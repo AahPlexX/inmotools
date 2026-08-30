@@ -8,7 +8,7 @@ test('queries a local CSV and exports the result without upload', async ({ page 
   await page.getByLabel('Choose data files').setInputFiles({ name: 'data.csv', mimeType: 'text/csv', buffer: csv });
   await expect(page.getByText(/data\.csv.*ready/i)).toBeVisible({ timeout: 45_000 });
 
-  const editor = page.getByLabel('SQL query');
+  const editor = page.getByRole('textbox', { name: 'SQL query', exact: true });
   await editor.fill(`SELECT sum(value) AS total FROM 'data.csv'`);
   await page.getByRole('button', { name: 'Run query' }).click();
   await expect(page.getByRole('cell', { name: '6' })).toBeVisible({ timeout: 45_000 });
