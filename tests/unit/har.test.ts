@@ -94,4 +94,17 @@ describe('HAR sanitizer', () => {
     expect(rows[0].phases.blocked).toBe(0);
     expect(rows[0].phases).toMatchObject({ dns: 5, connect: 15, ssl: 8, send: 2, wait: 70, receive: 28 });
   });
+  it('supports a user-supplied mask without changing unrelated values', async () => {
+    const result = await sanitizeHar(makeHar(), {
+      mode: 'mask',
+      mask: 'CUSTOM-MASK',
+      categories: { headers: true, cookies: true, query: true, bodies: true },
+    });
+    const text = JSON.stringify(result.har);
+    for (const secret of secretValues) expect(text).not.toContain(secret);
+    expect(text).toContain('CUSTOM-MASK');
+    expect(text).toContain('trace-safe');
+    expect(text).toContain('safe-value');
+  });
+
 });
