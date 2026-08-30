@@ -13,6 +13,10 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'midi-harmony-lab': () => import('./music/MusicWorkspace'),
   'svg-sprite-compiler': () => import('./svg/SvgWorkspace'),
   'regex-log-structurer': () => import('./logs/LogWorkspace'),
+  'har-sanitizer': () => import('./har/HarWorkspace'),
+  'geojson-simplifier': () => import('./geo/GeoWorkspace'),
+  'fuzzy-deduplicator': () => import('./dedupe/DedupeWorkspace'),
+  'otel-flamegraph': () => import('./otel/OtelWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
