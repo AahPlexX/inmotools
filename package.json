@@ -16,7 +16,9 @@
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.32.0",
     "@tonejs/midi": "2.0.28",
+    "apca-w3": "0.1.9",
     "cron-parser": "5.10.0",
+    "culori": "4.0.2",
     "double-metaphone": "2.0.1",
     "exifreader": "4.44.0",
     "lucide-react": "1.34.0",
