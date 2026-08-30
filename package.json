@@ -14,7 +14,7 @@
     "test:ci": "pnpm test:unit && pnpm build && playwright test"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "1.5.5",
+    "@duckdb/duckdb-wasm": "1.33.0",
     "@tonejs/midi": "2.0.28",
     "cron-parser": "5.10.0",
     "exifreader": "4.44.0",
