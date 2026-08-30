@@ -54,109 +54,111 @@ export default function ShaderWorkspace() {
       return;
     }
     setWebgl2(true);
+    const context: WebGL2RenderingContext = gl;
+    const surface: HTMLCanvasElement = canvas;
     let animation = 0;
     let disposed = false;
     const found: ShaderDiagnostic[] = [];
 
     function compile(type: number, shaderSource: string): WebGLShader | null {
-      const compiled = gl.createShader(type);
+      const compiled = context.createShader(type);
       if (!compiled) return null;
-      gl.shaderSource(compiled, shaderSource);
-      gl.compileShader(compiled);
-      const log = gl.getShaderInfoLog(compiled) ?? '';
+      context.shaderSource(compiled, shaderSource);
+      context.compileShader(compiled);
+      const log = context.getShaderInfoLog(compiled) ?? '';
       if (log.trim()) found.push(...parseWebGlLog(log));
-      if (!gl.getShaderParameter(compiled, gl.COMPILE_STATUS)) return compiled;
+      if (!context.getShaderParameter(compiled, context.COMPILE_STATUS)) return compiled;
       return compiled;
     }
 
-    const vertex = compile(gl.VERTEX_SHADER, VERTEX_SOURCE);
-    const fragment = compile(gl.FRAGMENT_SHADER, source);
-    if (!vertex || !fragment || !gl.getShaderParameter(vertex, gl.COMPILE_STATUS) || !gl.getShaderParameter(fragment, gl.COMPILE_STATUS)) {
+    const vertex = compile(context.VERTEX_SHADER, VERTEX_SOURCE);
+    const fragment = compile(context.FRAGMENT_SHADER, source);
+    if (!vertex || !fragment || !context.getShaderParameter(vertex, context.COMPILE_STATUS) || !context.getShaderParameter(fragment, context.COMPILE_STATUS)) {
       setDiagnostics(found);
       setStatus('Shader compilation failed. Review the line-addressable diagnostics below.');
-      if (vertex) gl.deleteShader(vertex);
-      if (fragment) gl.deleteShader(fragment);
+      if (vertex) context.deleteShader(vertex);
+      if (fragment) context.deleteShader(fragment);
       return;
     }
 
-    const program = gl.createProgram();
+    const program = context.createProgram();
     if (!program) {
-      gl.deleteShader(vertex); gl.deleteShader(fragment);
+      context.deleteShader(vertex); context.deleteShader(fragment);
       setStatus('WebGL2 could not allocate a shader program.');
       return;
     }
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.linkProgram(program);
-    const linkLog = gl.getProgramInfoLog(program) ?? '';
+    context.attachShader(program, vertex);
+    context.attachShader(program, fragment);
+    context.linkProgram(program);
+    const linkLog = context.getProgramInfoLog(program) ?? '';
     if (linkLog.trim()) found.push(...parseWebGlLog(linkLog));
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    if (!context.getProgramParameter(program, context.LINK_STATUS)) {
       setDiagnostics(found);
       setStatus('Shader linking failed. Review the diagnostics below.');
-      gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment);
+      context.deleteProgram(program); context.deleteShader(vertex); context.deleteShader(fragment);
       return;
     }
 
-    gl.useProgram(program);
+    context.useProgram(program);
     setDiagnostics(found);
     setStatus(found.length ? `Shader linked with ${found.length} compiler message${found.length === 1 ? '' : 's'}.` : 'Shader compiled and linked successfully.');
 
-    const resolution = gl.getUniformLocation(program, 'u_resolution');
-    const time = gl.getUniformLocation(program, 'u_time');
-    const mouse = gl.getUniformLocation(program, 'u_mouse');
-    const textureUniforms = [gl.getUniformLocation(program, 'u_texture0'), gl.getUniformLocation(program, 'u_texture1')];
+    const resolution = context.getUniformLocation(program, 'u_resolution');
+    const time = context.getUniformLocation(program, 'u_time');
+    const mouse = context.getUniformLocation(program, 'u_mouse');
+    const textureUniforms = [context.getUniformLocation(program, 'u_texture0'), context.getUniformLocation(program, 'u_texture1')];
     const textureHandles: WebGLTexture[] = [];
     const pointer = { x: 0, y: 0 };
 
     for (let index = 0; index < 2; index += 1) {
-      const handle = gl.createTexture();
+      const handle = context.createTexture();
       if (!handle) continue;
       textureHandles.push(handle);
-      gl.activeTexture(gl.TEXTURE0 + index);
-      gl.bindTexture(gl.TEXTURE_2D, handle);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-      if (textureUniforms[index] !== null) gl.uniform1i(textureUniforms[index], index);
+      context.activeTexture(context.TEXTURE0 + index);
+      context.bindTexture(context.TEXTURE_2D, handle);
+      context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE);
+      context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
+      context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.LINEAR);
+      context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.LINEAR);
+      context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 1, 1, 0, context.RGBA, context.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      if (textureUniforms[index] !== null) context.uniform1i(textureUniforms[index], index);
       const local = textures[index];
       if (local) {
         const image = new Image();
         image.onload = () => {
           if (disposed) return;
-          gl.activeTexture(gl.TEXTURE0 + index);
-          gl.bindTexture(gl.TEXTURE_2D, handle);
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          context.activeTexture(context.TEXTURE0 + index);
+          context.bindTexture(context.TEXTURE_2D, handle);
+          context.pixelStorei(context.UNPACK_FLIP_Y_WEBGL, true);
+          context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, image);
         };
         image.src = local.dataUrl;
       }
     }
 
     const onPointer = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      pointer.x = (event.clientX - rect.left) * (canvas.width / Math.max(1, rect.width));
-      pointer.y = (rect.bottom - event.clientY) * (canvas.height / Math.max(1, rect.height));
+      const rect = surface.getBoundingClientRect();
+      pointer.x = (event.clientX - rect.left) * (surface.width / Math.max(1, rect.width));
+      pointer.y = (rect.bottom - event.clientY) * (surface.height / Math.max(1, rect.height));
     };
-    canvas.addEventListener('pointermove', onPointer, { passive: true });
+    surface.addEventListener('pointermove', onPointer, { passive: true });
 
     function resize() {
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-      const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
-      if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-      gl.viewport(0, 0, canvas.width, canvas.height);
+      const width = Math.max(1, Math.round(surface.clientWidth * dpr));
+      const height = Math.max(1, Math.round(surface.clientHeight * dpr));
+      if (surface.width !== width || surface.height !== height) { surface.width = width; surface.height = height; }
+      context.viewport(0, 0, surface.width, surface.height);
     }
 
     const startedAt = performance.now();
     const render = (now: number) => {
       resize();
-      gl.useProgram(program);
-      if (resolution !== null) gl.uniform2f(resolution, canvas.width, canvas.height);
-      if (time !== null) gl.uniform1f(time, (now - startedAt) / 1000);
-      if (mouse !== null) gl.uniform2f(mouse, pointer.x, pointer.y);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      context.useProgram(program);
+      if (resolution !== null) context.uniform2f(resolution, surface.width, surface.height);
+      if (time !== null) context.uniform1f(time, (now - startedAt) / 1000);
+      if (mouse !== null) context.uniform2f(mouse, pointer.x, pointer.y);
+      context.drawArrays(context.TRIANGLES, 0, 3);
       animation = requestAnimationFrame(render);
     };
     animation = requestAnimationFrame(render);
@@ -164,9 +166,9 @@ export default function ShaderWorkspace() {
     return () => {
       disposed = true;
       cancelAnimationFrame(animation);
-      canvas.removeEventListener('pointermove', onPointer);
-      textureHandles.forEach((texture) => gl.deleteTexture(texture));
-      gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment);
+      surface.removeEventListener('pointermove', onPointer);
+      textureHandles.forEach((texture) => context.deleteTexture(texture));
+      context.deleteProgram(program); context.deleteShader(vertex); context.deleteShader(fragment);
     };
   }, [source, textures]);
 
