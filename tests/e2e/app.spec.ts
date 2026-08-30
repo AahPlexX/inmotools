@@ -1,17 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { TOOLS } from '../../src/catalog';
 
-const toolSlugs = [
-  'exif-scrubber',
-  'duckdb-workbench',
-  'subtitle-drift',
-  'hardware-packet-inspector',
-  'fluid-type-matrix',
-  'pdf-sanitizer',
-  'cron-team-matrix',
-  'midi-harmony-lab',
-  'svg-sprite-compiler',
-  'regex-log-structurer',
-];
+const toolSlugs = TOOLS.map((tool) => tool.slug);
 
 test('landing page exposes every registered suite without ordinal numbering', async ({ page }) => {
   await page.goto('./');
