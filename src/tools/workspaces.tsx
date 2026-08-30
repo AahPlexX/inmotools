@@ -17,6 +17,9 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'geojson-simplifier': () => import('./geo/GeoWorkspace'),
   'fuzzy-deduplicator': () => import('./dedupe/DedupeWorkspace'),
   'otel-flamegraph': () => import('./otel/OtelWorkspace'),
+  'apca-token-matrix': () => import('./contrast/ContrastWorkspace'),
+  'convolution-room-profiler': () => import('./audio/AudioWorkspace'),
+  'glsl-sandbox': () => import('./shader/ShaderWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
