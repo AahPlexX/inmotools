@@ -24,9 +24,10 @@ jobs:
       - name: Setup pnpm and Node
         uses: pnpm/setup@v2
         with:
-          version: 11.24.0
           runtime: node@24
-          cache: false
+          install: false
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
       - name: Unit tests
         run: pnpm test:unit
       - name: Build
