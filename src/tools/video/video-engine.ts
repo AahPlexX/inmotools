@@ -206,7 +206,7 @@ export async function exportPacketRange(file: File, range: SnappedRange): Promis
       : undefined;
 
     let firstVideo = true;
-    for await (const packet of videoSink.packets(startPacket, endPacket)) {
+    for await (const packet of videoSink.packets(startPacket, endPacket ?? undefined)) {
       const shifted = packet.clone({ timestamp: packet.timestamp - range.start });
       await videoSource.add(shifted, firstVideo ? { decoderConfig: videoConfig } : undefined);
       firstVideo = false;
