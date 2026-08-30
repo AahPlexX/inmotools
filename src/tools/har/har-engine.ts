@@ -1,5 +1,5 @@
 export type HarFindingCategory = 'headers' | 'cookies' | 'query' | 'bodies';
-export type HarSanitizePolicy = { mode: 'redact' | 'hash'; categories: Partial<Record<HarFindingCategory, boolean>> };
+export type HarSanitizePolicy = { mode: 'redact' | 'hash' | 'mask'; mask?: string; categories: Partial<Record<HarFindingCategory, boolean>> };
 export type HarFinding = { category: HarFindingCategory; entryIndex: number; field: string };
 type HarLike = { log?: { entries?: any[] } };
 
@@ -51,26 +51,30 @@ async function sha256(value: string): Promise<string> {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
-const replacement = (value: unknown, mode: HarSanitizePolicy['mode']) => mode === 'redact' ? Promise.resolve(REDACTED) : sha256(String(value ?? ''));
+async function replacement(value: unknown, policy: HarSanitizePolicy): Promise<string> {
+  if (policy.mode === 'redact') return REDACTED;
+  if (policy.mode === 'mask') return policy.mask?.trim() || REDACTED;
+  return sha256(String(value ?? ''));
+}
 
-async function sanitizeStructured(value: unknown, mode: HarSanitizePolicy['mode']): Promise<unknown> {
-  if (Array.isArray(value)) return Promise.all(value.map((item) => sanitizeStructured(item, mode)));
+async function sanitizeStructured(value: unknown, policy: HarSanitizePolicy): Promise<unknown> {
+  if (Array.isArray(value)) return Promise.all(value.map((item) => sanitizeStructured(item, policy)));
   if (!value || typeof value !== 'object') return value;
   const output: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = isSensitiveName(key) ? await replacement(child, mode) : await sanitizeStructured(child, mode);
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = isSensitiveName(key) ? await replacement(child, policy) : await sanitizeStructured(child, policy);
   return output;
 }
 
-async function sanitizeHeaders(headers: any[], mode: HarSanitizePolicy['mode']) { for (const header of headers ?? []) if (isSensitiveName(String(header?.name ?? ''))) header.value = await replacement(header.value, mode); }
-async function sanitizeCookies(cookies: any[], mode: HarSanitizePolicy['mode']) { for (const cookie of cookies ?? []) cookie.value = await replacement(cookie.value, mode); }
+async function sanitizeHeaders(headers: any[], policy: HarSanitizePolicy) { for (const header of headers ?? []) if (isSensitiveName(String(header?.name ?? ''))) header.value = await replacement(header.value, policy); }
+async function sanitizeCookies(cookies: any[], policy: HarSanitizePolicy) { for (const cookie of cookies ?? []) cookie.value = await replacement(cookie.value, policy); }
 
-async function sanitizeQuery(entry: any, mode: HarSanitizePolicy['mode']) {
+async function sanitizeQuery(entry: any, policy: HarSanitizePolicy) {
   const request = entry?.request;
   if (!request) return;
   const replacements = new Map<string, string>();
   for (const query of request.queryString ?? []) {
     if (!isSensitiveName(String(query?.name ?? ''))) continue;
-    const next = await replacement(query.value, mode);
+    const next = await replacement(query.value, policy);
     query.value = next; replacements.set(String(query.name), next);
   }
   if (typeof request.url === 'string') {
@@ -82,21 +86,21 @@ async function sanitizeQuery(entry: any, mode: HarSanitizePolicy['mode']) {
   }
 }
 
-async function sanitizeBody(entry: any, mode: HarSanitizePolicy['mode']) {
+async function sanitizeBody(entry: any, policy: HarSanitizePolicy) {
   const postData = entry?.request?.postData;
   if (!postData) return;
-  for (const parameter of postData.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''))) parameter.value = await replacement(parameter.value, mode);
+  for (const parameter of postData.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''))) parameter.value = await replacement(parameter.value, policy);
   const parsed = parseJsonBody(postData.text);
-  if (parsed !== undefined) postData.text = JSON.stringify(await sanitizeStructured(parsed, mode));
+  if (parsed !== undefined) postData.text = JSON.stringify(await sanitizeStructured(parsed, policy));
 }
 
 export async function sanitizeHar<T extends HarLike>(har: T, policy: HarSanitizePolicy) {
   const output = clone(har);
   for (const entry of output.log?.entries ?? []) {
-    if (policy.categories.headers) { await sanitizeHeaders(entry?.request?.headers, policy.mode); await sanitizeHeaders(entry?.response?.headers, policy.mode); }
-    if (policy.categories.cookies) { await sanitizeCookies(entry?.request?.cookies, policy.mode); await sanitizeCookies(entry?.response?.cookies, policy.mode); }
-    if (policy.categories.query) await sanitizeQuery(entry, policy.mode);
-    if (policy.categories.bodies) await sanitizeBody(entry, policy.mode);
+    if (policy.categories.headers) { await sanitizeHeaders(entry?.request?.headers, policy); await sanitizeHeaders(entry?.response?.headers, policy); }
+    if (policy.categories.cookies) { await sanitizeCookies(entry?.request?.cookies, policy); await sanitizeCookies(entry?.response?.cookies, policy); }
+    if (policy.categories.query) await sanitizeQuery(entry, policy);
+    if (policy.categories.bodies) await sanitizeBody(entry, policy);
   }
   return { har: output, findings: analyzeHar(har).findings };
 }
