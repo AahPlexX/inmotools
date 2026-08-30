@@ -75,6 +75,37 @@ function createIo(): WebIO {
     .registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
 }
 
+
+async function resizeBrowserTextures(document: Document, maximumDimension: number): Promise<void> {
+  if (typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') return;
+  for (const texture of document.getRoot().listTextures()) {
+    const image = texture.getImage();
+    const mimeType = texture.getMimeType();
+    if (!image || !mimeType || !/^image\/(png|jpeg|webp)$/i.test(mimeType)) continue;
+    let bitmap: ImageBitmap | null = null;
+    try {
+      bitmap = await createImageBitmap(new Blob([image.slice().buffer], { type: mimeType }));
+      const longest = Math.max(bitmap.width, bitmap.height);
+      const scale = Math.min(1, maximumDimension / Math.max(1, longest));
+      if (scale >= 1 && mimeType === 'image/webp') continue;
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = new OffscreenCanvas(width, height);
+      const context = canvas.getContext('2d');
+      if (!context) continue;
+      context.drawImage(bitmap, 0, 0, width, height);
+      const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
+      if (encoded.type !== 'image/webp' || !encoded.size) continue;
+      texture.setImage(new Uint8Array(await encoded.arrayBuffer()));
+      texture.setMimeType('image/webp');
+    } catch {
+      // Browser decoder/encoder support is optional. Preserve the original texture on failure.
+    } finally {
+      bitmap?.close();
+    }
+  }
+}
+
 export async function optimizeGlb(
   input: Uint8Array,
   requestedOptions: GltfOptimizeOptions,
@@ -102,6 +133,7 @@ export async function optimizeGlb(
     await document.transform(dedup(), prune());
   }
 
+  await resizeBrowserTextures(document, options.maxTextureDimension);
   const after = collectStats(document);
   const bytes = await io.writeBinary(document);
   return {
