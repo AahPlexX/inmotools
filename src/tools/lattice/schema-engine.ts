@@ -1,7 +1,11 @@
 import type { JsonValue } from './format-engine';
 
 type Shape =
-  | { readonly kind: 'string' | 'number' | 'boolean' | 'null' | 'unknown' }
+  | { readonly kind: 'string' }
+  | { readonly kind: 'number' }
+  | { readonly kind: 'boolean' }
+  | { readonly kind: 'null' }
+  | { readonly kind: 'unknown' }
   | { readonly kind: 'array'; readonly items: Shape }
   | { readonly kind: 'object'; readonly properties: Record<string, { readonly shape: Shape; readonly optional: boolean }> }
   | { readonly kind: 'union'; readonly variants: readonly Shape[] };
