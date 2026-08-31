@@ -1,15 +1,14 @@
 # In Progress
 
-## TASK-001: Add PlanCraft Studio floor-plan tool
-**Priority:** P0 | **Tags:** architecture, canvas, local-first
+## TASK-002: Complete JSON Lattice Studio
+**Priority:** P0 | **Tags:** graph, local-first, editor, worker
 
-Implement the approved PlanCraft Studio PRD as InmoTools tool 21 at `#/floorplan-studio` with worker-offloaded geometry, responsive dual-canvas drafting, transactional history, local autosave, accessibility, and vector export pipelines.
+Complete the approved JSON Lattice Studio plan as InmoTools tool 22 at `#/json-lattice`, preserving client-side execution, bidirectional structural editing, worker-offloaded graph layout, privacy controls, schema/query workbenches, responsive graph navigation, and local exports.
 
 ### Plan
 
-- Establish RED math/state/export contracts.
-- Implement pure geometry, state and export engines.
-- Add worker, renderer, symbol library and React workspace.
-- Register the route/catalog entry and verify desktop/mobile/accessibility/Pages deployment.
+- Complete Slice 3 history, ELK layout, SVG/CSV/raster export, and worker layout contracts.
+- Build the CodeMirror editor, worker client, dual-layer graph viewport, minimap, inspector, inline edit/collapse/search/diff/privacy/schema/query workflows, and optional DuckDB SQL panel.
+- Register the catalog entry and route alias, then verify desktop/mobile accessibility and GitHub Pages deployment.
 
 ---
