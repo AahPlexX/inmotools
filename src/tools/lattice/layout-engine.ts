@@ -61,6 +61,9 @@ export interface ElkLayoutLike {
   readonly edges?: readonly ElkEdgeLike[];
 }
 
+const ROOT_ELK_ID = '$';
+const toElkId = (path: string): string => path === '' ? ROOT_ELK_ID : path;
+const fromElkId = (id: string): string => id === ROOT_ELK_ID ? '' : id;
 const finite = (value: number | undefined): number => Number.isFinite(value) ? Number(value) : 0;
 
 export const layoutDirectionOption = (direction: LatticeLayoutDirection): 'RIGHT' | 'DOWN' | 'LEFT' | 'UP' => {
@@ -80,14 +83,14 @@ export const buildElkGraph = (graph: LatticeGraphModel, direction: LatticeLayout
     'elk.layered.spacing.nodeNodeBetweenLayers': '72',
   },
   children: graph.nodes.map((node) => ({
-    id: node.path,
+    id: toElkId(node.path),
     width: 220,
     height: node.childCount > 0 ? 84 : 72,
   })),
   edges: graph.edges.map((edge) => ({
     id: edge.id,
-    sources: [edge.source],
-    targets: [edge.target],
+    sources: [toElkId(edge.source)],
+    targets: [toElkId(edge.target)],
   })),
 });
 
@@ -103,8 +106,9 @@ export const normalizeElkLayout = (layout: ElkLayoutLike): LatticeLayoutModel =>
   const nodes = new Map<string, LatticeLayoutNode>();
   for (const node of layout.children ?? []) {
     if (node.id === undefined) continue;
-    nodes.set(node.id, {
-      id: node.id,
+    const id = fromElkId(node.id);
+    nodes.set(id, {
+      id,
       x: finite(node.x),
       y: finite(node.y),
       width: finite(node.width),
