@@ -7,7 +7,7 @@ import { buildFlatCsv, buildLatticeSvg, rasterizeLatticeSvg } from './export-eng
 import { parseStructuredText, serializeStructuredData, type JsonPrimitive, type JsonValue, type StructuredFormat } from './format-engine';
 import { buildGraphModel } from './graph-engine';
 import type { LatticeLayoutDirection, LatticeLayoutModel } from './layout-engine';
-import type { LatticeLayoutWorkerRequest, LatticeLayoutWorkerResponse } from './layout-worker';
+import { createLatticeLayoutWorkerClient, type LatticeLayoutWorkerClient, type LatticeLayoutWorkerRequest } from './layout-worker';
 import { applyJsonPatch, escapeJsonPointer, getPointerValue } from './patch-engine';
 import { protectData } from './privacy-engine';
 import { selectJsonPathPointers, slicePathsWithAncestors } from './query-engine';
@@ -83,7 +83,7 @@ export default function LatticeWorkspace() {
   const [renameKey, setRenameKey] = useState('');
   const [addKey, setAddKey] = useState('newField');
   const [addValue, setAddValue] = useState('null');
-  const workerRef = useRef<Worker | null>(null);
+  const workerRef = useRef<LatticeLayoutWorkerClient | null>(null);
   const requestIdRef = useRef(0);
   const suppressParseRef = useRef(false);
   const sqlSessionRef = useRef<LatticeSqlSession | null>(null);
@@ -149,14 +149,16 @@ export default function LatticeWorkspace() {
   }, [source, format, collapsedPaths, direction]);
 
   useEffect(() => {
-    const worker = new Worker(new URL('./layout-worker.ts', import.meta.url), { type: 'module' });
-    workerRef.current = worker;
-    worker.onmessage = (event: MessageEvent<LatticeLayoutWorkerResponse>) => {
-      if (event.data.requestId !== requestIdRef.current) return;
-      if (event.data.ok) { setLayout(event.data.layout); setLayoutError(''); }
-      else { setLayout(null); setLayoutError(event.data.error); }
-    };
-    return () => { worker.terminate(); workerRef.current = null; };
+    try {
+      const worker = createLatticeLayoutWorkerClient();
+      workerRef.current = worker;
+      setLayoutError('');
+      return () => { worker.terminate(); workerRef.current = null; };
+    } catch (error) {
+      workerRef.current = null;
+      setLayout(null);
+      setLayoutError(error instanceof Error ? error.message : 'Could not start the local layout worker.');
+    }
   }, []);
 
   useEffect(() => {
@@ -165,7 +167,11 @@ export default function LatticeWorkspace() {
     const requestId = ++requestIdRef.current;
     setLayout(null);
     const request: LatticeLayoutWorkerRequest = { requestId, graph, direction };
-    worker.postMessage(request);
+    void worker.layout(request).then((response) => {
+      if (response.requestId !== requestIdRef.current) return;
+      if (response.ok) { setLayout(response.layout); setLayoutError(''); }
+      else { setLayout(null); setLayoutError(response.error); }
+    });
   }, [graph, direction]);
 
   useEffect(() => () => { void closeLatticeSqlSession(sqlSessionRef.current); }, []);
