@@ -34,8 +34,8 @@ export const FloorplanCanvas = ({
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const pointersRef = useRef(new Map<number, ActivePointer>());
-  const lastPanRef = useRef<Point2D>();
-  const pinchRef = useRef<{ distance: number; midpoint: Point2D }>();
+  const lastPanRef = useRef<Point2D | undefined>(undefined);
+  const pinchRef = useRef<{ distance: number; midpoint: Point2D } | undefined>(undefined);
   const [resizeVersion, setResizeVersion] = useState(0);
 
   const localPoint = (clientX: number, clientY: number): Point2D => {

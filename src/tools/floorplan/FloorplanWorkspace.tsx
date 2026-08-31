@@ -58,7 +58,7 @@ export const FloorplanWorkspace = () => {
   const [spacePressed, setSpacePressed] = useState(false);
   const [status, setStatus] = useState('Ready. W draws walls; V returns to selection.');
   const [exportNote, setExportNote] = useState('');
-  const workerRef = useRef<Worker>();
+  const workerRef = useRef<Worker | undefined>(undefined);
   const requestRef = useRef(0);
   const acceptedRequestRef = useRef(0);
   const idRef = useRef(1);

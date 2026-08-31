@@ -18,7 +18,8 @@ export type ToolSlug =
   | 'glsl-sandbox'
   | 'video-keyframe-slicer'
   | 'gltf-optimizer'
-  | 'font-subsetter';
+  | 'font-subsetter'
+  | 'floorplan-studio';
 
 export interface ToolDefinition {
   slug: ToolSlug;
