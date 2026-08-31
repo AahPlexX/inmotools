@@ -25,6 +25,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'gltf-optimizer': () => import('./gltf/GltfWorkspace'),
   'font-subsetter': () => import('./font/FontWorkspace'),
   'json-lattice': () => import('./lattice/LatticeWorkspace'),
+  'regex-matrix': () => import('./regex/RegexWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
