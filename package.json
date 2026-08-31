@@ -30,6 +30,7 @@
     "double-metaphone": "2.0.1",
     "exifreader": "4.44.0",
     "fast-xml-parser": "5.11.1",
+    "jsonpath-plus": "10.4.0",
     "lucide-react": "1.34.0",
     "mediabunny": "1.55.4",
     "meshoptimizer": "1.2.0",
