@@ -20,6 +20,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'apca-token-matrix': () => import('./contrast/ContrastWorkspace'),
   'convolution-room-profiler': () => import('./audio/AudioWorkspace'),
   'glsl-sandbox': () => import('./shader/ShaderWorkspace'),
+  'floorplan-studio': () => import('./floorplan/FloorplanWorkspace'),
   'video-keyframe-slicer': () => import('./video/VideoWorkspace'),
   'gltf-optimizer': () => import('./gltf/GltfWorkspace'),
   'font-subsetter': () => import('./font/FontWorkspace'),

@@ -16,6 +16,7 @@ const rectClearance = (width: number, depth: number, bufferOffset: number): Clea
 });
 
 export const COMPONENT_LIBRARY: readonly SymbolDefinition[] = [
+  { key: 'ada-turning-circle', label: 'ADA 60" Circle', category: 'office', width: 1525, depth: 1525, height: 0, clearance: { shape: 'circle', dimensions: { x: 1525, y: 1525 }, bufferOffset: 0, adaRuleKey: 'ada_turning_circle' }, glyph: 'circle' },
   { key: 'sofa-3-seat', label: '3-Seat Sofa', category: 'living', width: 2200, depth: 900, height: 850, clearance: rectClearance(2200, 900, 450), glyph: 'sofa' },
   { key: 'sectional', label: 'Sectional', category: 'living', width: 2800, depth: 1800, height: 850, clearance: rectClearance(2800, 1800, 450), glyph: 'sofa' },
   { key: 'armchair', label: 'Armchair', category: 'living', width: 850, depth: 850, height: 900, clearance: rectClearance(850, 850, 450), glyph: 'chair' },

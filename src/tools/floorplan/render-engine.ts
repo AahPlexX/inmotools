@@ -61,6 +61,7 @@ const setupCanvas = (canvas: HTMLCanvasElement) => {
 };
 
 const transformed = (point: Point2D, viewport: FloorplanViewport) => worldToScreen(point, viewport);
+const layerVisible = (project: FloorplanProject, id: string) => project.layers.find((layer) => layer.id === id)?.visible !== false;
 
 const drawGrid = (context: CanvasRenderingContext2D, width: number, height: number, viewport: FloorplanViewport) => {
   const spacing = viewport.gridMm * viewport.scale;
@@ -114,7 +115,7 @@ export const drawBaseScene = (canvas: HTMLCanvasElement, project: FloorplanProje
     context.fillText(`${room.name} · ${room.areaSqMeters.toFixed(1)} m²`, c.x, c.y);
   }
 
-  for (const wall of project.walls) {
+  if (layerVisible(project, 'walls')) for (const wall of project.walls) {
     const start = vertices.get(wall.startVertexId); const end = vertices.get(wall.endVertexId); if (!start || !end) continue;
     const a = transformed(start, project.viewport); const b = transformed(end, project.viewport); const style = wallVisualStyle(wall);
     context.save(); context.strokeStyle = style.stroke; context.lineWidth = Math.max(2, wall.thickness * project.viewport.scale); context.setLineDash(style.dash.map((value) => value * project.viewport.scale));
@@ -125,7 +126,7 @@ export const drawBaseScene = (canvas: HTMLCanvasElement, project: FloorplanProje
       for (let i = 0; i <= steps; i += 1) { const t = i / steps; const x = a.x + (b.x - a.x) * t; const y = a.y + (b.y - a.y) * t; context.beginPath(); context.moveTo(x - 4, y - 4); context.lineTo(x + 4, y + 4); context.stroke(); }
       context.restore();
     }
-    for (const opening of wall.openings) {
+    if (layerVisible(project, 'doors') || layerVisible(project, 'windows')) for (const opening of wall.openings) {
       const geometry = hostedOpeningGeometry(start, end, opening);
       const j1 = transformed(geometry.jambA, project.viewport); const j2 = transformed(geometry.jambB, project.viewport);
       context.save(); context.strokeStyle = '#0b1120'; context.lineWidth = Math.max(4, wall.thickness * project.viewport.scale + 3); context.beginPath(); context.moveTo(j1.x, j1.y); context.lineTo(j2.x, j2.y); context.stroke();
@@ -142,8 +143,8 @@ export const drawBaseScene = (canvas: HTMLCanvasElement, project: FloorplanProje
     }
   }
 
-  for (const component of project.components) drawComponent(context, component, project.viewport);
-  for (const dimension of project.dimensions) {
+  for (const component of project.components) { const layer = component.category === 'mep' ? 'mep' : component.layerId; if (layerVisible(project, layer)) drawComponent(context, component, project.viewport); }
+  if (layerVisible(project, 'dimensions')) for (const dimension of project.dimensions) {
     const a = transformed(dimension.start, project.viewport); const b = transformed(dimension.end, project.viewport);
     context.save(); context.strokeStyle = '#94a3b8'; context.lineWidth = 1; context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
     const length = Math.hypot(dimension.end.x - dimension.start.x, dimension.end.y - dimension.start.y); context.fillStyle = '#cbd5e1'; context.font = '11px ui-monospace, monospace'; context.textAlign = 'center'; context.fillText(dimension.label ?? `${Math.round(length)} mm`, (a.x + b.x) / 2, (a.y + b.y) / 2 - 5); context.restore();
@@ -171,7 +172,7 @@ export const drawOverlayScene = (canvas: HTMLCanvasElement, project: FloorplanPr
   if (overlay.pointer) {
     const pointer = transformed(overlay.pointer, project.viewport); context.save(); context.strokeStyle = 'rgba(226,232,240,.5)'; context.lineWidth = 1; context.beginPath(); context.moveTo(pointer.x - 10, pointer.y); context.lineTo(pointer.x + 10, pointer.y); context.moveTo(pointer.x, pointer.y - 10); context.lineTo(pointer.x, pointer.y + 10); context.stroke(); context.restore();
   }
-  if (overlay.violations?.length) {
+  if (layerVisible(project, 'clearance') && overlay.violations?.length) {
     const violatingIds = new Set(overlay.violations.map((violation) => violation.componentId));
     for (const component of project.components.filter((item) => violatingIds.has(item.id))) {
       const center = transformed(component.position, project.viewport); const width = (component.clearance.dimensions.x + component.clearance.bufferOffset * 2) * project.viewport.scale; const depth = (component.clearance.dimensions.y + component.clearance.bufferOffset * 2) * project.viewport.scale;

@@ -183,3 +183,92 @@ tr:last-child td { border-bottom: 0; }
 }
 @keyframes local-pulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; box-shadow: 0 0 0 6px rgba(79,224,170,.11); } }
 @media (forced-colors: active) { .privacy-pulse { forced-color-adjust: auto; } }
+
+
+@theme {
+  --color-plancraft-canvas-bg: #0b1120;
+  --color-plancraft-panel-bg: #1e293b;
+  --color-plancraft-toolbar-bg: #334155;
+  --color-plancraft-border-subtle: #475569;
+  --color-plancraft-accent-cyan: #38bdf8;
+  --color-plancraft-alert-danger: #f43f5e;
+  --color-plancraft-alert-success: #10b981;
+}
+
+.plancraft { --pc-canvas:#0b1120; --pc-panel:#1e293b; --pc-toolbar:#334155; --pc-border:#475569; --pc-accent:#38bdf8; --pc-danger:#f43f5e; --pc-good:#10b981; color:#e2e8f0; background:#0f172a; font-size:clamp(.8rem,.75rem + .3vw,.95rem); min-width:0; }
+.plancraft button,.plancraft input,.plancraft select { color:inherit; }
+.plancraft-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:clamp(10px,1.2vw,16px); background:#111827; border-bottom:1px solid var(--pc-border); }
+.plancraft-toolbar>div:first-child { display:grid; gap:3px; }
+.plancraft-toolbar>div:first-child>strong { font-size:16px; letter-spacing:-.02em; }
+.plancraft-toolbar>div:first-child>span { color:#94a3b8; font:clamp(.72rem,.7rem + .2vw,.9rem)/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.plancraft-toolbar-actions,.plancraft-exportbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.plancraft-toolbar-actions label { display:flex; align-items:center; gap:6px; color:#cbd5e1; }
+.plancraft select,.plancraft input[type="text"],.plancraft input[type="number"] { background:#0f172a; border:1px solid var(--pc-border); border-radius:7px; min-height:36px; padding:6px 9px; }
+.plancraft-exportbar { padding:9px clamp(10px,1.2vw,16px); background:var(--pc-toolbar); border-bottom:1px solid #64748b; }
+.plancraft-button,.plancraft-file-button,.plancraft-coffee,.plancraft-tool-grid button,.plancraft-symbol-grid button { min-height:38px; border:1px solid #64748b; border-radius:8px; background:#1e293b; color:#f8fafc; padding:8px 10px; text-decoration:none; font-weight:650; font-size:12px; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.plancraft-button:hover,.plancraft-file-button:hover,.plancraft-coffee:hover,.plancraft-tool-grid button:hover,.plancraft-symbol-grid button:hover { border-color:var(--pc-accent); background:#26364b; }
+.plancraft-button.danger { color:#fecdd3; border-color:#9f3349; }
+.plancraft-file-button input { position:absolute; inline-size:1px; block-size:1px; opacity:0; pointer-events:none; }
+.plancraft-coffee { margin-left:auto; border-color:#b7791f; color:#fde68a; }
+.plancraft-shell { display:grid; grid-template-columns:clamp(220px,18vw,320px) minmax(0,1fr) clamp(220px,18vw,320px); min-height:clamp(520px,72vh,820px); }
+.plancraft-toolbox,.plancraft-inspector { min-width:0; background:var(--pc-panel); overflow:auto; max-height:clamp(520px,72vh,820px); }
+.plancraft-toolbox { border-right:1px solid var(--pc-border); }
+.plancraft-inspector { border-left:1px solid var(--pc-border); padding:12px; }
+.plancraft-panel-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px; border-bottom:1px solid var(--pc-border); color:#cbd5e1; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+.plancraft-panel-heading strong { color:#7dd3fc; font:11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:none; letter-spacing:0; }
+.plancraft-tool-grid { display:grid; gap:6px; padding:10px; }
+.plancraft-tool-grid button { justify-content:space-between; width:100%; }
+.plancraft-tool-grid button[aria-pressed="true"],.plancraft-symbol-grid button[aria-pressed="true"] { border-color:var(--pc-accent); background:#0c4a6e; box-shadow:inset 3px 0 0 var(--pc-accent); }
+.plancraft kbd { border:1px solid #64748b; border-radius:5px; padding:2px 5px; color:#bae6fd; font:10px/1 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.plancraft-library { border-top:1px solid var(--pc-border); }
+.plancraft-library details,.plancraft-details { border-bottom:1px solid var(--pc-border); }
+.plancraft-library summary,.plancraft-details summary { cursor:pointer; padding:10px 12px; color:#cbd5e1; font-weight:700; }
+.plancraft-symbol-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:0 10px 12px; }
+.plancraft-symbol-grid button { min-width:0; font-size:11px; font-weight:600; }
+.plancraft-stage { position:relative; min-width:0; background:var(--pc-canvas); overflow:hidden; }
+.plancraft-hud { position:absolute; z-index:4; top:10px; left:10px; right:10px; display:flex; flex-wrap:wrap; gap:6px; pointer-events:none; }
+.plancraft-hud span { background:rgba(15,23,42,.88); border:1px solid rgba(100,116,139,.8); border-radius:6px; padding:5px 8px; color:#cbd5e1; font:11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.plancraft-canvas-wrap { position:relative; width:100%; height:clamp(440px,68vh,760px); background:var(--pc-canvas); }
+.plancraft-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.plancraft-overlay { z-index:2; touch-action:none; cursor:crosshair; }
+.plancraft-overlay:focus-visible { outline:3px solid #7dd3fc; outline-offset:-4px; }
+.plancraft-status { min-height:38px; display:flex; justify-content:space-between; gap:12px; padding:9px 12px; background:#111827; border-top:1px solid var(--pc-border); color:#cbd5e1; font-size:11px; }
+.plancraft-status span:last-child { color:#94a3b8; }
+.plancraft-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border-top:1px solid var(--pc-border); background:#0f172a; }
+.plancraft-summary>div { padding:9px 10px; border-right:1px solid var(--pc-border); min-width:0; }
+.plancraft-summary span { display:block; color:#94a3b8; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+.plancraft-summary strong { display:block; margin-top:3px; color:#f8fafc; font:13px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.plancraft-form-stack { display:grid; gap:10px; padding:12px 0 16px; }
+.plancraft-form-stack>label { display:grid; gap:5px; color:#cbd5e1; font-size:12px; font-weight:650; }
+.plancraft-check { display:flex!important; align-items:center; gap:7px!important; font-weight:600!important; }
+.plancraft-readout { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--pc-border); font-size:12px; }
+.plancraft-readout span { color:#94a3b8; }
+.plancraft-layer-list { display:grid; gap:7px; padding:4px 12px 12px; }
+.plancraft-room-list { display:grid; gap:8px; padding:4px 12px 12px; }
+.plancraft-room-list>div { display:grid; gap:2px; padding:8px; border:1px solid var(--pc-border); border-radius:7px; background:#172033; }
+.plancraft-room-list span,.plancraft-room-list p { color:#94a3b8; font-size:11px; margin:0; }
+.plancraft-toast { margin:10px; padding:10px 12px; border:1px solid #047857; border-radius:8px; background:#052e2b; color:#d1fae5; font-size:12px; }
+.plancraft-toast a { color:#a7f3d0; font-weight:700; }
+.plancraft-disclaimer { margin:0; padding:10px 14px 14px; color:#94a3b8; font-size:11px; line-height:1.5; }
+
+@media (max-width:1023px) {
+  .plancraft-shell { grid-template-columns:minmax(190px,260px) minmax(0,1fr); }
+  .plancraft-inspector { grid-column:1/-1; max-height:none; border-left:0; border-top:1px solid var(--pc-border); display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .plancraft-inspector>.plancraft-panel-heading { grid-column:1/-1; }
+}
+@media (max-width:767px) {
+  .plancraft-toolbar { align-items:flex-start; flex-direction:column; }
+  .plancraft-toolbar-actions,.plancraft-exportbar { width:100%; overflow-x:auto; flex-wrap:nowrap; padding-bottom:10px; }
+  .plancraft-toolbar-actions>* ,.plancraft-exportbar>* { flex:0 0 auto; }
+  .plancraft-coffee { margin-left:0; }
+  .plancraft-shell { display:flex; flex-direction:column; min-height:0; }
+  .plancraft-stage { order:1; }
+  .plancraft-toolbox { order:2; max-height:none; border-right:0; border-top:1px solid var(--pc-border); }
+  .plancraft-inspector { order:3; display:block; max-height:none; }
+  .plancraft-tool-grid { display:flex; overflow-x:auto; padding:9px; }
+  .plancraft-tool-grid button { flex:0 0 auto; width:auto; min-height:44px; }
+  .plancraft-library details:not([open]) .plancraft-symbol-grid { display:none; }
+  .plancraft-canvas-wrap { height:55vh; min-height:360px; }
+  .plancraft-status { flex-direction:column; }
+  .plancraft-summary { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
