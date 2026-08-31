@@ -8,7 +8,14 @@ const clickAt = async (page: Parameters<typeof test>[0] extends never ? never : 
   await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
 };
 
-test('PlanCraft exact alias and generic route open the same local workspace', async ({ page }) => {
+test('PlanCraft catalog link, exact alias, and generic route open the same local workspace', async ({ page }) => {
+  await page.goto('./#/');
+  const catalogLink = page.getByRole('link', { name: /PlanCraft Studio/ });
+  await expect(catalogLink).toBeVisible();
+  await expect(catalogLink).toHaveAttribute('href', '#/tools/floorplan-studio');
+  await catalogLink.click();
+  await expect(page.getByTestId('floorplan-studio')).toBeVisible();
+
   await page.goto('./#/floorplan-studio');
   await expect(page.getByTestId('suite-title')).toContainText('PlanCraft Studio');
   await expect(page.getByTestId('floorplan-studio')).toBeVisible();
