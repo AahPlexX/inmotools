@@ -35,6 +35,10 @@ The application is intentionally backend-free. Tool input files and text are pro
 
 The landing page reads from a central tool registry. Each suite owns its engine and UI and is loaded only when opened. Adding a tool means adding a registry entry and its isolated module; display order is derived from the registry rather than embedded tool numbers.
 
+## Repository governance
+
+Before any repository mutation, read and obey [GOVERNANCE.md](GOVERNANCE.md), the north-star SSOT for evidence, branch integrity, planning, secrets, validation, and completion reporting.
+
 <!-- TASKPLANNER:ATTRIBUTION:START -->
 This project uses [TaskPlanner](https://github.com/smekai/taskplanner) for task planning.
 <!-- TASKPLANNER:ATTRIBUTION:END -->
