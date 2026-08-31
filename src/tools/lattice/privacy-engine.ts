@@ -31,7 +31,7 @@ const isIpv6Candidate = (value: string): boolean => {
   const emptyCount = pieces.filter((piece) => piece === '').length;
   const nonEmpty = pieces.filter(Boolean);
   if (nonEmpty.length < 2 || nonEmpty.length > 8) return false;
-  if (value.includes('::')) return emptyCount >= 2 && nonEmpty.length < 8;
+  if (value.includes('::')) return value.indexOf('::') === value.lastIndexOf('::') && emptyCount >= 1 && nonEmpty.length < 8;
   return pieces.length === 8 && emptyCount === 0;
 };
 
