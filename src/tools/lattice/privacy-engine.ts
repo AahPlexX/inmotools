@@ -24,6 +24,17 @@ const luhnValid = (candidate: string): boolean => {
   return sum % 10 === 0;
 };
 
+const isIpv6Candidate = (value: string): boolean => {
+  if (!value.includes(':') || !/^[0-9a-f:]+$/i.test(value)) return false;
+  const pieces = value.split(':');
+  if (pieces.some((piece) => piece.length > 4)) return false;
+  const emptyCount = pieces.filter((piece) => piece === '').length;
+  const nonEmpty = pieces.filter(Boolean);
+  if (nonEmpty.length < 2 || nonEmpty.length > 8) return false;
+  if (value.includes('::')) return emptyCount >= 2 && nonEmpty.length < 8;
+  return pieces.length === 8 && emptyCount === 0;
+};
+
 const secretKey = (key: string): boolean => /(?:password|passwd|secret|api[_-]?key|token)$/i.test(key);
 const maskFor = (kind: PrivacyKind): string => `[REDACTED_${kind === 'secret-key' ? 'SECRET' : kind.toUpperCase().replaceAll('-', '_')}]`;
 const mockFor = (kind: PrivacyKind, original: string): string => {
@@ -52,7 +63,7 @@ const protectString = (value: string, path: string, mode: PrivacyOptions['mode']
   next = replaceMatches(next, /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, 'email', mode, path, findings);
   next = replaceMatches(next, /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi, 'uuid', mode, path, findings);
   next = replaceMatches(next, /\b(?:\d{1,3}\.){3}\d{1,3}\b/g, 'ipv4', mode, path, findings, (match) => match.split('.').every((part) => Number(part) <= 255));
-  next = replaceMatches(next, /\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b/gi, 'ipv6', mode, path, findings);
+  next = replaceMatches(next, /(?<![0-9a-f:])[0-9a-f:]*:[0-9a-f:]+(?![0-9a-f:])/gi, 'ipv6', mode, path, findings, isIpv6Candidate);
   next = replaceMatches(next, /\b(?:\d[ -]*?){13,19}\b/g, 'card', mode, path, findings, luhnValid);
   return next;
 };
