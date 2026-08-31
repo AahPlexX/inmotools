@@ -1,3 +1,4 @@
+import type { ElkNode } from 'elkjs/lib/elk-api';
 import type { LatticeGraphModel } from './graph-engine';
 
 export type LatticeLayoutDirection = 'LR' | 'TB' | 'RL' | 'BT';
@@ -26,24 +27,7 @@ export interface LatticeLayoutModel {
   readonly edges: readonly LatticeLayoutEdge[];
 }
 
-export interface ElkNodeRequest {
-  readonly id: string;
-  readonly width: number;
-  readonly height: number;
-}
-
-export interface ElkEdgeRequest {
-  readonly id: string;
-  readonly sources: readonly string[];
-  readonly targets: readonly string[];
-}
-
-export interface ElkGraphRequest {
-  readonly id: string;
-  readonly layoutOptions: Readonly<Record<string, string>>;
-  readonly children: readonly ElkNodeRequest[];
-  readonly edges: readonly ElkEdgeRequest[];
-}
+export type ElkGraphRequest = ElkNode;
 
 interface ElkPointLike {
   readonly x?: number;
@@ -86,7 +70,7 @@ export const layoutDirectionOption = (direction: LatticeLayoutDirection): 'RIGHT
   return 'UP';
 };
 
-export const buildElkGraph = (graph: LatticeGraphModel, direction: LatticeLayoutDirection): ElkGraphRequest => ({
+export const buildElkGraph = (graph: LatticeGraphModel, direction: LatticeLayoutDirection): ElkNode => ({
   id: 'lattice-root',
   layoutOptions: {
     'elk.algorithm': 'layered',
