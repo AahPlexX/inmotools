@@ -52,7 +52,7 @@ const loadInitial = (): InitialSession => {
   } catch { return fallback; }
 };
 const sameJson = (a: JsonValue, b: JsonValue): boolean => JSON.stringify(a) === JSON.stringify(b);
-const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const plural = (count: number, noun: string, pluralNoun = `${noun}s`): string => `${count} ${count === 1 ? noun : pluralNoun}`;
 
 export default function LatticeWorkspace() {
   const initial = useMemo(loadInitial, []);
@@ -239,7 +239,7 @@ export default function LatticeWorkspace() {
   };
 
   const runJsonPath = () => {
-    try { const pointers = selectJsonPathPointers(history.present, jsonPath.trim() || '$'); setJsonPathPointers(pointers); setQuerySummary(`${plural(pointers.length, 'match')} · ${slicePathsWithAncestors(pointers).size} nodes with ancestors`); }
+    try { const pointers = selectJsonPathPointers(history.present, jsonPath.trim() || '$'); setJsonPathPointers(pointers); setQuerySummary(`${plural(pointers.length, 'match', 'matches')} · ${slicePathsWithAncestors(pointers).size} nodes with ancestors`); }
     catch (error) { setJsonPathPointers([]); setQuerySummary(error instanceof Error ? error.message : 'JSONPath failed.'); }
   };
   const runSql = async () => {

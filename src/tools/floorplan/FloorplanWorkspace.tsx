@@ -60,8 +60,9 @@ export const FloorplanWorkspace = () => {
   const [exportNote, setExportNote] = useState('');
   const workerRef = useRef<Worker | undefined>(undefined);
   const requestRef = useRef(0);
-  const acceptedRequestRef = useRef(0);
+  const latestProjectRef = useRef(history.present);
   const idRef = useRef(1);
+  latestProjectRef.current = history.present;
 
   const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idRef.current++}`;
   const openingCount = history.present.walls.reduce((sum, wall) => sum + wall.openings.length, 0);
@@ -74,15 +75,24 @@ export const FloorplanWorkspace = () => {
     try {
       const worker = new Worker(new URL('./floorplan-worker.ts', import.meta.url), { type: 'module' });
       worker.onmessage = (event: MessageEvent<FloorplanWorkerResponse>) => {
-        if (event.data.requestId < acceptedRequestRef.current) return;
-        if (event.data.type === 'analysis') { acceptedRequestRef.current = event.data.requestId; setAnalysis(event.data.analysis); }
+        if (event.data.requestId !== requestRef.current) return;
+        if (event.data.type === 'analysis') setAnalysis(event.data.analysis);
         else setStatus(`Geometry worker: ${event.data.message}`);
       };
-      worker.onerror = () => setAnalysis(analyzeFloorplan(history.present));
+      worker.onerror = () => {
+        if (workerRef.current === worker) workerRef.current = undefined;
+        worker.terminate();
+        setAnalysis(analyzeFloorplan(latestProjectRef.current));
+        setStatus('Geometry worker unavailable; using local analysis.');
+      };
       workerRef.current = worker;
-      return () => worker.terminate();
+      return () => {
+        if (workerRef.current === worker) workerRef.current = undefined;
+        worker.terminate();
+      };
     } catch {
       workerRef.current = undefined;
+      setAnalysis(analyzeFloorplan(latestProjectRef.current));
       return undefined;
     }
   }, []);
