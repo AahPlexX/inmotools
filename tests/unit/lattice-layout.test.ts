@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { buildElkGraph, layoutDirectionOption, normalizeElkLayout } from '../../src/tools/lattice/layout-engine';
 import { buildGraphModel } from '../../src/tools/lattice/graph-engine';
 
@@ -16,6 +17,16 @@ describe('JSON Lattice layout engine', () => {
     expect(request.layoutOptions).toMatchObject({ 'elk.algorithm': 'layered', 'elk.direction': 'DOWN' });
     expect(request.children?.map((node) => node.id)).toContain('/order/status');
     expect(request.edges?.some((edge) => edge.sources?.includes('/order') && edge.targets?.includes('/order/status'))).toBe(true);
+  });
+
+  it('executes a graph with the empty root JSON Pointer through ELK and restores the root path', async () => {
+    const graph = buildGraphModel({ status: 'paid', items: [{ sku: 'A1' }] });
+    const request = buildElkGraph(graph, 'LR');
+    expect(request.children?.some((node) => node.id === '')).toBe(false);
+    const result = await new ELK().layout(request);
+    const normalized = normalizeElkLayout(result);
+    expect(normalized.nodes.has('')).toBe(true);
+    expect(normalized.nodes.has('/status')).toBe(true);
   });
 
   it('normalizes worker layout geometry into a viewport-friendly model', () => {
