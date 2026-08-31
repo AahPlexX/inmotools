@@ -1,8 +1,8 @@
 import type { AcademyLesson, AcademyTrack } from './regex-types';
 
-const lesson = (id: string, title: string, objective: string, guide: string, starter: string, flags: string, hint: string, cases: AcademyLesson['cases']): AcademyLesson => ({ id, title, objective, guide, starter, flags, hint, cases });
-const yes = (value: string) => ({ value, shouldMatch: true } as const);
-const no = (value: string) => ({ value, shouldMatch: false } as const);
+const lesson = (id: string, title: string, objective: string, guide: string, starter: string, flags: string, cases: AcademyLesson['cases'], hint: string): AcademyLesson => ({ id, title, objective, guide, starter, flags, hint, cases });
+const yes = (value: string): AcademyLesson['cases'][number] => ({ value, shouldMatch: true });
+const no = (value: string): AcademyLesson['cases'][number] => ({ value, shouldMatch: false });
 
 export const ACADEMY_TRACKS: AcademyTrack[] = [
   { id: 'fundamentals', title: 'Fundamentals', lessons: [
@@ -19,7 +19,7 @@ export const ACADEMY_TRACKS: AcademyTrack[] = [
     lesson('non-capturing','Non-Capturing Groups','Group alternatives without adding a capture.','(?:...) groups syntax without storing a numbered capture.','^(?:cat|dog)s?$','i',[yes('cats'),yes('DOG'),no('bird')],'Use non-capturing groups for structure-only branches.'),
     lesson('lazy-quantifier','Lazy Quantifiers','Capture the shortest angle-bracketed segment.','A ? after a quantifier makes it reluctant.','<.+?>','g',[yes('<one> <two>'),no('plain')],'Compare .+ with .+? on repeated delimiters.'),
     lesson('word-boundary','Word Boundaries','Find cat as a complete word.','\\b asserts a transition between word and non-word characters.','\\bcat\\b','gi',[yes('a cat naps'),no('concatenate')],'A boundary consumes no characters.'),
-    lesson('negative-lookahead','Negative Lookahead','Match user handles that do not begin with admin.','(?!...) asserts that the next characters must not match its inner pattern.','^(?!admin)[a-z0-9_]{5,12}$','i','Put the assertion immediately after the start anchor.',[no('administrator'),no('admin_root'),yes('sarah_connor'),yes('johndoe123')]),
+    lesson('negative-lookahead','Negative Lookahead','Match user handles that do not begin with admin.','(?!...) asserts that the next characters must not match its inner pattern.','^(?!admin)[a-z0-9_]{5,12}$','i',[no('administrator'),no('admin_root'),yes('sarah_connor'),yes('johndoe123')],'Put the assertion immediately after the start anchor.'),
   ]},
   { id: 'advanced', title: 'Advanced', lessons: [
     lesson('positive-lookahead','Positive Lookahead','Require at least one digit without consuming it.','(?=...) checks ahead while leaving the cursor in place.','^(?=.*\\d)[a-z0-9]+$','i',[yes('user7'),no('username')],'Use a lookahead for a requirement independent of the main consuming pattern.'),
