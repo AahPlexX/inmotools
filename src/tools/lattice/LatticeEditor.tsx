@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { json } from '@codemirror/lang-json';
+import { json, jsonParseLinter } from '@codemirror/lang-json';
+import { lintGutter, linter } from '@codemirror/lint';
+import { searchKeymap } from '@codemirror/search';
 import { EditorState } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
+import type { StructuredFormat } from './format-engine';
 
-export default function LatticeEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export default function LatticeEditor({ value, format, onChange }: { value: string; format: StructuredFormat; onChange: (value: string) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -14,19 +17,15 @@ export default function LatticeEditor({ value, onChange }: { value: string; onCh
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const languageExtensions = format === 'json' ? [json(), linter(jsonParseLinter()), lintGutter()] : [];
     const state = EditorState.create({
       doc: value,
       extensions: [
-        lineNumbers(),
-        history(),
-        drawSelection(),
-        highlightActiveLine(),
-        json(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        lineNumbers(), history(), drawSelection(), highlightActiveLine(),
+        ...languageExtensions,
+        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.contentAttributes.of({ 'aria-label': 'JSON Lattice source', spellcheck: 'false' }),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) onChangeRef.current(update.state.doc.toString());
-        }),
+        EditorView.updateListener.of((update) => { if (update.docChanged) onChangeRef.current(update.state.doc.toString()); }),
         EditorView.theme({
           '&': { minHeight: '360px', height: '100%', backgroundColor: 'var(--surface)', color: 'var(--ink)', fontSize: '13px' },
           '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
@@ -40,7 +39,7 @@ export default function LatticeEditor({ value, onChange }: { value: string; onCh
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
     return () => { view.destroy(); viewRef.current = null; };
-  }, []);
+  }, [format]);
 
   useEffect(() => {
     const view = viewRef.current;
