@@ -44,9 +44,9 @@ test('edits bidirectionally, searches, collapses subtrees, and supports undo/red
   await page.getByLabel('Search graph').fill('paid');
   await expect(page.getByTestId('search-match-count')).toHaveText('1');
 
-  await page.getByRole('button', { name: 'Collapse /items' }).click();
+  await page.getByRole('button', { name: 'Collapse /items', exact: true }).click();
   await expect(page.getByTestId('visible-node-count')).toHaveText('5');
-  await page.getByRole('button', { name: 'Expand /items' }).click();
+  await page.getByRole('button', { name: 'Expand /items', exact: true }).click();
   await expect(page.getByTestId('visible-node-count')).toHaveText('11');
 
   await page.locator('[data-node-path="/status"]').dblclick();
@@ -78,9 +78,11 @@ test('provides privacy, diff, schema, JSONPath, and local DuckDB query workflows
   await page.getByLabel('Comparison JSON').fill(JSON.stringify({ orderId: 8921, status: 'failed', items: [] }, null, 2));
   await expect(page.getByTestId('diff-summary')).toContainText(/modified|deleted/i);
 
+  await page.locator('details').filter({ hasText: 'Schema generator' }).locator('summary').click();
   await page.getByLabel('Schema target').selectOption('typescript');
   await expect(page.getByTestId('schema-output')).toContainText('export interface Root');
 
+  await page.locator('details').filter({ hasText: 'JSONPath & DuckDB' }).locator('summary').click();
   await page.getByLabel('JSONPath query').fill('$.items[*].sku');
   await page.getByRole('button', { name: 'Run JSONPath' }).click();
   await expect(page.getByTestId('query-summary')).toContainText('2 matches');

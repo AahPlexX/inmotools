@@ -153,6 +153,6 @@ export default function LatticeViewport({
         </div>;
       })}
     </div>
-    <div className="lattice-minimap" aria-label="Graph minimap"><svg viewBox={`0 0 ${Math.max(1, layout.bounds.width)} ${Math.max(1, layout.bounds.height)}`}>{[...layout.nodes.values()].slice(0, 1200).map((node) => <rect key={node.id} x={node.x} y={node.y} width={node.width} height={node.height} className={visibleIds.has(node.id) ? 'is-visible' : ''} />)}</svg></div>
+    <div className="lattice-minimap" role="img" aria-label="Graph minimap"><svg aria-hidden="true" viewBox={`0 0 ${Math.max(1, layout.bounds.width)} ${Math.max(1, layout.bounds.height)}`}>{[...layout.nodes.values()].slice(0, 1200).map((node) => <rect key={node.id} x={node.x} y={node.y} width={node.width} height={node.height} className={visibleIds.has(node.id) ? 'is-visible' : ''} />)}</svg></div>
   </div>;
 }

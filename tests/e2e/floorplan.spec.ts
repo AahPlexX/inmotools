@@ -3,9 +3,10 @@ import { expect, test } from '@playwright/test';
 
 const clickAt = async (page: Parameters<typeof test>[0] extends never ? never : any, xRatio: number, yRatio: number) => {
   const canvas = page.getByTestId('floorplan-overlay');
+  await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Floor-plan overlay canvas is not visible.');
-  await page.mouse.click(box.x + box.width * xRatio, box.y + box.height * yRatio);
+  await canvas.click({ position: { x: box.width * xRatio, y: box.height * yRatio } });
 };
 
 test('PlanCraft catalog link, exact alias, and generic route open the same local workspace', async ({ page }) => {
@@ -38,7 +39,9 @@ test('drafts a room, hosts a door, stages a component, and supports undo/redo', 
   await expect(page.getByTestId('wall-count')).toHaveText('4');
   await expect(page.getByTestId('room-count')).toHaveText('1');
 
-  await page.getByRole('button', { name: /Parametric Door/ }).click();
+  const doorTool = page.getByRole('button', { name: /Parametric Door/ });
+  await doorTool.click();
+  await expect(doorTool).toHaveAttribute('aria-pressed', 'true');
   await clickAt(page, 0.5, 0.25);
   await expect(page.getByTestId('opening-count')).toHaveText('1');
 
