@@ -112,15 +112,15 @@ test('RegexMatrix parity workbench exposes benchmark, reference, list export, de
   await page.goto('./#/regex-matrix');
   await expect(page.getByTestId('regex-matrix-workspace')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Reference' }).click();
+  await page.getByRole('tab', { name: 'Reference' }).click();
   await page.getByLabel('Search regex reference').fill('lookbehind');
   await expect(page.getByTestId('regex-reference-results')).toContainText(/lookbehind/i);
 
-  await page.getByRole('button', { name: 'Benchmark' }).click();
+  await page.getByRole('tab', { name: 'Benchmark' }).click();
   await page.getByRole('button', { name: 'Run benchmark' }).click();
   await expect(page.getByTestId('benchmark-summary')).toContainText(/median|p95/i);
 
-  await page.getByRole('button', { name: 'List & export' }).click();
+  await page.getByRole('tab', { name: 'List & export' }).click();
   await page.getByLabel('Pattern').fill('\\w+');
   await page.getByLabel('Flags').fill('g');
   await page.getByLabel('Test subject').fill('alpha beta');
@@ -130,11 +130,11 @@ test('RegexMatrix parity workbench exposes benchmark, reference, list export, de
   await page.getByRole('button', { name: 'Export matches CSV' }).click();
   expect((await download).suggestedFilename()).toBe('regex-matrix-matches.csv');
 
-  await page.getByRole('button', { name: 'Debugger' }).click();
+  await page.getByRole('tab', { name: 'Debugger' }).click();
   await expect(page.getByTestId('debugger-step')).toContainText(/step/i);
   await page.getByRole('button', { name: 'Next debug step' }).click();
 
-  await page.getByRole('button', { name: 'Synthesize' }).click();
+  await page.getByRole('tab', { name: 'Synthesize' }).click();
   await page.getByLabel('Positive synthesis samples').fill('123\n456\n789');
   await page.getByLabel('Negative synthesis samples').fill('12a\n1234');
   await page.getByRole('button', { name: 'Generate candidates' }).click();
