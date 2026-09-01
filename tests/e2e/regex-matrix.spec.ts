@@ -69,9 +69,10 @@ test('Studio exports YAML and generated code downloads', async ({ page }) => {
 
 test('Studio session snapshots can be saved and restored locally', async ({ page }) => {
   await page.goto('./#/regex-matrix');
-  await page.getByLabel('Pattern').fill('saved-pattern');
+  const patternEditor = page.getByRole('textbox', { name: 'Pattern', exact: true });
+  await patternEditor.fill('saved-pattern');
   await page.getByRole('button', { name: 'Save session' }).click();
-  await page.getByLabel('Pattern').fill('changed-pattern');
+  await patternEditor.fill('changed-pattern');
   await page.getByText(/Saved sessions \(1\)/).click();
   await page.getByRole('button', { name: /Load saved session saved-pattern/ }).click();
   await expect(page.getByRole('textbox', { name: 'Pattern' })).toHaveText('saved-pattern');

@@ -96,14 +96,16 @@ const RegexWorkspace = () => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
       const command=event.ctrlKey || event.metaKey;
-      if (command && event.key === 'Enter') { event.preventDefault(); if (mode === 'academy') checkLesson(); else void runAssertions(); return; }
       if (!command) return;
       const key=event.key.toLowerCase();
-      if (key === 'm' && !event.shiftKey) { event.preventDefault(); setMode((current) => current === 'studio' ? 'academy' : 'studio'); return; }
+      const code=event.code.toLowerCase();
+      const isLetter = (letter: string) => key === letter || code === `key${letter}`;
+      if ((event.key === 'Enter' || event.code === 'Enter') && !event.shiftKey) { event.preventDefault(); if (mode === 'academy') checkLesson(); else void runAssertions(); return; }
+      if (isLetter('m') && !event.shiftKey) { event.preventDefault(); setMode((current) => current === 'studio' ? 'academy' : 'studio'); return; }
       if (!event.shiftKey) return;
-      if (key === 'f') { event.preventDefault(); focusById('regex-engine-flavor'); return; }
-      if (key === 'e') { event.preventDefault(); setMode('studio'); setMobileView('explain'); focusById('regex-explanation-list'); return; }
-      if (key === 'r') { event.preventDefault(); setMode('studio'); setMobileView('safety'); focusById('regex-safety-panel'); }
+      if (isLetter('f')) { event.preventDefault(); focusById('regex-engine-flavor'); return; }
+      if (isLetter('e')) { event.preventDefault(); setMode('studio'); setMobileView('explain'); focusById('regex-explanation-list'); return; }
+      if (isLetter('r')) { event.preventDefault(); setMode('studio'); setMobileView('safety'); focusById('regex-safety-panel'); }
     };
     window.addEventListener('keydown',onKeyDown);
     return () => window.removeEventListener('keydown',onKeyDown);
