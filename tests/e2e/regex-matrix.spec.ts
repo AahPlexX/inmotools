@@ -39,7 +39,7 @@ test('Academy lesson can be completed and opened in Studio', async ({ page }) =>
   await expect(page.getByTestId('lesson-status')).toContainText(/complete/i);
   await page.getByRole('button', { name: 'Open in Studio' }).click();
   await expect(page.getByRole('button', { name: 'Studio' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByLabel('Pattern')).toHaveValue('^(?!admin)[a-z0-9_]{5,12}$');
+  await expect(page.getByRole('textbox', { name: 'Pattern' })).toHaveText('^(?!admin)[a-z0-9_]{5,12}$');
 });
 
 test('RegexMatrix remains accessible and avoids document overflow on the active viewport', async ({ page }) => {
