@@ -80,6 +80,8 @@ test('Studio session snapshots can be saved and restored locally', async ({ page
 
 test('RegexMatrix keyboard accelerators switch modes and submit Academy work', async ({ page }) => {
   await page.goto('./#/regex-matrix');
+  await expect(page.getByTestId('regex-matrix-workspace')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Studio' })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Control+M');
   await expect(page.getByRole('button', { name: 'Academy' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Negative Lookahead/ }).click();
