@@ -444,3 +444,45 @@ tr:last-child td { border-bottom: 0; }
   .regex-academy-footer { grid-column:auto; flex-direction:column; align-items:flex-start; }
 }
 @media (prefers-reduced-motion:reduce) { .regex-matrix * { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
+
+
+.regex-power-workbench { border-top:1px solid var(--matrix-line); padding:clamp(.75rem,1.2vw,1rem); background:#0d192a; min-width:0; }
+.regex-tool-tabs { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.7rem; }
+.regex-tool-tabs [role="tab"] { border-radius:6px; padding:.45rem .65rem; }
+.regex-tool-tabs [aria-selected="true"] { background:var(--matrix-accent); color:#06121d; border-color:var(--matrix-accent); font-weight:750; }
+.regex-tool-panel { border:1px solid var(--matrix-line); border-radius:8px; background:var(--matrix-panel-strong); padding:clamp(.65rem,1vw,1rem); min-width:0; }
+.regex-tool-search { display:grid; gap:.35rem; color:var(--matrix-muted); font-size:.78rem; }
+.regex-reference-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:.45rem; margin-top:.7rem; max-height:440px; overflow:auto; }
+.regex-reference-results article,.regex-synthesis-candidates article { border:1px solid #29435f; border-radius:7px; padding:.55rem; display:grid; gap:.4rem; min-width:0; }
+.regex-reference-results article>div,.regex-synthesis-candidates article>div { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.35rem .55rem; align-items:baseline; }
+.regex-reference-results code,.regex-synthesis-candidates code { color:var(--matrix-accent); overflow-wrap:anywhere; }
+.regex-reference-results strong,.regex-synthesis-candidates strong { min-width:0; }
+.regex-reference-results small,.regex-synthesis-candidates small { grid-column:1/-1; color:var(--matrix-muted); }
+.regex-reference-results p { color:var(--matrix-muted); font-size:.76rem; margin:0; }
+.regex-tool-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.regex-tool-actions small,.regex-truth-note { color:var(--matrix-muted); font-size:.76rem; }
+.regex-benchmark-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:.45rem; margin:.75rem 0 0; }
+.regex-benchmark-stats div { border:1px solid #29435f; padding:.55rem; border-radius:6px; }
+.regex-benchmark-stats dt { color:var(--matrix-muted); font-size:.72rem; }
+.regex-benchmark-stats dd { margin:.2rem 0 0; font-weight:750; }
+.regex-match-export-preview,.regex-format-review { max-height:360px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; background:#08111d; border:1px solid var(--matrix-line); padding:.7rem; color:#dcecff; }
+.regex-debug-step { border-left:3px solid var(--matrix-accent); padding:.55rem .7rem; display:grid; gap:.25rem; }
+.regex-debug-step code { color:var(--matrix-accent); overflow-wrap:anywhere; }
+.regex-debug-step p { margin:0; }
+.regex-debug-step small { color:var(--matrix-muted); }
+.regex-synthesis-inputs { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.6rem; }
+.regex-synthesis-inputs label { display:grid; gap:.3rem; color:var(--matrix-muted); font-size:.76rem; }
+.regex-synthesis-inputs textarea { min-height:110px; resize:vertical; }
+.regex-synthesis-candidates { display:grid; gap:.45rem; margin-top:.7rem; }
+.regex-fuzz-list { columns:2; color:var(--matrix-muted); }
+.regex-academy-switch { display:grid; grid-template-columns:1fr 1fr; gap:.35rem; margin-bottom:.8rem; position:sticky; top:0; background:var(--matrix-bg); z-index:2; padding-bottom:.45rem; }
+.regex-practice-lab { padding:clamp(1rem,2vw,1.6rem); max-width:900px; }
+.regex-practice-lab>label { display:grid; gap:.4rem; color:var(--matrix-muted); }
+.regex-practice-lab textarea { min-height:90px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+@media (max-width:767px) {
+  .regex-power-workbench { padding:.65rem .75rem; }
+  .regex-tool-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .regex-tool-tabs button { min-width:0; }
+  .regex-synthesis-inputs { grid-template-columns:1fr; }
+  .regex-fuzz-list { columns:1; }
+}
