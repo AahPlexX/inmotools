@@ -1,5 +1,5 @@
 export type RegexMode = 'studio' | 'academy';
-export type RegexFlavor = 'ecmascript' | 'pcre2' | 'python' | 'go-re2' | 'rust' | 'oniguruma';
+export type RegexFlavor = 'ecmascript' | 'pcre' | 'pcre2' | 'python' | 'go-re2' | 'java' | 'dotnet' | 'rust' | 'posix-ere' | 'posix-bre' | 'oniguruma';
 export type RegexCodeTarget = 'javascript' | 'typescript' | 'python' | 'go' | 'rust' | 'php' | 'java' | 'csharp' | 'ruby';
 export type RegexCapability = 'execution' | 'compatibility';
 
@@ -74,7 +74,7 @@ export interface AcademyLesson {
 }
 
 export interface AcademyTrack {
-  readonly id: 'fundamentals' | 'intermediate' | 'advanced' | 'production';
+  readonly id: 'fundamentals' | 'intermediate' | 'advanced' | 'production' | 'seo';
   readonly title: string;
   readonly lessons: readonly AcademyLesson[];
 }

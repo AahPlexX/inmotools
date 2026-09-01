@@ -4,7 +4,7 @@ const lesson = (id: string, title: string, objective: string, guide: string, sta
 const yes = (value: string): AcademyLesson['cases'][number] => ({ value, shouldMatch: true });
 const no = (value: string): AcademyLesson['cases'][number] => ({ value, shouldMatch: false });
 
-export const ACADEMY_TRACKS: AcademyTrack[] = [
+const CORE_ACADEMY_TRACKS: AcademyTrack[] = [
   { id: 'fundamentals', title: 'Fundamentals', lessons: [
     lesson('literal-text','Literal Text','Match the exact word cat.','Ordinary characters match themselves.','cat','',["cat","bobcat"].map(yes).concat([no('dog')]),'Start with the text you want to find.'),
     lesson('digit-class','Digit Class','Match a three-digit code.','\\d matches a decimal digit; braces repeat a token a fixed number of times.','^\\d{3}$','',[yes('204'),yes('999'),no('20a'),no('1200')],'Anchor both ends when the whole string must conform.'),
@@ -38,6 +38,19 @@ export const ACADEMY_TRACKS: AcademyTrack[] = [
     lesson('api-key-redaction','API Key Redaction','Find a prefixed token for replacement.','Capture only the stable prefix and match the secret body separately.','\\b(api[_-]?key[=:]\\s*)[A-Za-z0-9_-]{8,}\\b','gi',[yes('api_key=abcDEF12345'),no('api_key=short')],'Test false positives before applying redaction to incident data.'),
   ]},
 ];
+
+
+const SEO_TRACK: AcademyTrack = { id:'seo', title:'Regex for SEO', lessons:[
+  lesson('seo-slug','URL Slugs','Match lowercase URL slugs without leading or trailing hyphens.','Validate only the URL component you manage.','^[a-z0-9]+(?:-[a-z0-9]+)*$','',[yes('regex-tools'),yes('seo-2026'),no('-leading'),no('UPPER')],'Model the slug, not the entire URL.'),
+  lesson('seo-query','Query Parameters','Capture utm_source values from a query string.','Target a named parameter boundary.','(?:^|[?&])utm_source=([^&#]+)','g',[yes('?utm_source=newsletter'),yes('&utm_source=search'),no('?source=news')],'Account for first and later parameters.'),
+  lesson('seo-canonical','Canonical Paths','Identify paths that end with a trailing slash.','Anchors make normalization checks deterministic.','^/[^?#]*/$','',[yes('/guides/regex/'),no('/guides/regex'),no('https://site.test/path/')],'Keep host parsing outside a path-only regex.'),
+  lesson('seo-extension','Asset Extensions','Find common image extensions case-insensitively.','Group extensions and anchor them to the pathname end.','\\.(?:png|jpe?g|webp|gif)$','i',[yes('/img/hero.JPG'),yes('/a.webp'),no('/a.jpg?size=2')],'Strip query strings before extension checks when appropriate.'),
+  lesson('seo-redirect','Redirect Inventory','Capture source and destination columns in a simple redirect line.','Use whitespace structure only when the input format guarantees it.','^(?<from>/\\S*)\\s+(?<to>/\\S*)$','m',[yes('/old /new'),no('/only-one')],'Prefer a CSV parser for CSV exports.'),
+  lesson('seo-title','Title Audit','Flag titles longer than 60 characters.','Regex can flag a length threshold but cannot judge search quality.','^.{61,}$','',[yes('This title is intentionally much longer than sixty characters for audit'),no('Concise title')],'Treat length as an audit signal, not a ranking rule.'),
+  lesson('seo-nofollow','Link Attribute','Detect a nofollow token inside a rel attribute value.','Token boundaries reduce false positives.','\\bnofollow\\b','i',[yes('ugc nofollow'),no('dofollow')],'Parse HTML before applying regex to attributes in production.'),
+  lesson('seo-date-path','Dated Paths','Capture year and month folders in a content path.','Named groups make reporting clearer.','^/(?<year>20\\d{2})/(?<month>0[1-9]|1[0-2])/(?:.+)$','',[yes('/2026/08/regex-guide'),no('/26/08/regex-guide')],'Validate calendar semantics separately when needed.')
+]};
+export const ACADEMY_TRACKS: AcademyTrack[] = [...CORE_ACADEMY_TRACKS, SEO_TRACK];
 
 export const validateAcademySolution = (lessonInput: AcademyLesson, pattern: string, flags: string) => {
   try {

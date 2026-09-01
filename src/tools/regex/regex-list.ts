@@ -1,0 +1,5 @@
+import type { RegexMatchRecord } from './regex-types';
+export interface RegexMatchExportRow { readonly matchNumber:number; readonly start:number; readonly end:number; readonly match:string; readonly groups:readonly string[]; readonly namedGroups:Readonly<Record<string,string>>; }
+export const buildMatchExportRows=(matches:readonly RegexMatchRecord[]):RegexMatchExportRow[]=>matches.map((match,index)=>({matchNumber:index+1,start:match.index,end:match.end,match:match.match,groups:match.groups,namedGroups:match.namedGroups}));
+const csvCell=(value:string)=>`"${value.replace(/"/g,'""')}"`;
+export const serializeMatchRows=(rows:readonly RegexMatchExportRow[],format:'json'|'csv'|'text'):string=>{if(format==='json')return JSON.stringify(rows,null,2);if(format==='text')return rows.map((row)=>`${row.matchNumber}\t${row.start}-${row.end}\t${row.match}`).join('\n');return['matchNumber,start,end,match,groups,namedGroups',...rows.map((row)=>[row.matchNumber,row.start,row.end,csvCell(row.match),csvCell(JSON.stringify(row.groups)),csvCell(JSON.stringify(row.namedGroups))].join(','))].join('\n');};
