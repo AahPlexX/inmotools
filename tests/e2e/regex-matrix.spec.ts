@@ -106,3 +106,45 @@ test('Mobile Studio uses segmented work views without document overflow', async 
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+
+
+test('RegexMatrix parity workbench exposes benchmark, reference, list export, debugger, and synthesis', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await expect(page.getByTestId('regex-matrix-workspace')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Reference' }).click();
+  await page.getByLabel('Search regex reference').fill('lookbehind');
+  await expect(page.getByTestId('regex-reference-results')).toContainText(/lookbehind/i);
+
+  await page.getByRole('button', { name: 'Benchmark' }).click();
+  await page.getByRole('button', { name: 'Run benchmark' }).click();
+  await expect(page.getByTestId('benchmark-summary')).toContainText(/median|p95/i);
+
+  await page.getByRole('button', { name: 'List & export' }).click();
+  await page.getByLabel('Pattern').fill('\\w+');
+  await page.getByLabel('Flags').fill('g');
+  await page.getByLabel('Test subject').fill('alpha beta');
+  await page.getByRole('button', { name: 'Run pattern' }).click();
+  await expect(page.getByTestId('match-export-preview')).toContainText('alpha');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export matches CSV' }).click();
+  expect((await download).suggestedFilename()).toBe('regex-matrix-matches.csv');
+
+  await page.getByRole('button', { name: 'Debugger' }).click();
+  await expect(page.getByTestId('debugger-step')).toContainText(/step/i);
+  await page.getByRole('button', { name: 'Next debug step' }).click();
+
+  await page.getByRole('button', { name: 'Synthesize' }).click();
+  await page.getByLabel('Positive synthesis samples').fill('123\n456\n789');
+  await page.getByLabel('Negative synthesis samples').fill('12a\n1234');
+  await page.getByRole('button', { name: 'Generate candidates' }).click();
+  await expect(page.getByTestId('synthesis-candidates')).toContainText('\\d');
+});
+
+test('RegexMatrix Academy includes SEO course and deterministic practice lab', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByRole('button', { name: 'Academy' }).click();
+  await expect(page.getByRole('heading', { name: 'Regex for SEO' })).toBeVisible();
+  await page.getByRole('button', { name: 'Practice Lab' }).click();
+  await expect(page.getByTestId('practice-lab')).toContainText(/challenge|practice/i);
+});
