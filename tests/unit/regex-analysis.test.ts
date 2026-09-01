@@ -3,6 +3,7 @@ import { buildRegexExplanation } from '../../src/tools/regex/regex-ast';
 import { analyzeCompatibility } from '../../src/tools/regex/regex-compat';
 import { analyzeRedos } from '../../src/tools/regex/regex-redos';
 import { generateRegexSnippet } from '../../src/tools/regex/regex-codegen';
+import { buildRailroadProjection, renderRailroadSvg } from '../../src/tools/regex/regex-railroad';
 
 describe('RegexMatrix diagnostics', () => {
   it('builds source-ranged ECMAScript explanation nodes', () => {
@@ -35,4 +36,28 @@ describe('RegexMatrix diagnostics', () => {
     expect(generateRegexSnippet('go', '\\d+', '', 'id 42')).toContain('regexp.MustCompile');
     expect(generateRegexSnippet('rust', '\\d+', '', 'id 42')).toContain('Regex::new');
   });
+
+  it('projects source-ranged explanation nodes into a deterministic railroad SVG', () => {
+    const tree = buildRegexExplanation('(?<year>\d{4})-(?<month>\d{2})', 'g', 'ecmascript');
+    const projection = buildRailroadProjection(tree);
+
+    expect(projection.segments).toHaveLength(tree.children.length);
+    expect(projection.segments.some((segment) => segment.label.includes('year'))).toBe(true);
+    expect(projection.segments.every((segment) => segment.start >= 0 && segment.end <= tree.source.length)).toBe(true);
+    expect(projection.width).toBeGreaterThan(300);
+
+    const svg = renderRailroadSvg(projection);
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('Regex railroad projection');
+    expect(svg).toContain('data-start=');
+    expect(svg).toContain('&lt;year&gt;');
+  });
+
+  it('escapes railroad labels and sources in exported SVG', () => {
+    const tree = buildRegexExplanation('a&b', '', 'ecmascript');
+    const svg = renderRailroadSvg(buildRailroadProjection(tree));
+    expect(svg).toContain('a&amp;b');
+    expect(svg).not.toContain('>a&b<');
+  });
+
 });

@@ -23,6 +23,11 @@ test('Studio executes matches, exposes diagnostics, and identifies a ReDoS hazar
   await expect(page.getByTestId('match-count')).toHaveText('2');
   await expect(page.getByTestId('match-inspector')).toContainText('year');
   await expect(page.getByTestId('engine-status')).toContainText(/Execution/i);
+  const railroad = page.getByTestId('railroad-projection');
+  await expect(railroad).toBeVisible();
+  await expect(railroad).toContainText(/year/i);
+  await page.getByRole('button', { name: /Named capture group <year>/ }).click();
+  await expect(page.getByTestId('railroad-selection')).toContainText(/0–/);
 
   await page.getByLabel('Pattern').fill('(a+)+$');
   await page.getByRole('button', { name: 'Run pattern' }).click();
