@@ -28,19 +28,15 @@ interface Props {
   readonly onPatternChange: (value: string) => void;
   readonly onSelectSource: (start: number, end: number, label: string) => void;
 }
-const lines = (value: string) => value.split(/?
-/).map((item) => item.trim()).filter(Boolean);
+const lines = (value: string) => value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
 const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanation, onPatternChange, onSelectSource }: Props) => {
   const [active,setActive] = useState<PowerTool>('reference');
   const [referenceQuery,setReferenceQuery] = useState('');
   const [benchmark,setBenchmark] = useState<RegexBenchmarkSummary | null>(null);
   const [benchmarkBusy,setBenchmarkBusy] = useState(false);
   const [debugIndex,setDebugIndex] = useState(0);
-  const [positive,setPositive] = useState('123
-456
-789');
-  const [negative,setNegative] = useState('12a
-1234');
+  const [positive,setPositive] = useState('123\n456\n789');
+  const [negative,setNegative] = useState('12a\n1234');
   const [candidates,setCandidates] = useState<RegexSynthesisCandidate[]>([]);
   const [fuzz,setFuzz] = useState<string[]>([]);
   const reference = useMemo(() => searchRegexReference(referenceQuery, flavor).slice(0,80), [flavor,referenceQuery]);
