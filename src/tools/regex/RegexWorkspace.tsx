@@ -4,14 +4,18 @@ import RegexEditor from './RegexEditor';
 import { ACADEMY_TRACKS, validateAcademySolution } from './regex-academy';
 import { buildRegexExplanation } from './regex-ast';
 import { generateRegexSnippet } from './regex-codegen';
+import { buildAssertionExport, codeFileExtension, serializeAssertionExport, type AssertionExportFormat } from './regex-export';
 import { analyzeCompatibility } from './regex-compat';
 import { saveRegexMatrixValue, loadRegexMatrixValue } from './regex-persistence';
+import { addRegexSessionSnapshot, type RegexSavedSession } from './regex-session';
 import { analyzeRedos } from './regex-redos';
 import { buildRailroadProjection, renderRailroadSvg } from './regex-railroad';
 import { decodeRegexMatrixState, encodeRegexMatrixState } from './regex-share';
 import type { AcademyLesson, RegexCodeTarget, RegexFlavor, RegexMode, RegexRunResult } from './regex-types';
 import { executeRegexWithWatchdog } from './regex-worker-client';
 
+type StudioView = 'editor' | 'matches' | 'explain' | 'safety';
+const STUDIO_VIEWS: readonly { value: StudioView; label: string }[] = [{ value:'editor', label:'Editor' }, { value:'matches', label:'Matches' }, { value:'explain', label:'Explain' }, { value:'safety', label:'Safety' }];
 const EXECUTABLE = new Set<RegexFlavor>(['ecmascript', 'pcre2']);
 const TARGETS: { value: RegexCodeTarget; label: string }[] = [
   { value:'typescript', label:'TypeScript' }, { value:'javascript', label:'JavaScript' }, { value:'python', label:'Python' }, { value:'go', label:'Go' }, { value:'rust', label:'Rust' }, { value:'php', label:'PHP' }, { value:'java', label:'Java' }, { value:'csharp', label:'C#' }, { value:'ruby', label:'Ruby' },
@@ -39,8 +43,11 @@ const RegexWorkspace = () => {
   const [lessonId,setLessonId] = useState('negative-lookahead'); const lesson = lessons.find((entry) => entry.lesson.id === lessonId)?.lesson ?? lessons[0]!.lesson;
   const [academySolution,setAcademySolution] = useState(lesson.starter); const [lessonResult,setLessonResult] = useState<ReturnType<typeof validateAcademySolution> | null>(null);
   const [completed,setCompleted] = useState<Set<string>>(new Set()); const [status,setStatus] = useState('Ready. Execution stays on this device.');
+  const [mobileView,setMobileView] = useState<StudioView>('editor');
+  const [savedSessions,setSavedSessions] = useState<RegexSavedSession[]>([]);
 
   useEffect(() => { void loadRegexMatrixValue<string[]>('academy-progress').then((value) => { if (value) setCompleted(new Set(value)); }); }, []);
+  useEffect(() => { void loadRegexMatrixValue<RegexSavedSession[]>('saved-sessions').then((value) => { if (value) setSavedSessions(value.slice(0,200)); }); }, []);
   useEffect(() => { setAcademySolution(lesson.starter); setLessonResult(null); }, [lesson.id]);
   const compatibility = useMemo(() => analyzeCompatibility(pattern), [pattern]);
   const redos = useMemo(() => flavor === 'ecmascript' ? analyzeRedos(pattern, flags) : { safe:true, risk:'unknown' as const, score:null, metricLabel:'Ambiguity path score' as const, note:'Static ReDoS scoring is limited to ECMAScript in this release.', trails:[] }, [flavor, flags, pattern]);
@@ -68,28 +75,59 @@ const RegexWorkspace = () => {
   };
   const checkLesson = () => { const checked=validateAcademySolution(lesson, academySolution, lesson.flags); setLessonResult(checked); if (checked.complete) { const next=new Set(completed); next.add(lesson.id); setCompleted(next); void saveRegexMatrixValue('academy-progress',[...next]); } };
   const openLesson = () => { setPattern(academySolution); setFlags(lesson.flags); setSubject(lesson.cases.map((item) => item.value).join('\n')); setMode('studio'); setStatus(`Opened “${lesson.title}” in Studio.`); };
+  const saveSession = () => {
+    const savedAt=Date.now();
+    const snapshot: RegexSavedSession = { id:`session-${savedAt}`, savedAt, pattern, flags, subject, flavor, replacement, positive, negative, codeTarget };
+    const next=addRegexSessionSnapshot(savedSessions,snapshot);
+    setSavedSessions(next); void saveRegexMatrixValue('saved-sessions',next); setStatus('Studio session saved locally.');
+  };
+  const loadSession = (snapshot: RegexSavedSession) => {
+    setPattern(snapshot.pattern); setFlags(snapshot.flags); setSubject(snapshot.subject); setFlavor(snapshot.flavor); setReplacement(snapshot.replacement); setPositive(snapshot.positive); setNegative(snapshot.negative); setCodeTarget(snapshot.codeTarget); setMode('studio'); setMobileView('editor'); setStatus(`Loaded session from ${new Date(snapshot.savedAt).toLocaleString()}.`);
+  };
   const share = async () => { const encoded=encodeRegexMatrixState({ mode, flavor, pattern, flags, subject }); const base=window.location.href.split('#')[0]!; const url=`${base}#/regex-matrix?state=${encoded}`; try { await navigator.clipboard.writeText(url); setStatus('Compressed local share URL copied.'); } catch { window.location.hash=`/regex-matrix?state=${encoded}`; setStatus('Share state placed in the address bar.'); } };
-  const exportAssertions = () => downloadText(JSON.stringify({ engine:flavor, pattern, flags, positive:positive.split(/\r?\n/).filter(Boolean), negative:negative.split(/\r?\n/).filter(Boolean) }, null, 2), 'regex-matrix-tests.json', 'application/json;charset=utf-8');
+  const exportAssertions = (format: AssertionExportFormat) => {
+    const bundle=buildAssertionExport({ engine:flavor, pattern, flags, positive, negative });
+    downloadText(serializeAssertionExport(bundle,format), `regex-matrix-tests.${format === 'yaml' ? 'yaml' : 'json'}`, format === 'yaml' ? 'application/yaml;charset=utf-8' : 'application/json;charset=utf-8');
+  };
+  const exportCode = () => downloadText(code, `regex-matrix-${codeTarget}.${codeFileExtension(codeTarget)}`, 'text/plain;charset=utf-8');
   const exportDiagram = () => downloadText(renderRailroadSvg(railroad), 'regex-matrix-diagram.svg', 'image/svg+xml;charset=utf-8');
+  useEffect(() => {
+    const focusById = (id: string) => window.requestAnimationFrame(() => document.getElementById(id)?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      const command=event.ctrlKey || event.metaKey;
+      if (command && event.key === 'Enter') { event.preventDefault(); if (mode === 'academy') checkLesson(); else void runAssertions(); return; }
+      if (!command) return;
+      const key=event.key.toLowerCase();
+      if (key === 'm' && !event.shiftKey) { event.preventDefault(); setMode((current) => current === 'studio' ? 'academy' : 'studio'); return; }
+      if (!event.shiftKey) return;
+      if (key === 'f') { event.preventDefault(); focusById('regex-engine-flavor'); return; }
+      if (key === 'e') { event.preventDefault(); setMode('studio'); setMobileView('explain'); focusById('regex-explanation-list'); return; }
+      if (key === 'r') { event.preventDefault(); setMode('studio'); setMobileView('safety'); focusById('regex-safety-panel'); }
+    };
+    window.addEventListener('keydown',onKeyDown);
+    return () => window.removeEventListener('keydown',onKeyDown);
+  }, [academySolution, completed, flags, lesson, mode, negative, pattern, positive, subject, flavor]);
 
-  return <div className="regex-matrix" data-testid="regex-matrix-workspace">
+  return <div className={`regex-matrix regex-mobile-${mobileView}`} data-testid="regex-matrix-workspace">
     <header className="regex-matrix-bar">
       <div className="regex-mode-switch" aria-label="Workspace mode"><button type="button" aria-pressed={mode==='studio'} onClick={() => setMode('studio')}>Studio</button><button type="button" aria-pressed={mode==='academy'} onClick={() => setMode('academy')}>Academy</button></div>
-      <label>Engine flavor<select aria-label="Engine flavor" value={flavor} onChange={(event) => setFlavor(event.target.value as RegexFlavor)}>{FLAVORS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      <label>Engine flavor<select id="regex-engine-flavor" aria-label="Engine flavor" value={flavor} onChange={(event) => setFlavor(event.target.value as RegexFlavor)}>{FLAVORS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       <span className="regex-engine-state" data-testid="engine-status"><strong>{activeCompatibility.capability === 'execution' ? 'Execution' : 'Compatibility'}</strong> · {activeCompatibility.label}</span>
       <a className="regex-coffee" href="https://buymeacoffee.com/aahplexx" target="_blank" rel="noreferrer">☕ Buy me a coffee ($3)</a>
     </header>
 
     {mode === 'studio' ? <>
       <section className="regex-pattern-strip" aria-label="Expression controls"><div className="regex-pattern-editor"><span>Pattern</span><RegexEditor label="Pattern" value={pattern} onChange={setPattern} compact selectionRequest={railroadSelection ?? undefined} /></div><label className="regex-flags">Flags<input aria-label="Flags" value={flags} onChange={(event) => setFlags(event.target.value)} /></label><button type="button" className="regex-run" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void runPattern()}>{busy ? 'Running…' : 'Run pattern'}</button></section>
+      <nav className="regex-mobile-views" aria-label="Studio view">{STUDIO_VIEWS.map((item) => <button type="button" key={item.value} aria-pressed={mobileView===item.value} onClick={() => setMobileView(item.value)}>{item.label}</button>)}</nav>
       <main className="regex-studio-grid">
-        <section className="regex-editor-pane" aria-label="Test and replacement workspace"><div className="regex-pane-heading"><h2>Test subject</h2><span>{subject.length} chars</span></div><RegexEditor label="Test subject" value={subject} onChange={setSubject} />
+        <section className="regex-editor-pane" data-mobile-panel="editor" aria-label="Test and replacement workspace"><div className="regex-pane-heading"><h2>Test subject</h2><span>{subject.length} chars</span></div><RegexEditor label="Test subject" value={subject} onChange={setSubject} />
           <div className="regex-substitute"><label>Replacement<input aria-label="Replacement" value={replacement} onChange={(event) => setReplacement(event.target.value)} /></label><pre tabIndex={0}>{replacementPreview}</pre></div>
           <details><summary>Assertion suite</summary><div className="regex-assertion-inputs"><label>Must match<textarea aria-label="Must match" value={positive} onChange={(event) => setPositive(event.target.value)} /></label><label>Must not match<textarea aria-label="Must not match" value={negative} onChange={(event) => setNegative(event.target.value)} /></label></div><button type="button" onClick={() => void runAssertions()}>Run assertions</button>{assertions.length ? <p>{assertions.filter((item) => item.passed).length}/{assertions.length} assertions pass</p> : null}</details>
         </section>
-        <section className="regex-match-pane" aria-label="Match inspector"><div className="regex-pane-heading"><h2>Matches</h2><strong data-testid="match-count">{result.matches.length}</strong></div>{result.error ? <p className="regex-error" role="alert">{result.error}</p> : <div data-testid="match-inspector" className="regex-match-list">{result.matches.length ? result.matches.map((match,index) => <article key={`${match.index}-${index}`}><header><strong>Match {index+1}</strong><span>{match.index}–{match.end} · {match.match.length} chars</span></header><code>{match.match}</code>{Object.entries(match.namedGroups).length ? <dl>{Object.entries(match.namedGroups).map(([name,value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl> : null}</article>) : <p className="regex-empty">Run the pattern to inspect matches and capture groups.</p>}</div>}<p className="regex-duration">Last execution: {result.durationMs.toFixed(2)} ms</p></section>
-        <aside className="regex-diagnostic-pane" aria-label="Regex diagnostics"><section><div className="regex-pane-heading"><h2>Explain</h2><span>{explanation.children.length} tokens</span></div><ol className="regex-ast-list" tabIndex={0} aria-label="Regex structural explanation">{explanation.children.slice(0,18).map((node) => <li key={node.id}><code>{node.source || '∅'}</code><span>{node.label}</span><small>{node.start}–{node.end}</small></li>)}</ol></section>
-          <section className={`regex-safety ${redos.risk}`}><div className="regex-pane-heading"><h2>ReDoS safety</h2><strong data-testid="redos-status">{riskLabel(redos.risk)}</strong></div><p>{redos.metricLabel}: {redos.score ?? 'n/a'}</p><small>{redos.note}</small></section>
+        <section className="regex-match-pane" data-mobile-panel="matches" aria-label="Match inspector"><div className="regex-pane-heading"><h2>Matches</h2><strong data-testid="match-count">{result.matches.length}</strong></div>{result.error ? <p className="regex-error" role="alert">{result.error}</p> : <div data-testid="match-inspector" className="regex-match-list">{result.matches.length ? result.matches.map((match,index) => <article key={`${match.index}-${index}`}><header><strong>Match {index+1}</strong><span>{match.index}–{match.end} · {match.match.length} chars</span></header><code>{match.match}</code>{Object.entries(match.namedGroups).length ? <dl>{Object.entries(match.namedGroups).map(([name,value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl> : null}</article>) : <p className="regex-empty">Run the pattern to inspect matches and capture groups.</p>}</div>}<p className="regex-duration">Last execution: {result.durationMs.toFixed(2)} ms</p></section>
+        <aside className="regex-diagnostic-pane" aria-label="Regex diagnostics"><section data-mobile-panel="explain"><div className="regex-pane-heading"><h2>Explain</h2><span>{explanation.children.length} tokens</span></div><ol id="regex-explanation-list" className="regex-ast-list" tabIndex={0} aria-label="Regex structural explanation">{explanation.children.slice(0,18).map((node) => <li key={node.id}><code>{node.source || '∅'}</code><span>{node.label}</span><small>{node.start}–{node.end}</small></li>)}</ol></section>
+          <section id="regex-safety-panel" tabIndex={-1} data-mobile-panel="safety" className={`regex-safety ${redos.risk}`}> <div className="regex-pane-heading"><h2>ReDoS safety</h2><strong data-testid="redos-status">{riskLabel(redos.risk)}</strong></div><p>{redos.metricLabel}: {redos.score ?? 'n/a'}</p><small>{redos.note}</small></section>
         </aside>
       </main>
       <section className="regex-railroad-panel" aria-labelledby="regex-railroad-heading">
@@ -109,7 +147,7 @@ const RegexWorkspace = () => {
         <div><div className="regex-pane-heading"><h2>Flavor compatibility</h2><span>Execution vs analysis is explicit</span></div><div className="regex-compat-table" role="table" aria-label="Flavor compatibility matrix">{compatibility.map((entry) => <div role="row" key={entry.flavor}><strong role="cell">{entry.label}</strong><span role="cell">{entry.capability === 'execution' ? 'Execution' : 'Compatibility only'}</span><span role="cell">{entry.supported ? 'Pattern supported' : entry.issues[0]}</span></div>)}</div></div>
         <div><div className="regex-pane-heading"><h2>Code generator</h2><label>Target<select aria-label="Code target" value={codeTarget} onChange={(event) => setCodeTarget(event.target.value as RegexCodeTarget)}>{TARGETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label></div><pre className="regex-code" tabIndex={0}>{code}</pre></div>
       </section>
-      <footer className="regex-exportbar"><button type="button" onClick={exportAssertions}>Export test JSON</button><button type="button" onClick={exportDiagram}>Export diagram SVG</button><button type="button" onClick={() => void share()}>Copy share URL</button><span role="status">{status}</span></footer>
+      <footer className="regex-exportbar"><button type="button" onClick={() => exportAssertions('json')}>Export test JSON</button><button type="button" onClick={() => exportAssertions('yaml')}>Export test YAML</button><button type="button" onClick={exportCode}>Export code</button><button type="button" onClick={exportDiagram}>Export diagram SVG</button><button type="button" onClick={saveSession}>Save session</button><details className="regex-sessions"><summary>Saved sessions ({savedSessions.length})</summary><div>{savedSessions.length ? savedSessions.slice(0,12).map((snapshot) => <button type="button" key={snapshot.id} aria-label={`Load saved session ${snapshot.pattern}`} onClick={() => loadSession(snapshot)}><code>{snapshot.pattern || '∅'}</code><span>{new Date(snapshot.savedAt).toLocaleString()}</span></button>) : <p>No saved sessions yet.</p>}</div>{savedSessions.length>12 ? <small>{savedSessions.length-12} older snapshots remain stored locally.</small> : null}</details><details className="regex-shortcuts"><summary>Shortcuts</summary><p><kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> run assertions / check lesson · <kbd>Ctrl/Cmd</kbd>+<kbd>M</kbd> switch mode · <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>/<kbd>E</kbd>/<kbd>R</kbd> engine / explain / safety</p></details><button type="button" onClick={() => void share()}>Copy share URL</button><span role="status">{status}</span></footer>
     </> : <section className="regex-academy" data-testid="academy-panel">
       <aside className="regex-lesson-nav" aria-label="Academy lessons">{ACADEMY_TRACKS.map((track) => <section key={track.id}><h2>{track.title}</h2>{track.lessons.map((item) => <button type="button" key={item.id} className={item.id===lesson.id?'active':''} aria-pressed={item.id===lesson.id} onClick={() => setLessonId(item.id)}>{completed.has(item.id) ? '✓ ' : ''}{item.title}</button>)}</section>)}</aside>
       <article className="regex-lesson"><header><p>{lessons.find((entry) => entry.lesson.id === lesson.id)?.track.title}</p><h2>{lesson.title}</h2><p>{lesson.objective}</p></header><div className="regex-lesson-guide"><strong>How it works</strong><p>{lesson.guide}</p></div><label>Academy solution<textarea aria-label="Academy solution" value={academySolution} onChange={(event) => setAcademySolution(event.target.value)} /></label><div className="regex-lesson-actions"><button type="button" onClick={checkLesson}>Check solution</button><button type="button" onClick={openLesson}>Open in Studio</button></div><p className="regex-hint">Hint: {lesson.hint}</p>{lessonResult ? <div data-testid="lesson-status" className={lessonResult.complete?'regex-complete':'regex-incomplete'}>{lessonResult.error ?? (lessonResult.complete ? 'Lesson complete' : `${lessonResult.cases.filter((item) => item.passed).length}/${lessonResult.cases.length} cases pass`)}</div> : null}<ul className="regex-case-list">{lesson.cases.map((item) => <li key={item.value}><code>{item.value}</code><span>{item.shouldMatch ? 'must match' : 'must not match'}</span></li>)}</ul></article>

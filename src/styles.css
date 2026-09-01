@@ -379,6 +379,16 @@ tr:last-child td { border-bottom: 0; }
 .regex-code { max-height:300px; }
 .regex-exportbar { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; padding:.75rem; border-top:1px solid var(--matrix-line); background:var(--matrix-panel-strong); }
 .regex-exportbar [role="status"] { margin-left:auto; color:var(--matrix-muted); font-size:.78rem; }
+
+.regex-mobile-views { display:none; }
+.regex-sessions,.regex-shortcuts { position:relative; }
+.regex-sessions summary,.regex-shortcuts summary { cursor:pointer; font-size:.78rem; color:var(--matrix-muted); }
+.regex-sessions>div { position:absolute; z-index:12; bottom:calc(100% + .45rem); left:0; width:min(360px,88vw); max-height:280px; overflow:auto; padding:.45rem; border:1px solid var(--matrix-line); border-radius:8px; background:var(--matrix-panel-strong); box-shadow:0 16px 35px rgba(0,0,0,.28); }
+.regex-sessions button { display:grid; width:100%; grid-template-columns:minmax(0,1fr) auto; gap:.6rem; text-align:left; border:0; border-bottom:1px solid #203650; background:transparent; color:var(--matrix-text); padding:.45rem; }
+.regex-sessions code { overflow:hidden; text-overflow:ellipsis; color:var(--matrix-accent); }
+.regex-sessions span,.regex-sessions p,.regex-sessions small { color:var(--matrix-muted); font-size:.72rem; }
+.regex-shortcuts p { position:absolute; z-index:12; bottom:calc(100% + .45rem); left:0; width:min(520px,88vw); margin:0; padding:.65rem; border:1px solid var(--matrix-line); border-radius:8px; background:var(--matrix-panel-strong); color:var(--matrix-muted); font-size:.72rem; box-shadow:0 16px 35px rgba(0,0,0,.28); }
+.regex-shortcuts kbd { color:var(--matrix-text); }
 .regex-academy { display:grid; grid-template-columns:minmax(230px,300px) minmax(0,1fr); min-height:640px; }
 .regex-lesson-nav { border-right:1px solid var(--matrix-line); padding:.75rem; max-height:72vh; overflow:auto; }
 .regex-lesson-nav section+section { margin-top:1rem; }
@@ -405,6 +415,15 @@ tr:last-child td { border-bottom: 0; }
   .regex-lower-grid>div+div { border-left:0; border-top:1px solid var(--matrix-line); }
 }
 @media (max-width:767px) {
+  .regex-mobile-views { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.3rem; padding:.5rem .75rem; border-top:1px solid var(--matrix-line); border-bottom:1px solid var(--matrix-line); background:var(--matrix-panel-strong); position:sticky; top:0; z-index:8; }
+  .regex-mobile-views button { min-width:0; padding:.45rem .25rem; border:1px solid var(--matrix-line); border-radius:6px; background:transparent; color:var(--matrix-muted); font-size:.74rem; }
+  .regex-mobile-views button[aria-pressed="true"] { border-color:var(--matrix-accent); color:var(--matrix-text); background:#13243a; }
+  .regex-studio-grid>.regex-editor-pane,.regex-studio-grid>.regex-match-pane,.regex-studio-grid>.regex-diagnostic-pane { display:none; }
+  .regex-mobile-editor .regex-studio-grid>.regex-editor-pane { display:block; }
+  .regex-mobile-matches .regex-studio-grid>.regex-match-pane { display:block; }
+  .regex-mobile-explain .regex-studio-grid>.regex-diagnostic-pane,.regex-mobile-safety .regex-studio-grid>.regex-diagnostic-pane { display:block; }
+  .regex-diagnostic-pane>[data-mobile-panel] { display:none; }
+  .regex-mobile-explain .regex-diagnostic-pane>[data-mobile-panel="explain"],.regex-mobile-safety .regex-diagnostic-pane>[data-mobile-panel="safety"] { display:block; }
   .regex-matrix-bar { align-items:stretch; }
   .regex-matrix-bar label { width:100%; justify-content:space-between; }
   .regex-coffee { margin-left:0; }
@@ -418,6 +437,8 @@ tr:last-child td { border-bottom: 0; }
   .regex-exportbar { align-items:stretch; }
   .regex-exportbar button { flex:1 1 45%; }
   .regex-exportbar [role="status"] { width:100%; margin-left:0; }
+  .regex-sessions,.regex-shortcuts { flex:1 1 45%; }
+  .regex-sessions>div,.regex-shortcuts p { left:auto; right:0; }
   .regex-academy { grid-template-columns:1fr; }
   .regex-lesson-nav { border-right:0; border-bottom:1px solid var(--matrix-line); max-height:280px; }
   .regex-academy-footer { grid-column:auto; flex-direction:column; align-items:flex-start; }
