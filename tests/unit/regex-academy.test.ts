@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { ACADEMY_TRACKS, validateAcademySolution } from '../../src/tools/regex/regex-academy';
 
 describe('RegexMatrix Academy', () => {
-  it('ships four coherent tracks with at least twenty-four deterministic lessons', () => {
-    expect(ACADEMY_TRACKS.map((track) => track.id)).toEqual(['fundamentals', 'intermediate', 'advanced', 'production']);
-    expect(ACADEMY_TRACKS.flatMap((track) => track.lessons).length).toBeGreaterThanOrEqual(24);
+  it('ships five coherent tracks with at least thirty deterministic lessons', () => {
+    expect(ACADEMY_TRACKS.map((track) => track.id)).toEqual(['fundamentals', 'intermediate', 'advanced', 'production', 'seo']);
+    expect(ACADEMY_TRACKS.flatMap((track) => track.lessons).length).toBeGreaterThanOrEqual(30);
     expect(ACADEMY_TRACKS.every((track) => track.lessons.length >= 5)).toBe(true);
   });
 
