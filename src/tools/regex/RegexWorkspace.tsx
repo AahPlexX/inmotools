@@ -7,6 +7,7 @@ import { generateRegexSnippet } from './regex-codegen';
 import { analyzeCompatibility } from './regex-compat';
 import { saveRegexMatrixValue, loadRegexMatrixValue } from './regex-persistence';
 import { analyzeRedos } from './regex-redos';
+import { buildRailroadProjection, renderRailroadSvg } from './regex-railroad';
 import { decodeRegexMatrixState, encodeRegexMatrixState } from './regex-share';
 import type { AcademyLesson, RegexCodeTarget, RegexFlavor, RegexMode, RegexRunResult } from './regex-types';
 import { executeRegexWithWatchdog } from './regex-worker-client';
@@ -21,7 +22,6 @@ const FLAVORS: { value: RegexFlavor; label: string }[] = [
 const initialResult: RegexRunResult = { engine:'ECMAScript · browser RegExp', capability:'execution', matches:[], durationMs:0, error:null };
 const parseSharedState = () => { const query = window.location.hash.split('?')[1] ?? ''; const encoded = new URLSearchParams(query).get('state'); return encoded ? decodeRegexMatrixState(encoded) : null; };
 const riskLabel = (risk: ReturnType<typeof analyzeRedos>['risk']) => risk === 'critical' ? 'Critical hazard' : risk === 'caution' ? 'Caution' : risk === 'linear' ? 'Linear / clean' : 'Unknown';
-const escapeXml = (value: string) => value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 const RegexWorkspace = () => {
   const shared = useMemo(parseSharedState, []);
@@ -46,9 +46,15 @@ const RegexWorkspace = () => {
   const redos = useMemo(() => flavor === 'ecmascript' ? analyzeRedos(pattern, flags) : { safe:true, risk:'unknown' as const, score:null, metricLabel:'Ambiguity path score' as const, note:'Static ReDoS scoring is limited to ECMAScript in this release.', trails:[] }, [flavor, flags, pattern]);
   const explanation = useMemo(() => { try { return buildRegexExplanation(pattern, flags, flavor); } catch (error) { return { id:'error', kind:'Pattern', label:error instanceof Error ? error.message : String(error), source:pattern, start:0, end:pattern.length, children:[] }; } }, [flavor, flags, pattern]);
   const code = useMemo(() => generateRegexSnippet(codeTarget, pattern, flags, subject), [codeTarget, flags, pattern, subject]);
+  const railroad = useMemo(() => buildRailroadProjection(explanation), [explanation]);
+  const [railroadSelection,setRailroadSelection] = useState<{ from:number; to:number; revision:number; label:string } | null>(null);
   const replacementPreview = useMemo(() => { if (flavor !== 'ecmascript') return 'Replacement preview currently uses the ECMAScript execution engine.'; try { return subject.replace(new RegExp(pattern, flags), replacement); } catch (error) { return error instanceof Error ? error.message : String(error); } }, [flavor, flags, pattern, replacement, subject]);
   const activeCompatibility = compatibility.find((entry) => entry.flavor === flavor)!;
 
+  const selectRailroadSegment = (segment: (typeof railroad.segments)[number]) => {
+    setRailroadSelection((current) => ({ from:segment.start, to:segment.end, revision:(current?.revision ?? 0)+1, label:segment.label }));
+    setStatus(`Selected ${segment.label} at ${segment.start}–${segment.end}.`);
+  };
   const runPattern = async () => {
     if (!EXECUTABLE.has(flavor)) { setStatus(`${activeCompatibility.label} is compatibility-only in this release. Choose ECMAScript or PCRE2 to execute.`); return; }
     setBusy(true); const next = await executeRegexWithWatchdog(flavor as 'ecmascript'|'pcre2', pattern, flags, subject); setResult(next); setBusy(false); setStatus(next.error ? next.error : `${next.matches.length} match${next.matches.length === 1 ? '' : 'es'} in ${next.durationMs.toFixed(2)} ms.`);
@@ -64,7 +70,7 @@ const RegexWorkspace = () => {
   const openLesson = () => { setPattern(academySolution); setFlags(lesson.flags); setSubject(lesson.cases.map((item) => item.value).join('\n')); setMode('studio'); setStatus(`Opened “${lesson.title}” in Studio.`); };
   const share = async () => { const encoded=encodeRegexMatrixState({ mode, flavor, pattern, flags, subject }); const base=window.location.href.split('#')[0]!; const url=`${base}#/regex-matrix?state=${encoded}`; try { await navigator.clipboard.writeText(url); setStatus('Compressed local share URL copied.'); } catch { window.location.hash=`/regex-matrix?state=${encoded}`; setStatus('Share state placed in the address bar.'); } };
   const exportAssertions = () => downloadText(JSON.stringify({ engine:flavor, pattern, flags, positive:positive.split(/\r?\n/).filter(Boolean), negative:negative.split(/\r?\n/).filter(Boolean) }, null, 2), 'regex-matrix-tests.json', 'application/json;charset=utf-8');
-  const exportDiagram = () => { const width=900; const nodes=explanation.children.slice(0,14); const height=Math.max(100, 48+nodes.length*34); const body=nodes.map((node,index) => `<g transform="translate(24 ${34+index*34})"><rect width="${Math.min(820,160+node.source.length*7)}" height="24" rx="4" fill="#13243a" stroke="#47627f"/><text x="10" y="16" fill="#e8f2ff" font-family="monospace" font-size="12">${escapeXml(node.label)} · ${escapeXml(node.source)}</text></g>`).join(''); downloadText(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#0b1120"/>${body}</svg>`, 'regex-matrix-diagram.svg', 'image/svg+xml;charset=utf-8'); };
+  const exportDiagram = () => downloadText(renderRailroadSvg(railroad), 'regex-matrix-diagram.svg', 'image/svg+xml;charset=utf-8');
 
   return <div className="regex-matrix" data-testid="regex-matrix-workspace">
     <header className="regex-matrix-bar">
@@ -75,7 +81,7 @@ const RegexWorkspace = () => {
     </header>
 
     {mode === 'studio' ? <>
-      <section className="regex-pattern-strip" aria-label="Expression controls"><div className="regex-pattern-editor"><span>Pattern</span><RegexEditor label="Pattern" value={pattern} onChange={setPattern} compact /></div><label className="regex-flags">Flags<input aria-label="Flags" value={flags} onChange={(event) => setFlags(event.target.value)} /></label><button type="button" className="regex-run" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void runPattern()}>{busy ? 'Running…' : 'Run pattern'}</button></section>
+      <section className="regex-pattern-strip" aria-label="Expression controls"><div className="regex-pattern-editor"><span>Pattern</span><RegexEditor label="Pattern" value={pattern} onChange={setPattern} compact selectionRequest={railroadSelection ?? undefined} /></div><label className="regex-flags">Flags<input aria-label="Flags" value={flags} onChange={(event) => setFlags(event.target.value)} /></label><button type="button" className="regex-run" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void runPattern()}>{busy ? 'Running…' : 'Run pattern'}</button></section>
       <main className="regex-studio-grid">
         <section className="regex-editor-pane" aria-label="Test and replacement workspace"><div className="regex-pane-heading"><h2>Test subject</h2><span>{subject.length} chars</span></div><RegexEditor label="Test subject" value={subject} onChange={setSubject} />
           <div className="regex-substitute"><label>Replacement<input aria-label="Replacement" value={replacement} onChange={(event) => setReplacement(event.target.value)} /></label><pre tabIndex={0}>{replacementPreview}</pre></div>
@@ -86,6 +92,19 @@ const RegexWorkspace = () => {
           <section className={`regex-safety ${redos.risk}`}><div className="regex-pane-heading"><h2>ReDoS safety</h2><strong data-testid="redos-status">{riskLabel(redos.risk)}</strong></div><p>{redos.metricLabel}: {redos.score ?? 'n/a'}</p><small>{redos.note}</small></section>
         </aside>
       </main>
+      <section className="regex-railroad-panel" aria-labelledby="regex-railroad-heading">
+        <div className="regex-pane-heading"><h2 id="regex-railroad-heading">Railroad projection</h2><span>Structural view · source linked</span></div>
+        <div className="regex-railroad-scroll" tabIndex={0} aria-label="Regex railroad projection" data-testid="railroad-projection">
+          <svg className="regex-railroad-svg" width={railroad.width} height={railroad.height} viewBox={`0 0 ${railroad.width} ${railroad.height}`} role="img" aria-label="Regex railroad structural projection">
+            <line className="regex-railroad-line" x1={18} y1={railroad.baselineY} x2={railroad.width-18} y2={railroad.baselineY} />
+            <circle className="regex-railroad-terminal" cx={18} cy={railroad.baselineY} r={5} />
+            {railroad.segments.map((segment) => <g key={segment.id} transform={`translate(${segment.x} ${railroad.baselineY-28})`} className={railroadSelection?.from===segment.start && railroadSelection?.to===segment.end ? 'regex-railroad-node active' : 'regex-railroad-node'}><rect width={segment.width} height={56} rx={9}/><text className="regex-railroad-source" x={segment.width/2} y={22} textAnchor="middle">{segment.source.length>24 ? `${segment.source.slice(0,21)}…` : (segment.source || '∅')}</text><text className="regex-railroad-label" x={segment.width/2} y={41} textAnchor="middle">{segment.label.length>30 ? `${segment.label.slice(0,27)}…` : segment.label}</text></g>)}
+            <circle className="regex-railroad-terminal" cx={railroad.width-18} cy={railroad.baselineY} r={5} />
+          </svg>
+        </div>
+        <div className="regex-railroad-tokens" aria-label="Railroad source tokens">{railroad.segments.map((segment) => <button type="button" key={segment.id} aria-pressed={railroadSelection?.from===segment.start && railroadSelection?.to===segment.end} aria-label={`${segment.label}: ${segment.source || 'empty'}, source ${segment.start} to ${segment.end}`} onClick={() => selectRailroadSegment(segment)}><code>{segment.source || '∅'}</code><span>{segment.start}–{segment.end}</span></button>)}</div>
+        <p className="regex-railroad-selection" data-testid="railroad-selection">{railroadSelection ? `${railroadSelection.label} · ${railroadSelection.from}–${railroadSelection.to}` : 'Choose a railroad token to select its source range in the pattern editor.'}</p>
+      </section>
       <section className="regex-lower-grid">
         <div><div className="regex-pane-heading"><h2>Flavor compatibility</h2><span>Execution vs analysis is explicit</span></div><div className="regex-compat-table" role="table" aria-label="Flavor compatibility matrix">{compatibility.map((entry) => <div role="row" key={entry.flavor}><strong role="cell">{entry.label}</strong><span role="cell">{entry.capability === 'execution' ? 'Execution' : 'Compatibility only'}</span><span role="cell">{entry.supported ? 'Pattern supported' : entry.issues[0]}</span></div>)}</div></div>
         <div><div className="regex-pane-heading"><h2>Code generator</h2><label>Target<select aria-label="Code target" value={codeTarget} onChange={(event) => setCodeTarget(event.target.value as RegexCodeTarget)}>{TARGETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label></div><pre className="regex-code" tabIndex={0}>{code}</pre></div>

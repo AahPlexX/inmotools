@@ -4,8 +4,9 @@ import { searchKeymap } from '@codemirror/search';
 import { EditorState } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 
-interface Props { readonly label: string; readonly value: string; readonly onChange: (value: string) => void; readonly compact?: boolean; }
-const RegexEditor = ({ label, value, onChange, compact = false }: Props) => {
+interface SelectionRequest { readonly from: number; readonly to: number; readonly revision: number; }
+interface Props { readonly label: string; readonly value: string; readonly onChange: (value: string) => void; readonly compact?: boolean; readonly selectionRequest?: SelectionRequest; }
+const RegexEditor = ({ label, value, onChange, compact = false, selectionRequest }: Props) => {
   const hostRef = useRef<HTMLDivElement>(null); const viewRef = useRef<EditorView | null>(null); const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => {
@@ -14,6 +15,14 @@ const RegexEditor = ({ label, value, onChange, compact = false }: Props) => {
     const view = new EditorView({ state, parent: host }); view.scrollDOM.tabIndex = 0; view.scrollDOM.setAttribute('aria-label', compact ? 'Expression editor scroll area' : 'Subject editor scroll area'); viewRef.current = view; return () => { view.destroy(); viewRef.current = null; };
   }, [compact, label]);
   useEffect(() => { const view = viewRef.current; if (!view) return; const current = view.state.doc.toString(); if (current !== value) view.dispatch({ changes: { from: 0, to: current.length, insert: value } }); }, [value]);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !selectionRequest) return;
+    const from = Math.max(0, Math.min(selectionRequest.from, view.state.doc.length));
+    const to = Math.max(from, Math.min(selectionRequest.to, view.state.doc.length));
+    view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+    view.focus();
+  }, [selectionRequest]);
   return <div className={`regex-editor${compact ? ' compact' : ''}`} ref={hostRef} />;
 };
 export default RegexEditor;
