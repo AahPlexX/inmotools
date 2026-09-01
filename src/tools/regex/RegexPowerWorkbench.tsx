@@ -6,7 +6,7 @@ import { buildMatchExportRows, serializeMatchRows } from './regex-list';
 import { searchRegexReference } from './regex-reference';
 import { generateFuzzCases, synthesizeRegexCandidates, type RegexSynthesisCandidate } from './regex-synthesis';
 import type { RegexExplanationNode, RegexFlavor, RegexRunResult } from './regex-types';
-import { executeRegexWithWatchdog } from './regex-worker-client';
+import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-worker-client';
 
 type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'format' | 'synthesize';
 const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = [
@@ -17,7 +17,7 @@ const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = 
   { value:'format', label:'Format' },
   { value:'synthesize', label:'Synthesize' },
 ];
-const EXECUTABLE = new Set<RegexFlavor>(['ecmascript','pcre2']);
+const EXECUTABLE = new Set<RegexFlavor>(['ecmascript','pcre2','oniguruma']);
 interface Props {
   readonly flavor: RegexFlavor;
   readonly pattern: string;
@@ -49,7 +49,7 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
     setBenchmarkBusy(true);
     const samples:number[]=[]; let timeouts=0;
     for (let index=0;index<12;index+=1) {
-      const run=await executeRegexWithWatchdog(flavor as 'ecmascript'|'pcre2',pattern,flags,subject);
+      const run=await executeRegexWithWatchdog(flavor as RegexExecutionFlavor,pattern,flags,subject);
       if (run.timedOut) timeouts+=1; else if (!run.error) samples.push(run.durationMs);
     }
     setBenchmark(buildBenchmarkSummary(samples,12,timeouts));

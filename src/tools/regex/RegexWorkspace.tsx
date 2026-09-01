@@ -14,11 +14,11 @@ import { analyzeRedos } from './regex-redos';
 import { buildRailroadProjection, renderRailroadSvg } from './regex-railroad';
 import { decodeRegexMatrixState, encodeRegexMatrixState } from './regex-share';
 import type { AcademyLesson, RegexCodeTarget, RegexFlavor, RegexMode, RegexRunResult } from './regex-types';
-import { executeRegexWithWatchdog } from './regex-worker-client';
+import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-worker-client';
 
 type StudioView = 'editor' | 'matches' | 'explain' | 'safety';
 const STUDIO_VIEWS: readonly { value: StudioView; label: string }[] = [{ value:'editor', label:'Editor' }, { value:'matches', label:'Matches' }, { value:'explain', label:'Explain' }, { value:'safety', label:'Safety' }];
-const EXECUTABLE = new Set<RegexFlavor>(['ecmascript', 'pcre2']);
+const EXECUTABLE = new Set<RegexFlavor>(['ecmascript', 'pcre2', 'oniguruma']);
 const TARGETS: { value: RegexCodeTarget; label: string }[] = [
   { value:'typescript', label:'TypeScript' }, { value:'javascript', label:'JavaScript' }, { value:'python', label:'Python' }, { value:'go', label:'Go' }, { value:'rust', label:'Rust' }, { value:'php', label:'PHP' }, { value:'java', label:'Java' }, { value:'csharp', label:'C#' }, { value:'ruby', label:'Ruby' },
 ];
@@ -63,14 +63,14 @@ const RegexWorkspace = () => {
     setStatus(`Selected ${segment.label} at ${segment.start}–${segment.end}.`);
   };
   const runPattern = async () => {
-    if (!EXECUTABLE.has(flavor)) { setStatus(`${activeCompatibility.label} is compatibility-only in this release. Choose ECMAScript or PCRE2 to execute.`); return; }
-    setBusy(true); const next = await executeRegexWithWatchdog(flavor as 'ecmascript'|'pcre2', pattern, flags, subject); setResult(next); setBusy(false); setStatus(next.error ? next.error : `${next.matches.length} match${next.matches.length === 1 ? '' : 'es'} in ${next.durationMs.toFixed(2)} ms.`);
+    if (!EXECUTABLE.has(flavor)) { setStatus(`${activeCompatibility.label} is compatibility-only in this release. Choose an execution flavor to run this pattern.`); return; }
+    setBusy(true); const next = await executeRegexWithWatchdog(flavor as RegexExecutionFlavor, pattern, flags, subject); setResult(next); setBusy(false); setStatus(next.error ? next.error : `${next.matches.length} match${next.matches.length === 1 ? '' : 'es'} in ${next.durationMs.toFixed(2)} ms.`);
   };
   const runAssertions = async () => {
     if (!EXECUTABLE.has(flavor)) { setStatus('Assertions require an execution engine.'); return; }
     const cases = [...positive.split(/\r?\n/).filter(Boolean).map((value) => ({value,expected:true})), ...negative.split(/\r?\n/).filter(Boolean).map((value) => ({value,expected:false}))];
     const rows=[] as { value:string; expected:boolean; passed:boolean }[];
-    for (const item of cases) { const checked=await executeRegexWithWatchdog(flavor as 'ecmascript'|'pcre2', pattern, flags.replace(/g/g,''), item.value); rows.push({ ...item, passed: !checked.error && (checked.matches.length > 0) === item.expected }); }
+    for (const item of cases) { const checked=await executeRegexWithWatchdog(flavor as RegexExecutionFlavor, pattern, flags.replace(/g/g,''), item.value); rows.push({ ...item, passed: !checked.error && (checked.matches.length > 0) === item.expected }); }
     setAssertions(rows);
   };
   const checkLesson = () => { const checked=validateAcademySolution(lesson, academySolution, lesson.flags); setLessonResult(checked); if (checked.complete) { const next=new Set(completed); next.add(lesson.id); setCompleted(next); void saveRegexMatrixValue('academy-progress',[...next]); } };
@@ -120,7 +120,7 @@ const RegexWorkspace = () => {
     </header>
 
     {mode === 'studio' ? <>
-      <section className="regex-pattern-strip" aria-label="Expression controls"><div className="regex-pattern-editor"><span>Pattern</span><RegexEditor label="Pattern" value={pattern} onChange={setPattern} compact selectionRequest={railroadSelection ?? undefined} /></div><label className="regex-flags">Flags<input aria-label="Flags" value={flags} onChange={(event) => setFlags(event.target.value)} /></label><button type="button" className="regex-run" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void runPattern()}>{busy ? 'Running…' : 'Run pattern'}</button></section>
+      <section className="regex-pattern-strip" aria-label="Expression controls"><div className="regex-pattern-editor"><span>Pattern</span><RegexEditor label="Pattern" value={pattern} onChange={setPattern} compact selectionRequest={railroadSelection ?? undefined} flavor={flavor} /></div><label className="regex-flags">Flags<input aria-label="Flags" value={flags} onChange={(event) => setFlags(event.target.value)} /></label><button type="button" className="regex-run" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void runPattern()}>{busy ? 'Running…' : 'Run pattern'}</button></section>
       <nav className="regex-mobile-views" aria-label="Studio view">{STUDIO_VIEWS.map((item) => <button type="button" key={item.value} aria-pressed={mobileView===item.value} onClick={() => setMobileView(item.value)}>{item.label}</button>)}</nav>
       <main className="regex-studio-grid">
         <section className="regex-editor-pane" data-mobile-panel="editor" aria-label="Test and replacement workspace"><div className="regex-pane-heading"><h2>Test subject</h2><span>{subject.length} chars</span></div><RegexEditor label="Test subject" value={subject} onChange={setSubject} />

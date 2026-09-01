@@ -13,7 +13,7 @@ export const REGEX_FLAVOR_CATALOG: readonly RegexFlavorDescriptor[] = [
   { value:'rust', label:'Rust regex · compatibility', capability:'compatibility', note:'Rust regex crate compatibility analysis and Rust code generation.' },
   { value:'posix-ere', label:'POSIX ERE · compatibility', capability:'compatibility', note:'POSIX Extended Regular Expression compatibility analysis.' },
   { value:'posix-bre', label:'POSIX BRE · compatibility', capability:'compatibility', note:'POSIX Basic Regular Expression compatibility analysis.' },
-  { value:'oniguruma', label:'Oniguruma · compatibility', capability:'compatibility', note:'Additional Oniguruma-oriented compatibility analysis.' },
+  { value:'oniguruma', label:'Oniguruma WASM', capability:'execution', note:'Executes locally through Microsoft’s bundled vscode-oniguruma WebAssembly binding.' },
 ];
 const detectFeatures = (pattern: string): Set<Feature> => {
   const features = new Set<Feature>();
