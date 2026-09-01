@@ -34,6 +34,24 @@ test('Studio executes matches, exposes diagnostics, and identifies a ReDoS hazar
   await expect(page.getByTestId('redos-status')).toContainText(/hazard|unsafe|critical/i);
 });
 
+test('Oniguruma executes locally and the pattern editor offers flavor-aware completions', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByLabel('Engine flavor').selectOption('oniguruma');
+  await expect(page.getByTestId('engine-status')).toContainText(/Execution.*Oniguruma/i);
+
+  const pattern = page.getByRole('textbox', { name: 'Pattern', exact: true });
+  await pattern.fill('foo|bar');
+  await page.getByLabel('Flags').fill('g');
+  await page.getByLabel('Test subject').fill('foo baz bar');
+  await page.getByRole('button', { name: 'Run pattern' }).click();
+  await expect(page.getByTestId('match-count')).toHaveText('2');
+  await expect(page.getByTestId('engine-status')).toContainText(/Oniguruma/i);
+
+  await pattern.fill('(?P');
+  await pattern.press('Control+Space');
+  await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('(?P<name>a)');
+});
+
 test('Academy lesson can be completed and opened in Studio', async ({ page }) => {
   await page.goto('./#/regex-matrix');
   await page.getByRole('button', { name: 'Academy' }).click();
