@@ -37,10 +37,31 @@ test('favorites and recent tools survive a reload', async ({ page }) => {
 
 test('support action exists without exposing internal implementation instructions', async ({ page }) => {
   await page.goto('./');
-  const support = page.getByRole('link', { name: 'Buy me a coffee' });
+  const support = page.getByRole('link', { name: /Buy me a coffee/ });
   await expect(support).toBeVisible();
   await expect(support).toHaveAttribute('href', /^https:\/\/buymeacoffee\.com\//);
   await expect(page.locator('body')).not.toContainText('internal prompt');
+});
+
+test('ethical support prompt is globally available, optional, and non-modal', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByRole('link', { name: '☕ Buy me a coffee ($3)' })).toBeVisible();
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('inmotools:support-prompt', {
+      detail: {
+        key: 'e2e-high-value-export',
+        message: "Rendered full 1080p 60 FPS tactical animation locally. If this upgraded your team's match preparation, support independent sports tooling with a coffee.",
+      },
+    }));
+  });
+
+  const prompt = page.getByRole('status', { name: 'Support independent tooling' });
+  await expect(prompt).toBeVisible();
+  await expect(prompt).toContainText('Rendered full 1080p 60 FPS tactical animation locally.');
+  await expect(prompt.getByRole('link', { name: '☕ Buy me a coffee ($3)' })).toHaveAttribute('href', /^https:\/\/buymeacoffee\.com\//);
+  await prompt.getByRole('button', { name: 'Dismiss support prompt' }).click();
+  await expect(prompt).toHaveCount(0);
 });
 
 test('hardware suite offers simulator mode when hardware APIs are unavailable', async ({ page }) => {
