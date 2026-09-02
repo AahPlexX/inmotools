@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'InMo Tools',
@@ -26,6 +26,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,wasm}'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
         navigateFallback: 'index.html',
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
@@ -33,5 +34,12 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
     chunkSizeWarningLimit: 1800,
+    rolldownOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
   },
 });
