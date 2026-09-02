@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes, downloadText } from '../../lib/download';
-import { analyzeFloorplan, type FloorplanAnalysis } from './floorplan-analysis';
+import { analyzeFloorplan, buildSnapTargets, type FloorplanAnalysis } from './floorplan-analysis';
 import FloorplanCanvas, { type FloorplanToolMode } from './FloorplanCanvas';
 import FloorplanInspector from './FloorplanInspector';
 import { constrainAngle, clampZoom, screenToWorld, snapToGrid } from './geometry-engine';
@@ -11,6 +11,10 @@ import type { FloorplanProject, HostedOpening, PlanComponent, Point2D, ProjectHi
 import type { FloorplanWorkerResponse } from './floorplan-worker';
 
 const AUTOSAVE_KEY = 'inmotools_plancraft_autosave';
+// Rooms, dimensions, and clearance warnings are derived by the geometry worker. A
+// worker that is merely slow to start or busy would otherwise leave the plan with
+// no analysis and no recovery, so fall back to the identical main-thread pass.
+const ANALYSIS_FALLBACK_MS = 1500;
 const COFFEE_URL = 'https://buymeacoffee.com/aahplexx';
 
 const safeInitialHistory = (): ProjectHistory => {
@@ -60,13 +64,24 @@ export const FloorplanWorkspace = () => {
   const [exportNote, setExportNote] = useState('');
   const workerRef = useRef<Worker | undefined>(undefined);
   const requestRef = useRef(0);
+  const analysisTimerRef = useRef<number | undefined>(undefined);
   const latestProjectRef = useRef(history.present);
   const idRef = useRef(1);
   latestProjectRef.current = history.present;
 
+  const cancelAnalysisFallback = () => {
+    if (analysisTimerRef.current === undefined) return;
+    window.clearTimeout(analysisTimerRef.current);
+    analysisTimerRef.current = undefined;
+  };
+
   const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${idRef.current++}`;
   const openingCount = history.present.walls.reduce((sum, wall) => sum + wall.openings.length, 0);
   const displayProject = useMemo<FloorplanProject>(() => ({ ...history.present, rooms: analysis.rooms }), [analysis.rooms, history.present]);
+  // Derived here rather than read from the worker analysis so that snapping always
+  // reflects the geometry just drawn; a lagging round trip would otherwise let a
+  // closing click miss an existing vertex and silently leave the outline open.
+  const snapTargets = useMemo(() => buildSnapTargets(history.present), [history.present]);
 
   const setPresent = (updater: (project: FloorplanProject) => FloorplanProject) => setHistory((current) => ({ ...current, present: updater(current.present) }));
   const commit = (label: string, updater: (project: FloorplanProject) => FloorplanProject) => setHistory((current) => commitProject(current, label, updater));
@@ -76,6 +91,7 @@ export const FloorplanWorkspace = () => {
       const worker = new Worker(new URL('./floorplan-worker.ts', import.meta.url), { type: 'module' });
       worker.onmessage = (event: MessageEvent<FloorplanWorkerResponse>) => {
         if (event.data.requestId !== requestRef.current) return;
+        cancelAnalysisFallback();
         if (event.data.type === 'analysis') setAnalysis(event.data.analysis);
         else setStatus(`Geometry worker: ${event.data.message}`);
       };
@@ -100,8 +116,19 @@ export const FloorplanWorkspace = () => {
   useEffect(() => {
     const requestId = ++requestRef.current;
     const worker = workerRef.current;
-    if (worker) worker.postMessage({ type: 'analyze', requestId, project: history.present });
-    else setAnalysis(analyzeFloorplan(history.present));
+    const project = history.present;
+    if (!worker) {
+      setAnalysis(analyzeFloorplan(project));
+      return undefined;
+    }
+    worker.postMessage({ type: 'analyze', requestId, project });
+    cancelAnalysisFallback();
+    analysisTimerRef.current = window.setTimeout(() => {
+      analysisTimerRef.current = undefined;
+      if (requestRef.current !== requestId) return;
+      setAnalysis(analyzeFloorplan(project));
+    }, ANALYSIS_FALLBACK_MS);
+    return cancelAnalysisFallback;
   }, [history.present.vertices, history.present.walls, history.present.components]);
 
   useEffect(() => {
@@ -114,7 +141,7 @@ export const FloorplanWorkspace = () => {
   const resolvePoint = (raw: Point2D, shiftKey = false) => {
     let point = draftStart && shiftKey ? constrainAngle(draftStart.point, raw, 45) : raw;
     const radius = 15 / history.present.viewport.scale;
-    const nearest = snapping ? analysis.snapTargets
+    const nearest = snapping ? snapTargets
       .map((target) => ({ target, distance: Math.hypot(target.point.x - point.x, target.point.y - point.y) }))
       .filter((item) => item.distance <= radius)
       .sort((a, b) => a.distance - b.distance || a.target.id.localeCompare(b.target.id))[0] : undefined;
