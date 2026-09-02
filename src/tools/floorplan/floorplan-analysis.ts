@@ -43,9 +43,9 @@ const pointSegmentDistance = (point: Point2D, start: Point2D, end: Point2D) => {
   return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
 };
 
-export const analyzeFloorplan = (project: FloorplanProject): FloorplanAnalysis => {
-  const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const rooms = extractRoomFaces(project.vertices, project.walls);
+// Snap targets are a direct projection of current geometry, so they stay cheap
+// enough to derive on demand while drafting rather than only inside the worker pass.
+export const buildSnapTargets = (project: FloorplanProject): SnapTarget[] => {
   const vertexById = new Map(project.vertices.map((vertex) => [vertex.id, vertex.position]));
   const snapTargets: SnapTarget[] = project.vertices.map((vertex) => ({ id: vertex.id, point: vertex.position, kind: 'vertex' }));
   for (const wall of project.walls) {
@@ -55,6 +55,14 @@ export const analyzeFloorplan = (project: FloorplanProject): FloorplanAnalysis =
     snapTargets.push({ id: `${wall.id}:mid`, kind: 'midpoint', point: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } });
   }
   for (const component of project.components) snapTargets.push({ id: component.id, point: component.position, kind: 'component' });
+  return snapTargets;
+};
+
+export const analyzeFloorplan = (project: FloorplanProject): FloorplanAnalysis => {
+  const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const rooms = extractRoomFaces(project.vertices, project.walls);
+  const vertexById = new Map(project.vertices.map((vertex) => [vertex.id, vertex.position]));
+  const snapTargets = buildSnapTargets(project);
   createSnapIndex(snapTargets);
 
   const clearanceViolations: ClearanceViolation[] = [];

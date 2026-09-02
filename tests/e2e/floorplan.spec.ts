@@ -55,6 +55,30 @@ test('drafts a room, hosts a door, stages a component, and supports undo/redo', 
   await expect(page.getByTestId('component-count')).toHaveText('1');
 });
 
+test('an interrupted gesture does not wedge the drafting canvas', async ({ page }) => {
+  await page.goto('./#/floorplan-studio');
+  await page.getByRole('button', { name: /Continuous Wall/ }).click();
+
+  // Model a gesture whose pointerup/pointercancel never reaches the canvas
+  // (OS gesture steal, palm rejection, capture lost to another element).
+  await page.evaluate(() => {
+    const overlay = document.querySelector('[data-testid="floorplan-overlay"]');
+    if (!overlay) throw new Error('Floor-plan overlay canvas is not present.');
+    const rect = overlay.getBoundingClientRect();
+    overlay.dispatchEvent(new PointerEvent('pointerdown', {
+      pointerId: 99, pointerType: 'touch', isPrimary: true, bubbles: true,
+      clientX: rect.left + 10, clientY: rect.top + 10,
+    }));
+  });
+
+  // Re-arm the wall tool so any draft seeded by the interrupted gesture is cleared
+  // and the two clicks below are the only geometry input.
+  await page.keyboard.press('w');
+  await clickAt(page, 0.25, 0.3);
+  await clickAt(page, 0.7, 0.3);
+  await expect(page.getByTestId('wall-count')).toHaveText('1');
+});
+
 test('autosaves locally and restores the drawing after reload', async ({ page }) => {
   await page.goto('./#/floorplan-studio');
   await page.getByRole('button', { name: /Continuous Wall/ }).click();

@@ -78,10 +78,29 @@ export const FloorplanCanvas = ({
     pinchRef.current = { distance, midpoint };
   };
 
+  // Pointer capture is cleared by the user agent immediately after pointerup or
+  // pointercancel, so a tracked id the canvas no longer captures belongs to a
+  // gesture whose release event never arrived. Dropping those ids keeps a lost
+  // release from being misread as an extra finger and silencing every later tap.
+  const dropReleasedPointers = (target: Element, activeId: number) => {
+    for (const pointerId of [...pointersRef.current.keys()]) {
+      if (pointerId !== activeId && !target.hasPointerCapture(pointerId)) pointersRef.current.delete(pointerId);
+    }
+  };
+
+  const capturePointer = (target: Element, pointerId: number) => {
+    // Touch and pen already receive implicit capture before pointerdown listeners
+    // run, and an explicit request throws when the id is not an active pointer or
+    // while a pointer lock is held. Capture is an optimization here, not a
+    // requirement, so a rejected request must not abort the interaction.
+    try { target.setPointerCapture(pointerId); } catch { /* Continue without explicit capture. */ }
+  };
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
+    dropReleasedPointers(event.currentTarget, event.pointerId);
     pointersRef.current.set(event.pointerId, screen);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    capturePointer(event.currentTarget, event.pointerId);
     if (pointersRef.current.size >= 2) { updatePinch(); return; }
     const shouldPan = spacePressed || event.button === 1 || (event.pointerType === 'touch' && mode === 'select');
     if (shouldPan) { lastPanRef.current = screen; return; }
@@ -91,6 +110,7 @@ export const FloorplanCanvas = ({
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
+    dropReleasedPointers(event.currentTarget, event.pointerId);
     if (pointersRef.current.has(event.pointerId)) pointersRef.current.set(event.pointerId, screen);
     if (pointersRef.current.size >= 2) { updatePinch(); return; }
     if (lastPanRef.current) {
