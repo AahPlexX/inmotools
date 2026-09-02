@@ -59,3 +59,21 @@ test('layout does not create accidental horizontal page overflow', async ({ page
   const suiteOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(suiteOverflow).toBeLessThanOrEqual(1);
 });
+
+
+test('stale lazy chunk failures recover by refreshing onto the current deployment', async ({ page }) => {
+  let blocked = false;
+  await page.route('**/assets/workspaces-*.js', async (route) => {
+    if (!blocked) {
+      blocked = true;
+      await route.abort('failed');
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('./');
+  await page.getByRole('link', { name: /PlanCraft Studio/ }).click();
+  await expect(page.getByTestId('suite-title')).toContainText('PlanCraft Studio');
+  expect(blocked).toBe(true);
+});
