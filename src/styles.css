@@ -486,3 +486,29 @@ tr:last-child td { border-bottom: 0; }
   .regex-synthesis-inputs { grid-template-columns:1fr; }
   .regex-fuzz-list { columns:1; }
 }
+
+/* Optional support prompt: surfaced only after a tool explicitly reports a completed high-value action. */
+.support-toast {
+  position: fixed;
+  right: clamp(14px, 2vw, 28px);
+  bottom: clamp(14px, 2vw, 28px);
+  z-index: 90;
+  width: min(430px, calc(100vw - 28px));
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.support-toast p { margin: 0; font-size: 14px; line-height: 1.55; }
+.support-toast-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.support-toast-actions a { color: var(--signal-strong); font-weight: 750; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.support-toast-actions button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-strong); color: var(--ink); font-weight: 700; }
+.support-toast-actions button:hover { border-color: var(--ink); }
+@media (max-width: 600px) {
+  .support-toast { left: 14px; right: 14px; bottom: 14px; width: auto; }
+}
+
