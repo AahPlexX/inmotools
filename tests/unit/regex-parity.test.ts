@@ -11,7 +11,7 @@ describe('RegexMatrix parity workbench contracts', () => {
     const rows = analyzeCompatibility('(?<=foo)bar');
     const flavors = rows.map((row) => row.flavor);
     expect(flavors).toEqual(expect.arrayContaining(['pcre','pcre2','ecmascript','python','go-re2','java','dotnet','rust','posix-ere','posix-bre','oniguruma']));
-    expect(rows.filter((row) => row.capability === 'execution').map((row) => row.flavor).sort()).toEqual(['ecmascript','oniguruma','pcre2']);
+    expect(rows.filter((row) => row.capability === 'execution').map((row) => row.flavor).sort()).toEqual(['ecmascript','oniguruma','pcre2','python']);
   });
 
   it('ships a useful searchable quick reference with flavor-aware entries', () => {

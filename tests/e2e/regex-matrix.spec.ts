@@ -166,3 +166,17 @@ test('RegexMatrix Academy includes SEO course and deterministic practice lab', a
   await page.getByRole('button', { name: 'Practice Lab' }).click();
   await expect(page.getByTestId('practice-lab')).toContainText(/challenge|practice/i);
 });
+
+test('Python re executes locally with Python-only named groups', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByLabel('Engine flavor').selectOption('python');
+  await expect(page.getByTestId('engine-status')).toContainText(/Execution.*Python/i);
+  await page.getByLabel('Pattern').fill('(?P<word>\\w+)');
+  await page.getByLabel('Flags').fill('g');
+  await page.getByLabel('Test subject').fill('alpha beta');
+  await page.getByRole('button', { name: 'Run pattern' }).click();
+  await expect(page.getByTestId('match-count')).toHaveText('2');
+  await expect(page.getByTestId('match-inspector')).toContainText('word');
+  await expect(page.getByTestId('match-inspector')).toContainText('alpha');
+});
+
