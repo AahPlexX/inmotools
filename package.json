@@ -5,13 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@12.1.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "dev": "pnpm prepare:pyodide && vite",
+    "build": "pnpm prepare:pyodide && tsc --noEmit -p tsconfig.app.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "playwright test",
-    "test:ci": "pnpm test:unit && pnpm build && playwright test"
+    "test:ci": "pnpm test:unit && pnpm build && playwright test",
+    "prepare:pyodide": "node scripts/copy-pyodide.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
@@ -45,6 +46,7 @@
     "papaparse": "5.7.0",
     "pcre2-wasm": "10.47.5",
     "pdf-lib": "1.17.1",
+    "pyodide": "314.0.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router": "8.3.1",

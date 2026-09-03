@@ -18,7 +18,7 @@ import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-wor
 
 type StudioView = 'editor' | 'matches' | 'explain' | 'safety';
 const STUDIO_VIEWS: readonly { value: StudioView; label: string }[] = [{ value:'editor', label:'Editor' }, { value:'matches', label:'Matches' }, { value:'explain', label:'Explain' }, { value:'safety', label:'Safety' }];
-const EXECUTABLE = new Set<RegexFlavor>(['ecmascript', 'pcre2', 'oniguruma']);
+const EXECUTABLE = new Set<RegexFlavor>(['ecmascript', 'pcre2', 'oniguruma', 'python']);
 const TARGETS: { value: RegexCodeTarget; label: string }[] = [
   { value:'typescript', label:'TypeScript' }, { value:'javascript', label:'JavaScript' }, { value:'python', label:'Python' }, { value:'go', label:'Go' }, { value:'rust', label:'Rust' }, { value:'php', label:'PHP' }, { value:'java', label:'Java' }, { value:'csharp', label:'C#' }, { value:'ruby', label:'Ruby' },
 ];
