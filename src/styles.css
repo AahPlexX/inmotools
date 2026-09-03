@@ -512,3 +512,23 @@ tr:last-child td { border-bottom: 0; }
   .support-toast { left: 14px; right: 14px; bottom: 14px; width: auto; }
 }
 
+/* RegexMatrix advanced Academy */
+.regex-crossword { display: grid; gap: 1rem; min-width: 0; }
+.regex-crossword-layout { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: clamp(.8rem, 2vw, 1.4rem); align-items: start; }
+.regex-crossword-grid { display: grid; grid-template-columns: repeat(3, minmax(44px, 62px)); gap: .35rem; width: fit-content; max-width: 100%; }
+.regex-crossword-grid input { width: clamp(44px, 12vw, 62px); aspect-ratio: 1; min-width: 0; border: 1px solid var(--matrix-line); border-radius: .65rem; background: var(--matrix-panel-strong); color: var(--matrix-text); text-align: center; font: 700 clamp(1.05rem, 3vw, 1.45rem)/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.regex-crossword-grid input:focus-visible { outline: 2px solid var(--matrix-accent); outline-offset: 2px; }
+.regex-crossword-rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; min-width: 0; }
+.regex-crossword-rules > div { display: grid; gap: .4rem; min-width: 0; }
+.regex-crossword-rules code { overflow-wrap: anywhere; padding: .45rem .55rem; border: 1px solid var(--matrix-line); border-radius: .55rem; background: var(--matrix-panel-strong); }
+.regex-crossword-rules code.pass { border-color: var(--matrix-success); }
+.regex-custom-tracks { display: grid; gap: 1rem; min-width: 0; }
+.regex-custom-tracks > label { display: grid; gap: .45rem; font-weight: 700; }
+.regex-custom-tracks textarea { width: 100%; min-height: 12rem; resize: vertical; border: 1px solid var(--matrix-line); border-radius: .7rem; padding: .75rem; background: var(--matrix-panel-strong); color: var(--matrix-text); font: 500 var(--matrix-code-size)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.regex-custom-track-list { display: grid; gap: .9rem; }
+.regex-custom-track-list > section { border: 1px solid var(--matrix-line); border-radius: .8rem; padding: .85rem; background: var(--matrix-panel-strong); }
+.regex-custom-track-list h3 { margin: .15rem 0 0; }
+.regex-custom-lesson { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .75rem 0; border-top: 1px solid var(--matrix-line); }
+.regex-custom-lesson p { margin: .2rem 0; }
+@media (max-width: 720px) { .regex-crossword-layout, .regex-crossword-rules { grid-template-columns: 1fr; } .regex-custom-lesson { align-items: flex-start; flex-direction: column; } }
+
