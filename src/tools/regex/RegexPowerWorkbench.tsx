@@ -1,19 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { buildBenchmarkSummary, type RegexBenchmarkSummary } from './regex-benchmark';
 import { buildDebugTrace, formatRegexForReview } from './regex-debugger';
+import { buildRegexAutomaton, simulateRegexAutomaton } from './regex-automaton';
 import { buildMatchExportRows, serializeMatchRows } from './regex-list';
 import { searchRegexReference } from './regex-reference';
 import { generateFuzzCases, synthesizeRegexCandidates, type RegexSynthesisCandidate } from './regex-synthesis';
 import type { RegexExplanationNode, RegexFlavor, RegexRunResult } from './regex-types';
 import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-worker-client';
 
-type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'format' | 'synthesize';
+type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'automaton' | 'format' | 'synthesize';
 const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = [
   { value:'reference', label:'Reference' },
   { value:'benchmark', label:'Benchmark' },
   { value:'list', label:'List & export' },
   { value:'debugger', label:'Debugger' },
+  { value:'automaton', label:'Automaton' },
   { value:'format', label:'Format' },
   { value:'synthesize', label:'Synthesize' },
 ];
@@ -41,9 +43,15 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
   const [fuzz,setFuzz] = useState<string[]>([]);
   const reference = useMemo(() => searchRegexReference(referenceQuery, flavor).slice(0,80), [flavor,referenceQuery]);
   const trace = useMemo(() => buildDebugTrace(explanation), [explanation]);
+  const automaton = useMemo(() => buildRegexAutomaton(pattern, flags), [flags, pattern]);
+  const automatonSimulation = useMemo(() => simulateRegexAutomaton(automaton, subject), [automaton, subject]);
+  const [automatonIndex,setAutomatonIndex] = useState(0);
+  useEffect(() => { setAutomatonIndex(0); }, [automatonSimulation]);
   const formatted = useMemo(() => formatRegexForReview(explanation), [explanation]);
   const matchRows = useMemo(() => buildMatchExportRows(result.matches), [result.matches]);
   const step = trace.steps[Math.min(debugIndex, Math.max(0,trace.steps.length-1))] ?? null;
+  const automatonFrame = automatonSimulation.frames[Math.min(automatonIndex, Math.max(0,automatonSimulation.frames.length-1))] ?? null;
+  const activeAutomatonStates = new Set(automatonFrame?.activeStateIds ?? []);
   const runBenchmark = async () => {
     if (!EXECUTABLE.has(flavor)) return;
     setBenchmarkBusy(true);
@@ -60,6 +68,10 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
     const next=Math.max(0,Math.min(trace.steps.length-1,debugIndex+delta));
     setDebugIndex(next); const selected=trace.steps[next]; if(selected) onSelectSource(selected.start,selected.end,selected.label);
   };
+  const moveAutomaton = (delta:number) => {
+    if (!automatonSimulation.frames.length) return;
+    setAutomatonIndex((current) => Math.max(0, Math.min(automatonSimulation.frames.length - 1, current + delta)));
+  };
   const runSynthesis = () => {
     const positiveRows=lines(positive), negativeRows=lines(negative);
     setCandidates(synthesizeRegexCandidates(positiveRows,negativeRows));
@@ -74,6 +86,31 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
       {active==='benchmark' ? <section aria-label="Regex benchmark"><div className="regex-tool-actions"><button type="button" disabled={!EXECUTABLE.has(flavor)||benchmarkBusy} onClick={()=>void runBenchmark()}>{benchmarkBusy?'Benchmarking…':'Run benchmark'}</button><small>12 isolated local executions through the selected real engine. Compatibility-only flavors cannot benchmark.</small></div>{benchmark ? <dl className="regex-benchmark-stats" data-testid="benchmark-summary"><div><dt>Median</dt><dd>{benchmark.medianMs.toFixed(3)} ms</dd></div><div><dt>P95</dt><dd>{benchmark.p95Ms.toFixed(3)} ms</dd></div><div><dt>Min / max</dt><dd>{benchmark.minMs.toFixed(3)} / {benchmark.maxMs.toFixed(3)} ms</dd></div><div><dt>Throughput</dt><dd>{benchmark.throughputPerSecond.toFixed(1)} runs/s</dd></div><div><dt>Timeouts</dt><dd>{benchmark.timeouts}/{benchmark.iterations}</dd></div></dl>:<p className="regex-empty">Run a benchmark to measure the current pattern, subject, flags, and execution engine.</p>}</section> : null}
       {active==='list' ? <section aria-label="Match list and export"><pre className="regex-match-export-preview" data-testid="match-export-preview" tabIndex={0}>{serializeMatchRows(matchRows,'text') || 'Run the pattern to build a match list.'}</pre><div className="regex-tool-actions"><button type="button" onClick={()=>exportMatches('csv')}>Export matches CSV</button><button type="button" onClick={()=>exportMatches('json')}>Export matches JSON</button><button type="button" onClick={()=>exportMatches('text')}>Export matches text</button></div></section> : null}
       {active==='debugger' ? <section aria-label="Structural regex debugger"><p className="regex-truth-note">Structural source traversal — not native-engine backtracking steps.</p>{step ? <article className="regex-debug-step" data-testid="debugger-step"><strong>Step {step.index+1} of {trace.steps.length}</strong><code>{step.source || '∅'}</code><p>{step.label}</p><small>Source {step.start}–{step.end}</small></article>:<p className="regex-empty" data-testid="debugger-step">No structural steps are available for this expression.</p>}<div className="regex-tool-actions"><button type="button" disabled={debugIndex<=0} onClick={()=>moveDebug(-1)}>Previous debug step</button><button type="button" disabled={debugIndex>=trace.steps.length-1} onClick={()=>moveDebug(1)}>Next debug step</button></div></section> : null}
+      {active==='automaton' ? <section aria-label="Regex Thompson NFA automaton">
+        <p className="regex-truth-note" data-testid="automaton-truth-note">{automaton.note}</p>
+        {!automaton.supported ? <p className="regex-error" data-testid="automaton-unsupported">Unsupported by this automaton visualizer: {automaton.unsupported.join(' ')}</p> : <>
+          <div className="regex-automaton-scroll" data-testid="automaton-canvas" tabIndex={0} aria-label="Regex automaton graph viewport">
+            <svg className="regex-automaton-svg" width={automaton.width} height={automaton.height} viewBox={`0 0 ${automaton.width} ${automaton.height}`} role="img" aria-label="Thompson NFA state graph">
+              <defs><marker id="regex-automaton-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+              {automaton.transitions.map((transition) => {
+                const from=automaton.states.find((state)=>state.id===transition.from), to=automaton.states.find((state)=>state.id===transition.to);
+                if(!from||!to) return null;
+                const backward=to.x<=from.x;
+                const path=backward ? `M ${from.x} ${from.y-25} C ${from.x+24} ${Math.max(18,from.y-74)}, ${to.x-24} ${Math.max(18,to.y-74)}, ${to.x} ${to.y-25}` : `M ${from.x+27} ${from.y} C ${(from.x+to.x)/2} ${from.y}, ${(from.x+to.x)/2} ${to.y}, ${to.x-27} ${to.y}`;
+                const labelX=backward?(from.x+to.x)/2:(from.x+to.x)/2, labelY=backward?Math.max(14,Math.min(from.y,to.y)-66):(from.y+to.y)/2-8;
+                return <g key={transition.id} className={activeAutomatonStates.has(transition.from)?'active':''}><path className="regex-automaton-edge" d={path} markerEnd="url(#regex-automaton-arrow)" /><text className="regex-automaton-edge-label" x={labelX} y={labelY} textAnchor="middle">{transition.label}</text></g>;
+              })}
+              {automaton.states.map((state)=><g key={state.id} className={`regex-automaton-state ${state.kind}${activeAutomatonStates.has(state.id)?' active':''}`} transform={`translate(${state.x} ${state.y})`}><circle r="25" /><text textAnchor="middle" y="4">{state.label}</text>{activeAutomatonStates.has(state.id)?<text className="regex-automaton-active-label" textAnchor="middle" y="42">active</text>:null}</g>)}
+            </svg>
+          </div>
+          <div className="regex-automaton-controls">
+            <button type="button" disabled={automatonIndex<=0} onClick={()=>moveAutomaton(-1)}>Previous automaton step</button>
+            <button type="button" disabled={automatonIndex>=automatonSimulation.frames.length-1} onClick={()=>moveAutomaton(1)}>Next automaton step</button>
+            <span data-testid="automaton-step">{automatonFrame ? `Step ${automatonFrame.index+1}/${automatonSimulation.frames.length}: ${automatonFrame.description}` : 'No simulation steps.'}</span>
+          </div>
+          <p className="regex-automaton-match" data-testid="automaton-match">{automatonSimulation.match ? `Match: ${automatonSimulation.match.text} · ${automatonSimulation.match.start}–${automatonSimulation.match.end}` : 'No match found by the supported NFA simulation.'}</p>
+        </>}
+      </section> : null}
       {active==='format' ? <section aria-label="Regex review formatter"><p className="regex-truth-note">Readable structural review. This does not rewrite the executable expression or claim semantic-equivalent whitespace formatting.</p><pre className="regex-format-review" tabIndex={0}>{formatted}</pre></section> : null}
       {active==='synthesize' ? <section className="regex-synthesis" aria-label="Sample-driven regex synthesis"><div className="regex-synthesis-inputs"><label>Positive synthesis samples<textarea aria-label="Positive synthesis samples" value={positive} onChange={(event)=>setPositive(event.target.value)} /></label><label>Negative synthesis samples<textarea aria-label="Negative synthesis samples" value={negative} onChange={(event)=>setNegative(event.target.value)} /></label></div><div className="regex-tool-actions"><button type="button" onClick={runSynthesis}>Generate candidates</button></div><div className="regex-synthesis-candidates" data-testid="synthesis-candidates">{candidates.length?candidates.map((candidate)=><article key={candidate.pattern}><div><code>{candidate.pattern}</code><strong>{candidate.label}</strong><small>{candidate.passesAllSamples?'All samples pass':'Review needed'} · score {candidate.score.toFixed(0)}</small></div><button type="button" disabled={!candidate.passesAllSamples} onClick={()=>onPatternChange(candidate.pattern)}>Use pattern</button></article>):<p className="regex-empty">Candidates appear here only after you request synthesis. RegexMatrix never silently replaces your pattern.</p>}</div>{fuzz.length?<details><summary>Generated edge cases ({fuzz.length})</summary><ul className="regex-fuzz-list">{fuzz.map((value,index)=><li key={`${index}-${value}`}><code>{JSON.stringify(value)}</code></li>)}</ul></details>:null}</section> : null}
     </div>
