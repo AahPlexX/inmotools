@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { buildBenchmarkSummary, type RegexBenchmarkSummary } from './regex-benchmark';
 import { buildDebugTrace, formatRegexForReview } from './regex-debugger';
+import { REGEX_FLAVOR_CATALOG } from './regex-compat';
 import { buildRegexAutomaton, simulateRegexAutomaton } from './regex-automaton';
 import { buildMatchExportRows, serializeMatchRows } from './regex-list';
+import { planRegexPortability } from './regex-portability';
 import { searchRegexReference } from './regex-reference';
 import { analyzeRedos } from './regex-redos';
 import { buildRedosProbeInput, summarizeRedosProfile, type RedosProfilePoint, type RedosProfileSummary } from './regex-redos-profile';
@@ -11,7 +13,7 @@ import { generateFuzzCases, synthesizeRegexCandidates, type RegexSynthesisCandid
 import type { RegexExplanationNode, RegexFlavor, RegexRunResult } from './regex-types';
 import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-worker-client';
 
-type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'automaton' | 'redos-profile' | 'format' | 'synthesize';
+type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'automaton' | 'redos-profile' | 'format' | 'portability' | 'synthesize';
 const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = [
   { value:'reference', label:'Reference' },
   { value:'benchmark', label:'Benchmark' },
@@ -20,6 +22,7 @@ const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = 
   { value:'automaton', label:'Automaton' },
   { value:'redos-profile', label:'ReDoS Lab' },
   { value:'format', label:'Format' },
+  { value:'portability', label:'Portability' },
   { value:'synthesize', label:'Synthesize' },
 ];
 const EXECUTABLE = new Set<RegexFlavor>(['ecmascript','pcre2','oniguruma']);
@@ -31,12 +34,14 @@ interface Props {
   readonly result: RegexRunResult;
   readonly explanation: RegexExplanationNode;
   readonly onPatternChange: (value: string) => void;
+  readonly onFlavorChange: (value: RegexFlavor) => void;
   readonly onSelectSource: (start: number, end: number, label: string) => void;
 }
 const lines = (value: string) => value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
-const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanation, onPatternChange, onSelectSource }: Props) => {
+const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanation, onPatternChange, onFlavorChange, onSelectSource }: Props) => {
   const [active,setActive] = useState<PowerTool>('reference');
   const [referenceQuery,setReferenceQuery] = useState('');
+  const [portabilityTarget,setPortabilityTarget] = useState<RegexFlavor>(flavor === 'python' ? 'ecmascript' : 'python');
   const [benchmark,setBenchmark] = useState<RegexBenchmarkSummary | null>(null);
   const [benchmarkBusy,setBenchmarkBusy] = useState(false);
   const [debugIndex,setDebugIndex] = useState(0);
@@ -50,11 +55,13 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
   const [redosProfile,setRedosProfile] = useState<RedosProfileSummary | null>(null);
   const [redosProfileBusy,setRedosProfileBusy] = useState(false);
   const reference = useMemo(() => searchRegexReference(referenceQuery, flavor).slice(0,80), [flavor,referenceQuery]);
+  const portability = useMemo(() => planRegexPortability(pattern, flavor, portabilityTarget), [flavor, pattern, portabilityTarget]);
   const trace = useMemo(() => buildDebugTrace(explanation), [explanation]);
   const automaton = useMemo(() => buildRegexAutomaton(pattern, flags), [flags, pattern]);
   const automatonSimulation = useMemo(() => simulateRegexAutomaton(automaton, subject), [automaton, subject]);
   const [automatonIndex,setAutomatonIndex] = useState(0);
   useEffect(() => { setAutomatonIndex(0); }, [automatonSimulation]);
+  useEffect(() => { if (portabilityTarget === flavor) setPortabilityTarget(flavor === 'ecmascript' ? 'python' : 'ecmascript'); }, [flavor, portabilityTarget]);
   useEffect(() => {
     setProbePump(redosAssessment.probe.pump);
     setProbeSuffix(redosAssessment.probe.suffix);
@@ -163,6 +170,15 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
         </>:<p className="regex-empty">Run the bounded profile to compare measured runtimes across increasing probe lengths.</p>}
       </section> : null}
       {active==='format' ? <section aria-label="Regex review formatter"><p className="regex-truth-note">Readable structural review. This does not rewrite the executable expression or claim semantic-equivalent whitespace formatting.</p><pre className="regex-format-review" tabIndex={0}>{formatted}</pre></section> : null}
+      {active==='portability' ? <section aria-label="Regex portability planner">
+        <p className="regex-truth-note">Only documented syntax migrations are applied automatically. Unsupported target constructs remain manual; RegexMatrix never invents speculative polyfills or claims semantic equivalence it cannot prove.</p>
+        <label className="regex-tool-search">Target flavor<select aria-label="Portability target" value={portabilityTarget} onChange={(event)=>setPortabilityTarget(event.target.value as RegexFlavor)}>{REGEX_FLAVOR_CATALOG.map((item)=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+        <p className="regex-hint" data-testid="portability-status">{portability.status==='safe-rewrite'?'Safe rewrite available':portability.status==='manual'?'Manual migration required':'Portable unchanged'}</p>
+        <pre className="regex-format-review" data-testid="portability-preview" tabIndex={0}>{portability.outputPattern || '∅'}</pre>
+        {portability.changes.length ? <ul>{portability.changes.map((change,index)=><li key={`${change.kind}-${index}`}><strong>{change.note}</strong> <code>{change.from}</code> → <code>{change.to}</code></li>)}</ul> : null}
+        <div data-testid="portability-blockers">{portability.blockers.length ? <ul>{portability.blockers.map((blocker)=><li key={blocker}>{blocker}</li>)}</ul> : <p className="regex-hint">No target blockers detected by the current compatibility model.</p>}</div>
+        <div className="regex-tool-actions"><button type="button" disabled={portability.status!=='safe-rewrite'} onClick={()=>{ onPatternChange(portability.outputPattern); onFlavorChange(portabilityTarget); }}>Apply safe rewrite</button></div>
+      </section> : null}
       {active==='synthesize' ? <section className="regex-synthesis" aria-label="Sample-driven regex synthesis"><div className="regex-synthesis-inputs"><label>Positive synthesis samples<textarea aria-label="Positive synthesis samples" value={positive} onChange={(event)=>setPositive(event.target.value)} /></label><label>Negative synthesis samples<textarea aria-label="Negative synthesis samples" value={negative} onChange={(event)=>setNegative(event.target.value)} /></label></div><div className="regex-tool-actions"><button type="button" onClick={runSynthesis}>Generate candidates</button></div><div className="regex-synthesis-candidates" data-testid="synthesis-candidates">{candidates.length?candidates.map((candidate)=><article key={candidate.pattern}><div><code>{candidate.pattern}</code><strong>{candidate.label}</strong><small>{candidate.passesAllSamples?'All samples pass':'Review needed'} · score {candidate.score.toFixed(0)}</small></div><button type="button" disabled={!candidate.passesAllSamples} onClick={()=>onPatternChange(candidate.pattern)}>Use pattern</button></article>):<p className="regex-empty">Candidates appear here only after you request synthesis. RegexMatrix never silently replaces your pattern.</p>}</div>{fuzz.length?<details><summary>Generated edge cases ({fuzz.length})</summary><ul className="regex-fuzz-list">{fuzz.map((value,index)=><li key={`${index}-${value}`}><code>{JSON.stringify(value)}</code></li>)}</ul></details>:null}</section> : null}
     </div>
   </section>;
