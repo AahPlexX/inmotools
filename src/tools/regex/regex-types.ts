@@ -46,6 +46,12 @@ export interface RedosAssessment {
   readonly metricLabel: 'Ambiguity path score';
   readonly note: string;
   readonly trails: readonly { readonly start: number; readonly end: number; readonly source: string }[];
+  readonly probe: {
+    readonly prefix: string;
+    readonly pump: string;
+    readonly suffix: string;
+    readonly basis: string;
+  };
 }
 
 export interface RegexShareState {

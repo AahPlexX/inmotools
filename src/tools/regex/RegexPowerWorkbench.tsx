@@ -5,17 +5,20 @@ import { buildDebugTrace, formatRegexForReview } from './regex-debugger';
 import { buildRegexAutomaton, simulateRegexAutomaton } from './regex-automaton';
 import { buildMatchExportRows, serializeMatchRows } from './regex-list';
 import { searchRegexReference } from './regex-reference';
+import { analyzeRedos } from './regex-redos';
+import { buildRedosProbeInput, summarizeRedosProfile, type RedosProfilePoint, type RedosProfileSummary } from './regex-redos-profile';
 import { generateFuzzCases, synthesizeRegexCandidates, type RegexSynthesisCandidate } from './regex-synthesis';
 import type { RegexExplanationNode, RegexFlavor, RegexRunResult } from './regex-types';
 import { executeRegexWithWatchdog, type RegexExecutionFlavor } from './regex-worker-client';
 
-type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'automaton' | 'format' | 'synthesize';
+type PowerTool = 'reference' | 'benchmark' | 'list' | 'debugger' | 'automaton' | 'redos-profile' | 'format' | 'synthesize';
 const TOOLS: readonly { readonly value: PowerTool; readonly label: string }[] = [
   { value:'reference', label:'Reference' },
   { value:'benchmark', label:'Benchmark' },
   { value:'list', label:'List & export' },
   { value:'debugger', label:'Debugger' },
   { value:'automaton', label:'Automaton' },
+  { value:'redos-profile', label:'ReDoS Lab' },
   { value:'format', label:'Format' },
   { value:'synthesize', label:'Synthesize' },
 ];
@@ -41,12 +44,22 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
   const [negative,setNegative] = useState('12a\n1234');
   const [candidates,setCandidates] = useState<RegexSynthesisCandidate[]>([]);
   const [fuzz,setFuzz] = useState<string[]>([]);
+  const redosAssessment = useMemo(() => analyzeRedos(pattern, flags), [flags, pattern]);
+  const [probePump,setProbePump] = useState(redosAssessment.probe.pump);
+  const [probeSuffix,setProbeSuffix] = useState(redosAssessment.probe.suffix);
+  const [redosProfile,setRedosProfile] = useState<RedosProfileSummary | null>(null);
+  const [redosProfileBusy,setRedosProfileBusy] = useState(false);
   const reference = useMemo(() => searchRegexReference(referenceQuery, flavor).slice(0,80), [flavor,referenceQuery]);
   const trace = useMemo(() => buildDebugTrace(explanation), [explanation]);
   const automaton = useMemo(() => buildRegexAutomaton(pattern, flags), [flags, pattern]);
   const automatonSimulation = useMemo(() => simulateRegexAutomaton(automaton, subject), [automaton, subject]);
   const [automatonIndex,setAutomatonIndex] = useState(0);
   useEffect(() => { setAutomatonIndex(0); }, [automatonSimulation]);
+  useEffect(() => {
+    setProbePump(redosAssessment.probe.pump);
+    setProbeSuffix(redosAssessment.probe.suffix);
+    setRedosProfile(null);
+  }, [pattern, flags, redosAssessment.probe.pump, redosAssessment.probe.suffix]);
   const formatted = useMemo(() => formatRegexForReview(explanation), [explanation]);
   const matchRows = useMemo(() => buildMatchExportRows(result.matches), [result.matches]);
   const step = trace.steps[Math.min(debugIndex, Math.max(0,trace.steps.length-1))] ?? null;
@@ -71,6 +84,19 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
   const moveAutomaton = (delta:number) => {
     if (!automatonSimulation.frames.length) return;
     setAutomatonIndex((current) => Math.max(0, Math.min(automatonSimulation.frames.length - 1, current + delta)));
+  };
+  const runRedosProfile = async () => {
+    setRedosProfileBusy(true);
+    setRedosProfile(null);
+    const points: RedosProfilePoint[] = [];
+    for (const repetitions of [4,8,12,16,20]) {
+      const input=buildRedosProbeInput(redosAssessment.probe,repetitions,probePump,probeSuffix);
+      const run=await executeRegexWithWatchdog('ecmascript',pattern,flags.replace(/g/g,''),input,400);
+      points.push({ repetitions, inputLength:input.length, durationMs:run.durationMs, timedOut:Boolean(run.timedOut), error:run.error });
+      if (run.timedOut) break;
+    }
+    setRedosProfile(summarizeRedosProfile(points));
+    setRedosProfileBusy(false);
   };
   const runSynthesis = () => {
     const positiveRows=lines(positive), negativeRows=lines(negative);
@@ -110,6 +136,31 @@ const RegexPowerWorkbench = ({ flavor, pattern, flags, subject, result, explanat
           </div>
           <p className="regex-automaton-match" data-testid="automaton-match">{automatonSimulation.match ? `Match: ${automatonSimulation.match.text} · ${automatonSimulation.match.start}–${automatonSimulation.match.end}` : 'No match found by the supported NFA simulation.'}</p>
         </>}
+      </section> : null}
+      {active==='redos-profile' ? <section aria-label="Empirical ReDoS trajectory lab">
+        <p className="regex-truth-note" data-testid="redos-profile-truth">Empirical worker-isolated measured runtime samples. These timings are not engine step counts and are not proof of asymptotic complexity; interpret them beside the static ambiguity analysis.</p>
+        <div className="regex-redos-profile-inputs">
+          <label>Probe pump<input aria-label="Probe pump" value={probePump} onChange={(event)=>setProbePump(event.target.value)} /></label>
+          <label>Failure suffix<input aria-label="Failure suffix" value={probeSuffix} onChange={(event)=>setProbeSuffix(event.target.value)} /></label>
+        </div>
+        <p className="regex-hint">Probe basis: {redosAssessment.probe.basis} Each point runs the ECMAScript engine in a disposable worker with a 400 ms watchdog.</p>
+        <div className="regex-tool-actions"><button type="button" disabled={redosProfileBusy || !probePump} onClick={()=>void runRedosProfile()}>{redosProfileBusy?'Profiling…':'Run empirical profile'}</button></div>
+        {redosProfile ? <>
+          <div className="regex-redos-chart-scroll" tabIndex={0} data-testid="redos-profile-chart" aria-label="Empirical regex runtime trajectory chart">
+            <svg className="regex-redos-chart" viewBox="0 0 620 240" width="620" height="240" role="img" aria-label="Measured runtime by adversarial probe length">
+              <line x1="56" y1="18" x2="56" y2="202" className="regex-redos-axis" /><line x1="56" y1="202" x2="596" y2="202" className="regex-redos-axis" />
+              {redosProfile.points.map((point,index) => {
+                const x=redosProfile.points.length===1?326:72+(index*(508/(redosProfile.points.length-1)));
+                const scale=Math.max(1,redosProfile.maxDurationMs);
+                const y=point.timedOut?24:196-(Math.min(scale,point.durationMs)/scale)*158;
+                return <g key={`${point.repetitions}-${index}`} className={point.timedOut?'timeout':''}><line x1={x} y1="202" x2={x} y2={y} className="regex-redos-bar" /><circle cx={x} cy={y} r="6" className="regex-redos-point" /><text x={x} y="220" textAnchor="middle" className="regex-redos-label">{point.repetitions}×</text><text x={x} y={Math.max(16,y-10)} textAnchor="middle" className="regex-redos-label">{point.timedOut?'timeout':`${point.durationMs.toFixed(2)} ms`}</text></g>;
+              })}
+              <text x="12" y="20" className="regex-redos-label">ms</text><text x="505" y="236" className="regex-redos-label">pump repetitions</text>
+            </svg>
+          </div>
+          <p className="regex-redos-profile-summary" data-testid="redos-profile-summary">Measured runtime trajectory: {redosProfile.classification}. {redosProfile.timeouts} timeout{redosProfile.timeouts===1?'':'s'}; {redosProfile.growthRatio===null?'growth ratio unavailable':`observed growth ratio ${redosProfile.growthRatio.toFixed(2)}×`}.</p>
+          <p className="regex-hint">{redosProfile.note}</p>
+        </>:<p className="regex-empty">Run the bounded profile to compare measured runtimes across increasing probe lengths.</p>}
       </section> : null}
       {active==='format' ? <section aria-label="Regex review formatter"><p className="regex-truth-note">Readable structural review. This does not rewrite the executable expression or claim semantic-equivalent whitespace formatting.</p><pre className="regex-format-review" tabIndex={0}>{formatted}</pre></section> : null}
       {active==='synthesize' ? <section className="regex-synthesis" aria-label="Sample-driven regex synthesis"><div className="regex-synthesis-inputs"><label>Positive synthesis samples<textarea aria-label="Positive synthesis samples" value={positive} onChange={(event)=>setPositive(event.target.value)} /></label><label>Negative synthesis samples<textarea aria-label="Negative synthesis samples" value={negative} onChange={(event)=>setNegative(event.target.value)} /></label></div><div className="regex-tool-actions"><button type="button" onClick={runSynthesis}>Generate candidates</button></div><div className="regex-synthesis-candidates" data-testid="synthesis-candidates">{candidates.length?candidates.map((candidate)=><article key={candidate.pattern}><div><code>{candidate.pattern}</code><strong>{candidate.label}</strong><small>{candidate.passesAllSamples?'All samples pass':'Review needed'} · score {candidate.score.toFixed(0)}</small></div><button type="button" disabled={!candidate.passesAllSamples} onClick={()=>onPatternChange(candidate.pattern)}>Use pattern</button></article>):<p className="regex-empty">Candidates appear here only after you request synthesis. RegexMatrix never silently replaces your pattern.</p>}</div>{fuzz.length?<details><summary>Generated edge cases ({fuzz.length})</summary><ul className="regex-fuzz-list">{fuzz.map((value,index)=><li key={`${index}-${value}`}><code>{JSON.stringify(value)}</code></li>)}</ul></details>:null}</section> : null}
