@@ -532,3 +532,67 @@ tr:last-child td { border-bottom: 0; }
 .regex-custom-lesson p { margin: .2rem 0; }
 @media (max-width: 720px) { .regex-crossword-layout, .regex-crossword-rules { grid-template-columns: 1fr; } .regex-custom-lesson { align-items: flex-start; flex-direction: column; } }
 
+
+
+/* Energy and macronutrient planner
+   Grids use auto-fit with minmax(min(100%, …)) so every cluster reflows at any
+   width instead of only at fixed breakpoints. Every track carries a zero min
+   width so long values wrap rather than forcing horizontal overflow. */
+.planner-section { padding-top: 26px; border-top: 1px solid var(--line); margin-top: 26px; min-width: 0; }
+.planner-section:first-child { padding-top: 0; border-top: 0; margin-top: 0; }
+.planner-section h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.planner-section h4 { margin: 24px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.planner-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+
+.planner-unit-toggle { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.planner-toggle-button { min-height: 44px; padding: 0 16px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 13px; cursor: pointer; }
+.planner-toggle-button[aria-pressed="true"] { border-color: var(--signal); background: var(--signal-soft); color: var(--signal-strong); }
+
+.planner-split-input { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.planner-check { display: flex; align-items: center; gap: 9px; min-height: 44px; font-size: 13px; font-weight: 700; }
+.planner-check input { width: auto; min-height: auto; }
+.planner-error { margin: 0; color: var(--danger); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.planner-custom-split { margin-top: 18px; }
+
+.planner-headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 22px; align-items: start; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--signal-soft); }
+.planner-headline-primary { min-width: 0; }
+.planner-headline-primary span { display: block; color: var(--signal-strong); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; }
+.planner-headline-primary strong { display: block; margin-top: 6px; font-size: clamp(34px, 8vw, 52px); font-weight: 800; line-height: 1.05; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.planner-headline-primary small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.planner-headline-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 14px 20px; margin: 0; min-width: 0; }
+.planner-headline-facts > div { min-width: 0; }
+.planner-headline-facts dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.planner-headline-facts dd { margin: 3px 0 0; font-size: 14px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+
+/* The badge and its numeric range share one cell, so stack them with a gap
+   rather than letting them run together. */
+.planner-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 750; }
+.planner-badge.is-inside { background: #e2f4ec; color: var(--good); }
+.planner-badge.is-outside { background: #fdf0e3; color: var(--warning); }
+.planner-range { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.planner-reconcile { margin-top: 14px; max-width: 78ch; }
+
+.planner-advisories { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.planner-advisories li { padding: 11px 14px; border-left: 3px solid var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-strong); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.planner-advisories li.is-caution { border-left-color: var(--warning); background: #fdf6ee; }
+.planner-advisories li.is-info { border-left-color: var(--signal); background: var(--signal-soft); }
+
+.planner-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.planner-actions .action-button { flex: 1 1 auto; min-width: 0; }
+.planner-results-table th[scope="row"] { font-weight: 700; }
+[data-testid="goal-table"] tr[aria-current="true"] { background: var(--signal-soft); }
+[data-testid="goal-table"] tr[aria-current="true"] th[scope="row"] { color: var(--signal-strong); }
+
+@media (max-width: 600px) {
+  .planner-headline { padding: 16px; }
+  .planner-actions .action-button { flex-basis: 100%; }
+}
+
+/* Landscape phones have width but very little height, so keep the vertical
+   rhythm tighter without changing the horizontal layout. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .planner-section { padding-top: 18px; margin-top: 18px; }
+  .planner-section-head { margin-bottom: 12px; }
+  .planner-headline { padding: 14px; gap: 14px; }
+  .planner-headline-primary strong { font-size: clamp(28px, 5vh, 38px); }
+}
