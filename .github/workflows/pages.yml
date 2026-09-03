@@ -3,6 +3,8 @@ name: Validate and deploy Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,13 +13,13 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # Superseded validation runs for the same ref carry no value, so cancel them.
+    concurrency:
+      group: validate-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -27,7 +29,7 @@ jobs:
           runtime: node@24
           install: false
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Unit tests
         run: pnpm test:unit
       - name: Build
@@ -37,18 +39,26 @@ jobs:
       - name: Browser tests
         run: pnpm test:e2e
       - name: Configure Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
   deploy:
     needs: validate
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    # Allow one deployment at a time and let an in-flight production deploy finish
+    # rather than cancelling it when a newer commit lands.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
