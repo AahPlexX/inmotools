@@ -38,7 +38,6 @@
     "exifreader": "4.44.0",
     "fast-xml-parser": "5.11.1",
     "jsonpath-plus": "10.4.0",
-    "lucide-react": "1.34.0",
     "lz-string": "1.5.0",
     "mediabunny": "1.55.4",
     "meshoptimizer": "1.2.0",
@@ -49,13 +48,11 @@
     "pyodide": "314.0.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router": "8.3.1",
     "read-excel-file": "9.3.10",
     "redos-detector": "6.1.4",
     "smol-toml": "1.8.0",
     "svgo": "4.1.0",
     "three": "0.185.1",
-    "tone": "15.1.22",
     "topojson-client": "3.1.0",
     "topojson-server": "3.0.1",
     "topojson-simplify": "3.0.3",
@@ -77,6 +74,6 @@
     "typescript": "7.0.2",
     "vite": "8.2.2",
     "vite-plugin-pwa": "1.3.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }

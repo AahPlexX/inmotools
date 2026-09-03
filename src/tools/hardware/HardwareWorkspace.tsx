@@ -15,6 +15,6 @@ export default function HardwareWorkspace() {
   return <><div className="workspace-header"><div><h2>Packet terminal</h2><p>Hex validation prevents partial or malformed byte writes.</p></div></div><div className="workspace-body">
     <div className="button-row" style={{marginTop:0}}><button className="action-button" type="button" onClick={()=>void connect()}>Connect serial device</button><button className="action-button secondary" type="button" onClick={simulator}>Start simulator</button></div>
     <div className="field" style={{marginTop:18}}><label htmlFor="packet">Transmit hexadecimal bytes</label><input id="packet" type="text" value={packet} onChange={(e)=>setPacket(e.target.value)} spellCheck={false}/></div><div className="button-row"><button className="action-button secondary" type="button" onClick={()=>void send()}>Send packet</button></div><div className="status-line" role="status">{status}</div>
-    <div className="code-output" data-testid="packet-stream" aria-live="polite">{stream.length?stream.join('\n'):'RX stream is empty. Start the simulator or connect a device.'}</div>
+    <div className="code-output" data-testid="packet-stream" role="log" aria-live="polite" aria-label="Received packet stream" tabIndex={0}>{stream.length?stream.join('\n'):'RX stream is empty. Start the simulator or connect a device.'}</div>
   </div></>;
 }
