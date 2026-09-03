@@ -231,3 +231,17 @@ test('RegexMatrix Automaton visualizes and steps a truthful Thompson NFA simulat
   await expect(page.getByTestId('automaton-unsupported')).toContainText(/lookaround|unsupported/i);
 });
 
+test('RegexMatrix ReDoS Lab measures a bounded empirical runtime trajectory without claiming engine steps', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByLabel('Pattern').fill('(a+)+$');
+  await page.getByLabel('Flags').fill('');
+  await page.getByRole('tab', { name: 'ReDoS Lab' }).click();
+  await expect(page.getByTestId('redos-profile-truth')).toContainText(/empirical|measured/i);
+  await expect(page.getByTestId('redos-profile-truth')).toContainText(/not.*step|not.*proof/i);
+  await expect(page.getByLabel('Probe pump')).toHaveValue('a');
+  await expect(page.getByLabel('Failure suffix')).toHaveValue('!');
+  await page.getByRole('button', { name: 'Run empirical profile' }).click();
+  await expect(page.getByTestId('redos-profile-chart')).toBeVisible();
+  await expect(page.getByTestId('redos-profile-summary')).toContainText(/runtime|timeout|growth/i);
+});
+

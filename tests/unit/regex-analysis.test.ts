@@ -26,6 +26,10 @@ describe('RegexMatrix diagnostics', () => {
     expect(dangerous.safe).toBe(false);
     expect(dangerous.risk).not.toBe('linear');
     expect(dangerous.metricLabel).toMatch(/ambiguity|path/i);
+    const probe = (dangerous as typeof dangerous & { probe?: { pump: string; suffix: string; basis: string } }).probe;
+    expect(probe?.pump).toBe('a');
+    expect(probe?.suffix).toBe('!');
+    expect(probe?.basis).toMatch(/trail|heuristic/i);
     const simple = analyzeRedos('^a+$');
     expect(simple.safe).toBe(true);
   });
