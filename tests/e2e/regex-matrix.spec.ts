@@ -166,3 +166,49 @@ test('RegexMatrix Academy includes SEO course and deterministic practice lab', a
   await page.getByRole('button', { name: 'Practice Lab' }).click();
   await expect(page.getByTestId('practice-lab')).toContainText(/challenge|practice/i);
 });
+
+test('Python re executes locally with Python-only named groups', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByLabel('Engine flavor').selectOption('python');
+  await expect(page.getByTestId('engine-status')).toContainText(/Execution.*Python/i);
+  await page.getByLabel('Pattern').fill('(?P<word>\\w+)');
+  await page.getByLabel('Flags').fill('g');
+  await page.getByLabel('Test subject').fill('alpha beta');
+  await page.getByRole('button', { name: 'Run pattern' }).click();
+  await expect(page.getByTestId('match-count')).toHaveText('2');
+  await expect(page.getByTestId('match-inspector')).toContainText('word');
+  await expect(page.getByTestId('match-inspector')).toContainText('alpha');
+});
+
+test('Regex crossword validates row and column constraints', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByRole('button', { name: 'Academy' }).click();
+  await page.getByRole('button', { name: 'Practice Lab' }).click();
+  await page.getByRole('button', { name: 'Regex Crossword' }).click();
+  await expect(page.getByTestId('regex-crossword')).toBeVisible();
+  const values = ['C','A','T','A','R','E','R','E','D'];
+  for (let index = 0; index < values.length; index += 1) {
+    const row = Math.floor(index / 3) + 1;
+    const column = (index % 3) + 1;
+    await page.getByLabel(`Crossword cell ${row},${column}`).fill(values[index]!);
+  }
+  await page.getByRole('button', { name: 'Check crossword' }).click();
+  await expect(page.getByTestId('crossword-status')).toContainText(/complete/i);
+});
+
+test('Custom Academy tracks import locally, persist, export, and open in Studio', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByRole('button', { name: 'Academy' }).click();
+  await page.getByRole('button', { name: 'Custom Tracks' }).click();
+  const payload = JSON.stringify({ schemaVersion: 1, track: { id: 'team-basics', title: 'Team Regex Basics', lessons: [{ id: 'digits-only', title: 'Digits only', objective: 'Match only digits.', guide: 'Anchor the expression and require one or more digits.', starter: '^\\d+$', flags: '', hint: 'Use anchors.', cases: [{ value: '123', shouldMatch: true }, { value: '12a', shouldMatch: false }] }] } });
+  await page.getByLabel('Custom track JSON').fill(payload);
+  await page.getByRole('button', { name: 'Import custom track' }).click();
+  await expect(page.getByTestId('custom-track-library')).toContainText('Team Regex Basics');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export Team Regex Basics' }).click();
+  expect((await download).suggestedFilename()).toBe('regex-matrix-track-team-basics.json');
+  await page.getByRole('button', { name: 'Open custom lesson Digits only' }).click();
+  await expect(page.getByRole('button', { name: 'Studio' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('textbox', { name: 'Pattern', exact: true })).toHaveText('^\\d+$');
+});
+
