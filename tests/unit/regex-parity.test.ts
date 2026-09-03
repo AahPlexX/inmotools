@@ -28,6 +28,10 @@ describe('RegexMatrix parity workbench contracts', () => {
     const trace = buildDebugTrace(root);
     expect(trace.nativeEngineTrace).toBe(false);
     expect(trace.steps).toHaveLength(2);
+    const automaton = (trace as typeof trace & { automaton?: { supported: boolean; states: readonly unknown[]; transitions: readonly unknown[] } }).automaton;
+    expect(automaton?.supported).toBe(true);
+    expect(automaton?.states.length).toBeGreaterThanOrEqual(3);
+    expect(automaton?.transitions.length).toBeGreaterThanOrEqual(2);
   });
 
   it('summarizes benchmark samples with deterministic percentile semantics', () => {

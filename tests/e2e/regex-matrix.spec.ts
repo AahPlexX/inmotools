@@ -212,3 +212,22 @@ test('Custom Academy tracks import locally, persist, export, and open in Studio'
   await expect(page.getByRole('textbox', { name: 'Pattern', exact: true })).toHaveText('^\\d+$');
 });
 
+test('RegexMatrix Automaton visualizes and steps a truthful Thompson NFA simulation', async ({ page }) => {
+  await page.goto('./#/regex-matrix');
+  await page.getByLabel('Pattern').fill('ab(c|d)*e');
+  await page.getByLabel('Flags').fill('g');
+  await page.getByLabel('Test subject').fill('xxabcdezz');
+  await page.getByRole('tab', { name: 'Automaton' }).click();
+  await expect(page.getByTestId('automaton-canvas')).toBeVisible();
+  await expect(page.getByTestId('automaton-canvas')).toContainText(/Start|Accept/);
+  await expect(page.getByTestId('automaton-truth-note')).toContainText(/Thompson|not native|educational/i);
+  const step = page.getByTestId('automaton-step');
+  const before = await step.textContent();
+  await page.getByRole('button', { name: 'Next automaton step' }).click();
+  await expect(step).not.toHaveText(before ?? '');
+  await expect(page.getByTestId('automaton-match')).toContainText('abcde');
+
+  await page.getByLabel('Pattern').fill('(?=foo)bar');
+  await expect(page.getByTestId('automaton-unsupported')).toContainText(/lookaround|unsupported/i);
+});
+
