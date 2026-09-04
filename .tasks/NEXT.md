@@ -1,34 +1,9 @@
 # Next
 
-## TASK-003: Decide the PWA precache policy for DuckDB WebAssembly
-**Priority:** P1 | **Tags:** performance, pwa, deployment
-
-The service worker precaches 48 entries totalling roughly 80 MB because `workbox.globPatterns` includes `wasm` and `maximumFileSizeToCacheInBytes` is 50 MB, so both DuckDB binaries (34 MB and 39 MB) are fetched for every visitor including those who never open the DuckDB workbench. Against the documented 100 GB per month GitHub Pages soft bandwidth limit this allows roughly 1,200 first visits per month.
-
-### Plan
-
-- Confirm whether offline DuckDB is a required capability or an unintended side effect of the glob pattern.
-- If not required, exclude the DuckDB `wasm` assets from precache and register them as runtime cache entries populated on first use.
-- Re-measure the reported precache total and record the resulting first-visit transfer size.
-
----
-
-## TASK-004: Stop publishing sourcemaps to the deployed site
-**Priority:** P2 | **Tags:** deployment, performance
-
-`build.sourcemap` is `true`, so about 20 MB of `.map` files ship to GitHub Pages inside a 100 MB `dist`. Keep sourcemaps available for debugging without serving them from the published site.
-
-### Plan
-
-- Disable published sourcemaps or emit them as a build artifact retained by the workflow instead.
-- Verify the deployed `dist` size and confirm the application still builds and runs.
-
----
-
 ## TASK-005: Harden the shared scrollable regions for keyboard users
 **Priority:** P2 | **Tags:** accessibility
 
-`.code-output` and `.result-table-wrap` are shared by thirteen suites. Both were made keyboard reachable where axe proved a violation, but the remaining usages only pass today because their empty states do not overflow. The catalog-driven axe sweep audits empty states only, so a populated overflowing region can still regress.
+`.code-output` and `.result-table-wrap` are shared by fourteen suites. Both were made keyboard reachable where axe proved a violation, but the remaining usages only pass today because their empty states do not overflow. The catalog-driven axe sweep audits empty states only, so a populated overflowing region can still regress.
 
 ### Plan
 
@@ -40,11 +15,41 @@ The service worker precaches 48 entries totalling roughly 80 MB because `workbox
 ## TASK-006: Broaden per-tool browser coverage
 **Priority:** P2 | **Tags:** testing
 
-Five of the registered suites have behavioural browser specs. Every route now receives an axe sweep, but most suites have no interaction test, so regressions in their engines surface only through unit tests.
+Seven of the twenty-six registered suites have behavioural browser specs: DuckDB Workbench, EXIF Scrubber, PlanCraft Studio, JSON Lattice Studio, RegexMatrix, Energy & Macro Planner, and Markdown Workbench. Every route receives an axe sweep and the landing page is covered, but the remaining nineteen suites have no interaction test, so regressions in their engines surface only through unit tests.
 
 ### Plan
 
 - Add a focused behavioural spec per uncovered suite, exercising its primary local workflow and its export path.
 - Keep each spec deterministic and independent of shared browser state.
+- Prioritise suites whose engines carry the least unit coverage.
+
+---
+
+## TASK-012: Record the AetherCast design under docs/superpowers
+**Priority:** P3 | **Tags:** documentation
+
+Every other shipped suite has a plan and a design document under `docs/superpowers`. AetherCast has neither, so the reasoning behind its index selection, its anomaly-screening thresholds, and its Fitzpatrick exposure model exists only in the implementation.
+
+This is deliberately left as a task rather than written retrospectively: the design rationale belongs to whoever made those modelling choices, and inventing a justification after the fact would produce a document that reads as authoritative while being a guess. Health-adjacent thresholds are the last place that is acceptable.
+
+### Plan
+
+- Have the original author record the intended scope, the standards each index implements, and the source of every threshold constant.
+- Confirm the in-app wording still matches what the engine actually computes.
+
+---
+
+## TASK-013: Reconcile the two undo histories in Markdown Workbench
+**Priority:** P3 | **Tags:** editor, ux
+
+The suite deliberately runs two history levels: CodeMirror's own fine-grained text history, reached with Ctrl+Z inside the editor and preserving the caret, and the workspace's document-level snapshots behind the toolbar Undo and Redo. They no longer corrupt each other — externally applied document swaps are excluded from CodeMirror's history, so Ctrl+Z after a toolbar Undo no longer reverses the undo — but two separate stacks remain observable to the user, and the toolbar steps are per-keystroke because a snapshot is committed on every document change.
+
+Left as a task rather than forced now because both obvious unifications regress something real: delegating the toolbar to CodeMirror loses document-level steps such as opening a file, while routing Ctrl+Z to the workspace snapshots replaces the whole document on each undo and so loses the caret.
+
+### Plan
+
+- Coalesce workspace snapshots by edit proximity so a document-level step spans a meaningful edit rather than one keystroke.
+- Decide whether the toolbar should surface only coarse document events (open, draft load, revert) and label it accordingly.
+- Cover the resulting behaviour in the browser spec.
 
 ---
