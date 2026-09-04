@@ -8,6 +8,32 @@ const getRuntime = () => {
   return runtimePromise;
 };
 
+export interface Pcre2SubstitutionResult {
+  readonly engine: string;
+  readonly output: string | null;
+  readonly error: string | null;
+}
+
+export const executePcre2Substitution = async (
+  pattern: string,
+  flags: string,
+  subject: string,
+  replacement: string,
+): Promise<Pcre2SubstitutionResult> => {
+  const engine = 'PCRE2 10.47.5 · WebAssembly';
+  try {
+    const { runtime, parseFlags } = await getRuntime();
+    const isGlobal = flags.includes('g');
+    const numericFlags = parseFlags(flags.replace('g', ''));
+    const output = isGlobal
+      ? runtime.replaceAll(pattern, subject, replacement, numericFlags)
+      : runtime.replace(pattern, subject, replacement, numericFlags);
+    return { engine, output, error: null };
+  } catch (error) {
+    return { engine, output: null, error: error instanceof Error ? error.message : String(error) };
+  }
+};
+
 export const executePcre2Regex = async (pattern: string, flags: string, subject: string): Promise<RegexRunResult> => {
   const started = now();
   try {
