@@ -28,6 +28,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'regex-matrix': () => import('./regex/RegexWorkspace'),
   'energy-macro-planner': () => import('./nutrition/NutritionWorkspace'),
   'aethercast': () => import('./aethercast/AetherCastWorkspace'),
+  'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

@@ -628,3 +628,73 @@ tr:last-child td { border-bottom: 0; }
 .regex-redos-label { fill:var(--matrix-muted); font:10px ui-monospace,SFMono-Regular,Menlo,monospace; }
 .regex-redos-profile-summary { color:var(--matrix-text); margin:.65rem 0 .25rem; font-size:.8rem; }
 @media (max-width:720px) { .regex-redos-profile-inputs { grid-template-columns:1fr; } }
+
+
+
+/* Markdown Workbench: uses the shared light-surface palette (--surface,
+   --ink, --line, --signal, etc.) rather than its own theme, matching the
+   editor's own CodeMirror theme() call in MarkdownEditor.tsx. */
+.markdown-workbench { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; min-width: 0; }
+
+.markdown-workbench-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-strong); }
+.markdown-workbench-toolbar-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.markdown-workbench-export-group { margin-left: auto; }
+.markdown-workbench-toolbar button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; }
+.markdown-workbench-toolbar button:hover:not(:disabled) { border-color: var(--signal); }
+.markdown-workbench-toolbar button[aria-pressed="true"] { background: var(--signal); border-color: var(--signal); color: #fff; }
+.markdown-workbench-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.markdown-workbench-check input { min-height: auto; width: auto; }
+.markdown-workbench-font-size { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* Split/source layout. Both classes are applied together (e.g.
+   "markdown-workbench-body markdown-workbench-view-split"); the view
+   modifier overrides the base grid so a single class-name toggle switches
+   between a two-pane and a single-pane layout. */
+.markdown-workbench-body { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; }
+.markdown-workbench-view-source { grid-template-columns: 1fr; }
+.markdown-workbench-editor-pane, .markdown-workbench-preview-pane { min-width: 0; overflow: hidden; }
+.markdown-workbench-editor-pane { border-right: 1px solid var(--line); }
+.markdown-workbench-view-source .markdown-workbench-editor-pane { border-right: 0; }
+.markdown-workbench-editor { height: 100%; min-height: 420px; }
+
+.markdown-workbench-preview { height: 100%; min-height: 420px; overflow: auto; padding: 16px 20px; line-height: 1.6; overflow-wrap: anywhere; }
+.markdown-workbench-preview table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+.markdown-workbench-preview th, .markdown-workbench-preview td { border: 1px solid var(--line); padding: 0.4rem 0.6rem; text-align: left; }
+.markdown-workbench-preview pre { background: var(--surface-strong); padding: 0.75rem; overflow: auto; border-radius: 6px; }
+.markdown-workbench-preview code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.markdown-workbench-preview img { max-width: 100%; }
+.markdown-workbench-preview .katex-display { overflow-x: auto; padding: 0.25rem 0; }
+.markdown-workbench-diagram { overflow: auto; margin: 1rem 0; }
+.markdown-workbench-diagram svg { max-width: 100%; height: auto; }
+.markdown-workbench-diagram-error { outline: 2px dashed var(--danger); border-radius: 6px; cursor: help; }
+
+.markdown-workbench-status { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.markdown-workbench-autosave-status { white-space: nowrap; }
+
+.markdown-workbench-panel { border-top: 1px solid var(--line); padding: 12px; }
+.markdown-workbench-panel summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+.markdown-workbench-hint { color: var(--muted); font-size: 12px; margin: 0.5rem 0 0; }
+
+.markdown-workbench-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 0; }
+.markdown-workbench-metrics div { border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; min-width: 0; }
+.markdown-workbench-metrics dt { font-size: 11px; color: var(--muted); }
+.markdown-workbench-metrics dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+
+.markdown-workbench-citation-controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.markdown-workbench-citation-controls label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.markdown-workbench-bibliography-input { width: 100%; min-height: 120px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.markdown-workbench-citation-preview { margin-top: 12px; overflow-wrap: anywhere; }
+.markdown-workbench-citation-warning { color: var(--warning); font-size: 12px; margin: 0 0 0.5rem; }
+.markdown-workbench-bibliography-output { font-size: 13px; line-height: 1.55; }
+
+.markdown-workbench-draft-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.markdown-workbench-draft-list button { width: 100%; text-align: left; font-size: 12px; overflow-wrap: anywhere; }
+
+@media (max-width: 860px) {
+  .markdown-workbench-body { grid-template-columns: 1fr; }
+  .markdown-workbench-editor-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .markdown-workbench-editor, .markdown-workbench-preview { min-height: 320px; }
+  .markdown-workbench-export-group { margin-left: 0; width: 100%; }
+  .markdown-workbench-status { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .markdown-workbench * { scroll-behavior: auto !important; } }
