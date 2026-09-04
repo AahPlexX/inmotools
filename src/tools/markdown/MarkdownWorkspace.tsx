@@ -244,7 +244,7 @@ export default function MarkdownWorkspace() {
     : 'Storage usage unavailable in this browser.';
 
   return (
-    <div className="markdown-workbench">
+    <div className="markdown-workbench" data-testid="markdown-workbench">
       <div className="markdown-workbench-toolbar" role="toolbar" aria-label="Markdown Workbench controls">
         <div className="markdown-workbench-toolbar-group">
           <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>

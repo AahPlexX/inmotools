@@ -30,6 +30,13 @@ export default function MarkdownEditor({ value, onChange, onCursorLineChange, li
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorLineChangeRef = useRef(onCursorLineChange);
+  // Set around a programmatic dispatch (the value-sync effect below, used
+  // when an external change - undo/redo, restoring a draft - replaces the
+  // document from outside the editor). Without this guard, that dispatch
+  // fires the same updateListener a real keystroke does, which calls
+  // onChange and re-commits the restored text as a brand-new edit,
+  // wiping out the workspace's own redo stack on every undo.
+  const isExternalSyncRef = useRef(false);
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onCursorLineChangeRef.current = onCursorLineChange; }, [onCursorLineChange]);
@@ -56,7 +63,7 @@ export default function MarkdownEditor({ value, onChange, onCursorLineChange, li
         }),
         EditorView.editorAttributes.of({ style: `font-size:${fontSize}px` }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+          if (update.docChanged && !isExternalSyncRef.current) onChangeRef.current(update.state.doc.toString());
           if (update.selectionSet || update.docChanged) {
             const line = update.state.doc.lineAt(update.state.selection.main.head).number;
             onCursorLineChangeRef.current?.(line);
@@ -86,7 +93,9 @@ export default function MarkdownEditor({ value, onChange, onCursorLineChange, li
     if (!view) return;
     const current = view.state.doc.toString();
     if (current === value) return;
+    isExternalSyncRef.current = true;
     view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
+    isExternalSyncRef.current = false;
   }, [value]);
 
   return <div className="markdown-workbench-editor" ref={hostRef} />;
