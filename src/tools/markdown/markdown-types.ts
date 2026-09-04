@@ -124,6 +124,23 @@ export interface MathRenderResult {
   readonly error?: string;
 }
 
+export interface OutlineEntry {
+  readonly depth: number;
+  readonly text: string;
+  readonly line: number;
+  readonly id: string;
+}
+
+export interface MathExpression {
+  readonly source: string;
+  readonly displayMode: boolean;
+  readonly line: number;
+}
+
+export interface MathDiagnostic extends MathExpression {
+  readonly error: string;
+}
+
 export type DiagramKind = 'mermaid' | 'graphviz';
 
 export interface DiagramRenderRequest {
