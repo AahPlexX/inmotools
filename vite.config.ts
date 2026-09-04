@@ -24,16 +24,30 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,wasm}'],
-        globIgnores: ['pyodide/**'],
+        globIgnores: ['pyodide/**', '**/duckdb-*.wasm'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /\/duckdb-.*\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'duckdb-wasm',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 2,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+              },
+            },
+          },
+        ],
       },
     }),
   ],
   build: {
     target: 'es2022',
-    sourcemap: true,
+    sourcemap: false,
     chunkSizeWarningLimit: 1800,
     rolldownOptions: {
       output: {
