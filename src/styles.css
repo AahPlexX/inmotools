@@ -688,7 +688,40 @@ tr:last-child td { border-bottom: 0; }
 .markdown-workbench-bibliography-output { font-size: 13px; line-height: 1.55; }
 
 .markdown-workbench-draft-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
-.markdown-workbench-draft-list button { width: 100%; text-align: left; font-size: 12px; overflow-wrap: anywhere; }
+.markdown-workbench-draft-list li { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.markdown-workbench-draft-list li > button:first-child { flex: 1; text-align: left; font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
+.markdown-workbench-draft-list button, .markdown-workbench-outline button, .markdown-workbench-slide-list button, .markdown-workbench-diagnostics button, .markdown-workbench-namebar button, .markdown-workbench-citation-controls button { min-height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; }
+.markdown-workbench-draft-list button:hover, .markdown-workbench-outline button:hover, .markdown-workbench-slide-list button:hover, .markdown-workbench-diagnostics button:hover, .markdown-workbench-namebar button:hover, .markdown-workbench-citation-controls button:hover { border-color: var(--signal); }
+.markdown-workbench-draft-delete { color: var(--danger) !important; border-color: #e2aaa6 !important; white-space: nowrap; }
+
+/* Native file inputs are triggered from adjacent buttons, so the input itself
+   is kept out of the visual flow while remaining reachable by assistive tech
+   and by tests (not display:none, which would remove it from the a11y tree). */
+.markdown-workbench-file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.markdown-workbench-namebar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.markdown-workbench-name-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 700; min-width: 0; }
+.markdown-workbench-name-field input { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font-weight: 400; min-width: 0; }
+.markdown-workbench-namebar .markdown-workbench-hint { margin: 0; }
+.markdown-workbench-namebar code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.markdown-workbench-outline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.markdown-workbench-outline li { min-width: 0; }
+.markdown-workbench-outline li > button { width: 100%; text-align: left; overflow-wrap: anywhere; }
+.markdown-workbench-outline li[data-depth="2"] { padding-left: 14px; }
+.markdown-workbench-outline li[data-depth="3"] { padding-left: 28px; }
+.markdown-workbench-outline li[data-depth="4"] { padding-left: 42px; }
+.markdown-workbench-outline li[data-depth="5"] { padding-left: 56px; }
+.markdown-workbench-outline li[data-depth="6"] { padding-left: 70px; }
+
+.markdown-workbench-slide-list { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 4px; }
+.markdown-workbench-slide-list li { min-width: 0; }
+.markdown-workbench-slide-list li > button { width: 100%; text-align: left; overflow-wrap: anywhere; }
+
+.markdown-workbench-diagnostics { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.markdown-workbench-diagnostics li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; min-width: 0; }
+.markdown-workbench-diagnostics code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.markdown-workbench-diagnostics span { color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
 
 @media (max-width: 860px) {
   .markdown-workbench-body { grid-template-columns: 1fr; }
@@ -696,5 +729,48 @@ tr:last-child td { border-bottom: 0; }
   .markdown-workbench-editor, .markdown-workbench-preview { min-height: 320px; }
   .markdown-workbench-export-group { margin-left: 0; width: 100%; }
   .markdown-workbench-status { justify-content: flex-start; }
+  .markdown-workbench-name-field, .markdown-workbench-name-field input { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .markdown-workbench * { scroll-behavior: auto !important; } }
+
+/* Print / PDF export.
+   window.print() would otherwise print the whole application shell - privacy
+   rail, site header, tool guidance, toolbar, source editor, every collapsible
+   panel and the footer - around the document. While the workbench is printing,
+   everything except the rendered preview is removed from the printed output so
+   "Print / PDF" produces the document and nothing else. */
+@media print {
+  body.markdown-workbench-printing .privacy-rail,
+  body.markdown-workbench-printing .site-header,
+  body.markdown-workbench-printing .site-footer,
+  body.markdown-workbench-printing .skip-link,
+  body.markdown-workbench-printing .support-toast,
+  body.markdown-workbench-printing .suite-topline,
+  body.markdown-workbench-printing .suite-intro,
+  body.markdown-workbench-printing .suite-guide,
+  body.markdown-workbench-printing .markdown-workbench-toolbar,
+  body.markdown-workbench-printing .markdown-workbench-namebar,
+  body.markdown-workbench-printing .markdown-workbench-status,
+  body.markdown-workbench-printing .markdown-workbench-panel,
+  body.markdown-workbench-printing .markdown-workbench-editor-pane { display: none !important; }
+
+  body.markdown-workbench-printing .markdown-workbench,
+  body.markdown-workbench-printing .suite-workspace,
+  body.markdown-workbench-printing .suite-page,
+  body.markdown-workbench-printing .app-frame,
+  body.markdown-workbench-printing main { border: 0 !important; padding: 0 !important; margin: 0 !important; background: #fff !important; box-shadow: none !important; }
+
+  body.markdown-workbench-printing .markdown-workbench-body { display: block !important; min-height: 0 !important; }
+  body.markdown-workbench-printing .markdown-workbench-preview-pane { overflow: visible !important; }
+  body.markdown-workbench-printing .markdown-workbench-preview {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    color: #000 !important;
+  }
+  /* Avoid splitting a heading from the text it introduces, or breaking a
+     table row, diagram, or code block across pages where avoidable. */
+  body.markdown-workbench-printing .markdown-workbench-preview :is(h1, h2, h3, h4, h5, h6) { break-after: avoid-page; }
+  body.markdown-workbench-printing .markdown-workbench-preview :is(pre, table, .markdown-workbench-diagram, .katex-display) { break-inside: avoid; }
+}

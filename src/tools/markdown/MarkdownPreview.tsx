@@ -1,31 +1,50 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { renderMarkdown } from './render-engine';
-import { substituteFormulaValues } from './table-formula-engine';
 import { renderMermaidDiagram, renderGraphvizDiagram, scheduleIdle } from './diagram-engine';
 import type { ScrollAnchor } from './markdown-types';
 
-// Renders the live preview: markdown -> sanitized HTML (with computed table
-// formula values substituted in first), then a post-render pass replaces
-// fenced ```mermaid and ```dot code blocks with their rendered diagram SVG.
+// Renders the live preview: prepared markdown -> sanitized HTML, then a
+// post-render pass replaces fenced ```mermaid and ```dot code blocks with
+// their rendered diagram SVG.
 //
-// Mermaid renders on the main thread (idle-scheduled, debounced) because its
-// renderer depends on real DOM elements that do not exist inside a Worker.
-// Graphviz renders inside a dedicated Worker, since @hpcc-js/wasm-graphviz
-// has no DOM dependency and is safe to isolate off the main thread.
+// Mermaid renders on the main thread (idle-scheduled and debounced) because
+// its renderer depends on real DOM elements that do not exist inside a
+// Worker. Graphviz renders inside a dedicated Worker, since
+// @hpcc-js/wasm-graphviz has no DOM dependency and is safe to isolate off the
+// main thread.
+//
+// Diagram rendering is asynchronous and a document can change while a pass is
+// still in flight, so every pass carries a generation token. A pass whose
+// token is stale abandons its work and cancels any Worker it started instead
+// of writing into a preview that has already moved on - without this, each
+// keystroke in a document containing a `dot` block spawned another Worker that
+// nothing ever terminated.
 
 mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
 
 export interface MarkdownPreviewProps {
-  readonly source: string;
+  // Already passed through the shared document pipeline by the parent, so the
+  // preview renders exactly what the exports serialize.
+  readonly preparedSource: string;
   readonly onAnchorsMeasured: (anchors: { sourceLine: number; offsetTop: number }[]) => void;
 }
 
+const DIAGRAM_DEBOUNCE_MS = 250;
+
 let mermaidDiagramCounter = 0;
 
-const renderDiagramBlocks = async (container: HTMLElement): Promise<void> => {
-  const blocks = Array.from(container.querySelectorAll('pre > code.language-mermaid, pre > code.language-dot'));
+const renderDiagramBlocks = async (
+  container: HTMLElement,
+  isCurrent: () => boolean,
+  trackCancel: (cancel: () => void) => void,
+): Promise<void> => {
+  const blocks = Array.from(
+    container.querySelectorAll('pre > code.language-mermaid, pre > code.language-dot'),
+  );
+
   for (const block of blocks) {
+    if (!isCurrent()) return;
     const pre = block.parentElement;
     if (!pre) continue;
     const source = block.textContent ?? '';
@@ -34,7 +53,12 @@ const renderDiagramBlocks = async (container: HTMLElement): Promise<void> => {
     if (isMermaid) {
       mermaidDiagramCounter += 1;
       const id = `markdown-workbench-mermaid-${mermaidDiagramCounter}`;
-      const result = await renderMermaidDiagram((diagramId, text) => mermaid.render(diagramId, text), id, source);
+      const result = await renderMermaidDiagram(
+        (diagramId, text) => mermaid.render(diagramId, text),
+        id,
+        source,
+      );
+      if (!isCurrent()) return;
       if (result.svg) {
         const wrapper = document.createElement('div');
         wrapper.className = 'markdown-workbench-diagram';
@@ -45,8 +69,11 @@ const renderDiagramBlocks = async (container: HTMLElement): Promise<void> => {
         pre.setAttribute('title', result.error);
       }
     } else {
+      const handle = renderGraphvizDiagram(source);
+      trackCancel(handle.cancel);
       try {
-        const response = await renderGraphvizDiagram(source).promise;
+        const response = await handle.promise;
+        if (!isCurrent()) return;
         if (response.svg) {
           const wrapper = document.createElement('div');
           wrapper.className = 'markdown-workbench-diagram';
@@ -57,6 +84,7 @@ const renderDiagramBlocks = async (container: HTMLElement): Promise<void> => {
           pre.setAttribute('title', response.error);
         }
       } catch {
+        if (!isCurrent()) return;
         pre.classList.add('markdown-workbench-diagram-error');
         pre.setAttribute('title', 'Graphviz rendering failed.');
       }
@@ -64,21 +92,37 @@ const renderDiagramBlocks = async (container: HTMLElement): Promise<void> => {
   }
 };
 
-export default function MarkdownPreview({ source, onAnchorsMeasured }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ preparedSource, onAnchorsMeasured }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [anchors, setAnchors] = useState<ScrollAnchor[]>([]);
+  const generationRef = useRef(0);
 
   useEffect(() => {
-    const substituted = substituteFormulaValues(source);
-    const { html, anchors: nextAnchors } = renderMarkdown(substituted);
+    const { html, anchors: nextAnchors } = renderMarkdown(preparedSource);
     const host = hostRef.current;
     if (host) host.innerHTML = html;
     setAnchors(nextAnchors);
 
-    scheduleIdle(() => {
-      if (host) void renderDiagramBlocks(host);
-    });
-  }, [source]);
+    generationRef.current += 1;
+    const generation = generationRef.current;
+    const isCurrent = () => generationRef.current === generation;
+    const cancels: (() => void)[] = [];
+
+    const timer = setTimeout(() => {
+      scheduleIdle(() => {
+        if (!isCurrent() || !host) return;
+        void renderDiagramBlocks(host, isCurrent, (cancel) => cancels.push(cancel));
+      });
+    }, DIAGRAM_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timer);
+      // Supersede any pass still in flight for this generation and tear down
+      // the Workers it created.
+      generationRef.current += 1;
+      cancels.forEach((cancel) => cancel());
+    };
+  }, [preparedSource]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -96,6 +140,7 @@ export default function MarkdownPreview({ source, onAnchorsMeasured }: MarkdownP
       ref={hostRef}
       role="region"
       aria-label="Rendered markdown preview"
+      tabIndex={0}
     />
   );
 }

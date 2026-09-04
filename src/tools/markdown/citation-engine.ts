@@ -187,6 +187,82 @@ export interface FormattedCitations {
   readonly unresolved: string[];
 }
 
+// --- In-text citation extraction and substitution ---
+//
+// A citation marker is Pandoc-style: [@citekey], optionally carrying a
+// locator or prefix/suffix text inside the same brackets (e.g.
+// [@smith2024, p. 14]). Multiple keys inside one bracket are separated by
+// semicolons ([@a; @b]).
+
+const CITATION_MARKER = /\[[^\]]*@[\w:.#$%&\-+?<>~/]+[^\]]*\]/g;
+const CITEKEY_IN_MARKER = /@([\w:.#$%&\-+?<>~/]+)/g;
+
+// Applies `replace` only to the regions of a document that are outside
+// fenced code blocks and inline code spans. Without this, a document that
+// *documents* citation syntax (showing [@key] inside a code fence) would
+// have its own examples silently rewritten - the same class of corruption
+// that would affect any source-level substitution pass.
+export const mapOutsideCode = (source: string, replace: (segment: string) => string): string => {
+  const codeRegion = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`)/g;
+  let result = '';
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = codeRegion.exec(source))) {
+    result += replace(source.slice(lastIndex, match.index)) + match[0];
+    lastIndex = match.index + match[0].length;
+  }
+  return result + replace(source.slice(lastIndex));
+};
+
+// Every distinct citekey referenced by the document, in first-appearance
+// order, ignoring markers inside code.
+export const extractCitekeys = (source: string): string[] => {
+  const keys = new Set<string>();
+  mapOutsideCode(source, (segment) => {
+    for (const marker of segment.matchAll(CITATION_MARKER)) {
+      for (const key of marker[0].matchAll(CITEKEY_IN_MARKER)) keys.add(key[1]);
+    }
+    return segment;
+  });
+  return [...keys];
+};
+
+// citeproc renders in-text citations as an HTML fragment for some styles
+// (italics, small-caps spans). Markdown rendering in this tool never allows
+// raw HTML through, so any tags here would be escaped and shown literally
+// to the reader. Reducing the fragment to its text content is therefore the
+// honest transformation: it keeps the citation correct and readable rather
+// than leaking visible markup into the document.
+const toPlainText = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+
+// Replaces each citation marker with its formatted in-text citation.
+// A marker whose key could not be resolved against the library is left
+// exactly as written, so an unresolved citation stays visible in the
+// document instead of silently vanishing.
+export const substituteInTextCitations = (
+  source: string,
+  inText: ReadonlyMap<string, string>,
+): string => {
+  if (inText.size === 0) return source;
+  return mapOutsideCode(source, (segment) =>
+    segment.replace(CITATION_MARKER, (marker) => {
+      const keys = [...marker.matchAll(CITEKEY_IN_MARKER)].map((match) => match[1]);
+      if (keys.length === 0) return marker;
+      const rendered = keys.map((key) => inText.get(key));
+      if (rendered.some((value) => value === undefined)) return marker;
+      return toPlainText(rendered.join('; '));
+    }),
+  );
+};
+
 export const formatCitations = async (
   library: CitationLibrary,
   citekeys: string[],
