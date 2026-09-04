@@ -16,6 +16,20 @@ describe('deployment and bundler contracts', () => {
     expect(config).not.toContain("registerType: 'autoUpdate'");
   });
 
+  it('keeps DuckDB WebAssembly out of the install-time precache and caches it on first use', () => {
+    const config = read('vite.config.ts');
+    expect(config).toContain("'**/duckdb-*.wasm'");
+    expect(config).toContain('runtimeCaching');
+    expect(config).toContain("handler: 'CacheFirst'");
+    expect(config).toContain("cacheName: 'duckdb-wasm'");
+  });
+
+  it('does not publish production source maps with the Pages artifact', () => {
+    const config = read('vite.config.ts');
+    expect(config).toContain('sourcemap: false');
+    expect(config).not.toContain('sourcemap: true');
+  });
+
   it('installs Vite preload-error recovery before rendering the application', () => {
     const entry = read('src/main.tsx');
     expect(entry).toContain('installPreloadErrorRecovery');
