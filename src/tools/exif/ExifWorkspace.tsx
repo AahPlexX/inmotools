@@ -28,7 +28,7 @@ export default function ExifWorkspace() {
     if (!file) return;
     setBusy(true);
     try {
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       const canvas = document.createElement('canvas');
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;

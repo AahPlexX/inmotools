@@ -1,4 +1,7 @@
-const SENSITIVE_PATTERNS = [/^GPS/i, /serial/i, /owner/i, /artist/i, /author/i, /location/i, /latitude/i, /longitude/i];
+const SENSITIVE_PATTERNS = [
+  /^GPS/i, /serial/i, /owner/i, /artist/i, /author/i, /location/i, /latitude/i, /longitude/i,
+  /^city$/i, /province/i, /^state/i, /country/i, /by-?line/i, /creator/i,
+];
 
 export interface MetadataTag { description?: string | number; value?: unknown }
 export interface SensitiveMetadata { key: string; value: string }

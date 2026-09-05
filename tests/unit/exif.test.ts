@@ -15,4 +15,16 @@ describe('EXIF scrubber helpers', () => {
     });
     expect(found.map((item) => item.key)).toEqual(expect.arrayContaining(['GPSLatitude', 'GPSLongitude', 'SerialNumber']));
   });
+
+  it('flags IPTC location and byline fields commonly embedded by editing tools', () => {
+    const found = listSensitiveMetadata({
+      City: { description: 'Providence' },
+      'Province/State': { description: 'Rhode Island' },
+      'Country/Primary Location Name': { description: 'USA' },
+      'By-line': { description: 'Jane Doe' },
+    });
+    expect(found.map((item) => item.key)).toEqual(
+      expect.arrayContaining(['City', 'Province/State', 'Country/Primary Location Name', 'By-line']),
+    );
+  });
 });
