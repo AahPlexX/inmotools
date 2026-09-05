@@ -6,9 +6,13 @@ export interface CorrectionAnchors { sourceStartMs: number; correctedStartMs: nu
 function parseTimestamp(value: string): number {
   const normalized = value.trim().replace(',', '.');
   const parts = normalized.split(':');
-  if (parts.length !== 3) throw new Error(`Invalid timestamp: ${value}`);
-  const seconds = Number(parts[2]);
-  return Math.round((Number(parts[0]) * 3600 + Number(parts[1]) * 60 + seconds) * 1000);
+  // WebVTT allows the hours component to be omitted for cues under one hour
+  // (e.g. "01:14.800"), while SRT always includes it ("00:01:14,800").
+  if (parts.length !== 2 && parts.length !== 3) throw new Error(`Invalid timestamp: ${value}`);
+  const hours = parts.length === 3 ? Number(parts[0]) : 0;
+  const minutes = Number(parts[parts.length - 2]);
+  const seconds = Number(parts[parts.length - 1]);
+  return Math.round((hours * 3600 + minutes * 60 + seconds) * 1000);
 }
 
 function formatTimestamp(ms: number, format: SubtitleFormat): string {
@@ -51,7 +55,8 @@ export function applyLinearCorrection(cues: SubtitleCue[], anchors: CorrectionAn
 export function serializeSubtitle(parsed: ParsedSubtitle): string {
   const blocks = parsed.cues.map((cue, index) => {
     const timing = `${formatTimestamp(cue.startMs, parsed.format)} --> ${formatTimestamp(cue.endMs, parsed.format)}`;
-    return parsed.format === 'srt' ? `${index + 1}\n${timing}\n${cue.text}` : `${timing}\n${cue.text}`;
+    if (parsed.format === 'srt') return `${index + 1}\n${timing}\n${cue.text}`;
+    return cue.id ? `${cue.id}\n${timing}\n${cue.text}` : `${timing}\n${cue.text}`;
   });
   return `${parsed.format === 'vtt' ? 'WEBVTT\n\n' : ''}${blocks.join('\n\n')}\n`;
 }

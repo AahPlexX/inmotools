@@ -48,4 +48,17 @@ describe('subtitle drift correction', () => {
     expect(parsed.format).toBe('vtt');
     expect(parsed.cues[0].startMs).toBe(1250);
   });
+
+  it('parses WebVTT cues that omit the optional hours component', () => {
+    const parsed = parseSubtitle('WEBVTT\n\n01:14.800 --> 01:16.300\nShort-form timestamp\n');
+    expect(parsed.cues[0].startMs).toBe(74_800);
+    expect(parsed.cues[0].endMs).toBe(76_300);
+  });
+
+  it('round-trips named WebVTT cue identifiers through serialization', () => {
+    const parsed = parseSubtitle('WEBVTT\n\nintro\n00:00:01.000 --> 00:00:02.000\nCaption\n');
+    expect(parsed.cues[0].id).toBe('intro');
+    const output = serializeSubtitle(parsed);
+    expect(output).toContain('intro\n00:00:01.000 --> 00:00:02.000');
+  });
 });
