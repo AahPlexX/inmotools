@@ -240,3 +240,116 @@ test('a pattern that matches but declares no groups is diagnosed rather than sho
   await expect(page.locator('[data-testid="log-table"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
 });
+
+
+test('MIDI Harmony Lab can stop playback and change the progression length', async ({ page }) => {
+  // The progression was permanently four chords, and rapid Play clicks layered
+  // oscillators with no way to silence them because nothing tracked what had
+  // been scheduled.
+  await page.goto('./#/tools/midi-harmony-lab');
+  const chords = page.locator('[data-testid^="chord-notes-"]');
+  await expect(chords).toHaveCount(4);
+  await expect(page.getByTestId('midi-stop')).toBeDisabled();
+
+  await page.getByTestId('midi-add-chord').click();
+  await expect(chords).toHaveCount(5);
+
+  await page.getByRole('button', { name: 'Remove chord 5' }).click();
+  await expect(chords).toHaveCount(4);
+
+  // Reordering swaps neighbours rather than rewriting the whole progression.
+  await page.locator('#root-0').fill('A4');
+  await page.getByRole('button', { name: 'Move chord 1 later' }).click();
+  await expect(page.locator('#root-1')).toHaveValue('A4');
+
+  // The last chord cannot be removed, so the progression can never be emptied.
+  for (let i = 0; i < 3; i += 1) {
+    await page.getByRole('button', { name: 'Remove chord 1' }).click();
+  }
+  await expect(chords).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Remove chord 1' })).toBeDisabled();
+});
+
+test('Cron Team Matrix projects a configurable number of runs', async ({ page }) => {
+  // The horizon was hardcoded to thirty with no way to shorten or extend it.
+  await page.goto('./#/tools/cron-team-matrix');
+  const rows = page.locator('tbody tr');
+  await expect(rows).toHaveCount(30);
+
+  await page.locator('#run-count').fill('5');
+  await expect(rows).toHaveCount(5);
+  await expect(page.locator('.status-line.good')).toContainText('5 upcoming runs');
+
+  // Out-of-range input is clamped rather than accepted.
+  await page.locator('#run-count').fill('9999');
+  await expect(rows).toHaveCount(200);
+});
+
+test('Hardware Packet Inspector exposes capture and port lifecycle controls', async ({ page }) => {
+  // Disconnect did not exist, so the readable and writable stream locks stayed
+  // held until the tab was reloaded and the port could not be reclaimed.
+  await page.goto('./#/tools/hardware-packet-inspector');
+
+  await expect(page.getByTestId('serial-disconnect')).toBeDisabled();
+  await expect(page.getByLabel('Baud rate')).toBeEnabled();
+  // Legacy devices need the slower standard rates.
+  await expect(page.getByLabel('Baud rate').locator('option')).toHaveCount(8);
+  await page.getByLabel('Baud rate').selectOption('9600');
+
+  const stream = page.getByTestId('packet-stream');
+  await expect(page.getByTestId('stream-clear')).toBeDisabled();
+  await page.getByRole('button', { name: 'Start simulator' }).click();
+  await expect(stream).toContainText('SIM RX');
+
+  // Enter transmits, matching any other serial terminal.
+  await page.locator('#packet').fill('01 02 03');
+  await page.locator('#packet').press('Enter');
+  await expect(stream).toContainText('SIM TX 01 02 03');
+
+  // Pausing stops the log growing, and clearing empties it.
+  await page.getByTestId('stream-pause').click();
+  await expect(page.getByTestId('stream-pause')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#packet').press('Enter');
+  await expect(stream).not.toContainText('SIM TX 01 02 03\nSIM TX 01 02 03');
+
+  await page.getByTestId('stream-pause').click();
+  await page.getByTestId('stream-clear').click();
+  await expect(stream).toContainText('RX stream is empty');
+});
+
+test('GeoJSON Simplifier runs simplification off the main thread', async ({ page }) => {
+  // Simplification is proportional to vertex count and previously ran on the
+  // main thread, so a large file stalled the tab.
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/geojson-simplifier');
+
+  // A polygon with enough vertices to be worth simplifying.
+  const ring = Array.from({ length: 4000 }, (_, index) => {
+    const angle = (index / 4000) * Math.PI * 2;
+    return [Number((Math.cos(angle) * 10).toFixed(6)), Number((Math.sin(angle) * 10).toFixed(6))];
+  });
+  ring.push(ring[0]);
+
+  await page.setInputFiles('#geo-file', {
+    name: 'ring.geojson',
+    mimeType: 'application/geo+json',
+    buffer: Buffer.from(JSON.stringify({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [ring] },
+    })),
+  });
+  await expect(page.locator('.status-line')).toContainText('coordinate positions loaded');
+
+  await page.getByRole('button', { name: 'Simplify geometry' }).click();
+  await expect(page.locator('.status-line')).toContainText('Simplified locally to', { timeout: 30_000 });
+
+  // The page stayed responsive throughout, and the output is smaller.
+  const outputVertices = await page.locator('.metric', { hasText: 'Output vertices' }).locator('strong').textContent();
+  expect(Number(outputVertices)).toBeGreaterThan(0);
+  expect(Number(outputVertices)).toBeLessThan(4001);
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Download GeoJSON/ }).click();
+  expect((await download).suggestedFilename()).toBe('ring.simplified.geojson');
+});

@@ -1,5 +1,35 @@
 # Done
 
+## TASK-017: Make the floor-plan room-count assertion deterministic
+**Priority:** P2 | **Tags:** testing, reliability
+
+The suite's long-standing flake, now fixed at the cause rather than papered over. Room, dimension, and clearance figures arrive from the geometry worker, so between drafting and the worker replying the panel still shows the previous analysis. The test was waiting on the number itself, which is a side effect, so under full-suite contention it read the stale value.
+
+Two attempts were needed and the first is worth recording. Raising the timeout to twenty seconds reduced the failure rate without removing it - the assertion was still racing, just over a wider window. Publishing a readiness signal backed by a counter incremented inside the analysis effect also failed, because an effect runs a commit after the geometry it describes has already changed, so the signal briefly claimed to be current for a stale analysis. That is the same class of ordering mistake the paged table had.
+
+The workspace now publishes `data-analysis-state` derived **during render** by comparing the exact vertices, walls, and components the displayed analysis was computed from against the live geometry. It cannot report current for a stale analysis, because both sides of the comparison come from the same render. The test waits on that signal and then asserts the number without a timeout.
+
+Verified by six consecutive isolated runs and three consecutive full-suite runs with retries disabled, rather than by one passing run.
+
+---
+
+## TASK-018: Work through a further twenty audit findings, verified individually
+**Priority:** P1 | **Tags:** audit, reliability, worker, quality-of-life
+
+Each finding was checked against the code before being acted on. Nine of the twenty did not reproduce, which is why verification comes first: acting on a false report means changing working code, and that is how a fix becomes a regression.
+
+**Did not reproduce.** Fuzzy Deduplicator already runs its candidate blocking in `dedupe.worker.ts`. PlanCraft and JSON Lattice already set `touch-action: none` on their canvases. The video element already carries `playsInline`. AetherCast's forecast scrubber already uses pointer events, which cover touch. The font subsetter already caps its glyph grid at 500 entries. The cron metric row already wraps rather than overflowing. The GLB viewport already uses a `ResizeObserver`, which handles orientation change better than the window listener the finding asked for. The HAR waterfall no longer contains the hardcoded 440px height described. Subtitle drift already clamps negative timestamps to zero - the finding describes that clamp as the defect, which is a design question rather than a bug.
+
+**Fixed.**
+
+- *Serial port lifecycle.* The Hardware Packet Inspector had no disconnect control, so the readable and writable stream locks stayed held until the tab was reloaded and the port could not be reclaimed by this tool or any other application. Disconnect now cancels the reader, releases both locks, and closes the port, and unmounting the workspace does the same - navigating away was the most likely way to leave a device held. Also added the standard baud rates, since 115200 was hardcoded and legacy microcontrollers need slower ones; a pause toggle and a clear control for the capture log; and Enter to transmit, which is what any serial terminal does.
+- *GeoJSON simplification off the main thread.* Simplification is proportional to vertex count, so a multi-megabyte file stalled the tab. It now runs in a worker with a main-thread fallback where workers are unavailable, and a Stop control terminates a run. No deadline here, unlike log structuring: this input is large rather than pathological, so bounding it by time would abandon work that was going to finish.
+- *MIDI progression and playback.* The progression was permanently four chords. Chords can now be added, removed, and reordered, with the last one protected so the progression cannot be emptied. Playback tracked nothing it scheduled, so rapid Play clicks layered oscillators with no way to silence them; a Stop control now stops every scheduled node and closes the context, and playback state clears itself when the progression ends.
+- *PDF queue and output naming.* A file added by mistake could only be removed by reloading the session. Every export was also named `inmotools-sanitized.pdf` regardless of input, so successive exports collided; a single edited file now yields `<source>.sanitized.pdf` and a merge names itself after the document count.
+- *Cron projection horizon.* The run count was hardcoded to thirty. It is now configurable up to two hundred, clamped rather than trusted.
+
+---
+
 ## TASK-016: Move log structuring off the main thread and cap its output
 **Priority:** P0 | **Tags:** audit, performance, worker, accessibility
 

@@ -38,11 +38,11 @@ test('drafts a room, hosts a door, stages a component, and supports undo/redo', 
 
   await expect(page.getByTestId('wall-count')).toHaveText('4');
   // Wall count is derived synchronously from the drafted geometry, but room
-  // detection comes back from the geometry worker, so this assertion additionally
-  // waits on worker startup and its first analysis round trip. Under parallel
-  // workers on an emulated mobile device that can exceed the default timeout,
-  // which made this the flakiest assertion in the suite.
-  await expect(page.getByTestId('room-count')).toHaveText('1', { timeout: 20_000 });
+  // detection comes back from the geometry worker. Waiting on the workspace's own
+  // analysis-readiness signal rather than on the number itself is what makes this
+  // deterministic: a longer timeout only widened the window it was racing.
+  await expect(page.getByTestId('floorplan-studio')).toHaveAttribute('data-analysis-state', 'current', { timeout: 20_000 });
+  await expect(page.getByTestId('room-count')).toHaveText('1');
 
   const doorTool = page.getByRole('button', { name: /Parametric Door/ });
   await doorTool.click();
