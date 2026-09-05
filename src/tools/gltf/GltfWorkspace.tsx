@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import GltfViewport from './GltfViewport';
 import { optimizeGlb, type GltfOptimizeResult } from './gltf-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
@@ -57,7 +58,7 @@ export default function GltfWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>glTF / GLB optimizer</h2><p>Inspect a self-contained GLB, reduce geometry, resize supported textures, and compare the local result in an orbit viewport.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="gltf-file">Binary GLB model</label><input id="gltf-file" type="file" accept=".glb,model/gltf-binary" onChange={(event) => void chooseFile(event.target.files?.[0])}/><small>External-resource .gltf packages are not accepted because a single-file picker cannot safely resolve their sidecar buffers/textures. Use a self-contained .glb.</small></div>
+      <div className="field"><label htmlFor="gltf-file">Binary GLB model</label><input id="gltf-file" type="file" accept=".glb,model/gltf-binary" onChange={(event) => consumeFileInput(event.target, () => chooseFile(event.target.files?.[0]))}/><small>External-resource .gltf packages are not accepted because a single-file picker cannot safely resolve their sidecar buffers/textures. Use a self-contained .glb.</small></div>
 
       {source && result ? <>
         <div className="workspace-grid" style={{ marginTop: 18 }}>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import readXlsxFile from 'read-excel-file/browser';
 import { downloadText } from '../../lib/download';
 import { findDuplicateClusters, mergeCluster, type DedupeCluster, type DedupeConfig, type DedupeRow } from './dedupe-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 type Sheet = { name: string; data: unknown[][] };
 type Decision = { dismissed: boolean; selections: Record<string, number> };
@@ -127,7 +128,7 @@ export default function DedupeWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Record reconciliation</h2><p>Block candidates, score fuzzy similarity, then choose canonical values before export.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="dedupe-file">Choose CSV or XLSX file</label><input id="dedupe-file" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => void load(event.target.files?.[0])}/></div>
+      <div className="field"><label htmlFor="dedupe-file">Choose CSV or XLSX file</label><input id="dedupe-file" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => consumeFileInput(event.target, () => load(event.target.files?.[0]))}/></div>
       {sheets.length > 1 ? <div className="field" style={{ marginTop: 16 }}><label htmlFor="dedupe-sheet">Spreadsheet sheet</label><select id="dedupe-sheet" value={sheetIndex} onChange={(event) => changeSheet(Number(event.target.value))}>{sheets.map((sheet, index) => <option key={`${sheet.name}-${index}`} value={index}>{sheet.name}</option>)}</select></div> : null}
       {table.rows.length ? <>
         <div className="metric-row"><div className="metric"><span>Rows</span><strong>{table.rows.length}</strong></div><div className="metric"><span>Columns</span><strong>{table.headers.length}</strong></div><div className="metric"><span>Clusters</span><strong>{clusters.length || '—'}</strong></div></div>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import HarWaterfallCanvas from './HarWaterfallCanvas';
 import { analyzeHar, buildWaterfallRows, sanitizeHar, type HarFindingCategory, type HarSanitizePolicy } from './har-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 const CATEGORY_LABELS: Record<HarFindingCategory, string> = {
   headers: 'Sensitive headers', cookies: 'Cookies', query: 'Query parameters', bodies: 'Request bodies',
@@ -49,7 +50,7 @@ export default function HarWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Credential review & waterfall</h2><p>Inspect sensitive fields before creating a shareable HAR.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="har-file">Choose HAR file</label><input id="har-file" type="file" accept=".har,application/json,.json" onChange={(event) => void loadFile(event.target.files?.[0])}/><small>The source file is read only by this browser session.</small></div>
+      <div className="field"><label htmlFor="har-file">Choose HAR file</label><input id="har-file" type="file" accept=".har,application/json,.json" onChange={(event) => consumeFileInput(event.target, () => loadFile(event.target.files?.[0]))}/><small>The source file is read only by this browser session.</small></div>
       {analysis ? <>
         <div className="metric-row">
           <div className="metric"><span>Requests</span><strong>{analysis.requestCount}</strong></div>

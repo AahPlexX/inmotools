@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import ShaderEditor from './ShaderEditor';
 import { buildStandaloneShaderHtml, parseWebGlLog, type ShaderDiagnostic } from './shader-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 const DEFAULT_SOURCE = `#version 300 es
 precision highp float;
@@ -196,7 +197,7 @@ export default function ShaderWorkspace() {
       <div className="workspace-grid">
         <div className="field"><span className="field-label">Fragment shader</span><ShaderEditor value={source} onChange={setSource}/><small>CodeMirror uses the maintained legacy shader stream mode. Compiler messages come from your browser/GPU driver.</small></div>
         <div>
-          <div className="field"><label htmlFor="shader-textures">Optional local textures (up to 2)</label><input id="shader-textures" type="file" accept="image/*" multiple onChange={(event) => void loadTextures(event.target.files)}/><small>{textures.length ? textures.map((texture, index) => `u_texture${index}: ${texture.name}`).join(' · ') : 'Texture uniforms receive black 1×1 placeholders until local images are selected.'}</small></div>
+          <div className="field"><label htmlFor="shader-textures">Optional local textures (up to 2)</label><input id="shader-textures" type="file" accept="image/*" multiple onChange={(event) => consumeFileInput(event.target, () => loadTextures(event.target.files))}/><small>{textures.length ? textures.map((texture, index) => `u_texture${index}: ${texture.name}`).join(' · ') : 'Texture uniforms receive black 1×1 placeholders until local images are selected.'}</small></div>
           <canvas ref={canvasRef} tabIndex={0} aria-label="Live WebGL2 fragment shader preview" style={{ display: 'block', width: '100%', height: 420, marginTop: 18, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: '#000', touchAction: 'none' }}/>
           {!webgl2 ? <div className="notice" style={{ marginTop: 14 }}>WebGL2 is unavailable here. You can still edit and export source, but live compilation/preview requires WebGL2.</div> : null}
         </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { rowsToCsv } from '../logs/log-engine';
 import { createDuckDbSession, registerLocalFile, runLocalQuery, type DuckDbSession, type QueryResult } from './duckdb-client';
+import { consumeFileInput } from '../../lib/file-input';
 
 export default function DuckDbWorkspace() {
   const sessionRef = useRef<DuckDbSession | null>(null);
@@ -52,7 +53,7 @@ export default function DuckDbWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Local SQL workbench</h2><p>DuckDB-Wasm runs in a dedicated browser worker.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="duck-files">Choose data files</label><input id="duck-files" type="file" accept=".csv,.parquet,text/csv,application/vnd.apache.parquet" multiple onChange={(event) => void loadFiles(event.target.files)} /><small>Loaded files: {files.length ? files.join(', ') : 'none'}</small></div>
+      <div className="field"><label htmlFor="duck-files">Choose data files</label><input id="duck-files" type="file" accept=".csv,.parquet,text/csv,application/vnd.apache.parquet" multiple onChange={(event) => consumeFileInput(event.target, () => loadFiles(event.target.files))} /><small>Loaded files: {files.length ? files.join(', ') : 'none'}</small></div>
       <div className="field" style={{marginTop:16}}><label htmlFor="sql-query">SQL query</label><textarea id="sql-query" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); if (!busy && query.trim()) void execute(); } }} spellCheck={false} /><small>Press Ctrl+Enter (Cmd+Enter on macOS) to run the query.</small></div>
       <div className="button-row"><button className="action-button" type="button" disabled={busy || !query.trim()} onClick={() => void execute()}>Run query</button><button className="action-button secondary" type="button" disabled={!result} onClick={exportCsv}>Export CSV</button><button className="action-button secondary" type="button" disabled={!result} onClick={exportJson}>Export JSON</button></div>
       <div className="status-line" role="status">{busy ? 'Working in browser memory…' : status}</div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import ExifReader from 'exifreader';
 import { downloadBlob } from '../../lib/download';
 import { buildSanitizedFilename, listSensitiveMetadata, type SensitiveMetadata } from './exif-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 export default function ExifWorkspace() {
   const [file, setFile] = useState<File | null>(null);
@@ -48,7 +49,7 @@ export default function ExifWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Inspect and sanitize</h2><p>Metadata review happens before any output is created.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="exif-file">Choose image</label><input id="exif-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => inspect(event.target.files?.[0] ?? null)} /></div>
+      <div className="field"><label htmlFor="exif-file">Choose image</label><input id="exif-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => consumeFileInput(event.target, () => inspect(event.target.files?.[0] ?? null))} /></div>
       <div className={`status-line ${sensitive.length ? 'error' : file ? 'good' : ''}`} role="status">{busy ? 'Processing locally…' : status}</div>
       {sensitive.length > 0 ? <div className="result-table-wrap"><table><thead><tr><th scope="col">Sensitive field</th><th scope="col">Detected value</th></tr></thead><tbody>{sensitive.map((item) => <tr key={item.key}><td>{item.key}</td><td>{item.value}</td></tr>)}</tbody></table></div> : null}
       <div className="button-row"><button className="action-button" type="button" disabled={!file || busy} onClick={sanitize}>Sanitize and download</button></div>

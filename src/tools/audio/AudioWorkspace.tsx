@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import SpectrogramCanvas from './SpectrogramCanvas';
 import { encodePcm24Wav } from './audio-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 type AudioAsset = { name: string; buffer: AudioBuffer };
 type RoomConfig = { wet: number; preDelayMs: number; lowCutHz: number; highCutHz: number };
@@ -154,8 +155,8 @@ export default function AudioWorkspace() {
     <div className="workspace-body">
       {typeof AudioContext === 'undefined' ? <div className="notice">This browser does not expose the Web Audio API required by this workspace.</div> : <>
         <div className="workspace-grid">
-          <div className="field"><label htmlFor="audio-dry">Dry source audio</label><input id="audio-dry" type="file" accept="audio/*" onChange={(event) => void loadAudio(event.target.files?.[0], 'dry')}/><small>{dry ? `${dry.name} · ${dry.buffer.duration.toFixed(2)} s` : 'Choose audio that you want to place into the room response.'}</small></div>
-          <div className="field"><label htmlFor="audio-ir">Impulse response</label><input id="audio-ir" type="file" accept="audio/*" onChange={(event) => void loadAudio(event.target.files?.[0], 'impulse')}/><small>{impulse ? `${impulse.name} · ${impulse.buffer.duration.toFixed(2)} s` : 'Choose a local room, hall, cabinet, or other impulse-response recording.'}</small></div>
+          <div className="field"><label htmlFor="audio-dry">Dry source audio</label><input id="audio-dry" type="file" accept="audio/*" onChange={(event) => consumeFileInput(event.target, () => loadAudio(event.target.files?.[0], 'dry'))}/><small>{dry ? `${dry.name} · ${dry.buffer.duration.toFixed(2)} s` : 'Choose audio that you want to place into the room response.'}</small></div>
+          <div className="field"><label htmlFor="audio-ir">Impulse response</label><input id="audio-ir" type="file" accept="audio/*" onChange={(event) => consumeFileInput(event.target, () => loadAudio(event.target.files?.[0], 'impulse'))}/><small>{impulse ? `${impulse.name} · ${impulse.buffer.duration.toFixed(2)} s` : 'Choose a local room, hall, cabinet, or other impulse-response recording.'}</small></div>
         </div>
         <div className="workspace-grid" style={{ marginTop: 20 }}>
           <div className="field"><label htmlFor="audio-wet">Wet mix · {(wet * 100).toFixed(0)}%</label><input id="audio-wet" type="range" min="0" max="1" step="0.01" value={wet} onChange={(event) => setWet(Number(event.target.value))}/><small>Equal-power crossfade between the dry and convolved paths.</small></div>
