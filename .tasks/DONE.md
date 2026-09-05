@@ -1,5 +1,24 @@
 # Done
 
+## TASK-016: Move log structuring off the main thread and cap its output
+**Priority:** P0 | **Tags:** audit, performance, worker, accessibility
+
+The worst remaining failure mode in the audit backlog. Regex Log Structurer evaluated a user-supplied pattern synchronously inside a `useMemo`, on every keystroke. A pattern that backtracks catastrophically - `^(a+)+$` against a long line of `a` - never returns, so the tab froze permanently, taking with it the only field that could have fixed the pattern. Confirmed before fixing: that pattern does not complete in 25 seconds of synchronous execution.
+
+Structuring now runs in a dedicated worker behind a four-second deadline. Exceeding it terminates the worker and names the cause, so a runaway pattern costs one worker instead of the session, and a Stop control cancels a run in progress.
+
+**Shared paged table.** Ten workspaces mount one element per row, which is ruinous on real input: the work succeeds and then layout kills the tab. `src/components/PagedTable.tsx` caps what is mounted, states the true total in an accessible caption, and is adopted here first. Pagination rather than virtualisation was chosen deliberately - a windowed list needs row-height measurement, hides totals from assistive technology unless carefully annotated, and breaks find-in-page. Export always serialises the entire result, so the cap is a display concern and never silently truncates output. Nine tools remain to adopt it under TASK-014.
+
+**Whole-document scan mode.** The audit asked for `m` and `s` flag toggles. Adding them as-is would have shipped placebo controls: matching is line by line, and a single line contains no newline for multiline anchors or dot-matches-newline to act on. Rather than fake it, the tool gained a scan mode - whole-document matching, where each match is one record - which makes those flags meaningful and adds real capability, since a record spanning lines (a stack trace, an embedded JSON payload) could not previously be parsed at all. In line mode both flags are disabled with the reason stated. Document mode refuses a pattern that can match the empty string instead of emitting a record per character.
+
+**Also fixed.** A file input, so a multi-megabyte log no longer has to travel through the clipboard, with the loaded filename driving export names instead of a generic default. Named group discovery now reads the pattern source statically instead of probing it against an empty string - the old probe learned nothing from a pattern that cannot match `''`, leaving columns to be inferred from whichever line matched first, and was itself one more chance to hang. Column kind inference labels each column integer, decimal, timestamp, text, or empty, reporting only what every sampled value supports.
+
+**Suite reliability, partially addressed.** The floor-plan room-count assertion has been the suite's flakiest. Investigated rather than re-rolled: wall count is derived synchronously, but room count waits on geometry-worker startup and its first round trip, which under parallel workers on an emulated mobile device can exceed the default timeout. The workspace already falls back to local analysis when the worker fails, so this is the assertion under-waiting rather than a product defect. Raising that one timeout to twenty seconds reduced the failure rate but did **not** eliminate it - the assertion failed once more afterwards and then passed a full suite run with retries disabled, so it remains intermittent under full-suite contention while passing consistently in isolation and when its own file runs at four workers. Carried as TASK-017 rather than recorded as fixed.
+
+Unit assertions rose from 362 to 380; browser tests from 208 to 216.
+
+---
+
 ## TASK-015: Fix the crash-class and file-input defects found by the catalog audit
 **Priority:** P0 | **Tags:** audit, correctness, reliability
 
@@ -62,7 +81,7 @@ The catalog regression is the reason the registry is now covered by an assertion
 
 Offline DuckDB was confirmed to be an unintended consequence of `workbox.globPatterns` including `wasm`, not a required capability. Both DuckDB binaries are excluded from the precache through `globIgnores` and served by a `CacheFirst` runtime cache populated on first actual use, so a visitor who never opens the DuckDB workbench never downloads them. The Pyodide runtime is excluded on the same basis, and the Markdown Workbench later adopted the same discipline for its own heavy lazily-loaded chunks.
 
-First-visit precache fell from roughly 80 MB across 48 entries to roughly 11.5 MB across 111 entries. Asserted by `tests/unit/deployment-config.test.ts`.
+First-visit precache fell from roughly 80 MB across 48 entries to roughly 11.5 MB (the entry count tracks however many chunks the catalog currently emits). Asserted by `tests/unit/deployment-config.test.ts`.
 
 ---
 
