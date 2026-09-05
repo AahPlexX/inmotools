@@ -89,3 +89,154 @@ test('re-importing an edited file with the same name is picked up', async ({ pag
   await expect(editor).toContainText('second');
   await expect(editor).not.toContainText('first');
 });
+
+
+test('Regex Log Structurer survives a catastrophically backtracking pattern', async ({ page }) => {
+  // The defining property of this fix: structuring runs in a worker with a
+  // deadline, so a runaway pattern hangs that worker instead of the tab. Before
+  // it, this pattern locked the page with no way left to edit the field that
+  // caused it.
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/regex-log-structurer');
+
+  const input = page.locator('#log-input');
+  await input.fill(`${'a'.repeat(3000)}b`);
+  await page.locator('#log-pattern').fill('^(?<boom>(a+)+)$');
+
+  // The deadline elapses and the tool says why, rather than freezing.
+  await expect(page.getByTestId('log-status')).toContainText(/did not finish within/i, { timeout: 30_000 });
+
+  // Decisive check: the page is still interactive afterwards.
+  await page.locator('#log-pattern').fill('^(?<line>.+)$');
+  await expect(page.getByTestId('log-status')).toContainText('1 matched line', { timeout: 20_000 });
+});
+
+test('Regex Log Structurer pages a large result instead of mounting every row', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/regex-log-structurer');
+
+  const lines = Array.from({ length: 1500 }, (_, index) => `2026-08-29 INFO event ${index}`).join('\n');
+  await page.locator('#log-input').fill(lines);
+  await expect(page.getByTestId('log-status')).toContainText('1500 matched lines', { timeout: 20_000 });
+
+  // Only one page is in the DOM, and the control states the real total.
+  const bodyRows = page.locator('[data-testid="log-table"] tbody tr');
+  await expect(bodyRows).toHaveCount(200);
+  await expect(page.getByTestId('log-table-range')).toContainText('Rows 1–200 of 1500');
+
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByTestId('log-table-range')).toContainText('Rows 201–400 of 1500');
+  await expect(bodyRows).toHaveCount(200);
+
+  // Export must cover the whole result, not the visible page.
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const stream = await (await download).createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  const csv = Buffer.concat(chunks).toString('utf8');
+  expect(csv).toContain('event 1499');
+  expect(csv.trim().split('\r\n')).toHaveLength(1501);
+});
+
+test('Regex Log Structurer reads a log file and reports inferred column kinds', async ({ page }) => {
+  await page.goto('./#/tools/regex-log-structurer');
+  await page.setInputFiles('#log-file', {
+    name: 'service.log',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('2026-08-29 INFO started\n2026-08-29 ERROR failed'),
+  });
+
+  await expect(page.getByTestId('log-status')).toContainText('2 matched lines', { timeout: 20_000 });
+  const header = page.locator('[data-testid="log-table"] thead');
+  await expect(header).toContainText('timestamp');
+  await expect(header).toContainText('text');
+
+  // The loaded filename drives the export name instead of a generic default.
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON' }).click();
+  expect((await download).suggestedFilename()).toBe('service.json');
+});
+
+test('Regex Log Structurer only offers the flags that can actually apply', async ({ page }) => {
+  await page.goto('./#/tools/regex-log-structurer');
+
+  // Line mode cannot honour multiline or dot-all, so they are disabled and the
+  // reason is stated rather than offering controls that do nothing.
+  await expect(page.getByTestId('log-flag-note')).toContainText('no newline for them to act on');
+  await expect(page.getByLabel('Multiline anchors (m)')).toBeDisabled();
+  await expect(page.getByLabel('Dot matches newline (s)')).toBeDisabled();
+  await expect(page.getByLabel('Ignore case (i)')).toBeEnabled();
+
+  await page.getByLabel('Scan').selectOption('document');
+  await expect(page.getByLabel('Multiline anchors (m)')).toBeEnabled();
+  await expect(page.getByLabel('Dot matches newline (s)')).toBeEnabled();
+  await expect(page.getByTestId('log-flag-note')).toHaveCount(0);
+
+  // Whole-document scanning parses a record that spans lines.
+  await page.locator('#log-input').fill('BEGIN\ndetail line\nEND');
+  await page.locator('#log-pattern').fill('BEGIN(?<body>.*?)END');
+  await page.getByLabel('Dot matches newline (s)').check();
+  await expect(page.getByTestId('log-status')).toContainText('1 matched line', { timeout: 20_000 });
+  await expect(page.locator('[data-testid="log-table"] tbody')).toContainText('detail line');
+});
+
+
+test('the paged table clamps to a valid page when the result shrinks', async ({ page }) => {
+  // Regression guard for the pager: clamping after commit painted one frame with
+  // an empty body and an impossible range such as "Rows 1401–900 of 900".
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/regex-log-structurer');
+
+  const wide = Array.from({ length: 1500 }, (_, index) => `2026-08-29 INFO event ${index}`).join('\n');
+  await page.locator('#log-input').fill(wide);
+  await expect(page.getByTestId('log-status')).toContainText('1500 matched lines', { timeout: 20_000 });
+
+  // Walk to a late page, then shrink the result underneath it.
+  for (let click = 0; click < 6; click += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByTestId('log-table-range')).toContainText('page 7 of 8');
+
+  await page.locator('#log-input').fill('2026-08-29 INFO only one line');
+  await expect(page.getByTestId('log-status')).toContainText('1 matched line', { timeout: 20_000 });
+
+  // A single row no longer paginates at all, so the pager is gone rather than
+  // reporting a page that cannot exist.
+  await expect(page.getByTestId('log-table-range')).toHaveCount(0);
+  await expect(page.locator('[data-testid="log-table"] tbody tr')).toHaveCount(1);
+
+  // Growing again starts from a valid page rather than the stale one.
+  await page.locator('#log-input').fill(wide);
+  await expect(page.getByTestId('log-status')).toContainText('1500 matched lines', { timeout: 20_000 });
+  await expect(page.getByTestId('log-table-range')).toContainText('Rows 1–200 of 1500');
+});
+
+test('stopping a run really stops it, including one still only scheduled', async ({ page }) => {
+  // Regression guard: Stop could not reach a run sitting in the debounce window,
+  // so the runaway pattern started anyway a moment later.
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/regex-log-structurer');
+
+  await page.locator('#log-input').fill(`${'a'.repeat(3000)}b`);
+  await page.locator('#log-pattern').fill('^(?<boom>(a+)+)$');
+  await page.getByTestId('log-cancel').click();
+
+  await expect(page.getByTestId('log-status')).toContainText('Stopped');
+  // The deadline message must never arrive: the run was cancelled before and
+  // during the debounce window, so nothing should still be executing.
+  await expect(page.getByTestId('log-status')).not.toContainText(/did not finish within/i, { timeout: 8000 });
+
+  // Exports are unavailable while the result does not describe the current pattern.
+  await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+});
+
+test('a pattern that matches but declares no groups is diagnosed rather than shown as empty rows', async ({ page }) => {
+  await page.goto('./#/tools/regex-log-structurer');
+  await page.getByLabel('Scan').selectOption('document');
+  await page.locator('#log-input').fill('id=1 id=2');
+  await page.locator('#log-pattern').fill('id=\\d+');
+
+  await expect(page.getByTestId('log-status')).toContainText('declares no named groups', { timeout: 20_000 });
+  // No headerless table, and nothing exportable.
+  await expect(page.locator('[data-testid="log-table"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+});

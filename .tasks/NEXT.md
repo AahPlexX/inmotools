@@ -7,11 +7,18 @@ A forensic audit covering all twenty-six suites produced roughly 130 findings. E
 
 The two crash-class defects and the cross-cutting file-input defect are fixed under TASK-015. What remains is grouped below by the nature of the work rather than by tool, since the same fix usually applies in several places at once.
 
+### Carried over from the TASK-016 review
+
+An independent design review of the log-structurer work raised twenty points; the defects were fixed there. These were judged real but out of that change's scope:
+
+- **One worker per run.** `log-runner.ts` constructs a worker, clones the whole input in, and clones the whole row set back, on every debounced keystroke. A single long-lived worker, replaced only when a deadline is missed, removes the construction and module-load cost; `cancel()` then means "ignore the response" for the common supersede case. Worth doing before the same runner is reused for GeoJSON and dedupe.
+- **Coarse pager navigation.** `PagedTable` has no page-size select, first/last buttons, or page input, so a million-row result is five thousand single steps from its end. Needed before the component is adopted by DuckDB Workbench, where result sets are largest.
+- **Column kind in the header's accessible name.** The inferred kind sits inside the `<th>`, so screen-reader cell navigation repeats it on every cell. Move it out of the labelling path, for example with `aria-describedby`.
+
 ### Verified and outstanding
 
-- **Unbounded DOM output.** DuckDB Workbench, Regex Log Structurer, Fuzzy Deduplicator and the APCA matrix mount one element per row or per token, so a large result set freezes the tab. Needs one shared virtualised or paginated table primitive, not four separate fixes.
-- **Main-thread computation.** GeoJSON simplification, regex execution against large logs, fuzzy candidate blocking, and Markdown table-formula evaluation all run synchronously on the main thread. Regex execution is the most severe because a catastrophic-backtracking pattern locks the tab with no way out.
-- **Missing file input.** Regex Log Structurer accepts pasted text only; a multi-megabyte log has to go through the clipboard.
+- **Unbounded DOM output.** The shared `PagedTable` primitive now exists and is adopted by Regex Log Structurer (TASK-016). Nine workspaces still mount one element per row and should adopt it: DuckDB Workbench, Fuzzy Deduplicator, the APCA matrix, HAR Sanitizer, Trace Flamegraph, JSON Lattice, EXIF Scrubber, Cron Team Matrix, and GLSL Sandbox. The APCA matrix needs care - it mounts interactive buttons per pairing rather than plain cells, so paging alone may not be the right shape.
+- **Main-thread computation.** Regex execution is done (TASK-016). Still synchronous: GeoJSON topology simplification, fuzzy candidate blocking, and Markdown Workbench's table-formula evaluation. The worker-with-deadline arrangement in `src/tools/logs/log-runner.ts` is the pattern to follow; a deadline matters wherever the input can be pathological rather than merely large.
 - **Free-text input still unguarded elsewhere.** The Energy Planner accepts negative ages and zero stature and reports a negative basal rate. PDF Sanitizer validates page ranges only when processing begins rather than as the field is edited.
 - **Mobile split panes.** RegexMatrix Studio, PlanCraft Studio and JSON Lattice place two working surfaces side by side and compress both below 768px. Markdown Workbench already stacks at 860px and is covered by a viewport test; the others need the same treatment or a tabbed switch.
 - **Touch gestures.** JSON Lattice and PlanCraft canvases do not set `touch-action: none`, so dragging scrolls the page instead of the canvas. AetherCast's forecast scrubber listens for mouse events only, so it cannot be scrubbed on a touchscreen at all.
@@ -48,6 +55,21 @@ Seven of the twenty-six registered suites have behavioural browser specs: DuckDB
 - Add a focused behavioural spec per uncovered suite, exercising its primary local workflow and its export path.
 - Keep each spec deterministic and independent of shared browser state.
 - Prioritise suites whose engines carry the least unit coverage.
+
+---
+
+## TASK-017: Make the floor-plan room-count assertion deterministic
+**Priority:** P2 | **Tags:** testing, reliability
+
+`tests/e2e/floorplan.spec.ts` asserts a room count that only appears once the geometry worker has started and returned its first analysis. Under full-suite contention on an emulated mobile device that wait is unpredictable: the assertion passes consistently in isolation and when its own file runs at four workers, and fails occasionally in a full run. Raising the timeout to twenty seconds reduced the rate without eliminating it, so the remaining cause is contention rather than a product defect - the workspace already falls back to local analysis when the worker fails.
+
+The wait is on a side effect rather than on a signal, which is the actual problem. A longer timeout only widens the window.
+
+### Plan
+
+- Have the workspace expose an explicit analysis-ready signal - a `data-analysis-state` attribute, or a testid that appears once the first worker response has been applied - and wait on that instead of on a derived number.
+- Prefer that signal over a timeout everywhere room, dimension, or clearance output is asserted.
+- Confirm by running the full suite repeatedly with retries disabled rather than once.
 
 ---
 
