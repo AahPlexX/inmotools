@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import FlamegraphCanvas from './FlamegraphCanvas';
 import { computeCriticalPath, parseTraceExport, type NormalizedSpan } from './otel-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 export default function OtelWorkspace() {
   const [spans, setSpans] = useState<NormalizedSpan[]>([]); const [status, setStatus] = useState('Choose an OTLP or Jaeger JSON trace export.'); const [selectedSpanId, setSelectedSpanId] = useState<string>(); const [service, setService] = useState('all'); const [errorsOnly, setErrorsOnly] = useState(false); const [minLatency, setMinLatency] = useState(0);
@@ -22,7 +23,7 @@ export default function OtelWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Trace flamegraph explorer</h2><p>Normalize OTLP or Jaeger spans, filter latency, and follow the critical path without uploading the trace.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="otel-file">Choose trace JSON</label><input id="otel-file" type="file" accept="application/json,.json" onChange={(event) => void load(event.target.files?.[0])}/></div>
+      <div className="field"><label htmlFor="otel-file">Choose trace JSON</label><input id="otel-file" type="file" accept="application/json,.json" onChange={(event) => consumeFileInput(event.target, () => load(event.target.files?.[0]))}/></div>
       {spans.length ? <>
         <div className="metric-row"><div className="metric"><span>Spans</span><strong>{spans.length}</strong></div><div className="metric"><span>Visible</span><strong>{filtered.length}</strong></div><div className="metric"><span>Errors</span><strong>{spans.filter((span) => span.error).length}</strong></div><div className="metric"><span>Critical spans</span><strong>{criticalPath.length}</strong></div></div>
         <div className="workspace-grid three" style={{ marginTop: 18 }}>

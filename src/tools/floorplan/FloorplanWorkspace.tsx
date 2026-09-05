@@ -9,6 +9,7 @@ import { COMPONENT_LIBRARY, getSymbolDefinition } from './symbol-library';
 import { commitProject, createInitialProject, loadProject, redoState, undoState, updateSelection } from './state-engine';
 import type { FloorplanProject, HostedOpening, PlanComponent, Point2D, ProjectHistory, WallSegment, WallVertex } from './floorplan-types';
 import type { FloorplanWorkerResponse } from './floorplan-worker';
+import { consumeFileInput } from '../../lib/file-input';
 
 const AUTOSAVE_KEY = 'inmotools_plancraft_autosave';
 // Rooms, dimensions, and clearance warnings are derived by the geometry worker. A
@@ -316,7 +317,7 @@ export const FloorplanWorkspace = () => {
         <button type="button" className="plancraft-button" onClick={() => exportDxfFile('r2000')}>Export DXF R2000</button>
         <button type="button" className="plancraft-button" onClick={() => void exportPdfFile()}>Export PDF</button>
         <button type="button" className="plancraft-button" onClick={backupJson}>Backup JSON</button>
-        <label className="plancraft-file-button">Restore JSON<input type="file" accept="application/json,.json" onChange={(event) => void restoreJson(event.target.files?.[0])} /></label>
+        <label className="plancraft-file-button">Restore JSON<input type="file" accept="application/json,.json" onChange={(event) => consumeFileInput(event.target, () => restoreJson(event.target.files?.[0]))} /></label>
         <a className="plancraft-coffee" href={COFFEE_URL} target="_blank" rel="noreferrer">☕ Buy me a coffee ($3)</a>
       </div>
 

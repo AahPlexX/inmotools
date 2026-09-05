@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import { exportPacketRange, inspectLocalMedia, snapTrimRange, type MediaInspection } from './video-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 function formatSeconds(value: number) {
   if (!Number.isFinite(value)) return '—';
@@ -71,7 +72,7 @@ export default function VideoWorkspace() {
     <div className="workspace-header"><div><h2>Lossless keyframe video slicer</h2><p>Trim compatible local video by copying encoded packets, with boundaries disclosed before export.</p></div></div>
     <div className="workspace-body">
       <div className="notice"><strong>Lossless means no decode/re-encode.</strong> Video boundaries snap to verified keyframes so complete GOPs are preserved. The exported range can therefore be wider than the range you requested.</div>
-      <div className="field" style={{ marginTop: 18 }}><label htmlFor="video-file">Video file</label><input id="video-file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange={(event) => void chooseFile(event.target.files?.[0])}/><small>MP4, MOV, and WebM are inspected locally. Export only proceeds when a compatible output container can preserve the source codecs.</small></div>
+      <div className="field" style={{ marginTop: 18 }}><label htmlFor="video-file">Video file</label><input id="video-file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange={(event) => consumeFileInput(event.target, () => chooseFile(event.target.files?.[0]))}/><small>MP4, MOV, and WebM are inspected locally. Export only proceeds when a compatible output container can preserve the source codecs.</small></div>
 
       {previewUrl ? <video src={previewUrl} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: 420, marginTop: 18, borderRadius: 'var(--radius-sm)', background: '#000' }}/>: null}
 

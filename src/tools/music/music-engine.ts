@@ -11,6 +11,27 @@ function noteToMidi(note: string): number {
   return (Number(match[2]) + 1) * 12 + NOTE_INDEX[match[1]];
 }
 
+// `buildChord` throws for an unparseable root, which is the right contract for
+// an engine but not something a caller can use during render: the root arrives
+// from a free-text field, so every intermediate keystroke ("C" after deleting
+// the octave from "C4") is invalid and an unguarded throw tears down the
+// workspace. These helpers let the interface ask whether a chord is buildable
+// and render a message instead of crashing, without weakening the contract the
+// engine's own tests rely on.
+
+export function isValidNote(note: string): boolean {
+  const match = /^([A-G](?:#|b)?)(-?\d+)$/.exec(note.trim());
+  return Boolean(match) && NOTE_INDEX[match![1]] !== undefined;
+}
+
+export function tryBuildChord(spec: ChordSpec): number[] | null {
+  try {
+    return buildChord(spec);
+  } catch {
+    return null;
+  }
+}
+
 export function buildChord(spec: ChordSpec): number[] {
   const root = noteToMidi(spec.root);
   const notes = INTERVALS[spec.quality].map((interval) => root + interval);

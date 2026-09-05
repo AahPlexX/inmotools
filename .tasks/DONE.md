@@ -1,5 +1,22 @@
 # Done
 
+## TASK-015: Fix the crash-class and file-input defects found by the catalog audit
+**Priority:** P0 | **Tags:** audit, correctness, reliability
+
+Three defects from the catalog-wide audit were confirmed to reproduce and are fixed here. Each is guarded by a test that was proven to fail against the unfixed code.
+
+**MIDI Harmony Lab crashed on an ordinary keystroke.** `buildChord` was called directly inside render, and the chord root is a free-text field, so deleting the octave from `C4` left `C`, `noteToMidi` threw, and the throw during render unmounted the workspace to a blank screen. The engine keeps its throwing contract, which its own tests depend on; the interface now asks `tryBuildChord` and explains what a root needs instead of dying. Playback and MIDI export report which chord is unbuildable rather than throwing from the handler.
+
+**Cron Team Matrix crashed on an unrecognized timezone.** Both the source zone and the comparison list are free text, and both reached `Intl.DateTimeFormat` during render, where an unknown IANA name raises `RangeError`. Zones are now validated first: an unusable source zone produces an inline message, and unusable comparison zones are named and skipped while the valid columns still render.
+
+**Sixteen file inputs could not re-select the same file.** A file input only fires `change` when its value differs, so re-importing a file after editing it did nothing at all. Fixed through one shared `consumeFileInput` helper rather than sixteen inline resets. The helper resets only after the caller's work settles, which matters for the four handlers that receive the live `FileList`: clearing the value early empties that list and would have broken the read it was meant to protect. All eighteen file inputs in the catalog now have a reset path.
+
+Unit assertions rose from 346 to 362; browser tests from 202 to 208.
+
+Also recorded during this pass: several audit findings did not reproduce and were deliberately not "fixed", since changing working code on a false report is its own defect. The PDF page-range crash is already caught and reported; three-digit hex colours are already expanded by the colour parser before parsing; and four of the five Markdown Workbench findings describe behaviour that TASK-011 had already addressed. See TASK-014 for the verified remainder.
+
+---
+
 ## TASK-011: Close the Markdown Workbench completeness gaps
 **Priority:** P0 | **Tags:** local-first, editor, export, correctness
 

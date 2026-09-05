@@ -15,6 +15,7 @@ import { generateSchemaTargets } from './schema-engine';
 import { closeLatticeSqlSession, createLatticeSqlSession, refreshJsonTreeTable, runLatticeSql, type LatticeSqlSession } from './lattice-sql';
 import { commitHistory, createHistory, redoHistory, undoHistory } from './state-engine';
 import type { QueryResult } from '../duckdb/duckdb-client';
+import { consumeFileInput } from '../../lib/file-input';
 
 const DEFAULT_SOURCE = JSON.stringify({
   project: 'JSON Lattice Studio',
@@ -290,7 +291,7 @@ export default function LatticeWorkspace() {
 
     <div className="lattice-inputbar">
       <label>Input format<select aria-label="Input format" value={format} onChange={(event) => changeFormat(event.target.value as StructuredFormat)}>{FORMATS.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}</select></label>
-      <label className="lattice-file">Open local file<input type="file" accept=".json,.yaml,.yml,.toml,.xml,.csv,application/json,text/csv" onChange={(event) => void loadFile(event.target.files?.[0])} /></label>
+      <label className="lattice-file">Open local file<input type="file" accept=".json,.yaml,.yml,.toml,.xml,.csv,application/json,text/csv" onChange={(event) => consumeFileInput(event.target, () => loadFile(event.target.files?.[0]))} /></label>
       <label className="lattice-search">Search graph<input aria-label="Search graph" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="key, value, type, or path" /></label>
       <span className="lattice-search-count"><strong data-testid="search-match-count">{searchMatches.size}</strong> matches</span>
       <label>Layout<select value={direction} onChange={(event) => setDirection(event.target.value as LatticeLayoutDirection)}><option value="LR">Left → right</option><option value="TB">Top → bottom</option><option value="RL">Right → left</option><option value="BT">Bottom → top</option></select></label>

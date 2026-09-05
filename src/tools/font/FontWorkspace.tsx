@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { collectRequiredCodePoints, inspectFont, subsetToWoff2, type FontInspection, type FontPreset } from './font-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 const PRESET_OPTIONS: Array<{ id: FontPreset; label: string }> = [
   { id: 'basic-latin', label: 'Basic Latin' },
@@ -85,7 +86,7 @@ export default function FontWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Font glyph subsetter</h2><p>Inspect cmap coverage and source metrics, choose Unicode coverage, then build a smaller WOFF2 locally.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="font-file">Font file</label><input id="font-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" onChange={(event) => void chooseFile(event.target.files?.[0])}/><small>WOFF2 is decompressed locally before OpenType inspection; originals are never modified.</small></div>
+      <div className="field"><label htmlFor="font-file">Font file</label><input id="font-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" onChange={(event) => consumeFileInput(event.target, () => chooseFile(event.target.files?.[0]))}/><small>WOFF2 is decompressed locally before OpenType inspection; originals are never modified.</small></div>
 
       {inspection ? <>
         <div className="metric-row"><div className="metric"><span>Family</span><strong>{inspection.familyName}</strong></div><div className="metric"><span>Style</span><strong>{inspection.styleName}</strong></div><div className="metric"><span>Units/em</span><strong>{inspection.unitsPerEm}</strong></div><div className="metric"><span>Ascender</span><strong>{inspection.ascender}</strong></div><div className="metric"><span>Descender</span><strong>{inspection.descender}</strong></div><div className="metric"><span>Source</span><strong>{formatBytes(inspection.inputBytes)}</strong></div></div>

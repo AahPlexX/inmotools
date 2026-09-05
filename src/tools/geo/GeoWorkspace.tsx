@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import GeoPreview from './GeoPreview';
 import { countCoordinates, simplifyTopology } from './geo-engine';
+import { consumeFileInput } from '../../lib/file-input';
 
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 
@@ -46,7 +47,7 @@ export default function GeoWorkspace() {
   return <>
     <div className="workspace-header"><div><h2>Topology-aware simplifier</h2><p>Reduce coordinate precision and geometry detail without independently drifting shared borders.</p></div></div>
     <div className="workspace-body">
-      <div className="field"><label htmlFor="geo-file">Choose GeoJSON file</label><input id="geo-file" type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={(event) => void loadFile(event.target.files?.[0])}/></div>
+      <div className="field"><label htmlFor="geo-file">Choose GeoJSON file</label><input id="geo-file" type="file" accept=".geojson,.json,application/geo+json,application/json" onChange={(event) => consumeFileInput(event.target, () => loadFile(event.target.files?.[0]))}/></div>
       {source ? <>
         <div className="workspace-grid three" style={{ marginTop: 18 }}>
           <div className="field"><label htmlFor="geo-decimals">Coordinate decimals</label><input id="geo-decimals" type="number" min="0" max="12" value={decimals} onChange={(event) => setDecimals(Math.max(0, Math.min(12, Number(event.target.value))))}/><small>Lower precision usually saves more bytes.</small></div>
