@@ -18,7 +18,7 @@ An independent design review of the log-structurer work raised twenty points; th
 ### Verified and outstanding
 
 - **Unbounded DOM output.** The shared `PagedTable` primitive now exists and is adopted by Regex Log Structurer (TASK-016). Eleven workspaces still render an uncapped table and should adopt it, verified by searching for `result-table-wrap` outside the primitive: APCA token matrix, Cron Team Matrix, Fuzzy Deduplicator, DuckDB Workbench, EXIF Scrubber, HAR Sanitizer, JSON Lattice, Energy & Macro Planner, Trace Flamegraph, GLSL Sandbox, and SVG Sprite Compiler. Priority follows result size: DuckDB and the deduplicator can produce the largest tables. Two need more than a drop-in - the APCA matrix mounts an interactive button per pairing rather than plain cells, and several of the others render a fixed handful of rows where paging would add controls without removing a risk, so each should be judged rather than converted mechanically.
-- **Main-thread computation.** Regex execution is done (TASK-016). Still synchronous: GeoJSON topology simplification, fuzzy candidate blocking, and Markdown Workbench's table-formula evaluation. The worker-with-deadline arrangement in `src/tools/logs/log-runner.ts` is the pattern to follow; a deadline matters wherever the input can be pathological rather than merely large.
+- **Main-thread computation.** Regex execution (TASK-016) and GeoJSON simplification (TASK-018) are done, and fuzzy candidate blocking turned out to already run in a worker. The one remaining case is Markdown Workbench's table-formula evaluation, which recomputes synchronously on every keystroke. Two patterns now exist to follow: `src/tools/logs/log-runner.ts` where the input can be pathological and needs a deadline, and `src/tools/geo/geo.worker.ts` where it is merely large and only needs cancellation.
 - **Free-text input still unguarded elsewhere.** The Energy Planner accepts negative ages and zero stature and reports a negative basal rate. PDF Sanitizer validates page ranges only when processing begins rather than as the field is edited.
 - **Mobile split panes.** RegexMatrix Studio, PlanCraft Studio and JSON Lattice place two working surfaces side by side and compress both below 768px. Markdown Workbench already stacks at 860px and is covered by a viewport test; the others need the same treatment or a tabbed switch.
 - **Touch gestures.** JSON Lattice and PlanCraft canvases do not set `touch-action: none`, so dragging scrolls the page instead of the canvas. AetherCast's forecast scrubber listens for mouse events only, so it cannot be scrubbed on a touchscreen at all.
@@ -55,21 +55,6 @@ Seven of the twenty-six registered suites have behavioural browser specs: DuckDB
 - Add a focused behavioural spec per uncovered suite, exercising its primary local workflow and its export path.
 - Keep each spec deterministic and independent of shared browser state.
 - Prioritise suites whose engines carry the least unit coverage.
-
----
-
-## TASK-017: Make the floor-plan room-count assertion deterministic
-**Priority:** P2 | **Tags:** testing, reliability
-
-`tests/e2e/floorplan.spec.ts` asserts a room count that only appears once the geometry worker has started and returned its first analysis. Under full-suite contention on an emulated mobile device that wait is unpredictable: the assertion passes consistently in isolation and when its own file runs at four workers, and fails occasionally in a full run. Raising the timeout to twenty seconds reduced the rate without eliminating it, so the remaining cause is contention rather than a product defect - the workspace already falls back to local analysis when the worker fails.
-
-The wait is on a side effect rather than on a signal, which is the actual problem. A longer timeout only widens the window.
-
-### Plan
-
-- Have the workspace expose an explicit analysis-ready signal - a `data-analysis-state` attribute, or a testid that appears once the first worker response has been applied - and wait on that instead of on a derived number.
-- Prefer that signal over a timeout everywhere room, dimension, or clearance output is asserted.
-- Confirm by running the full suite repeatedly with retries disabled rather than once.
 
 ---
 

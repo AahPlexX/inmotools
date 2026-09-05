@@ -52,6 +52,24 @@ const isTypingTarget = (target: EventTarget | null) => target instanceof HTMLInp
 export const FloorplanWorkspace = () => {
   const [history, setHistory] = useState<ProjectHistory>(safeInitialHistory);
   const [analysis, setAnalysis] = useState<FloorplanAnalysis>(() => analyzeFloorplan(history.present));
+  // Which analysis request the displayed result came from, and which one is
+  // outstanding. Rooms, dimensions, and clearances arrive from the geometry
+  // worker, so between drafting and the worker replying the panel still shows the
+  // previous analysis. Publishing that distinction lets a caller - a test, or a
+  // future progress indicator - wait for a signal instead of watching a derived
+  // number and guessing when it has settled.
+  // The exact geometry the displayed analysis was computed from. Compared against
+  // the live geometry during render, so the signal cannot briefly claim to be
+  // current for a stale analysis - which a counter incremented inside an effect
+  // does, because the effect runs a commit after the geometry already changed.
+  type AnalysedGeometry = readonly [unknown, unknown, unknown];
+  const geometryOf = (project: FloorplanProject): AnalysedGeometry =>
+    [project.vertices, project.walls, project.components] as const;
+  const [analysedGeometry, setAnalysedGeometry] = useState<AnalysedGeometry>(() => geometryOf(history.present));
+  const liveGeometry = geometryOf(history.present);
+  const analysisCurrent = analysedGeometry[0] === liveGeometry[0]
+    && analysedGeometry[1] === liveGeometry[1]
+    && analysedGeometry[2] === liveGeometry[2];
   const [mode, setMode] = useState<FloorplanToolMode>('select');
   const [selectedSymbol, setSelectedSymbol] = useState('sofa-3-seat');
   const [draftStart, setDraftStart] = useState<{ point: Point2D; vertexId?: string }>();
@@ -93,13 +111,14 @@ export const FloorplanWorkspace = () => {
       worker.onmessage = (event: MessageEvent<FloorplanWorkerResponse>) => {
         if (event.data.requestId !== requestRef.current) return;
         cancelAnalysisFallback();
-        if (event.data.type === 'analysis') setAnalysis(event.data.analysis);
+        if (event.data.type === 'analysis') { setAnalysis(event.data.analysis); setAnalysedGeometry(geometryOf(latestProjectRef.current)); }
         else setStatus(`Geometry worker: ${event.data.message}`);
       };
       worker.onerror = () => {
         if (workerRef.current === worker) workerRef.current = undefined;
         worker.terminate();
         setAnalysis(analyzeFloorplan(latestProjectRef.current));
+        setAnalysedGeometry(geometryOf(latestProjectRef.current));
         setStatus('Geometry worker unavailable; using local analysis.');
       };
       workerRef.current = worker;
@@ -120,6 +139,7 @@ export const FloorplanWorkspace = () => {
     const project = history.present;
     if (!worker) {
       setAnalysis(analyzeFloorplan(project));
+      setAnalysedGeometry(geometryOf(project));
       return undefined;
     }
     worker.postMessage({ type: 'analyze', requestId, project });
@@ -128,6 +148,7 @@ export const FloorplanWorkspace = () => {
       analysisTimerRef.current = undefined;
       if (requestRef.current !== requestId) return;
       setAnalysis(analyzeFloorplan(project));
+      setAnalysedGeometry(geometryOf(project));
     }, ANALYSIS_FALLBACK_MS);
     return cancelAnalysisFallback;
   }, [history.present.vertices, history.present.walls, history.present.components]);
@@ -300,7 +321,7 @@ export const FloorplanWorkspace = () => {
   const categories = ['living', 'bedroom', 'dining', 'kitchen_bath', 'office', 'mep'] as const;
 
   return (
-    <div className="plancraft" data-testid="floorplan-studio">
+    <div className="plancraft" data-testid="floorplan-studio" data-analysis-state={analysisCurrent ? 'current' : 'pending'}>
       <header className="plancraft-toolbar">
         <div><strong>PlanCraft Studio</strong><span>{mode.replaceAll('_', ' ')} · X {Math.round(pointerWorld?.x ?? 0)} mm · Y {Math.round(pointerWorld?.y ?? 0)} mm · {(history.present.viewport.scale * 100).toFixed(0)}%</span></div>
         <div className="plancraft-toolbar-actions">

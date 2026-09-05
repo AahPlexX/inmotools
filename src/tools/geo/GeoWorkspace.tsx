@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import GeoPreview from './GeoPreview';
 import { countCoordinates, simplifyTopology } from './geo-engine';
@@ -27,15 +27,84 @@ export default function GeoWorkspace() {
     } catch (error) { setSource(null); setResult(null); setStatus(`GeoJSON load failed: ${error instanceof Error ? error.message : 'invalid JSON'}`); }
   }
 
-  function simplify() {
+  // Simplification is proportional to vertex count, so a multi-megabyte file
+  // stalled the main thread long enough for the tab to stop responding. It now
+  // runs in a worker, and the handle is kept so a superseded or abandoned run can
+  // be terminated rather than left to finish into a view that has moved on.
+  const workerRef = useRef<Worker | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const terminateWorker = useCallback(() => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+  }, []);
+
+  useEffect(() => () => terminateWorker(), [terminateWorker]);
+
+  const runSimplify = useCallback((request: { decimals: number; retain: number; output: 'geojson' | 'topojson' }) => {
     if (!source) return;
-    try {
-      const preview = simplifyTopology(source, { decimals, retain, output: 'geojson' });
-      const exported = output === 'geojson' ? preview.geojson : simplifyTopology(source, { decimals, retain, output: 'topojson' }).topojson;
+    terminateWorker();
+
+    // Falls back to the main thread where workers are unavailable, so the tool
+    // still works rather than producing nothing.
+    if (typeof Worker === 'undefined') {
+      try {
+        const preview = simplifyTopology(source, { ...request, output: 'geojson' });
+        const exported = request.output === 'geojson'
+          ? preview.geojson
+          : simplifyTopology(source, { ...request, output: 'topojson' }).topojson;
+        setResult({ preview: preview.geojson, exported, outputCoordinates: preview.outputCoordinateCount, bytes: bytes(exported) });
+        setStatus(`Simplified locally to ${preview.outputCoordinateCount} coordinate positions.`);
+      } catch (error) {
+        setResult(null);
+        setStatus(`Simplification failed: ${error instanceof Error ? error.message : 'unsupported geometry'}`);
+      }
+      return;
+    }
+
+    setRunning(true);
+    setStatus('Simplifying geometry in a background worker…');
+    const worker = new Worker(new URL('./geo.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    const id = `geo-${Date.now()}`;
+    // The preview always needs GeoJSON; a TopoJSON export is a second pass.
+    let preview: any = null;
+
+    worker.onmessage = (event: MessageEvent<{ id: string; result?: any; error?: string }>) => {
+      if (event.data.id !== id || workerRef.current !== worker) return;
+      if (event.data.error) {
+        terminateWorker(); setRunning(false); setResult(null);
+        setStatus(`Simplification failed: ${event.data.error}`);
+        return;
+      }
+      if (!preview) {
+        preview = event.data.result;
+        if (request.output === 'topojson') {
+          worker.postMessage({ id, source, options: { ...request, output: 'topojson' } });
+          return;
+        }
+      }
+      const exported = request.output === 'geojson' ? preview.geojson : event.data.result.topojson;
+      terminateWorker(); setRunning(false);
       setResult({ preview: preview.geojson, exported, outputCoordinates: preview.outputCoordinateCount, bytes: bytes(exported) });
       setStatus(`Simplified locally to ${preview.outputCoordinateCount} coordinate positions.`);
-    } catch (error) { setResult(null); setStatus(`Simplification failed: ${error instanceof Error ? error.message : 'unsupported geometry'}`); }
-  }
+    };
+
+    worker.onerror = () => {
+      terminateWorker(); setRunning(false);
+      setStatus('The simplification worker failed to start.');
+    };
+
+    worker.postMessage({ id, source, options: { ...request, output: 'geojson' } });
+  }, [source, terminateWorker]);
+
+  const simplify = () => runSimplify({ decimals, retain, output });
+
+  const cancel = () => {
+    terminateWorker();
+    setRunning(false);
+    setStatus('Simplification stopped. Adjust the settings and run it again.');
+  };
 
   function save() {
     if (!result) return;
@@ -54,7 +123,7 @@ export default function GeoWorkspace() {
           <div className="field"><label htmlFor="geo-retain">Geometry detail retained</label><input id="geo-retain" type="number" min="0.05" max="1" step="0.05" value={retain} onChange={(event) => setRetain(Math.max(0.05, Math.min(1, Number(event.target.value))))}/><small>1 keeps all simplifiable vertices; smaller values remove more detail.</small></div>
           <div className="field"><label htmlFor="geo-output">Export format</label><select id="geo-output" value={output} onChange={(event) => setOutput(event.target.value as 'geojson' | 'topojson')}><option value="geojson">GeoJSON</option><option value="topojson">TopoJSON</option></select><small>TopoJSON preserves shared topology directly and can be more compact.</small></div>
         </div>
-        <div className="button-row"><button className="action-button" type="button" onClick={simplify}>Simplify geometry</button><button className="action-button secondary" type="button" disabled={!result} onClick={save}>Download {output === 'geojson' ? 'GeoJSON' : 'TopoJSON'}</button></div>
+        <div className="button-row"><button className="action-button" type="button" onClick={simplify} disabled={running}>{running ? 'Simplifying…' : 'Simplify geometry'}</button>{running ? <button className="action-button secondary" type="button" onClick={cancel} data-testid="geo-cancel">Stop</button> : null}<button className="action-button secondary" type="button" disabled={!result || running} onClick={save}>Download {output === 'geojson' ? 'GeoJSON' : 'TopoJSON'}</button></div>
         <div className="metric-row">
           <div className="metric"><span>Input vertices</span><strong>{sourceMetrics?.coordinates ?? 0}</strong></div>
           <div className="metric"><span>Output vertices</span><strong>{result?.outputCoordinates ?? '—'}</strong></div>
