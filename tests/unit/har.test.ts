@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeHar, buildWaterfallRows, sanitizeHar } from '../../src/tools/har/har-engine';
+import { analyzeHar, buildWaterfallRows, decodeBase64Body, readBody, sanitizeHar } from '../../src/tools/har/har-engine';
 
 const secretValues = ['Bearer top-secret-token', 'session-secret', 'query-secret', 'body-secret', 'nested-api-key'];
 
@@ -107,4 +107,69 @@ describe('HAR sanitizer', () => {
     expect(text).toContain('safe-value');
   });
 
+});
+
+
+describe('base64-encoded request bodies', () => {
+  const secretBody = JSON.stringify({ user: 'ada', access_token: 'super-secret-value' });
+  const base64Har = {
+    log: {
+      entries: [{
+        request: {
+          method: 'POST',
+          url: 'https://example.test/login',
+          headers: [],
+          cookies: [],
+          queryString: [],
+          postData: { mimeType: 'application/json', encoding: 'base64', text: btoa(secretBody) },
+        },
+        response: { headers: [], cookies: [] },
+      }],
+    },
+  };
+
+  it('decodes a base64 body so its credentials are reported as findings', () => {
+    // Previously the scan read the encoded text, JSON.parse failed, and the body
+    // was never reported at all - the tool stayed silent about the secret.
+    const { findings } = analyzeHar(base64Har);
+    expect(findings.some((finding) => finding.field === 'request.body:access_token')).toBe(true);
+  });
+
+  it('sanitizes a credential inside a base64 body instead of copying it through', async () => {
+    const { har } = await sanitizeHar(base64Har, { mode: 'redact', categories: { headers: true, cookies: true, query: true, bodies: true } });
+    const encoded = har.log.entries[0].request.postData.text as string;
+    // The decisive assertion: the secret must not survive anywhere in the output.
+    expect(JSON.stringify(har)).not.toContain('super-secret-value');
+    const decoded = JSON.parse(atob(encoded));
+    expect(decoded.access_token).not.toBe('super-secret-value');
+    expect(decoded.user).toBe('ada');
+  });
+
+  it('keeps the declared transport encoding so the sanitized archive stays loadable', async () => {
+    const { har } = await sanitizeHar(base64Har, { mode: 'redact', categories: { headers: false, cookies: false, query: false, bodies: true } });
+    const postData = har.log.entries[0].request.postData;
+    expect(postData.encoding).toBe('base64');
+    expect(() => JSON.parse(atob(postData.text as string))).not.toThrow();
+  });
+
+  it('leaves a plain-text body unencoded', async () => {
+    const plain = {
+      log: { entries: [{ request: { headers: [], cookies: [], queryString: [], postData: { text: secretBody } }, response: { headers: [], cookies: [] } } ] },
+    };
+    const { har } = await sanitizeHar(plain, { mode: 'redact', categories: { headers: false, cookies: false, query: false, bodies: true } });
+    const text = har.log.entries[0].request.postData.text as string;
+    expect(() => JSON.parse(text)).not.toThrow();
+    expect(text).not.toContain('super-secret-value');
+  });
+
+  it('treats a mislabelled encoding as plain text rather than throwing', () => {
+    expect(decodeBase64Body('not base64 at all!!')).toBeUndefined();
+    expect(decodeBase64Body('')).toBeUndefined();
+    expect(readBody({ encoding: 'base64', text: 'not base64 at all!!' }).wasBase64).toBe(false);
+  });
+
+  it('round-trips a decodable body', () => {
+    expect(decodeBase64Body(btoa('{"a":1}'))).toBe('{"a":1}');
+    expect(readBody({ encoding: 'base64', text: btoa('{"a":1}') })).toEqual({ text: '{"a":1}', wasBase64: true });
+  });
 });

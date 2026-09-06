@@ -7,6 +7,24 @@ A forensic audit covering all twenty-six suites produced roughly 130 findings. E
 
 The two crash-class defects and the cross-cutting file-input defect are fixed under TASK-015. What remains is grouped below by the nature of the work rather than by tool, since the same fix usually applies in several places at once.
 
+### Verified and confirmed by the TASK-019 sweep, not yet fixed
+
+These reproduce in the code and are worth doing; they were left out of TASK-019 because that change was scoped to output correctness.
+
+- **Audio parameters do not reach a running graph.** `connectRoomGraph` reads its config once and keeps every node in function-local consts, so moving wet mix, pre-delay, low cut or high cut does nothing until playback is restarted - the tool's central controls appear inert. Fix by retaining the nodes and writing to `gain.value` / `frequency.value` / `delayTime.value` from an effect keyed on the config. Deliberately deferred rather than rushed: audio behaviour cannot be verified in a headless browser, so this needs a plan for how it will be proven rather than assumed.
+- **Audio node chains leak per playback.** `stopSource` disconnects only the buffer source; the dry/wet/master/analyser chain stays wired to the destination, so each play cycle leaves another chain behind. Silent and collectible, but unbounded.
+- **A 6-channel impulse response fails with an unexplained error.** `ConvolverNode` accepts 1, 2 or 4 channels; the channel count is clamped only against the 32-channel ceiling, so a surround IR throws `NotSupportedError` from `convolver.buffer = impulse` and surfaces as a bare failure string. Needs a pre-flight check naming the real constraint.
+- **DuckDB queries cannot be cancelled.** `runLocalQuery` is a bare `await connection.query(sql)`; duckdb-wasm's `cancelPendingQuery` is unused, so a long scan can only be escaped by leaving the tool. The worker-with-cancel pattern now exists twice in the repo to follow.
+- **The DuckDB result table is unbounded.** It has no `max-height` and no row cap, so a large result forces very long page scrolling. This is the clean `PagedTable` drop-in: the table is a single expression, cells are plain strings, row identity is already positional, and both export paths read the full result rather than the visible page.
+- **The APCA matrix mounts one interactive element per pairing.** Thirty tokens is a 900-cell cross product including self-pairs, each an interactive button with two contrast calculations. Paging alone may be the wrong shape here - consider excluding self-pairs and capping token count.
+- **The contrast heatmap has no axis labels.** The compact view is a bare grid of colour buttons with no sticky row or column headers, so which tokens intersect is only discoverable through each button's `aria-label`.
+- **The HAR waterfall clips beyond its height clamp.** Canvas height is capped at 440px while the draw loop still positions every row by index, so rows past roughly the twelfth are painted outside the bitmap; arrow-key navigation selects rows that can never be seen, and the wrapper has no scroll container.
+- **HAR has no filtering.** No way to narrow entries by status, domain or method, which the trace explorer does provide.
+- **The shader render loop never idles.** A static shader still redraws at full refresh rate with no pause, no time freeze or reset, and no visibility-based suspension; compiler diagnostics are also inert, and jumping to a line would need an imperative handle on the editor, which it does not currently expose.
+- **Dedupe cannot read non-UTF-8 CSV.** `File.text()` is UTF-8 only, so a Windows-1252 export arrives with replacement characters and no encoding control exists.
+- **Dedupe export has no progress signal.** It builds the whole reconciled set synchronously on the main thread and only then reports, so there is no way to tell a large export from a hang.
+- **Wide dedupe datasets have no column controls.** Every cluster table renders every column; the existing checkboxes control match participation, not visibility.
+
 ### Carried over from the TASK-016 review
 
 An independent design review of the log-structurer work raised twenty points; the defects were fixed there. These were judged real but out of that change's scope:

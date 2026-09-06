@@ -152,12 +152,25 @@ export const resolveSplit = (
   ? customSplit ?? SPLIT_PRESETS.balanced
   : SPLIT_PRESETS[preference];
 
+// Plausibility ceilings. The checks below already reject non-positive values,
+// but nothing rejected absurd ones, so an age of 900 drove Mifflin-St Jeor
+// (10w + 6.25h - 5age + c) negative and that negative basal rate was rendered as
+// a result. These bounds are deliberately generous - well past any real
+// measurement - so they catch data-entry accidents without second-guessing
+// genuine outliers.
+const MAX_WEIGHT_KG = 650;
+const MAX_HEIGHT_CM = 275;
+const MAX_AGE_YEARS = 120;
+
 export const validateEnergyPlanInput = (input: EnergyPlanInput): readonly InputIssue[] => {
   const issues: InputIssue[] = [];
 
   if (!isPositiveFinite(input.weightKg)) issues.push({ field: 'weightKg', message: 'Body mass must be a positive number of kilograms.' });
+  else if (input.weightKg > MAX_WEIGHT_KG) issues.push({ field: 'weightKg', message: `Body mass above ${MAX_WEIGHT_KG} kg is outside the range these equations were derived for.` });
   if (!isPositiveFinite(input.heightCm)) issues.push({ field: 'heightCm', message: 'Stature must be a positive number of centimetres.' });
+  else if (input.heightCm > MAX_HEIGHT_CM) issues.push({ field: 'heightCm', message: `Stature above ${MAX_HEIGHT_CM} cm is outside the range these equations were derived for.` });
   if (!isPositiveFinite(input.ageYears) || !Number.isInteger(input.ageYears)) issues.push({ field: 'ageYears', message: 'Age must be a positive whole number of years.' });
+  else if (input.ageYears > MAX_AGE_YEARS) issues.push({ field: 'ageYears', message: `Age above ${MAX_AGE_YEARS} years is outside the range these equations were derived for.` });
   if (input.biologicalSex !== 'male' && input.biologicalSex !== 'female') issues.push({ field: 'biologicalSex', message: 'Formula variant must be male or female.' });
   if (!(input.activityLevel in ACTIVITY_MULTIPLIERS)) issues.push({ field: 'activityLevel', message: `Activity level must be one of ${ACTIVITY_LEVELS.join(', ')}.` });
 
