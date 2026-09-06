@@ -1,5 +1,24 @@
 # Done
 
+## TASK-019: Fix the findings that make a tool produce wrong or unsafe output
+**Priority:** P0 | **Tags:** audit, correctness, security
+
+Forty-six further audit findings were verified against the code. Five did not reproduce, eleven were imprecise in a way that changed what needed doing, and the rest were confirmed. This entry covers the confirmed subset where a tool's *output* was wrong rather than merely awkward, which is the class worth fixing first: an awkward tool wastes time, a wrong one produces a bad artefact the user then trusts.
+
+**A credential survived HAR sanitization.** A HAR entry may declare `postData.encoding: "base64"`, in which case the body is base64 in `text`. Both the finding scan and the sanitizer read that field raw, so `JSON.parse` failed, the body was skipped, and it was copied verbatim into the "sanitized" archive - while the tool reported success. The scan was equally silent, so the user was never told the secret was there. Bodies are now decoded through one shared reader used by both paths, sanitized, and re-encoded in the encoding the entry declared so the archive stays loadable. A mislabelled encoding degrades to plain text rather than throwing. Guarded by a test confirmed to fail against the old code with `expected 'super-secret-value' not to be 'super-secret-value'`.
+
+**The fluid type scale emitted incorrect CSS.** Every step reused the base step's preferred expression while substituting its own bounds. That expression encodes one specific line between the two base endpoints, so pairing it with different bounds gives a rule that pins to its minimum until the base line happens to cross it, then stops short of its maximum. With 1rem to 2rem across 320-1440px at ratio 1.25, `step-1` stayed flat at 1.25rem until roughly 1041px and reached 2rem rather than its declared 2.5rem. Only the base step was ever correct. Each step now gets its own interpolation from the engine.
+
+**The viewport previews showed one width four times.** The four cards applied the generated `clamp()` inline, and a `vw` term resolves against the real document viewport, so all four rendered identically while labelled 320, 768, 1024 and 1440px. Sizes are now resolved arithmetically at each simulated width, and each card states the rem value it resolves to. Also added the copy control the generated CSS never had - there was no clipboard affordance anywhere in the repo - and made the step range configurable, which the engine always supported and only the interface hardcoded.
+
+**Sprite compilation produced sprites that could not inherit colour or scale.** Normalizing to `currentColor` handled presentation attributes but ignored `style="fill:#f00"`, so a sprite compiled for `currentColor` still carried hard-coded colours. svgo does not rescue this: preset-default has no `convertStyleToAttrs`, and its `inlineStyles` plugin can move rules *into* style attributes. Separately, an SVG lacking a `viewBox` produced a `<symbol>` with no coordinate system, so `<use>` rendered it at the wrong scale; a viewBox is now synthesized from usable `width`/`height`, and omitted rather than guessed when the dimensions are relative.
+
+**The energy planner accepted implausible measurements.** Non-positive values were rejected but nothing bounded them from above, so an age of 900 drove Mifflin-St Jeor negative and a negative basal rate was rendered as a result. Generous ceilings now reject data-entry accidents without second-guessing genuine outliers.
+
+Did not reproduce: the flamegraph already implements wheel zoom, drag pan and keyboard pan/zoom; sub-millisecond spans already survive via a float conversion and a 2px bar-width floor; shader textures are already configured CLAMP_TO_EDGE with a non-mipmapping filter; the Katch-McArdle fallback is already disclosed in three places; and the DuckDB query textarea already has a fixed height.
+
+---
+
 ## TASK-017: Make the floor-plan room-count assertion deterministic
 **Priority:** P2 | **Tags:** testing, reliability
 

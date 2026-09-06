@@ -37,7 +37,10 @@ export function analyzeHar(har: HarLike) {
       for (const cookie of message.cookies ?? []) findings.push({ category: 'cookies', entryIndex, field: `${side}.cookie:${String(cookie?.name ?? '')}` });
     }
     for (const query of entry?.request?.queryString ?? []) if (isSensitiveName(String(query?.name ?? ''))) findings.push({ category: 'query', entryIndex, field: `request.query:${String(query.name)}` });
-    const parsedBody = parseJsonBody(entry?.request?.postData?.text);
+    // Decoded first, so a base64 body's credentials are reported rather than
+    // skipped. Without this the scan stayed silent about the very values the
+    // sanitizer was also failing to reach.
+    const parsedBody = parseJsonBody(readBody(entry?.request?.postData).text);
     if (parsedBody !== undefined) {
       const fields: string[] = [];
       scanObject(parsedBody, '', fields);
@@ -86,12 +89,59 @@ async function sanitizeQuery(entry: any, policy: HarSanitizePolicy) {
   }
 }
 
+// A HAR may declare `postData.encoding: "base64"`, in which case `text` holds
+// the body base64-encoded. Reading it as-is meant `JSON.parse` failed, the body
+// was skipped, and it was copied verbatim into the "sanitized" output - so a
+// credential in a base64 body survived a sanitization pass that reported
+// success. Decoding first is what makes the guarantee hold.
+//
+// Returns undefined when the value is not decodable base64, so a mislabelled
+// body falls through to being treated as plain text rather than throwing.
+export function decodeBase64Body(text: unknown): string | undefined {
+  if (typeof text !== 'string' || text.trim() === '') return undefined;
+  try {
+    const binary = atob(text.replace(/\s+/g, ''));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+}
+
+const encodeBase64Body = (text: string): string => {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
+// The body as readable text regardless of transport encoding, plus how to put it
+// back. Both the finding scan and the sanitizer go through this so they cannot
+// disagree about what a body contains.
+export function readBody(postData: { text?: unknown; encoding?: unknown } | undefined): {
+  text: string | undefined;
+  wasBase64: boolean;
+} {
+  if (!postData) return { text: undefined, wasBase64: false };
+  if (String(postData.encoding ?? '').toLowerCase() === 'base64') {
+    const decoded = decodeBase64Body(postData.text);
+    if (decoded !== undefined) return { text: decoded, wasBase64: true };
+  }
+  return { text: typeof postData.text === 'string' ? postData.text : undefined, wasBase64: false };
+}
+
 async function sanitizeBody(entry: any, policy: HarSanitizePolicy) {
   const postData = entry?.request?.postData;
   if (!postData) return;
   for (const parameter of postData.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''))) parameter.value = await replacement(parameter.value, policy);
-  const parsed = parseJsonBody(postData.text);
-  if (parsed !== undefined) postData.text = JSON.stringify(await sanitizeStructured(parsed, policy));
+
+  const { text, wasBase64 } = readBody(postData);
+  const parsed = parseJsonBody(text);
+  if (parsed === undefined) return;
+  const sanitized = JSON.stringify(await sanitizeStructured(parsed, policy));
+  // Re-encoded in the transport encoding the entry declared, so the sanitized
+  // archive stays loadable by whatever consumed the original.
+  postData.text = wasBase64 ? encodeBase64Body(sanitized) : sanitized;
 }
 
 export async function sanitizeHar<T extends HarLike>(har: T, policy: HarSanitizePolicy) {
