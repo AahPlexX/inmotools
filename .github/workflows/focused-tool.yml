@@ -1,0 +1,99 @@
+name: Focused tool validation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Build
+        run: pnpm build
+      - name: Select focused browser specs
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            printf 'specs=%s\n' 'tests/e2e/exif.spec.ts' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base="$BEFORE_SHA"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="HEAD^"
+          fi
+          git diff --name-only "$base"...HEAD > /tmp/inmotools-focused-paths.txt
+          mapfile -t specs < <(node scripts/select-e2e-specs.mjs /tmp/inmotools-focused-paths.txt)
+
+          if printf '%s\n' "${specs[@]:-}" | grep -qx '__FULL_SUITE__'; then
+            printf 'full=true\n' >> "$GITHUB_OUTPUT"
+            printf 'specs=\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ ${#specs[@]} -eq 0 ]]; then
+            # Bootstrap this workflow against Tool 1. Subsequent tool commits are
+            # selected from their repository-controlled changed paths above.
+            if grep -qx '.github/workflows/focused-tool.yml' /tmp/inmotools-focused-paths.txt; then
+              specs=('tests/e2e/exif.spec.ts')
+            else
+              printf 'skip=true\n' >> "$GITHUB_OUTPUT"
+              printf 'specs=\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          printf 'specs=%s\n' "${specs[*]}" >> "$GITHUB_OUTPUT"
+      - name: Install Playwright Chromium
+        if: ${{ steps.select.outputs.skip != 'true' && steps.select.outputs.full != 'true' }}
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Focused browser tests
+        if: ${{ steps.select.outputs.skip != 'true' && steps.select.outputs.full != 'true' }}
+        env:
+          E2E_SPECS: ${{ steps.select.outputs.specs }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r -a specs <<< "$E2E_SPECS"
+          for spec in "${specs[@]}"; do
+            [[ "$spec" =~ ^tests/e2e/[A-Za-z0-9._/-]+\.spec\.ts$ ]] || {
+              echo "Rejected non-repository E2E path: $spec" >&2
+              exit 2
+            }
+          done
+          pnpm exec playwright test "${specs[@]}"
+      - name: Full-suite handoff
+        if: ${{ steps.select.outputs.full == 'true' }}
+        run: echo 'Cross-cutting change detected; the existing Validate and deploy Pages workflow owns the full browser matrix.'
+      - name: Upload focused Playwright failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: focused-playwright-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
