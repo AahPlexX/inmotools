@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assessDataset, ppbToUgM3 } from '../../src/tools/aethercast/aethercast-engine';
-import { parseTimestampInZone } from '../../src/tools/aethercast/aethercast-import';
+import { parseCsvWithMapping, parseTimestampInZone } from '../../src/tools/aethercast/aethercast-import';
 import type { AetherCastDataset, AetherCastSettings, HourlyAtmosphericPoint } from '../../src/tools/aethercast/aethercast-types';
 
 const settings: AetherCastSettings = {
@@ -65,5 +65,28 @@ describe('AetherCast September 2026 audit regressions', () => {
     expect(Number.isNaN(parseTimestampInZone('2026-11-01T01:30:00', 'America/New_York'))).toBe(true);
     expect(parseTimestampInZone('2026-11-01T01:30:00-04:00', 'America/New_York'))
       .toBe(Date.parse('2026-11-01T05:30:00Z'));
+  });
+
+  it('records accepted, rejected, explicit-offset, and wall-clock timestamp reconciliation counts', () => {
+    const raw = [
+      'time,pm25',
+      '2026-11-01T01:30:00-04:00,8',
+      '2026-11-01T01:30:00,9',
+    ].join('\n');
+    const result = parseCsvWithMapping(raw, { timestamp: 'time', pm25: 'pm25' }, {
+      timezone: 'America/New_York',
+      units: { pm25: 'UG_M3' },
+    });
+
+    expect(result.dataset?.points).toHaveLength(1);
+    expect(result.dataset?.timestampReconciliation).toEqual({
+      consideredRows: 2,
+      acceptedRows: 1,
+      rejectedRows: 1,
+      explicitOffsetRows: 1,
+      wallClockRows: 1,
+      timezone: 'America/New_York',
+      disambiguationPolicy: 'REJECT_AMBIGUOUS_OR_NONEXISTENT',
+    });
   });
 });
