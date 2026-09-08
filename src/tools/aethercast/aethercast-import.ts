@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { ppbToUgM3, ppmToUgM3 } from './aethercast-engine';
 import type { AetherCastDataset, HourlyAtmosphericPoint, ImportSource } from './aethercast-types';
 
 export interface ImportResult {
@@ -26,43 +27,78 @@ interface OpenMeteoResponse {
   longitude?: number;
   elevation?: number;
   timezone?: string;
+  utc_offset_seconds?: number;
   hourly?: OpenMeteoHourly;
 }
 
 const MAX_ROWS = 17_520;
+const EXPLICIT_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+const wallParts = (epochMs: number, timeZone: string): number => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(epochMs));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Date.UTC(
+    Number(values.year), Number(values.month) - 1, Number(values.day),
+    Number(values.hour), Number(values.minute), Number(values.second),
+  );
+};
+
+/** Parse a wall-clock timestamp using the dataset's IANA timezone rather than the browser timezone. */
+export function parseTimestampInZone(value: string, timeZone: string | null, fallbackOffsetSeconds?: number): number {
+  if (!value) return NaN;
+  if (EXPLICIT_ZONE.test(value)) return Date.parse(value);
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return NaN;
+  const wallUtc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0));
+
+  if (timeZone) {
+    try {
+      // Resolve the IANA-zone offset iteratively. Repeating once handles most DST-boundary offsets.
+      let candidate = wallUtc;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const observedWall = wallParts(candidate, timeZone);
+        const next = candidate + (wallUtc - observedWall);
+        if (next === candidate) break;
+        candidate = next;
+      }
+      return candidate;
+    } catch {
+      // Fall through to the explicit Open-Meteo offset if the runtime lacks this zone.
+    }
+  }
+  if (typeof fallbackOffsetSeconds === 'number' && Number.isFinite(fallbackOffsetSeconds)) {
+    return wallUtc - fallbackOffsetSeconds * 1000;
+  }
+  return Date.parse(`${normalized}Z`);
+}
+
+const validMeasurement = (value: number | null | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 
 export function parseOpenMeteoJson(raw: string): ImportResult {
   let parsed: OpenMeteoResponse;
   try {
     parsed = JSON.parse(raw) as OpenMeteoResponse;
   } catch {
-    return {
-      dataset: null,
-      errors: ['This file is not valid JSON. Export the raw Open-Meteo Air Quality API response and try again.'],
-    };
+    return { dataset: null, errors: ['This file is not valid JSON. Export the raw Open-Meteo Air Quality API response and try again.'] };
   }
 
   const hourly = parsed.hourly;
   if (!hourly || !Array.isArray(hourly.time) || hourly.time.length === 0) {
-    return {
-      dataset: null,
-      errors: ['No hourly.time array was found. This does not look like an Open-Meteo Air Quality API response.'],
-    };
+    return { dataset: null, errors: ['No hourly.time array was found. This does not look like an Open-Meteo Air Quality API response.'] };
   }
 
   const errors: string[] = [];
   const arrays: Record<string, (number | null)[] | undefined> = {
-    pm10: hourly.pm10,
-    pm2_5: hourly.pm2_5,
-    carbon_monoxide: hourly.carbon_monoxide,
-    nitrogen_dioxide: hourly.nitrogen_dioxide,
-    sulphur_dioxide: hourly.sulphur_dioxide,
-    ozone: hourly.ozone,
-    uv_index: hourly.uv_index,
-    uv_index_clear_sky: hourly.uv_index_clear_sky,
-    wind_speed_10m: hourly.wind_speed_10m,
-    us_aqi: hourly.us_aqi,
-    european_aqi: hourly.european_aqi,
+    pm10: hourly.pm10, pm2_5: hourly.pm2_5, carbon_monoxide: hourly.carbon_monoxide,
+    nitrogen_dioxide: hourly.nitrogen_dioxide, sulphur_dioxide: hourly.sulphur_dioxide,
+    ozone: hourly.ozone, uv_index: hourly.uv_index, uv_index_clear_sky: hourly.uv_index_clear_sky,
+    wind_speed_10m: hourly.wind_speed_10m, us_aqi: hourly.us_aqi, european_aqi: hourly.european_aqi,
   };
 
   let length = hourly.time.length;
@@ -72,38 +108,34 @@ export function parseOpenMeteoJson(raw: string): ImportResult {
       length = Math.min(length, values.length);
     }
   }
-
   const truncatedByMismatch = Math.max(0, hourly.time.length - length);
   const capped = Math.min(length, MAX_ROWS);
-  if (length > MAX_ROWS) {
-    errors.push(`This import has ${length} hourly rows; only the first ${MAX_ROWS} (about two years) were loaded to keep the browser responsive.`);
-  }
+  if (length > MAX_ROWS) errors.push(`This import has ${length} hourly rows; only the first ${MAX_ROWS} were loaded.`);
 
   const points: HourlyAtmosphericPoint[] = [];
+  let invalidTimestamps = 0;
   for (let index = 0; index < capped; index += 1) {
     const iso = hourly.time[index];
-    const epochMs = Date.parse(iso);
-    if (!iso || Number.isNaN(epochMs)) continue;
+    const epochMs = iso ? parseTimestampInZone(iso, parsed.timezone ?? null, parsed.utc_offset_seconds) : NaN;
+    if (!iso || Number.isNaN(epochMs)) { invalidTimestamps += 1; continue; }
     points.push({
       isoTimestamp: iso,
       epochMs,
-      pm25: hourly.pm2_5?.[index] ?? null,
-      pm10: hourly.pm10?.[index] ?? null,
-      carbonMonoxideUgM3: hourly.carbon_monoxide?.[index] ?? null,
-      nitrogenDioxide: hourly.nitrogen_dioxide?.[index] ?? null,
-      sulphurDioxide: hourly.sulphur_dioxide?.[index] ?? null,
-      ozone: hourly.ozone?.[index] ?? null,
-      uvIndex: hourly.uv_index?.[index] ?? null,
-      uvIndexClearSky: hourly.uv_index_clear_sky?.[index] ?? null,
-      windSpeedMs: hourly.wind_speed_10m?.[index] ?? null,
-      providedUsAqi: hourly.us_aqi?.[index] ?? null,
-      providedEuropeanAqi: hourly.european_aqi?.[index] ?? null,
+      pm25: validMeasurement(hourly.pm2_5?.[index]),
+      pm10: validMeasurement(hourly.pm10?.[index]),
+      carbonMonoxideUgM3: validMeasurement(hourly.carbon_monoxide?.[index]),
+      nitrogenDioxide: validMeasurement(hourly.nitrogen_dioxide?.[index]),
+      sulphurDioxide: validMeasurement(hourly.sulphur_dioxide?.[index]),
+      ozone: validMeasurement(hourly.ozone?.[index]),
+      uvIndex: validMeasurement(hourly.uv_index?.[index]),
+      uvIndexClearSky: validMeasurement(hourly.uv_index_clear_sky?.[index]),
+      windSpeedMs: validMeasurement(hourly.wind_speed_10m?.[index]),
+      providedUsAqi: validMeasurement(hourly.us_aqi?.[index]),
+      providedEuropeanAqi: validMeasurement(hourly.european_aqi?.[index]),
     });
   }
-
-  if (points.length === 0) {
-    return { dataset: null, errors: [...errors, 'No usable hourly rows were found after validation.'] };
-  }
+  if (invalidTimestamps > 0) errors.push(`${invalidTimestamps} row${invalidTimestamps === 1 ? '' : 's'} had invalid timestamps and were skipped.`);
+  if (points.length === 0) return { dataset: null, errors: [...errors, 'No usable hourly rows were found after validation.'] };
 
   return {
     dataset: {
@@ -113,7 +145,7 @@ export function parseOpenMeteoJson(raw: string): ImportResult {
       elevationMeters: typeof parsed.elevation === 'number' ? parsed.elevation : null,
       timezone: parsed.timezone ?? null,
       points,
-      truncatedRows: truncatedByMismatch,
+      truncatedRows: truncatedByMismatch + invalidTimestamps,
     },
     errors,
   };
@@ -128,64 +160,121 @@ export interface CsvColumnMap {
   sulphurDioxide?: string;
   ozone?: string;
   uvIndex?: string;
+  uvIndexClearSky?: string;
   windSpeedMs?: string;
 }
 
-export function parseCsvWithMapping(raw: string, map: CsvColumnMap): ImportResult {
+export type CsvMassUnit = 'UG_M3' | 'MG_M3';
+export type CsvGasUnit = 'UG_M3' | 'PPB';
+export type CsvCoUnit = 'UG_M3' | 'MG_M3' | 'PPM';
+export type CsvWindUnit = 'M_S' | 'KM_H' | 'MPH';
+
+export interface CsvUnitMap {
+  pm25?: CsvMassUnit;
+  pm10?: CsvMassUnit;
+  carbonMonoxide?: CsvCoUnit;
+  nitrogenDioxide?: CsvGasUnit;
+  sulphurDioxide?: CsvGasUnit;
+  ozone?: CsvGasUnit;
+  windSpeed?: CsvWindUnit;
+}
+
+export interface CsvImportOptions {
+  timezone?: string;
+  units?: CsvUnitMap;
+}
+
+export function getCsvHeaders(raw: string): { headers: string[]; errors: string[] } {
+  const parsed = Papa.parse<Record<string, string>>(raw, { header: true, preview: 1, skipEmptyLines: true });
+  return {
+    headers: parsed.meta.fields?.filter(Boolean) ?? [],
+    errors: parsed.errors.map((error) => error.message),
+  };
+}
+
+const findHeader = (headers: readonly string[], candidates: readonly string[]): string | undefined => {
+  const normalized = new Map(headers.map((header) => [header.toLowerCase().replace(/[^a-z0-9]+/g, ''), header]));
+  for (const candidate of candidates) {
+    const found = normalized.get(candidate.replace(/[^a-z0-9]+/g, ''));
+    if (found) return found;
+  }
+  return undefined;
+};
+
+export function guessCsvColumnMap(headers: readonly string[]): CsvColumnMap {
+  return {
+    timestamp: findHeader(headers, ['timestamp', 'time', 'datetime', 'date']) ?? headers[0] ?? '',
+    pm25: findHeader(headers, ['pm25', 'pm2_5', 'pm2.5']),
+    pm10: findHeader(headers, ['pm10']),
+    carbonMonoxideUgM3: findHeader(headers, ['carbonmonoxide', 'co']),
+    nitrogenDioxide: findHeader(headers, ['nitrogendioxide', 'no2']),
+    sulphurDioxide: findHeader(headers, ['sulphurdioxide', 'sulfurdioxide', 'so2']),
+    ozone: findHeader(headers, ['ozone', 'o3']),
+    uvIndex: findHeader(headers, ['uvindex', 'uvi', 'uv']),
+    uvIndexClearSky: findHeader(headers, ['uvindexclearsky', 'uviclearsky']),
+    windSpeedMs: findHeader(headers, ['windspeedms', 'windspeed', 'wind']),
+  };
+}
+
+const massToUgM3 = (value: number, unit: CsvMassUnit | undefined): number => unit === 'MG_M3' ? value * 1000 : value;
+const gasToUgM3 = (value: number, unit: CsvGasUnit | undefined, molarMass: number): number => unit === 'PPB' ? ppbToUgM3(value, molarMass) : value;
+const coToUgM3 = (value: number, unit: CsvCoUnit | undefined): number => unit === 'PPM' ? ppmToUgM3(value) : unit === 'MG_M3' ? value * 1000 : value;
+const windToMs = (value: number, unit: CsvWindUnit | undefined): number => unit === 'MPH' ? value * 0.44704 : unit === 'KM_H' ? value / 3.6 : value;
+
+export function parseCsvWithMapping(raw: string, map: CsvColumnMap, options: CsvImportOptions = {}): ImportResult {
   const result = Papa.parse<Record<string, string>>(raw, { header: true, skipEmptyLines: true });
   if (result.errors.length > 0) {
-    return {
-      dataset: null,
-      errors: result.errors.slice(0, 5).map((error) => `Row ${error.row ?? '?'}: ${error.message}`),
-    };
+    return { dataset: null, errors: result.errors.slice(0, 5).map((error) => `Row ${error.row ?? '?'}: ${error.message}`) };
   }
+  if (!map.timestamp) return { dataset: null, errors: ['Choose a timestamp column before importing CSV data.'] };
 
   const rows = result.data.slice(0, MAX_ROWS);
   const truncated = Math.max(0, result.data.length - rows.length);
+  const errors: string[] = truncated > 0 ? [`Only the first ${MAX_ROWS} rows were imported.`] : [];
 
   const toNumber = (value: string | undefined): number | null => {
     if (value === undefined || value.trim() === '') return null;
     const parsedValue = Number(value);
-    return Number.isFinite(parsedValue) ? parsedValue : null;
+    return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : null;
+  };
+  const mapped = (row: Record<string, string>, column: string | undefined, convert: (value: number) => number): number | null => {
+    if (!column) return null;
+    const value = toNumber(row[column]);
+    return value === null ? null : convert(value);
   };
 
   const points: HourlyAtmosphericPoint[] = [];
+  let skipped = 0;
   for (const row of rows) {
-    const iso = row[map.timestamp];
-    const epochMs = iso ? Date.parse(iso) : NaN;
-    if (!iso || Number.isNaN(epochMs)) continue;
+    const iso = row[map.timestamp]?.trim();
+    const epochMs = iso ? parseTimestampInZone(iso, options.timezone?.trim() || null) : NaN;
+    if (!iso || Number.isNaN(epochMs)) { skipped += 1; continue; }
     points.push({
       isoTimestamp: iso,
       epochMs,
-      pm25: map.pm25 ? toNumber(row[map.pm25]) : null,
-      pm10: map.pm10 ? toNumber(row[map.pm10]) : null,
-      carbonMonoxideUgM3: map.carbonMonoxideUgM3 ? toNumber(row[map.carbonMonoxideUgM3]) : null,
-      nitrogenDioxide: map.nitrogenDioxide ? toNumber(row[map.nitrogenDioxide]) : null,
-      sulphurDioxide: map.sulphurDioxide ? toNumber(row[map.sulphurDioxide]) : null,
-      ozone: map.ozone ? toNumber(row[map.ozone]) : null,
+      pm25: mapped(row, map.pm25, (value) => massToUgM3(value, options.units?.pm25)),
+      pm10: mapped(row, map.pm10, (value) => massToUgM3(value, options.units?.pm10)),
+      carbonMonoxideUgM3: mapped(row, map.carbonMonoxideUgM3, (value) => coToUgM3(value, options.units?.carbonMonoxide)),
+      nitrogenDioxide: mapped(row, map.nitrogenDioxide, (value) => gasToUgM3(value, options.units?.nitrogenDioxide, 46.01)),
+      sulphurDioxide: mapped(row, map.sulphurDioxide, (value) => gasToUgM3(value, options.units?.sulphurDioxide, 64.07)),
+      ozone: mapped(row, map.ozone, (value) => gasToUgM3(value, options.units?.ozone, 48.0)),
       uvIndex: map.uvIndex ? toNumber(row[map.uvIndex]) : null,
-      uvIndexClearSky: null,
-      windSpeedMs: map.windSpeedMs ? toNumber(row[map.windSpeedMs]) : null,
+      uvIndexClearSky: map.uvIndexClearSky ? toNumber(row[map.uvIndexClearSky]) : null,
+      windSpeedMs: mapped(row, map.windSpeedMs, (value) => windToMs(value, options.units?.windSpeed)),
       providedUsAqi: null,
       providedEuropeanAqi: null,
     });
   }
+  if (skipped > 0) errors.push(`${skipped} row${skipped === 1 ? '' : 's'} had invalid timestamps and were skipped.`);
+  if (points.length === 0) return { dataset: null, errors: [...errors, 'No usable rows were found. Check the timestamp column and timezone mapping.'] };
 
-  if (points.length === 0) {
-    return { dataset: null, errors: ['No usable rows were found. Check the timestamp column mapping.'] };
-  }
-
+  points.sort((a, b) => a.epochMs - b.epochMs);
   return {
     dataset: {
-      importSource: 'csv-mapped',
-      latitude: null,
-      longitude: null,
-      elevationMeters: null,
-      timezone: null,
-      points,
-      truncatedRows: truncated,
+      importSource: 'csv-mapped', latitude: null, longitude: null, elevationMeters: null,
+      timezone: options.timezone?.trim() || null, points, truncatedRows: truncated + skipped,
     },
-    errors: truncated > 0 ? [`Only the first ${MAX_ROWS} rows were imported to keep the browser responsive.`] : [],
+    errors,
   };
 }
 
@@ -193,8 +282,14 @@ export function parseAetherCastExport(raw: string): ImportResult {
   try {
     const parsed = JSON.parse(raw) as AetherCastDataset;
     if (!parsed.points || !Array.isArray(parsed.points)) throw new Error('missing points');
-    return { dataset: { ...parsed, importSource: 'aethercast-export' as ImportSource }, errors: [] };
+    const points = parsed.points
+      .filter((point) => typeof point.isoTimestamp === 'string')
+      .map((point) => ({ ...point, epochMs: parseTimestampInZone(point.isoTimestamp, parsed.timezone ?? null) }))
+      .filter((point) => Number.isFinite(point.epochMs))
+      .sort((a, b) => a.epochMs - b.epochMs);
+    if (points.length === 0) throw new Error('no valid points');
+    return { dataset: { ...parsed, points, importSource: 'aethercast-export' as ImportSource }, errors: [] };
   } catch {
-    return { dataset: null, errors: ['This does not look like a previously exported AetherCast JSON file.'] };
+    return { dataset: null, errors: ['This does not look like a valid previously exported AetherCast JSON file.'] };
   }
 }

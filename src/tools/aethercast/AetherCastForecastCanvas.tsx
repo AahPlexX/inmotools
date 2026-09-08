@@ -1,26 +1,29 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import type { HourlyAssessment } from './aethercast-types';
+import type { HourlyAssessment, IndexStandard } from './aethercast-types';
 
 interface AetherCastForecastCanvasProps {
-  assessments: readonly HourlyAssessment[];
-  activeIndex: number | null;
-  onScrub: (index: number | null) => void;
-  describedById: string;
+  readonly assessments: readonly HourlyAssessment[];
+  readonly activeIndex: number | null;
+  readonly standard: IndexStandard;
+  readonly onScrub: (index: number | null) => void;
+  readonly describedById: string;
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
-  GOOD: '#10b981',
-  MODERATE: '#f59e0b',
-  UNHEALTHY_SENSITIVE: '#f97316',
-  UNHEALTHY: '#ef4444',
-  VERY_UNHEALTHY: '#a855f7',
-  HAZARDOUS: '#881337',
-  BEYOND_INDEX: '#881337',
+  GOOD: '#087a55', FAIR: '#3f7f67', MODERATE: '#9b5d00', POOR: '#b45309',
+  UNHEALTHY_SENSITIVE: '#c2410c', UNHEALTHY: '#b3261e', VERY_POOR: '#9f1239',
+  VERY_UNHEALTHY: '#7e22ce', EXTREMELY_POOR: '#701a75', HAZARDOUS: '#701a2b', BEYOND_INDEX: '#4c0519',
 };
 
 const CHART_PADDING = 24;
 
-export function AetherCastForecastCanvas({ assessments, activeIndex, onScrub, describedById }: AetherCastForecastCanvasProps) {
+const valueFor = (assessment: HourlyAssessment, standard: IndexStandard): number | null =>
+  standard === 'US_EPA' ? assessment.compositeAqi : assessment.eaqiValue;
+
+const categoryFor = (assessment: HourlyAssessment, standard: IndexStandard): string | null =>
+  standard === 'US_EPA' ? assessment.aqiCategory : assessment.eaqiBand;
+
+export function AetherCastForecastCanvas({ assessments, activeIndex, standard, onScrub, describedById }: AetherCastForecastCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [size, setSize] = useState({ width: 320, height: 220 });
 
@@ -49,48 +52,53 @@ export function AetherCastForecastCanvas({ assessments, activeIndex, onScrub, de
     canvas.style.height = `${size.height}px`;
     const context = canvas.getContext('2d');
     if (!context) return;
-    context.scale(ratio, ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, size.width, size.height);
-
     if (assessments.length === 0) return;
 
-    const maxAqi = Math.max(150, ...assessments.map((assessment) => assessment.compositeAqi ?? 0));
+    const values = assessments.map((assessment) => valueFor(assessment, standard)).filter((value): value is number => value !== null);
+    const maxIndex = Math.max(standard === 'US_EPA' ? 150 : 100, ...values);
     const stepX = (size.width - CHART_PADDING * 2) / Math.max(1, assessments.length - 1);
-    const yFor = (aqi: number) => size.height - CHART_PADDING - (aqi / maxAqi) * (size.height - CHART_PADDING * 2);
+    const yFor = (value: number) => size.height - CHART_PADDING - (value / maxIndex) * (size.height - CHART_PADDING * 2);
 
-    context.strokeStyle = '#334155';
+    context.strokeStyle = '#64748b';
     context.lineWidth = 1;
     context.beginPath();
     context.moveTo(CHART_PADDING, size.height - CHART_PADDING);
     context.lineTo(size.width - CHART_PADDING, size.height - CHART_PADDING);
     context.stroke();
 
-    context.beginPath();
-    context.strokeStyle = '#10b981';
+    context.strokeStyle = '#205bd6';
     context.lineWidth = 2;
+    let drawing = false;
+    context.beginPath();
     assessments.forEach((assessment, index) => {
+      const value = valueFor(assessment, standard);
+      if (value === null) { drawing = false; return; }
       const x = CHART_PADDING + index * stepX;
-      const y = yFor(assessment.compositeAqi ?? 0);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+      const y = yFor(value);
+      if (!drawing) { context.moveTo(x, y); drawing = true; } else context.lineTo(x, y);
     });
     context.stroke();
 
     if (activeIndex !== null && assessments[activeIndex]) {
-      const x = CHART_PADDING + activeIndex * stepX;
-      context.strokeStyle = '#e2e8f0';
-      context.beginPath();
-      context.moveTo(x, CHART_PADDING);
-      context.lineTo(x, size.height - CHART_PADDING);
-      context.stroke();
-
-      const category = assessments[activeIndex].aqiCategory ?? 'GOOD';
-      context.fillStyle = CATEGORY_COLOR[category] ?? '#10b981';
-      context.beginPath();
-      context.arc(x, yFor(assessments[activeIndex].compositeAqi ?? 0), 4, 0, Math.PI * 2);
-      context.fill();
+      const assessment = assessments[activeIndex];
+      const value = valueFor(assessment, standard);
+      if (value !== null) {
+        const x = CHART_PADDING + activeIndex * stepX;
+        context.strokeStyle = '#334155';
+        context.beginPath();
+        context.moveTo(x, CHART_PADDING);
+        context.lineTo(x, size.height - CHART_PADDING);
+        context.stroke();
+        const category = categoryFor(assessment, standard) ?? 'GOOD';
+        context.fillStyle = CATEGORY_COLOR[category] ?? '#205bd6';
+        context.beginPath();
+        context.arc(x, yFor(value), 4, 0, Math.PI * 2);
+        context.fill();
+      }
     }
-  }, [assessments, activeIndex, size]);
+  }, [assessments, activeIndex, size, standard]);
 
   const handlePointer = (clientX: number) => {
     const canvas = canvasRef.current;
@@ -98,8 +106,7 @@ export function AetherCastForecastCanvas({ assessments, activeIndex, onScrub, de
     const rect = canvas.getBoundingClientRect();
     const usable = Math.max(1, rect.width - CHART_PADDING * 2);
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left - CHART_PADDING) / usable));
-    const index = Math.round(ratio * (assessments.length - 1));
-    onScrub(Math.min(assessments.length - 1, Math.max(0, index)));
+    onScrub(Math.min(assessments.length - 1, Math.max(0, Math.round(ratio * (assessments.length - 1)))));
   };
 
   const handlePointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -109,14 +116,10 @@ export function AetherCastForecastCanvas({ assessments, activeIndex, onScrub, de
   const handleKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
     if (assessments.length === 0) return;
     const current = activeIndex ?? 0;
-    if (event.key === 'ArrowRight') {
-      onScrub(Math.min(assessments.length - 1, current + 1));
-      event.preventDefault();
-    }
-    if (event.key === 'ArrowLeft') {
-      onScrub(Math.max(0, current - 1));
-      event.preventDefault();
-    }
+    if (event.key === 'ArrowRight') { onScrub(Math.min(assessments.length - 1, current + 1)); event.preventDefault(); }
+    if (event.key === 'ArrowLeft') { onScrub(Math.max(0, current - 1)); event.preventDefault(); }
+    if (event.key === 'Home') { onScrub(0); event.preventDefault(); }
+    if (event.key === 'End') { onScrub(assessments.length - 1); event.preventDefault(); }
   };
 
   return (
@@ -124,7 +127,7 @@ export function AetherCastForecastCanvas({ assessments, activeIndex, onScrub, de
       ref={canvasRef}
       role="img"
       tabIndex={0}
-      aria-label="Composite AQI forecast chart. Use the arrow keys or drag to scrub through imported hours."
+      aria-label={`${standard === 'US_EPA' ? 'US EPA AQI' : 'European Air Quality Index'} chart. Use arrow keys, Home/End, or drag to scrub through imported hours.`}
       aria-describedby={describedById}
       className="aethercast-canvas"
       onPointerMove={handlePointerMove}

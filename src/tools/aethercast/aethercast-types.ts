@@ -5,6 +5,7 @@ export type ImportSource = 'open-meteo-json' | 'csv-mapped' | 'aethercast-export
 export type VulnerabilityLens = 'NONE' | 'ASTHMA' | 'CARDIOVASCULAR' | 'PEDIATRIC' | 'PHOTOSENSITIVE';
 export type IndexStandard = 'US_EPA' | 'EUROPEAN_EAQI';
 export type UnitSystem = 'METRIC' | 'US';
+export type IndexCoverage = 'COMPLETE' | 'PARTIAL' | 'NONE';
 
 export interface HourlyAtmosphericPoint {
   isoTimestamp: string;
@@ -35,16 +36,24 @@ export interface AetherCastDataset {
 export interface PollutantScore {
   subIndex: number | null;
   category: AqiCategory | null;
+  /** @deprecated Prefer whoGuidelinePass; kept for backward-compatible exports. */
   whoDailyPass: boolean | null;
+  /** @deprecated Prefer whoGuidelineValue; kept for backward-compatible consumers. */
   whoAnnualBenchmark: number | null;
+  whoGuidelinePass: boolean | null;
+  whoGuidelineValue: number | null;
+  whoAveragingLabel: string | null;
+  epaAveragingLabel: string | null;
 }
 
 export interface HourlyAssessment {
   point: HourlyAtmosphericPoint;
   compositeAqi: number | null;
   aqiCategory: AqiCategory | null;
+  usAqiCoverage: IndexCoverage;
   eaqiValue: number | null;
   eaqiBand: EaqiBand | null;
+  europeanAqiCoverage: IndexCoverage;
   burnMinutes: number | null;
   pollutants: Record<'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co', PollutantScore>;
 }
@@ -60,9 +69,9 @@ export interface AnomalyEvent {
 export interface ActivityWindow {
   startTimestamp: string;
   endTimestamp: string;
-  suitabilityScore: number;
-  primaryLimitingFactor: 'UV' | 'OZONE' | 'PARTICULATES' | 'NONE';
-  recommendation: 'EXCELLENT' | 'FAIR' | 'USE_CAUTION' | 'AVOID';
+  suitabilityScore: number | null;
+  primaryLimitingFactor: 'UV' | 'OZONE' | 'PARTICULATES' | 'NONE' | 'DATA_GAP';
+  recommendation: 'EXCELLENT' | 'FAIR' | 'USE_CAUTION' | 'AVOID' | 'UNKNOWN';
 }
 
 export interface AetherCastSettings {
