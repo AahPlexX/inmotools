@@ -19,6 +19,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # PR validation computes the exact base-to-head path set so it can run
+          # the relevant browser surface without serializing every tool behind
+          # the entire catalog suite. Main still runs the full E2E matrix.
+          fetch-depth: 0
       - name: Setup pnpm and Node
         uses: pnpm/setup@v2
         with:
@@ -33,7 +38,29 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Browser tests
-        run: pnpm test:e2e
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            pnpm test:e2e
+            exit 0
+          fi
+
+          git diff --name-only "$BASE_SHA"...HEAD > /tmp/inmotools-changed-paths.txt
+          E2E_SPECS="$(node scripts/select-e2e-specs.mjs /tmp/inmotools-changed-paths.txt)"
+          if [[ -z "$E2E_SPECS" || "$E2E_SPECS" == "__FULL_SUITE__" ]]; then
+            echo "Cross-cutting or unmapped change detected; running the full browser suite."
+            pnpm test:e2e
+          else
+            echo "Running focused browser specs:"
+            printf '%s\n' "$E2E_SPECS"
+            # Spec paths are repository-controlled and contain no whitespace.
+            # shellcheck disable=SC2086
+            pnpm exec playwright test $E2E_SPECS
+          fi
 
   build-pages:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
