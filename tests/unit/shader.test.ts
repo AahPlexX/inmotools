@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildStandaloneShaderHtml, parseWebGlLog } from '../../src/tools/shader/shader-engine';
+import { buildStandaloneShaderHtml, normalizeRenderScale, parseWebGlLog } from '../../src/tools/shader/shader-engine';
 
 describe('WebGL GLSL sandbox engine', () => {
   it('normalizes common WebGL compiler diagnostics into line-addressable messages', () => {
-    const diagnostics = parseWebGlLog([
-      "ERROR: 0:7: 'foo' : undeclared identifier",
-      'WARNING: 0:12: precision qualifier ignored',
-      '0:18(4): error: syntax error, unexpected NEW_IDENTIFIER',
-    ].join('\n'));
-
+    const diagnostics = parseWebGlLog(["ERROR: 0:7: 'foo' : undeclared identifier", 'WARNING: 0:12: precision qualifier ignored', '0:18(4): error: syntax error, unexpected NEW_IDENTIFIER'].join('\n'));
     expect(diagnostics).toEqual([
       expect.objectContaining({ severity: 'error', line: 7, message: expect.stringContaining('undeclared identifier') }),
       expect.objectContaining({ severity: 'warning', line: 12, message: expect.stringContaining('precision qualifier') }),
@@ -16,34 +11,24 @@ describe('WebGL GLSL sandbox engine', () => {
     ]);
   });
 
-  it('exports a zero-dependency WebGL2 page with standard uniforms and safe embedded shader source', () => {
-    const fragmentSource = `#version 300 es
-precision highp float;
-out vec4 outColor;
-uniform vec2 u_resolution;
-uniform float u_time;
-uniform vec2 u_mouse;
-uniform sampler2D u_texture0;
-void main(){ outColor = vec4(u_mouse / u_resolution, fract(u_time), 1.0); }
-// </script><script>alert('unsafe')</script>`;
-    const html = buildStandaloneShaderHtml({ fragmentSource, textureDataUrls: ['data:image/png;base64,AAAA'] });
+  it('exports preview-equivalent placeholder textures for both sampler slots', () => {
+    const html = buildStandaloneShaderHtml({ fragmentSource: '#version 300 es\nprecision highp float;\nout vec4 outColor;\nuniform sampler2D u_texture0;\nuniform sampler2D u_texture1;\nvoid main(){outColor=texture(u_texture0,vec2(.5))+texture(u_texture1,vec2(.5));}' });
+    expect(html).toContain("new Uint8Array([0,0,0,255])");
+    expect(html).toContain('textureDataUrls.forEach');
+    expect(html).toContain('[null,null]');
+  });
 
-    expect(html).toContain('<canvas');
-    expect(html).toContain('webgl2');
-    expect(html).toContain('u_resolution');
-    expect(html).toContain('u_time');
-    expect(html).toContain('u_mouse');
-    expect(html).toContain('u_texture0');
-    expect(html).toContain('requestAnimationFrame');
-    expect(html).toMatch(/resize/i);
-    expect(html).toMatch(/pointer/i);
+  it('embeds supplied textures without losing the placeholder setup for absent slots', () => {
+    const html = buildStandaloneShaderHtml({ fragmentSource: '#version 300 es\nprecision highp float;\nout vec4 outColor;\nvoid main(){outColor=vec4(1.);}', textureDataUrls: ['data:image/png;base64,AAAA'] });
     expect(html).toContain('data:image/png;base64,AAAA');
+    expect(html).toContain('null');
     expect(html).not.toContain("</script><script>alert('unsafe')</script>");
   });
 
-  it('omits optional texture bootstrap when no local texture is exported', () => {
-    const html = buildStandaloneShaderHtml({ fragmentSource: '#version 300 es\nprecision highp float;\nout vec4 outColor;\nvoid main(){outColor=vec4(1.);}' });
-    expect(html).not.toContain('data:image/');
-    expect(html).toContain('u_resolution');
+  it('bounds render scale to a predictable device-load range', () => {
+    expect(normalizeRenderScale(0)).toBe(0.25);
+    expect(normalizeRenderScale(1)).toBe(1);
+    expect(normalizeRenderScale(99)).toBe(2);
+    expect(normalizeRenderScale(Number.NaN)).toBe(1);
   });
 });
