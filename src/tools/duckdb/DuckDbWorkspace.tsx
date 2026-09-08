@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { PagedTable } from '../../components/PagedTable';
 import {
+  WORKBENCH_QUERY_MAX_BYTES,
   createDuckDbSession,
   registerLocalFile,
   startLocalQuery,
@@ -13,8 +14,17 @@ import {
 } from './duckdb-client';
 import { consumeFileInput } from '../../lib/file-input';
 
+const ROW_LIMIT_OPTIONS = [1_000, 10_000, 50_000] as const;
+const QUERY_HISTORY_LIMIT = 12;
+
+function displayValue(value: QueryValue): string {
+  if (value === null) return 'NULL';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function csvCell(value: QueryValue | string) {
-  const text = value === null ? '' : String(value);
+  const text = value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
@@ -29,12 +39,20 @@ function sqlFileName(name: string) {
   return name.replaceAll("'", "''");
 }
 
+function limitStatus(result: QueryResult, rowLimit: number): string {
+  if (result.complete) return 'Complete result captured.';
+  if (result.limitedBy === 'rows') return `Result incomplete: stopped after the ${rowLimit.toLocaleString()}-row capture limit.`;
+  return `Result incomplete: stopped before exceeding the ${(WORKBENCH_QUERY_MAX_BYTES / 1024 / 1024).toLocaleString()} MiB capture limit.`;
+}
+
 export default function DuckDbWorkspace() {
   const sessionRef = useRef<DuckDbSession | null>(null);
   const taskRef = useRef<LocalQueryTask | null>(null);
   const runVersion = useRef(0);
   const [files, setFiles] = useState<string[]>([]);
   const [query, setQuery] = useState("SELECT * FROM 'data.csv' LIMIT 100");
+  const [queryHistory, setQueryHistory] = useState<string[]>([]);
+  const [rowLimit, setRowLimit] = useState<number>(10_000);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [search, setSearch] = useState('');
   const [inspectedValue, setInspectedValue] = useState<{ column: string; value: string } | null>(null);
@@ -97,7 +115,7 @@ export default function DuckDbWorkspace() {
     }
   }
 
-  async function executeSql(sql: string, successPrefix = 'Query complete') {
+  async function executeSql(sql: string, successPrefix = 'Query complete', remember = false) {
     const version = ++runVersion.current;
     setBusy(true);
     setResult(null);
@@ -107,13 +125,19 @@ export default function DuckDbWorkspace() {
     try {
       const session = await ensureSession();
       if (runVersion.current !== version) return;
-      const task = startLocalQuery(session.connection, sql);
+      const task = startLocalQuery(session.connection, sql, {
+        maxRows: rowLimit,
+        maxBytes: WORKBENCH_QUERY_MAX_BYTES,
+      });
       taskRef.current = task;
       setCanCancel(true);
       const output = await task.promise;
       if (runVersion.current !== version) return;
       setResult(output);
-      setStatus(`${successPrefix}: ${output.values.length.toLocaleString()} row${output.values.length === 1 ? '' : 's'} returned.`);
+      if (remember) {
+        setQueryHistory((current) => [sql, ...current.filter((item) => item !== sql)].slice(0, QUERY_HISTORY_LIMIT));
+      }
+      setStatus(`${successPrefix}: ${output.values.length.toLocaleString()} row${output.values.length === 1 ? '' : 's'} captured. ${limitStatus(output, rowLimit)}`);
     } catch (error) {
       if (runVersion.current !== version) return;
       setStatus(`Query failed: ${error instanceof Error ? error.message : 'unknown error'}`);
@@ -127,8 +151,9 @@ export default function DuckDbWorkspace() {
   }
 
   async function execute() {
-    if (!query.trim()) return;
-    await executeSql(query);
+    const sql = query.trim();
+    if (!sql) return;
+    await executeSql(sql, 'Query complete', true);
   }
 
   async function cancelQuery() {
@@ -150,7 +175,7 @@ export default function DuckDbWorkspace() {
   const filteredValues = useMemo(() => {
     if (!result || !search.trim()) return result?.values ?? [];
     const needle = search.toLocaleLowerCase();
-    return result.values.filter((row) => row.some((value) => String(value ?? '').toLocaleLowerCase().includes(needle)));
+    return result.values.filter((row) => row.some((value) => displayValue(value).toLocaleLowerCase().includes(needle)));
   }, [result, search]);
 
   function exportCsv() {
@@ -160,7 +185,13 @@ export default function DuckDbWorkspace() {
   function exportJson() {
     if (result) {
       downloadText(
-        JSON.stringify({ columns: result.columns, rows: result.values }, null, 2),
+        JSON.stringify({
+          columns: result.columns,
+          types: result.types,
+          rows: result.values,
+          complete: result.complete,
+          limitedBy: result.limitedBy,
+        }, null, 2),
         'query-result.json',
         'application/json',
       );
@@ -209,19 +240,42 @@ export default function DuckDbWorkspace() {
         <small>Press Ctrl+Enter (Cmd+Enter on macOS) to run the query.</small>
       </div>
 
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end', marginBottom: 12 }}>
+        <div className="field" style={{ minWidth: 'min(100%, 13rem)', flex: '1 1 13rem', margin: 0 }}>
+          <label htmlFor="duck-row-limit">Maximum captured rows</label>
+          <select id="duck-row-limit" value={rowLimit} disabled={busy} onChange={(event) => setRowLimit(Number(event.target.value))}>
+            {ROW_LIMIT_OPTIONS.map((value) => <option value={value} key={value}>{value.toLocaleString()}</option>)}
+          </select>
+        </div>
+        <div className="field" style={{ minWidth: 'min(100%, 13rem)', flex: '1 1 13rem', margin: 0 }}>
+          <label htmlFor="duck-query-history">Query history</label>
+          <select id="duck-query-history" value="" disabled={busy || !queryHistory.length} onChange={(event) => { if (event.target.value) setQuery(event.target.value); }}>
+            <option value="">{queryHistory.length ? 'Choose a previous query' : 'No queries yet'}</option>
+            {queryHistory.map((item, index) => <option value={item} key={`${index}-${item}`}>{item}</option>)}
+          </select>
+        </div>
+      </div>
+      <p className="muted" style={{ overflowWrap: 'anywhere' }}>
+        Results stream from DuckDB and stop retaining rows at the selected row cap or 32 MiB of normalized result data. Incomplete captures are always labeled before export.
+      </p>
+
       <div className="button-row">
         <button className="action-button" type="button" disabled={busy || !query.trim()} onClick={() => void execute()}>Run query</button>
         <button className="action-button secondary" type="button" disabled={!canCancel} onClick={() => void cancelQuery()}>Cancel query</button>
-        <button className="action-button secondary" type="button" disabled={!result} onClick={exportCsv}>Export full CSV</button>
-        <button className="action-button secondary" type="button" disabled={!result} onClick={exportJson}>Export full JSON</button>
+        <button className="action-button secondary" type="button" disabled={!result} onClick={exportCsv}>Export captured CSV</button>
+        <button className="action-button secondary" type="button" disabled={!result} onClick={exportJson}>Export captured JSON</button>
       </div>
       <div className="status-line" role="status">{busy ? 'Working in browser memory…' : status}</div>
 
       {result ? <>
+        <div className="notice" style={{ marginTop: 14, overflowWrap: 'anywhere' }} data-testid="duckdb-result-metadata">
+          <strong>{result.complete ? 'Complete capture' : 'Incomplete capture'}</strong>
+          <div>{result.columns.map((column, index) => `${column}: ${result.types[index] ?? 'unknown'}`).join(' · ')}</div>
+        </div>
         <div className="field" style={{ marginTop: 16 }}>
           <label htmlFor="duck-result-search">Search displayed rows</label>
           <input id="duck-result-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search any returned value" />
-          <small>{search.trim() ? `${filteredValues.length.toLocaleString()} of ${result.values.length.toLocaleString()} rows match. ` : ''}Search affects display only; exports always include the complete query result.</small>
+          <small>{search.trim() ? `${filteredValues.length.toLocaleString()} of ${result.values.length.toLocaleString()} captured rows match. ` : ''}Search affects display only; exports include every captured row and identify whether capture was complete.</small>
         </div>
 
         <PagedTable
@@ -233,8 +287,8 @@ export default function DuckDbWorkspace() {
           renderCell={(row, columnKey) => {
             const index = Number(columnKey);
             const value = row[index];
-            const text = value === null ? '' : String(value);
-            if (text.length <= 120) return text;
+            const text = displayValue(value);
+            if (text.length <= 120) return value === null ? <span aria-label="NULL">NULL</span> : text;
             return <button type="button" onClick={() => setInspectedValue({ column: result.columns[index] ?? `Column ${index + 1}`, value: text })}>
               {text.slice(0, 117)}…
             </button>;
