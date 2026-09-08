@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatRunInZone,
   getCronRuns,
   isValidTimeZone,
   partitionTimeZones,
@@ -21,13 +22,27 @@ describe('cron schedule projection', () => {
     ]);
   });
 
-  it('projects one instant into multiple named zones', () => {
+  it('preserves seconds from six-field cron expressions', () => {
+    const [run] = getCronRuns('17 * * * * *', {
+      count: 1,
+      startDate: new Date('2026-08-31T00:00:00.000Z'),
+      timeZone: 'UTC',
+    });
+    expect(run.toISOString()).toBe('2026-08-31T00:00:17.000Z');
+    expect(formatRunInZone(run, 'UTC')).toContain('00:00:17');
+  });
+
+  it('projects one instant into multiple named zones with offsets', () => {
     const projected = projectRunToZones(new Date('2026-08-31T15:00:00.000Z'), ['UTC', 'America/Chicago']);
-    expect(projected.UTC).toContain('15:00');
-    expect(projected['America/Chicago']).toContain('10:00');
+    expect(projected.UTC).toContain('15:00:00');
+    expect(projected['America/Chicago']).toContain('10:00:00');
+    expect(projected.UTC).toMatch(/GMT|UTC/);
+  });
+
+  it('bounds the requested run count', () => {
+    expect(() => getCronRuns('* * * * *', { count: 201 })).toThrow(/between 1 and 200/);
   });
 });
-
 
 describe('timezone validation', () => {
   it('accepts a recognized IANA zone', () => {
@@ -49,6 +64,13 @@ describe('timezone validation', () => {
     const { valid, invalid } = partitionTimeZones(['UTC', 'Mars/Olympus', 'Asia/Tokyo']);
     expect(valid).toEqual(['UTC', 'Asia/Tokyo']);
     expect(invalid).toEqual(['Mars/Olympus']);
+  });
+
+  it('collapses duplicate zones and reports zones beyond the configured cap', () => {
+    const result = partitionTimeZones(['UTC', 'UTC', 'Asia/Tokyo', 'Europe/London'], 2);
+    expect(result.valid).toEqual(['UTC', 'Asia/Tokyo']);
+    expect(result.duplicates).toEqual(['UTC']);
+    expect(result.truncated).toEqual(['Europe/London']);
   });
 });
 

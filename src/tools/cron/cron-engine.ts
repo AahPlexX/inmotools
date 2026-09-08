@@ -6,19 +6,17 @@ export interface CronRunOptions {
   timeZone?: string;
 }
 
+export const MAX_COMPARISON_ZONES = 24;
+
 export function getCronRuns(expression: string, options: CronRunOptions = {}): Date[] {
+  const count = options.count ?? 30;
+  if (!Number.isInteger(count) || count < 1 || count > 200) throw new Error('Run count must be between 1 and 200.');
   const interval = CronExpressionParser.parse(expression, {
     currentDate: options.startDate ?? new Date(),
     tz: options.timeZone ?? 'UTC',
   });
-  return interval.take(options.count ?? 30).map((value) => value.toDate());
+  return interval.take(count).map((value) => value.toDate());
 }
-
-// Both projection helpers below take timezone strings straight from free-text
-// user input. `Intl.DateTimeFormat` throws a RangeError for an unrecognized
-// IANA zone, and these functions are called during render, so an unguarded
-// throw takes the whole workspace down rather than reporting a bad zone. Every
-// zone is therefore validated before use and reported, never thrown on.
 
 export function isValidTimeZone(zone: string): boolean {
   if (!zone.trim()) return false;
@@ -30,39 +28,75 @@ export function isValidTimeZone(zone: string): boolean {
   }
 }
 
-// Partitions a caller-supplied zone list into the zones that can actually be
-// formatted and the ones that cannot, so the interface can render the valid
-// columns and name the invalid entries instead of failing wholesale.
-export function partitionTimeZones(zones: string[]): { valid: string[]; invalid: string[] } {
+export interface PartitionedTimeZones {
+  valid: string[];
+  invalid: string[];
+  duplicates: string[];
+  truncated: string[];
+}
+
+export function partitionTimeZones(zones: string[], limit = MAX_COMPARISON_ZONES): PartitionedTimeZones {
   const valid: string[] = [];
   const invalid: string[] = [];
-  for (const zone of zones) (isValidTimeZone(zone) ? valid : invalid).push(zone);
-  return { valid, invalid };
+  const duplicates: string[] = [];
+  const truncated: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of zones) {
+    const zone = raw.trim();
+    if (!zone) continue;
+    if (seen.has(zone)) {
+      if (!duplicates.includes(zone)) duplicates.push(zone);
+      continue;
+    }
+    seen.add(zone);
+    if (!isValidTimeZone(zone)) {
+      invalid.push(zone);
+      continue;
+    }
+    if (valid.length >= limit) {
+      truncated.push(zone);
+      continue;
+    }
+    valid.push(zone);
+  }
+  return { valid, invalid, duplicates, truncated };
 }
 
 const UNAVAILABLE = 'Unavailable';
 
-export function projectRunToZones(run: Date, zones: string[]): Record<string, string> {
-  return Object.fromEntries(zones.map((zone) => {
-    try {
-      return [zone, new Intl.DateTimeFormat('en-US', {
-        timeZone: zone,
-        year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
-        hour12: false,
-      }).format(run)];
-    } catch {
-      return [zone, UNAVAILABLE];
-    }
-  }));
+function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
+  return parts.find((item) => item.type === type)?.value ?? '';
 }
 
-// The hour a run falls on in a given zone, or null when the zone cannot be
-// resolved. Returning null keeps the 24-hour distribution renderable when the
-// source zone is mid-edit and temporarily invalid.
+export function formatRunInZone(run: Date, zone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+      timeZoneName: 'shortOffset',
+    }).formatToParts(run);
+    return `${part(parts, 'year')}-${part(parts, 'month')}-${part(parts, 'day')} ${part(parts, 'hour')}:${part(parts, 'minute')}:${part(parts, 'second')} ${part(parts, 'timeZoneName')}`.trim();
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+export function projectRunToZones(run: Date, zones: string[]): Record<string, string> {
+  return Object.fromEntries(zones.map((zone) => [zone, formatRunInZone(run, zone)]));
+}
+
 export function runHourInZone(run: Date, zone: string): number | null {
   try {
     const formatted = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone, hour: '2-digit', hourCycle: 'h23',
+      timeZone: zone,
+      hour: '2-digit',
+      hourCycle: 'h23',
     }).format(run);
     const hour = Number(formatted);
     return Number.isFinite(hour) ? hour : null;
