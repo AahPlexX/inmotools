@@ -243,7 +243,7 @@ test('downloads a DOCX and a structural EPUB', async ({ page }) => {
   const epubDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'EPUB (structural)', exact: true }).click();
   expect((await epubDownload).suggestedFilename()).toBe('DOCX-and-EPUB-check.epub');
-  await expect(page.getByTestId('markdown-status')).toContainText(/structural EPUB/i, { timeout: 15_000 });
+  await expect(page.getByTestId('markdown-status')).toContainText(/not EPUBCheck-validated/i, { timeout: 15_000 });
 });
 
 test('routes the Print / PDF export through the browser print dialog rather than a direct download', async ({ page }) => {

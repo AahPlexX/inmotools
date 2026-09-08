@@ -76,7 +76,10 @@ export interface LocalQueryTask {
 export function startLocalQuery(connection: duckdb.AsyncDuckDBConnection, sql: string): LocalQueryTask {
   let settled = false;
   const promise = (async () => {
-    const reader = await connection.send(sql, true);
+    // This workbench buffers the complete result before exposing it. Keep DuckDB's
+    // default materialized pending-query mode instead of opting into live streaming;
+    // the pending query remains cancellable through cancelSent() while it runs.
+    const reader = await connection.send(sql);
     const columns = reader.schema.fields.map((field) => field.name);
     const values: QueryValue[][] = [];
 

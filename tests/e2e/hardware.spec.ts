@@ -19,12 +19,12 @@ test('simulator exercises framing, rules, filtering, counters, and retained expo
   await page.getByRole('button', { name: 'Add parsing rule' }).click();
   await page.getByLabel('Rule 3 label').fill('sensor');
   await page.getByLabel('Rule 3 pattern').fill('sensor=');
-  await expect(page.getByText('Valid')).toHaveCount(3);
+  await expect(page.getByRole('cell', { name: 'Valid', exact: true })).toHaveCount(3);
 
   await page.getByLabel('Search capture').fill('');
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export retained CSV' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('packet-capture.csv');
-  await expect(page.getByRole('status')).toContainText(/Exported .* retained capture entr/);
+  await expect(page.locator('.status-line')).toContainText(/Exported .* retained capture entr/);
 });

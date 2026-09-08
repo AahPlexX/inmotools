@@ -9,5 +9,5 @@ test('starts and explicitly stops the local Web Audio progression', async ({ pag
   await expect(stop).toBeEnabled();
   await stop.click();
   await expect(stop).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText(/audio graph was released/i);
+  await expect(page.locator('.status-line')).toContainText(/audio graph was released/i);
 });

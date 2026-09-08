@@ -66,8 +66,8 @@ test('ethical support prompt is globally available, optional, and non-modal', as
 
 test('hardware suite offers simulator mode when hardware APIs are unavailable', async ({ page }) => {
   await page.goto('./#/tools/hardware-packet-inspector');
-  await expect(page.getByRole('button', { name: 'Start simulator' })).toBeVisible();
-  await page.getByRole('button', { name: 'Start simulator' }).click();
+  await expect(page.getByRole('button', { name: 'Run simulator scenario' })).toBeVisible();
+  await page.getByRole('button', { name: 'Run simulator scenario' }).click();
   await expect(page.getByTestId('packet-stream')).toContainText(/RX|SIM/i);
 });
 

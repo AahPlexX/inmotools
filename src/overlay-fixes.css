@@ -1,0 +1,8 @@
+/* Cross-workspace overlay stacking rules.
+   Keep interactive popovers above earlier result controls so visual and pointer
+   stacking agree; nested z-index values cannot escape a lower parent stacking
+   context. */
+.regex-exportbar {
+  position: relative;
+  z-index: 20;
+}

@@ -108,6 +108,9 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       clearTimeout(timer);
       generationRef.current += 1;
       cancels.forEach((cancel) => cancel());
+      // Unmounting or replacing the preview must release exporters waiting for
+      // the current render. A replacement effect immediately marks itself pending.
+      onRenderStateChange?.(false);
     };
   }, [preparedSource, onRenderStateChange]);
 

@@ -1,19 +1,29 @@
 import { expect, test } from '@playwright/test';
 
+type StudioViewName = 'Editor' | 'Matches' | 'Explain';
+
+const selectStudioViewWhenSegmented = async (page: import('@playwright/test').Page, name: StudioViewName) => {
+  const navigation = page.getByRole('navigation', { name: 'Studio view' });
+  if (await navigation.isVisible()) await navigation.getByRole('button', { name, exact: true }).click();
+};
+
 test('RegexMatrix advances zero-length Unicode matches by code point and exposes capped-result continuation', async ({ page }) => {
   await page.goto('./#/regex-matrix');
   await page.getByLabel('Pattern').fill('(?=)');
   await page.getByLabel('Flags').fill('gu');
   await page.getByLabel('Test subject').fill('😀');
   await page.getByRole('button', { name: 'Run pattern' }).click();
+  await selectStudioViewWhenSegmented(page, 'Matches');
   await expect(page.getByTestId('match-count')).toHaveText('2');
   await expect(page.getByTestId('match-inspector')).toContainText('0–0');
   await expect(page.getByTestId('match-inspector')).toContainText('2–2');
 
+  await selectStudioViewWhenSegmented(page, 'Editor');
   await page.getByLabel('Pattern').fill('a');
   await page.getByLabel('Flags').fill('g');
   await page.getByLabel('Test subject').fill('a'.repeat(5_001));
   await page.getByRole('button', { name: 'Run pattern' }).click();
+  await selectStudioViewWhenSegmented(page, 'Matches');
   await expect(page.getByTestId('match-count')).toHaveText('5001');
   await expect(page.getByTestId('match-limit-status')).toContainText('omitted 1 remaining match');
   await expect(page.getByRole('group', { name: 'Returned match pages' })).toBeVisible();
@@ -28,6 +38,7 @@ test('RegexMatrix advances zero-length Unicode matches by code point and exposes
 test('RegexMatrix explanation pagination makes tokens after the initial slice reachable', async ({ page }) => {
   await page.goto('./#/regex-matrix');
   await page.getByLabel('Pattern').fill('(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)(m)(n)(o)(p)(q)(r)(s)(t)');
+  await selectStudioViewWhenSegmented(page, 'Explain');
   const pager = page.getByRole('group', { name: 'Explanation pages' });
   await expect(pager).toBeVisible();
   await pager.getByRole('button', { name: 'Next' }).click();

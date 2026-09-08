@@ -30,7 +30,7 @@ test('MIDI Harmony Lab survives a root note left without an octave', async ({ pa
   await root.fill('C');
 
   // The workspace must stay mounted and explain the problem instead of crashing.
-  await expect(page.getByTestId('chord-notes-0')).toContainText('not a note this lab can build');
+  await expect(page.getByTestId('chord-notes-0')).toContainText(/cannot produce a valid 0–127 MIDI triad/i);
   await expect(page.locator('#root-0')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play progression' })).toBeVisible();
 
@@ -280,9 +280,11 @@ test('Cron Team Matrix projects a configurable number of runs', async ({ page })
   await expect(rows).toHaveCount(5);
   await expect(page.locator('.status-line.good')).toContainText('5 upcoming runs');
 
-  // Out-of-range input is clamped rather than accepted.
+  // Out-of-range input is clamped to 200, while the shared table mounts one
+  // bounded page so the browser never needs to render all 200 rows at once.
   await page.locator('#run-count').fill('9999');
-  await expect(rows).toHaveCount(200);
+  await expect(rows).toHaveCount(50);
+  await expect(page.getByTestId('cron-runs-range')).toContainText('Rows 1–50 of 200');
 });
 
 test('Hardware Packet Inspector exposes capture and port lifecycle controls', async ({ page }) => {
@@ -297,8 +299,9 @@ test('Hardware Packet Inspector exposes capture and port lifecycle controls', as
   await page.getByLabel('Baud rate').selectOption('9600');
 
   const stream = page.getByTestId('packet-stream');
-  await expect(page.getByTestId('stream-clear')).toBeDisabled();
-  await page.getByRole('button', { name: 'Start simulator' }).click();
+  const clear = page.getByRole('button', { name: 'Clear capture' });
+  await expect(clear).toBeDisabled();
+  await page.getByRole('button', { name: 'Run simulator scenario' }).click();
   await expect(stream).toContainText('SIM RX');
 
   // Enter transmits, matching any other serial terminal.
@@ -307,14 +310,15 @@ test('Hardware Packet Inspector exposes capture and port lifecycle controls', as
   await expect(stream).toContainText('SIM TX 01 02 03');
 
   // Pausing stops the log growing, and clearing empties it.
-  await page.getByTestId('stream-pause').click();
-  await expect(page.getByTestId('stream-pause')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Pause capture' }).click();
+  const resume = page.getByRole('button', { name: 'Resume capture' });
+  await expect(resume).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#packet').press('Enter');
   await expect(stream).not.toContainText('SIM TX 01 02 03\nSIM TX 01 02 03');
 
-  await page.getByTestId('stream-pause').click();
-  await page.getByTestId('stream-clear').click();
-  await expect(stream).toContainText('RX stream is empty');
+  await resume.click();
+  await clear.click();
+  await expect(stream).toContainText('Capture is empty for the current filters');
 });
 
 test('GeoJSON Simplifier runs simplification off the main thread', async ({ page }) => {

@@ -8,7 +8,7 @@ const onePixelPng = Buffer.from(
 test('sanitizes an image locally, reinspects it, and produces a download', async ({ page }) => {
   await page.goto('./#/tools/exif-scrubber');
   await page.getByLabel('Choose image').setInputFiles({ name: 'private.png', mimeType: 'image/png', buffer: onePixelPng });
-  await expect(page.getByText(/No sensitive metadata found|Sensitive metadata/i)).toBeVisible();
+  await expect(page.getByText('No sensitive metadata found', { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Sanitize and download' }).click();
