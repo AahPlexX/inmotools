@@ -476,11 +476,11 @@ export const planToCsv = (plan: EnergyPlan): string => {
     ['input_goal', plan.goalType, ''],
     ['goal_adjustment', plan.goalDeltaPercent, '%'],
     ['input_macro_split', plan.splitPreference, ''],
-    ...(plan.input.bodyFatPercentage === undefined ? [] : [['input_body_fat', plan.input.bodyFatPercentage, '%'] as [string, string | number, string]),
+    ...(plan.input.bodyFatPercentage === undefined ? [] : [['input_body_fat', plan.input.bodyFatPercentage, '%'] as [string, string | number, string]]),
     ['basal_metabolic_rate', plan.bmr.primaryKcal, 'kcal/day'],
     ['mifflin_st_jeor', plan.bmr.mifflinStJeor, 'kcal/day'],
     ['revised_harris_benedict', plan.bmr.revisedHarrisBenedict, 'kcal/day'],
-    ...(plan.bmr.katchMcArdle === undefined ? [] : [['katch_mcardle', plan.bmr.katchMcArdle, 'kcal/day'] as [string, string | number, string]),
+    ...(plan.bmr.katchMcArdle === undefined ? [] : [['katch_mcardle', plan.bmr.katchMcArdle, 'kcal/day'] as [string, string | number, string]]),
     ['total_daily_energy_expenditure', plan.tdeeKcal, 'kcal/day'],
     ['target_intake', plan.targetKcal, 'kcal/day'],
     ...plan.macronutrients.flatMap((macro): Array<[string, string | number, string]> => [
