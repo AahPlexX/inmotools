@@ -34,4 +34,13 @@ describe('deployment and bundler contracts', () => {
     const entry = read('src/main.tsx');
     expect(entry).toContain('installPreloadErrorRecovery');
   });
+
+  it('keeps Pages deployment independent from browser validation while limiting deploys to main', () => {
+    const workflow = read('.github/workflows/pages.yml');
+    expect(workflow).toContain('validate:');
+    expect(workflow).toContain('build-pages:');
+    expect(workflow).toContain('needs: build-pages');
+    expect(workflow).toContain("github.ref == 'refs/heads/main'");
+    expect(workflow).not.toContain('needs: validate');
+  });
 });

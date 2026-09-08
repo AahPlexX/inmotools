@@ -16,7 +16,8 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    # Superseded validation runs for the same ref carry no value, so cancel them.
+    # Validation is intentionally independent from production deployment. Browser
+    # regressions must stay visible without leaving main pinned to an older build.
     concurrency:
       group: validate-${{ github.ref }}
       cancel-in-progress: true
@@ -38,18 +39,32 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Browser tests
         run: pnpm test:e2e
+
+  build-pages:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build production Pages artifact
+        run: pnpm build
       - name: Configure Pages
-        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
   deploy:
-    needs: validate
-    if: github.event_name != 'pull_request'
+    needs: build-pages
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
