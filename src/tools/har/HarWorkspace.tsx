@@ -4,71 +4,20 @@ import HarWaterfallCanvas from './HarWaterfallCanvas';
 import { analyzeHar, buildWaterfallRows, sanitizeHar, type HarFindingCategory, type HarSanitizePolicy } from './har-engine';
 import { consumeFileInput } from '../../lib/file-input';
 
-const CATEGORY_LABELS: Record<HarFindingCategory, string> = {
-  headers: 'Sensitive headers', cookies: 'Cookies', query: 'Query parameters', bodies: 'Request bodies',
-};
+const CATEGORY_LABELS: Record<HarFindingCategory, string> = { headers: 'Sensitive headers', cookies: 'Cookies', query: 'Query parameters', bodies: 'Request/response bodies' };
 
 export default function HarWorkspace() {
-  const [source, setSource] = useState<any | null>(null);
-  const [fileName, setFileName] = useState('network.har');
-  const [status, setStatus] = useState('Choose a HAR file to inspect locally.');
-  const [mode, setMode] = useState<HarSanitizePolicy['mode']>('redact');
-  const [mask, setMask] = useState('MASKED');
-  const [categories, setCategories] = useState<Record<HarFindingCategory, boolean>>({ headers: true, cookies: true, query: true, bodies: true });
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [source, setSource] = useState<any | null>(null); const [fileName, setFileName] = useState('network.har'); const [status, setStatus] = useState('Choose a HAR file to inspect locally.');
+  const [mode, setMode] = useState<HarSanitizePolicy['mode']>('redact'); const [mask, setMask] = useState('MASKED'); const [categories, setCategories] = useState<Record<HarFindingCategory, boolean>>({ headers: true, cookies: true, query: true, bodies: true });
+  const [selectedEntryIndex, setSelectedEntryIndex] = useState(0); const [methodFilter,setMethodFilter]=useState(''); const [domainFilter,setDomainFilter]=useState(''); const [statusFilter,setStatusFilter]=useState(''); const [lastResult,setLastResult]=useState<Awaited<ReturnType<typeof sanitizeHar>>|null>(null);
 
-  const analysis = useMemo(() => source ? analyzeHar(source) : null, [source]);
-  const rows = useMemo(() => source ? buildWaterfallRows(source) : [], [source]);
-  const selected = rows[selectedIndex];
-  const selectedEntry = source?.log?.entries?.[selectedIndex];
+  const analysis = useMemo(() => source ? analyzeHar(source) : null, [source]); const rows = useMemo(() => source ? buildWaterfallRows(source) : [], [source]);
+  const filteredRows = useMemo(() => rows.filter((row) => { const methodOk=!methodFilter||row.method.toLowerCase().includes(methodFilter.toLowerCase()); let host=''; try{host=new URL(row.url).hostname}catch{host=row.url} const domainOk=!domainFilter||host.toLowerCase().includes(domainFilter.toLowerCase()); const statusOk=!statusFilter||String(row.status).startsWith(statusFilter.trim()); return methodOk&&domainOk&&statusOk; }), [rows,methodFilter,domainFilter,statusFilter]);
+  const selectedPosition=Math.max(0,filteredRows.findIndex((row)=>row.index===selectedEntryIndex)); const selected=filteredRows[selectedPosition]; const selectedEntry=selected?source?.log?.entries?.[selected.index]:undefined;
 
-  async function loadFile(file: File | undefined) {
-    if (!file) return;
-    try {
-      const parsed = JSON.parse(await file.text());
-      if (!parsed?.log || !Array.isArray(parsed.log.entries)) throw new Error('This JSON does not contain a HAR log.entries array.');
-      setSource(parsed); setFileName(file.name); setSelectedIndex(0);
-      setStatus(`${parsed.log.entries.length} requests loaded. Review findings before export.`);
-    } catch (error) {
-      setSource(null); setStatus(`HAR load failed: ${error instanceof Error ? error.message : 'invalid JSON'}`);
-    }
-  }
+  async function loadFile(file: File | undefined) { if (!file) return; try { const parsed=JSON.parse(await file.text()); if (!parsed?.log||!Array.isArray(parsed.log.entries)) throw new Error('This JSON does not contain a HAR log.entries array.'); setSource(parsed);setFileName(file.name);setSelectedEntryIndex(0);setLastResult(null);setStatus(`${parsed.log.entries.length} requests loaded. Review findings before export.`); } catch(error){setSource(null);setLastResult(null);setStatus(`HAR load failed: ${error instanceof Error?error.message:'invalid JSON'}`);} }
 
-  async function exportSanitized() {
-    if (!source) return;
-    try {
-      setStatus('Sanitizing the selected categories locally…');
-      const result = await sanitizeHar(source, { mode, mask, categories });
-      const base = fileName.replace(/\.har$/i, '').replace(/\.json$/i, '');
-      downloadText(JSON.stringify(result.har, null, 2), `${base || 'network'}.sanitized.har`, 'application/json');
-      setStatus(`Sanitized ${result.findings.length} detected credential-bearing fields locally.`);
-    } catch (error) {
-      setStatus(`Sanitization failed: ${error instanceof Error ? error.message : 'unknown error'}`);
-    }
-  }
+  async function exportSanitized() { if(!source)return; try { setStatus('Sanitizing the selected categories locally…'); const result=await sanitizeHar(source,{mode,mask,categories}); setLastResult(result); const base=fileName.replace(/\.har$/i,'').replace(/\.json$/i,''); downloadText(JSON.stringify(result.har,null,2),`${base||'network'}.sanitized.har`,'application/json'); setStatus(`Sanitized ${result.changedFindings.length} selected credential-bearing locations. Output was rescanned before download.`); } catch(error){setStatus(`Sanitization failed: ${error instanceof Error?error.message:'unknown error'}`);} }
 
-  return <>
-    <div className="workspace-header"><div><h2>Credential review & waterfall</h2><p>Inspect sensitive fields before creating a shareable HAR.</p></div></div>
-    <div className="workspace-body">
-      <div className="field"><label htmlFor="har-file">Choose HAR file</label><input id="har-file" type="file" accept=".har,application/json,.json" onChange={(event) => consumeFileInput(event.target, () => loadFile(event.target.files?.[0]))}/><small>The source file is read only by this browser session.</small></div>
-      {analysis ? <>
-        <div className="metric-row">
-          <div className="metric"><span>Requests</span><strong>{analysis.requestCount}</strong></div>
-          <div className="metric"><span>Findings</span><strong>{analysis.findings.length}</strong></div>
-          <div className="metric"><span>Categories</span><strong>{Object.values(categories).filter(Boolean).length}/4</strong></div>
-        </div>
-        <div className="workspace-grid" style={{ marginTop: 18 }}>
-          <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}><legend className="field-label">Sanitize categories</legend>{(Object.keys(CATEGORY_LABELS) as HarFindingCategory[]).map((category) => <label key={category} style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 36 }}><input type="checkbox" checked={categories[category]} onChange={(event) => setCategories((current) => ({ ...current, [category]: event.target.checked }))}/>{CATEGORY_LABELS[category]}</label>)}</fieldset>
-          <div className="field"><label htmlFor="har-mode">Replacement mode</label><select id="har-mode" value={mode} onChange={(event) => setMode(event.target.value as HarSanitizePolicy['mode'])}><option value="redact">[REDACTED]</option><option value="hash">SHA-256 hash</option><option value="mask">Custom mask</option></select>{mode === 'mask' ? <><label htmlFor="har-mask">Custom mask text</label><input id="har-mask" type="text" value={mask} onChange={(event) => setMask(event.target.value)}/></> : null}<small>SHA-256 preserves equality for comparison; it is not a guarantee that low-entropy secrets cannot be guessed.</small></div>
-        </div>
-        <HarWaterfallCanvas rows={rows} selectedIndex={Math.min(selectedIndex, Math.max(0, rows.length - 1))} onSelect={setSelectedIndex}/>
-        {selected ? <div className="notice" style={{ marginTop: 18 }}><strong>{selected.method} · HTTP {selected.status}</strong><div style={{ overflowWrap: 'anywhere', marginTop: 5 }}>{selected.url}</div><div style={{ marginTop: 5 }}>{selected.totalMs} ms total · wait {selected.phases.wait} ms · receive {selected.phases.receive} ms</div></div> : null}
-        {selectedEntry ? <details style={{ marginTop: 16 }}><summary>Selected request metadata</summary><pre className="code-output" tabIndex={0}>{JSON.stringify({ method: selectedEntry.request?.method, url: selectedEntry.request?.url, status: selectedEntry.response?.status, timings: selectedEntry.timings }, null, 2)}</pre></details> : null}
-        <h3 style={{ marginTop: 24 }}>Credential findings</h3>
-        <div className="result-table-wrap" tabIndex={0} aria-label="Detected HAR credential fields"><table><thead><tr><th scope="col">Category</th><th scope="col">Path</th></tr></thead><tbody>{analysis.findings.length ? analysis.findings.map((finding, index) => <tr key={`${finding.entryIndex}-${finding.field}-${index}`}><td>{CATEGORY_LABELS[finding.category]}</td><td>{finding.field}</td></tr>) : <tr><td colSpan={2}>No likely credential-bearing fields detected.</td></tr>}</tbody></table></div>
-        <div className="button-row"><button className="action-button" type="button" onClick={() => void exportSanitized()}>Download sanitized HAR</button></div>
-      </> : null}
-      <div className={`status-line ${source ? 'good' : ''}`} role="status">{status}</div>
-    </div>
-  </>;
+  return <><div className="workspace-header"><div><h2>Credential review & waterfall</h2><p>Inspect sensitive fields, request timing, and the exact post-sanitize structure before sharing a HAR.</p></div></div><div className="workspace-body"><div className="field"><label htmlFor="har-file">Choose HAR file</label><input id="har-file" type="file" accept=".har,application/json,.json" onChange={(event)=>consumeFileInput(event.target,()=>loadFile(event.target.files?.[0]))}/><small>The source file is read only by this browser session.</small></div>{analysis?<><div className="metric-row"><div className="metric"><span>Requests</span><strong>{analysis.requestCount}</strong></div><div className="metric"><span>Original findings</span><strong>{analysis.findings.length}</strong></div><div className="metric"><span>Visible requests</span><strong>{filteredRows.length}</strong></div></div><div className="workspace-grid" style={{marginTop:18}}><fieldset className="field" style={{border:0,padding:0,margin:0}}><legend className="field-label">Sanitize categories</legend>{(Object.keys(CATEGORY_LABELS) as HarFindingCategory[]).map((category)=><label key={category} style={{display:'flex',gap:10,alignItems:'center',minHeight:36}}><input type="checkbox" checked={categories[category]} onChange={(event)=>{setCategories((current)=>({...current,[category]:event.target.checked}));setLastResult(null)}}/>{CATEGORY_LABELS[category]}</label>)}</fieldset><div className="field"><label htmlFor="har-mode">Replacement mode</label><select id="har-mode" value={mode} onChange={(event)=>{setMode(event.target.value as HarSanitizePolicy['mode']);setLastResult(null)}}><option value="redact">[REDACTED]</option><option value="hash">SHA-256 hash</option><option value="mask">Custom mask</option></select>{mode==='mask'?<><label htmlFor="har-mask">Custom mask text</label><input id="har-mask" type="text" value={mask} onChange={(event)=>{setMask(event.target.value);setLastResult(null)}}/></>:null}<small>SHA-256 preserves equality for comparison; it is not encryption.</small></div></div><div className="workspace-grid three" style={{marginTop:18}}><div className="field"><label htmlFor="har-method-filter">Filter method</label><input id="har-method-filter" value={methodFilter} onChange={(e)=>setMethodFilter(e.target.value)} placeholder="GET"/></div><div className="field"><label htmlFor="har-domain-filter">Filter domain</label><input id="har-domain-filter" value={domainFilter} onChange={(e)=>setDomainFilter(e.target.value)} placeholder="api.example.com"/></div><div className="field"><label htmlFor="har-status-filter">Filter status</label><input id="har-status-filter" inputMode="numeric" value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value.replace(/\D/g,'').slice(0,3))} placeholder="4"/></div></div>{filteredRows.length?<HarWaterfallCanvas rows={filteredRows} selectedIndex={selectedPosition} onSelect={(position)=>{const row=filteredRows[position];if(row)setSelectedEntryIndex(row.index)}}/>:<div className="notice" style={{marginTop:18}}>No requests match the current filters.</div>}{selected?<div className="notice" style={{marginTop:18}}><strong>{selected.method} · HTTP {selected.status}</strong><div style={{overflowWrap:'anywhere',marginTop:5}}>{selected.url}</div><div style={{marginTop:5}}>{selected.totalMs} ms total · wait {selected.phases.wait} ms · receive {selected.phases.receive} ms</div></div>:null}{selectedEntry?<details style={{marginTop:16}}><summary>Selected request metadata</summary><pre className="code-output" tabIndex={0}>{JSON.stringify({method:selectedEntry.request?.method,url:selectedEntry.request?.url,status:selectedEntry.response?.status,timings:selectedEntry.timings},null,2)}</pre></details>:null}<h3 style={{marginTop:24}}>Credential findings in source</h3><div className="result-table-wrap" tabIndex={0} aria-label="Detected HAR credential fields"><table><thead><tr><th scope="col">Category</th><th scope="col">Path</th></tr></thead><tbody>{analysis.findings.length?analysis.findings.map((finding,index)=><tr key={`${finding.entryIndex}-${finding.field}-${index}`}><td>{CATEGORY_LABELS[finding.category]}</td><td>{finding.field}</td></tr>):<tr><td colSpan={2}>No likely credential-bearing fields detected.</td></tr>}</tbody></table></div>{lastResult?<div className="notice" data-testid="har-output-scan" style={{marginTop:18}}><strong>Post-sanitize rescan</strong><p>{lastResult.changedFindings.length} selected locations were transformed. {lastResult.outputFindings.length} credential-bearing field locations remain structurally present in the output; their values may be redacted, hashed, masked, or unchanged when that category was not selected.</p></div>:null}<div className="button-row"><button className="action-button" type="button" onClick={()=>void exportSanitized()}>Download sanitized HAR</button></div></>:null}<div className={`status-line ${source?'good':''}`} role="status">{status}</div></div></>;
 }
