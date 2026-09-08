@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import {
   ACTIVITY_LEVELS,
+  BMR_EQUATIONS,
+  BMR_EQUATION_LABEL,
   DISTRIBUTION_RANGE,
   GOAL_TYPES,
+  MIFFLIN_DERIVATION_AGE_RANGE,
   PROTEIN_ADEQUACY_G_PER_KG,
   calculateEnergyPlan,
   cmToFeetInches,
@@ -19,6 +22,7 @@ import {
   validateEnergyPlanInput,
   type ActivityLevel,
   type BiologicalSex,
+  type BmrEquation,
   type EnergyPlanInput,
   type GoalType,
   type MacronutrientSplit,
@@ -51,6 +55,7 @@ interface FormState {
   readonly activityLevel: ActivityLevel;
   readonly useBodyFat: boolean;
   readonly bodyFatPercentage: number;
+  readonly primaryEquation: BmrEquation;
   readonly goalType: GoalType;
   readonly splitPreference: SplitPreference;
   readonly customSplit: MacronutrientSplit;
@@ -66,6 +71,7 @@ const DEFAULT_FORM: FormState = {
   activityLevel: 'moderately_active',
   useBodyFat: false,
   bodyFatPercentage: 20,
+  primaryEquation: 'mifflin_st_jeor',
   goalType: 'maintenance',
   splitPreference: 'balanced',
   customSplit: { protein: 30, fat: 30, carbohydrate: 40 },
@@ -77,7 +83,15 @@ const readAutosave = (): FormState => {
     const raw = window.localStorage.getItem(AUTOSAVE_KEY);
     if (!raw) return DEFAULT_FORM;
     const parsed = JSON.parse(raw) as Partial<FormState>;
-    return { ...DEFAULT_FORM, ...parsed, customSplit: { ...DEFAULT_FORM.customSplit, ...parsed.customSplit } };
+    const primaryEquation = BMR_EQUATIONS.includes(parsed.primaryEquation as BmrEquation)
+      ? parsed.primaryEquation as BmrEquation
+      : DEFAULT_FORM.primaryEquation;
+    return {
+      ...DEFAULT_FORM,
+      ...parsed,
+      primaryEquation,
+      customSplit: { ...DEFAULT_FORM.customSplit, ...parsed.customSplit },
+    };
   } catch {
     return DEFAULT_FORM;
   }
@@ -90,6 +104,7 @@ const toInput = (form: FormState): EnergyPlanInput => ({
   biologicalSex: form.biologicalSex,
   activityLevel: form.activityLevel,
   ...(form.useBodyFat ? { bodyFatPercentage: form.bodyFatPercentage } : {}),
+  primaryEquation: form.primaryEquation,
   goalType: form.goalType,
   macronutrientSplitPreference: form.splitPreference,
   ...(form.splitPreference === 'custom' ? { customSplit: form.customSplit } : {}),
@@ -99,7 +114,7 @@ const numeric = (value: string) => (value.trim() === '' ? Number.NaN : Number(va
 
 export default function NutritionWorkspace() {
   const [form, setForm] = useState<FormState>(readAutosave);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState('Autosaves locally in this browser.');
 
   const update = <Key extends keyof FormState>(key: Key, value: FormState[Key]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -112,7 +127,12 @@ export default function NutritionWorkspace() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try { window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(form)); } catch { /* Local storage may be unavailable. */ }
+      try {
+        window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(form));
+        setNote('Changes saved locally. Reloading this tool restores them.');
+      } catch {
+        setNote('Local restore is unavailable in this browser; the current plan remains on screen.');
+      }
     }, 600);
     return () => window.clearTimeout(timer);
   }, [form]);
@@ -130,31 +150,37 @@ export default function NutritionWorkspace() {
     }
   };
 
+  const reset = () => {
+    setForm(DEFAULT_FORM);
+    try { window.localStorage.removeItem(AUTOSAVE_KEY); } catch { /* unavailable storage */ }
+    setNote('Reset to defaults and cleared the locally restored plan.');
+  };
+
   return (
     <>
       <div className="workspace-header">
         <div>
           <h2>Energy and macronutrient plan</h2>
-          <p>Published equations, computed on this device.</p>
+          <p>Published equations, computed on this device with reconstructable exports.</p>
         </div>
-        <button className="action-button" type="button" onClick={() => { setForm(DEFAULT_FORM); setNote('Reset to defaults.'); }}>
-          Reset
-        </button>
+        <button className="action-button" type="button" onClick={reset}>Reset</button>
       </div>
 
       <div className="workspace-body">
+        <div className="notice" data-testid="planner-scope" style={{ marginBottom: 18, overflowWrap: 'anywhere' }}>
+          <strong>Supported scope</strong>
+          <p>
+            This workflow is for non-pregnant, non-breastfeeding adults aged {MIFFLIN_DERIVATION_AGE_RANGE[0]}–{MIFFLIN_DERIVATION_AGE_RANGE[1]}.
+            The age range matches the original Mifflin-St Jeor derivation sample; it is not a child or pregnancy energy-needs calculator.
+          </p>
+        </div>
+
         <section className="planner-section" aria-labelledby="measurements-heading">
           <div className="planner-section-head">
-            <h3 id="measurements-heading">Measurements</h3>
+            <h3 id="measurements-heading">Measurements and equation</h3>
             <div className="planner-unit-toggle" role="group" aria-label="Measurement units">
               {(['metric', 'imperial'] as const).map((unit) => (
-                <button
-                  key={unit}
-                  type="button"
-                  className="planner-toggle-button"
-                  aria-pressed={form.units === unit}
-                  onClick={() => update('units', unit)}
-                >
+                <button key={unit} type="button" className="planner-toggle-button" aria-pressed={form.units === unit} onClick={() => update('units', unit)}>
                   {unit === 'metric' ? 'Metric' : 'Imperial'}
                 </button>
               ))}
@@ -207,50 +233,57 @@ export default function NutritionWorkspace() {
 
             <div className="field">
               <label htmlFor="age-years">Age (years)</label>
-              <input id="age-years" data-testid="age-input" type="number" inputMode="numeric" min="1" step="1"
+              <input id="age-years" data-testid="age-input" type="number" inputMode="numeric" min={MIFFLIN_DERIVATION_AGE_RANGE[0]} max={MIFFLIN_DERIVATION_AGE_RANGE[1]} step="1"
                 value={Number.isNaN(form.ageYears) ? '' : form.ageYears}
                 onChange={(event) => update('ageYears', numeric(event.target.value))}
                 aria-describedby={issueFor('ageYears') ? 'age-error' : undefined} />
-              {issueFor('ageYears') ? <p className="planner-error" id="age-error">{issueFor('ageYears')}</p> : null}
+              {issueFor('ageYears') ? <p className="planner-error" id="age-error">{issueFor('ageYears')}</p> : <small>Supported: 19–78 years.</small>}
             </div>
 
             <div className="field">
               <label htmlFor="sex-variant">Formula variant</label>
-              <select id="sex-variant" data-testid="sex-select" value={form.biologicalSex}
-                onChange={(event) => update('biologicalSex', event.target.value as BiologicalSex)}>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+              <select id="sex-variant" data-testid="sex-select" value={form.biologicalSex} onChange={(event) => update('biologicalSex', event.target.value as BiologicalSex)}>
+                <option value="male">Male</option><option value="female">Female</option>
               </select>
-              <small>Selects the equation constants, not an identity.</small>
+              <small>Selects equation constants, not identity.</small>
             </div>
 
             <div className="field">
               <label htmlFor="activity-level">Activity level</label>
-              <select id="activity-level" data-testid="activity-select" value={form.activityLevel}
-                onChange={(event) => update('activityLevel', event.target.value as ActivityLevel)}>
-                {ACTIVITY_LEVELS.map((level) => (
-                  <option key={level} value={level}>{formatActivityLabel(level)}</option>
-                ))}
+              <select id="activity-level" data-testid="activity-select" value={form.activityLevel} onChange={(event) => update('activityLevel', event.target.value as ActivityLevel)}>
+                {ACTIVITY_LEVELS.map((level) => <option key={level} value={level}>{formatActivityLabel(level)}</option>)}
               </select>
               <small>{ACTIVITY_HELP[form.activityLevel]}</small>
             </div>
 
             <div className="field">
               <label className="planner-check" htmlFor="use-body-fat">
-                <input id="use-body-fat" data-testid="body-fat-toggle" type="checkbox" checked={form.useBodyFat}
-                  onChange={(event) => update('useBodyFat', event.target.checked)} />
+                <input id="use-body-fat" data-testid="body-fat-toggle" type="checkbox" checked={form.useBodyFat} onChange={(event) => update('useBodyFat', event.target.checked)} />
                 <span>Include body fat percentage</span>
               </label>
-              <input aria-label="Body fat percentage" data-testid="body-fat-input" type="number" inputMode="decimal"
-                min="1" max="70" step="0.1" disabled={!form.useBodyFat}
+              <input aria-label="Body fat percentage" data-testid="body-fat-input" type="number" inputMode="decimal" min="1" max="70" step="0.1" disabled={!form.useBodyFat}
                 value={Number.isNaN(form.bodyFatPercentage) ? '' : form.bodyFatPercentage}
                 onChange={(event) => update('bodyFatPercentage', numeric(event.target.value))}
                 aria-describedby={issueFor('bodyFatPercentage') ? 'body-fat-error' : undefined} />
               {issueFor('bodyFatPercentage')
                 ? <p className="planner-error" id="body-fat-error">{issueFor('bodyFatPercentage')}</p>
-                : <small>Adds the Katch-McArdle equation, which uses lean mass.</small>}
+                : <small>Adds a Katch-McArdle estimate; it does not silently replace your selected equation.</small>}
+            </div>
+
+            <div className="field">
+              <label htmlFor="primary-equation">Primary resting-energy equation</label>
+              <select id="primary-equation" data-testid="equation-select" value={form.primaryEquation} onChange={(event) => update('primaryEquation', event.target.value as BmrEquation)}
+                aria-describedby={issueFor('primaryEquation') ? 'equation-error' : 'equation-help'}>
+                {BMR_EQUATIONS.map((equation) => (
+                  <option key={equation} value={equation} disabled={equation === 'katch_mcardle' && !form.useBodyFat}>{BMR_EQUATION_LABEL[equation]}</option>
+                ))}
+              </select>
+              {issueFor('primaryEquation')
+                ? <p className="planner-error" id="equation-error">{issueFor('primaryEquation')}</p>
+                : <small id="equation-help">This choice drives TDEE and the goal target. Other available equations remain visible for comparison.</small>}
             </div>
           </div>
+          {issueFor('measurements') ? <p className="planner-error" role="alert">{issueFor('measurements')}</p> : null}
         </section>
 
         <section className="planner-section" aria-labelledby="objective-heading">
@@ -258,24 +291,21 @@ export default function NutritionWorkspace() {
           <div className="workspace-grid three">
             <div className="field">
               <label htmlFor="goal-type">Goal</label>
-              <select id="goal-type" data-testid="goal-select" value={form.goalType}
-                onChange={(event) => update('goalType', event.target.value as GoalType)}>
+              <select id="goal-type" data-testid="goal-select" value={form.goalType} onChange={(event) => update('goalType', event.target.value as GoalType)}>
                 {GOAL_TYPES.map((goal) => <option key={goal} value={goal}>{formatGoalLabel(goal)}</option>)}
               </select>
             </div>
             <div className="field">
               <label htmlFor="split-preference">Distribution</label>
-              <select id="split-preference" data-testid="split-select" value={form.splitPreference}
-                onChange={(event) => update('splitPreference', event.target.value as SplitPreference)}>
+              <select id="split-preference" data-testid="split-select" value={form.splitPreference} onChange={(event) => update('splitPreference', event.target.value as SplitPreference)}>
                 {SPLIT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <div className="field">
               <label htmlFor="meals-per-day">Meals per day</label>
-              <input id="meals-per-day" data-testid="meals-input" type="number" inputMode="numeric" min="1" max="12" step="1"
-                value={form.mealsPerDay}
+              <input id="meals-per-day" data-testid="meals-input" type="number" inputMode="numeric" min="1" max="12" step="1" value={form.mealsPerDay}
                 onChange={(event) => update('mealsPerDay', Math.max(1, Math.min(12, Math.round(numeric(event.target.value) || 1))))} />
-              <small>Divides the totals into per-meal figures.</small>
+              <small>Divides totals into per-meal figures.</small>
             </div>
           </div>
 
@@ -302,143 +332,65 @@ export default function NutritionWorkspace() {
           <>
             <section className="planner-section" aria-labelledby="results-heading" data-testid="planner-results" aria-live="polite">
               <div className="planner-section-head"><h3 id="results-heading">Results</h3></div>
-
               <div className="planner-headline">
-                <div className="planner-headline-primary">
-                  <span>Target intake</span>
-                  <strong data-testid="target-kcal">{plan.targetKcal.toLocaleString()}</strong>
-                  <small>kcal per day</small>
-                </div>
+                <div className="planner-headline-primary"><span>Target intake</span><strong data-testid="target-kcal">{plan.targetKcal.toLocaleString()}</strong><small>kcal per day</small></div>
                 <dl className="planner-headline-facts">
-                  <div>
-                    <dt>Basal metabolic rate</dt>
-                    <dd data-testid="bmr-primary">{plan.bmr.primaryKcal.toLocaleString()} kcal · {plan.bmr.primaryEquation}</dd>
-                  </div>
-                  <div>
-                    <dt>Total daily energy expenditure</dt>
-                    <dd data-testid="tdee-kcal">{plan.tdeeKcal.toLocaleString()} kcal · ×{plan.activityMultiplier}</dd>
-                  </div>
-                  <div>
-                    <dt>Goal adjustment</dt>
-                    <dd>{plan.goalDeltaPercent > 0 ? '+' : ''}{plan.goalDeltaPercent}% of expenditure</dd>
-                  </div>
-                  <div>
-                    <dt>Estimated weekly mass change</dt>
-                    <dd>{plan.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{plan.estimatedWeeklyMassChangeKg} kg</dd>
-                  </div>
+                  <div><dt>Selected resting-energy estimate</dt><dd data-testid="bmr-primary">{plan.bmr.primaryKcal.toLocaleString()} kcal · {plan.bmr.primaryEquation}</dd></div>
+                  <div><dt>Total daily energy expenditure</dt><dd data-testid="tdee-kcal">{plan.tdeeKcal.toLocaleString()} kcal · ×{plan.activityMultiplier}</dd></div>
+                  <div><dt>Goal adjustment</dt><dd>{plan.goalDeltaPercent > 0 ? '+' : ''}{plan.goalDeltaPercent}% of expenditure</dd></div>
+                  <div><dt>Estimated weekly mass change</dt><dd>{plan.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{plan.estimatedWeeklyMassChangeKg} kg</dd></div>
                 </dl>
               </div>
 
-              <h4>Basal metabolic rate by equation</h4>
+              <h4>Resting energy by equation</h4>
               <div className="metric-row">
                 <div className="metric"><span>Mifflin-St Jeor</span><strong>{plan.bmr.mifflinStJeor.toLocaleString()} kcal</strong></div>
                 <div className="metric"><span>Revised Harris-Benedict</span><strong>{plan.bmr.revisedHarrisBenedict.toLocaleString()} kcal</strong></div>
                 {plan.bmr.katchMcArdle === undefined ? (
                   <div className="metric" data-testid="katch-absent"><span>Katch-McArdle</span><strong>Add body fat</strong></div>
                 ) : (
-                  <div className="metric" data-testid="katch-present">
-                    <span>Katch-McArdle</span>
-                    <strong>{plan.bmr.katchMcArdle.toLocaleString()} kcal</strong>
-                    <p className="help-text">Lean mass {plan.bmr.leanBodyMassKg} kg</p>
-                  </div>
+                  <div className="metric" data-testid="katch-present"><span>Katch-McArdle</span><strong>{plan.bmr.katchMcArdle.toLocaleString()} kcal</strong><p className="help-text">Lean mass {plan.bmr.leanBodyMassKg} kg</p></div>
                 )}
               </div>
 
               <h4>Macronutrients</h4>
               <div className="result-table-wrap" role="region" aria-label="Daily macronutrient targets" tabIndex={0}>
                 <table data-testid="macro-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Macronutrient</th>
-                      <th scope="col">Grams</th>
-                      <th scope="col">kcal</th>
-                      <th scope="col">% of energy</th>
-                      <th scope="col">Published range</th>
-                      <th scope="col">Per meal</th>
+                  <thead><tr><th scope="col">Macronutrient</th><th scope="col">Grams</th><th scope="col">kcal</th><th scope="col">% of energy</th><th scope="col">Published range</th><th scope="col">Per meal</th></tr></thead>
+                  <tbody>{plan.macronutrients.map((macro) => (
+                    <tr key={macro.key}>
+                      <th scope="row">{macronutrientLabel(macro.key)}</th><td data-testid={`grams-${macro.key}`}>{macro.grams} g</td><td>{macro.kcal.toLocaleString()}</td><td>{macro.percentOfEnergy}%</td>
+                      <td><span className={macro.withinDistributionRange ? 'planner-badge is-inside' : 'planner-badge is-outside'}>{macro.withinDistributionRange ? 'Inside' : 'Outside'}</span><span className="planner-range">{macro.distributionRange[0]}–{macro.distributionRange[1]}%</span></td>
+                      <td>{Math.round(macro.grams / form.mealsPerDay)} g</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {plan.macronutrients.map((macro) => (
-                      <tr key={macro.key}>
-                        <th scope="row">{macronutrientLabel(macro.key)}</th>
-                        <td data-testid={`grams-${macro.key}`}>{macro.grams} g</td>
-                        <td>{macro.kcal.toLocaleString()}</td>
-                        <td>{macro.percentOfEnergy}%</td>
-                        <td>
-                          <span className={macro.withinDistributionRange ? 'planner-badge is-inside' : 'planner-badge is-outside'}>
-                            {macro.withinDistributionRange ? 'Inside' : 'Outside'}
-                          </span>
-                          <span className="planner-range">{macro.distributionRange[0]}–{macro.distributionRange[1]}%</span>
-                        </td>
-                        <td>{Math.round(macro.grams / form.mealsPerDay)} g</td>
-                      </tr>
-                    ))}
-                  </tbody>
+                  ))}</tbody>
                 </table>
               </div>
 
               <p className="help-text planner-reconcile">
-                Protein is {plan.proteinGramsPerKg} g/kg against the {PROTEIN_ADEQUACY_G_PER_KG} g/kg adequacy reference.
-                Rounded grams represent {plan.reconciledKcal.toLocaleString()} kcal.
-                Published ranges are the Acceptable Macronutrient Distribution Range
-                ({DISTRIBUTION_RANGE.carbohydrate[0]}–{DISTRIBUTION_RANGE.carbohydrate[1]}% carbohydrate,
-                {' '}{DISTRIBUTION_RANGE.fat[0]}–{DISTRIBUTION_RANGE.fat[1]}% fat,
-                {' '}{DISTRIBUTION_RANGE.protein[0]}–{DISTRIBUTION_RANGE.protein[1]}% protein).
+                Protein is {plan.proteinGramsPerKg} g/kg against the {PROTEIN_ADEQUACY_G_PER_KG} g/kg adequacy reference. Rounded grams represent {plan.reconciledKcal.toLocaleString()} kcal.
+                Published ranges are {DISTRIBUTION_RANGE.carbohydrate[0]}–{DISTRIBUTION_RANGE.carbohydrate[1]}% carbohydrate, {DISTRIBUTION_RANGE.fat[0]}–{DISTRIBUTION_RANGE.fat[1]}% fat, and {DISTRIBUTION_RANGE.protein[0]}–{DISTRIBUTION_RANGE.protein[1]}% protein.
               </p>
 
-              {plan.advisories.length > 0 ? (
-                <ul className="planner-advisories" data-testid="planner-advisories">
-                  {plan.advisories.map((advisory) => (
-                    <li key={advisory.code} className={advisory.severity === 'caution' ? 'is-caution' : 'is-info'}>
-                      {advisory.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              {plan.advisories.length > 0 ? <ul className="planner-advisories" data-testid="planner-advisories">{plan.advisories.map((advisory) => <li key={advisory.code} className={advisory.severity === 'caution' ? 'is-caution' : 'is-info'}>{advisory.message}</li>)}</ul> : null}
             </section>
 
             <section className="planner-section" aria-labelledby="comparison-heading">
               <div className="planner-section-head"><h3 id="comparison-heading">Every goal tier</h3></div>
               <div className="result-table-wrap" role="region" aria-label="Targets for every goal tier" tabIndex={0}>
-                <table data-testid="goal-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Goal</th>
-                      <th scope="col">Adjustment</th>
-                      <th scope="col">Target</th>
-                      <th scope="col">Weekly change</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {goalComparison.map((candidate) => (
-                      <tr key={candidate.goalType} aria-current={candidate.goalType === plan.goalType ? 'true' : undefined}>
-                        <th scope="row">{formatGoalLabel(candidate.goalType)}</th>
-                        <td>{candidate.goalDeltaPercent > 0 ? '+' : ''}{candidate.goalDeltaPercent}%</td>
-                        <td>{candidate.targetKcal.toLocaleString()} kcal</td>
-                        <td>{candidate.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{candidate.estimatedWeeklyMassChangeKg} kg</td>
-                      </tr>
-                    ))}
-                  </tbody>
+                <table data-testid="goal-table"><thead><tr><th scope="col">Goal</th><th scope="col">Adjustment</th><th scope="col">Target</th><th scope="col">Weekly change</th></tr></thead>
+                  <tbody>{goalComparison.map((candidate) => <tr key={candidate.goalType} aria-current={candidate.goalType === plan.goalType ? 'true' : undefined}><th scope="row">{formatGoalLabel(candidate.goalType)}</th><td>{candidate.goalDeltaPercent > 0 ? '+' : ''}{candidate.goalDeltaPercent}%</td><td>{candidate.targetKcal.toLocaleString()} kcal</td><td>{candidate.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{candidate.estimatedWeeklyMassChangeKg} kg</td></tr>)}</tbody>
                 </table>
               </div>
             </section>
 
             <section className="planner-section" aria-labelledby="export-heading">
-              <div className="planner-section-head"><h3 id="export-heading">Export</h3></div>
+              <div className="planner-section-head"><div><h3 id="export-heading">Export</h3><p className="help-text">Every format includes source measurements, canonical units, selected equation, activity/goal assumptions, and calculated outputs.</p></div></div>
               <div className="planner-actions">
                 <button className="action-button" type="button" onClick={copyPlan}>Copy Markdown</button>
-                <button className="action-button" type="button"
-                  onClick={() => { downloadText(planToMarkdown(plan), 'energy-plan.md', 'text/markdown;charset=utf-8'); setNote('Markdown downloaded.'); }}>
-                  Download Markdown
-                </button>
-                <button className="action-button" type="button"
-                  onClick={() => { downloadText(planToCsv(plan), 'energy-plan.csv', 'text/csv;charset=utf-8'); setNote('CSV downloaded.'); }}>
-                  Download CSV
-                </button>
-                <button className="action-button" type="button"
-                  onClick={() => { downloadText(JSON.stringify(plan, null, 2), 'energy-plan.json', 'application/json'); setNote('JSON downloaded.'); }}>
-                  Download JSON
-                </button>
+                <button className="action-button" type="button" onClick={() => { downloadText(planToMarkdown(plan), 'energy-plan.md', 'text/markdown;charset=utf-8'); setNote('Markdown downloaded.'); }}>Download Markdown</button>
+                <button className="action-button" type="button" onClick={() => { downloadText(planToCsv(plan), 'energy-plan.csv', 'text/csv;charset=utf-8'); setNote('CSV downloaded.'); }}>Download CSV</button>
+                <button className="action-button" type="button" onClick={() => { downloadText(JSON.stringify(plan, null, 2), 'energy-plan.json', 'application/json'); setNote('JSON downloaded with reconstructable inputs and assumptions.'); }}>Download JSON</button>
               </div>
               <p className="status-line" role="status" data-testid="planner-status">{note}</p>
             </section>
@@ -446,10 +398,7 @@ export default function NutritionWorkspace() {
         ) : (
           <section className="planner-section" aria-labelledby="blocked-heading">
             <div className="planner-section-head"><h3 id="blocked-heading">Results</h3></div>
-            <div className="notice" data-testid="planner-blocked" role="status">
-              <strong>Waiting on valid measurements</strong>
-              <ul>{issues.map((issue) => <li key={`${issue.field}-${issue.message}`}>{issue.message}</li>)}</ul>
-            </div>
+            <div className="notice" data-testid="planner-blocked" role="status"><strong>Waiting on supported, valid measurements</strong><ul>{issues.map((issue) => <li key={`${issue.field}-${issue.message}`}>{issue.message}</li>)}</ul></div>
           </section>
         )}
       </div>

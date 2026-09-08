@@ -31,18 +31,15 @@ test('computes basal rate, expenditure, target, and macronutrient grams', async 
   await page.getByTestId('activity-select').selectOption('moderately_active');
   await page.getByTestId('goal-select').selectOption('maintenance');
 
-  // Mifflin-St Jeor: 10*80 + 6.25*180 - 5*30 + 5 = 1780; TDEE = 1780 * 1.55 = 2759.
   await expect(page.getByTestId('bmr-primary')).toContainText('1,780');
   await expect(page.getByTestId('bmr-primary')).toContainText('Mifflin-St Jeor');
   await expect(page.getByTestId('tdee-kcal')).toContainText('2,759');
   await expect(page.getByTestId('target-kcal')).toHaveText('2,759');
-
-  // Balanced split: protein 25% of 2759 = 689.75 kcal / 4 = 172 g.
   await expect(page.getByTestId('grams-protein')).toHaveText('172 g');
   await expect(page.getByTestId('katch-absent')).toBeVisible();
 });
 
-test('adds the Katch-McArdle equation when body fat is supplied', async ({ page }) => {
+test('adds Katch-McArdle when body fat is supplied but changes primary only after explicit selection', async ({ page }) => {
   await page.goto('./#/energy-macro-planner');
   await page.getByTestId('weight-input').fill('80');
   await page.getByTestId('height-input').fill('180');
@@ -51,28 +48,40 @@ test('adds the Katch-McArdle equation when body fat is supplied', async ({ page 
 
   await page.getByTestId('body-fat-toggle').check();
   await page.getByTestId('body-fat-input').fill('20');
-
-  // Lean mass 64 kg; 370 + 21.6*64 = 1752.4 -> 1752.
   await expect(page.getByTestId('katch-present')).toContainText('1,752');
+  await expect(page.getByTestId('bmr-primary')).toContainText('Mifflin-St Jeor');
+
+  await page.getByTestId('equation-select').selectOption('katch_mcardle');
   await expect(page.getByTestId('bmr-primary')).toContainText('Katch-McArdle');
+  await expect(page.getByTestId('bmr-primary')).toContainText('1,752');
+});
+
+test('blocks ages outside the published Mifflin derivation sample and the reproduced nonpositive case', async ({ page }) => {
+  await page.goto('./#/energy-macro-planner');
+  await page.getByTestId('age-input').fill('18');
+  await expect(page.getByTestId('planner-blocked')).toContainText('19–78');
+
+  await page.getByTestId('age-input').fill('78');
+  await page.getByTestId('weight-input').fill('1');
+  await page.getByTestId('height-input').fill('1');
+  await expect(page.getByTestId('planner-blocked')).toContainText('non-positive resting-energy estimate');
+  await expect(page.getByTestId('planner-results')).toHaveCount(0);
 });
 
 test('rejects a custom split that does not total one hundred percent', async ({ page }) => {
   await page.goto('./#/energy-macro-planner');
   await page.getByTestId('split-select').selectOption('custom');
   await expect(page.getByTestId('custom-split-ok')).toBeVisible();
-
   await page.getByTestId('custom-protein').fill('50');
   await expect(page.getByTestId('custom-split-error')).toContainText('total 100');
   await expect(page.getByTestId('planner-blocked')).toBeVisible();
-
   await page.getByTestId('custom-fat').fill('20');
   await page.getByTestId('custom-carbohydrate').fill('30');
   await expect(page.getByTestId('custom-split-ok')).toBeVisible();
   await expect(page.getByTestId('planner-results')).toBeVisible();
 });
 
-test('reports a low-intake advisory without withholding the numbers', async ({ page }) => {
+test('reports a low-intake advisory without withholding positive numbers', async ({ page }) => {
   await page.goto('./#/energy-macro-planner');
   await page.getByTestId('weight-input').fill('45');
   await page.getByTestId('height-input').fill('150');
@@ -93,17 +102,14 @@ test('switches units and keeps the underlying measurement', async ({ page }) => 
   await page.getByTestId('weight-input').fill('80');
   await page.getByTestId('height-input').fill('180');
   const target = await page.getByTestId('target-kcal').textContent();
-
   await page.getByRole('button', { name: 'Imperial' }).click();
   await expect(page.getByTestId('height-feet')).toBeVisible();
-  // Converting the display must not change the computed plan.
   await expect(page.getByTestId('target-kcal')).toHaveText(target ?? '');
-
   await page.getByRole('button', { name: 'Metric' }).click();
   await expect(page.getByTestId('weight-input')).toHaveValue('80');
 });
 
-test('exposes export controls and restores autosaved measurements', async ({ page }) => {
+test('exports reconstructable inputs and restores autosaved measurements', async ({ page }) => {
   await page.goto('./#/energy-macro-planner');
   await page.getByTestId('weight-input').fill('93');
   await expect(page.getByRole('button', { name: 'Copy Markdown' })).toBeVisible();
@@ -112,7 +118,11 @@ test('exposes export controls and restores autosaved measurements', async ({ pag
 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download CSV' }).click();
-  expect((await download).suggestedFilename()).toBe('energy-plan.csv');
+  const csvDownload = await download;
+  expect(csvDownload.suggestedFilename()).toBe('energy-plan.csv');
+  const csvText = await (await import('node:fs/promises')).readFile(await csvDownload.path() ?? '', 'utf8');
+  expect(csvText).toContain('input_weight,93,kg');
+  expect(csvText).toContain('primary_equation,Mifflin-St Jeor');
 
   await page.waitForTimeout(900);
   await page.reload();
@@ -140,7 +150,6 @@ for (const viewport of viewports) {
     const { scrollWidth, clientWidth } = await documentOverflow(page);
     expect(scrollWidth, `document must not scroll horizontally at ${viewport.name}`).toBeLessThanOrEqual(clientWidth + 1);
 
-    // The headline figure and its label must not overlap, and text must stay legible.
     const collisions = await page.evaluate(() => {
       const boxes = [...document.querySelectorAll('.planner-headline-facts dt, .planner-headline-facts dd, .planner-headline-primary strong, .planner-headline-primary small, .planner-section h3, .planner-badge, .planner-range')]
         .map((node) => ({ text: (node.textContent ?? '').trim(), rect: node.getBoundingClientRect(), node }))
@@ -159,8 +168,7 @@ for (const viewport of viewports) {
     });
     expect(collisions, `overlapping text at ${viewport.name}`).toEqual([]);
 
-    // No element may be clipped by its own container, which is how text smooshes.
-    const clipped = await page.evaluate(() => [...document.querySelectorAll('.planner-section, .planner-headline, .field, .planner-advisories li')]
+    const clipped = await page.evaluate(() => [...document.querySelectorAll('.planner-section, .planner-headline, .field, .planner-advisories li, [data-testid="planner-scope"]')]
       .filter((node) => node.scrollWidth > node.clientWidth + 1)
       .map((node) => `${node.className}: ${node.scrollWidth} > ${node.clientWidth}`));
     expect(clipped, `clipped containers at ${viewport.name}`).toEqual([]);
