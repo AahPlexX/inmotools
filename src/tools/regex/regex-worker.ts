@@ -1,13 +1,26 @@
-import { executeEcmaRegex } from './regex-engine';
+import { executeEcmaRegex, type EcmaRegexExecutionOptions } from './regex-engine';
 import { executePcre2Regex } from './pcre-engine';
 import { executeOnigurumaRegex } from './oniguruma-engine';
 import type { RegexRunResult } from './regex-types';
 
-type Request = { readonly requestId: number; readonly flavor: 'ecmascript' | 'pcre2' | 'oniguruma'; readonly pattern: string; readonly flags: string; readonly subject: string };
+type Request = {
+  readonly requestId: number;
+  readonly flavor: 'ecmascript' | 'pcre2' | 'oniguruma';
+  readonly pattern: string;
+  readonly flags: string;
+  readonly subject: string;
+  readonly ecmaOptions?: EcmaRegexExecutionOptions;
+};
 type Response = { readonly requestId: number; readonly result: RegexRunResult };
 const scope = self as unknown as DedicatedWorkerGlobalScope;
+
 scope.onmessage = (event: MessageEvent<Request>) => {
   const request = event.data;
-  Promise.resolve(request.flavor === 'pcre2' ? executePcre2Regex(request.pattern, request.flags, request.subject) : request.flavor === 'oniguruma' ? executeOnigurumaRegex(request.pattern, request.flags, request.subject) : executeEcmaRegex(request.pattern, request.flags, request.subject))
-    .then((result) => scope.postMessage({ requestId: request.requestId, result } satisfies Response));
+  Promise.resolve(
+    request.flavor === 'pcre2'
+      ? executePcre2Regex(request.pattern, request.flags, request.subject)
+      : request.flavor === 'oniguruma'
+        ? executeOnigurumaRegex(request.pattern, request.flags, request.subject)
+        : executeEcmaRegex(request.pattern, request.flags, request.subject, request.ecmaOptions),
+  ).then((result) => scope.postMessage({ requestId: request.requestId, result } satisfies Response));
 };

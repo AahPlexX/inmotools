@@ -24,9 +24,23 @@ const TARGETS: { value: RegexCodeTarget; label: string }[] = [
   { value:'typescript', label:'TypeScript' }, { value:'javascript', label:'JavaScript' }, { value:'python', label:'Python' }, { value:'go', label:'Go' }, { value:'rust', label:'Rust' }, { value:'php', label:'PHP' }, { value:'java', label:'Java' }, { value:'csharp', label:'C#' }, { value:'ruby', label:'Ruby' },
 ];
 const initialResult: RegexRunResult = { engine:'ECMAScript · browser RegExp', capability:'execution', matches:[], durationMs:0, error:null };
+const MATCH_VIEW_PAGE_SIZE = 100;
+const EXPLANATION_PAGE_SIZE = 18;
+const SESSION_PAGE_SIZE = 12;
+const FULL_EXPORT_MATCH_LIMIT = 100_000;
 const parseSharedState = () => { const query = window.location.hash.split('?')[1] ?? ''; const encoded = new URLSearchParams(query).get('state'); return encoded ? decodeRegexMatrixState(encoded) : null; };
 const parseSharedTrack = () => { const query = window.location.hash.split('?')[1] ?? ''; return new URLSearchParams(query).get('track'); };
 const riskLabel = (risk: ReturnType<typeof analyzeRedos>['risk']) => risk === 'critical' ? 'Critical hazard' : risk === 'caution' ? 'Caution' : risk === 'linear' ? 'Linear / clean' : 'Unknown';
+
+const Pager = ({ page, pages, onChange, label }: { page:number; pages:number; onChange:(page:number)=>void; label:string }) => pages <= 1 ? null : (
+  <div role="group" aria-label={label} style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center', margin:'10px 0' }}>
+    <button type="button" onClick={() => onChange(0)} disabled={page === 0}>First</button>
+    <button type="button" onClick={() => onChange(Math.max(0,page-1))} disabled={page === 0}>Previous</button>
+    <span>Page {page+1} of {pages}</span>
+    <button type="button" onClick={() => onChange(Math.min(pages-1,page+1))} disabled={page >= pages-1}>Next</button>
+    <button type="button" onClick={() => onChange(pages-1)} disabled={page >= pages-1}>Last</button>
+  </div>
+);
 
 const RegexWorkspace = () => {
   const shared = useMemo(parseSharedState, []);
@@ -37,6 +51,10 @@ const RegexWorkspace = () => {
   const [flags,setFlags] = useState(shared?.flags ?? 'g');
   const [subject,setSubject] = useState(shared?.subject ?? 'Release: 2026-08-31\nArchive: 2025-12-14');
   const [result,setResult] = useState<RegexRunResult>(initialResult); const [busy,setBusy] = useState(false);
+  const [matchViewPage,setMatchViewPage] = useState(0);
+  const [matchOrdinalOffset,setMatchOrdinalOffset] = useState(0);
+  const [explanationPage,setExplanationPage] = useState(0);
+  const [sessionPage,setSessionPage] = useState(0);
   const [replacement,setReplacement] = useState('${year}/${month}/${day}');
   const [positive,setPositive] = useState('2026-08-31\n2025-12-14'); const [negative,setNegative] = useState('31/08/2026\ninvalid');
   const [assertions,setAssertions] = useState<{ value:string; expected:boolean; passed:boolean }[]>([]);
@@ -52,6 +70,7 @@ const RegexWorkspace = () => {
   useEffect(() => { void loadRegexMatrixValue<string[]>('academy-progress').then((value) => { if (value) setCompleted(new Set(value)); }); }, []);
   useEffect(() => { void loadRegexMatrixValue<RegexSavedSession[]>('saved-sessions').then((value) => { if (value) setSavedSessions(value.slice(0,200)); }); }, []);
   useEffect(() => { setAcademySolution(lesson.starter); setLessonResult(null); }, [lesson.id]);
+  useEffect(() => { setExplanationPage(0); }, [pattern,flags,flavor]);
   const compatibility = useMemo(() => analyzeCompatibility(pattern), [pattern]);
   const redos = useMemo(() => flavor === 'ecmascript' ? analyzeRedos(pattern, flags) : { safe:true, risk:'unknown' as const, score:null, metricLabel:'Ambiguity path score' as const, note:'Static ReDoS scoring is limited to ECMAScript in this release.', trails:[] }, [flavor, flags, pattern]);
   const explanation = useMemo(() => { try { return buildRegexExplanation(pattern, flags, flavor); } catch (error) { return { id:'error', kind:'Pattern', label:error instanceof Error ? error.message : String(error), source:pattern, start:0, end:pattern.length, children:[] }; } }, [flavor, flags, pattern]);
@@ -61,13 +80,54 @@ const RegexWorkspace = () => {
   const replacementPreview = useMemo(() => { if (flavor !== 'ecmascript') return 'Replacement preview currently uses the ECMAScript execution engine.'; try { return subject.replace(new RegExp(pattern, flags), replacement); } catch (error) { return error instanceof Error ? error.message : String(error); } }, [flavor, flags, pattern, replacement, subject]);
   const activeCompatibility = compatibility.find((entry) => entry.flavor === flavor)!;
 
+  const matchPageCount=Math.max(1,Math.ceil(result.matches.length/MATCH_VIEW_PAGE_SIZE));
+  const safeMatchPage=Math.min(matchViewPage,matchPageCount-1);
+  const matchPageStart=safeMatchPage*MATCH_VIEW_PAGE_SIZE;
+  const visibleMatches=result.matches.slice(matchPageStart,matchPageStart+MATCH_VIEW_PAGE_SIZE);
+  const explanationPageCount=Math.max(1,Math.ceil(explanation.children.length/EXPLANATION_PAGE_SIZE));
+  const safeExplanationPage=Math.min(explanationPage,explanationPageCount-1);
+  const visibleExplanation=explanation.children.slice(safeExplanationPage*EXPLANATION_PAGE_SIZE,(safeExplanationPage+1)*EXPLANATION_PAGE_SIZE);
+  const sessionPageCount=Math.max(1,Math.ceil(savedSessions.length/SESSION_PAGE_SIZE));
+  const safeSessionPage=Math.min(sessionPage,sessionPageCount-1);
+  const visibleSessions=savedSessions.slice(safeSessionPage*SESSION_PAGE_SIZE,(safeSessionPage+1)*SESSION_PAGE_SIZE);
+  const displayedMatchCount=result.totalMatchesExact && result.totalMatches !== null && result.totalMatches !== undefined ? result.totalMatches : result.matches.length;
+
   const selectRailroadSegment = (segment: (typeof railroad.segments)[number]) => {
     setRailroadSelection((current) => ({ from:segment.start, to:segment.end, revision:(current?.revision ?? 0)+1, label:segment.label }));
     setStatus(`Selected ${segment.label} at ${segment.start}–${segment.end}.`);
   };
+  const describeResult = (next: RegexRunResult, prefix='') => {
+    if (next.error) return next.error;
+    if (next.truncated) {
+      const omitted=next.omittedCount === null || next.omittedCount === undefined ? 'additional matches exist beyond the counted bound' : `${next.omittedCount.toLocaleString()} omitted from this returned batch`;
+      return `${prefix}${next.matches.length.toLocaleString()} returned; ${omitted}. Execution ${next.durationMs.toFixed(2)} ms.`;
+    }
+    return `${prefix}${next.matches.length.toLocaleString()} match${next.matches.length === 1 ? '' : 'es'} in ${next.durationMs.toFixed(2)} ms.`;
+  };
   const runPattern = async () => {
     if (!EXECUTABLE.has(flavor)) { setStatus(`${activeCompatibility.label} is compatibility-only in this release. Choose an execution flavor to run this pattern.`); return; }
-    setBusy(true); const next = await executeRegexWithWatchdog(flavor as RegexExecutionFlavor, pattern, flags, subject); setResult(next); setBusy(false); setStatus(next.error ? next.error : `${next.matches.length} match${next.matches.length === 1 ? '' : 'es'} in ${next.durationMs.toFixed(2)} ms.`);
+    setBusy(true);
+    const next = await executeRegexWithWatchdog(flavor as RegexExecutionFlavor, pattern, flags, subject);
+    setResult(next); setBusy(false); setMatchOrdinalOffset(0); setMatchViewPage(0); setStatus(describeResult(next));
+  };
+  const continueMatches = async () => {
+    if (flavor !== 'ecmascript' || result.nextStartIndex === null || result.nextStartIndex === undefined) return;
+    setBusy(true);
+    const priorCount=result.matches.length;
+    const next=await executeRegexWithWatchdog('ecmascript',pattern,flags,subject,500,{ startIndex:result.nextStartIndex });
+    setResult(next); setBusy(false); setMatchOrdinalOffset((value)=>value+priorCount); setMatchViewPage(0); setStatus(describeResult(next,`Continued at subject index ${result.nextStartIndex}. `));
+  };
+  const exportMatches = async () => {
+    if (!EXECUTABLE.has(flavor)) { setStatus('Match export requires an execution engine.'); return; }
+    setBusy(true);
+    const exported=flavor === 'ecmascript'
+      ? await executeRegexWithWatchdog('ecmascript',pattern,flags,subject,5_000,{ matchLimit:FULL_EXPORT_MATCH_LIMIT,countLimit:FULL_EXPORT_MATCH_LIMIT,startIndex:0 })
+      : await executeRegexWithWatchdog(flavor as RegexExecutionFlavor,pattern,flags,subject,5_000);
+    setBusy(false);
+    const complete=!exported.error && !exported.timedOut && exported.truncated !== true;
+    const payload={ schemaVersion:1, flavor, engine:exported.engine, pattern, flags, subjectLength:subject.length, complete, returnedMatches:exported.matches.length, totalMatches:exported.totalMatches ?? (complete ? exported.matches.length : null), limit:flavor === 'ecmascript' ? FULL_EXPORT_MATCH_LIMIT : null, error:exported.error, matches:exported.matches };
+    downloadText(JSON.stringify(payload,null,2),'regex-matrix-matches.json','application/json;charset=utf-8');
+    setStatus(complete ? `Exported all ${exported.matches.length.toLocaleString()} matches reported by the execution engine.` : `Exported ${exported.matches.length.toLocaleString()} matches with explicit incomplete metadata${flavor === 'ecmascript' ? `; the export bound is ${FULL_EXPORT_MATCH_LIMIT.toLocaleString()}` : ''}.`);
   };
   const runAssertions = async () => {
     if (!EXECUTABLE.has(flavor)) { setStatus('Assertions require an execution engine.'); return; }
@@ -82,10 +142,14 @@ const RegexWorkspace = () => {
     const savedAt=Date.now();
     const snapshot: RegexSavedSession = { id:`session-${savedAt}`, savedAt, pattern, flags, subject, flavor, replacement, positive, negative, codeTarget };
     const next=addRegexSessionSnapshot(savedSessions,snapshot);
-    setSavedSessions(next); void saveRegexMatrixValue('saved-sessions',next); setStatus('Studio session saved locally.');
+    setSavedSessions(next); setSessionPage(0); void saveRegexMatrixValue('saved-sessions',next); setStatus('Studio session saved locally.');
   };
   const loadSession = (snapshot: RegexSavedSession) => {
     setPattern(snapshot.pattern); setFlags(snapshot.flags); setSubject(snapshot.subject); setFlavor(snapshot.flavor); setReplacement(snapshot.replacement); setPositive(snapshot.positive); setNegative(snapshot.negative); setCodeTarget(snapshot.codeTarget); setMode('studio'); setMobileView('editor'); setStatus(`Loaded session from ${new Date(snapshot.savedAt).toLocaleString()}.`);
+  };
+  const deleteSession = (id:string) => {
+    const next=savedSessions.filter((snapshot)=>snapshot.id!==id);
+    setSavedSessions(next); setSessionPage((value)=>Math.min(value,Math.max(0,Math.ceil(next.length/SESSION_PAGE_SIZE)-1))); void saveRegexMatrixValue('saved-sessions',next); setStatus('Deleted the selected local session.');
   };
   const share = async () => { const encoded=encodeRegexMatrixState({ mode, flavor, pattern, flags, subject }); const base=window.location.href.split('#')[0]!; const url=`${base}#/regex-matrix?state=${encoded}`; try { await navigator.clipboard.writeText(url); setStatus('Compressed local share URL copied.'); } catch { window.location.hash=`/regex-matrix?state=${encoded}`; setStatus('Share state placed in the address bar.'); } };
   const openCustomLesson = (item: AcademyLesson) => { setPattern(item.starter); setFlags(item.flags); setSubject(item.cases.map((entry) => entry.value).join('\n')); setFlavor('ecmascript'); setMode('studio'); setMobileView('editor'); setStatus(`Opened custom lesson “${item.title}” in Studio.`); };
@@ -131,8 +195,21 @@ const RegexWorkspace = () => {
           <div className="regex-substitute"><label>Replacement<input aria-label="Replacement" value={replacement} onChange={(event) => setReplacement(event.target.value)} /></label><pre tabIndex={0}>{replacementPreview}</pre></div>
           <details><summary>Assertion suite</summary><div className="regex-assertion-inputs"><label>Must match<textarea aria-label="Must match" value={positive} onChange={(event) => setPositive(event.target.value)} /></label><label>Must not match<textarea aria-label="Must not match" value={negative} onChange={(event) => setNegative(event.target.value)} /></label></div><button type="button" onClick={() => void runAssertions()}>Run assertions</button>{assertions.length ? <p>{assertions.filter((item) => item.passed).length}/{assertions.length} assertions pass</p> : null}</details>
         </section>
-        <section className="regex-match-pane" data-mobile-panel="matches" aria-label="Match inspector"><div className="regex-pane-heading"><h2>Matches</h2><strong data-testid="match-count">{result.matches.length}</strong></div>{result.error ? <p className="regex-error" role="alert">{result.error}</p> : <div data-testid="match-inspector" className="regex-match-list">{result.matches.length ? result.matches.map((match,index) => <article key={`${match.index}-${index}`}><header><strong>Match {index+1}</strong><span>{match.index}–{match.end} · {match.match.length} chars</span></header><code>{match.match}</code>{Object.entries(match.namedGroups).length ? <dl>{Object.entries(match.namedGroups).map(([name,value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl> : null}</article>) : <p className="regex-empty">Run the pattern to inspect matches and capture groups.</p>}</div>}<p className="regex-duration">Last execution: {result.durationMs.toFixed(2)} ms</p></section>
-        <aside className="regex-diagnostic-pane" aria-label="Regex diagnostics"><section data-mobile-panel="explain"><div className="regex-pane-heading"><h2>Explain</h2><span>{explanation.children.length} tokens</span></div><ol id="regex-explanation-list" className="regex-ast-list" tabIndex={0} aria-label="Regex structural explanation">{explanation.children.slice(0,18).map((node) => <li key={node.id}><code>{node.source || '∅'}</code><span>{node.label}</span><small>{node.start}–{node.end}</small></li>)}</ol></section>
+        <section className="regex-match-pane" data-mobile-panel="matches" aria-label="Match inspector">
+          <div className="regex-pane-heading"><h2>Matches</h2><strong data-testid="match-count">{displayedMatchCount}</strong></div>
+          {result.error ? <p className="regex-error" role="alert">{result.error}</p> : <>
+            {result.truncated ? <p className="notice" data-testid="match-limit-status">This execution returned {result.matches.length.toLocaleString()} match records from the current cursor{result.omittedCount === null || result.omittedCount === undefined ? '; more matches exist beyond the counting bound.' : ` and omitted ${result.omittedCount.toLocaleString()} remaining match${result.omittedCount===1?'':'es'}.`}</p> : null}
+            <div data-testid="match-inspector" className="regex-match-list">{result.matches.length ? visibleMatches.map((match,index) => <article key={`${match.index}-${matchPageStart+index}`}><header><strong>Match {matchOrdinalOffset+matchPageStart+index+1}</strong><span>{match.index}–{match.end} · {match.match.length} chars</span></header><code>{match.match}</code>{Object.entries(match.namedGroups).length ? <dl>{Object.entries(match.namedGroups).map(([name,value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl> : null}</article>) : <p className="regex-empty">Run the pattern to inspect matches and capture groups.</p>}</div>
+            <Pager page={safeMatchPage} pages={matchPageCount} onChange={setMatchViewPage} label="Returned match pages" />
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, margin:'10px 0' }}>
+              {flavor==='ecmascript' && result.nextStartIndex !== null && result.nextStartIndex !== undefined ? <button type="button" data-testid="continue-matches" disabled={busy} onClick={() => void continueMatches()}>Continue after returned batch</button> : null}
+              <button type="button" disabled={busy || !EXECUTABLE.has(flavor)} onClick={() => void exportMatches()}>{flavor==='ecmascript' ? 'Export up to 100,000 matches' : 'Export engine matches JSON'}</button>
+              {matchOrdinalOffset>0 ? <button type="button" disabled={busy} onClick={() => void runPattern()}>Restart from beginning</button> : null}
+            </div>
+          </>}
+          <p className="regex-duration">Last execution: {result.durationMs.toFixed(2)} ms</p>
+        </section>
+        <aside className="regex-diagnostic-pane" aria-label="Regex diagnostics"><section data-mobile-panel="explain"><div className="regex-pane-heading"><h2>Explain</h2><span>{explanation.children.length} tokens</span></div><ol id="regex-explanation-list" className="regex-ast-list" tabIndex={0} aria-label="Regex structural explanation">{visibleExplanation.map((node) => <li key={node.id}><code>{node.source || '∅'}</code><span>{node.label}</span><small>{node.start}–{node.end}</small></li>)}</ol><Pager page={safeExplanationPage} pages={explanationPageCount} onChange={setExplanationPage} label="Explanation pages" /></section>
           <section id="regex-safety-panel" tabIndex={-1} data-mobile-panel="safety" className={`regex-safety ${redos.risk}`}> <div className="regex-pane-heading"><h2>ReDoS safety</h2><strong data-testid="redos-status">{riskLabel(redos.risk)}</strong></div><p>{redos.metricLabel}: {redos.score ?? 'n/a'}</p><small>{redos.note}</small></section>
         </aside>
       </main>
@@ -154,7 +231,7 @@ const RegexWorkspace = () => {
         <div><div className="regex-pane-heading"><h2>Flavor compatibility</h2><span>Execution vs analysis is explicit</span></div><div className="regex-compat-table" role="table" aria-label="Flavor compatibility matrix">{compatibility.map((entry) => <div role="row" key={entry.flavor}><strong role="cell">{entry.label}</strong><span role="cell">{entry.capability === 'execution' ? 'Execution' : 'Compatibility only'}</span><span role="cell">{entry.supported ? 'Pattern supported' : entry.issues[0]}</span></div>)}</div></div>
         <div><div className="regex-pane-heading"><h2>Code generator</h2><label>Target<select aria-label="Code target" value={codeTarget} onChange={(event) => setCodeTarget(event.target.value as RegexCodeTarget)}>{TARGETS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label></div><pre className="regex-code" tabIndex={0}>{code}</pre></div>
       </section>
-      <footer className="regex-exportbar"><button type="button" onClick={() => exportAssertions('json')}>Export test JSON</button><button type="button" onClick={() => exportAssertions('yaml')}>Export test YAML</button><button type="button" onClick={exportCode}>Export code</button><button type="button" onClick={exportDiagram}>Export diagram SVG</button><button type="button" onClick={saveSession}>Save session</button><details className="regex-sessions"><summary>Saved sessions ({savedSessions.length})</summary><div>{savedSessions.length ? savedSessions.slice(0,12).map((snapshot) => <button type="button" key={snapshot.id} aria-label={`Load saved session ${snapshot.pattern}`} onClick={() => loadSession(snapshot)}><code>{snapshot.pattern || '∅'}</code><span>{new Date(snapshot.savedAt).toLocaleString()}</span></button>) : <p>No saved sessions yet.</p>}</div>{savedSessions.length>12 ? <small>{savedSessions.length-12} older snapshots remain stored locally.</small> : null}</details><details className="regex-shortcuts"><summary>Shortcuts</summary><p><kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> run assertions / check lesson · <kbd>Ctrl</kbd>+<kbd>M</kbd> switch mode (use Control on macOS; Command+M is browser-reserved) · <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>/<kbd>E</kbd>/<kbd>R</kbd> engine / explain / safety</p></details><button type="button" onClick={() => void share()}>Copy share URL</button><span role="status">{status}</span></footer>
+      <footer className="regex-exportbar"><button type="button" onClick={() => exportAssertions('json')}>Export test JSON</button><button type="button" onClick={() => exportAssertions('yaml')}>Export test YAML</button><button type="button" onClick={exportCode}>Export code</button><button type="button" onClick={exportDiagram}>Export diagram SVG</button><button type="button" onClick={saveSession}>Save session</button><details className="regex-sessions"><summary>Saved sessions ({savedSessions.length})</summary>{savedSessions.length ? <><div>{visibleSessions.map((snapshot) => <div key={snapshot.id} style={{ display:'flex', flexWrap:'wrap', gap:8, alignItems:'center' }}><button type="button" aria-label={`Load saved session ${snapshot.pattern}`} onClick={() => loadSession(snapshot)}><code>{snapshot.pattern || '∅'}</code><span>{new Date(snapshot.savedAt).toLocaleString()}</span></button><button type="button" aria-label={`Delete saved session ${snapshot.pattern}`} onClick={() => deleteSession(snapshot.id)}>Delete</button></div>)}</div><Pager page={safeSessionPage} pages={sessionPageCount} onChange={setSessionPage} label="Saved session pages" /></> : <p>No saved sessions yet.</p>}</details><details className="regex-shortcuts"><summary>Shortcuts</summary><p><kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> run assertions / check lesson · <kbd>Ctrl</kbd>+<kbd>M</kbd> switch mode (use Control on macOS; Command+M is browser-reserved) · <kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>/<kbd>E</kbd>/<kbd>R</kbd> engine / explain / safety</p></details><button type="button" onClick={() => void share()}>Copy share URL</button><span role="status">{status}</span></footer>
     </> : <section className="regex-academy" data-testid="academy-panel">
       <aside className="regex-lesson-nav" aria-label="Academy lessons"><div className="regex-academy-switch" aria-label="Academy activity"><button type="button" aria-pressed={academyPane==='lessons'} onClick={()=>setAcademyPane('lessons')}>Lessons</button><button type="button" aria-pressed={academyPane==='practice'} onClick={()=>setAcademyPane('practice')}>Practice Lab</button><button type="button" aria-pressed={academyPane==='custom'} onClick={()=>setAcademyPane('custom')}>Custom Tracks</button></div>{ACADEMY_TRACKS.map((track) => <section key={track.id}><h2>{track.title}</h2>{track.lessons.map((item) => <button type="button" key={item.id} className={item.id===lesson.id&&academyPane==='lessons'?'active':''} aria-pressed={item.id===lesson.id&&academyPane==='lessons'} onClick={() => { setLessonId(item.id); setAcademyPane('lessons'); }}>{completed.has(item.id) ? '✓ ' : ''}{item.title}</button>)}</section>)}</aside>
       {academyPane==='practice' ? <RegexPracticeLab /> : academyPane==='custom' ? <RegexCustomTracks initialEncodedTrack={sharedTrack} onOpenLesson={openCustomLesson} /> : <article className="regex-lesson"><header><p>{lessons.find((entry) => entry.lesson.id === lesson.id)?.track.title}</p><h2>{lesson.title}</h2><p>{lesson.objective}</p></header><div className="regex-lesson-guide"><strong>How it works</strong><p>{lesson.guide}</p></div><label>Academy solution<textarea aria-label="Academy solution" value={academySolution} onChange={(event) => setAcademySolution(event.target.value)} /></label><div className="regex-lesson-actions"><button type="button" onClick={checkLesson}>Check solution</button><button type="button" onClick={openLesson}>Open in Studio</button></div><p className="regex-hint">Hint: {lesson.hint}</p>{lessonResult ? <div data-testid="lesson-status" className={lessonResult.complete?'regex-complete':'regex-incomplete'}>{lessonResult.error ?? (lessonResult.complete ? 'Lesson complete' : `${lessonResult.cases.filter((item) => item.passed).length}/${lessonResult.cases.length} cases pass`)}</div> : null}<ul className="regex-case-list">{lesson.cases.map((item) => <li key={item.value}><code>{item.value}</code><span>{item.shouldMatch ? 'must match' : 'must not match'}</span></li>)}</ul></article>}

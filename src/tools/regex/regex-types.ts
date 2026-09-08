@@ -18,6 +18,20 @@ export interface RegexRunResult {
   readonly durationMs: number;
   readonly error: string | null;
   readonly timedOut?: boolean;
+  /** True when more matches exist beyond the returned match array. */
+  readonly truncated?: boolean;
+  /** Exact omitted count when the bounded scan completed; null when only a lower bound is known. */
+  readonly omittedCount?: number | null;
+  /** Exact number of matches encountered from the requested start cursor when known. */
+  readonly totalMatches?: number | null;
+  /** Cursor immediately after the final returned match, suitable for bounded continuation. */
+  readonly nextStartIndex?: number | null;
+  /** Subject code-unit index at which this run began. */
+  readonly startIndex?: number;
+  /** Maximum number of match records retained in this result. */
+  readonly matchLimit?: number;
+  /** False when the counting guard stopped before the end of the subject. */
+  readonly totalMatchesExact?: boolean;
 }
 
 export interface RegexCompatibilityEntry {
