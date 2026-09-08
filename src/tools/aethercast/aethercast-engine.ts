@@ -237,12 +237,29 @@ function epaSubIndex(key: PollutantKey, points: readonly HourlyAtmosphericPoint[
   }
 
   const oneHourPpb = point.sulphurDioxide === null ? null : truncateTo(ugM3ToPpb(point.sulphurDioxide, SO2_MOLAR_MASS), 0);
-  const oneIndex = oneHourPpb === null || oneHourPpb > 304 ? null : interpolate(oneHourPpb, EPA_SO2_1HR_PPB);
   const mean24 = rollingAverage(points, index, key, 24);
   const mean24Ppb = mean24 === null ? null : truncateTo(ugM3ToPpb(mean24, SO2_MOLAR_MASS), 0);
-  const dailyIndex = mean24Ppb === null || mean24Ppb < 305 ? null : interpolate(mean24Ppb, EPA_SO2_24HR_PPB);
-  const available = [oneIndex, dailyIndex].filter((value): value is number => value !== null);
-  return { value: available.length ? Math.max(...available) : null, averaging: 'SO2 1-hour AQI through 200; 24-hour average for higher AQI; integer ppb' };
+
+  if (mean24Ppb !== null && mean24Ppb >= 305) {
+    return {
+      value: interpolate(mean24Ppb, EPA_SO2_24HR_PPB),
+      averaging: 'EPA SO2 24-hour average at or above 305 ppb; integer ppb',
+    };
+  }
+
+  if (oneHourPpb !== null && oneHourPpb >= 305) {
+    return {
+      value: mean24Ppb === null ? null : 200,
+      averaging: mean24Ppb === null
+        ? 'EPA SO2 1-hour concentration is at or above 305 ppb; a complete 24-hour average is required before the special-case AQI can be resolved'
+        : 'EPA SO2 special case: 1-hour concentration is at or above 305 ppb while the 24-hour average is below 305 ppb; AQI is fixed at 200',
+    };
+  }
+
+  return {
+    value: oneHourPpb === null ? null : interpolate(oneHourPpb, EPA_SO2_1HR_PPB),
+    averaging: 'EPA SO2 1-hour AQI through 200; integer ppb',
+  };
 }
 
 function europeanSubIndex(value: number | null, thresholds: readonly number[]): number | null {

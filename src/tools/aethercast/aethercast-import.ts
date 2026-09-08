@@ -32,7 +32,56 @@ interface OpenMeteoResponse {
 }
 
 const MAX_ROWS = 17_520;
-const EXPLICIT_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+const DAY_MS = 86_400_000;
+const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?$/i;
+
+interface WallClockParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+  explicitZone: string | null;
+  normalized: string;
+}
+
+const daysInMonth = (year: number, month: number): number => {
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 0;
+};
+
+const parseWallClockParts = (value: string): WallClockParts | null => {
+  const match = value.trim().match(DATE_TIME);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? 0);
+  const millisecond = Number((match[7] ?? '').slice(0, 3).padEnd(3, '0') || 0);
+  if (
+    month < 1 || month > 12
+    || day < 1 || day > daysInMonth(year, month)
+    || hour < 0 || hour > 23
+    || minute < 0 || minute > 59
+    || second < 0 || second > 59
+  ) return null;
+  const explicitZone = match[8] ?? null;
+  return {
+    year, month, day, hour, minute, second, millisecond, explicitZone,
+    normalized: value.trim().replace(' ', 'T'),
+  };
+};
+
+const wallUtcSecond = (parts: WallClockParts): number => {
+  const date = new Date(0);
+  date.setUTCFullYear(parts.year, parts.month - 1, parts.day);
+  date.setUTCHours(parts.hour, parts.minute, parts.second, 0);
+  return date.getTime();
+};
 
 const wallParts = (epochMs: number, timeZone: string): number => {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -41,40 +90,56 @@ const wallParts = (epochMs: number, timeZone: string): number => {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   }).formatToParts(new Date(epochMs));
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return Date.UTC(
-    Number(values.year), Number(values.month) - 1, Number(values.day),
-    Number(values.hour), Number(values.minute), Number(values.second),
-  );
+  const date = new Date(0);
+  date.setUTCFullYear(Number(values.year), Number(values.month) - 1, Number(values.day));
+  date.setUTCHours(Number(values.hour), Number(values.minute), Number(values.second), 0);
+  return date.getTime();
 };
 
-/** Parse a wall-clock timestamp using the dataset's IANA timezone rather than the browser timezone. */
+const resolveIanaWallClock = (wallUtc: number, timeZone: string): number[] => {
+  const offsets = new Set<number>();
+  for (const probe of [wallUtc - 3 * DAY_MS, wallUtc, wallUtc + 3 * DAY_MS]) {
+    offsets.add(wallParts(probe, timeZone) - probe);
+  }
+  const candidates = new Set<number>();
+  for (const offset of offsets) {
+    const candidate = wallUtc - offset;
+    if (wallParts(candidate, timeZone) === wallUtc) candidates.add(candidate);
+  }
+  return [...candidates].sort((a, b) => a - b);
+};
+
+/**
+ * Parse a timestamp without ever normalizing impossible calendar dates or DST wall times.
+ * Timezone-less values in an IANA zone use a strict reject policy: gaps and ambiguous
+ * fall-back times return NaN and must be supplied with an explicit UTC offset to import.
+ */
 export function parseTimestampInZone(value: string, timeZone: string | null, fallbackOffsetSeconds?: number): number {
   if (!value) return NaN;
-  if (EXPLICIT_ZONE.test(value)) return Date.parse(value);
-  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!match) return NaN;
-  const wallUtc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0));
+  const parts = parseWallClockParts(value);
+  if (!parts) return NaN;
+
+  if (parts.explicitZone) {
+    const parsed = Date.parse(parts.normalized);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  const wallUtc = wallUtcSecond(parts);
+  if (!Number.isFinite(wallUtc)) return NaN;
 
   if (timeZone) {
     try {
-      // Resolve the IANA-zone offset iteratively. Repeating once handles most DST-boundary offsets.
-      let candidate = wallUtc;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const observedWall = wallParts(candidate, timeZone);
-        const next = candidate + (wallUtc - observedWall);
-        if (next === candidate) break;
-        candidate = next;
-      }
-      return candidate;
+      const candidates = resolveIanaWallClock(wallUtc, timeZone);
+      if (candidates.length !== 1) return NaN;
+      return candidates[0] + parts.millisecond;
     } catch {
-      // Fall through to the explicit Open-Meteo offset if the runtime lacks this zone.
+      if (typeof fallbackOffsetSeconds !== 'number' || !Number.isFinite(fallbackOffsetSeconds)) return NaN;
     }
   }
   if (typeof fallbackOffsetSeconds === 'number' && Number.isFinite(fallbackOffsetSeconds)) {
-    return wallUtc - fallbackOffsetSeconds * 1000;
+    return wallUtc + parts.millisecond - fallbackOffsetSeconds * 1000;
   }
-  return Date.parse(`${normalized}Z`);
+  return wallUtc + parts.millisecond;
 }
 
 const validMeasurement = (value: number | null | undefined): number | null =>
@@ -134,7 +199,7 @@ export function parseOpenMeteoJson(raw: string): ImportResult {
       providedEuropeanAqi: validMeasurement(hourly.european_aqi?.[index]),
     });
   }
-  if (invalidTimestamps > 0) errors.push(`${invalidTimestamps} row${invalidTimestamps === 1 ? '' : 's'} had invalid timestamps and were skipped.`);
+  if (invalidTimestamps > 0) errors.push(`${invalidTimestamps} row${invalidTimestamps === 1 ? '' : 's'} had invalid, nonexistent, or ambiguous timestamps and were skipped.`);
   if (points.length === 0) return { dataset: null, errors: [...errors, 'No usable hourly rows were found after validation.'] };
 
   return {
@@ -265,7 +330,7 @@ export function parseCsvWithMapping(raw: string, map: CsvColumnMap, options: Csv
       providedEuropeanAqi: null,
     });
   }
-  if (skipped > 0) errors.push(`${skipped} row${skipped === 1 ? '' : 's'} had invalid timestamps and were skipped.`);
+  if (skipped > 0) errors.push(`${skipped} row${skipped === 1 ? '' : 's'} had invalid, nonexistent, or ambiguous timestamps and were skipped. Add an explicit UTC offset to disambiguate repeated wall times.`);
   if (points.length === 0) return { dataset: null, errors: [...errors, 'No usable rows were found. Check the timestamp column and timezone mapping.'] };
 
   points.sort((a, b) => a.epochMs - b.epochMs);
