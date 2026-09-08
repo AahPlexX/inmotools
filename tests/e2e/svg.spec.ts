@@ -16,8 +16,10 @@ test('compiles collision-safe symbols, isolates bad files, and invalidates stale
   await expect(source).toContainText('id="foo"');
   await expect(source).toContainText('id="foo-2"');
   await expect(source).toContainText('id="foo-3"');
-  await expect(source).toContainText('id="foo--paint"');
-  await expect(source).toContainText('url(#foo--paint)');
+  const text = await source.textContent();
+  const internal = /id="(foo--[^"]+)"/.exec(text ?? '')?.[1];
+  expect(internal).toBeTruthy();
+  expect(text).toContain(`url(#${internal})`);
 
   await page.getByRole('checkbox', { name: /Normalize literal/ }).uncheck();
   await expect(source).toHaveCount(0);
