@@ -16,11 +16,6 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    # Validation is intentionally independent from production deployment. Browser
-    # regressions must stay visible without leaving main pinned to an older build.
-    concurrency:
-      group: validate-${{ github.ref }}
-      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -69,11 +64,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    # Allow one deployment at a time and let an in-flight production deploy finish
-    # rather than cancelling it when a newer commit lands.
+    # Every main commit gets its own deployment. Serialize production writes, but
+    # retain the pending queue instead of replacing older commits with newer ones.
     concurrency:
       group: pages
-      cancel-in-progress: false
+      queue: max
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

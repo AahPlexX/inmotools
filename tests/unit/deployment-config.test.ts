@@ -43,4 +43,11 @@ describe('deployment and bundler contracts', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).not.toContain('needs: validate');
   });
+
+  it('does not cancel per-commit validation and queues every main deployment', () => {
+    const workflow = read('.github/workflows/pages.yml');
+    expect(workflow).not.toContain('cancel-in-progress: true');
+    expect(workflow).toContain('group: pages');
+    expect(workflow).toContain('queue: max');
+  });
 });
