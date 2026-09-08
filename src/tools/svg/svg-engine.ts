@@ -2,25 +2,43 @@ import { optimize } from 'svgo/browser';
 
 export interface SvgSource { name: string; text: string }
 export interface SvgCompileOptions { currentColor?: boolean }
+export interface SvgCompiledFile {
+  name: string;
+  id: string;
+  symbol: string;
+  originalBytes: number;
+  optimizedBytes: number;
+}
+export interface SvgCompileError { name: string; message: string }
+export interface SvgCompileResult { sprite: string; files: SvgCompiledFile[]; errors: SvgCompileError[] }
 
 function slugify(name: string): string {
   return name.replace(/\.svg$/i, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'icon';
 }
 
-function normalizeCurrentColor(svg: string): string {
-  // Presentation attributes: fill="#f00" / stroke='red'.
-  const withAttributes = svg.replace(/\s(?:fill|stroke)=(['"])(?!none\b|currentColor\b)[^'"]+\1/gi, (match) =>
-    match.replace(/=(['"])[^'"]+\1/, '="currentColor"'),
-  );
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-  // CSS declarations inside a style attribute: style="fill:#f00;stroke:red".
-  //
-  // Handling only presentation attributes left these untouched, so a sprite
-  // compiled with currentColor normalization still contained hard-coded colours
-  // and silently refused to inherit. svgo's preset-default does not rescue this -
-  // it has no convertStyleToAttrs plugin, and its inlineStyles plugin can move
-  // <style> rules *into* style attributes, so colours end up here rather than in
-  // the attributes the first pass covers.
+function allocateUniqueId(base: string, used: Set<string>): string {
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  let suffix = 2;
+  while (used.has(`${base}-${suffix}`)) suffix += 1;
+  const candidate = `${base}-${suffix}`;
+  used.add(candidate);
+  return candidate;
+}
+
+function normalizeCurrentColor(svg: string): string {
+  const withAttributes = svg.replace(/\s(?:fill|stroke)=(['"])([^'"]+)\1/gi, (match, _quote: string, rawValue: string) => {
+    const value = rawValue.trim().toLowerCase();
+    if (value === 'none' || value === 'currentcolor' || value.startsWith('url(')) return match;
+    return match.replace(/=(['"])[^'"]+\1/, '="currentColor"');
+  });
+
   return withAttributes.replace(/\sstyle=(['"])([^'"]*)\1/gi, (match, quote: string, body: string) => {
     const rewritten = body.replace(
       /(^|;)\s*(fill|stroke)\s*:\s*([^;]+)/gi,
@@ -34,12 +52,6 @@ function normalizeCurrentColor(svg: string): string {
   });
 }
 
-// A <symbol> with no viewBox has no intrinsic coordinate system, so <use>
-// renders it against the referencing element's box at the wrong scale. When the
-// source omits viewBox but carries width and height, an equivalent viewBox can
-// be synthesized from them rather than emitting a symbol that cannot scale.
-// Unitless and px values are usable; anything else (em, %, unknown) is not, and
-// is left alone rather than guessed at.
 function deriveViewBox(attributes: string): string | undefined {
   const explicit = /viewBox=(['"])(.*?)\1/i.exec(attributes)?.[2];
   if (explicit) return explicit;
@@ -58,27 +70,79 @@ function deriveViewBox(attributes: string): string | undefined {
   return width !== undefined && height !== undefined ? `0 0 ${width} ${height}` : undefined;
 }
 
-export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOptions = {}) {
-  const seen = new Map<string, number>();
-  const files = sources.map((source) => {
-    const result = optimize(source.text, { multipass: true });
-    const optimized = result.data;
-    const compiled = options.currentColor ? normalizeCurrentColor(optimized) : optimized;
-    const svgMatch = compiled.match(/<svg\b([^>]*)>([\s\S]*?)<\/svg>/i);
-    if (!svgMatch) throw new Error(`${source.name} is not a valid SVG.`);
-    const viewBox = deriveViewBox(svgMatch[1]);
-    const base = slugify(source.name);
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    const id = count === 0 ? base : `${base}-${count + 1}`;
-    const symbol = `<symbol id="${id}"${viewBox ? ` viewBox="${viewBox}"` : ''}>${svgMatch[2]}</symbol>`;
-    return {
-      name: source.name,
-      id,
-      symbol,
-      originalBytes: new TextEncoder().encode(source.text).byteLength,
-      optimizedBytes: new TextEncoder().encode(optimized).byteLength,
-    };
-  });
-  return { sprite: `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">${files.map((file) => file.symbol).join('')}</svg>`, files };
+const ROOT_ATTRS_TO_PRESERVE = new Set([
+  'class', 'style', 'fill', 'stroke', 'color', 'opacity', 'fill-opacity', 'stroke-opacity',
+  'fill-rule', 'clip-rule', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'paint-order', 'vector-effect',
+  'shape-rendering', 'color-interpolation', 'color-interpolation-filters', 'color-rendering',
+  'image-rendering', 'text-rendering', 'transform', 'transform-origin', 'overflow',
+]);
+
+function preservedRootAttributes(attributes: string): string {
+  const kept: string[] = [];
+  const attributePattern = /\s([:\w-]+)=(['"])(.*?)\2/g;
+  for (const match of attributes.matchAll(attributePattern)) {
+    if (ROOT_ATTRS_TO_PRESERVE.has(match[1].toLowerCase())) kept.push(`${match[1]}=${match[2]}${match[3]}${match[2]}`);
+  }
+  return kept.length ? ` ${kept.join(' ')}` : '';
+}
+
+function prefixInternalIds(markup: string, symbolId: string): string {
+  const rawIds = Array.from(markup.matchAll(/\sid=(['"])([^'"]+)\1/gi), (match) => match[2]);
+  if (!rawIds.length) return markup;
+
+  const used = new Set<string>();
+  const mapping = new Map<string, string>();
+  for (const rawId of rawIds) {
+    if (mapping.has(rawId)) continue;
+    const base = `${symbolId}--${slugify(rawId)}`;
+    mapping.set(rawId, allocateUniqueId(base, used));
+  }
+
+  let rewritten = markup;
+  for (const [rawId, nextId] of mapping) {
+    const escaped = escapeRegExp(rawId);
+    rewritten = rewritten.replace(new RegExp(`(\\sid=(['"]))${escaped}\\2`, 'g'), `$1${nextId}$2`);
+    rewritten = rewritten.replace(new RegExp(`url\\(\\s*#${escaped}\\s*\\)`, 'g'), `url(#${nextId})`);
+    rewritten = rewritten.replace(new RegExp(`((?:href|xlink:href)=(['"]))#${escaped}\\2`, 'g'), `$1#${nextId}$2`);
+    rewritten = rewritten.replace(new RegExp(`((?:begin|end)=(['"])[^'"]*)\\b${escaped}(?=\\.)`, 'g'), `$1${nextId}`);
+  }
+  return rewritten;
+}
+
+export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOptions = {}): SvgCompileResult {
+  const symbolIds = new Set<string>();
+  const files: SvgCompiledFile[] = [];
+  const errors: SvgCompileError[] = [];
+
+  for (const source of sources) {
+    try {
+      const result = optimize(source.text, { multipass: true });
+      const optimized = result.data;
+      const normalized = options.currentColor ? normalizeCurrentColor(optimized) : optimized;
+      const svgMatch = normalized.match(/<svg\b([^>]*)>([\s\S]*?)<\/svg>/i);
+      if (!svgMatch) throw new Error('Not a valid SVG document.');
+
+      const id = allocateUniqueId(slugify(source.name), symbolIds);
+      const viewBox = deriveViewBox(svgMatch[1]);
+      const rootAttributes = preservedRootAttributes(svgMatch[1]);
+      const content = prefixInternalIds(svgMatch[2], id);
+      const symbol = `<symbol id="${id}"${viewBox ? ` viewBox="${viewBox}"` : ''}${rootAttributes}>${content}</symbol>`;
+      files.push({
+        name: source.name,
+        id,
+        symbol,
+        originalBytes: new TextEncoder().encode(source.text).byteLength,
+        optimizedBytes: new TextEncoder().encode(optimized).byteLength,
+      });
+    } catch (error) {
+      errors.push({ name: source.name, message: error instanceof Error ? error.message : 'Unknown SVG compile error.' });
+    }
+  }
+
+  return {
+    sprite: `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">${files.map((file) => file.symbol).join('')}</svg>`,
+    files,
+    errors,
+  };
 }
