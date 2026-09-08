@@ -1,100 +1,38 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
-import { exportPacketRange, inspectLocalMedia, snapTrimRange, type MediaInspection } from './video-engine';
+import { adjacentKeyframe, exportPacketRange, inspectLocalMedia, snapTrimRange, type MediaInspection } from './video-engine';
 import { consumeFileInput } from '../../lib/file-input';
 
-function formatSeconds(value: number) {
-  if (!Number.isFinite(value)) return '—';
-  const minutes = Math.floor(value / 60);
-  const seconds = value - minutes * 60;
-  return `${minutes}:${seconds.toFixed(3).padStart(6, '0')}`;
-}
+const KEYFRAME_PAGE_SIZE = 100;
+function formatSeconds(value:number){if(!Number.isFinite(value))return '—';const minutes=Math.floor(value/60),seconds=value-minutes*60;return `${minutes}:${seconds.toFixed(3).padStart(6,'0')}`;}
+function extensionForMime(type:string){if(type.includes('webm'))return'webm';if(type.includes('quicktime'))return'mov';return'mp4';}
 
-function extensionForMime(type: string) {
-  if (type.includes('webm')) return 'webm';
-  if (type.includes('quicktime')) return 'mov';
-  return 'mp4';
-}
+export default function VideoWorkspace(){
+ const videoRef=useRef<HTMLVideoElement>(null),abortRef=useRef<AbortController|null>(null);
+ const [file,setFile]=useState<File|null>(null),[inspection,setInspection]=useState<MediaInspection|null>(null),[previewUrl,setPreviewUrl]=useState('');
+ const [selectedVideoId,setSelectedVideoId]=useState<number|null>(null),[selectedAudioId,setSelectedAudioId]=useState<number|null>(null);
+ const [requestedStart,setRequestedStart]=useState(0),[requestedEnd,setRequestedEnd]=useState(0),[playhead,setPlayhead]=useState(0),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[keyframePage,setKeyframePage]=useState(0);
+ const [status,setStatus]=useState('Choose a local video file to inspect verified keyframes.');
+ useEffect(()=>()=>{abortRef.current?.abort();if(previewUrl)URL.revokeObjectURL(previewUrl);},[previewUrl]);
+ const videoTrack=inspection?.videos.find((track)=>track.id===selectedVideoId)??inspection?.videos[0]??null;
+ const snapped=useMemo(()=>{if(!inspection||!videoTrack?.keyframes.length)return null;try{return snapTrimRange(requestedStart,requestedEnd,videoTrack.keyframes,inspection.duration);}catch{return null;}},[inspection,requestedEnd,requestedStart,videoTrack]);
+ const keyframePageCount=Math.max(1,Math.ceil((videoTrack?.keyframes.length??0)/KEYFRAME_PAGE_SIZE));
+ const visibleKeyframes=(videoTrack?.keyframes??[]).slice(keyframePage*KEYFRAME_PAGE_SIZE,(keyframePage+1)*KEYFRAME_PAGE_SIZE);
 
-export default function VideoWorkspace() {
-  const [file, setFile] = useState<File | null>(null);
-  const [inspection, setInspection] = useState<MediaInspection | null>(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [requestedStart, setRequestedStart] = useState(0);
-  const [requestedEnd, setRequestedEnd] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Choose a local video file to inspect verified keyframes.');
-
-  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
-
-  const snapped = useMemo(() => {
-    if (!inspection?.video?.keyframes.length) return null;
-    try { return snapTrimRange(requestedStart, requestedEnd, inspection.video.keyframes, inspection.duration); }
-    catch { return null; }
-  }, [inspection, requestedEnd, requestedStart]);
-
-  async function chooseFile(next: File | undefined) {
-    if (!next) return;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    const url = URL.createObjectURL(next);
-    setFile(next); setPreviewUrl(url); setInspection(null); setBusy(true); setStatus('Reading container metadata and verifying video keyframes locally…');
-    try {
-      const result = await inspectLocalMedia(next);
-      if (!result.video) throw new Error('No video track was found in this file.');
-      if (!result.video.keyframes.length) throw new Error('No verified video keyframes were found.');
-      setInspection(result);
-      setRequestedStart(0);
-      setRequestedEnd(result.duration);
-      setStatus(`Ready: ${result.video.keyframes.length.toLocaleString()} verified keyframe${result.video.keyframes.length === 1 ? '' : 's'} found without decoding/re-encoding the video.`);
-    } catch (error) {
-      setInspection(null);
-      setStatus(`Inspection failed: ${error instanceof Error ? error.message : 'unsupported media file'}`);
-    } finally { setBusy(false); }
-  }
-
-  async function exportSlice() {
-    if (!file || !inspection || !snapped) return;
-    setBusy(true);
-    setStatus('Copying encoded packets into a new compatible container locally…');
-    try {
-      const blob = await exportPacketRange(file, snapped);
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const base = file.name.replace(/\.[^.]+$/, '') || 'video';
-      const extension = extensionForMime(blob.type);
-      downloadBytes(bytes, `${base}.${snapped.start.toFixed(3)}-${snapped.end.toFixed(3)}.${extension}`, blob.type || 'application/octet-stream');
-      setStatus(`Exported ${formatSeconds(snapped.start)}–${formatSeconds(snapped.end)} by encoded-packet passthrough. No video or audio decoder/encoder path was used.`);
-    } catch (error) {
-      setStatus(`Lossless packet export failed: ${error instanceof Error ? error.message : 'unsupported codec/container combination'}`);
-    } finally { setBusy(false); }
-  }
-
-  return <>
-    <div className="workspace-header"><div><h2>Lossless keyframe video slicer</h2><p>Trim compatible local video by copying encoded packets, with boundaries disclosed before export.</p></div></div>
-    <div className="workspace-body">
-      <div className="notice"><strong>Lossless means no decode/re-encode.</strong> Video boundaries snap to verified keyframes so complete GOPs are preserved. The exported range can therefore be wider than the range you requested.</div>
-      <div className="field" style={{ marginTop: 18 }}><label htmlFor="video-file">Video file</label><input id="video-file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange={(event) => consumeFileInput(event.target, () => chooseFile(event.target.files?.[0]))}/><small>MP4, MOV, and WebM are inspected locally. Export only proceeds when a compatible output container can preserve the source codecs.</small></div>
-
-      {previewUrl ? <video src={previewUrl} controls playsInline preload="metadata" style={{ display: 'block', width: '100%', maxHeight: 420, marginTop: 18, borderRadius: 'var(--radius-sm)', background: '#000' }}/>: null}
-
-      {inspection?.video ? <>
-        <div className="metric-row"><div className="metric"><span>Duration</span><strong>{formatSeconds(inspection.duration)}</strong></div><div className="metric"><span>Video codec</span><strong>{inspection.video.codecString ?? inspection.video.codec}</strong></div><div className="metric"><span>Frame size</span><strong>{inspection.video.width}×{inspection.video.height}</strong></div><div className="metric"><span>Keyframes</span><strong>{inspection.video.keyframes.length}</strong></div>{inspection.audio ? <div className="metric"><span>Audio</span><strong>{inspection.audio.codecString ?? inspection.audio.codec}</strong></div> : null}</div>
-
-        <div className="workspace-grid" style={{ marginTop: 20 }}>
-          <div className="field"><label htmlFor="trim-start">Requested start (seconds)</label><input id="trim-start" type="number" min="0" max={inspection.duration} step="0.001" value={requestedStart} onChange={(event) => setRequestedStart(Number(event.target.value))}/><input aria-label="Requested start timeline" type="range" min="0" max={inspection.duration} step="0.001" value={Math.min(requestedStart, inspection.duration)} onChange={(event) => setRequestedStart(Number(event.target.value))}/></div>
-          <div className="field"><label htmlFor="trim-end">Requested end (seconds)</label><input id="trim-end" type="number" min="0" max={inspection.duration} step="0.001" value={requestedEnd} onChange={(event) => setRequestedEnd(Number(event.target.value))}/><input aria-label="Requested end timeline" type="range" min="0" max={inspection.duration} step="0.001" value={Math.min(requestedEnd, inspection.duration)} onChange={(event) => setRequestedEnd(Number(event.target.value))}/></div>
-        </div>
-
-        <div aria-label="Verified keyframe timeline" style={{ position: 'relative', height: 46, marginTop: 14, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--surface-strong)' }}>
-          {inspection.video.keyframes.slice(0, 500).map((keyframe) => <span key={keyframe} aria-hidden="true" style={{ position: 'absolute', left: `${inspection.duration ? (keyframe / inspection.duration) * 100 : 0}%`, top: 8, bottom: 8, width: 1, background: 'var(--muted)' }}/>) }
-          {snapped ? <><span aria-hidden="true" style={{ position: 'absolute', left: `${(snapped.start / inspection.duration) * 100}%`, top: 2, bottom: 2, width: 3, background: 'var(--signal)' }}/><span aria-hidden="true" style={{ position: 'absolute', left: `${(snapped.end / inspection.duration) * 100}%`, top: 2, bottom: 2, width: 3, background: 'var(--signal)' }}/></> : null}
-        </div>
-        <small>Thin marks show up to the first 500 verified keyframes; emphasized marks show the current snapped boundaries.</small>
-
-        {snapped ? <div className="workspace-grid" style={{ marginTop: 18 }}><div className="notice"><strong>Requested</strong><br/>{formatSeconds(snapped.requestedStart)} → {formatSeconds(snapped.requestedEnd)}</div><div className="notice"><strong>Packet-safe export</strong><br/>{formatSeconds(snapped.start)} → {formatSeconds(snapped.end)}<br/><small>{snapped.startAdjusted || snapped.endAdjusted ? 'Boundary adjustment required to preserve complete video GOPs.' : 'Requested boundaries are already packet-safe.'}</small></div></div> : <div className="notice" style={{ marginTop: 18 }}>The current start/end selection cannot form a complete keyframe-safe range.</div>}
-
-        <div className="button-row"><button className="action-button" type="button" disabled={busy || !snapped} onClick={() => void exportSlice()}>{busy ? 'Working locally…' : 'Export lossless packet slice'}</button></div>
-      </> : null}
-      <div className={`status-line ${inspection ? 'good' : ''}`} role="status">{status}</div>
-    </div>
-  </>;
+ async function chooseFile(next:File|undefined){if(!next)return;abortRef.current?.abort();if(previewUrl)URL.revokeObjectURL(previewUrl);const url=URL.createObjectURL(next);setFile(next);setPreviewUrl(url);setInspection(null);setBusy(true);setProgress(0);setStatus('Reading all media tracks and verifying video keyframes locally…');try{const result=await inspectLocalMedia(next);if(!result.videos.length)throw new Error('No video track was found in this file.');const preferred=result.videos.find((track)=>track.id===result.primaryVideoId)??result.videos[0];if(!preferred.keyframes.length)throw new Error('No verified video keyframes were found on the primary video track.');setInspection(result);setSelectedVideoId(preferred.id);setSelectedAudioId(result.primaryAudioId);setRequestedStart(0);setRequestedEnd(result.duration);setPlayhead(0);setKeyframePage(0);setStatus(`Ready: ${result.videos.length} video track${result.videos.length===1?'':'s'} and ${result.audios.length} audio track${result.audios.length===1?'':'s'} inventoried. ${preferred.keyframes.length.toLocaleString()} verified keyframes on the selected video track.`);}catch(error){setInspection(null);setStatus(`Inspection failed: ${error instanceof Error?error.message:'unsupported media file'}`);}finally{setBusy(false);}}
+ function chooseVideo(id:number){const track=inspection?.videos.find((item)=>item.id===id);if(!track)return;setSelectedVideoId(id);setRequestedStart(0);setRequestedEnd(inspection?.duration??0);setKeyframePage(0);setStatus(`Video track ${track.number} selected with ${track.keyframes.length.toLocaleString()} verified keyframes.`);}
+ function seek(time:number){const target=Math.max(0,Math.min(inspection?.duration??0,time));setPlayhead(target);if(videoRef.current)videoRef.current.currentTime=target;}
+ function moveKeyframe(direction:'previous'|'next'){if(!videoTrack)return;const target=adjacentKeyframe(videoTrack.keyframes,playhead,direction);if(target!==null)seek(target);}
+ async function exportSlice(){if(!file||!inspection||!snapped||selectedVideoId===null)return;const controller=new AbortController();abortRef.current=controller;setBusy(true);setProgress(0);setStatus('Copying selected encoded tracks into a compatible container locally…');try{const blob=await exportPacketRange(file,snapped,{videoTrackId:selectedVideoId,audioTrackId:selectedAudioId,signal:controller.signal,onProgress:setProgress});const bytes=new Uint8Array(await blob.arrayBuffer());const base=file.name.replace(/\.[^.]+$/,'')||'video',extension=extensionForMime(blob.type);downloadBytes(bytes,`${base}.${snapped.start.toFixed(3)}-${snapped.end.toFixed(3)}.${extension}`,blob.type||'application/octet-stream');setStatus(`Exported ${formatSeconds(snapped.start)}–${formatSeconds(snapped.end)} from video track ${videoTrack?.number}${selectedAudioId===null?' without audio':` with audio track ${inspection.audios.find((track)=>track.id===selectedAudioId)?.number??'?'}`}. No decoder/encoder path was used.`);}catch(error){setStatus(error instanceof DOMException&&error.name==='AbortError'?'Export canceled.':`Lossless packet export failed: ${error instanceof Error?error.message:'unsupported codec/container combination'}`);}finally{if(abortRef.current===controller)abortRef.current=null;setBusy(false);}}
+ return <><div className="workspace-header"><div><h2>Lossless keyframe video slicer</h2><p>Trim compatible local video by copying encoded packets, with track and boundary choices disclosed before export.</p></div></div><div className="workspace-body"><div className="notice"><strong>Lossless means no decode/re-encode.</strong> Video boundaries snap to verified keyframes so complete GOPs are preserved. Non-selected tracks are intentionally omitted and shown below before export.</div><div className="field" style={{marginTop:18}}><label htmlFor="video-file">Video file</label><input id="video-file" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" onChange={(event)=>consumeFileInput(event.target,()=>chooseFile(event.target.files?.[0]))}/></div>
+ {previewUrl?<video ref={videoRef} src={previewUrl} controls playsInline preload="metadata" onTimeUpdate={(event)=>setPlayhead(event.currentTarget.currentTime)} style={{display:'block',width:'100%',maxHeight:420,marginTop:18,borderRadius:'var(--radius-sm)',background:'#000'}}/>:null}
+ {inspection&&videoTrack?<><div className="metric-row"><div className="metric"><span>Duration</span><strong>{formatSeconds(inspection.duration)}</strong></div><div className="metric"><span>Video tracks</span><strong>{inspection.videos.length}</strong></div><div className="metric"><span>Audio tracks</span><strong>{inspection.audios.length}</strong></div><div className="metric"><span>Selected keyframes</span><strong>{videoTrack.keyframes.length}</strong></div></div>
+ <div className="workspace-grid" style={{marginTop:18}}><div className="field"><label htmlFor="video-track">Video track retained</label><select id="video-track" value={selectedVideoId??''} onChange={(event)=>chooseVideo(Number(event.target.value))}>{inspection.videos.map((track)=><option key={track.id} value={track.id}>Track {track.number} · {track.codecString??track.codec} · {track.width}×{track.height} · {track.keyframes.length} keyframes</option>)}</select></div><div className="field"><label htmlFor="audio-track">Audio track retained</label><select id="audio-track" value={selectedAudioId??'none'} onChange={(event)=>setSelectedAudioId(event.target.value==='none'?null:Number(event.target.value))}><option value="none">No audio</option>{inspection.audios.map((track)=><option key={track.id} value={track.id}>Track {track.number} · {track.codecString??track.codec} · {track.sampleRate??'?'} Hz · {track.numberOfChannels??'?'} ch</option>)}</select></div></div>
+ {(inspection.videos.length>1||inspection.audios.length>1)?<div className="notice" style={{marginTop:14}}>Export retains exactly the selected video track and selected audio track. {inspection.videos.length-1} other video track{inspection.videos.length-1===1?' is':'s are'} omitted; {Math.max(0,inspection.audios.length-(selectedAudioId===null?0:1))} other audio track{Math.max(0,inspection.audios.length-(selectedAudioId===null?0:1))===1?' is':'s are'} omitted.</div>:null}
+ <div className="button-row"><button className="action-button secondary" type="button" onClick={()=>moveKeyframe('previous')} disabled={adjacentKeyframe(videoTrack.keyframes,playhead,'previous')===null}>Previous keyframe</button><button className="action-button secondary" type="button" onClick={()=>moveKeyframe('next')} disabled={adjacentKeyframe(videoTrack.keyframes,playhead,'next')===null}>Next keyframe</button><button className="action-button secondary" type="button" onClick={()=>setRequestedStart(playhead)}>Set In at playhead</button><button className="action-button secondary" type="button" onClick={()=>setRequestedEnd(playhead)}>Set Out at playhead</button>{snapped?<><button className="action-button secondary" type="button" onClick={()=>seek(snapped.start)}>Preview snapped In</button><button className="action-button secondary" type="button" onClick={()=>seek(snapped.end)}>Preview snapped Out</button></>:null}</div>
+ <div className="workspace-grid" style={{marginTop:16}}><div className="field"><label htmlFor="trim-start">Requested start (seconds)</label><input id="trim-start" type="number" min="0" max={inspection.duration} step="0.001" value={requestedStart} onChange={(event)=>setRequestedStart(Number(event.target.value))}/></div><div className="field"><label htmlFor="trim-end">Requested end (seconds)</label><input id="trim-end" type="number" min="0" max={inspection.duration} step="0.001" value={requestedEnd} onChange={(event)=>setRequestedEnd(Number(event.target.value))}/></div></div>
+ {snapped?<div className="workspace-grid" style={{marginTop:16}}><div className="notice"><strong>Requested</strong><br/>{formatSeconds(snapped.requestedStart)} → {formatSeconds(snapped.requestedEnd)}</div><div className="notice"><strong>Packet-safe export</strong><br/>{formatSeconds(snapped.start)} → {formatSeconds(snapped.end)}<br/><small>{snapped.startAdjusted||snapped.endAdjusted?'Adjusted to verified keyframes.':'Requested boundaries are already packet-safe.'}</small></div></div>:<div className="notice" style={{marginTop:16}}>The current In/Out selection cannot form a complete keyframe-safe range.</div>}
+ <h3 style={{marginTop:22}}>Verified keyframes</h3><div className="result-table-wrap" tabIndex={0} aria-label="Verified keyframe list"><table><thead><tr><th scope="col">#</th><th scope="col">Timestamp</th><th scope="col">Action</th></tr></thead><tbody>{visibleKeyframes.map((keyframe,index)=><tr key={keyframe}><td>{keyframePage*KEYFRAME_PAGE_SIZE+index+1}</td><td>{formatSeconds(keyframe)}</td><td><button type="button" className="action-button secondary" onClick={()=>seek(keyframe)}>Seek</button></td></tr>)}</tbody></table></div>{keyframePageCount>1?<div className="button-row" role="group" aria-label="Keyframe pages"><button type="button" className="action-button secondary" disabled={keyframePage===0} onClick={()=>setKeyframePage((page)=>Math.max(0,page-1))}>Previous keyframes</button><span>Page {keyframePage+1} of {keyframePageCount}</span><button type="button" className="action-button secondary" disabled={keyframePage>=keyframePageCount-1} onClick={()=>setKeyframePage((page)=>Math.min(keyframePageCount-1,page+1))}>Next keyframes</button></div>:null}
+ {busy?<div style={{marginTop:16}}><progress max={1} value={progress} style={{width:'100%'}} aria-label="Packet export progress"/><div className="button-row"><button className="action-button secondary" type="button" onClick={()=>abortRef.current?.abort()}>Cancel export</button></div></div>:<div className="button-row"><button className="action-button" type="button" disabled={!snapped} onClick={()=>void exportSlice()}>Export lossless packet slice</button></div>}
+ </>:null}<div className={`status-line ${inspection?'good':''}`} role="status">{status}</div></div></>;
 }
