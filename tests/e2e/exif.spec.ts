@@ -24,8 +24,8 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
     { name: 'first.png', mimeType: 'image/png', buffer: onePixelPng },
     { name: 'second.png', mimeType: 'image/png', buffer: onePixelPng },
   ]);
-  await expect(page.getByText('first.png')).toBeVisible();
-  await expect(page.getByText('second.png')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'first.png', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'second.png', exact: true })).toBeVisible();
 
   await page.getByLabel('Output format').selectOption('image/jpeg');
   await expect(page.getByLabel('JPEG transparency background')).toBeVisible();
@@ -40,6 +40,6 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
   expect(zipDownload.suggestedFilename()).toBe('exif-sanitized-batch.zip');
 
   await page.getByRole('button', { name: 'Remove' }).first().click();
-  await expect(page.getByText('first.png')).toHaveCount(0);
-  await expect(page.getByText('second.png')).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'first.png', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: 'second.png', exact: true })).toBeVisible();
 });
