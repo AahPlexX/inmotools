@@ -22,10 +22,10 @@ export function readGlbJson(input:Uint8Array):Record<string,any>{
 }
 
 export async function inspectGlb(input:Uint8Array):Promise<GltfInspection>{
- const json=readGlbJson(input);const extensionsUsed=Array.isArray(json.extensionsUsed)?json.extensionsUsed.map(String):[];const extensionsRequired=Array.isArray(json.extensionsRequired)?json.extensionsRequired.map(String):[];const transformBlockers:string[]=[],previewBlockers:string[]=[];
+ const json=readGlbJson(input);const extensionsUsed:string[]=Array.isArray(json.extensionsUsed)?(json.extensionsUsed as unknown[]).map((value)=>String(value)):[];const extensionsRequired:string[]=Array.isArray(json.extensionsRequired)?(json.extensionsRequired as unknown[]).map((value)=>String(value)):[];const transformBlockers:string[]=[],previewBlockers:string[]=[];
  if(extensionsUsed.includes('KHR_draco_mesh_compression')){const message='KHR_draco_mesh_compression requires a Draco decoder, which this build does not bundle.';transformBlockers.push(`${message} Transformation is disabled to avoid corrupt output.`);previewBlockers.push(`${message} Preview is disabled instead of rendering an incomplete model.`);}
  if(extensionsUsed.includes('KHR_texture_basisu'))previewBlockers.push('KHR_texture_basisu preview requires a KTX2 transcoder, which this build does not bundle. Optimization can preserve the texture unchanged.');
- const textureFormats=[...new Set((json.images??[]).map((image:any)=>String(image?.mimeType??'unknown')))];
+ const textureFormats:string[]=[...new Set<string>(((json.images??[]) as unknown[]).map((image:any)=>String(image?.mimeType??'unknown')))];
  if(transformBlockers.length){return{stats:{meshes:(json.meshes??[]).length,primitives:(json.meshes??[]).reduce((sum:number,mesh:any)=>sum+(mesh.primitives?.length??0),0),vertices:0,triangles:0,textures:(json.textures??[]).length,cameras:(json.cameras??[]).length,animations:(json.animations??[]).length},inputBytes:input.byteLength,extensionsUsed,extensionsRequired,transformBlockers,previewBlockers,textureFormats};}
  await MeshoptDecoder.ready;const document=await createIo().readBinary(input);return{stats:collectStats(document),inputBytes:input.byteLength,extensionsUsed,extensionsRequired,transformBlockers,previewBlockers,textureFormats};
 }
