@@ -22,7 +22,7 @@ export async function createDuckDbSession(): Promise<DuckDbSession> {
   const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), worker);
   try {
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-    await db.open({ path: ':memory:', query: { castBigIntToDouble: true } });
+    await db.open({ path: ':memory:', query: { castBigIntToDouble: false } });
     const connection = await db.connect();
     return {
       db,
@@ -42,22 +42,59 @@ export async function registerLocalFile(db: duckdb.AsyncDuckDB, file: File): Pro
   await db.registerFileBuffer(file.name, new Uint8Array(await file.arrayBuffer()));
 }
 
-export interface QueryResult {
-  columns: string[];
-  rows: Array<Record<string, string | number | boolean | null>>;
+export async function unregisterLocalFile(db: duckdb.AsyncDuckDB, name: string): Promise<void> {
+  await db.dropFile(name);
 }
 
-function normalizeValue(value: unknown): string | number | boolean | null {
+export type QueryValue = string | number | boolean | null;
+
+export interface QueryResult {
+  columns: string[];
+  values: QueryValue[][];
+  /** Compatibility view for consumers that currently require name-keyed rows. */
+  rows: Array<Record<string, QueryValue>>;
+}
+
+export function normalizeDuckDbValue(value: unknown): QueryValue {
   if (value === null || value === undefined) return null;
-  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'bigint') return value.toString();
   if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return value;
   if (value instanceof Date) return value.toISOString();
   return String(value);
 }
 
+export function buildQueryResult(columns: string[], values: QueryValue[][]): QueryResult {
+  const rows = values.map((row) => Object.fromEntries(columns.map((column, index) => [column, row[index] ?? null])));
+  return { columns, values, rows };
+}
+
+export interface LocalQueryTask {
+  promise: Promise<QueryResult>;
+  cancel: () => Promise<boolean>;
+}
+
+export function startLocalQuery(connection: duckdb.AsyncDuckDBConnection, sql: string): LocalQueryTask {
+  let settled = false;
+  const promise = (async () => {
+    const reader = await connection.send(sql, true);
+    const columns = reader.schema.fields.map((field) => field.name);
+    const values: QueryValue[][] = [];
+
+    for await (const batch of reader) {
+      for (let rowIndex = 0; rowIndex < batch.numRows; rowIndex += 1) {
+        const row = columns.map((_, columnIndex) => normalizeDuckDbValue(batch.getChildAt(columnIndex)?.get(rowIndex)));
+        values.push(row);
+      }
+    }
+    return buildQueryResult(columns, values);
+  })().finally(() => { settled = true; });
+
+  return {
+    promise,
+    cancel: async () => settled ? false : connection.cancelSent(),
+  };
+}
+
 export async function runLocalQuery(connection: duckdb.AsyncDuckDBConnection, sql: string): Promise<QueryResult> {
-  const result = await connection.query(sql);
-  const columns = result.schema.fields.map((field) => field.name);
-  const rows = result.toArray().map((row) => Object.fromEntries(columns.map((column) => [column, normalizeValue(row[column])]))) as QueryResult['rows'];
-  return { columns, rows };
+  return startLocalQuery(connection, sql).promise;
 }
