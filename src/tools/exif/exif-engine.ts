@@ -21,3 +21,7 @@ export function buildSanitizedFilename(filename: string, mimeType: string): stri
   const stem = filename.replace(/\.[^.]+$/, '');
   return `${stem}-sanitized.${extension}`;
 }
+
+export function buildSanitizedFilenameFromBlob(filename: string, blob: Pick<Blob, 'type'>): string {
+  return buildSanitizedFilename(filename, blob.type);
+}
