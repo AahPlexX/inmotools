@@ -3,6 +3,7 @@ import { screenToWorld } from './geometry-engine';
 import { drawBaseScene, drawOverlayScene } from './render-engine';
 import type { FloorplanAnalysis } from './floorplan-analysis';
 import type { FloorplanProject, Point2D } from './floorplan-types';
+import './FloorplanCanvas.css';
 
 export type FloorplanToolMode = 'select' | 'wall' | 'door' | 'window' | 'measure' | 'ada' | 'component';
 
@@ -26,6 +27,18 @@ interface ActivePointer {
   readonly y: number;
 }
 
+interface TouchSelectGesture {
+  readonly pointerId: number;
+  readonly start: Point2D;
+  last: Point2D;
+  moved: boolean;
+  readonly shiftKey: boolean;
+}
+
+const TOUCH_PAN_THRESHOLD_PX = 8;
+const VIEWPORT_PAN_STEP_PX = 48;
+const VIEWPORT_ZOOM_FACTOR = 1.2;
+
 export const FloorplanCanvas = ({
   project, analysis, mode, pointerWorld, snapWorld, draftStart, draftEnd, spacePressed,
   onWorldMove, onWorldClick, onPan, onZoomAt,
@@ -36,6 +49,7 @@ export const FloorplanCanvas = ({
   const pointersRef = useRef(new Map<number, ActivePointer>());
   const lastPanRef = useRef<Point2D | undefined>(undefined);
   const pinchRef = useRef<{ distance: number; midpoint: Point2D } | undefined>(undefined);
+  const touchSelectRef = useRef<TouchSelectGesture | undefined>(undefined);
   const [resizeVersion, setResizeVersion] = useState(0);
 
   const localPoint = (clientX: number, clientY: number): Point2D => {
@@ -78,10 +92,6 @@ export const FloorplanCanvas = ({
     pinchRef.current = { distance, midpoint };
   };
 
-  // Pointer capture is cleared by the user agent immediately after pointerup or
-  // pointercancel, so a tracked id the canvas no longer captures belongs to a
-  // gesture whose release event never arrived. Dropping those ids keeps a lost
-  // release from being misread as an extra finger and silencing every later tap.
   const dropReleasedPointers = (target: Element, activeId: number) => {
     for (const pointerId of [...pointersRef.current.keys()]) {
       if (pointerId !== activeId && !target.hasPointerCapture(pointerId)) pointersRef.current.delete(pointerId);
@@ -89,11 +99,7 @@ export const FloorplanCanvas = ({
   };
 
   const capturePointer = (target: Element, pointerId: number) => {
-    // Touch and pen already receive implicit capture before pointerdown listeners
-    // run, and an explicit request throws when the id is not an active pointer or
-    // while a pointer lock is held. Capture is an optimization here, not a
-    // requirement, so a rejected request must not abort the interaction.
-    try { target.setPointerCapture(pointerId); } catch { /* Continue without explicit capture. */ }
+    try { target.setPointerCapture(pointerId); } catch { /* Capture is helpful, not required. */ }
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -101,18 +107,51 @@ export const FloorplanCanvas = ({
     dropReleasedPointers(event.currentTarget, event.pointerId);
     pointersRef.current.set(event.pointerId, screen);
     capturePointer(event.currentTarget, event.pointerId);
-    if (pointersRef.current.size >= 2) { updatePinch(); return; }
-    const shouldPan = spacePressed || event.button === 1 || (event.pointerType === 'touch' && mode === 'select');
+
+    if (pointersRef.current.size >= 2) {
+      touchSelectRef.current = undefined;
+      lastPanRef.current = undefined;
+      updatePinch();
+      return;
+    }
+
+    if (event.pointerType === 'touch' && mode === 'select' && !spacePressed) {
+      touchSelectRef.current = { pointerId: event.pointerId, start: screen, last: screen, moved: false, shiftKey: event.shiftKey };
+      return;
+    }
+
+    const shouldPan = spacePressed || event.button === 1;
     if (shouldPan) { lastPanRef.current = screen; return; }
-    const world = screenToWorld(screen, project.viewport);
-    onWorldClick(world, event.shiftKey);
+    onWorldClick(screenToWorld(screen, project.viewport), event.shiftKey);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
     dropReleasedPointers(event.currentTarget, event.pointerId);
     if (pointersRef.current.has(event.pointerId)) pointersRef.current.set(event.pointerId, screen);
-    if (pointersRef.current.size >= 2) { updatePinch(); return; }
+
+    if (pointersRef.current.size >= 2) {
+      touchSelectRef.current = undefined;
+      lastPanRef.current = undefined;
+      updatePinch();
+      return;
+    }
+
+    const touchSelect = touchSelectRef.current;
+    if (touchSelect?.pointerId === event.pointerId) {
+      if (!touchSelect.moved && Math.hypot(screen.x - touchSelect.start.x, screen.y - touchSelect.start.y) > TOUCH_PAN_THRESHOLD_PX) {
+        touchSelect.moved = true;
+        lastPanRef.current = touchSelect.last;
+      }
+      if (touchSelect.moved) {
+        const previous = lastPanRef.current ?? touchSelect.last;
+        onPan(screen.x - previous.x, screen.y - previous.y);
+        lastPanRef.current = screen;
+      }
+      touchSelect.last = screen;
+      return;
+    }
+
     if (lastPanRef.current) {
       onPan(screen.x - lastPanRef.current.x, screen.y - lastPanRef.current.y);
       lastPanRef.current = screen;
@@ -121,7 +160,21 @@ export const FloorplanCanvas = ({
     onWorldMove(screenToWorld(screen, project.viewport), event.shiftKey);
   };
 
-  const handlePointerEnd = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const screen = localPoint(event.clientX, event.clientY);
+    const touchSelect = touchSelectRef.current;
+    const wasSinglePointer = pointersRef.current.size <= 1;
+    if (touchSelect?.pointerId === event.pointerId && !touchSelect.moved && wasSinglePointer) {
+      onWorldClick(screenToWorld(screen, project.viewport), touchSelect.shiftKey);
+    }
+    if (touchSelect?.pointerId === event.pointerId) touchSelectRef.current = undefined;
+    pointersRef.current.delete(event.pointerId);
+    lastPanRef.current = undefined;
+    updatePinch();
+  };
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (touchSelectRef.current?.pointerId === event.pointerId) touchSelectRef.current = undefined;
     pointersRef.current.delete(event.pointerId);
     lastPanRef.current = undefined;
     updatePinch();
@@ -133,8 +186,20 @@ export const FloorplanCanvas = ({
     onZoomAt(screen, Math.exp(-event.deltaY * 0.0015));
   };
 
+  const zoomAtCenter = (factor: number) => {
+    const rect = overlayRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    onZoomAt({ x: rect.width / 2, y: rect.height / 2 }, factor);
+  };
+
   return (
-    <div className="plancraft-canvas-wrap" ref={wrapRef}>
+    <div
+      className="plancraft-canvas-wrap"
+      ref={wrapRef}
+      data-pan-x={project.viewport.panX}
+      data-pan-y={project.viewport.panY}
+      data-scale={project.viewport.scale}
+    >
       <canvas className="plancraft-canvas" ref={baseRef} aria-hidden="true" />
       <canvas
         className="plancraft-canvas plancraft-overlay"
@@ -145,10 +210,18 @@ export const FloorplanCanvas = ({
         tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onWheel={handleWheel}
       />
+      <div className="plancraft-view-controls" role="group" aria-label="Viewport controls">
+        <button type="button" aria-label="Pan view left" onClick={() => onPan(VIEWPORT_PAN_STEP_PX, 0)}>←</button>
+        <button type="button" aria-label="Pan view up" onClick={() => onPan(0, VIEWPORT_PAN_STEP_PX)}>↑</button>
+        <button type="button" aria-label="Pan view down" onClick={() => onPan(0, -VIEWPORT_PAN_STEP_PX)}>↓</button>
+        <button type="button" aria-label="Pan view right" onClick={() => onPan(-VIEWPORT_PAN_STEP_PX, 0)}>→</button>
+        <button type="button" aria-label="Zoom view out" onClick={() => zoomAtCenter(1 / VIEWPORT_ZOOM_FACTOR)}>−</button>
+        <button type="button" aria-label="Zoom view in" onClick={() => zoomAtCenter(VIEWPORT_ZOOM_FACTOR)}>+</button>
+      </div>
     </div>
   );
 };

@@ -1,0 +1,106 @@
+.plancraft-view-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(44px, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--pc-border);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.plancraft-view-controls button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid #64748b;
+  border-radius: 7px;
+  background: #1e293b;
+  color: #f8fafc;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.plancraft-view-controls button:hover {
+  border-color: var(--pc-accent);
+  background: #26364b;
+}
+
+@media (max-width: 767px) {
+  .plancraft .plancraft-toolbar-actions,
+  .plancraft .plancraft-exportbar {
+    width: 100%;
+    overflow-x: visible;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .plancraft .plancraft-toolbar-actions > *,
+  .plancraft .plancraft-exportbar > * {
+    flex: 1 1 11rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .plancraft .plancraft-toolbar-actions label {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .plancraft .plancraft-toolbar-actions select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .plancraft .plancraft-tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    overflow-x: visible;
+    gap: 7px;
+  }
+
+  .plancraft .plancraft-tool-grid button,
+  .plancraft .plancraft-symbol-grid button,
+  .plancraft .plancraft-exportbar .plancraft-button,
+  .plancraft .plancraft-exportbar .plancraft-file-button,
+  .plancraft .plancraft-exportbar .plancraft-coffee {
+    width: 100%;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .plancraft .plancraft-symbol-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  }
+
+  .plancraft .plancraft-summary {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.5rem), 1fr));
+  }
+
+  .plancraft .plancraft-status span,
+  .plancraft .plancraft-panel-heading,
+  .plancraft .plancraft-readout,
+  .plancraft .plancraft-room-list,
+  .plancraft .plancraft-toolbar > div,
+  .plancraft .plancraft-toolbar span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .plancraft-view-controls {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+  }
+}
+
+@media (max-height: 460px) and (orientation: landscape) {
+  .plancraft-view-controls {
+    grid-template-columns: repeat(6, minmax(44px, 1fr));
+  }
+}

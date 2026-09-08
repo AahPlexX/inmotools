@@ -1,12 +1,46 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-const clickAt = async (page: Parameters<typeof test>[0] extends never ? never : any, xRatio: number, yRatio: number) => {
+const clickAt = async (page: Page, xRatio: number, yRatio: number) => {
   const canvas = page.getByTestId('floorplan-overlay');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Floor-plan overlay canvas is not visible.');
   await canvas.click({ position: { x: box.width * xRatio, y: box.height * yRatio } });
+};
+
+const dispatchTouch = async (
+  page: Page,
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+  xRatio: number,
+  yRatio: number,
+  pointerId = 31,
+  offsetX = 0,
+  offsetY = 0,
+) => {
+  const canvas = page.getByTestId('floorplan-overlay');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Floor-plan overlay canvas is not visible.');
+  await page.evaluate(({ eventType, clientX, clientY, id }) => {
+    const overlay = document.querySelector('[data-testid="floorplan-overlay"]');
+    if (!overlay) throw new Error('Floor-plan overlay canvas is not present.');
+    overlay.dispatchEvent(new PointerEvent(eventType, {
+      pointerId: id,
+      pointerType: 'touch',
+      isPrimary: true,
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      button: 0,
+      buttons: eventType === 'pointerup' || eventType === 'pointercancel' ? 0 : 1,
+    }));
+  }, {
+    eventType: type,
+    clientX: box.x + box.width * xRatio + offsetX,
+    clientY: box.y + box.height * yRatio + offsetY,
+    id: pointerId,
+  });
 };
 
 test('PlanCraft catalog link, exact alias, and generic route open the same local workspace', async ({ page }) => {
@@ -37,10 +71,6 @@ test('drafts a room, hosts a door, stages a component, and supports undo/redo', 
   await clickAt(page, 0.22, 0.25);
 
   await expect(page.getByTestId('wall-count')).toHaveText('4');
-  // Wall count is derived synchronously from the drafted geometry, but room
-  // detection comes back from the geometry worker. Waiting on the workspace's own
-  // analysis-readiness signal rather than on the number itself is what makes this
-  // deterministic: a longer timeout only widened the window it was racing.
   await expect(page.getByTestId('floorplan-studio')).toHaveAttribute('data-analysis-state', 'current', { timeout: 20_000 });
   await expect(page.getByTestId('room-count')).toHaveText('1');
 
@@ -60,12 +90,38 @@ test('drafts a room, hosts a door, stages a component, and supports undo/redo', 
   await expect(page.getByTestId('component-count')).toHaveText('1');
 });
 
+test('a touch tap selects while a touch drag pans without selecting', async ({ page }) => {
+  await page.goto('./#/floorplan-studio');
+  await page.getByRole('button', { name: /Continuous Wall/ }).click();
+  await clickAt(page, 0.25, 0.3);
+  await clickAt(page, 0.7, 0.3);
+  await expect(page.getByTestId('wall-count')).toHaveText('1');
+
+  await page.getByRole('button', { name: /Select & Transform/ }).click();
+  await clickAt(page, 0.9, 0.8);
+  await expect(page.getByLabel('Project name')).toBeVisible();
+
+  await dispatchTouch(page, 'pointerdown', 0.5, 0.3);
+  await dispatchTouch(page, 'pointerup', 0.5, 0.3);
+  await expect(page.getByLabel('Thickness (mm)')).toBeVisible();
+
+  await clickAt(page, 0.9, 0.8);
+  await expect(page.getByLabel('Project name')).toBeVisible();
+  const wrap = page.locator('.plancraft-canvas-wrap');
+  const before = Number(await wrap.getAttribute('data-pan-x'));
+
+  await dispatchTouch(page, 'pointerdown', 0.75, 0.75, 44);
+  await dispatchTouch(page, 'pointermove', 0.75, 0.75, 44, 48, 0);
+  await dispatchTouch(page, 'pointerup', 0.75, 0.75, 44, 48, 0);
+
+  await expect.poll(async () => Number(await wrap.getAttribute('data-pan-x'))).toBeGreaterThan(before);
+  await expect(page.getByLabel('Project name')).toBeVisible();
+});
+
 test('an interrupted gesture does not wedge the drafting canvas', async ({ page }) => {
   await page.goto('./#/floorplan-studio');
   await page.getByRole('button', { name: /Continuous Wall/ }).click();
 
-  // Model a gesture whose pointerup/pointercancel never reaches the canvas
-  // (OS gesture steal, palm rejection, capture lost to another element).
   await page.evaluate(() => {
     const overlay = document.querySelector('[data-testid="floorplan-overlay"]');
     if (!overlay) throw new Error('Floor-plan overlay canvas is not present.');
@@ -76,12 +132,37 @@ test('an interrupted gesture does not wedge the drafting canvas', async ({ page 
     }));
   });
 
-  // Re-arm the wall tool so any draft seeded by the interrupted gesture is cleared
-  // and the two clicks below are the only geometry input.
   await page.keyboard.press('w');
   await clickAt(page, 0.25, 0.3);
   await clickAt(page, 0.7, 0.3);
   await expect(page.getByTestId('wall-count')).toHaveText('1');
+});
+
+test('single-pointer viewport controls remain usable at a 320px viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('./#/floorplan-studio');
+
+  const controls = page.getByRole('group', { name: 'Viewport controls' });
+  await expect(controls).toBeVisible();
+  for (const name of ['Pan view left', 'Pan view up', 'Pan view down', 'Pan view right', 'Zoom view out', 'Zoom view in']) {
+    const button = controls.getByRole('button', { name });
+    await expect(button).toBeVisible();
+    const box = await button.boundingBox();
+    expect(box?.width ?? 0, `${name} width`).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0, `${name} height`).toBeGreaterThanOrEqual(44);
+  }
+
+  const wrap = page.locator('.plancraft-canvas-wrap');
+  const scaleBefore = Number(await wrap.getAttribute('data-scale'));
+  await controls.getByRole('button', { name: 'Zoom view in' }).click();
+  await expect.poll(async () => Number(await wrap.getAttribute('data-scale'))).toBeGreaterThan(scaleBefore);
+
+  const panBefore = Number(await wrap.getAttribute('data-pan-x'));
+  await controls.getByRole('button', { name: 'Pan view left' }).click();
+  await expect.poll(async () => Number(await wrap.getAttribute('data-pan-x'))).toBeGreaterThan(panBefore);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test('autosaves locally and restores the drawing after reload', async ({ page }) => {
