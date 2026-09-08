@@ -15,6 +15,12 @@ export interface InlinedCss {
   readonly unresolved: string[];
 }
 
+export interface BundledEpubStylesheet {
+  readonly css: string;
+  readonly assets: ExportAsset[];
+  readonly unresolved: string[];
+}
+
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
@@ -43,6 +49,7 @@ const mediaTypeFromUrl = (url: string): string | null => {
   if (pathname.endsWith('.woff')) return 'font/woff';
   if (pathname.endsWith('.ttf')) return 'font/ttf';
   if (pathname.endsWith('.otf')) return 'font/otf';
+  if (pathname.endsWith('.css')) return 'text/css';
   return null;
 };
 
@@ -53,6 +60,13 @@ const extensionForMediaType = (mediaType: string): string => {
     case 'image/gif': return 'gif';
     case 'image/webp': return 'webp';
     case 'image/svg+xml': return 'svg';
+    case 'font/woff2': return 'woff2';
+    case 'font/woff': return 'woff';
+    case 'font/ttf': return 'ttf';
+    case 'font/otf': return 'otf';
+    case 'application/font-woff': return 'woff';
+    case 'application/vnd.ms-fontobject': return 'eot';
+    case 'text/css': return 'css';
     default: return 'bin';
   }
 };
@@ -104,6 +118,42 @@ export const inlineStylesheetAssets = async (
   }
 
   return { css: output, unresolved };
+};
+
+export const bundleStylesheetAssetsForEpub = async (
+  css: string,
+  baseUrl: string,
+  fetcher: typeof fetch = fetch,
+): Promise<BundledEpubStylesheet> => {
+  const references = Array.from(css.matchAll(/url\(\s*(['"]?)([^'"\)]+)\1\s*\)/gi));
+  let output = css;
+  const unresolved: string[] = [];
+  const assets: ExportAsset[] = [];
+  const replacements = new Map<string, string>();
+
+  for (const match of references) {
+    const raw = match[2].trim();
+    if (!raw || raw.startsWith('data:') || raw.startsWith('#') || replacements.has(raw)) continue;
+    let absolute: string;
+    try {
+      absolute = new URL(raw, baseUrl).href;
+    } catch {
+      unresolved.push(raw);
+      continue;
+    }
+    const asset = await fetchAsset(absolute, fetcher);
+    if (!asset) {
+      unresolved.push(raw);
+      continue;
+    }
+    const path = `assets/style-${assets.length + 1}.${extensionForMediaType(asset.mediaType)}`;
+    assets.push({ path, mediaType: asset.mediaType, data: asset.data });
+    // The stylesheet itself is stored in OEBPS/styles, so packaged resources live one level up.
+    replacements.set(raw, `../${path}`);
+  }
+
+  for (const [source, replacement] of replacements) output = output.split(source).join(replacement);
+  return { css: output, assets, unresolved };
 };
 
 export const bundleHtmlImages = async (
