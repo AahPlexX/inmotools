@@ -40,12 +40,9 @@ import {
   buildStandaloneMarkdownHtml,
   renderDocxToBytes,
 } from './export-engine';
+import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
 import type { CitationStyleId, DraftRecord, ProjectHistory } from './markdown-types';
-// KaTeX's own stylesheet supplies its web fonts and layout rules; without
-// it, math renders with broken/fallback glyphs despite correct HTML
-// structure. Imported here (not globally in src/styles.css) so it is only
-// fetched when this tool is actually opened, matching this catalog's
-// per-tool lazy-loading convention.
+import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
 
 type ViewMode = 'source' | 'split';
@@ -105,14 +102,11 @@ export default function MarkdownWorkspace() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bibInputRef = useRef<HTMLInputElement | null>(null);
-  // The text most recently persisted to a local draft. Comparing against it is
-  // what makes the unsaved-changes prompt truthful: previously the prompt was
-  // armed unconditionally on mount, so closing the tab on an untouched
-  // document still triggered the browser's "leave site?" dialog.
   const persistedTextRef = useRef<string>(DEFAULT_SOURCE);
+  const previewPendingRef = useRef(false);
+  const previewWaitersRef = useRef<Array<() => void>>([]);
   const [isDirty, setIsDirty] = useState(false);
 
-  // --- Draft store + storage estimate, initialized once on mount ---
   useEffect(() => {
     if (typeof indexedDB === 'undefined') return;
     draftStoreRef.current = createIndexedDbDraftStore();
@@ -148,7 +142,6 @@ export default function MarkdownWorkspace() {
       .catch(() => setStatus('Local autosave failed; your work is still in the editor.'));
   }, [refreshStorageEstimate]);
 
-  // --- Debounced autosave ---
   useEffect(() => {
     if (!draftStoreRef.current) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -162,7 +155,6 @@ export default function MarkdownWorkspace() {
     setIsDirty(source !== persistedTextRef.current);
   }, [source]);
 
-  // --- Unsaved-changes warning, armed only while there really are unsaved changes ---
   useEffect(() => {
     if (!isDirty) return;
     const handler = (event: BeforeUnloadEvent) => {
@@ -180,7 +172,6 @@ export default function MarkdownWorkspace() {
   const undo = useCallback(() => setHistory((current) => undoHistory(current)), []);
   const redo = useCallback(() => setHistory((current) => redoHistory(current)), []);
 
-  // --- Derived data ---
   const parsed = useMemo(() => parseMarkdown(source), [source]);
   const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
   const slides = useMemo(() => splitIntoSlides(source), [source]);
@@ -192,8 +183,6 @@ export default function MarkdownWorkspace() {
     [parsed.frontmatter.data],
   );
 
-  // A document's effective title: an explicit name the author typed, else a
-  // `title` field from frontmatter, else the first heading, else a fallback.
   const effectiveTitle = useMemo(() => {
     if (documentName.trim()) return documentName.trim();
     const frontmatterTitle = parsed.frontmatter.data.title;
@@ -204,13 +193,9 @@ export default function MarkdownWorkspace() {
   }, [documentName, parsed.frontmatter.data.title, outline]);
 
   const filenameStem = useMemo(() => toFilenameStem(effectiveTitle), [effectiveTitle]);
-
-  // Read by the Ctrl/Cmd+S handler and the explicit save button, which must not
-  // be re-created every time the title changes.
   const effectiveTitleRef = useRef(effectiveTitle);
   effectiveTitleRef.current = effectiveTitle;
 
-  // --- Citations ---
   const citationLibrary = useMemo(() => {
     if (!bibliographyText.trim()) return null;
     try {
@@ -233,22 +218,29 @@ export default function MarkdownWorkspace() {
       .then((result) => { if (!cancelled) setCitationResult(result); })
       .catch(() => { if (!cancelled) setStatus('Citation formatting failed for the selected style.'); });
     return () => { cancelled = true; };
-    // citekeySignature stands in for the citekeys array so a re-render that
-    // produces an equal-but-new array does not re-run citeproc.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citationLibrary, citekeySignature, citationStyle]);
 
-  // The document as it actually reads once formulas are evaluated and
-  // citations formatted. Every consumer - preview and all five exports -
-  // works from this one value, which is what keeps their outputs identical.
   const preparedSource = useMemo(
     () => prepareDocument(source, citationResult?.inText),
     [source, citationResult],
   );
 
-  // --- Scroll sync ---
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
     editorViewScrollRef.current = offsets;
+  }, []);
+
+  const handlePreviewRenderStateChange = useCallback((pending: boolean) => {
+    previewPendingRef.current = pending;
+    if (!pending) {
+      const waiters = previewWaitersRef.current.splice(0);
+      waiters.forEach((resolve) => resolve());
+    }
+  }, []);
+
+  const waitForPreviewSettled = useCallback((): Promise<void> => {
+    if (!previewPendingRef.current) return Promise.resolve();
+    return new Promise((resolve) => previewWaitersRef.current.push(resolve));
   }, []);
 
   const scrollPreviewToLine = useCallback((line: number) => {
@@ -264,7 +256,6 @@ export default function MarkdownWorkspace() {
     scrollPreviewToLine(line);
   }, [scrollPreviewToLine]);
 
-  // --- Opening local files ---
   const loadMarkdownFile = useCallback(async (file: File) => {
     try {
       const text = await file.text();
@@ -307,12 +298,6 @@ export default function MarkdownWorkspace() {
     if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
   }, []);
 
-  // --- Export body HTML ---
-  // Prefers the live preview (which contains rendered diagram SVG that only
-  // exists after the async diagram pass) and falls back to rendering straight
-  // from the prepared source. The fallback is what makes exporting from Source
-  // view work at all: the preview pane is not mounted in that mode, so both
-  // the HTML and EPUB exports used to silently write an empty document.
   const buildExportBodyHtml = useCallback((): { html: string; usedFallback: boolean } => {
     const live = previewHostRef.current
       ?.querySelector<HTMLElement>('.markdown-workbench-preview')
@@ -337,14 +322,25 @@ export default function MarkdownWorkspace() {
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
-  const exportHtml = () => {
+  const exportHtml = async () => {
+    setStatus('Preparing standalone HTML and bundling its assets…');
+    await waitForPreviewSettled();
     const { html: bodyHtml, usedFallback } = buildExportBodyHtml();
-    const html = buildStandaloneMarkdownHtml(effectiveTitle, bodyHtml);
+    const [images, katexCss] = await Promise.all([
+      bundleHtmlImages(bodyHtml, document.baseURI, 'inline'),
+      inlineStylesheetAssets(katexExportCss, document.baseURI),
+    ]);
+    const unresolved = [...images.unresolved, ...katexCss.unresolved];
+    if (unresolved.length > 0) {
+      setStatus(`Standalone HTML export stopped: ${unresolved.length} referenced asset${unresolved.length === 1 ? '' : 's'} could not be bundled. Check image paths/network access and try again.`);
+      return;
+    }
+    const html = buildStandaloneMarkdownHtml(effectiveTitle, images.html, { additionalCss: katexCss.css });
     downloadText(html, `${filenameStem}.html`, 'text/html;charset=utf-8');
     setStatus(usedFallback
-      ? `Exported ${filenameStem}.html from the source. Open Split view first if you need rendered diagrams included.`
-      : `Exported ${filenameStem}.html as a standalone offline file.`);
-    noteExport('Exported a standalone offline HTML file locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
+      ? `Exported ${filenameStem}.html as a self-contained file from source. Open Split view first if you need rendered diagrams included.`
+      : `Exported ${filenameStem}.html as a self-contained offline file with KaTeX fonts and images bundled.`);
+    noteExport('Exported a self-contained offline HTML file locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
   const exportAstJson = () => {
@@ -357,7 +353,7 @@ export default function MarkdownWorkspace() {
     try {
       const bytes = await renderDocxToBytes(parseToMdast(preparedSource));
       downloadBytes(bytes, `${filenameStem}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      setStatus(`Exported ${filenameStem}.docx. Math renders as plain text in Word, not as an editable equation.`);
+      setStatus(`Exported ${filenameStem}.docx. Code blocks, blockquotes, ordered lists, links, and image references are preserved; math remains non-editable plain text unless rasterized.`);
       noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
     } catch {
       setStatus('DOCX export failed.');
@@ -365,16 +361,23 @@ export default function MarkdownWorkspace() {
   };
 
   const exportEpub = async () => {
-    setStatus('Packaging EPUB…');
+    setStatus('Packaging EPUB and bundling referenced images…');
     try {
+      await waitForPreviewSettled();
       const { html: bodyHtml } = buildExportBodyHtml();
+      const bundled = await bundleHtmlImages(bodyHtml, document.baseURI, 'epub');
+      if (bundled.unresolved.length > 0) {
+        setStatus(`EPUB export stopped: ${bundled.unresolved.length} referenced image${bundled.unresolved.length === 1 ? '' : 's'} could not be bundled.`);
+        return;
+      }
       const author = typeof parsed.frontmatter.data.author === 'string' ? parsed.frontmatter.data.author : '';
       const bytes = await buildEpubArchive(
         { title: effectiveTitle, author, identifier: `urn:uuid:${crypto.randomUUID()}` },
-        bodyHtml,
+        bundled.html,
+        bundled.assets,
       );
       downloadBytes(bytes, `${filenameStem}.epub`, 'application/epub+zip');
-      setStatus(`Packaged ${filenameStem}.epub as a structural EPUB (not EPUBCheck-validated).`);
+      setStatus(`Packaged ${filenameStem}.epub with XHTML-safe markup, required modification metadata, and referenced images bundled (not EPUBCheck-validated).`);
       noteExport('Packaged a structural EPUB locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
     } catch {
       setStatus('EPUB export failed.');
@@ -382,8 +385,6 @@ export default function MarkdownWorkspace() {
   };
 
   const printDocument = () => {
-    // A dedicated print stylesheet scopes the printed output to the rendered
-    // document only; the class below is what activates it.
     document.body.classList.add('markdown-workbench-printing');
     const cleanup = () => {
       document.body.classList.remove('markdown-workbench-printing');
@@ -396,8 +397,6 @@ export default function MarkdownWorkspace() {
       return;
     }
     window.print();
-    // afterprint is not dispatched by every browser/print path, so the class is
-    // also cleared on a timer as a backstop.
     window.setTimeout(cleanup, 1000);
   };
 
@@ -410,14 +409,11 @@ export default function MarkdownWorkspace() {
     }
   };
 
-  // --- Draft actions ---
   const saveDraftNow = useCallback(() => {
     if (!draftStoreRef.current) {
       setStatus('Local draft storage is unavailable in this browser.');
       return;
     }
-    // Naming an explicitly saved draft after the document makes the draft list
-    // identifiable, rather than a column of entries all called "Autosave".
     void persistDraft(source, effectiveTitleRef.current).then(() => setStatus('Saved a local draft.'));
   }, [persistDraft, source]);
 
@@ -452,10 +448,6 @@ export default function MarkdownWorkspace() {
       .catch(() => setStatus('Could not delete that local draft.'));
   };
 
-  // --- Keyboard shortcut: save a local draft ---
-  // Deliberately limited to Ctrl/Cmd+S. Undo/redo are intentionally left to
-  // CodeMirror's own keymap inside the editor so this tool never shadows the
-  // editor's caret-preserving text history with a coarser document-level one.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -486,40 +478,21 @@ export default function MarkdownWorkspace() {
           <button type="button" onClick={() => fileInputRef.current?.click()}>Open .md</button>
           <button type="button" onClick={startNewDraft}>New</button>
           <button type="button" onClick={saveDraftNow}>Save draft</button>
-          <input
-            ref={fileInputRef}
-            className="markdown-workbench-file-input"
-            type="file"
-            accept=".md,.markdown,.txt,text/markdown,text/plain"
-            onChange={onFileInputChange}
-            aria-label="Open a local Markdown file"
-          />
+          <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileInputChange} aria-label="Open a local Markdown file" />
         </div>
         <div className="markdown-workbench-toolbar-group">
-          <label className="markdown-workbench-check">
-            <input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />
-            Wrap lines
-          </label>
-          <label className="markdown-workbench-check">
-            <input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />
-            Vim keys
-          </label>
-          <label className="markdown-workbench-check">
-            <input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />
-            Spellcheck
-          </label>
-          <label className="markdown-workbench-font-size">
-            Font
-            <input type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} />
-          </label>
+          <label className="markdown-workbench-check"><input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />Wrap lines</label>
+          <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
+          <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
+          <label className="markdown-workbench-font-size">Font<input type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /></label>
         </div>
         <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
           <button type="button" onClick={exportMarkdown}>Markdown</button>
           <button type="button" onClick={exportRenderedMarkdown}>Rendered Markdown</button>
-          <button type="button" onClick={exportHtml}>Standalone HTML</button>
+          <button type="button" onClick={() => void exportHtml()}>Standalone HTML</button>
           <button type="button" onClick={printDocument}>Print / PDF</button>
-          <button type="button" onClick={exportDocx}>DOCX</button>
-          <button type="button" onClick={exportEpub}>EPUB (structural)</button>
+          <button type="button" onClick={() => void exportDocx()}>DOCX</button>
+          <button type="button" onClick={() => void exportEpub()}>EPUB (structural)</button>
           <button type="button" onClick={exportAstJson}>AST JSON</button>
         </div>
       </div>
@@ -527,16 +500,9 @@ export default function MarkdownWorkspace() {
       <div className="markdown-workbench-namebar">
         <label className="markdown-workbench-name-field">
           Document name
-          <input
-            type="text"
-            value={documentName}
-            placeholder={effectiveTitle}
-            onChange={(event) => setDocumentName(event.target.value)}
-          />
+          <input type="text" value={documentName} placeholder={effectiveTitle} onChange={(event) => setDocumentName(event.target.value)} />
         </label>
-        <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">
-          Exports as <code>{filenameStem}.*</code>
-        </span>
+        <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">Exports as <code>{filenameStem}.*</code></span>
         <div className="markdown-workbench-toolbar-group">
           <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')}>Copy Markdown</button>
           <button type="button" onClick={() => void copyToClipboard(buildExportBodyHtml().html, 'the rendered HTML')}>Copy HTML</button>
@@ -544,11 +510,7 @@ export default function MarkdownWorkspace() {
       </div>
 
       <div className={`markdown-workbench-body markdown-workbench-view-${view}`}>
-        <div
-          className="markdown-workbench-editor-pane"
-          onDrop={onEditorDrop}
-          onDragOver={onEditorDragOver}
-        >
+        <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
             value={source}
             onChange={setSource}
@@ -562,7 +524,11 @@ export default function MarkdownWorkspace() {
         </div>
         {view === 'split' ? (
           <div className="markdown-workbench-preview-pane" ref={previewHostRef}>
-            <MarkdownPreview preparedSource={preparedSource} onAnchorsMeasured={handleAnchorsMeasured} />
+            <MarkdownPreview
+              preparedSource={preparedSource}
+              onAnchorsMeasured={handleAnchorsMeasured}
+              onRenderStateChange={handlePreviewRenderStateChange}
+            />
           </div>
         ) : null}
       </div>
@@ -570,9 +536,7 @@ export default function MarkdownWorkspace() {
       <div className="markdown-workbench-status" role="status" aria-live="polite">
         <span data-testid="markdown-status">{status}</span>
         <span className="markdown-workbench-autosave-status" data-testid="markdown-save-state">
-          {lastSavedAt
-            ? `${isDirty ? 'Unsaved changes · last saved' : 'Saved'} ${new Date(lastSavedAt).toLocaleTimeString()}`
-            : 'Not yet saved locally'}
+          {lastSavedAt ? `${isDirty ? 'Unsaved changes · last saved' : 'Saved'} ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Not yet saved locally'}
         </span>
       </div>
 
@@ -582,15 +546,11 @@ export default function MarkdownWorkspace() {
           <ul className="markdown-workbench-outline" data-testid="markdown-outline">
             {outline.map((entry) => (
               <li key={`${entry.id}-${entry.line}`} data-depth={entry.depth}>
-                <button type="button" onClick={() => revealLine(entry.line)}>
-                  {entry.text || '(untitled heading)'}
-                </button>
+                <button type="button" onClick={() => revealLine(entry.line)}>{entry.text || '(untitled heading)'}</button>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="markdown-workbench-hint">No headings yet. Add a line starting with # to build an outline.</p>
-        )}
+        ) : <p className="markdown-workbench-hint">No headings yet. Add a line starting with # to build an outline.</p>}
       </details>
 
       <details className="markdown-workbench-panel">
@@ -611,15 +571,10 @@ export default function MarkdownWorkspace() {
           {frontmatterEntries.length > 0 ? (
             <dl className="markdown-workbench-metrics" data-testid="markdown-frontmatter">
               {frontmatterEntries.map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>
-                </div>
+                <div key={key}><dt>{key}</dt><dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd></div>
               ))}
             </dl>
-          ) : (
-            <p className="markdown-workbench-hint">The frontmatter block parsed but contained no top-level fields.</p>
-          )}
+          ) : <p className="markdown-workbench-hint">The frontmatter block parsed but contained no top-level fields.</p>}
           <p className="markdown-workbench-hint">A <code>title</code> field here names your exports unless you set a document name above.</p>
         </details>
       ) : null}
@@ -631,14 +586,11 @@ export default function MarkdownWorkspace() {
             {mathDiagnostics.map((diagnostic) => (
               <li key={`${diagnostic.line}-${diagnostic.source}`}>
                 <button type="button" onClick={() => revealLine(diagnostic.line)}>Line {diagnostic.line}</button>
-                <code>{diagnostic.source}</code>
-                <span>{diagnostic.error}</span>
+                <code>{diagnostic.source}</code><span>{diagnostic.error}</span>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="markdown-workbench-hint">Every math expression in this document parses. Broken expressions render as flagged error text in the preview and are listed here.</p>
-        )}
+        ) : <p className="markdown-workbench-hint">Every math expression in this document parses. Broken expressions render as flagged error text in the preview and are listed here.</p>}
       </details>
 
       <details className="markdown-workbench-panel">
@@ -647,27 +599,17 @@ export default function MarkdownWorkspace() {
           <label>
             Bibliography format
             <select value={bibliographyFormat} onChange={(event) => setBibliographyFormat(event.target.value as 'bib' | 'json')}>
-              <option value="bib">.bib (BibTeX)</option>
-              <option value="json">CSL-JSON</option>
+              <option value="bib">.bib (BibTeX)</option><option value="json">CSL-JSON</option>
             </select>
           </label>
           <label>
             Citation style
             <select value={citationStyle} onChange={(event) => setCitationStyle(event.target.value as CitationStyleId)}>
-              {CITATION_STYLES.map((style) => (
-                <option key={style.id} value={style.id}>{style.label}</option>
-              ))}
+              {CITATION_STYLES.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
             </select>
           </label>
           <button type="button" onClick={() => bibInputRef.current?.click()}>Load .bib / CSL-JSON file</button>
-          <input
-            ref={bibInputRef}
-            className="markdown-workbench-file-input"
-            type="file"
-            accept=".bib,.json,.txt,application/json,text/plain"
-            onChange={(event) => void onBibInputChange(event)}
-            aria-label="Load a local bibliography file"
-          />
+          <input ref={bibInputRef} className="markdown-workbench-file-input" type="file" accept=".bib,.json,.txt,application/json,text/plain" onChange={(event) => void onBibInputChange(event)} aria-label="Load a local bibliography file" />
         </div>
         <textarea
           className="markdown-workbench-bibliography-input"
@@ -676,25 +618,14 @@ export default function MarkdownWorkspace() {
           value={bibliographyText}
           onChange={(event) => setBibliographyText(event.target.value)}
         />
-        <p className="markdown-workbench-hint">
-          Reference a source with <code>[@citekey]</code>. Resolved markers are replaced with formatted citations in the
-          preview and in every export; an unresolved marker is left exactly as written so it stays visible.
-        </p>
+        <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are replaced with formatted citations in the preview and in every export; an unresolved marker is left exactly as written so it stays visible.</p>
         {citationResult ? (
           <div className="markdown-workbench-citation-preview">
             {citationResult.unresolved.length > 0 ? (
-              <p className="markdown-workbench-citation-warning">
-                Unresolved citation key{citationResult.unresolved.length === 1 ? '' : 's'}: {citationResult.unresolved.join(', ')}
-              </p>
+              <p className="markdown-workbench-citation-warning">Unresolved citation key{citationResult.unresolved.length === 1 ? '' : 's'}: {citationResult.unresolved.join(', ')}</p>
             ) : null}
             {citationResult.bibliographyHtml.length > 0 ? (
-              <div
-                className="markdown-workbench-bibliography-output"
-                // The bibliography HTML originates from this tool's own citeproc-js
-                // formatting call, not from arbitrary user-supplied markdown, so it
-                // is not passed through the markdown sanitizer a second time here.
-                dangerouslySetInnerHTML={{ __html: citationResult.bibliographyHtml.join('') }}
-              />
+              <div className="markdown-workbench-bibliography-output" dangerouslySetInnerHTML={{ __html: citationResult.bibliographyHtml.join('') }} />
             ) : null}
           </div>
         ) : null}
@@ -704,17 +635,8 @@ export default function MarkdownWorkspace() {
         <summary>Slides ({slides.length})</summary>
         <ol className="markdown-workbench-slide-list" data-testid="markdown-slide-list">
           {slides.map((slide) => {
-            const heading = slide.source
-              .split('\n')
-              .map((line) => line.trim())
-              .find((line) => line.length > 0);
-            return (
-              <li key={slide.index}>
-                <button type="button" onClick={() => revealLine(slide.startLine)}>
-                  {heading ? heading.replace(/^#+\s*/, '') : '(empty slide)'}
-                </button>
-              </li>
-            );
+            const heading = slide.source.split('\n').map((line) => line.trim()).find((line) => line.length > 0);
+            return <li key={slide.index}><button type="button" onClick={() => revealLine(slide.startLine)}>{heading ? heading.replace(/^#+\s*/, '') : '(empty slide)'}</button></li>;
           })}
         </ol>
         <p className="markdown-workbench-hint">Split on --- thematic breaks. This is a lightweight sectioning view, not a full presentation framework.</p>
@@ -727,23 +649,12 @@ export default function MarkdownWorkspace() {
           <ul className="markdown-workbench-draft-list" data-testid="markdown-draft-list">
             {drafts.map((draft) => (
               <li key={draft.id}>
-                <button type="button" onClick={() => loadDraft(draft)}>
-                  {draft.name} — {new Date(draft.updatedAt).toLocaleString()}
-                </button>
-                <button
-                  type="button"
-                  className="markdown-workbench-draft-delete"
-                  onClick={() => removeDraft(draft)}
-                  aria-label={`Delete draft saved ${new Date(draft.updatedAt).toLocaleString()}`}
-                >
-                  Delete
-                </button>
+                <button type="button" onClick={() => loadDraft(draft)}>{draft.name} — {new Date(draft.updatedAt).toLocaleString()}</button>
+                <button type="button" className="markdown-workbench-draft-delete" onClick={() => removeDraft(draft)} aria-label={`Delete draft saved ${new Date(draft.updatedAt).toLocaleString()}`}>Delete</button>
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="markdown-workbench-hint">No local drafts saved yet.</p>
-        )}
+        ) : <p className="markdown-workbench-hint">No local drafts saved yet.</p>}
         <p className="markdown-workbench-hint">Drafts are stored in this browser only (IndexedDB) and are never uploaded. Ctrl/Cmd+S saves one immediately.</p>
       </details>
     </div>

@@ -4,34 +4,15 @@ import { renderMarkdown } from './render-engine';
 import { renderMermaidDiagram, renderGraphvizDiagram, scheduleIdle } from './diagram-engine';
 import type { ScrollAnchor } from './markdown-types';
 
-// Renders the live preview: prepared markdown -> sanitized HTML, then a
-// post-render pass replaces fenced ```mermaid and ```dot code blocks with
-// their rendered diagram SVG.
-//
-// Mermaid renders on the main thread (idle-scheduled and debounced) because
-// its renderer depends on real DOM elements that do not exist inside a
-// Worker. Graphviz renders inside a dedicated Worker, since
-// @hpcc-js/wasm-graphviz has no DOM dependency and is safe to isolate off the
-// main thread.
-//
-// Diagram rendering is asynchronous and a document can change while a pass is
-// still in flight, so every pass carries a generation token. A pass whose
-// token is stale abandons its work and cancels any Worker it started instead
-// of writing into a preview that has already moved on - without this, each
-// keystroke in a document containing a `dot` block spawned another Worker that
-// nothing ever terminated.
-
 mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
 
 export interface MarkdownPreviewProps {
-  // Already passed through the shared document pipeline by the parent, so the
-  // preview renders exactly what the exports serialize.
   readonly preparedSource: string;
   readonly onAnchorsMeasured: (anchors: { sourceLine: number; offsetTop: number }[]) => void;
+  readonly onRenderStateChange?: (pending: boolean) => void;
 }
 
 const DIAGRAM_DEBOUNCE_MS = 250;
-
 let mermaidDiagramCounter = 0;
 
 const renderDiagramBlocks = async (
@@ -92,7 +73,7 @@ const renderDiagramBlocks = async (
   }
 };
 
-export default function MarkdownPreview({ preparedSource, onAnchorsMeasured }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [anchors, setAnchors] = useState<ScrollAnchor[]>([]);
   const generationRef = useRef(0);
@@ -107,22 +88,28 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured }: M
     const generation = generationRef.current;
     const isCurrent = () => generationRef.current === generation;
     const cancels: (() => void)[] = [];
+    onRenderStateChange?.(true);
 
     const timer = setTimeout(() => {
       scheduleIdle(() => {
-        if (!isCurrent() || !host) return;
-        void renderDiagramBlocks(host, isCurrent, (cancel) => cancels.push(cancel));
+        if (!isCurrent()) return;
+        if (!host) {
+          onRenderStateChange?.(false);
+          return;
+        }
+        void renderDiagramBlocks(host, isCurrent, (cancel) => cancels.push(cancel))
+          .finally(() => {
+            if (isCurrent()) onRenderStateChange?.(false);
+          });
       });
     }, DIAGRAM_DEBOUNCE_MS);
 
     return () => {
       clearTimeout(timer);
-      // Supersede any pass still in flight for this generation and tear down
-      // the Workers it created.
       generationRef.current += 1;
       cancels.forEach((cancel) => cancel());
     };
-  }, [preparedSource]);
+  }, [preparedSource, onRenderStateChange]);
 
   useEffect(() => {
     const host = hostRef.current;
