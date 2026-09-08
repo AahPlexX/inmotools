@@ -16,11 +16,15 @@ import { exportCanvasPng, exportCsv, exportJson, exportPdfBrief } from './aether
 import { readSettings, writeSettings } from './aethercast-persistence';
 import { AetherCastForecastCanvas } from './AetherCastForecastCanvas';
 import { requestSupportPrompt } from '../../lib/support';
-import type { AetherCastDataset, AetherCastSettings, FitzpatrickType, VulnerabilityLens } from './aethercast-types';
+import type { AetherCastDataset, AetherCastSettings, FitzpatrickType, HourlyAssessment, IndexStandard, VulnerabilityLens } from './aethercast-types';
 import './aethercast.css';
 
 const TABLE_ID = 'aethercast-readout-table';
 const PAGE_SIZE = 100;
+const EPA_POLLUTANTS = ['pm25', 'pm10', 'o3', 'no2', 'so2', 'co'] as const;
+const EPA_LABELS: Record<(typeof EPA_POLLUTANTS)[number], string> = {
+  pm25: 'PM2.5', pm10: 'PM10', o3: 'O3', no2: 'NO2', so2: 'SO2', co: 'CO',
+};
 
 interface PendingCsv {
   readonly raw: string;
@@ -56,6 +60,21 @@ const dataTimeLabel = (dataset: AetherCastDataset): string => {
   if (Math.abs(deltaHours) < 1) return 'Latest dataset timestamp is within one hour of now.';
   if (deltaHours > 0) return `Dataset extends ${Math.round(deltaHours)} hours into the future.`;
   return `Latest dataset timestamp is ${Math.round(Math.abs(deltaHours))} hours old.`;
+};
+
+const pollutantCoverageLabel = (assessment: HourlyAssessment, standard: IndexStandard): string => {
+  if (standard === 'US_EPA') {
+    const available = EPA_POLLUTANTS.filter((key) => assessment.pollutants[key].subIndex !== null);
+    return `${available.length}/6${available.length ? `: ${available.map((key) => EPA_LABELS[key]).join(', ')}` : ''}`;
+  }
+  const available = [
+    assessment.point.pm25 !== null ? 'PM2.5' : null,
+    assessment.point.pm10 !== null ? 'PM10' : null,
+    assessment.point.ozone !== null ? 'O3' : null,
+    assessment.point.nitrogenDioxide !== null ? 'NO2' : null,
+    assessment.point.sulphurDioxide !== null ? 'SO2' : null,
+  ].filter((value): value is string => value !== null);
+  return `${available.length}/5${available.length ? `: ${available.join(', ')}` : ''}`;
 };
 
 export default function AetherCastWorkspace() {
@@ -177,6 +196,7 @@ export default function AetherCastWorkspace() {
         <button type="button" onClick={() => setPendingCsv(null)}>Cancel</button>
       </div>
       <label className="aethercast-timezone-field">Dataset timezone<input value={pendingCsv.timezone} onChange={(event) => setPendingCsv((current) => current ? { ...current, timezone: event.target.value } : current)} placeholder="America/Chicago" /></label>
+      <p className="aethercast-method-note">Timezone-less timestamps are interpreted in this IANA zone. Nonexistent spring-forward times and repeated fall-back times are rejected; add an explicit UTC offset to disambiguate a repeated wall time.</p>
       <div className="aethercast-mapping-grid">
         {CSV_FIELDS.map((field) => (
           <label key={field.key}>
@@ -216,6 +236,8 @@ export default function AetherCastWorkspace() {
     );
   }
 
+  const reconciliation = dataset.timestampReconciliation;
+
   return (
     <div className="aethercast-workspace">
       <div className="aethercast-toolbar">
@@ -245,21 +267,45 @@ export default function AetherCastWorkspace() {
 
       <p className="aethercast-data-age" role="status">{dataTimeLabel(dataset)} Timezone: {dataset.timezone ?? 'unspecified'}. Imported rows: {dataset.points.length.toLocaleString()}{dataset.truncatedRows ? `; ${dataset.truncatedRows.toLocaleString()} rows omitted or invalid.` : '.'}</p>
 
+      {reconciliation && (
+        <section className="aethercast-list-section" aria-label="Timestamp reconciliation" data-testid="aethercast-timestamp-reconciliation">
+          <h3>Timestamp reconciliation</h3>
+          <p>{reconciliation.acceptedRows.toLocaleString()} of {reconciliation.consideredRows.toLocaleString()} considered timestamps were accepted; {reconciliation.rejectedRows.toLocaleString()} were rejected. {reconciliation.explicitOffsetRows.toLocaleString()} carried an explicit UTC offset and {reconciliation.wallClockRows.toLocaleString()} were timezone-resolved wall clocks.</p>
+          <p>Policy: ambiguous or nonexistent wall times are rejected rather than shifted or guessed. Timezone: {reconciliation.timezone ?? 'none supplied'}.</p>
+        </section>
+      )}
+
       {activeAssessment && (
         <section className="aethercast-status" aria-label="Selected snapshot">
-          <p><span>{settings.activeStandard === 'US_EPA' ? 'US EPA AQI' : 'European Air Quality Index'}</span><strong>{selectedValue ?? 'unknown'}</strong> {selectedBand ? `(${selectedBand.replaceAll('_', ' ')})` : ''}</p>
+          <p><span>{settings.activeStandard === 'US_EPA' ? 'Locally calculated US EPA AQI' : 'Locally calculated European Air Quality Index'}</span><strong>{selectedValue ?? 'unknown'}</strong> {selectedBand ? `(${selectedBand.replaceAll('_', ' ')})` : ''}</p>
           <p><span>Index coverage</span><strong>{selectedCoverage.toLowerCase()}</strong></p>
+          <p data-testid="aethercast-pollutant-coverage"><span>Pollutants contributing</span><strong>{pollutantCoverageLabel(activeAssessment, settings.activeStandard)}</strong></p>
+          <p><span>Imported provider US AQI</span><strong>{activeAssessment.point.providedUsAqi ?? 'not supplied'}</strong></p>
+          <p><span>Imported provider European AQI</span><strong>{activeAssessment.point.providedEuropeanAqi ?? 'not supplied'}</strong></p>
           <p><span>UV Index</span><strong>{activeAssessment.point.uvIndex ?? 'unknown'}</strong></p>
           <p><span>Skin-type timing heuristic</span><strong>{formatBurn(activeAssessment.burnMinutes)}</strong></p>
-          <p className="aethercast-health-note">The timing estimate is not a safe-exposure limit. UV risk depends on more than skin type, and WHO recommends sun-protection measures when UVI reaches 3 or above.</p>
+          <p className="aethercast-health-note">Imported provider indices are comparison-only and never replace the locally calculated values. The timing estimate is not a safe-exposure limit. UV risk depends on more than skin type, and WHO recommends sun-protection measures when UVI reaches 3 or above.</p>
         </section>
       )}
 
       <p className="aethercast-method-note">
         {settings.activeStandard === 'US_EPA'
-          ? 'US values are recalculated from raw concentrations using EPA PM NowCast weighting, pollutant-specific averaging periods, concentration truncation, interpolation, and final AQI rounding. Ozone uses the prescribed 8-hour/1-hour AQI rules here; the operational AirNow ozone NowCast is a separate two-week statistical model and is not represented as if it were calculated locally.'
-          : 'European values are recalculated from raw hourly PM2.5, PM10, O3, NO2, and SO2 concentrations using the current EEA hourly bands; source-provided European index values are not reused.'}
+          ? 'US values are recalculated from raw concentrations using EPA PM NowCast weighting, pollutant-specific averaging periods, concentration truncation, interpolation, final AQI rounding, and the EPA SO2 high-concentration special case. Ozone uses the prescribed 8-hour/1-hour AQI rules here; the operational AirNow ozone NowCast is a separate two-week statistical model and is not represented as if it were calculated locally.'
+          : 'European values are recalculated from raw hourly PM2.5, PM10, O3, NO2, and SO2 concentrations using the current EEA hourly bands; source-provided European index values are displayed only for comparison and are not reused.'}
       </p>
+
+      {activeAssessment && (
+        <section className="aethercast-list-section" aria-label="EPA averaging window availability" data-testid="aethercast-averaging-availability">
+          <h3>EPA averaging-window availability</h3>
+          <p>Each pollutant states whether its AQI subindex is currently calculable and which averaging rule applies.</p>
+          <ul>
+            {EPA_POLLUTANTS.map((key) => {
+              const score = activeAssessment.pollutants[key];
+              return <li key={key}><strong>{EPA_LABELS[key]}:</strong> {score.subIndex === null ? 'not currently calculable' : `subindex ${Math.round(score.subIndex)}`} — {score.epaAveragingLabel ?? 'method unavailable'}.</li>;
+            })}
+          </ul>
+        </section>
+      )}
 
       <div ref={canvasWrapRef} className="aethercast-canvas-wrap">
         <AetherCastForecastCanvas assessments={assessments} activeIndex={activeIndex} standard={settings.activeStandard} onScrub={setActiveIndex} describedById={TABLE_ID} />
@@ -283,7 +329,7 @@ export default function AetherCastWorkspace() {
       <div className="aethercast-table-wrap">
         <table id={TABLE_ID} className="aethercast-table">
           <caption>Hourly readout. This page shows {pageRows.length} of {assessments.length} rows; pagination controls expose the complete imported range.</caption>
-          <thead><tr><th>Time</th><th>{settings.activeStandard === 'US_EPA' ? 'US AQI' : 'European index'}</th><th>Band</th><th>Coverage</th><th>PM2.5 µg/m³</th><th>O3 µg/m³</th><th>UV</th></tr></thead>
+          <thead><tr><th>Time</th><th>{settings.activeStandard === 'US_EPA' ? 'Calculated US AQI' : 'Calculated European index'}</th><th>Band</th><th>Coverage</th><th>Pollutants contributing</th><th>Provider US AQI</th><th>Provider European AQI</th><th>PM2.5 µg/m³</th><th>O3 µg/m³</th><th>UV</th></tr></thead>
           <tbody>
             {pageRows.map((assessment, offset) => {
               const globalIndex = pageStart + offset;
@@ -291,7 +337,7 @@ export default function AetherCastWorkspace() {
               const band = settings.activeStandard === 'US_EPA' ? assessment.aqiCategory : assessment.eaqiBand;
               const coverage = settings.activeStandard === 'US_EPA' ? assessment.usAqiCoverage : assessment.europeanAqiCoverage;
               const selectRow = () => setActiveIndex(globalIndex);
-              return <tr key={`${assessment.point.isoTimestamp}-${globalIndex}`} aria-current={globalIndex === activeIndex ? 'true' : undefined} tabIndex={0} onClick={selectRow} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectRow(); } }}><td>{assessment.point.isoTimestamp}</td><td>{value ?? '—'}</td><td>{band?.replaceAll('_', ' ') ?? '—'}</td><td>{coverage.toLowerCase()}</td><td>{assessment.point.pm25 ?? '—'}</td><td>{assessment.point.ozone ?? '—'}</td><td>{assessment.point.uvIndex ?? '—'}</td></tr>;
+              return <tr key={`${assessment.point.isoTimestamp}-${globalIndex}`} aria-current={globalIndex === activeIndex ? 'true' : undefined} tabIndex={0} onClick={selectRow} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectRow(); } }}><td>{assessment.point.isoTimestamp}</td><td>{value ?? '—'}</td><td>{band?.replaceAll('_', ' ') ?? '—'}</td><td>{coverage.toLowerCase()}</td><td>{pollutantCoverageLabel(assessment, settings.activeStandard)}</td><td>{assessment.point.providedUsAqi ?? '—'}</td><td>{assessment.point.providedEuropeanAqi ?? '—'}</td><td>{assessment.point.pm25 ?? '—'}</td><td>{assessment.point.ozone ?? '—'}</td><td>{assessment.point.uvIndex ?? '—'}</td></tr>;
             })}
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 import { ppbToUgM3, ppmToUgM3 } from './aethercast-engine';
-import type { AetherCastDataset, HourlyAtmosphericPoint, ImportSource } from './aethercast-types';
+import type { AetherCastDataset, HourlyAtmosphericPoint, ImportSource, TimestampReconciliationReport } from './aethercast-types';
 
 export interface ImportResult {
   dataset: AetherCastDataset | null;
@@ -109,6 +109,26 @@ const resolveIanaWallClock = (wallUtc: number, timeZone: string): number[] => {
   return [...candidates].sort((a, b) => a - b);
 };
 
+const timestampShape = (value: string | undefined): 'EXPLICIT' | 'WALL' | 'MISSING' => {
+  if (!value?.trim()) return 'MISSING';
+  return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.trim()) ? 'EXPLICIT' : 'WALL';
+};
+
+const reconciliationReport = (
+  timestamps: readonly (string | undefined)[],
+  acceptedRows: number,
+  rejectedRows: number,
+  timezone: string | null,
+): TimestampReconciliationReport => ({
+  consideredRows: timestamps.length,
+  acceptedRows,
+  rejectedRows,
+  explicitOffsetRows: timestamps.filter((value) => timestampShape(value) === 'EXPLICIT').length,
+  wallClockRows: timestamps.filter((value) => timestampShape(value) === 'WALL').length,
+  timezone,
+  disambiguationPolicy: 'REJECT_AMBIGUOUS_OR_NONEXISTENT',
+});
+
 /**
  * Parse a timestamp without ever normalizing impossible calendar dates or DST wall times.
  * Timezone-less values in an IANA zone use a strict reject policy: gaps and ambiguous
@@ -177,6 +197,7 @@ export function parseOpenMeteoJson(raw: string): ImportResult {
   const capped = Math.min(length, MAX_ROWS);
   if (length > MAX_ROWS) errors.push(`This import has ${length} hourly rows; only the first ${MAX_ROWS} were loaded.`);
 
+  const consideredTimestamps = hourly.time.slice(0, capped);
   const points: HourlyAtmosphericPoint[] = [];
   let invalidTimestamps = 0;
   for (let index = 0; index < capped; index += 1) {
@@ -211,6 +232,7 @@ export function parseOpenMeteoJson(raw: string): ImportResult {
       timezone: parsed.timezone ?? null,
       points,
       truncatedRows: truncatedByMismatch + invalidTimestamps,
+      timestampReconciliation: reconciliationReport(consideredTimestamps, points.length, invalidTimestamps, parsed.timezone ?? null),
     },
     errors,
   };
@@ -308,6 +330,7 @@ export function parseCsvWithMapping(raw: string, map: CsvColumnMap, options: Csv
     return value === null ? null : convert(value);
   };
 
+  const consideredTimestamps = rows.map((row) => row[map.timestamp]?.trim());
   const points: HourlyAtmosphericPoint[] = [];
   let skipped = 0;
   for (const row of rows) {
@@ -334,10 +357,12 @@ export function parseCsvWithMapping(raw: string, map: CsvColumnMap, options: Csv
   if (points.length === 0) return { dataset: null, errors: [...errors, 'No usable rows were found. Check the timestamp column and timezone mapping.'] };
 
   points.sort((a, b) => a.epochMs - b.epochMs);
+  const timezone = options.timezone?.trim() || null;
   return {
     dataset: {
       importSource: 'csv-mapped', latitude: null, longitude: null, elevationMeters: null,
-      timezone: options.timezone?.trim() || null, points, truncatedRows: truncated + skipped,
+      timezone, points, truncatedRows: truncated + skipped,
+      timestampReconciliation: reconciliationReport(consideredTimestamps, points.length, skipped, timezone),
     },
     errors,
   };
@@ -347,13 +372,24 @@ export function parseAetherCastExport(raw: string): ImportResult {
   try {
     const parsed = JSON.parse(raw) as AetherCastDataset;
     if (!parsed.points || !Array.isArray(parsed.points)) throw new Error('missing points');
+    const sourceTimestamps = parsed.points.map((point) => typeof point.isoTimestamp === 'string' ? point.isoTimestamp : undefined);
     const points = parsed.points
       .filter((point) => typeof point.isoTimestamp === 'string')
       .map((point) => ({ ...point, epochMs: parseTimestampInZone(point.isoTimestamp, parsed.timezone ?? null) }))
       .filter((point) => Number.isFinite(point.epochMs))
       .sort((a, b) => a.epochMs - b.epochMs);
     if (points.length === 0) throw new Error('no valid points');
-    return { dataset: { ...parsed, points, importSource: 'aethercast-export' as ImportSource }, errors: [] };
+    const rejectedRows = Math.max(0, parsed.points.length - points.length);
+    return {
+      dataset: {
+        ...parsed,
+        points,
+        importSource: 'aethercast-export' as ImportSource,
+        timestampReconciliation: parsed.timestampReconciliation
+          ?? reconciliationReport(sourceTimestamps, points.length, rejectedRows, parsed.timezone ?? null),
+      },
+      errors: rejectedRows ? [`${rejectedRows} exported row${rejectedRows === 1 ? '' : 's'} had invalid, nonexistent, or ambiguous timestamps and were skipped.`] : [],
+    };
   } catch {
     return { dataset: null, errors: ['This does not look like a valid previously exported AetherCast JSON file.'] };
   }

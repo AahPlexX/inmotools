@@ -7,6 +7,16 @@ export type IndexStandard = 'US_EPA' | 'EUROPEAN_EAQI';
 export type UnitSystem = 'METRIC' | 'US';
 export type IndexCoverage = 'COMPLETE' | 'PARTIAL' | 'NONE';
 
+export interface TimestampReconciliationReport {
+  consideredRows: number;
+  acceptedRows: number;
+  rejectedRows: number;
+  explicitOffsetRows: number;
+  wallClockRows: number;
+  timezone: string | null;
+  disambiguationPolicy: 'REJECT_AMBIGUOUS_OR_NONEXISTENT';
+}
+
 export interface HourlyAtmosphericPoint {
   isoTimestamp: string;
   epochMs: number;
@@ -31,6 +41,7 @@ export interface AetherCastDataset {
   timezone: string | null;
   points: HourlyAtmosphericPoint[];
   truncatedRows: number;
+  timestampReconciliation?: TimestampReconciliationReport;
 }
 
 export interface PollutantScore {
