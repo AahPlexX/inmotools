@@ -1,76 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import GltfViewport from './GltfViewport';
-import { optimizeGlb, type GltfOptimizeResult } from './gltf-engine';
+import { inspectGlb, optimizeGlb, type GltfInspection, type GltfOptimizeResult } from './gltf-engine';
 import { consumeFileInput } from '../../lib/file-input';
 
-function formatBytes(value: number) {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
-  return `${(value / 1024 / 1024).toFixed(2)} MiB`;
-}
+function formatBytes(value:number){if(value<1024)return`${value} B`;if(value<1024*1024)return`${(value/1024).toFixed(1)} KiB`;return`${(value/1024/1024).toFixed(2)} MiB`;}
 
-export default function GltfWorkspace() {
-  const [file, setFile] = useState<File | null>(null);
-  const [source, setSource] = useState<Uint8Array | null>(null);
-  const [result, setResult] = useState<GltfOptimizeResult | null>(null);
-  const [targetRatio, setTargetRatio] = useState(0.65);
-  const [maxTextureDimension, setMaxTextureDimension] = useState(2048);
-  const [preview, setPreview] = useState<'before' | 'after'>('before');
-  const [wireframe, setWireframe] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Choose a binary GLB model to inspect and optimize locally.');
-
-  const previewBytes = useMemo(() => preview === 'after' && result ? result.bytes : source, [preview, result, source]);
-
-  async function chooseFile(next: File | undefined) {
-    if (!next) return;
-    setBusy(true); setFile(next); setResult(null); setPreview('before'); setStatus('Reading the GLB bytes locally…');
-    try {
-      const bytes = new Uint8Array(await next.arrayBuffer());
-      if (new DataView(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 12)).getUint32(0, true) !== 0x46546c67) throw new Error('This workspace currently requires a self-contained binary .glb file.');
-      setSource(bytes);
-      const baseline = await optimizeGlb(bytes, { targetRatio: 1, maxTextureDimension: 8192 });
-      setResult(baseline);
-      setStatus(`Loaded ${baseline.before.meshes} mesh${baseline.before.meshes === 1 ? '' : 'es'} · ${baseline.before.triangles.toLocaleString()} triangles locally.`);
-    } catch (error) { setSource(null); setStatus(`GLB load failed: ${error instanceof Error ? error.message : 'unsupported model'}`); }
-    finally { setBusy(false); }
-  }
-
-  async function optimize() {
-    if (!source) return;
-    setBusy(true); setStatus('Optimizing geometry and supported textures locally…');
-    try {
-      const optimized = await optimizeGlb(source, { targetRatio, maxTextureDimension });
-      setResult(optimized); setPreview('after');
-      const delta = optimized.inputBytes ? (1 - optimized.outputBytes / optimized.inputBytes) * 100 : 0;
-      setStatus(`Optimization complete: ${optimized.after.triangles.toLocaleString()} triangles · ${formatBytes(optimized.outputBytes)} (${delta >= 0 ? `${delta.toFixed(1)}% smaller` : `${Math.abs(delta).toFixed(1)}% larger`}).`);
-    } catch (error) { setStatus(`Optimization failed: ${error instanceof Error ? error.message : 'GLB processing error'}`); }
-    finally { setBusy(false); }
-  }
-
-  function download() {
-    if (!result || !file) return;
-    downloadBytes(result.bytes, `${file.name.replace(/\.glb$/i, '')}.optimized.glb`, 'model/gltf-binary');
-    setStatus('Downloaded the optimized GLB. The original file was not modified.');
-  }
-
-  return <>
-    <div className="workspace-header"><div><h2>glTF / GLB optimizer</h2><p>Inspect a self-contained GLB, reduce geometry, resize supported textures, and compare the local result in an orbit viewport.</p></div></div>
-    <div className="workspace-body">
-      <div className="field"><label htmlFor="gltf-file">Binary GLB model</label><input id="gltf-file" type="file" accept=".glb,model/gltf-binary" onChange={(event) => consumeFileInput(event.target, () => chooseFile(event.target.files?.[0]))}/><small>External-resource .gltf packages are not accepted because a single-file picker cannot safely resolve their sidecar buffers/textures. Use a self-contained .glb.</small></div>
-
-      {source && result ? <>
-        <div className="workspace-grid" style={{ marginTop: 18 }}>
-          <div className="field"><label htmlFor="gltf-ratio">Target polygon ratio · {Math.round(targetRatio * 100)}%</label><input id="gltf-ratio" type="range" min="0.05" max="1" step="0.05" value={targetRatio} onChange={(event) => setTargetRatio(Number(event.target.value))}/><small>Mesh simplification is lossy below 100%; use the viewport to inspect silhouette and topology changes.</small></div>
-          <div className="field"><label htmlFor="gltf-texture">Maximum texture dimension</label><select id="gltf-texture" value={maxTextureDimension} onChange={(event) => setMaxTextureDimension(Number(event.target.value))}><option value="512">512 px</option><option value="1024">1024 px</option><option value="2048">2048 px</option><option value="4096">4096 px</option><option value="8192">8192 px</option></select><small>PNG/JPEG/WebP textures are locally resized/re-encoded to WebP when this browser supports the required decoder/encoder path.</small></div>
-        </div>
-        <div className="button-row"><button className="action-button" type="button" disabled={busy} onClick={() => void optimize()}>{busy ? 'Optimizing locally…' : 'Optimize GLB'}</button><button className="action-button secondary" type="button" disabled={!result} onClick={download}>Download GLB</button><button className="action-button secondary" type="button" onClick={() => setPreview((value) => value === 'before' ? 'after' : 'before')}>Show {preview === 'before' ? 'after' : 'before'}</button><label className="check-item"><input type="checkbox" checked={wireframe} onChange={(event) => setWireframe(event.target.checked)}/><span>Wireframe</span></label></div>
-
-        <div className="metric-row"><div className="metric"><span>View</span><strong>{preview}</strong></div><div className="metric"><span>Bytes</span><strong>{formatBytes(preview === 'after' ? result.outputBytes : result.inputBytes)}</strong></div><div className="metric"><span>Meshes</span><strong>{(preview === 'after' ? result.after : result.before).meshes}</strong></div><div className="metric"><span>Triangles</span><strong>{(preview === 'after' ? result.after : result.before).triangles.toLocaleString()}</strong></div><div className="metric"><span>Vertices</span><strong>{(preview === 'after' ? result.after : result.before).vertices.toLocaleString()}</strong></div><div className="metric"><span>Textures</span><strong>{(preview === 'after' ? result.after : result.before).textures}</strong></div></div>
-        <GltfViewport bytes={previewBytes} wireframe={wireframe}/>
-      </> : null}
-      <div className={`status-line ${source ? 'good' : ''}`} role="status">{status}</div>
-    </div>
-  </>;
+export default function GltfWorkspace(){
+ const abortRef=useRef<AbortController|null>(null);const [file,setFile]=useState<File|null>(null),[source,setSource]=useState<Uint8Array|null>(null),[inspection,setInspection]=useState<GltfInspection|null>(null),[result,setResult]=useState<GltfOptimizeResult|null>(null);const [targetRatio,setTargetRatio]=useState(.65),[maxTextureDimension,setMaxTextureDimension]=useState(2048),[preview,setPreview]=useState<'before'|'after'>('before'),[wireframe,setWireframe]=useState(false),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[stage,setStage]=useState(''),[status,setStatus]=useState('Choose a binary GLB model to inspect and optimize locally.');
+ useEffect(()=>()=>abortRef.current?.abort(),[]);
+ useEffect(()=>{setResult(null);setPreview('before');},[targetRatio,maxTextureDimension]);
+ const previewBytes=useMemo(()=>preview==='after'&&result?result.bytes:source,[preview,result,source]);
+ const previewBlocked=inspection?.previewBlockers.length?true:false;
+ async function chooseFile(next:File|undefined){if(!next)return;abortRef.current?.abort();setBusy(true);setFile(next);setResult(null);setInspection(null);setPreview('before');setStatus('Inspecting the original GLB without transforming it…');try{const bytes=new Uint8Array(await next.arrayBuffer());const inspected=await inspectGlb(bytes);setSource(bytes);setInspection(inspected);const blockerText=inspected.transformBlockers.length?` ${inspected.transformBlockers.join(' ')}`:'';setStatus(`Loaded original bytes unchanged: ${inspected.stats.meshes} mesh${inspected.stats.meshes===1?'':'es'} · ${inspected.stats.triangles.toLocaleString()} triangles · ${inspected.stats.cameras} camera${inspected.stats.cameras===1?'':'s'}.${blockerText}`);}catch(error){setSource(null);setInspection(null);setStatus(`GLB inspection failed: ${error instanceof Error?error.message:'unsupported model'}`);}finally{setBusy(false);}}
+ async function optimize(){if(!source)return;const controller=new AbortController();abortRef.current=controller;setBusy(true);setProgress(0);setStage('Starting');setStatus('Optimizing geometry and resizing only supported textures locally…');try{const optimized=await optimizeGlb(source,{targetRatio,maxTextureDimension},{signal:controller.signal,onProgress:(value,nextStage)=>{setProgress(value);setStage(nextStage);}});if(controller.signal.aborted)return;setResult(optimized);setPreview('after');const delta=optimized.inputBytes?(1-optimized.outputBytes/optimized.inputBytes)*100:0;setStatus(`Optimization complete: ${optimized.after.triangles.toLocaleString()} triangles · ${formatBytes(optimized.outputBytes)} (${delta>=0?`${delta.toFixed(1)}% smaller`:`${Math.abs(delta).toFixed(1)}% larger`}). ${optimized.report.resizedTextures} texture${optimized.report.resizedTextures===1?'':'s'} resized without changing image format.`);}catch(error){setStatus(error instanceof DOMException&&error.name==='AbortError'?'Optimization canceled; original and last completed output remain unchanged.':`Optimization failed: ${error instanceof Error?error.message:'GLB processing error'}`);}finally{if(abortRef.current===controller)abortRef.current=null;setBusy(false);}}
+ function download(){if(!result||!file)return;downloadBytes(result.bytes,`${file.name.replace(/\.glb$/i,'')}.optimized.glb`,'model/gltf-binary');setStatus('Downloaded the optimized GLB. The original file was not modified.');}
+ const stats=preview==='after'&&result?result.after:inspection?.stats;
+ return <><div className="workspace-header"><div><h2>glTF / GLB optimizer</h2><p>Inspect the original GLB without rewriting it, then apply explicitly selected geometry and texture transforms.</p></div></div><div className="workspace-body"><div className="field"><label htmlFor="gltf-file">Binary GLB model</label><input id="gltf-file" type="file" accept=".glb,model/gltf-binary" onChange={(event)=>consumeFileInput(event.target,()=>chooseFile(event.target.files?.[0]))}/><small>Inspection is read-only. External-resource .gltf packages are not accepted.</small></div>
+ {source&&inspection?<><div className="metric-row"><div className="metric"><span>Original bytes</span><strong>{formatBytes(source.byteLength)}</strong></div><div className="metric"><span>Meshes</span><strong>{inspection.stats.meshes}</strong></div><div className="metric"><span>Cameras</span><strong>{inspection.stats.cameras}</strong></div><div className="metric"><span>Animations</span><strong>{inspection.stats.animations}</strong></div><div className="metric"><span>Textures</span><strong>{inspection.stats.textures}</strong></div></div>
+ <details style={{marginTop:16}}><summary>Extension and texture preflight</summary><div className="notice"><strong>Extensions used:</strong> {inspection.extensionsUsed.join(', ')||'none'}<br/><strong>Required:</strong> {inspection.extensionsRequired.join(', ')||'none'}<br/><strong>Image formats:</strong> {inspection.textureFormats.join(', ')||'none detected'}</div>{inspection.transformBlockers.map((message)=><div className="notice" key={message}>{message}</div>)}{inspection.previewBlockers.map((message)=><div className="notice" key={message}>{message}</div>)}</details>
+ <div className="workspace-grid" style={{marginTop:18}}><div className="field"><label htmlFor="gltf-ratio">Target polygon ratio · {Math.round(targetRatio*100)}%</label><input id="gltf-ratio" type="range" min="0.05" max="1" step="0.05" value={targetRatio} onChange={(event)=>setTargetRatio(Number(event.target.value))}/><small>Below 100% is lossy. Settings changes invalidate the previous optimized output.</small></div><div className="field"><label htmlFor="gltf-texture">Maximum texture dimension</label><select id="gltf-texture" value={maxTextureDimension} onChange={(event)=>setMaxTextureDimension(Number(event.target.value))}>{[512,1024,2048,4096,8192].map((size)=><option value={size} key={size}>{size} px</option>)}</select><small>Oversized PNG/JPEG/WebP images are resized only when the browser can re-encode the same MIME format.</small></div></div>
+ <div className="button-row"><button className="action-button" type="button" disabled={busy||inspection.transformBlockers.length>0} onClick={()=>void optimize()}>{busy?'Optimizing locally…':'Optimize GLB'}</button>{busy?<button className="action-button secondary" type="button" onClick={()=>abortRef.current?.abort()}>Cancel optimization</button>:null}<button className="action-button secondary" type="button" disabled={!result||busy} onClick={download}>Download optimized GLB</button>{result?<button className="action-button secondary" type="button" onClick={()=>setPreview((value)=>value==='before'?'after':'before')}>Show {preview==='before'?'after':'before'}</button>:null}<label className="check-item"><input type="checkbox" checked={wireframe} onChange={(event)=>setWireframe(event.target.checked)}/><span>Wireframe</span></label></div>
+ {busy?<div style={{marginTop:14}}><progress max={1} value={progress} style={{width:'100%'}} aria-label="GLB optimization progress"/><small>{stage}</small></div>:null}
+ {stats?<div className="metric-row"><div className="metric"><span>View</span><strong>{preview}</strong></div><div className="metric"><span>Bytes</span><strong>{formatBytes(preview==='after'&&result?result.outputBytes:source.byteLength)}</strong></div><div className="metric"><span>Triangles</span><strong>{stats.triangles.toLocaleString()}</strong></div><div className="metric"><span>Vertices</span><strong>{stats.vertices.toLocaleString()}</strong></div><div className="metric"><span>Cameras</span><strong>{stats.cameras}</strong></div></div>:null}
+ {!previewBlocked?<GltfViewport bytes={previewBytes} wireframe={wireframe}/>:<div className="notice" style={{marginTop:18}}>Preview disabled because this model requires a decoder/transcoder not bundled by this build. The source remains untouched.</div>}
+ {result?<details style={{marginTop:16}}><summary>Optimization report</summary><div className="notice"><strong>Settings:</strong> {Math.round(result.options.targetRatio*100)}% geometry · {result.options.maxTextureDimension}px texture cap<br/><strong>Stages:</strong> {result.report.stages.join(' · ')}<br/><strong>Textures resized:</strong> {result.report.resizedTextures}<br/><strong>Camera count preserved:</strong> {result.report.cameraCountPreserved?'yes':'no'}</div>{result.report.skippedTextures.length?<ul>{result.report.skippedTextures.map((item)=><li key={item}>{item}</li>)}</ul>:null}</details>:null}
+ </>:null}<div className={`status-line ${source?'good':''}`} role="status">{status}</div></div></>;
 }

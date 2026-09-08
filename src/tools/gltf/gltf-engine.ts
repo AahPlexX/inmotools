@@ -1,147 +1,42 @@
 import { WebIO, type Document, type Primitive } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, simplify, weld } from '@gltf-transform/functions';
+import { dedup, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
 
-export type GltfOptimizeOptions = {
-  targetRatio: number;
-  maxTextureDimension: number;
-};
+export type GltfOptimizeOptions = { targetRatio: number; maxTextureDimension: number };
+export type GltfStats = { meshes:number; primitives:number; vertices:number; triangles:number; textures:number; cameras:number; animations:number };
+export type GltfInspection = { stats:GltfStats; inputBytes:number; extensionsUsed:string[]; extensionsRequired:string[]; transformBlockers:string[]; previewBlockers:string[]; textureFormats:string[] };
+export type GltfOptimizeReport = { resizedTextures:number; skippedTextures:string[]; preservedTextureFormats:true; cameraCountPreserved:boolean; stages:string[] };
+export type GltfOptimizeResult = { bytes:Uint8Array; inputBytes:number; outputBytes:number; before:GltfStats; after:GltfStats; options:GltfOptimizeOptions; report:GltfOptimizeReport };
+export type GltfRunControl = { signal?:AbortSignal; onProgress?:(progress:number,stage:string)=>void };
 
-export type GltfStats = {
-  meshes: number;
-  primitives: number;
-  vertices: number;
-  triangles: number;
-  textures: number;
-};
+export function clampGltfOptions(options:Partial<GltfOptimizeOptions>):GltfOptimizeOptions { return { targetRatio:Number.isFinite(options.targetRatio)?Math.max(.05,Math.min(1,Number(options.targetRatio))):.6, maxTextureDimension:Number.isFinite(options.maxTextureDimension)?Math.max(64,Math.min(8192,Math.round(Number(options.maxTextureDimension)))):2048 }; }
+function primitiveElementCount(primitive:Primitive){return primitive.getIndices()?.getCount()??primitive.getAttribute('POSITION')?.getCount()??0;}
+function primitiveTriangleCount(primitive:Primitive){const count=primitiveElementCount(primitive),mode=Number(primitive.getMode());if(mode===4)return Math.floor(count/3);if(mode===5||mode===6)return Math.max(0,count-2);return 0;}
+function collectStats(document:Document):GltfStats { const root=document.getRoot();let primitives=0,vertices=0,triangles=0;for(const mesh of root.listMeshes())for(const primitive of mesh.listPrimitives()){primitives++;vertices+=primitive.getAttribute('POSITION')?.getCount()??0;triangles+=primitiveTriangleCount(primitive);}return{meshes:root.listMeshes().length,primitives,vertices,triangles,textures:root.listTextures().length,cameras:root.listCameras().length,animations:root.listAnimations().length}; }
+function createIo(){return new WebIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.decoder':MeshoptDecoder});}
+function throwIfAborted(signal?:AbortSignal){if(signal?.aborted)throw new DOMException('Optimization canceled.','AbortError');}
 
-export type GltfOptimizeResult = {
-  bytes: Uint8Array;
-  inputBytes: number;
-  outputBytes: number;
-  before: GltfStats;
-  after: GltfStats;
-  options: GltfOptimizeOptions;
-};
-
-export function clampGltfOptions(options: Partial<GltfOptimizeOptions>): GltfOptimizeOptions {
-  const targetRatio = Number.isFinite(options.targetRatio)
-    ? Math.max(0.05, Math.min(1, Number(options.targetRatio)))
-    : 0.6;
-  const maxTextureDimension = Number.isFinite(options.maxTextureDimension)
-    ? Math.max(64, Math.min(8192, Math.round(Number(options.maxTextureDimension))))
-    : 2048;
-  return { targetRatio, maxTextureDimension };
+export function readGlbJson(input:Uint8Array):Record<string,any>{
+ if(input.byteLength<20)throw new Error('The selected file is too small to be a GLB document.');const view=new DataView(input.buffer,input.byteOffset,input.byteLength);if(view.getUint32(0,true)!==0x46546c67)throw new Error('File is not a binary GLB document.');if(view.getUint32(4,true)!==2)throw new Error('Only glTF 2.0 GLB files are supported.');const jsonLength=view.getUint32(12,true),jsonType=view.getUint32(16,true);if(jsonType!==0x4e4f534a||20+jsonLength>input.byteLength)throw new Error('GLB JSON chunk is missing or invalid.');return JSON.parse(new TextDecoder().decode(input.subarray(20,20+jsonLength)).trim());
 }
 
-function primitiveElementCount(primitive: Primitive): number {
-  return primitive.getIndices()?.getCount() ?? primitive.getAttribute('POSITION')?.getCount() ?? 0;
+export async function inspectGlb(input:Uint8Array):Promise<GltfInspection>{
+ const json=readGlbJson(input);const extensionsUsed=Array.isArray(json.extensionsUsed)?json.extensionsUsed.map(String):[];const extensionsRequired=Array.isArray(json.extensionsRequired)?json.extensionsRequired.map(String):[];const transformBlockers:string[]=[],previewBlockers:string[]=[];
+ if(extensionsUsed.includes('KHR_draco_mesh_compression')){const message='KHR_draco_mesh_compression requires a Draco decoder, which this build does not bundle.';transformBlockers.push(`${message} Transformation is disabled to avoid corrupt output.`);previewBlockers.push(`${message} Preview is disabled instead of rendering an incomplete model.`);}
+ if(extensionsUsed.includes('KHR_texture_basisu'))previewBlockers.push('KHR_texture_basisu preview requires a KTX2 transcoder, which this build does not bundle. Optimization can preserve the texture unchanged.');
+ const textureFormats=[...new Set((json.images??[]).map((image:any)=>String(image?.mimeType??'unknown')))];
+ if(transformBlockers.length){return{stats:{meshes:(json.meshes??[]).length,primitives:(json.meshes??[]).reduce((sum:number,mesh:any)=>sum+(mesh.primitives?.length??0),0),vertices:0,triangles:0,textures:(json.textures??[]).length,cameras:(json.cameras??[]).length,animations:(json.animations??[]).length},inputBytes:input.byteLength,extensionsUsed,extensionsRequired,transformBlockers,previewBlockers,textureFormats};}
+ await MeshoptDecoder.ready;const document=await createIo().readBinary(input);return{stats:collectStats(document),inputBytes:input.byteLength,extensionsUsed,extensionsRequired,transformBlockers,previewBlockers,textureFormats};
 }
 
-function primitiveTriangleCount(primitive: Primitive): number {
-  const count = primitiveElementCount(primitive);
-  const mode = Number(primitive.getMode());
-  if (mode === 4) return Math.floor(count / 3); // TRIANGLES
-  if (mode === 5 || mode === 6) return Math.max(0, count - 2); // STRIP / FAN
-  return 0;
+async function resizeBrowserTextures(document:Document,maximumDimension:number,control:GltfRunControl,report:GltfOptimizeReport){
+ if(typeof createImageBitmap==='undefined'||typeof OffscreenCanvas==='undefined'){report.skippedTextures.push('Texture resize unavailable: browser image/canvas APIs are missing.');return;}
+ const textures=document.getRoot().listTextures();for(let index=0;index<textures.length;index++){throwIfAborted(control.signal);const texture=textures[index],image=texture.getImage(),mimeType=texture.getMimeType();control.onProgress?.(.45+.35*(index/Math.max(1,textures.length)),`Inspecting texture ${index+1} of ${textures.length}`);if(!image||!mimeType||!/^image\/(png|jpeg|webp)$/i.test(mimeType)){report.skippedTextures.push(`${texture.getName()||`Texture ${index+1}`}: unsupported or unknown image format.`);continue;}let bitmap:ImageBitmap|null=null;try{bitmap=await createImageBitmap(new Blob([image.slice().buffer],{type:mimeType}));const longest=Math.max(bitmap.width,bitmap.height);if(longest<=maximumDimension)continue;const scale=maximumDimension/longest,width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));const canvas=new OffscreenCanvas(width,height),context=canvas.getContext('2d');if(!context){report.skippedTextures.push(`${texture.getName()||`Texture ${index+1}`}: 2D canvas unavailable.`);continue;}context.drawImage(bitmap,0,0,width,height);const quality=mimeType==='image/jpeg'||mimeType==='image/webp'?0.9:undefined;const encoded=await canvas.convertToBlob(quality===undefined?{type:mimeType}:{type:mimeType,quality});if(encoded.type!==mimeType||!encoded.size){report.skippedTextures.push(`${texture.getName()||`Texture ${index+1}`}: browser could not re-encode ${mimeType} without changing format.`);continue;}texture.setImage(new Uint8Array(await encoded.arrayBuffer()));texture.setMimeType(mimeType);report.resizedTextures++;}catch{report.skippedTextures.push(`${texture.getName()||`Texture ${index+1}`}: decode/resize failed; original preserved.`);}finally{bitmap?.close();}}
 }
 
-function collectStats(document: Document): GltfStats {
-  const root = document.getRoot();
-  const meshes = root.listMeshes();
-  let primitives = 0;
-  let vertices = 0;
-  let triangles = 0;
-  for (const mesh of meshes) {
-    for (const primitive of mesh.listPrimitives()) {
-      primitives += 1;
-      vertices += primitive.getAttribute('POSITION')?.getCount() ?? 0;
-      triangles += primitiveTriangleCount(primitive);
-    }
-  }
-  return {
-    meshes: meshes.length,
-    primitives,
-    vertices,
-    triangles,
-    textures: root.listTextures().length,
-  };
-}
-
-function createIo(): WebIO {
-  return new WebIO()
-    .registerExtensions(ALL_EXTENSIONS)
-    .registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
-}
-
-
-async function resizeBrowserTextures(document: Document, maximumDimension: number): Promise<void> {
-  if (typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') return;
-  for (const texture of document.getRoot().listTextures()) {
-    const image = texture.getImage();
-    const mimeType = texture.getMimeType();
-    if (!image || !mimeType || !/^image\/(png|jpeg|webp)$/i.test(mimeType)) continue;
-    let bitmap: ImageBitmap | null = null;
-    try {
-      bitmap = await createImageBitmap(new Blob([image.slice().buffer], { type: mimeType }));
-      const longest = Math.max(bitmap.width, bitmap.height);
-      const scale = Math.min(1, maximumDimension / Math.max(1, longest));
-      if (scale >= 1 && mimeType === 'image/webp') continue;
-      const width = Math.max(1, Math.round(bitmap.width * scale));
-      const height = Math.max(1, Math.round(bitmap.height * scale));
-      const canvas = new OffscreenCanvas(width, height);
-      const context = canvas.getContext('2d');
-      if (!context) continue;
-      context.drawImage(bitmap, 0, 0, width, height);
-      const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
-      if (encoded.type !== 'image/webp' || !encoded.size) continue;
-      texture.setImage(new Uint8Array(await encoded.arrayBuffer()));
-      texture.setMimeType('image/webp');
-    } catch {
-      // Browser decoder/encoder support is optional. Preserve the original texture on failure.
-    } finally {
-      bitmap?.close();
-    }
-  }
-}
-
-export async function optimizeGlb(
-  input: Uint8Array,
-  requestedOptions: GltfOptimizeOptions,
-): Promise<GltfOptimizeResult> {
-  if (input.byteLength < 12) throw new Error('The selected file is too small to be a GLB document.');
-  const options = clampGltfOptions(requestedOptions);
-  await MeshoptDecoder.ready;
-  const io = createIo();
-  const document = await io.readBinary(input);
-  const before = collectStats(document);
-
-  if (options.targetRatio < 0.999 && before.triangles > 1) {
-    await MeshoptSimplifier.ready;
-    await document.transform(
-      weld(),
-      simplify({
-        simplifier: MeshoptSimplifier,
-        ratio: options.targetRatio,
-        error: 0.01,
-      }),
-      dedup(),
-      prune(),
-    );
-  } else {
-    await document.transform(dedup(), prune());
-  }
-
-  await resizeBrowserTextures(document, options.maxTextureDimension);
-  const after = collectStats(document);
-  const bytes = await io.writeBinary(document);
-  return {
-    bytes,
-    inputBytes: input.byteLength,
-    outputBytes: bytes.byteLength,
-    before,
-    after,
-    options,
-  };
+export async function optimizeGlb(input:Uint8Array,requestedOptions:GltfOptimizeOptions,control:GltfRunControl={}):Promise<GltfOptimizeResult>{
+ const inspection=await inspectGlb(input);if(inspection.transformBlockers.length)throw new Error(inspection.transformBlockers.join(' '));throwIfAborted(control.signal);const options=clampGltfOptions(requestedOptions);control.onProgress?.(.08,'Reading GLB without modifying source');await MeshoptDecoder.ready;const io=createIo(),document=await io.readBinary(input),before=collectStats(document);const report:GltfOptimizeReport={resizedTextures:0,skippedTextures:[],preservedTextureFormats:true,cameraCountPreserved:true,stages:[]};
+ if(options.targetRatio<.999&&before.triangles>1){throwIfAborted(control.signal);control.onProgress?.(.2,'Simplifying mesh geometry');await MeshoptSimplifier.ready;await document.transform(weld(),simplify({simplifier:MeshoptSimplifier,ratio:options.targetRatio,error:.01}),dedup());report.stages.push('Mesh simplification');}else report.stages.push('Geometry unchanged (100% target)');
+ throwIfAborted(control.signal);await resizeBrowserTextures(document,options.maxTextureDimension,control,report);report.stages.push('Texture resize with original MIME formats preserved');const after=collectStats(document);report.cameraCountPreserved=after.cameras===before.cameras;if(!report.cameraCountPreserved)throw new Error('Optimization unexpectedly changed the camera count; output was not written.');throwIfAborted(control.signal);control.onProgress?.(.88,'Writing optimized GLB');const bytes=await io.writeBinary(document);control.onProgress?.(1,'Optimization complete');return{bytes,inputBytes:input.byteLength,outputBytes:bytes.byteLength,before,after,options,report};
 }
