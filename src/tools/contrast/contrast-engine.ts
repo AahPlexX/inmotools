@@ -1,126 +1,23 @@
 import { calcAPCA } from 'apca-w3';
 import { converter, formatHex, parse } from 'culori';
 
-export type ContrastRole = 'body' | 'large' | 'ui';
-
-export type ColorToken = {
-  name: string;
-  source: string;
-  hex: string;
-};
-
-export type ColorTokenError = {
-  line: number;
-  source: string;
-  message: string;
-};
-
-export type ColorTokenParseResult = {
-  tokens: ColorToken[];
-  errors: ColorTokenError[];
-};
-
-export type ContrastCell = {
-  foreground: ColorToken;
-  background: ColorToken;
-  apcaLc: number;
-  wcag: number;
-  guidanceLabel: string;
-};
-
-const APCA_GUIDANCE: Record<ContrastRole, { minimumLc: number; label: string }> = {
-  body: { minimumLc: 75, label: 'body text' },
-  large: { minimumLc: 60, label: 'large text' },
-  ui: { minimumLc: 45, label: 'UI graphics/text' },
-};
-
-const toRgb = converter('rgb');
-
-function normalizeHex(value: string): string | null {
-  const parsed = parse(value.trim());
-  if (!parsed) return null;
-  try {
-    const hex = formatHex(parsed);
-    return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toLowerCase() : null;
-  } catch {
-    return null;
-  }
-}
-
-export function parseTokenLines(text: string): ColorTokenParseResult {
-  const tokens: ColorToken[] = [];
-  const errors: ColorTokenError[] = [];
-
-  text.split(/\r?\n/).forEach((rawLine, index) => {
-    const source = rawLine.trim();
-    if (!source || source.startsWith('# ')) return;
-
-    const withoutSemicolon = source.endsWith(';') ? source.slice(0, -1).trim() : source;
-    const separator = withoutSemicolon.match(/^(.+?)\s*([:=])\s*(.+)$/);
-    if (!separator) {
-      errors.push({ line: index + 1, source, message: 'Expected a token name followed by : or = and a CSS color.' });
-      return;
-    }
-
-    const name = separator[1].trim();
-    const colorSource = separator[3].trim();
-    const hex = normalizeHex(colorSource);
-    if (!name || !hex) {
-      errors.push({ line: index + 1, source, message: 'Invalid CSS color token.' });
-      return;
-    }
-
-    tokens.push({ name, source: colorSource, hex });
-  });
-
-  return { tokens, errors };
-}
-
-function linearize(channel: number): number {
-  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-}
-
-function relativeLuminance(color: string): number {
-  const parsed = parse(color);
-  const rgb = parsed ? toRgb(parsed) : undefined;
-  if (!rgb || !Number.isFinite(rgb.r) || !Number.isFinite(rgb.g) || !Number.isFinite(rgb.b)) {
-    throw new Error(`Invalid CSS color: ${color}`);
-  }
-  return 0.2126 * linearize(rgb.r) + 0.7152 * linearize(rgb.g) + 0.0722 * linearize(rgb.b);
-}
-
-export function wcagContrast(foreground: string, background: string): number {
-  const first = relativeLuminance(foreground);
-  const second = relativeLuminance(background);
-  const lighter = Math.max(first, second);
-  const darker = Math.min(first, second);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function apcaContrast(foreground: string, background: string): number {
-  const value = Number(calcAPCA(foreground, background));
-  return Number.isFinite(value) ? value : 0;
-}
-
-export function buildContrastMatrix(tokens: ColorToken[], role: ContrastRole): ContrastCell[] {
-  const guidance = APCA_GUIDANCE[role];
-  const cells: ContrastCell[] = [];
-
-  for (const foreground of tokens) {
-    for (const background of tokens) {
-      const apcaLc = apcaContrast(foreground.hex, background.hex);
-      const passesGuidance = Math.abs(apcaLc) >= guidance.minimumLc;
-      cells.push({
-        foreground,
-        background,
-        apcaLc,
-        wcag: wcagContrast(foreground.hex, background.hex),
-        guidanceLabel: passesGuidance
-          ? `APCA guidance: meets selected ${guidance.label} target (|Lc| ≥ ${guidance.minimumLc}).`
-          : `APCA guidance: below selected ${guidance.label} target (|Lc| < ${guidance.minimumLc}).`,
-      });
-    }
-  }
-
-  return cells;
-}
+export type ContrastRole='body'|'large'|'ui';
+type Rgba={r:number;g:number;b:number;alpha:number};
+export type ColorToken={name:string;source:string;hex:string;alpha:number;rgba:Rgba};
+export type ColorTokenError={line:number;source:string;message:string};
+export type ColorTokenParseResult={tokens:ColorToken[];errors:ColorTokenError[]};
+export type ContrastCell={foreground:ColorToken;background:ColorToken;resolvedForeground:string;resolvedBackground:string;apcaLc:number;wcag:number;passesGuidance:boolean;guidanceLabel:string};
+const APCA_GUIDANCE:Record<ContrastRole,{minimumLc:number;label:string}>={body:{minimumLc:75,label:'body text'},large:{minimumLc:60,label:'large text'},ui:{minimumLc:45,label:'UI graphics/text'}};
+const toRgb=converter('rgb');
+export function tokenCssName(name:string){return name.startsWith('--')?name:`--${name.replace(/[^a-z0-9_-]+/gi,'-').toLowerCase()}`}
+function parseRgba(value:string):Rgba|null{const parsed=parse(value.trim());if(!parsed)return null;try{const rgb=toRgb(parsed);if(!rgb||![rgb.r,rgb.g,rgb.b].every(component=>typeof component==='number'&&Number.isFinite(component)))return null;const alpha=typeof rgb.alpha==='number'&&Number.isFinite(rgb.alpha)?Math.max(0,Math.min(1,rgb.alpha)):1;return{r:rgb.r,g:rgb.g,b:rgb.b,alpha}}catch{return null}}
+function hexOf(rgba:Rgba){const value=formatHex({mode:'rgb',r:rgba.r,g:rgba.g,b:rgba.b});return /^#[0-9a-f]{6}$/i.test(value)?value.toLowerCase():'#000000'}
+export function parseTokenLines(text:string):ColorTokenParseResult{const tokens:ColorToken[]=[],errors:ColorTokenError[]=[],usedNames=new Set<string>();text.split(/\r?\n/).forEach((rawLine,index)=>{const source=rawLine.trim();if(!source||source.startsWith('# '))return;const withoutSemicolon=source.endsWith(';')?source.slice(0,-1).trim():source;const separator=withoutSemicolon.match(/^(.+?)\s*([:=])\s*(.+)$/);if(!separator){errors.push({line:index+1,source,message:'Expected a token name followed by : or = and a CSS color.'});return}const name=separator[1].trim(),colorSource=separator[3].trim(),rgba=parseRgba(colorSource);if(!name||!rgba){errors.push({line:index+1,source,message:'Invalid CSS color token.'});return}const cssName=tokenCssName(name);if(usedNames.has(cssName)){errors.push({line:index+1,source,message:`Duplicate exported token name: ${cssName}.`});return}usedNames.add(cssName);tokens.push({name,source:colorSource,hex:hexOf(rgba),alpha:rgba.alpha,rgba})});return{tokens,errors}}
+function composite(front:Rgba,back:Rgba):Rgba{const alpha=front.alpha+back.alpha*(1-front.alpha);if(alpha<=0)return{r:0,g:0,b:0,alpha:0};return{r:(front.r*front.alpha+back.r*back.alpha*(1-front.alpha))/alpha,g:(front.g*front.alpha+back.g*back.alpha*(1-front.alpha))/alpha,b:(front.b*front.alpha+back.b*back.alpha*(1-front.alpha))/alpha,alpha}}
+export function resolveBackdrop(value:string):Rgba{const parsed=parseRgba(value);if(!parsed)throw new Error('Backdrop must be a valid CSS color.');if(parsed.alpha<.999999)throw new Error('Backdrop must be opaque so translucent tokens resolve deterministically.');return{...parsed,alpha:1}}
+export function resolvePair(foreground:ColorToken,background:ColorToken,backdrop='#ffffff'){const base=resolveBackdrop(backdrop),resolvedBackground=composite(background.rgba,base),resolvedForeground=composite(foreground.rgba,resolvedBackground);return{foreground:hexOf({...resolvedForeground,alpha:1}),background:hexOf({...resolvedBackground,alpha:1})}}
+function linearize(channel:number){return channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4}
+function relativeLuminance(color:string){const rgba=parseRgba(color);if(!rgba)throw new Error(`Invalid CSS color: ${color}`);return .2126*linearize(rgba.r)+.7152*linearize(rgba.g)+.0722*linearize(rgba.b)}
+export function wcagContrast(foreground:string,background:string):number{const first=relativeLuminance(foreground),second=relativeLuminance(background),lighter=Math.max(first,second),darker=Math.min(first,second);return(lighter+.05)/(darker+.05)}
+function apcaContrast(foreground:string,background:string){const value=Number(calcAPCA(foreground,background));return Number.isFinite(value)?value:0}
+export function buildContrastMatrix(tokens:ColorToken[],role:ContrastRole,backdrop='#ffffff'):ContrastCell[]{const guidance=APCA_GUIDANCE[role],cells:ContrastCell[]=[];resolveBackdrop(backdrop);for(const foreground of tokens)for(const background of tokens){if(foreground===background)continue;const resolved=resolvePair(foreground,background,backdrop),apcaLc=apcaContrast(resolved.foreground,resolved.background),passesGuidance=Math.abs(apcaLc)>=guidance.minimumLc;cells.push({foreground,background,resolvedForeground:resolved.foreground,resolvedBackground:resolved.background,apcaLc,wcag:wcagContrast(resolved.foreground,resolved.background),passesGuidance,guidanceLabel:passesGuidance?`APCA guidance: meets selected ${guidance.label} target (|Lc| ≥ ${guidance.minimumLc}).`:`APCA guidance: below selected ${guidance.label} target (|Lc| < ${guidance.minimumLc}).`})}return cells}

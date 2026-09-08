@@ -1,92 +1,19 @@
 import { useMemo, useState } from 'react';
+import { PagedTable } from '../../components/PagedTable';
 import { downloadText } from '../../lib/download';
-import { buildContrastMatrix, parseTokenLines, type ColorToken, type ContrastRole } from './contrast-engine';
+import { buildContrastMatrix, parseTokenLines, tokenCssName, type ColorToken, type ContrastCell, type ContrastRole } from './contrast-engine';
 
-const DEFAULT_TOKENS = `--ink: #101820;
---paper: #ffffff;
---signal: #205bd6;
---signal-soft: oklch(95% 0.025 255);
---muted: hsl(215 12% 42%);
---danger: #a52a2a;`;
+const DEFAULT_TOKENS=`--ink: #101820;\n--paper: #ffffff;\n--signal: #205bd6;\n--signal-soft: oklch(95% 0.025 255);\n--muted: hsl(215 12% 42%);\n--danger: #a52a2a;`;
+type PreviewMode='none'|'protanopia'|'deuteranopia'|'tritanopia';
+const CVD_MATRICES:Record<Exclude<PreviewMode,'none'>,number[]>={protanopia:[.56667,.43333,0,.55833,.44167,0,0,.24167,.75833],deuteranopia:[.625,.375,0,.7,.3,0,0,.3,.7],tritanopia:[.95,.05,0,0,.43333,.56667,0,.475,.525]};
+function simulate(hex:string,mode:PreviewMode){if(mode==='none')return hex;const value=hex.replace('#',''),rgb=[0,2,4].map(index=>Number.parseInt(value.slice(index,index+2),16)),matrix=CVD_MATRICES[mode],next=[0,1,2].map(row=>Math.max(0,Math.min(255,Math.round(rgb[0]*matrix[row*3]+rgb[1]*matrix[row*3+1]+rgb[2]*matrix[row*3+2]))));return`#${next.map(channel=>channel.toString(16).padStart(2,'0')).join('')}`}
+function csvCell(value:unknown){const text=String(value??'');return/[",\r\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text}
 
-type PreviewMode = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia';
-
-const CVD_MATRICES: Record<Exclude<PreviewMode, 'none'>, number[]> = {
-  protanopia: [0.56667, 0.43333, 0, 0.55833, 0.44167, 0, 0, 0.24167, 0.75833],
-  deuteranopia: [0.625, 0.375, 0, 0.7, 0.3, 0, 0, 0.3, 0.7],
-  tritanopia: [0.95, 0.05, 0, 0, 0.43333, 0.56667, 0, 0.475, 0.525],
-};
-
-function simulate(hex: string, mode: PreviewMode): string {
-  if (mode === 'none') return hex;
-  const value = hex.replace('#', '');
-  const rgb = [0, 2, 4].map((index) => Number.parseInt(value.slice(index, index + 2), 16));
-  const matrix = CVD_MATRICES[mode];
-  const next = [0, 1, 2].map((row) => Math.max(0, Math.min(255, Math.round(
-    rgb[0] * matrix[row * 3] + rgb[1] * matrix[row * 3 + 1] + rgb[2] * matrix[row * 3 + 2],
-  ))));
-  return `#${next.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function cssName(token: ColorToken): string {
-  return token.name.startsWith('--') ? token.name : `--${token.name.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase()}`;
-}
-
-export default function ContrastWorkspace() {
-  const [source, setSource] = useState(DEFAULT_TOKENS);
-  const [role, setRole] = useState<ContrastRole>('body');
-  const [view, setView] = useState<'table' | 'heatmap'>('table');
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('none');
-  const [foregroundName, setForegroundName] = useState('--ink');
-  const [backgroundName, setBackgroundName] = useState('--paper');
-  const [status, setStatus] = useState('Edit color tokens to build a local APCA/WCAG comparison matrix.');
-
-  const parsed = useMemo(() => parseTokenLines(source), [source]);
-  const cells = useMemo(() => buildContrastMatrix(parsed.tokens, role), [parsed.tokens, role]);
-  const foreground = parsed.tokens.find((token) => token.name === foregroundName) ?? parsed.tokens[0];
-  const background = parsed.tokens.find((token) => token.name === backgroundName) ?? parsed.tokens[1] ?? parsed.tokens[0];
-  const selectedCell = cells.find((cell) => cell.foreground === foreground && cell.background === background);
-
-  const css = useMemo(() => `:root {\n${parsed.tokens.map((token) => `  ${cssName(token)}: ${token.source};`).join('\n')}\n}\n`, [parsed.tokens]);
-
-  async function copyCss() {
-    try {
-      await navigator.clipboard.writeText(css);
-      setStatus(`Copied ${parsed.tokens.length} CSS custom properties.`);
-    } catch {
-      setStatus('Clipboard access was unavailable. Use Download CSS instead.');
-    }
-  }
-
-  return <>
-    <div className="workspace-header"><div><h2>APCA / OKLCH token matrix</h2><p>Compare directional APCA guidance with the conventional WCAG 2 contrast ratio.</p></div></div>
-    <div className="workspace-body">
-      <div className="notice"><strong>Important:</strong> APCA Lc is shown as perceptual guidance, not as a WCAG 2.x conformance result. The WCAG ratio is reported separately.</div>
-      <div className="workspace-grid" style={{ marginTop: 18 }}>
-        <div className="field"><label htmlFor="contrast-tokens">Color tokens</label><textarea id="contrast-tokens" value={source} onChange={(event) => setSource(event.target.value)} spellCheck={false}/><small>Use <code>name: CSS-color;</code> or <code>name = CSS-color;</code>. Hex, RGB, HSL, and OKLCH are accepted.</small></div>
-        <div>
-          <div className="field"><label htmlFor="contrast-role">APCA guidance role</label><select id="contrast-role" value={role} onChange={(event) => setRole(event.target.value as ContrastRole)}><option value="body">Body text guidance</option><option value="large">Large text guidance</option><option value="ui">UI graphics/text guidance</option></select></div>
-          <div className="field" style={{ marginTop: 14 }}><label htmlFor="contrast-view">Matrix view</label><select id="contrast-view" value={view} onChange={(event) => setView(event.target.value as 'table' | 'heatmap')}><option value="table">Accessible table</option><option value="heatmap">Compact visual matrix</option></select></div>
-          <div className="metric-row"><div className="metric"><span>Valid tokens</span><strong>{parsed.tokens.length}</strong></div><div className="metric"><span>Pairings</span><strong>{cells.length}</strong></div><div className="metric"><span>Source errors</span><strong>{parsed.errors.length}</strong></div></div>
-          {parsed.errors.length ? <div className="notice" style={{ marginTop: 14 }}><strong>Lines to fix:</strong><ul style={{ marginBottom: 0 }}>{parsed.errors.map((error) => <li key={`${error.line}-${error.source}`}>Line {error.line}: {error.source}</li>)}</ul></div> : null}
-        </div>
-      </div>
-
-      {parsed.tokens.length ? <>
-        <h3 style={{ marginTop: 24 }}>Contrast matrix</h3>
-        {view === 'table' ? <div className="result-table-wrap" tabIndex={0} aria-label="APCA and WCAG contrast matrix"><table><thead><tr><th scope="col">Foreground</th><th scope="col">Background</th><th scope="col">APCA Lc</th><th scope="col">WCAG 2 ratio</th><th scope="col">Guidance</th></tr></thead><tbody>{cells.map((cell) => <tr key={`${cell.foreground.name}-${cell.background.name}`}><td><span aria-hidden="true" style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: cell.foreground.hex, marginRight: 8, border: '1px solid var(--line)' }}/>{cell.foreground.name}</td><td><span aria-hidden="true" style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 3, background: cell.background.hex, marginRight: 8, border: '1px solid var(--line)' }}/>{cell.background.name}</td><td>{cell.apcaLc.toFixed(1)}</td><td>{cell.wcag.toFixed(2)}:1</td><td>{cell.guidanceLabel}</td></tr>)}</tbody></table></div> : <div className="result-table-wrap" tabIndex={0} aria-label="Compact contrast heatmap"><div style={{ display: 'grid', gridTemplateColumns: `repeat(${parsed.tokens.length}, minmax(104px, 1fr))`, minWidth: parsed.tokens.length * 104 }}>{cells.map((cell) => <button key={`${cell.foreground.name}-${cell.background.name}`} type="button" onClick={() => { setForegroundName(cell.foreground.name); setBackgroundName(cell.background.name); }} aria-label={`${cell.foreground.name} on ${cell.background.name}: APCA ${cell.apcaLc.toFixed(1)}, WCAG ${cell.wcag.toFixed(2)} to 1`} style={{ minHeight: 88, border: '1px solid rgba(127,127,127,.35)', background: cell.background.hex, color: cell.foreground.hex, padding: 8, textAlign: 'left' }}><strong>{cell.apcaLc.toFixed(0)} Lc</strong><br/><small>{cell.wcag.toFixed(1)}:1</small></button>)}</div></div>}
-
-        <h3 style={{ marginTop: 24 }}>Component sandbox</h3>
-        <div className="workspace-grid three">
-          <div className="field"><label htmlFor="sandbox-fg">Foreground</label><select id="sandbox-fg" value={foreground?.name ?? ''} onChange={(event) => setForegroundName(event.target.value)}>{parsed.tokens.map((token) => <option key={token.name} value={token.name}>{token.name}</option>)}</select></div>
-          <div className="field"><label htmlFor="sandbox-bg">Background</label><select id="sandbox-bg" value={background?.name ?? ''} onChange={(event) => setBackgroundName(event.target.value)}>{parsed.tokens.map((token) => <option key={token.name} value={token.name}>{token.name}</option>)}</select></div>
-          <div className="field"><label htmlFor="sandbox-cvd">Color-vision preview</label><select id="sandbox-cvd" value={previewMode} onChange={(event) => setPreviewMode(event.target.value as PreviewMode)}><option value="none">No simulation</option><option value="protanopia">Protanopia preview</option><option value="deuteranopia">Deuteranopia preview</option><option value="tritanopia">Tritanopia preview</option></select><small>Preview aid only; simulation is not a pass/fail accessibility test.</small></div>
-        </div>
-        {foreground && background ? <div style={{ marginTop: 16, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: 22, background: simulate(background.hex, previewMode), color: simulate(foreground.hex, previewMode) }}><p style={{ marginTop: 0, fontSize: 18, fontWeight: 750 }}>Readable interface sample</p><p>Use the matrix to compare perceptual APCA guidance and WCAG 2 contrast without conflating the two systems.</p><button type="button" style={{ border: `1px solid ${simulate(foreground.hex, previewMode)}`, borderRadius: 8, padding: '10px 14px', background: 'transparent', color: 'inherit', fontWeight: 700 }}>Example action</button>{selectedCell ? <p style={{ marginBottom: 0, marginTop: 16, fontSize: 12 }}>APCA {selectedCell.apcaLc.toFixed(1)} Lc · WCAG {selectedCell.wcag.toFixed(2)}:1</p> : null}</div> : null}
-
-        <div className="button-row"><button className="action-button" type="button" onClick={() => void copyCss()}>Copy CSS variables</button><button className="action-button secondary" type="button" onClick={() => { downloadText(css, 'color-tokens.css', 'text/css;charset=utf-8'); setStatus('Downloaded CSS token variables locally.'); }}>Download CSS</button></div>
-      </> : null}
-      <div className={`status-line ${parsed.tokens.length ? 'good' : ''}`} role="status">{status}</div>
-    </div>
-  </>;
+export default function ContrastWorkspace(){
+ const[source,setSource]=useState(DEFAULT_TOKENS),[role,setRole]=useState<ContrastRole>('body'),[view,setView]=useState<'table'|'heatmap'>('table'),[previewMode,setPreviewMode]=useState<PreviewMode>('none'),[foregroundName,setForegroundName]=useState('--ink'),[backgroundName,setBackgroundName]=useState('--paper'),[backdrop,setBackdrop]=useState('#ffffff'),[filter,setFilter]=useState<'all'|'pass'|'fail'>('all'),[sort,setSort]=useState<'apca-desc'|'wcag-desc'|'name'>('apca-desc'),[status,setStatus]=useState('Edit color tokens to build a local APCA/WCAG comparison matrix.');
+ const parsed=useMemo(()=>parseTokenLines(source),[source]);const matrix=useMemo(()=>{try{return{cells:buildContrastMatrix(parsed.tokens,role,backdrop),error:''}}catch(error){return{cells:[] as ContrastCell[],error:error instanceof Error?error.message:'Invalid compositing backdrop.'}}},[backdrop,parsed.tokens,role]);const cells=matrix.cells;const visibleCells=useMemo(()=>{const next=cells.filter(cell=>filter==='all'||(filter==='pass'?cell.passesGuidance:!cell.passesGuidance));next.sort((a,b)=>sort==='apca-desc'?Math.abs(b.apcaLc)-Math.abs(a.apcaLc):sort==='wcag-desc'?b.wcag-a.wcag:`${a.foreground.name}\0${a.background.name}`.localeCompare(`${b.foreground.name}\0${b.background.name}`));return next},[cells,filter,sort]);const foreground=parsed.tokens.find(token=>token.name===foregroundName)??parsed.tokens[0],background=parsed.tokens.find(token=>token.name===backgroundName)??parsed.tokens[1]??parsed.tokens[0];const selectedCell=cells.find(cell=>cell.foreground===foreground&&cell.background===background);const css=useMemo(()=>`:root {\n${parsed.tokens.map(token=>`  ${tokenCssName(token.name)}: ${token.source};`).join('\n')}\n}\n`,[parsed.tokens]);
+ async function copyCss(){try{await navigator.clipboard.writeText(css);setStatus(`Copied ${parsed.tokens.length} CSS custom properties.`)}catch{setStatus('Clipboard access was unavailable. Use Download CSS instead.')}}
+ function exportCsv(){const lines=[['Foreground','Background','Resolved foreground','Resolved background','APCA Lc','WCAG 2 ratio','Guidance'].map(csvCell).join(','),...visibleCells.map(cell=>[cell.foreground.name,cell.background.name,cell.resolvedForeground,cell.resolvedBackground,cell.apcaLc.toFixed(2),cell.wcag.toFixed(4),cell.guidanceLabel].map(csvCell).join(','))];downloadText(lines.join('\n'),'contrast-matrix.csv','text/csv;charset=utf-8');setStatus(`Exported ${visibleCells.length} currently filtered/sorted contrast pairings.`)}
+ const heatmapAllowed=parsed.tokens.length<=30;
+ return <><div className="workspace-header"><div><h2>APCA / OKLCH token matrix</h2><p>Translucent colors are composited before contrast is calculated; self-pairs are omitted.</p></div></div><div className="workspace-body"><div className="notice"><strong>Important:</strong> APCA Lc is perceptual guidance, not a WCAG 2.x conformance result. WCAG 2 contrast is reported separately.</div><div className="workspace-grid" style={{marginTop:18}}><div className="field"><label htmlFor="contrast-tokens">Color tokens</label><textarea id="contrast-tokens" value={source} onChange={event=>setSource(event.target.value)} spellCheck={false}/><small>Hex, RGB/RGBA, HSL, OKLCH, and other Culori-supported CSS colors are accepted. Duplicate exported token names are rejected.</small></div><div><div className="field"><label htmlFor="contrast-backdrop">Opaque compositing backdrop</label><input id="contrast-backdrop" value={backdrop} onChange={event=>setBackdrop(event.target.value)} spellCheck={false}/><small>Alpha tokens are resolved against this backdrop. The backdrop itself must be opaque.</small></div><div className="field" style={{marginTop:14}}><label htmlFor="contrast-role">APCA guidance role</label><select id="contrast-role" value={role} onChange={event=>setRole(event.target.value as ContrastRole)}><option value="body">Body text guidance</option><option value="large">Large text guidance</option><option value="ui">UI graphics/text guidance</option></select></div><div className="field" style={{marginTop:14}}><label htmlFor="contrast-view">Matrix view</label><select id="contrast-view" value={view} onChange={event=>setView(event.target.value as 'table'|'heatmap')}><option value="table">Accessible paged table</option><option value="heatmap">Axis-labelled heatmap</option></select></div><div className="metric-row"><div className="metric"><span>Valid tokens</span><strong>{parsed.tokens.length}</strong></div><div className="metric"><span>Directional pairings</span><strong>{cells.length}</strong></div><div className="metric"><span>Source errors</span><strong>{parsed.errors.length+(matrix.error?1:0)}</strong></div></div></div></div>{parsed.errors.length||matrix.error?<div className="notice" style={{marginTop:14}}><strong>Fix before relying on the matrix:</strong><ul>{parsed.errors.map(error=><li key={`${error.line}-${error.source}`}>Line {error.line}: {error.message}</li>)}{matrix.error?<li>{matrix.error}</li>:null}</ul></div>:null}{parsed.tokens.length&&!matrix.error?<><h3 style={{marginTop:24}}>Contrast matrix</h3><div className="workspace-grid three"><div className="field"><label htmlFor="contrast-filter">Guidance filter</label><select id="contrast-filter" value={filter} onChange={event=>setFilter(event.target.value as typeof filter)}><option value="all">All pairings</option><option value="pass">Meets selected APCA target</option><option value="fail">Below selected APCA target</option></select></div><div className="field"><label htmlFor="contrast-sort">Sort</label><select id="contrast-sort" value={sort} onChange={event=>setSort(event.target.value as typeof sort)}><option value="apca-desc">APCA magnitude high → low</option><option value="wcag-desc">WCAG ratio high → low</option><option value="name">Token names</option></select></div><div className="button-row" style={{alignSelf:'end'}}><button className="action-button secondary" type="button" onClick={exportCsv}>Export current CSV</button></div></div>{view==='table'?<PagedTable columns={[{key:'fg',label:'Foreground'},{key:'bg',label:'Background'},{key:'apca',label:'APCA Lc'},{key:'wcag',label:'WCAG 2 ratio'},{key:'guidance',label:'Guidance'}]} rows={visibleCells} caption="APCA and WCAG contrast matrix" pageSize={100} rowKey={cell=>`${cell.foreground.name}-${cell.background.name}`} renderCell={(cell,column)=>column==='fg'?<><span aria-hidden="true" style={{display:'inline-block',width:12,height:12,borderRadius:3,background:cell.resolvedForeground,marginRight:8,border:'1px solid var(--line)'}}/>{cell.foreground.name}{cell.foreground.alpha<1?` (α ${cell.foreground.alpha.toFixed(2)})`:''}</>:column==='bg'?<><span aria-hidden="true" style={{display:'inline-block',width:12,height:12,borderRadius:3,background:cell.resolvedBackground,marginRight:8,border:'1px solid var(--line)'}}/>{cell.background.name}{cell.background.alpha<1?` (α ${cell.background.alpha.toFixed(2)})`:''}</>:column==='apca'?cell.apcaLc.toFixed(1):column==='wcag'?`${cell.wcag.toFixed(2)}:1`:cell.guidanceLabel}/>:heatmapAllowed?<div className="result-table-wrap" role="region" aria-label="Axis-labelled contrast heatmap" tabIndex={0}><table><thead><tr><th scope="col">Foreground ↓ / Background →</th>{parsed.tokens.map(token=><th scope="col" key={token.name}>{token.name}</th>)}</tr></thead><tbody>{parsed.tokens.map(fg=><tr key={fg.name}><th scope="row">{fg.name}</th>{parsed.tokens.map(bg=>{const cell=cells.find(item=>item.foreground===fg&&item.background===bg);return <td key={bg.name} style={cell?{background:cell.resolvedBackground,color:cell.resolvedForeground,minWidth:84,textAlign:'center'}:{textAlign:'center'}}>{cell?<><strong>{cell.apcaLc.toFixed(0)}</strong><br/><small>{cell.wcag.toFixed(1)}:1</small></>:'—'}</td>})}</tr>)}</tbody></table></div>:<div className="notice">The heatmap is limited to 30 tokens to avoid mounting an unbounded cross-product. Use the paged table for this {parsed.tokens.length}-token set.</div>}<h3 style={{marginTop:24}}>Component sandbox</h3><div className="workspace-grid three"><div className="field"><label htmlFor="sandbox-fg">Foreground</label><select id="sandbox-fg" value={foreground?.name??''} onChange={event=>setForegroundName(event.target.value)}>{parsed.tokens.map(token=><option key={token.name}>{token.name}</option>)}</select></div><div className="field"><label htmlFor="sandbox-bg">Background</label><select id="sandbox-bg" value={background?.name??''} onChange={event=>setBackgroundName(event.target.value)}>{parsed.tokens.map(token=><option key={token.name}>{token.name}</option>)}</select></div><div className="field"><label htmlFor="sandbox-cvd">Color-vision preview</label><select id="sandbox-cvd" value={previewMode} onChange={event=>setPreviewMode(event.target.value as PreviewMode)}><option value="none">No simulation</option><option value="protanopia">Protanopia preview</option><option value="deuteranopia">Deuteranopia preview</option><option value="tritanopia">Tritanopia preview</option></select></div></div>{foreground&&background&&selectedCell?<div style={{marginTop:16,border:'1px solid var(--line)',borderRadius:'var(--radius-sm)',padding:22,background:simulate(selectedCell.resolvedBackground,previewMode),color:simulate(selectedCell.resolvedForeground,previewMode)}}><p style={{marginTop:0,fontSize:18,fontWeight:750}}>Readable interface sample</p><p>Resolved after alpha compositing: {selectedCell.resolvedForeground} on {selectedCell.resolvedBackground}.</p><p style={{marginBottom:0}}>APCA {selectedCell.apcaLc.toFixed(1)} Lc · WCAG {selectedCell.wcag.toFixed(2)}:1</p></div>:foreground===background?<div className="notice" style={{marginTop:16}}>Choose different foreground and background tokens; self-pairs are intentionally excluded.</div>:null}<div className="button-row"><button className="action-button" type="button" onClick={()=>void copyCss()}>Copy CSS variables</button><button className="action-button secondary" type="button" onClick={()=>{downloadText(css,'color-tokens.css','text/css;charset=utf-8');setStatus('Downloaded CSS token variables locally.')}}>Download CSS</button></div></>:null}<div className={`status-line ${parsed.tokens.length&&!matrix.error?'good':''}`} role="status">{status}</div></div></>;
 }
