@@ -23,22 +23,35 @@ async function downloadBytes(download: import('@playwright/test').Download) {
   return Buffer.concat(chunks);
 }
 
-async function pointerDragToCard(page: Page, sourceName: string, targetIndex: number) {
+async function dragHandleToCard(page: Page, sourceName: string, targetIndex: number, useTouch: boolean) {
   const handle = page.getByRole('button', { name: `Drag ${sourceName} to reorder` });
   const target = page.getByTestId('pdf-item').nth(targetIndex);
   const sourceBox = await handle.boundingBox();
   const targetBox = await target.boundingBox();
   expect(sourceBox).not.toBeNull();
   expect(targetBox).not.toBeNull();
-  const pointerId = 41;
-  const start = { clientX: sourceBox!.x + sourceBox!.width / 2, clientY: sourceBox!.y + sourceBox!.height / 2 };
-  const end = { clientX: targetBox!.x + targetBox!.width / 2, clientY: targetBox!.y + targetBox!.height / 2 };
-  await handle.dispatchEvent('pointerdown', { ...start, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1 });
-  await handle.dispatchEvent('pointermove', { ...end, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: -1, buttons: 1 });
-  await handle.dispatchEvent('pointerup', { ...end, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: 0, buttons: 0 });
+  const start = { x: sourceBox!.x + sourceBox!.width / 2, y: sourceBox!.y + sourceBox!.height / 2 };
+  const end = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + targetBox!.height / 2 };
+
+  if (useTouch) {
+    const session = await page.context().newCDPSession(page);
+    try {
+      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [end] });
+      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } finally {
+      await session.detach();
+    }
+    return;
+  }
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 6 });
+  await page.mouse.up();
 }
 
-test('keeps an empty Even preset distinct from All and previews/reorders output pages', async ({ page }) => {
+test('keeps an empty Even preset distinct from All and previews/reorders output pages', async ({ page }, testInfo) => {
   await page.goto('./#/tools/pdf-sanitizer');
   await page.getByLabel('Add PDF files').setInputFiles([
     { name: 'first.pdf', mimeType: 'application/pdf', buffer: await plainPdf(100) },
@@ -49,7 +62,7 @@ test('keeps an empty Even preset distinct from All and previews/reorders output 
   await expect(page.getByRole('button', { name: 'Even', exact: true }).first()).toBeDisabled();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
 
-  await pointerDragToCard(page, 'first.pdf', 1);
+  await dragHandleToCard(page, 'first.pdf', 1, testInfo.project.name.includes('mobile'));
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['second.pdf · page 1', 'first.pdf · page 1']);
 
   // Dragging is convenience, not a requirement: explicit controls remain the
