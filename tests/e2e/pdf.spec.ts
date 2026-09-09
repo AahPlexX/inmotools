@@ -28,16 +28,33 @@ async function dragHandleToCard(page: Page, sourceName: string, targetIndex: num
   const target = page.getByTestId('pdf-item').nth(targetIndex);
   const sourceBox = await handle.boundingBox();
   const targetBox = await target.boundingBox();
+  const viewport = page.viewportSize();
   expect(sourceBox).not.toBeNull();
   expect(targetBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
   const start = { x: sourceBox!.x + sourceBox!.width / 2, y: sourceBox!.y + sourceBox!.height / 2 };
-  const end = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + targetBox!.height / 2 };
+  const desired = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + Math.min(targetBox!.height / 3, 80) };
+  const end = {
+    x: Math.max(20, Math.min(viewport!.width - 20, desired.x)),
+    y: Math.max(20, Math.min(viewport!.height - 24, desired.y)),
+  };
 
   if (useTouch) {
     const session = await page.context().newCDPSession(page);
     try {
       await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
-      await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [end] });
+      for (let step = 1; step <= 12; step += 1) {
+        const ratio = step / 12;
+        await session.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio }],
+        });
+      }
+      // Hold near the edge with tiny horizontal movement so tall mobile cards
+      // exercise the workspace's explicit auto-scroll path before release.
+      for (let step = 0; step < 8; step += 1) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: end.x + (step % 2), y: end.y }] });
+      }
       await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     } finally {
       await session.detach();
@@ -47,7 +64,8 @@ async function dragHandleToCard(page: Page, sourceName: string, targetIndex: num
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps: 6 });
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  for (let step = 0; step < 8; step += 1) await page.mouse.move(end.x + (step % 2), end.y);
   await page.mouse.up();
 }
 
