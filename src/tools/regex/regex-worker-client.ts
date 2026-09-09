@@ -24,6 +24,9 @@ export const executeRegexWithWatchdog = (
         capability: 'execution',
         matches: [],
         durationMs: timeoutMs,
+        startupMs: 0,
+        executionMs: timeoutMs,
+        offsetUnit: 'utf16-code-unit',
         error: `Execution stopped by the ${timeoutMs} ms watchdog target.`,
         timedOut: true,
       });
@@ -32,7 +35,7 @@ export const executeRegexWithWatchdog = (
       if (event.data.requestId !== id) return;
       window.clearTimeout(timer);
       worker.terminate();
-      resolve(event.data.result);
+      resolve({ ...event.data.result, offsetUnit: event.data.result.offsetUnit ?? 'utf16-code-unit' });
     };
     worker.onerror = () => {
       window.clearTimeout(timer);
@@ -42,6 +45,9 @@ export const executeRegexWithWatchdog = (
         capability: 'execution',
         matches: [],
         durationMs: 0,
+        startupMs: 0,
+        executionMs: 0,
+        offsetUnit: 'utf16-code-unit',
         error: 'Local regex worker failed to initialize.',
       });
     };
