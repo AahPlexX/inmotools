@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import { inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs, type PageSelectionPreset, type PdfInspection } from './pdf-engine';
 import { consumeFileInput } from '../../lib/file-input';
@@ -33,6 +33,7 @@ export default function PdfWorkspace() {
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, or flatten.');
   const [busy, setBusy] = useState(false);
   const pointerDragRef = useRef<PointerDrag | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
   const [pointerDragOver, setPointerDragOver] = useState<number | null>(null);
 
   const pageStates = useMemo(() => items.map((item) => {
@@ -65,6 +66,12 @@ export default function PdfWorkspace() {
     }
     return rows;
   }, [items, pageStates]);
+
+  useEffect(() => () => {
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
+    pointerDragRef.current = null;
+  }, []);
 
   async function load(list: FileList | null) {
     if (!list?.length) return;
@@ -122,42 +129,59 @@ export default function PdfWorkspace() {
   }
 
   function startPointerDrag(index: number, event: React.PointerEvent<HTMLButtonElement>) {
-    if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    pointerDragRef.current = { from: index, over: index, pointerId: event.pointerId };
+    if (pointerDragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    dragCleanupRef.current?.();
+
+    const pointerId = event.pointerId;
+    const from = index;
+    let over = index;
+    pointerDragRef.current = { from, over, pointerId };
     setPointerDragOver(index);
-    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* pointer capture is optional */ }
-    event.preventDefault();
-  }
 
-  function movePointerDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = pointerDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    let over: number | null;
-    if (event.clientY < DRAG_EDGE_PX) {
-      window.scrollBy(0, -DRAG_SCROLL_PX);
-      over = Math.max(0, drag.over - 1);
-    } else if (event.clientY > window.innerHeight - DRAG_EDGE_PX) {
-      window.scrollBy(0, DRAG_SCROLL_PX);
-      over = Math.min(items.length - 1, drag.over + 1);
-    } else {
-      over = pointerTargetIndex(event.clientY);
-    }
-    if (over !== null && over !== drag.over) {
-      pointerDragRef.current = { ...drag, over };
+    const setOver = (next: number | null) => {
+      if (next === null || next === over) return;
+      over = next;
+      pointerDragRef.current = { from, over, pointerId };
       setPointerDragOver(over);
-    }
-    event.preventDefault();
-  }
+    };
 
-  function finishPointerDrag(event: React.PointerEvent<HTMLButtonElement>, cancelled = false) {
-    const drag = pointerDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const hit = pointerTargetIndex(event.clientY);
-    const over = cancelled ? drag.from : hit === null || hit === drag.from ? drag.over : hit;
-    pointerDragRef.current = null;
-    setPointerDragOver(null);
-    try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* capture may already be released */ }
-    if (!cancelled && over !== drag.from) reorder(drag.from, over);
+    const onMove = (nativeEvent: PointerEvent) => {
+      if (nativeEvent.pointerId !== pointerId) return;
+      if (nativeEvent.clientY < DRAG_EDGE_PX) {
+        window.scrollBy(0, -DRAG_SCROLL_PX);
+        setOver(Math.max(0, over - 1));
+      } else if (nativeEvent.clientY > window.innerHeight - DRAG_EDGE_PX) {
+        window.scrollBy(0, DRAG_SCROLL_PX);
+        setOver(Math.min(items.length - 1, over + 1));
+      } else {
+        setOver(pointerTargetIndex(nativeEvent.clientY));
+      }
+      nativeEvent.preventDefault();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      if (dragCleanupRef.current === cleanup) dragCleanupRef.current = null;
+    };
+
+    const finish = (nativeEvent: PointerEvent, cancelled: boolean) => {
+      if (nativeEvent.pointerId !== pointerId) return;
+      cleanup();
+      pointerDragRef.current = null;
+      setPointerDragOver(null);
+      if (!cancelled && over !== from) reorder(from, over);
+      nativeEvent.preventDefault();
+    };
+
+    const onUp = (nativeEvent: PointerEvent) => finish(nativeEvent, false);
+    const onCancel = (nativeEvent: PointerEvent) => finish(nativeEvent, true);
+
+    dragCleanupRef.current = cleanup;
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp, { passive: false });
+    window.addEventListener('pointercancel', onCancel, { passive: false });
     event.preventDefault();
   }
 
@@ -234,9 +258,6 @@ export default function PdfWorkspace() {
               style={{ touchAction: 'none', cursor: 'grab' }}
               aria-label={`Drag ${item.file.name} to reorder`}
               onPointerDown={(event) => startPointerDrag(index, event)}
-              onPointerMove={movePointerDrag}
-              onPointerUp={(event) => finishPointerDrag(event)}
-              onPointerCancel={(event) => finishPointerDrag(event, true)}
             >Drag</button>
           </div>
           <div className="workspace-grid three">
