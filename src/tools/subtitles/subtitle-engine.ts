@@ -28,6 +28,14 @@ export interface CorrectionAnchors {
   correctedEndMs: number;
 }
 
+export interface SubtitleTimingDiagnostics {
+  outOfOrderCueNumbers: number[];
+  overlappingCueNumbers: number[];
+}
+
+const INLINE_VTT_TIMESTAMP_SOURCE = '<((?:(?:\\d{2,}):)?\\d{2}:\\d{2}\\.\\d{3})>';
+const inlineVttTimestampRegex = () => new RegExp(INLINE_VTT_TIMESTAMP_SOURCE, 'g');
+
 function parseTimestamp(value: string): number {
   const normalized = value.trim().replace(',', '.');
   const parts = normalized.split(':');
@@ -77,8 +85,30 @@ function parseTimingLine(line: string) {
 
 function validateCue(cue: SubtitleCue, index: number) {
   if (!Number.isFinite(cue.startMs) || !Number.isFinite(cue.endMs)) throw new Error(`Cue ${index + 1} has a non-finite timestamp.`);
-  if (cue.startMs < 0) return;
   if (cue.endMs <= cue.startMs) throw new Error(`Cue ${index + 1} must end after it starts.`);
+}
+
+function validateVttCueTextTimestamps(cue: SubtitleCue, index: number) {
+  let previous = cue.startMs;
+  for (const match of cue.text.matchAll(inlineVttTimestampRegex())) {
+    const timestamp = parseTimestamp(match[1]);
+    if (timestamp <= cue.startMs) throw new Error(`Cue ${index + 1} has an inline WebVTT timestamp at or before its cue start.`);
+    if (timestamp >= cue.endMs) throw new Error(`Cue ${index + 1} has an inline WebVTT timestamp at or after its cue end.`);
+    if (timestamp <= previous) throw new Error(`Cue ${index + 1} inline WebVTT timestamps must be strictly increasing.`);
+    previous = timestamp;
+  }
+}
+
+export function analyzeCueTimings(cues: readonly SubtitleCue[]): SubtitleTimingDiagnostics {
+  const outOfOrderCueNumbers: number[] = [];
+  const overlappingCueNumbers: number[] = [];
+  for (let index = 1; index < cues.length; index += 1) {
+    const previous = cues[index - 1];
+    const current = cues[index];
+    if (current.startMs < previous.startMs) outOfOrderCueNumbers.push(index + 1);
+    if (current.startMs < previous.endMs) overlappingCueNumbers.push(index + 1);
+  }
+  return { outOfOrderCueNumbers, overlappingCueNumbers };
 }
 
 export function parseSubtitle(input: string): ParsedSubtitle {
@@ -97,7 +127,7 @@ export function parseSubtitle(input: string): ParsedSubtitle {
   const vttRawBlocks: VttRawBlock[] = [];
   const blocks = body.trim().split(/\n\s*\n/).filter(Boolean);
 
-  for (const block of blocks) {
+  for (const [blockIndex, block] of blocks.entries()) {
     if (format === 'vtt' && isVttRawBlock(block)) {
       vttRawBlocks.push({ beforeCueIndex: cues.length, text: block });
       continue;
@@ -106,8 +136,11 @@ export function parseSubtitle(input: string): ParsedSubtitle {
     const lines = block.split('\n');
     const timingIndex = lines.findIndex((line) => /\s-->\s/.test(line));
     if (timingIndex < 0) {
-      if (format === 'vtt') vttRawBlocks.push({ beforeCueIndex: cues.length, text: block });
-      continue;
+      if (format === 'vtt') {
+        vttRawBlocks.push({ beforeCueIndex: cues.length, text: block });
+        continue;
+      }
+      throw new Error(`SRT block ${blockIndex + 1} does not contain a cue timing line; nothing was discarded.`);
     }
     if (timingIndex > 1) throw new Error('A cue may contain at most one identifier line before its timing line.');
 
@@ -120,6 +153,7 @@ export function parseSubtitle(input: string): ParsedSubtitle {
       settings: format === 'vtt' ? timing.settings : undefined,
     };
     validateCue(cue, cues.length);
+    if (format === 'vtt') validateVttCueTextTimestamps(cue, cues.length);
     cues.push(cue);
   }
 
@@ -134,7 +168,33 @@ function validateAnchors(anchors: CorrectionAnchors) {
   if (anchors.correctedEndMs <= anchors.correctedStartMs) throw new Error('The late corrected anchor must be after the early corrected anchor.');
 }
 
-export function applyLinearCorrection(cues: SubtitleCue[], anchors: CorrectionAnchors): SubtitleCue[] {
+function transformVttCueText(
+  text: string,
+  mapTimestamp: (ms: number) => number,
+  correctedStartMs: number,
+  correctedEndMs: number,
+  cueIndex: number,
+): string {
+  let previous = Math.max(0, correctedStartMs);
+  const serializedEnd = Math.max(0, correctedEndMs);
+  return text.replace(inlineVttTimestampRegex(), (_full, rawTimestamp: string) => {
+    const correctedTimestamp = mapTimestamp(parseTimestamp(rawTimestamp));
+    if (correctedTimestamp <= previous) {
+      throw new Error(`Cue ${cueIndex + 1} inline WebVTT timestamps would no longer be strictly after the serialized cue start and previous timestamp.`);
+    }
+    if (correctedTimestamp >= serializedEnd) {
+      throw new Error(`Cue ${cueIndex + 1} has an inline WebVTT timestamp that would be at or after its serialized cue end.`);
+    }
+    previous = correctedTimestamp;
+    return `<${formatTimestamp(correctedTimestamp, 'vtt')}>`;
+  });
+}
+
+export function applyLinearCorrection(
+  cues: SubtitleCue[],
+  anchors: CorrectionAnchors,
+  format: SubtitleFormat = 'srt',
+): SubtitleCue[] {
   validateAnchors(anchors);
   const span = anchors.sourceEndMs - anchors.sourceStartMs;
   const correctedSpan = anchors.correctedEndMs - anchors.correctedStartMs;
@@ -146,11 +206,15 @@ export function applyLinearCorrection(cues: SubtitleCue[], anchors: CorrectionAn
     if (!Number.isFinite(cue.startMs) || !Number.isFinite(cue.endMs) || cue.endMs <= cue.startMs) {
       throw new Error(`Cue ${index + 1} has an invalid source span.`);
     }
-    const corrected = { ...cue, startMs: map(cue.startMs), endMs: map(cue.endMs) };
-    if (!Number.isFinite(corrected.startMs) || !Number.isFinite(corrected.endMs) || corrected.endMs <= corrected.startMs) {
+    const correctedStartMs = map(cue.startMs);
+    const correctedEndMs = map(cue.endMs);
+    if (!Number.isFinite(correctedStartMs) || !Number.isFinite(correctedEndMs) || correctedEndMs <= correctedStartMs) {
       throw new Error(`Cue ${index + 1} would have an invalid corrected span.`);
     }
-    return corrected;
+    const text = format === 'vtt'
+      ? transformVttCueText(cue.text, map, correctedStartMs, correctedEndMs, index)
+      : cue.text;
+    return { ...cue, text, startMs: correctedStartMs, endMs: correctedEndMs };
   });
 }
 
@@ -162,6 +226,7 @@ export function serializeSubtitle(parsed: ParsedSubtitle): string {
   parsed.cues.forEach((cue, index) => {
     validateCue(cue, index);
     if (cue.endMs <= 0) throw new Error(`Cue ${index + 1} ends at or below zero after correction and cannot be serialized safely.`);
+    if (parsed.format === 'vtt') validateVttCueTextTimestamps({ ...cue, startMs: Math.max(0, cue.startMs) }, index);
   });
 
   if (parsed.format === 'srt') {

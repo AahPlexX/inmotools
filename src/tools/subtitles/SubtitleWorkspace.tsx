@@ -3,12 +3,14 @@ import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { PagedTable } from '../../components/PagedTable';
 import {
+  analyzeCueTimings,
   applyLinearCorrection,
   countCuesShiftedBelowZero,
   parseAnchorTime,
   parseSubtitle,
   serializeSubtitle,
   type ParsedSubtitle,
+  type SubtitleTimingDiagnostics,
 } from './subtitle-engine';
 
 const SAMPLE = `1\n00:00:00,000 --> 00:00:02,000\nFirst line\n\n2\n00:01:40,000 --> 00:01:42,000\nLast line\n`;
@@ -17,6 +19,7 @@ interface CorrectionOutput {
   text: string;
   parsed: ParsedSubtitle;
   belowZero: number;
+  diagnostics: SubtitleTimingDiagnostics;
 }
 
 function displayTime(ms: number) {
@@ -27,6 +30,16 @@ function displayTime(ms: number) {
   const seconds = Math.floor((safe % 60_000) / 1000);
   const millis = Math.round(safe) % 1000;
   return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+function timingSummary(diagnostics: SubtitleTimingDiagnostics) {
+  const order = diagnostics.outOfOrderCueNumbers.length
+    ? `${diagnostics.outOfOrderCueNumbers.length} out-of-order cue start${diagnostics.outOfOrderCueNumbers.length === 1 ? '' : 's'}`
+    : 'cue starts ordered';
+  const overlaps = diagnostics.overlappingCueNumbers.length
+    ? `${diagnostics.overlappingCueNumbers.length} adjacent overlap${diagnostics.overlappingCueNumbers.length === 1 ? '' : 's'}`
+    : 'no adjacent overlaps';
+  return `${order} · ${overlaps}`;
 }
 
 export default function SubtitleWorkspace() {
@@ -42,9 +55,10 @@ export default function SubtitleWorkspace() {
 
   const parseState = useMemo(() => {
     try {
-      return { parsed: parseSubtitle(sourceText), error: '' };
+      const parsed = parseSubtitle(sourceText);
+      return { parsed, diagnostics: analyzeCueTimings(parsed.cues), error: '' };
     } catch (error) {
-      return { parsed: null, error: error instanceof Error ? error.message : 'Invalid subtitle syntax.' };
+      return { parsed: null, diagnostics: null, error: error instanceof Error ? error.message : 'Invalid subtitle syntax.' };
     }
   }, [sourceText]);
 
@@ -94,10 +108,11 @@ export default function SubtitleWorkspace() {
       correctedStartMs: parseAnchorTime(correctedStart),
       sourceEndMs: parseAnchorTime(sourceEnd),
       correctedEndMs: parseAnchorTime(correctedEnd),
-    });
+    }, input.format);
     const belowZero = countCuesShiftedBelowZero(correctedCues);
     const text = serializeSubtitle({ ...input, cues: correctedCues });
-    return { text, parsed: parseSubtitle(text), belowZero };
+    const parsed = parseSubtitle(text);
+    return { text, parsed, belowZero, diagnostics: analyzeCueTimings(parsed.cues) };
   }
 
   function previewCorrection() {
@@ -107,7 +122,7 @@ export default function SubtitleWorkspace() {
       setApplied(null);
       setStatus(
         next.belowZero
-          ? `Preview ready. ${next.belowZero} cue${next.belowZero === 1 ? '' : 's'} begin below zero and will be clipped to 00:00:00.000 in the output.`
+          ? `Preview ready. ${next.belowZero} cue${next.belowZero === 1 ? '' : 's'} begin below zero and are clipped to 00:00:00.000; cues ending at or below zero are rejected.`
           : `Preview ready for ${next.parsed.cues.length} cue${next.parsed.cues.length === 1 ? '' : 's'}. The original source is unchanged.`,
       );
     } catch (error) {
@@ -140,7 +155,7 @@ export default function SubtitleWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>Two-anchor correction</h2><p>All cue timestamps use the same calculated slope and offset.</p></div></div>
+    <div className="workspace-header"><div><h2>Two-anchor correction</h2><p>All cue and WebVTT inline timestamps use the same calculated slope and offset.</p></div></div>
     <div className="workspace-body">
       <div className="field">
         <label htmlFor="subtitle-file">Choose subtitle file (optional)</label>
@@ -155,7 +170,13 @@ export default function SubtitleWorkspace() {
       <div className="field" style={{ marginTop: 16 }}>
         <label htmlFor="subtitle-text">Original subtitle contents</label>
         <textarea id="subtitle-text" value={sourceText} onChange={(event) => updateSource(event.target.value)} />
-        <small>{parseState.parsed ? `${parseState.parsed.cues.length} cues detected · ${parseState.parsed.format.toUpperCase()}` : `Check subtitle syntax: ${parseState.error}`}</small>
+        <small>{parseState.parsed && parseState.diagnostics
+          ? `${parseState.parsed.cues.length} cues detected · ${parseState.parsed.format.toUpperCase()} · ${timingSummary(parseState.diagnostics)}`
+          : `Check subtitle syntax: ${parseState.error}`}</small>
+      </div>
+
+      <div className="notice" data-testid="subtitle-output-policy" style={{ marginTop: 14 }}>
+        <strong>Output timing policy:</strong> cue starts mapped below zero are clipped to 00:00:00.000; cues ending at or below zero are rejected. Existing overlaps are preserved and reported rather than silently changed.
       </div>
 
       <div className="workspace-grid" style={{ marginTop: 18 }}>
@@ -187,7 +208,10 @@ export default function SubtitleWorkspace() {
         <div className="field" style={{ marginTop: 18 }}>
           <label htmlFor="subtitle-output">{applied ? 'Applied output copy' : 'Correction preview'}</label>
           <textarea id="subtitle-output" value={output.text} readOnly aria-readonly="true" />
-          <small>{output.belowZero ? `${output.belowZero} cue start${output.belowZero === 1 ? '' : 's'} clipped at zero during serialization. ` : ''}WebVTT cue settings and structural blocks are preserved.</small>
+          <small>
+            {output.belowZero ? `${output.belowZero} cue start${output.belowZero === 1 ? '' : 's'} clipped at zero during serialization. ` : ''}
+            WebVTT cue settings, structural blocks, and inline timestamp tags are preserved and retimed. {timingSummary(output.diagnostics)}.
+          </small>
         </div>
 
         <PagedTable
