@@ -1,9 +1,11 @@
 import { Midi } from '@tonejs/midi';
 
 export interface ChordSpec { root: string; quality: 'major' | 'minor' | 'diminished' | 'sus2' | 'sus4'; inversion: number; beats?: number }
+export interface ProgressionDocument { version: 1; bpm: number; chords: ChordSpec[] }
 
 const NOTE_INDEX: Record<string, number> = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
 const INTERVALS: Record<ChordSpec['quality'], number[]> = { major: [0, 4, 7], minor: [0, 3, 7], diminished: [0, 3, 6], sus2: [0, 2, 7], sus4: [0, 5, 7] };
+const QUALITY_SET = new Set<ChordSpec['quality']>(['major', 'minor', 'diminished', 'sus2', 'sus4']);
 
 function noteToMidi(note: string): number {
   const match = /^([A-G](?:#|b)?)(-?\d+)$/.exec(note.trim());
@@ -73,4 +75,46 @@ export function buildMidiBytes(progression: ChordSpec[], bpm = 120): Uint8Array 
     beat += beats;
   }
   return midi.toArray();
+}
+
+function isChordDocument(value: unknown): value is ChordSpec {
+  if (!value || typeof value !== 'object') return false;
+  const chord = value as Record<string, unknown>;
+  return typeof chord.root === 'string'
+    && typeof chord.quality === 'string'
+    && QUALITY_SET.has(chord.quality as ChordSpec['quality'])
+    && typeof chord.inversion === 'number'
+    && Number.isInteger(chord.inversion)
+    && (chord.beats === undefined || (typeof chord.beats === 'number' && Number.isFinite(chord.beats)));
+}
+
+export function serializeProgression(chords: ChordSpec[], bpm: number): string {
+  const errors = validateProgression(chords, bpm);
+  if (errors.length) throw new Error(errors.join(' '));
+  const document: ProgressionDocument = {
+    version: 1,
+    bpm,
+    chords: chords.map((chord) => ({ ...chord })),
+  };
+  return JSON.stringify(document, null, 2);
+}
+
+export function parseProgressionJson(text: string): ProgressionDocument {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('Progression file is not valid JSON.');
+  }
+  if (!parsed || typeof parsed !== 'object') throw new Error('Progression JSON must contain an object.');
+  const document = parsed as Record<string, unknown>;
+  if (document.version !== 1) throw new Error(`Unsupported progression JSON version: ${String(document.version ?? 'missing')}. Expected version 1.`);
+  if (typeof document.bpm !== 'number' || !Number.isFinite(document.bpm)) throw new Error('Progression JSON must contain a numeric BPM value.');
+  if (!Array.isArray(document.chords)) throw new Error('Progression JSON must contain a chords array.');
+  if (!document.chords.every(isChordDocument)) throw new Error('Progression JSON contains a malformed chord.');
+
+  const chords = document.chords.map((chord) => ({ ...chord }));
+  const errors = validateProgression(chords, document.bpm);
+  if (errors.length) throw new Error(errors.join(' '));
+  return { version: 1, bpm: document.bpm, chords };
 }

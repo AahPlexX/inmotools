@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { downloadBytes } from '../../lib/download';
-import { buildChord, buildMidiBytes, tryBuildChord, validateProgression, voiceLeadingDistance, type ChordSpec } from './music-engine';
+import { downloadBytes, downloadText } from '../../lib/download';
+import { consumeFileInput } from '../../lib/file-input';
+import {
+  buildChord,
+  buildMidiBytes,
+  parseProgressionJson,
+  serializeProgression,
+  tryBuildChord,
+  validateProgression,
+  voiceLeadingDistance,
+  type ChordSpec,
+} from './music-engine';
 
 const START: ChordSpec[] = [
   { root: 'C4', quality: 'major', inversion: 0, beats: 4 },
@@ -9,41 +19,124 @@ const START: ChordSpec[] = [
   { root: 'C4', quality: 'major', inversion: 0, beats: 4 },
 ];
 
-type ScheduledGraph = { context: AudioContext; sources: OscillatorNode[]; nodes: AudioNode[] };
+type PlaybackState = 'idle' | 'starting' | 'playing';
+type ActiveChord = { index: number; chord: ChordSpec };
+type ScheduledGraph = {
+  session: number;
+  context: AudioContext;
+  sources: OscillatorNode[];
+  gains: GainNode[];
+  timers: number[];
+  snapshot: ChordSpec[];
+  bpm: number;
+  loop: boolean;
+};
+
+const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error || 'unknown error');
 
 export default function MusicWorkspace() {
   const [chords, setChords] = useState<ChordSpec[]>(START);
   const [bpm, setBpm] = useState(120);
   const [status, setStatus] = useState('Adjust inversions to reduce large jumps between neighboring voicings.');
+  const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
+  const [activeChord, setActiveChord] = useState<ActiveChord | null>(null);
+  const [loopAudition, setLoopAudition] = useState(false);
   const graphRef = useRef<ScheduledGraph | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const sessionRef = useRef(0);
+  const mountedRef = useRef(true);
 
   function update(index: number, patch: Partial<ChordSpec>) {
     setChords((current) => current.map((chord, chordIndex) => chordIndex === index ? { ...chord, ...patch } : chord));
   }
 
-  function stopPlayback(report = true) {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
+  function clearCycleResources(graph: ScheduledGraph) {
+    for (const timer of graph.timers) window.clearTimeout(timer);
+    graph.timers = [];
+    for (const source of graph.sources) {
+      try { source.stop(); } catch { /* source may already have ended */ }
+      try { source.disconnect(); } catch { /* already disconnected */ }
     }
-    const graph = graphRef.current;
-    graphRef.current = null;
-    if (graph) {
-      for (const source of graph.sources) {
-        try { source.stop(); } catch { /* already stopped */ }
-      }
-      for (const node of graph.nodes) {
-        try { node.disconnect(); } catch { /* already disconnected */ }
-      }
-      void graph.context.close().catch(() => undefined);
+    for (const gain of graph.gains) {
+      try { gain.disconnect(); } catch { /* already disconnected */ }
     }
-    setPlaying(false);
-    if (report) setStatus('Playback stopped and the audio graph was released.');
+    graph.sources = [];
+    graph.gains = [];
   }
 
-  useEffect(() => () => stopPlayback(false), []);
+  function closeContext(context: AudioContext) {
+    if (context.state === 'closed') return;
+    void context.close().catch(() => undefined);
+  }
+
+  function releaseGraph(graph: ScheduledGraph) {
+    clearCycleResources(graph);
+    closeContext(graph.context);
+  }
+
+  function stopPlayback(report = true) {
+    sessionRef.current += 1;
+    const graph = graphRef.current;
+    graphRef.current = null;
+    if (graph) releaseGraph(graph);
+    if (mountedRef.current) {
+      setPlaybackState('idle');
+      setActiveChord(null);
+      if (report) setStatus('Playback stopped and the audio graph was released.');
+    }
+  }
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    stopPlayback(false);
+  }, []);
+
+  function scheduleCycle(graph: ScheduledGraph) {
+    if (graphRef.current !== graph || sessionRef.current !== graph.session) return;
+    clearCycleResources(graph);
+
+    let audioTime = graph.context.currentTime + 0.05;
+    let elapsed = 0;
+    graph.snapshot.forEach((chord, index) => {
+      const startOffset = elapsed;
+      const seconds = (60 / graph.bpm) * (chord.beats ?? 4);
+      const snapshotChord = { ...chord };
+      if (index === 0) {
+        if (mountedRef.current) setActiveChord({ index, chord: snapshotChord });
+      } else {
+        graph.timers.push(window.setTimeout(() => {
+          if (mountedRef.current && graphRef.current === graph && sessionRef.current === graph.session) setActiveChord({ index, chord: snapshotChord });
+        }, (startOffset + 0.05) * 1000));
+      }
+
+      for (const midi of buildChord(chord)) {
+        const oscillator = graph.context.createOscillator();
+        const gain = graph.context.createGain();
+        oscillator.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        oscillator.type = 'triangle';
+        gain.gain.setValueAtTime(0.0001, audioTime);
+        gain.gain.exponentialRampToValueAtTime(0.055, audioTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioTime + Math.max(0.08, seconds - 0.03));
+        oscillator.connect(gain).connect(graph.context.destination);
+        oscillator.start(audioTime);
+        oscillator.stop(audioTime + seconds);
+        graph.sources.push(oscillator);
+        graph.gains.push(gain);
+      }
+      audioTime += seconds;
+      elapsed += seconds;
+    });
+
+    graph.timers.push(window.setTimeout(() => {
+      if (graphRef.current !== graph || sessionRef.current !== graph.session) return;
+      if (graph.loop) {
+        if (mountedRef.current) setStatus('Looping the audition snapshot. Edits remain queued for the next audition.');
+        scheduleCycle(graph);
+      } else {
+        stopPlayback(false);
+        if (mountedRef.current) setStatus('Playback complete and the audio graph was released.');
+      }
+    }, (elapsed + 0.12) * 1000));
+  }
 
   async function play() {
     const errors = validateProgression(chords, bpm);
@@ -51,39 +144,65 @@ export default function MusicWorkspace() {
       setStatus(errors[0]);
       return;
     }
+
     stopPlayback(false);
-    const context = new AudioContext();
-    await context.resume();
-    const graph: ScheduledGraph = { context, sources: [], nodes: [] };
-    graphRef.current = graph;
-    setPlaying(true);
-    let time = context.currentTime + 0.05;
-    for (const chord of chords) {
-      const seconds = (60 / bpm) * (chord.beats ?? 4);
-      for (const midi of buildChord(chord)) {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-        oscillator.type = 'triangle';
-        gain.gain.setValueAtTime(0.0001, time);
-        gain.gain.exponentialRampToValueAtTime(0.055, time + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.08, seconds - 0.03));
-        oscillator.connect(gain).connect(context.destination);
-        oscillator.start(time);
-        oscillator.stop(time + seconds);
-        graph.sources.push(oscillator);
-        graph.nodes.push(oscillator, gain);
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
+    const snapshot = chords.map((chord) => ({ ...chord }));
+    setPlaybackState('starting');
+    setActiveChord(null);
+    setStatus('Starting audio and acquiring the browser audio context…');
+
+    let context: AudioContext;
+    try {
+      context = new AudioContext();
+    } catch (error) {
+      if (mountedRef.current && sessionRef.current === session) {
+        setPlaybackState('idle');
+        setStatus(`Audio playback failed: ${messageOf(error)}`);
       }
-      time += seconds;
+      return;
     }
-    setStatus('Progression is playing through the browser Web Audio engine.');
-    const total = chords.reduce((sum, chord) => sum + (60 / bpm) * (chord.beats ?? 4), 0);
-    timerRef.current = window.setTimeout(() => {
-      if (graphRef.current === graph) {
-        stopPlayback(false);
-        setStatus('Playback complete and the audio graph was released.');
+
+    const graph: ScheduledGraph = {
+      session,
+      context,
+      sources: [],
+      gains: [],
+      timers: [],
+      snapshot,
+      bpm,
+      loop: loopAudition,
+    };
+    // Own the context before awaiting resume(). Stop/unmount can now close it
+    // even while browser permission/hardware startup is still pending.
+    graphRef.current = graph;
+
+    try {
+      await context.resume();
+      if (graphRef.current !== graph || sessionRef.current !== session) {
+        closeContext(context);
+        return;
       }
-    }, (total + 0.15) * 1000);
+      scheduleCycle(graph);
+      if (mountedRef.current) {
+        setPlaybackState('playing');
+        setStatus(graph.loop ? 'Progression snapshot is looping through the browser Web Audio engine.' : 'Progression snapshot is playing through the browser Web Audio engine.');
+      }
+    } catch (error) {
+      if (graphRef.current !== graph || sessionRef.current !== session) {
+        closeContext(context);
+        return;
+      }
+      graphRef.current = null;
+      sessionRef.current += 1;
+      releaseGraph(graph);
+      if (mountedRef.current) {
+        setPlaybackState('idle');
+        setActiveChord(null);
+        setStatus(`Audio playback failed: ${messageOf(error)}`);
+      }
+    }
   }
 
   function addChord() {
@@ -115,10 +234,40 @@ export default function MusicWorkspace() {
     setStatus('Standard MIDI file created locally and sent to your downloads.');
   }
 
+  function saveProgressionJson() {
+    try {
+      downloadText(serializeProgression(chords, bpm), 'inmotools-progression.json', 'application/json;charset=utf-8');
+      setStatus('Versioned progression JSON created locally and sent to your downloads.');
+    } catch (error) {
+      setStatus(`Could not save progression JSON: ${messageOf(error)}`);
+    }
+  }
+
+  async function loadProgressionJson(file: File) {
+    try {
+      const document = parseProgressionJson(await file.text());
+      setChords(document.chords);
+      setBpm(document.bpm);
+      setStatus(`Loaded ${document.chords.length} chord${document.chords.length === 1 ? '' : 's'} from ${file.name}. If an audition is active, the imported progression applies to the next audition.`);
+    } catch (error) {
+      setStatus(`Could not load progression JSON: ${messageOf(error)}`);
+    }
+  }
+
+  const auditioning = playbackState !== 'idle';
+
   return <>
-    <div className="workspace-header"><div><h2>Harmony and voice-leading lab</h2><p>Web Audio handles auditioning; MIDI export stays binary and local.</p></div></div>
+    <div className="workspace-header"><div><h2>Harmony and voice-leading lab</h2><p>Web Audio handles auditioning; MIDI and progression exports stay local.</p></div></div>
     <div className="workspace-body">
-      <div className="field" style={{ maxWidth: 220 }}><label htmlFor="bpm">Tempo (BPM)</label><input id="bpm" type="number" min="30" max="300" value={bpm} onChange={(event) => setBpm(Number(event.target.value))} aria-invalid={!Number.isFinite(bpm) || bpm < 30 || bpm > 300} /><small>30–300 BPM.</small></div>
+      <div className="workspace-grid">
+        <div className="field"><label htmlFor="bpm">Tempo (BPM)</label><input id="bpm" type="number" min="30" max="300" value={bpm} onChange={(event) => setBpm(Number(event.target.value))} aria-invalid={!Number.isFinite(bpm) || bpm < 30 || bpm > 300} /><small>30–300 BPM.</small></div>
+        <div className="field"><label style={{ display: 'flex', gap: 10, alignItems: 'center' }}><input type="checkbox" checked={loopAudition} disabled={auditioning} onChange={(event) => setLoopAudition(event.target.checked)} /> Loop audition</label><small>Loop choice is captured when Play starts and remains fixed for that audition.</small></div>
+        <div className="field"><label htmlFor="midi-json-import">Load progression JSON</label><input id="midi-json-import" type="file" accept="application/json,.json" onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; consumeFileInput(input, () => file ? loadProgressionJson(file) : undefined); }} /><small>Loads the versioned local progression format and validates every chord before applying it.</small></div>
+      </div>
+
+      <div className="notice" style={{ marginTop: 14 }}><strong>Audition snapshot behavior</strong><p className="help-text">Edits made during playback apply to the next audition. The current audition—including each loop cycle—continues from the validated chord and tempo snapshot captured when you pressed Play.</p></div>
+      <div className="notice" data-testid="midi-active-chord" aria-live="polite" style={{ marginTop: 12 }}><strong>Active audition chord</strong><p className="help-text">{activeChord ? `Chord ${activeChord.index + 1}: ${activeChord.chord.root} ${activeChord.chord.quality}` : playbackState === 'starting' ? 'Preparing the audition snapshot…' : 'No chord is currently being auditioned.'}</p></div>
+
       <div className="workspace-grid" style={{ marginTop: 18 }}>
         {chords.map((chord, index) => {
           const notes = tryBuildChord(chord);
@@ -136,7 +285,7 @@ export default function MusicWorkspace() {
           </div>;
         })}
       </div>
-      <div className="button-row"><button className="action-button" type="button" onClick={() => void play()} disabled={playing}>Play progression</button><button className="action-button secondary" type="button" onClick={() => stopPlayback()} disabled={!playing} data-testid="midi-stop">Stop</button><button className="action-button secondary" type="button" onClick={addChord} data-testid="midi-add-chord">Add chord</button><button className="action-button secondary" type="button" onClick={exportMidi}>Export MIDI</button></div>
+      <div className="button-row"><button className="action-button" type="button" onClick={() => void play()} disabled={auditioning}>Play progression</button><button className="action-button secondary" type="button" onClick={() => stopPlayback()} disabled={!auditioning} data-testid="midi-stop">Stop</button><button className="action-button secondary" type="button" onClick={addChord} data-testid="midi-add-chord">Add chord</button><button className="action-button secondary" type="button" onClick={exportMidi}>Export MIDI</button><button className="action-button secondary" type="button" onClick={saveProgressionJson}>Save progression JSON</button></div>
       <div className="status-line" role="status">{status}</div>
     </div>
   </>;
