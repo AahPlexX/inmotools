@@ -28,7 +28,7 @@ const TOOL_SPECS = new Map([
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],
-  ['video', ['tests/e2e/audit-hardening.spec.ts']],
+  ['video', ['tests/e2e/video.spec.ts']],
 ]);
 
 const GLOBAL_CLIENT_PATHS = [
