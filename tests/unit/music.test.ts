@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildChord, buildMidiBytes, isValidNote, tryBuildChord, validateProgression, voiceLeadingDistance } from '../../src/tools/music/music-engine';
+import {
+  buildChord,
+  buildMidiBytes,
+  isValidNote,
+  parseProgressionJson,
+  serializeProgression,
+  tryBuildChord,
+  validateProgression,
+  voiceLeadingDistance,
+} from '../../src/tools/music/music-engine';
 
 describe('harmonic progression engine', () => {
   it('builds first inversion major voicing in ascending order', () => {
@@ -53,5 +62,27 @@ describe('tryBuildChord', () => {
   it('returns null instead of throwing for an incomplete root', () => {
     expect(() => tryBuildChord({ root: 'C', quality: 'major', inversion: 0 })).not.toThrow();
     expect(tryBuildChord({ root: 'C', quality: 'major', inversion: 0 })).toBeNull();
+  });
+});
+
+describe('progression JSON', () => {
+  const chords = [
+    { root: 'D4', quality: 'minor' as const, inversion: 0, beats: 2 },
+    { root: 'G4', quality: 'major' as const, inversion: 1, beats: 4 },
+  ];
+
+  it('round-trips a versioned progression document without losing settings', () => {
+    const json = serializeProgression(chords, 96);
+    expect(parseProgressionJson(json)).toEqual({ version: 1, bpm: 96, chords });
+  });
+
+  it('rejects unsupported document versions', () => {
+    expect(() => parseProgressionJson(JSON.stringify({ version: 99, bpm: 96, chords }))).toThrow(/version/i);
+  });
+
+  it('rejects malformed or musically invalid imported progressions', () => {
+    expect(() => parseProgressionJson('{bad json')).toThrow(/valid JSON/i);
+    expect(() => parseProgressionJson(JSON.stringify({ version: 1, bpm: 0, chords }))).toThrow(/Tempo/i);
+    expect(() => parseProgressionJson(JSON.stringify({ version: 1, bpm: 96, chords: [] }))).toThrow(/at least one chord/i);
   });
 });
