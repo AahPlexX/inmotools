@@ -59,8 +59,9 @@ test('binds optimized output to the current settings and exposes fit/preview con
 
   await page.getByRole('button', { name: 'Optimize GLB' }).click();
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeEnabled({ timeout: 60_000 });
-  await expect(page.getByText(/Camera count preserved:/)).toContainText('yes');
-  await expect(page.getByText(/Animation count preserved:/)).toContainText('yes');
+  const optimizationReport = page.locator('details').filter({ hasText: 'Optimization report' });
+  await expect(optimizationReport).toContainText('Camera count preserved: yes');
+  await expect(optimizationReport).toContainText('Animation count preserved: yes');
 
   await page.locator('#gltf-texture').selectOption('4096');
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
@@ -84,6 +85,7 @@ test('blocks transformation when an unknown optional extension payload cannot be
   await expect(page.getByTestId('gltf-extension-report')).toContainText('VENDOR_unknown_payload');
   await expect(page.getByTestId('gltf-extension-report')).toContainText(/blocked to preserve unknown payloads/i);
   await expect(page.getByRole('button', { name: 'Optimize GLB' })).toBeDisabled();
+  await page.getByText('Extension and texture preflight', { exact: true }).click();
   await expect(page.getByRole('alert')).toContainText(/unregistered extension|preserv/i);
 });
 
