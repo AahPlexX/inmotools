@@ -95,7 +95,7 @@ function throwIfAborted(signal?: AbortSignal, message = 'Operation canceled.') {
   if (signal?.aborted) throw cancellationError(message);
 }
 
-function bindInputAbort(input: Input, signal: AbortSignal | undefined) {
+function bindInputAbort(input: Input, signal: AbortSignal | undefined): () => undefined {
   if (!signal) return () => undefined;
   if (signal.aborted) {
     input.dispose();
@@ -103,7 +103,10 @@ function bindInputAbort(input: Input, signal: AbortSignal | undefined) {
   }
   const abort = () => input.dispose();
   signal.addEventListener('abort', abort, { once: true });
-  return () => signal.removeEventListener('abort', abort);
+  return () => {
+    signal.removeEventListener('abort', abort);
+    return undefined;
+  };
 }
 
 export function packetStartsBeforeRangeEnd(timestamp: number, rangeEnd: number): boolean {
