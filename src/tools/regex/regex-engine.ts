@@ -90,12 +90,16 @@ export const executeEcmaRegex = (
       }
     }
 
+    const durationMs = now() - started;
     const truncated = !totalMatchesExact || totalMatches > matches.length;
     return {
       engine: 'ECMAScript · browser RegExp',
       capability: 'execution',
       matches,
-      durationMs: now() - started,
+      durationMs,
+      startupMs: 0,
+      executionMs: durationMs,
+      offsetUnit: 'utf16-code-unit',
       error: null,
       truncated,
       omittedCount: totalMatchesExact ? Math.max(0, totalMatches - matches.length) : null,
@@ -106,11 +110,15 @@ export const executeEcmaRegex = (
       matchLimit,
     };
   } catch (error) {
+    const durationMs = now() - started;
     return {
       engine: 'ECMAScript · browser RegExp',
       capability: 'execution',
       matches: [],
-      durationMs: now() - started,
+      durationMs,
+      startupMs: 0,
+      executionMs: durationMs,
+      offsetUnit: 'utf16-code-unit',
       error: error instanceof Error ? error.message : String(error),
       truncated: false,
       omittedCount: 0,
