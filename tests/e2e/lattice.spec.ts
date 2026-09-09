@@ -99,28 +99,28 @@ test('blocks exports while source edits are pending or invalid instead of export
   await expect(page.getByTestId('visible-node-count')).toHaveText('11');
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i);
 
+  const normalizedExports = ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export protected JSON'];
   const editor = page.locator('[aria-label="JSON Lattice source"]');
   await editor.fill('{"status":"pending"}');
   await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
-  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML']) {
-    await expect(page.getByRole('button', { name })).toBeDisabled();
-  }
+  for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Export raw source' })).toBeEnabled();
 
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
   await expect(page.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export protected JSON' })).toBeEnabled();
 
   await editor.fill('{');
   await expect(page.getByTestId('revision-status')).toContainText(/invalid/i, { timeout: 2_000 });
-  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML']) {
-    await expect(page.getByRole('button', { name })).toBeDisabled();
-  }
+  for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Export raw source' })).toBeEnabled();
 });
 
 test('exposes local vector/raster/data exports without serious accessibility or overflow defects', async ({ page }) => {
   await page.goto('./#/json-lattice');
   await setSource(page, SAMPLE);
 
-  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML']) {
+  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export raw source']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
 
