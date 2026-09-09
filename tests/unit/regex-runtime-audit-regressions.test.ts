@@ -23,4 +23,11 @@ describe('RegexMatrix PCRE2 September 2026 audit regressions', () => {
     expect(result.omittedCount).toBe(1);
     expect(result.offsetUnit).toBe('utf16-code-unit');
   });
+
+  it('reports PCRE2 match offsets in the JavaScript UI UTF-16 code-unit coordinate system', async () => {
+    const result = await executePcre2Regex('a', 'g', '😀a');
+    expect(result.error).toBeNull();
+    expect(result.matches[0]).toMatchObject({ match: 'a', index: 2, end: 3 });
+    expect(result.offsetUnit).toBe('utf16-code-unit');
+  });
 });
