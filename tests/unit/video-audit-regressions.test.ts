@@ -37,6 +37,6 @@ describe('video slicer September audit regressions', () => {
     const source = readFileSync(new URL('../../src/tools/video/video-engine.ts', import.meta.url), 'utf8');
     expect(source).not.toMatch(/audioEnd\s*=\s*await\s+audioSink\.getPacket\(range\.end/);
     expect(source).toMatch(/audioSink\.packets\(audioStart\)/);
-    expect(source).toMatch(/addVideoTrack\(videoSource,\s*\{[\s\S]*?rotation\s*:/);
+    expect(source).toMatch(/addVideoTrack\(videoSource,\s*\{[\s\S]*?\brotation(?:\s*:|\s*,)/);
   });
 });
