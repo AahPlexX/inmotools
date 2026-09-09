@@ -23,7 +23,7 @@ export interface RegexRunResult {
   /** Pattern execution time excluding measured runtime/bootstrap time. */
   readonly executionMs?: number;
   /** Coordinate system used by every match index/end value exposed to the JavaScript UI and exports. */
-  readonly offsetUnit?: RegexOffsetUnit;
+  readonly offsetUnit: RegexOffsetUnit;
   readonly error: string | null;
   readonly timedOut?: boolean;
   /** True when more matches exist beyond the returned match array. */
