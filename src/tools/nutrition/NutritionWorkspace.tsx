@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import {
   ACTIVITY_LEVELS,
+  ACTIVITY_MULTIPLIERS,
   BMR_EQUATIONS,
   BMR_EQUATION_LABEL,
   DISTRIBUTION_RANGE,
@@ -30,6 +31,9 @@ import {
 } from './nutrition-engine';
 
 const AUTOSAVE_KEY = 'inmotools_energy_planner_autosave';
+const PRESETS_KEY = 'inmotools_energy_planner_presets_v1';
+const MAX_PRESETS = 12;
+const MAX_PRESET_NAME = 60;
 
 const ACTIVITY_HELP: Record<ActivityLevel, string> = {
   sedentary: 'Desk-based day with little deliberate exercise.',
@@ -62,6 +66,12 @@ interface FormState {
   readonly mealsPerDay: number;
 }
 
+interface SavedPreset {
+  readonly name: string;
+  readonly form: FormState;
+  readonly updatedAt: string;
+}
+
 const DEFAULT_FORM: FormState = {
   units: 'metric',
   weightKg: 80,
@@ -78,22 +88,87 @@ const DEFAULT_FORM: FormState = {
   mealsPerDay: 3,
 };
 
+const finiteOr = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const normalizeFormState = (value: unknown): FormState => {
+  const parsed = value && typeof value === 'object' ? value as Partial<FormState> : {};
+  const primaryEquation = BMR_EQUATIONS.includes(parsed.primaryEquation as BmrEquation)
+    ? parsed.primaryEquation as BmrEquation
+    : DEFAULT_FORM.primaryEquation;
+  const activityLevel = ACTIVITY_LEVELS.includes(parsed.activityLevel as ActivityLevel)
+    ? parsed.activityLevel as ActivityLevel
+    : DEFAULT_FORM.activityLevel;
+  const goalType = GOAL_TYPES.includes(parsed.goalType as GoalType)
+    ? parsed.goalType as GoalType
+    : DEFAULT_FORM.goalType;
+  const splitPreference = SPLIT_OPTIONS.some((option) => option.value === parsed.splitPreference)
+    ? parsed.splitPreference as SplitPreference
+    : DEFAULT_FORM.splitPreference;
+  const custom = parsed.customSplit && typeof parsed.customSplit === 'object' ? parsed.customSplit : DEFAULT_FORM.customSplit;
+  return {
+    units: parsed.units === 'imperial' ? 'imperial' : 'metric',
+    weightKg: finiteOr(parsed.weightKg, DEFAULT_FORM.weightKg),
+    heightCm: finiteOr(parsed.heightCm, DEFAULT_FORM.heightCm),
+    ageYears: finiteOr(parsed.ageYears, DEFAULT_FORM.ageYears),
+    biologicalSex: parsed.biologicalSex === 'female' ? 'female' : 'male',
+    activityLevel,
+    useBodyFat: typeof parsed.useBodyFat === 'boolean' ? parsed.useBodyFat : DEFAULT_FORM.useBodyFat,
+    bodyFatPercentage: finiteOr(parsed.bodyFatPercentage, DEFAULT_FORM.bodyFatPercentage),
+    primaryEquation,
+    goalType,
+    splitPreference,
+    customSplit: {
+      protein: finiteOr(custom.protein, DEFAULT_FORM.customSplit.protein),
+      fat: finiteOr(custom.fat, DEFAULT_FORM.customSplit.fat),
+      carbohydrate: finiteOr(custom.carbohydrate, DEFAULT_FORM.customSplit.carbohydrate),
+    },
+    mealsPerDay: Math.max(1, Math.min(12, Math.round(finiteOr(parsed.mealsPerDay, DEFAULT_FORM.mealsPerDay)))),
+  };
+};
+
 const readAutosave = (): FormState => {
   try {
     const raw = window.localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return DEFAULT_FORM;
-    const parsed = JSON.parse(raw) as Partial<FormState>;
-    const primaryEquation = BMR_EQUATIONS.includes(parsed.primaryEquation as BmrEquation)
-      ? parsed.primaryEquation as BmrEquation
-      : DEFAULT_FORM.primaryEquation;
-    return {
-      ...DEFAULT_FORM,
-      ...parsed,
-      primaryEquation,
-      customSplit: { ...DEFAULT_FORM.customSplit, ...parsed.customSplit },
-    };
+    return raw ? normalizeFormState(JSON.parse(raw)) : DEFAULT_FORM;
   } catch {
     return DEFAULT_FORM;
+  }
+};
+
+const readPresets = (): SavedPreset[] => {
+  try {
+    const raw = window.localStorage.getItem(PRESETS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    const presets: SavedPreset[] = [];
+    for (const candidate of parsed) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const item = candidate as Partial<SavedPreset>;
+      const name = typeof item.name === 'string' ? item.name.trim().slice(0, MAX_PRESET_NAME) : '';
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      presets.push({
+        name,
+        form: normalizeFormState(item.form),
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : '',
+      });
+      if (presets.length >= MAX_PRESETS) break;
+    }
+    return presets;
+  } catch {
+    return [];
+  }
+};
+
+const persistPresets = (presets: readonly SavedPreset[]): boolean => {
+  try {
+    window.localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+    return true;
+  } catch {
+    return false;
   }
 };
 
@@ -115,6 +190,9 @@ const numeric = (value: string) => (value.trim() === '' ? Number.NaN : Number(va
 export default function NutritionWorkspace() {
   const [form, setForm] = useState<FormState>(readAutosave);
   const [note, setNote] = useState('Autosaves locally in this browser.');
+  const [presets, setPresets] = useState<SavedPreset[]>(readPresets);
+  const [presetName, setPresetName] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('');
 
   const update = <Key extends keyof FormState>(key: Key, value: FormState[Key]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -140,6 +218,58 @@ export default function NutritionWorkspace() {
   const imperialWeight = Math.round(kgToPounds(form.weightKg) * 10) / 10;
   const imperialHeight = cmToFeetInches(form.heightCm);
 
+  const savePreset = () => {
+    const name = presetName.trim().slice(0, MAX_PRESET_NAME);
+    if (!name) {
+      setNote('Enter a preset name before saving.');
+      return;
+    }
+    if (issues.length > 0) {
+      setNote('Fix the current input errors before saving this preset.');
+      return;
+    }
+    const nextPreset: SavedPreset = { name, form, updatedAt: new Date().toISOString() };
+    const existing = presets.findIndex((preset) => preset.name === name);
+    const next = existing >= 0
+      ? presets.map((preset, index) => index === existing ? nextPreset : preset)
+      : [nextPreset, ...presets].slice(0, MAX_PRESETS);
+    if (!persistPresets(next)) {
+      setNote('Preset storage is unavailable in this browser; nothing was saved.');
+      return;
+    }
+    setPresets(next);
+    setSelectedPreset(name);
+    setPresetName(name);
+    setNote(existing >= 0 ? `Updated preset “${name}”.` : `Saved preset “${name}” locally.`);
+  };
+
+  const loadPreset = () => {
+    const preset = presets.find((candidate) => candidate.name === selectedPreset);
+    if (!preset) {
+      setNote('Choose a saved preset to load.');
+      return;
+    }
+    setForm(preset.form);
+    setPresetName(preset.name);
+    setNote(`Loaded preset “${preset.name}”.`);
+  };
+
+  const deletePreset = () => {
+    const preset = presets.find((candidate) => candidate.name === selectedPreset);
+    if (!preset) {
+      setNote('Choose a saved preset to delete.');
+      return;
+    }
+    const next = presets.filter((candidate) => candidate.name !== preset.name);
+    if (!persistPresets(next)) {
+      setNote('Preset storage is unavailable in this browser; nothing was deleted.');
+      return;
+    }
+    setPresets(next);
+    setSelectedPreset('');
+    setNote(`Deleted preset “${preset.name}”.`);
+  };
+
   const copyPlan = async () => {
     if (!plan) return;
     try {
@@ -153,7 +283,7 @@ export default function NutritionWorkspace() {
   const reset = () => {
     setForm(DEFAULT_FORM);
     try { window.localStorage.removeItem(AUTOSAVE_KEY); } catch { /* unavailable storage */ }
-    setNote('Reset to defaults and cleared the locally restored plan.');
+    setNote('Reset to defaults and cleared the autosaved plan. Named presets were kept.');
   };
 
   return (
@@ -174,6 +304,30 @@ export default function NutritionWorkspace() {
             The age range matches the original Mifflin-St Jeor derivation sample; it is not a child or pregnancy energy-needs calculator.
           </p>
         </div>
+
+        <section className="planner-section" aria-labelledby="preset-heading">
+          <div className="planner-section-head">
+            <div><h3 id="preset-heading">Input presets</h3><p className="help-text">Save up to {MAX_PRESETS} named input sets in this browser. Presets keep canonical kg/cm values at their stored precision and are never uploaded.</p></div>
+          </div>
+          <div className="workspace-grid three">
+            <div className="field">
+              <label htmlFor="preset-name">Preset name</label>
+              <input id="preset-name" aria-label="Preset name" value={presetName} maxLength={MAX_PRESET_NAME} onChange={(event) => setPresetName(event.target.value)} placeholder="e.g. Maintenance block" />
+            </div>
+            <div className="field">
+              <label htmlFor="saved-preset">Saved preset</label>
+              <select id="saved-preset" aria-label="Saved preset" value={selectedPreset} onChange={(event) => setSelectedPreset(event.target.value)}>
+                <option value="">{presets.length ? 'Choose a preset' : 'No saved presets'}</option>
+                {presets.map((preset) => <option key={preset.name} value={preset.name}>{preset.name}</option>)}
+              </select>
+            </div>
+            <div className="planner-actions" style={{ alignSelf: 'end' }}>
+              <button className="action-button" type="button" onClick={savePreset}>Save preset</button>
+              <button className="action-button secondary" type="button" onClick={loadPreset} disabled={!selectedPreset}>Load preset</button>
+              <button className="action-button secondary" type="button" onClick={deletePreset} disabled={!selectedPreset}>Delete preset</button>
+            </div>
+          </div>
+        </section>
 
         <section className="planner-section" aria-labelledby="measurements-heading">
           <div className="planner-section-head">
@@ -254,6 +408,7 @@ export default function NutritionWorkspace() {
                 {ACTIVITY_LEVELS.map((level) => <option key={level} value={level}>{formatActivityLabel(level)}</option>)}
               </select>
               <small>{ACTIVITY_HELP[form.activityLevel]}</small>
+              <small data-testid="activity-assumption">Planning assumption: ×{ACTIVITY_MULTIPLIERS[form.activityLevel]} multiplies the selected resting-energy estimate; it is not a measured expenditure.</small>
             </div>
 
             <div className="field">
@@ -372,7 +527,7 @@ export default function NutritionWorkspace() {
                 Published ranges are {DISTRIBUTION_RANGE.carbohydrate[0]}–{DISTRIBUTION_RANGE.carbohydrate[1]}% carbohydrate, {DISTRIBUTION_RANGE.fat[0]}–{DISTRIBUTION_RANGE.fat[1]}% fat, and {DISTRIBUTION_RANGE.protein[0]}–{DISTRIBUTION_RANGE.protein[1]}% protein.
               </p>
 
-              {plan.advisories.length > 0 ? <ul className="planner-advisories" data-testid="planner-advisories">{plan.advisories.map((advisory) => <li key={advisory.code} className={advisory.severity === 'caution' ? 'is-caution' : 'is-info'}>{advisory.message}</li>)}</ul> : null}
+              {plan.advisories.length > 0 ? <ul className="planner-advisories" data-testid="planner-advisories">{plan.advisories.map((advisory) => <li key={advisory.code} className={advisory.severity === 'caution' ? 'is-caution' : 'is-info'}><strong>{advisory.scope.replaceAll('_', ' ')}</strong>: {advisory.message}</li>)}</ul> : null}
             </section>
 
             <section className="planner-section" aria-labelledby="comparison-heading">
@@ -385,12 +540,12 @@ export default function NutritionWorkspace() {
             </section>
 
             <section className="planner-section" aria-labelledby="export-heading">
-              <div className="planner-section-head"><div><h3 id="export-heading">Export</h3><p className="help-text">Every format includes source measurements, canonical units, selected equation, activity/goal assumptions, and calculated outputs.</p></div></div>
+              <div className="planner-section-head"><div><h3 id="export-heading">Export</h3><p className="help-text">Every format includes source measurements, canonical units, selected equation, activity/goal assumptions, calculated outputs, and advisory code, severity, scope, and message.</p></div></div>
               <div className="planner-actions">
                 <button className="action-button" type="button" onClick={copyPlan}>Copy Markdown</button>
                 <button className="action-button" type="button" onClick={() => { downloadText(planToMarkdown(plan), 'energy-plan.md', 'text/markdown;charset=utf-8'); setNote('Markdown downloaded.'); }}>Download Markdown</button>
                 <button className="action-button" type="button" onClick={() => { downloadText(planToCsv(plan), 'energy-plan.csv', 'text/csv;charset=utf-8'); setNote('CSV downloaded.'); }}>Download CSV</button>
-                <button className="action-button" type="button" onClick={() => { downloadText(JSON.stringify(plan, null, 2), 'energy-plan.json', 'application/json'); setNote('JSON downloaded with reconstructable inputs and assumptions.'); }}>Download JSON</button>
+                <button className="action-button" type="button" onClick={() => { downloadText(JSON.stringify(plan, null, 2), 'energy-plan.json', 'application/json'); setNote('JSON downloaded with reconstructable inputs, assumptions, and advisories.'); }}>Download JSON</button>
               </div>
               <p className="status-line" role="status" data-testid="planner-status">{note}</p>
             </section>

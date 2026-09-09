@@ -114,9 +114,12 @@ export interface MacronutrientTarget {
   readonly distributionRange: readonly [number, number];
 }
 
+export type AdvisoryScope = 'energy_target' | 'macronutrient_distribution' | 'protein_adequacy';
+
 export interface Advisory {
   readonly code: 'below_basal_rate' | 'below_planning_floor' | 'outside_distribution_range' | 'below_protein_adequacy';
   readonly severity: 'info' | 'caution';
+  readonly scope: AdvisoryScope;
   readonly message: string;
 }
 
@@ -328,27 +331,27 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
   const advisories: Advisory[] = [];
   if (targetKcal < primaryKcal) {
     advisories.push({
-      code: 'below_basal_rate', severity: 'caution',
+      code: 'below_basal_rate', severity: 'caution', scope: 'energy_target',
       message: `The target of ${round(targetKcal)} kcal is below the selected resting-energy estimate of ${round(primaryKcal)} kcal.`,
     });
   }
   const floor = PLANNING_FLOOR_KCAL[biologicalSex];
   if (targetKcal < floor) {
     advisories.push({
-      code: 'below_planning_floor', severity: 'caution',
+      code: 'below_planning_floor', severity: 'caution', scope: 'energy_target',
       message: `The target of ${round(targetKcal)} kcal is below the ${floor} kcal planning floor commonly used with the ${biologicalSex} formula. This is a planning reference, not a clinical minimum.`,
     });
   }
   const outside = macronutrients.filter((macro) => !macro.withinDistributionRange);
   if (outside.length > 0) {
     advisories.push({
-      code: 'outside_distribution_range', severity: 'info',
+      code: 'outside_distribution_range', severity: 'info', scope: 'macronutrient_distribution',
       message: `Outside the published distribution range: ${outside.map((macro) => `${macro.key} at ${macro.percentOfEnergy}% versus ${macro.distributionRange[0]}–${macro.distributionRange[1]}%`).join('; ')}.`,
     });
   }
   if (proteinGramsPerKg < PROTEIN_ADEQUACY_G_PER_KG) {
     advisories.push({
-      code: 'below_protein_adequacy', severity: 'info',
+      code: 'below_protein_adequacy', severity: 'info', scope: 'protein_adequacy',
       message: `Protein at ${proteinGramsPerKg} g/kg is below the ${PROTEIN_ADEQUACY_G_PER_KG} g/kg adequacy reference.`,
     });
   }
@@ -454,7 +457,10 @@ export const planToMarkdown = (plan: EnergyPlan): string => {
     `Rounded grams represent ${plan.reconciledKcal} kcal.`, '',
     '## Assumptions', ...plan.assumptions.map((assumption) => `- ${assumption}`),
   ];
-  if (plan.advisories.length > 0) lines.push('', '## Advisories', ...plan.advisories.map((advisory) => `- ${advisory.message}`));
+  if (plan.advisories.length > 0) {
+    lines.push('', '## Advisories', ...plan.advisories.map((advisory) =>
+      `- Code: ${advisory.code}; Severity: ${advisory.severity}; Scope: ${advisory.scope}; Message: ${advisory.message}`));
+  }
   lines.push('', 'Planning estimates from published equations. Not clinical guidance. Not intended for children, pregnancy, or breastfeeding.');
   return lines.join('\n');
 };
@@ -491,6 +497,15 @@ export const planToCsv = (plan: EnergyPlan): string => {
     ['protein_per_kg', plan.proteinGramsPerKg, 'g/kg'],
     ['estimated_weekly_mass_change', plan.estimatedWeeklyMassChangeKg, 'kg/week'],
     ...plan.assumptions.map((assumption, index): [string, string, string] => [`assumption_${index + 1}`, assumption, '']),
+    ...plan.advisories.flatMap((advisory, index): Array<[string, string, string]> => {
+      const row = index + 1;
+      return [
+        [`advisory_${row}_code`, advisory.code, ''],
+        [`advisory_${row}_severity`, advisory.severity, ''],
+        [`advisory_${row}_scope`, advisory.scope, ''],
+        [`advisory_${row}_message`, advisory.message, ''],
+      ];
+    }),
   ];
   return ['metric,value,unit', ...rows.map(([metric, value, unit]) => `${csvCell(metric)},${csvCell(value)},${csvCell(unit)}`)].join('\n');
 };
