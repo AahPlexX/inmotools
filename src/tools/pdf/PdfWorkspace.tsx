@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import { inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs, type PageSelectionPreset, type PdfInspection } from './pdf-engine';
 import { consumeFileInput } from '../../lib/file-input';
@@ -11,15 +11,7 @@ type PdfItem = {
   rotate: 0 | 90 | 180 | 270;
 };
 
-type PointerDrag = {
-  from: number;
-  over: number;
-  pointerId: number;
-};
-
 const OUTPUT_PREVIEW_LIMIT = 100;
-const DRAG_EDGE_PX = 72;
-const DRAG_SCROLL_PX = 56;
 
 const bytesLabel = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -32,9 +24,6 @@ export default function PdfWorkspace() {
   const [flatten, setFlatten] = useState(true);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, or flatten.');
   const [busy, setBusy] = useState(false);
-  const pointerDragRef = useRef<PointerDrag | null>(null);
-  const dragCleanupRef = useRef<(() => void) | null>(null);
-  const [pointerDragOver, setPointerDragOver] = useState<number | null>(null);
 
   const pageStates = useMemo(() => items.map((item) => {
     try {
@@ -66,12 +55,6 @@ export default function PdfWorkspace() {
     }
     return rows;
   }, [items, pageStates]);
-
-  useEffect(() => () => {
-    dragCleanupRef.current?.();
-    dragCleanupRef.current = null;
-    pointerDragRef.current = null;
-  }, []);
 
   async function load(list: FileList | null) {
     if (!list?.length) return;
@@ -110,79 +93,6 @@ export default function PdfWorkspace() {
       next.splice(to, 0, item);
       return next;
     });
-  }
-
-  function pointerTargetIndex(clientY: number): number | null {
-    let closestIndex: number | null = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-    for (const card of document.querySelectorAll<HTMLElement>('[data-pdf-index]')) {
-      const index = Number(card.dataset.pdfIndex);
-      if (!Number.isInteger(index)) continue;
-      const rect = card.getBoundingClientRect();
-      const distance = clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
-    }
-    return closestIndex;
-  }
-
-  function startPointerDrag(index: number, event: React.PointerEvent<HTMLButtonElement>) {
-    if (pointerDragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    dragCleanupRef.current?.();
-
-    const pointerId = event.pointerId;
-    const from = index;
-    let over = index;
-    pointerDragRef.current = { from, over, pointerId };
-    setPointerDragOver(index);
-
-    const setOver = (next: number | null) => {
-      if (next === null || next === over) return;
-      over = next;
-      pointerDragRef.current = { from, over, pointerId };
-      setPointerDragOver(over);
-    };
-
-    const onMove = (nativeEvent: PointerEvent) => {
-      if (nativeEvent.pointerId !== pointerId) return;
-      if (nativeEvent.clientY < DRAG_EDGE_PX) {
-        window.scrollBy(0, -DRAG_SCROLL_PX);
-        setOver(Math.max(0, over - 1));
-      } else if (nativeEvent.clientY > window.innerHeight - DRAG_EDGE_PX) {
-        window.scrollBy(0, DRAG_SCROLL_PX);
-        setOver(Math.min(items.length - 1, over + 1));
-      } else {
-        setOver(pointerTargetIndex(nativeEvent.clientY));
-      }
-      nativeEvent.preventDefault();
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onCancel);
-      if (dragCleanupRef.current === cleanup) dragCleanupRef.current = null;
-    };
-
-    const finish = (nativeEvent: PointerEvent, cancelled: boolean) => {
-      if (nativeEvent.pointerId !== pointerId) return;
-      cleanup();
-      pointerDragRef.current = null;
-      setPointerDragOver(null);
-      if (!cancelled && over !== from) reorder(from, over);
-      nativeEvent.preventDefault();
-    };
-
-    const onUp = (nativeEvent: PointerEvent) => finish(nativeEvent, false);
-    const onCancel = (nativeEvent: PointerEvent) => finish(nativeEvent, true);
-
-    dragCleanupRef.current = cleanup;
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', onUp, { passive: false });
-    window.addEventListener('pointercancel', onCancel, { passive: false });
-    event.preventDefault();
   }
 
   function update(index: number, patch: Partial<PdfItem>) {
@@ -244,22 +154,12 @@ export default function PdfWorkspace() {
         const evenPreset = pageSelectionPreset('even', item.inspection.pageCount);
         return <div
           className="notice"
-          style={{ marginTop: 14, outline: pointerDragOver === index ? '2px solid currentColor' : undefined, outlineOffset: pointerDragOver === index ? 2 : undefined }}
+          style={{ marginTop: 14 }}
           key={item.id}
           data-testid="pdf-item"
           data-pdf-index={index}
           aria-label={`PDF queue item ${index + 1}: ${item.file.name}`}
         >
-          <div className="button-row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
-            <button
-              className="action-button secondary"
-              type="button"
-              draggable={false}
-              style={{ touchAction: 'none', cursor: 'grab' }}
-              aria-label={`Drag ${item.file.name} to reorder`}
-              onPointerDown={(event) => startPointerDrag(index, event)}
-            >Drag</button>
-          </div>
           <div className="workspace-grid three">
             <div>
               <strong style={{ overflowWrap: 'anywhere' }}>{item.file.name}</strong>
@@ -279,8 +179,16 @@ export default function PdfWorkspace() {
             </div>
             <div className="field"><label htmlFor={`rotate-${index}`}>Rotate output</label><select id={`rotate-${index}`} value={item.rotate} onChange={(event) => update(index, { rotate: Number(event.target.value) as PdfItem['rotate'] })}><option value="0">No rotation</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
           </div>
-          <div className="button-row"><button className="action-button secondary" type="button" disabled={index === 0} onClick={() => move(index, -1)}>Move up</button><button className="action-button secondary" type="button" disabled={index === items.length - 1} onClick={() => move(index, 1)}>Move down</button><button className="action-button secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item.file.name} from the queue`}>Remove</button></div>
-          <small>Use the Drag handle with mouse, pen, or touch, or use Move up / Move down as the non-drag ordering alternative.</small>
+          <div className="workspace-grid" style={{ marginTop: 10, alignItems: 'end' }}>
+            <div className="field" style={{ minWidth: 0 }}>
+              <label htmlFor={`position-${index}`}>Position for {item.file.name}</label>
+              <select id={`position-${index}`} value={String(index + 1)} onChange={(event) => reorder(index, Number(event.target.value) - 1)}>
+                {items.map((_, positionIndex) => <option key={positionIndex} value={String(positionIndex + 1)}>Position {positionIndex + 1}</option>)}
+              </select>
+            </div>
+            <div className="button-row" style={{ marginTop: 0 }}><button className="action-button secondary" type="button" disabled={index === 0} onClick={() => move(index, -1)}>Move up</button><button className="action-button secondary" type="button" disabled={index === items.length - 1} onClick={() => move(index, 1)}>Move down</button><button className="action-button secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item.file.name} from the queue`}>Remove</button></div>
+          </div>
+          <small>Choose an exact queue position or use Move up / Move down. These native controls work with touch, mouse, and keyboard without requiring a drag gesture.</small>
         </div>;
       })}
 
