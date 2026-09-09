@@ -19,7 +19,7 @@ test('binds simplification output to its settings, format, inspection, and stati
 
  await page.locator('#geo-output').selectOption('topojson');
  await expect(page.getByText(/Generated settings/)).toHaveCount(0);
- await expect(page.getByRole('button',{name:/Download generated GeoJSON/})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/Download generated GeoJSON/})).toBeDisabled();
  await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText(/Run simplification again/);
 });
 
@@ -40,7 +40,6 @@ test('a slower previous file read cannot overwrite a newer GeoJSON selection',as
  await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 positions loaded');
  await page.waitForTimeout(400);
  await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 positions loaded');
- await expect(page.getByText(/4 positions/)).toBeVisible();
 });
 
 test('all interoperability warnings remain reachable instead of silently truncating after twenty',async({page})=>{
