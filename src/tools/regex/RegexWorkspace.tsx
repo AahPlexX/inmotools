@@ -56,7 +56,7 @@ const RegexWorkspace = () => {
   const [matchOrdinalOffset,setMatchOrdinalOffset] = useState(0);
   const [explanationPage,setExplanationPage] = useState(0);
   const [sessionPage,setSessionPage] = useState(0);
-  const [replacement,setReplacement] = useState('${year}/${month}/${day}');
+  const [replacement,setReplacement] = useState('$<year>/$<month>/$<day>');
   const [positive,setPositive] = useState('2026-08-31\n2025-12-14'); const [negative,setNegative] = useState('31/08/2026\ninvalid');
   const [assertions,setAssertions] = useState<{ value:string; expected:boolean; passed:boolean }[]>([]);
   const [codeTarget,setCodeTarget] = useState<RegexCodeTarget>('typescript');
