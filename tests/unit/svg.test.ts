@@ -8,11 +8,24 @@ describe('SVG sprite compiler', () => {
   });
   it('allocates globally unique symbol IDs even when suffix-like filenames collide',()=>{const result=compileSvgSprite([{name:'foo.svg',text:'<svg viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>'},{name:'foo-2.svg',text:'<svg viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>'},{name:'foo.svg',text:'<svg viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>'}]);expect(result.files.map(f=>f.id)).toEqual(['foo','foo-2','foo-3']);});
   it('isolates one invalid file instead of dropping valid siblings',()=>{const result=compileSvgSprite([{name:'good.svg',text:'<svg viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>'},{name:'bad.svg',text:'not svg'}]);expect(result.files).toHaveLength(1);expect(result.errors[0].name).toBe('bad.svg');});
+
+  it('strips scripts and SVG event-handler attributes from compiled output',()=>{
+    const result=compileSvgSprite([{name:'unsafe.svg',text:'<svg viewBox="0 0 10 10" onload="alert(1)"><script>alert(2)</script><rect onclick="alert(3)" width="10" height="10"/></svg>'}]);
+    expect(result.sprite).not.toMatch(/<script\b/i);
+    expect(result.sprite).not.toMatch(/\son(?:load|click)=/i);
+  });
 });
 
 describe('currentColor normalization',()=>{
   it('rewrites literal fill and stroke declarations inside a style attribute',()=>{const{sprite}=compileSvgSprite([{name:'styled.svg',text:'<svg viewBox="0 0 10 10"><path style="fill:#ff0000;stroke:blue" d="M0 0h10v10H0z"/></svg>'}],{currentColor:true});expect(sprite).toContain('fill:currentColor');expect(sprite).toContain('stroke:currentColor');});
   it('preserves paint-server references while scoping the optimized internal ID',()=>{const{sprite}=compileSvgSprite([{name:'keep.svg',text:'<svg viewBox="0 0 10 10"><defs><linearGradient id="paint"><stop offset="0" stop-color="red"/></linearGradient></defs><path fill="url(#paint)" style="stroke:url(#paint)" d="M0 0h10"/></svg>'}],{currentColor:true});const id=/id="(keep--[^"]+)"/.exec(sprite)?.[1];expect(id).toBeTruthy();expect(sprite).toContain(`fill="url(#${id})"`);expect(sprite).toContain(`stroke:url(#${id})`);expect(sprite).not.toContain('fill="currentColor"');});
+  it('preserves non-literal paint semantics instead of turning them into visible currentColor paint',()=>{
+    const{sprite}=compileSvgSprite([{name:'semantic.svg',text:'<svg viewBox="0 0 10 10"><path fill="inherit" stroke="context-stroke" style="fill:var(--icon-fill);stroke:transparent" d="M0 0h10"/></svg>'}],{currentColor:true});
+    expect(sprite).toMatch(/fill="inherit"|fill:inherit/);
+    expect(sprite).toMatch(/context-stroke/);
+    expect(sprite).toMatch(/var\(--icon-fill\)/);
+    expect(sprite).toMatch(/transparent/);
+  });
   it('does not touch style declarations when normalization is off',()=>{const{sprite}=compileSvgSprite([{name:'raw.svg',text:'<svg viewBox="0 0 10 10"><path style="fill:#ff0000" d="M0 0h10v10H0z"/></svg>'}],{currentColor:false});expect(sprite).not.toContain('currentColor');});
 });
 
@@ -22,7 +35,13 @@ describe('symbol structure preservation',()=>{
 });
 
 describe('symbol viewBox derivation',()=>{
-  it('synthesizes a viewBox from width and height when none is present',()=>{expect(compileSvgSprite([{name:'sized.svg',text:'<svg width="24" height="16"><path d="M0 0h24v16H0z"/></svg>'}]).sprite).toContain('viewBox="0 0 24 16"');});
+  it('synthesizes a viewBox from width and height when none is present',()=>{const result=compileSvgSprite([{name:'sized.svg',text:'<svg width="24" height="16"><path d="M0 0h24v16H0z"/></svg>'}]);expect(result.sprite).toContain('viewBox="0 0 24 16"');expect(result.warnings).toEqual([]);});
   it('accepts px dimensions',()=>{expect(compileSvgSprite([{name:'px.svg',text:'<svg width="32px" height="32px"><path d="M0 0h32v32H0z"/></svg>'}]).sprite).toContain('viewBox="0 0 32 32"');});
   it('prefers an explicit viewBox over dimensions',()=>{expect(compileSvgSprite([{name:'both.svg',text:'<svg viewBox="0 0 48 48" width="24" height="24"><path d="M0 0h48v48H0z"/></svg>'}]).sprite).toContain('viewBox="0 0 48 48"');});
+  it('warns instead of guessing when dimensions cannot safely define a viewBox',()=>{
+    const result=compileSvgSprite([{name:'relative.svg',text:'<svg width="2em" height="100%"><path d="M0 0h10v10H0z"/></svg>'}]);
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0].symbol).not.toContain('viewBox=');
+    expect(result.warnings).toEqual([{name:'relative.svg',message:expect.stringMatching(/viewBox/i)}]);
+  });
 });
