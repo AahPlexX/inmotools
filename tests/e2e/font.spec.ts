@@ -28,24 +28,25 @@ test('verifies generated weight metadata and invalidates exports when the select
   test.setTimeout(90_000);
   await loadFixture(page);
 
+  const downloadWoff2 = page.getByRole('button', { name: 'Download WOFF2', exact: true });
   await page.getByRole('button', { name: 'Build WOFF2 subset' }).click();
   await expect(page.getByTestId('font-metadata-comparison')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('font-output-weight')).toHaveText('700');
-  await expect(page.getByRole('button', { name: 'Download WOFF2' })).toBeVisible();
+  await expect(downloadWoff2).toBeVisible();
 
   await page.locator('#font-custom').fill('A');
-  await expect(page.getByRole('button', { name: 'Download WOFF2' })).toHaveCount(0);
+  await expect(downloadWoff2).toHaveCount(0);
   await expect(page.getByText(/rebuild the subset before exporting/i)).toBeVisible();
 
   await page.getByLabel('Basic Latin').uncheck();
   await expect(page.getByTestId('font-retained-summary')).toContainText('1 requested · 1 present');
   await page.getByRole('button', { name: 'Build WOFF2 subset' }).click();
-  await expect(page.getByRole('button', { name: 'Download WOFF2' })).toBeVisible({ timeout: 60_000 });
+  await expect(downloadWoff2).toBeVisible({ timeout: 60_000 });
 
   await page.locator('#font-custom').fill('😀');
   await expect(page.getByTestId('font-retained-summary')).toContainText('1 requested · 0 present');
   await expect(page.getByRole('button', { name: 'Build WOFF2 subset' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Download WOFF2' })).toHaveCount(0);
+  await expect(downloadWoff2).toHaveCount(0);
 });
 
 test('reflows populated font inspection across phone portrait, landscape, and tablet viewports', async ({ page }) => {
