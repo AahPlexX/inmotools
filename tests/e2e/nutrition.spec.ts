@@ -128,7 +128,7 @@ test('exports reconstructable inputs and restores autosaved measurements', async
   await page.reload();
   await expect(page.getByTestId('weight-input')).toHaveValue('93');
 
-  await page.getByRole('button', { name: 'Reset' }).click();
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
   await expect(page.getByTestId('weight-input')).toHaveValue('80');
 });
 
