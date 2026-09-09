@@ -45,7 +45,7 @@ function makeTriangleGlb(extra: Record<string, unknown> = {}): Buffer {
 
 async function loadModel(page: import('@playwright/test').Page, name = 'triangle.glb', extra: Record<string, unknown> = {}) {
   await page.setInputFiles('#gltf-file', { name, mimeType: 'model/gltf-binary', buffer: makeTriangleGlb(extra) });
-  await expect(page.getByRole('status')).toContainText(/Loaded original bytes unchanged/i, { timeout: 30_000 });
+  await expect(page.locator('.status-line')).toContainText(/Loaded original bytes unchanged/i, { timeout: 30_000 });
 }
 
 test('binds optimized output to the current settings and exposes fit/preview controls', async ({ page }) => {
@@ -64,12 +64,12 @@ test('binds optimized output to the current settings and exposes fit/preview con
 
   await page.locator('#gltf-texture').selectOption('4096');
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText(/settings changed|invalidated/i);
+  await expect(page.locator('.status-line')).toContainText(/settings changed|invalidated/i);
 
   await page.getByRole('button', { name: 'Optimize GLB' }).click();
   await page.locator('#gltf-texture').selectOption('8192');
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText(/settings changed|invalidated/i);
+  await expect(page.locator('.status-line')).toContainText(/settings changed|invalidated/i);
   await page.waitForTimeout(750);
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
 });
