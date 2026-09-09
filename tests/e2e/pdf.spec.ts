@@ -24,7 +24,7 @@ async function downloadBytes(download: import('@playwright/test').Download) {
 }
 
 test('keeps an empty Even preset distinct from All and previews/reorders output pages', async ({ page }) => {
-  await page.goto('./#/tools/pdf-splice-sanitizer');
+  await page.goto('./#/tools/pdf-sanitizer');
   await page.getByLabel('Add PDF files').setInputFiles([
     { name: 'first.pdf', mimeType: 'application/pdf', buffer: await plainPdf(100) },
     { name: 'second.pdf', mimeType: 'application/pdf', buffer: await plainPdf(200) },
@@ -46,7 +46,7 @@ test('keeps an empty Even preset distinct from All and previews/reorders output 
 });
 
 test('blocks unsupported editable-form preservation and verifies flattened output before download', async ({ page }) => {
-  await page.goto('./#/tools/pdf-splice-sanitizer');
+  await page.goto('./#/tools/pdf-sanitizer');
   await page.getByLabel('Add PDF files').setInputFiles({ name: 'form.pdf', mimeType: 'application/pdf', buffer: await editableFormPdf() });
   await expect(page.getByTestId('pdf-form-policy')).toContainText(/1 source form field.*will be flattened/i);
 
