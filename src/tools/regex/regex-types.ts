@@ -2,6 +2,7 @@ export type RegexMode = 'studio' | 'academy';
 export type RegexFlavor = 'ecmascript' | 'pcre' | 'pcre2' | 'python' | 'go-re2' | 'java' | 'dotnet' | 'rust' | 'posix-ere' | 'posix-bre' | 'oniguruma';
 export type RegexCodeTarget = 'javascript' | 'typescript' | 'python' | 'go' | 'rust' | 'php' | 'java' | 'csharp' | 'ruby';
 export type RegexCapability = 'execution' | 'compatibility';
+export type RegexOffsetUnit = 'utf16-code-unit';
 
 export interface RegexMatchRecord {
   readonly match: string;
@@ -15,7 +16,14 @@ export interface RegexRunResult {
   readonly engine: string;
   readonly capability: 'execution';
   readonly matches: readonly RegexMatchRecord[];
+  /** End-to-end duration for this execution request. */
   readonly durationMs: number;
+  /** Runtime/bootstrap time attributable to this request, when measured separately. */
+  readonly startupMs?: number;
+  /** Pattern execution time excluding measured runtime/bootstrap time. */
+  readonly executionMs?: number;
+  /** Coordinate system used by every match index/end value exposed to the JavaScript UI and exports. */
+  readonly offsetUnit?: RegexOffsetUnit;
   readonly error: string | null;
   readonly timedOut?: boolean;
   /** True when more matches exist beyond the returned match array. */
@@ -26,7 +34,7 @@ export interface RegexRunResult {
   readonly totalMatches?: number | null;
   /** Cursor immediately after the final returned match, suitable for bounded continuation. */
   readonly nextStartIndex?: number | null;
-  /** Subject code-unit index at which this run began. */
+  /** Subject UTF-16 code-unit index at which this run began. */
   readonly startIndex?: number;
   /** Maximum number of match records retained in this result. */
   readonly matchLimit?: number;
