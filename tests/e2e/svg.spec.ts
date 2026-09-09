@@ -31,7 +31,7 @@ test('compiles collision-safe symbols, isolates bad files, previews safely, and 
 
   await page.getByRole('checkbox', { name: /Normalize literal/ }).uncheck();
   await expect(source).toHaveCount(0);
-  await expect(page.getByRole('status')).toContainText(/Recompile/);
+  await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText(/Recompile/);
 });
 
 test('strips executable SVG content before output and never runs it in preview', async ({ page }) => {
