@@ -9,6 +9,15 @@ async function onePagePdf(title: string) {
   return new Uint8Array(await doc.save());
 }
 
+async function formPdf() {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([300, 200]);
+  const field = doc.getForm().createTextField('name');
+  field.addToPage(page, { x: 20, y: 120, width: 150, height: 24 });
+  field.setText('Local');
+  return new Uint8Array(await doc.save());
+}
+
 describe('PDF page selection', () => {
   it('validates ranges before processing and preserves explicit order/repeats', () => {
     expect(parsePageSelection('3,1,3,4-5', 5)).toEqual([3, 1, 3, 4, 5]);
@@ -17,10 +26,11 @@ describe('PDF page selection', () => {
     expect(() => parsePageSelection('1,,2', 5)).toThrow(/empty items/);
   });
 
-  it('builds useful all, odd, even, and reverse presets', () => {
+  it('keeps an empty preset distinct from the all-pages sentinel', () => {
     expect(pageSelectionPreset('all', 5)).toBe('');
     expect(pageSelectionPreset('odd', 5)).toBe('1,3,5');
     expect(pageSelectionPreset('even', 5)).toBe('2,4');
+    expect(pageSelectionPreset('even', 1)).toBeNull();
     expect(pageSelectionPreset('reverse', 4)).toBe('4,3,2,1');
   });
 });
@@ -52,6 +62,11 @@ describe('PDF binary processing', () => {
     expect(loaded.getAuthor()).toBeUndefined();
     expect(loaded.getSubject()).toBeUndefined();
     expect(loaded.getForm().getFields()).toHaveLength(0);
+  });
+
+  it('blocks form-bearing page copies when flattening is disabled instead of silently losing fields', async () => {
+    await expect(splicePdfs([{ bytes: await formPdf(), flatten: false }])).rejects.toThrow(/editable AcroForm preservation is not supported/i);
+    await expect(splicePdfs([{ bytes: await formPdf() }])).rejects.toThrow(/enable flattening/i);
   });
 
   it('uses the requested page order and preserves duplicates', async () => {
