@@ -14,7 +14,7 @@ const TOOL_SPECS = new Map([
   ['font', ['tests/e2e/audit-hardening.spec.ts']],
   ['geo', ['tests/e2e/geo.spec.ts']],
   ['gltf', ['tests/e2e/audit-hardening.spec.ts']],
-  ['har', ['tests/e2e/audit-hardening.spec.ts']],
+  ['har', ['tests/e2e/har.spec.ts']],
   ['hardware', ['tests/e2e/hardware.spec.ts']],
   ['lattice', ['tests/e2e/lattice.spec.ts']],
   ['logs', ['tests/e2e/audit-hardening.spec.ts']],
