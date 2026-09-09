@@ -10,7 +10,13 @@ export interface SvgCompiledFile {
   optimizedBytes: number;
 }
 export interface SvgCompileError { name: string; message: string }
-export interface SvgCompileResult { sprite: string; files: SvgCompiledFile[]; errors: SvgCompileError[] }
+export interface SvgCompileWarning { name: string; message: string }
+export interface SvgCompileResult {
+  sprite: string;
+  files: SvgCompiledFile[];
+  errors: SvgCompileError[];
+  warnings: SvgCompileWarning[];
+}
 
 function slugify(name: string): string {
   return name.replace(/\.svg$/i, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'icon';
@@ -32,10 +38,30 @@ function allocateUniqueId(base: string, used: Set<string>): string {
   return candidate;
 }
 
+const PRESERVED_PAINT_KEYWORDS = new Set([
+  'none',
+  'currentcolor',
+  'transparent',
+  'context-fill',
+  'context-stroke',
+  'inherit',
+  'initial',
+  'revert',
+  'revert-layer',
+  'unset',
+]);
+
+function isNonLiteralPaint(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return PRESERVED_PAINT_KEYWORDS.has(normalized)
+    || normalized.startsWith('url(')
+    || normalized.startsWith('var(')
+    || normalized.startsWith('env(');
+}
+
 function normalizeCurrentColor(svg: string): string {
   const withAttributes = svg.replace(/\s(?:fill|stroke)=(['"])([^'"]+)\1/gi, (match, _quote: string, rawValue: string) => {
-    const value = rawValue.trim().toLowerCase();
-    if (value === 'none' || value === 'currentcolor' || value.startsWith('url(')) return match;
+    if (isNonLiteralPaint(rawValue)) return match;
     return match.replace(/=(['"])[^'"]+\1/, '="currentColor"');
   });
 
@@ -43,8 +69,7 @@ function normalizeCurrentColor(svg: string): string {
     const rewritten = body.replace(
       /(^|;)\s*(fill|stroke)\s*:\s*([^;]+)/gi,
       (declaration, prefix: string, property: string, value: string) => {
-        const trimmed = value.trim().toLowerCase();
-        if (trimmed === 'none' || trimmed === 'currentcolor' || trimmed.startsWith('url(')) return declaration;
+        if (isNonLiteralPaint(value)) return declaration;
         return `${prefix}${property}:currentColor`;
       },
     );
@@ -52,9 +77,14 @@ function normalizeCurrentColor(svg: string): string {
   });
 }
 
-function deriveViewBox(attributes: string): string | undefined {
+interface ViewBoxResolution {
+  value?: string;
+  warning?: string;
+}
+
+function deriveViewBox(attributes: string): ViewBoxResolution {
   const explicit = /viewBox=(['"])(.*?)\1/i.exec(attributes)?.[2];
-  if (explicit) return explicit;
+  if (explicit) return { value: explicit };
 
   const dimension = (name: 'width' | 'height'): number | undefined => {
     const raw = new RegExp(`\\s${name}=(['"])([^'"]+)\\1`, 'i').exec(attributes)?.[2]?.trim();
@@ -67,7 +97,8 @@ function deriveViewBox(attributes: string): string | undefined {
 
   const width = dimension('width');
   const height = dimension('height');
-  return width !== undefined && height !== undefined ? `0 0 ${width} ${height}` : undefined;
+  if (width !== undefined && height !== undefined) return { value: `0 0 ${width} ${height}` };
+  return { warning: 'No explicit viewBox was present and width/height could not safely define one. The symbol was compiled without a guessed viewBox; add an explicit numeric viewBox to make scaling predictable.' };
 }
 
 const ROOT_ATTRS_TO_PRESERVE = new Set([
@@ -114,10 +145,14 @@ export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOption
   const symbolIds = new Set<string>();
   const files: SvgCompiledFile[] = [];
   const errors: SvgCompileError[] = [];
+  const warnings: SvgCompileWarning[] = [];
 
   for (const source of sources) {
     try {
-      const result = optimize(source.text, { multipass: true });
+      const result = optimize(source.text, {
+        multipass: true,
+        plugins: ['preset-default', 'removeScripts'],
+      });
       const optimized = result.data;
       const normalized = options.currentColor ? normalizeCurrentColor(optimized) : optimized;
       const svgMatch = normalized.match(/<svg\b([^>]*)>([\s\S]*?)<\/svg>/i);
@@ -125,9 +160,10 @@ export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOption
 
       const id = allocateUniqueId(slugify(source.name), symbolIds);
       const viewBox = deriveViewBox(svgMatch[1]);
+      if (viewBox.warning) warnings.push({ name: source.name, message: viewBox.warning });
       const rootAttributes = preservedRootAttributes(svgMatch[1]);
       const content = prefixInternalIds(svgMatch[2], id);
-      const symbol = `<symbol id="${id}"${viewBox ? ` viewBox="${viewBox}"` : ''}${rootAttributes}>${content}</symbol>`;
+      const symbol = `<symbol id="${id}"${viewBox.value ? ` viewBox="${viewBox.value}"` : ''}${rootAttributes}>${content}</symbol>`;
       files.push({
         name: source.name,
         id,
@@ -144,5 +180,6 @@ export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOption
     sprite: `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">${files.map((file) => file.symbol).join('')}</svg>`,
     files,
     errors,
+    warnings,
   };
 }
