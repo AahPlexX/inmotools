@@ -1,5 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 async function plainPdf(width = 300) {
   const doc = await PDFDocument.create();
@@ -23,53 +23,7 @@ async function downloadBytes(download: import('@playwright/test').Download) {
   return Buffer.concat(chunks);
 }
 
-async function dragHandleToCard(page: Page, sourceName: string, targetIndex: number, useTouch: boolean) {
-  const handle = page.getByRole('button', { name: `Drag ${sourceName} to reorder` });
-  const target = page.getByTestId('pdf-item').nth(targetIndex);
-  const sourceBox = await handle.boundingBox();
-  const targetBox = await target.boundingBox();
-  const viewport = page.viewportSize();
-  expect(sourceBox).not.toBeNull();
-  expect(targetBox).not.toBeNull();
-  expect(viewport).not.toBeNull();
-  const start = { x: sourceBox!.x + sourceBox!.width / 2, y: sourceBox!.y + sourceBox!.height / 2 };
-  const desired = { x: targetBox!.x + targetBox!.width / 2, y: targetBox!.y + Math.min(targetBox!.height / 3, 80) };
-  const end = {
-    x: Math.max(20, Math.min(viewport!.width - 20, desired.x)),
-    y: Math.max(20, Math.min(viewport!.height - 24, desired.y)),
-  };
-
-  if (useTouch) {
-    const session = await page.context().newCDPSession(page);
-    try {
-      await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
-      for (let step = 1; step <= 12; step += 1) {
-        const ratio = step / 12;
-        await session.send('Input.dispatchTouchEvent', {
-          type: 'touchMove',
-          touchPoints: [{ x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio }],
-        });
-      }
-      // Hold near the edge with tiny horizontal movement so tall mobile cards
-      // exercise the workspace's explicit auto-scroll path before release.
-      for (let step = 0; step < 8; step += 1) {
-        await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: end.x + (step % 2), y: end.y }] });
-      }
-      await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    } finally {
-      await session.detach();
-    }
-    return;
-  }
-
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps: 12 });
-  for (let step = 0; step < 8; step += 1) await page.mouse.move(end.x + (step % 2), end.y);
-  await page.mouse.up();
-}
-
-test('keeps an empty Even preset distinct from All and previews/reorders output pages', async ({ page }, testInfo) => {
+test('keeps an empty Even preset distinct from All and reorders output without requiring drag gestures', async ({ page }) => {
   await page.goto('./#/tools/pdf-sanitizer');
   await page.getByLabel('Add PDF files').setInputFiles([
     { name: 'first.pdf', mimeType: 'application/pdf', buffer: await plainPdf(100) },
@@ -80,11 +34,13 @@ test('keeps an empty Even preset distinct from All and previews/reorders output 
   await expect(page.getByRole('button', { name: 'Even', exact: true }).first()).toBeDisabled();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
 
-  await dragHandleToCard(page, 'first.pdf', 1, testInfo.project.name.includes('mobile'));
+  // Direct-position reordering is a native single-pointer/keyboard control,
+  // avoiding a custom drag gesture while preserving arbitrary queue movement.
+  await page.getByLabel('Position for first.pdf').selectOption('2');
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['second.pdf · page 1', 'first.pdf · page 1']);
+  await expect(page.getByRole('button', { name: /Drag .* to reorder/ })).toHaveCount(0);
 
-  // Dragging is convenience, not a requirement: explicit controls remain the
-  // single-pointer/keyboard alternative required for accessible reordering.
+  // Step controls remain available as the simplest adjacent-movement option.
   await page.getByTestId('pdf-item').nth(0).getByRole('button', { name: 'Move down' }).click();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
   await expect(page.getByText('Output pages').locator('..')).toContainText('2');
