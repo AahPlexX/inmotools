@@ -7,13 +7,14 @@ STYLE
 
 intro
 00:00:01.000 --> 00:00:02.000 line:10% position:25% align:start
-Caption
+Cap <00:00:01.500>tion
 `;
 
 test('previews and applies drift correction without mutating the original WebVTT source', async ({ page }) => {
   await page.goto('./#/tools/subtitle-drift');
   const source = page.getByLabel('Original subtitle contents');
   await source.fill(vtt);
+  await expect(page.getByTestId('subtitle-output-policy')).toContainText(/overlaps are preserved/i);
   await page.getByLabel('Source time').first().fill('00:00:01.000');
   await page.getByLabel('Correct time').first().fill('00:00:02.000');
   await page.getByLabel('Source time').nth(1).fill('00:00:02.000');
@@ -23,6 +24,7 @@ test('previews and applies drift correction without mutating the original WebVTT
   const output = page.getByLabel('Correction preview');
   await expect(output).toHaveValue(/STYLE/);
   await expect(output).toHaveValue(/00:00:02\.000 --> 00:00:03\.000 line:10% position:25% align:start/);
+  await expect(output).toHaveValue(/Cap <00:00:02\.500>tion/);
   await expect(source).toHaveValue(vtt);
 
   await page.getByRole('button', { name: 'Apply preview' }).click();
@@ -34,4 +36,11 @@ test('previews and applies drift correction without mutating the original WebVTT
   await page.getByRole('button', { name: 'Download corrected copy' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('subtitle-corrected.vtt');
+});
+
+test('reports malformed SRT blocks instead of silently dropping them', async ({ page }) => {
+  await page.goto('./#/tools/subtitle-drift');
+  await page.getByLabel('Original subtitle contents').fill(`1\n00:00:01,000 --> 00:00:02,000\nGood\n\nBROKEN BLOCK\n`);
+  await expect(page.getByText(/Check subtitle syntax: SRT block 2.*timing line.*nothing was discarded/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Preview correction' })).toBeDisabled();
 });

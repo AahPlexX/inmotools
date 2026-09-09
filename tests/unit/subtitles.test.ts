@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  analyzeCueTimings,
   applyLinearCorrection,
   countCuesShiftedBelowZero,
   parseAnchorTime,
@@ -28,6 +29,10 @@ describe('subtitle drift correction', () => {
     expect(parsed.cues[1].text).toBe('Middle line');
   });
 
+  it('rejects malformed SRT blocks instead of silently discarding them', () => {
+    expect(() => parseSubtitle(`${srt}\nBROKEN BLOCK\n`)).toThrow(/SRT block 4.*timing line.*nothing was discarded/i);
+  });
+
   it('applies a two-anchor linear correction across all timestamps', () => {
     const parsed = parseSubtitle(srt);
     const corrected = applyLinearCorrection(parsed.cues, {
@@ -40,6 +45,31 @@ describe('subtitle drift correction', () => {
     expect(corrected[1].startMs).toBe(52_000);
     expect(corrected[2].startMs).toBe(103_000);
     expect(corrected[1].endMs).toBeGreaterThan(corrected[1].startMs);
+  });
+
+  it('retimes WebVTT inline timestamp tags with the same linear mapping', () => {
+    const parsed = parseSubtitle('WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nA <00:00:02.000>B <00:00:03.000>C\n');
+    const corrected = applyLinearCorrection(parsed.cues, {
+      sourceStartMs: 1_000,
+      correctedStartMs: 2_000,
+      sourceEndMs: 4_000,
+      correctedEndMs: 8_000,
+    }, 'vtt');
+    expect(corrected[0].startMs).toBe(2_000);
+    expect(corrected[0].endMs).toBe(8_000);
+    expect(corrected[0].text).toBe('A <00:00:04.000>B <00:00:06.000>C');
+  });
+
+  it('rejects WebVTT inline timestamps that are invalid or collapse after correction rounding', () => {
+    expect(() => parseSubtitle('WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n<00:00:01.000>Bad\n')).toThrow(/inline WebVTT timestamp at or before/i);
+
+    const parsed = parseSubtitle('WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nA <00:00:01.000>B <00:00:01.001>C\n');
+    expect(() => applyLinearCorrection(parsed.cues, {
+      sourceStartMs: 0,
+      correctedStartMs: 0,
+      sourceEndMs: 2_000,
+      correctedEndMs: 2,
+    }, 'vtt')).toThrow(/strictly after.*previous timestamp/i);
   });
 
   it('serializes valid timestamp syntax', () => {
@@ -67,6 +97,12 @@ describe('subtitle drift correction', () => {
     expect(output).toContain('REGION\nid:fred\nwidth:40%');
     expect(output).toContain('NOTE editorial marker\nkeep this note');
     expect(output).toContain('00:00:01.000 --> 00:00:02.000 line:10% position:25% align:start');
+  });
+
+  it('reports out-of-order starts and overlaps without rewriting cue order', () => {
+    const parsed = parseSubtitle(`1\n00:00:05,000 --> 00:00:07,000\nFirst\n\n2\n00:00:04,000 --> 00:00:06,000\nSecond\n`);
+    expect(analyzeCueTimings(parsed.cues)).toEqual({ outOfOrderCueNumbers: [2], overlappingCueNumbers: [2] });
+    expect(parsed.cues.map((cue) => cue.text)).toEqual(['First', 'Second']);
   });
 
   it('accepts millisecond and readable timestamp anchors', () => {
@@ -103,7 +139,7 @@ describe('subtitle drift correction', () => {
       correctedStartMs: 0,
       sourceEndMs: 4_000,
       correctedEndMs: 2_000,
-    });
+    }, 'vtt');
     expect(countCuesShiftedBelowZero(corrected)).toBe(1);
     expect(serializeSubtitle({ ...parsed, cues: corrected })).toContain('00:00:00.000 --> 00:00:01.000');
 
