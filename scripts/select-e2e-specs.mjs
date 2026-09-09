@@ -11,7 +11,7 @@ const TOOL_SPECS = new Map([
   ['duckdb', ['tests/e2e/duckdb.spec.ts']],
   ['exif', ['tests/e2e/exif.spec.ts']],
   ['floorplan', ['tests/e2e/floorplan.spec.ts']],
-  ['font', ['tests/e2e/audit-hardening.spec.ts']],
+  ['font', ['tests/e2e/font.spec.ts']],
   ['geo', ['tests/e2e/geo.spec.ts']],
   ['gltf', ['tests/e2e/audit-hardening.spec.ts']],
   ['har', ['tests/e2e/har.spec.ts']],
