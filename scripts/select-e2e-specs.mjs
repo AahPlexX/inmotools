@@ -6,7 +6,7 @@ const TOOL_SPECS = new Map([
   ['aethercast', ['tests/e2e/aethercast.spec.ts']],
   ['audio', ['tests/e2e/audio.spec.ts']],
   ['contrast', ['tests/e2e/contrast.spec.ts']],
-  ['cron', ['tests/e2e/audit-hardening.spec.ts']],
+  ['cron', ['tests/e2e/cron.spec.ts']],
   ['dedupe', ['tests/e2e/dedupe.spec.ts']],
   ['duckdb', ['tests/e2e/duckdb.spec.ts']],
   ['exif', ['tests/e2e/exif.spec.ts']],
