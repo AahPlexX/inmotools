@@ -1,5 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 async function plainPdf(width = 300) {
   const doc = await PDFDocument.create();
@@ -23,6 +23,21 @@ async function downloadBytes(download: import('@playwright/test').Download) {
   return Buffer.concat(chunks);
 }
 
+async function pointerDragToCard(page: Page, sourceName: string, targetIndex: number) {
+  const handle = page.getByRole('button', { name: `Drag ${sourceName} to reorder` });
+  const target = page.getByTestId('pdf-item').nth(targetIndex);
+  const sourceBox = await handle.boundingBox();
+  const targetBox = await target.boundingBox();
+  expect(sourceBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+  const pointerId = 41;
+  const start = { clientX: sourceBox!.x + sourceBox!.width / 2, clientY: sourceBox!.y + sourceBox!.height / 2 };
+  const end = { clientX: targetBox!.x + targetBox!.width / 2, clientY: targetBox!.y + targetBox!.height / 2 };
+  await handle.dispatchEvent('pointerdown', { ...start, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1 });
+  await handle.dispatchEvent('pointermove', { ...end, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: -1, buttons: 1 });
+  await handle.dispatchEvent('pointerup', { ...end, bubbles: true, pointerId, pointerType: 'touch', isPrimary: true, button: 0, buttons: 0 });
+}
+
 test('keeps an empty Even preset distinct from All and previews/reorders output pages', async ({ page }) => {
   await page.goto('./#/tools/pdf-sanitizer');
   await page.getByLabel('Add PDF files').setInputFiles([
@@ -34,13 +49,12 @@ test('keeps an empty Even preset distinct from All and previews/reorders output 
   await expect(page.getByRole('button', { name: 'Even', exact: true }).first()).toBeDisabled();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
 
-  const cards = page.getByTestId('pdf-item');
-  await cards.nth(0).dragTo(cards.nth(1));
+  await pointerDragToCard(page, 'first.pdf', 1);
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['second.pdf · page 1', 'first.pdf · page 1']);
 
-  // Pointer drag is optional convenience; the explicit controls remain the
-  // device-agnostic ordering path for keyboard and touch-only users.
-  await cards.nth(0).getByRole('button', { name: 'Move down' }).click();
+  // Dragging is convenience, not a requirement: explicit controls remain the
+  // single-pointer/keyboard alternative required for accessible reordering.
+  await page.getByTestId('pdf-item').nth(0).getByRole('button', { name: 'Move down' }).click();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
   await expect(page.getByText('Output pages').locator('..')).toContainText('2');
 });
