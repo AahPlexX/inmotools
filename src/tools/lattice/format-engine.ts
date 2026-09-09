@@ -26,11 +26,31 @@ export const normalizeJsonValue = (value: unknown): JsonValue => {
   return String(value);
 };
 
+// XML and CSV are schema-free. Infer only scalars whose lexical form survives
+// the conversion exactly; identifier-like values such as "00123", unsafe
+// integers, explicit plus signs, and precision-significant forms remain text.
+const inferSchemaFreeScalar = (value: string): string | number | boolean => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (!value.length) return value;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  if (Number.isInteger(numeric) && !Number.isSafeInteger(numeric)) return value;
+  return String(numeric) === value ? numeric : value;
+};
+
+const inferSchemaFreeValue = (value: unknown): unknown => {
+  if (typeof value === 'string') return inferSchemaFreeScalar(value);
+  if (Array.isArray(value)) return value.map(inferSchemaFreeValue);
+  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, inferSchemaFreeValue(item)]));
+  return value;
+};
+
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@',
-  parseTagValue: true,
-  parseAttributeValue: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
   trimValues: true,
 });
 
@@ -44,16 +64,16 @@ export const parseStructuredText = (text: string, format: StructuredFormat): Jso
   if (format === 'json') return normalizeJsonValue(JSON.parse(text));
   if (format === 'yaml') return normalizeJsonValue(YAML.parse(text));
   if (format === 'toml') return normalizeJsonValue(parseToml(text));
-  if (format === 'xml') return normalizeJsonValue(xmlParser.parse(text));
+  if (format === 'xml') return normalizeJsonValue(inferSchemaFreeValue(xmlParser.parse(text)));
 
   const parsed = Papa.parse<Record<string, unknown>>(text, {
     header: true,
-    dynamicTyping: true,
+    dynamicTyping: false,
     skipEmptyLines: 'greedy',
   });
   const fatal = parsed.errors.find((item) => item.type === 'Quotes' || item.type === 'Delimiter');
   if (fatal) throw new Error(`CSV parse failed: ${fatal.message}`);
-  return normalizeJsonValue(parsed.data);
+  return normalizeJsonValue(inferSchemaFreeValue(parsed.data));
 };
 
 const requireTomlObject = (value: JsonValue): Record<string, unknown> => {

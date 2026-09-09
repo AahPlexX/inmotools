@@ -17,6 +17,17 @@ const setSource = async (page: Parameters<typeof test>[0] extends never ? never 
   await editor.fill(value);
 };
 
+const expectButtonsDisabledNow = async (page: any, names: string[]) => {
+  const states = await page.evaluate((expectedNames: string[]) => {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
+    return expectedNames.map((name) => ({
+      name,
+      disabled: buttons.find((button) => button.textContent?.trim() === name)?.disabled ?? false,
+    }));
+  }, names);
+  expect(states).toEqual(names.map((name) => ({ name, disabled: true })));
+};
+
 test('JSON Lattice catalog link, exact alias, and generic route open the same local workspace', async ({ page }) => {
   await page.goto('./#/');
   const catalogLink = page.getByRole('link', { name: /JSON Lattice Studio/ });
@@ -93,11 +104,38 @@ test('provides privacy, diff, schema, JSONPath, and local DuckDB query workflows
   await expect(page.getByTestId('sql-results')).toContainText('paid');
 });
 
+test('blocks exports while source edits are pending or invalid instead of exporting the last valid revision', async ({ page }) => {
+  await page.goto('./#/json-lattice');
+  await setSource(page, SAMPLE);
+  await expect(page.getByTestId('visible-node-count')).toHaveText('11');
+  await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i);
+
+  const normalizedExports = ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export protected JSON'];
+  const editor = page.locator('[aria-label="JSON Lattice source"]');
+  await editor.fill('{"status":"pending"}');
+  await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
+  await expectButtonsDisabledNow(page, normalizedExports);
+  const rawExport = page.getByRole('button', { name: 'Export raw source' });
+  await expect(rawExport).toBeEnabled();
+
+  await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
+  await expect(page.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export protected JSON' })).toBeEnabled();
+
+  await editor.fill('{');
+  await expect(page.getByTestId('revision-status')).toContainText(/invalid/i, { timeout: 2_000 });
+  for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
+  await expect(rawExport).toBeEnabled();
+  const rawDownload = page.waitForEvent('download');
+  await rawExport.click();
+  expect((await rawDownload).suggestedFilename()).toBe('json-lattice-source.json');
+});
+
 test('exposes local vector/raster/data exports without serious accessibility or overflow defects', async ({ page }) => {
   await page.goto('./#/json-lattice');
   await setSource(page, SAMPLE);
 
-  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML']) {
+  for (const name of ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export raw source']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
 
@@ -111,4 +149,26 @@ test('exposes local vector/raster/data exports without serious accessibility or 
   const results = await new AxeBuilder({ page }).analyze();
   const severe = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
   expect(severe).toEqual([]);
+});
+
+test('reflows after real content load in phone portrait, phone landscape, and tablet viewports', async ({ page }) => {
+  const viewports = [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 768, height: 1024 },
+  ];
+  const longKey = 'extremely-long-property-key-'.repeat(30);
+  const longValue = 'extremely-long-value-token-'.repeat(40);
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('./#/json-lattice');
+    await setSource(page, JSON.stringify({ [longKey]: longValue, nested: { status: 'loaded' } }, null, 2));
+    await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
+    await expect(page.locator(`[data-node-path="/${longKey}"]`)).toBeVisible();
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+    await expect(page.getByRole('button', { name: 'Export raw source' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export JSON' })).toBeVisible();
+  }
 });

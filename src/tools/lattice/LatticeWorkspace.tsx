@@ -27,6 +27,7 @@ const STORAGE_KEY = 'inmotools:json-lattice:v1';
 const FORMATS: StructuredFormat[] = ['json', 'yaml', 'toml', 'xml', 'csv'];
 
 type SchemaTarget = 'typescript' | 'zod' | 'go' | 'rust' | 'jsonSchemaDraft07' | 'jsonSchema202012';
+type RevisionState = 'current' | 'pending' | 'invalid';
 interface InitialSession { source: string; format: StructuredFormat; value: JsonValue; collapsed: string[]; direction: LatticeLayoutDirection; }
 
 const parseMaybeJson = (text: string): JsonValue => {
@@ -39,6 +40,13 @@ const detectFormat = (name: string): StructuredFormat => {
   if (ext === 'xml') return 'xml';
   if (ext === 'csv') return 'csv';
   return 'json';
+};
+const rawExportDetails = (format: StructuredFormat): { extension: string; mime: string } => {
+  if (format === 'json') return { extension: 'json', mime: 'application/json;charset=utf-8' };
+  if (format === 'csv') return { extension: 'csv', mime: 'text/csv;charset=utf-8' };
+  if (format === 'xml') return { extension: 'xml', mime: 'application/xml;charset=utf-8' };
+  if (format === 'yaml') return { extension: 'yaml', mime: 'text/yaml;charset=utf-8' };
+  return { extension: 'toml', mime: 'text/plain;charset=utf-8' };
 };
 const loadInitial = (): InitialSession => {
   const fallback = { source: DEFAULT_SOURCE, format: 'json' as const, value: parseStructuredText(DEFAULT_SOURCE, 'json'), collapsed: [], direction: 'LR' as const };
@@ -65,6 +73,7 @@ export default function LatticeWorkspace() {
   const [layout, setLayout] = useState<LatticeLayoutModel | null>(null);
   const [layoutError, setLayoutError] = useState('');
   const [parseError, setParseError] = useState('');
+  const [revisionState, setRevisionState] = useState<RevisionState>('current');
   const [status, setStatus] = useState('Edit, inspect, query, and export locally.');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
@@ -110,6 +119,12 @@ export default function LatticeWorkspace() {
   const schemaOutputs = useMemo(() => generateSchemaTargets(history.present), [history.present]);
   const selectedNode = useMemo(() => baseGraph.nodes.find((node) => node.path === activePath) ?? baseGraph.nodes[0], [baseGraph, activePath]);
   const selectedValue = useMemo(() => { try { return selectedNode ? getPointerValue(history.present, selectedNode.path) : null; } catch { return null; } }, [history.present, selectedNode]);
+  const normalizedExportReady = revisionState === 'current';
+  const revisionLabel = revisionState === 'current'
+    ? 'Revision current · normalized exports ready'
+    : revisionState === 'pending'
+      ? 'Revision pending · normalized exports paused'
+      : 'Revision invalid · normalized exports paused';
 
   const comparisonResult = useMemo(() => {
     if (!diffMode) return { result: null, error: '' };
@@ -122,12 +137,17 @@ export default function LatticeWorkspace() {
       suppressParseRef.current = true;
       setSource(serializeStructuredData(value, targetFormat));
       setParseError('');
+      setRevisionState('current');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not serialize the current document.'); }
   };
   const commitValue = (value: JsonValue, note: string) => {
     setHistory((current) => commitHistory(current, value));
     syncSourceFromValue(value);
     setStatus(note);
+  };
+  const editSource = (value: string) => {
+    setRevisionState('pending');
+    setSource(value);
   };
 
   useEffect(() => {
@@ -137,7 +157,11 @@ export default function LatticeWorkspace() {
         const next = parseStructuredText(source, format);
         setParseError('');
         setHistory((current) => sameJson(current.present, next) ? current : commitHistory(current, next));
-      } catch (error) { setParseError(error instanceof Error ? error.message : 'Could not parse this document.'); }
+        setRevisionState('current');
+      } catch (error) {
+        setParseError(error instanceof Error ? error.message : 'Could not parse this document.');
+        setRevisionState('invalid');
+      }
     }, 140);
     return () => window.clearTimeout(timer);
   }, [source, format]);
@@ -195,6 +219,7 @@ export default function LatticeWorkspace() {
       setFormat(next);
       setSource(nextSource);
       setParseError('');
+      setRevisionState('current');
       setStatus(`Editor converted to ${next.toUpperCase()} locally.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : `Cannot represent this document as ${next}.`); }
   };
@@ -203,6 +228,7 @@ export default function LatticeWorkspace() {
     const nextFormat = detectFormat(file.name);
     const text = await file.text();
     suppressParseRef.current = false;
+    setRevisionState('pending');
     setFormat(nextFormat);
     setSource(text);
     setStatus(`${file.name} loaded locally as ${nextFormat.toUpperCase()}.`);
@@ -255,19 +281,28 @@ export default function LatticeWorkspace() {
   };
 
   const exportSvg = () => {
-    if (!layout) return;
+    if (!layout || !normalizedExportReady) return;
     downloadText(buildLatticeSvg(graph, layout), 'json-lattice.svg', 'image/svg+xml;charset=utf-8');
   };
   const exportRaster = async (kind: 'png' | 'jpeg') => {
-    if (!layout) return;
+    if (!layout || !normalizedExportReady) return;
     try { const svg = buildLatticeSvg(graph, layout); downloadBlob(await rasterizeLatticeSvg(svg, { format: kind, scale: 2 }), `json-lattice.${kind === 'jpeg' ? 'jpg' : 'png'}`); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Raster export failed.'); }
   };
   const exportFormat = (target: 'json' | 'yaml' | 'toml') => {
+    if (!normalizedExportReady) return;
     try { downloadText(serializeStructuredData(history.present, target), `json-lattice.${target === 'yaml' ? 'yaml' : target}`, target === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Export failed.'); }
   };
-  const exportProtectedJson = () => downloadText(serializeStructuredData(privacy.value, 'json'), 'json-lattice-protected.json', 'application/json;charset=utf-8');
+  const exportRawSource = () => {
+    const { extension, mime } = rawExportDetails(format);
+    downloadText(source, `json-lattice-source.${extension}`, mime);
+    setStatus(`Raw ${format.toUpperCase()} source exported exactly as shown in the editor.`);
+  };
+  const exportProtectedJson = () => {
+    if (!normalizedExportReady) return;
+    downloadText(serializeStructuredData(privacy.value, 'json'), 'json-lattice-protected.json', 'application/json;charset=utf-8');
+  };
 
   const diffSummary = (() => {
     if (!diffMode) return 'Diff mode off.';
@@ -299,8 +334,8 @@ export default function LatticeWorkspace() {
 
     <div className="lattice-main">
       <section className="lattice-source-panel" aria-label="Canonical source editor">
-        <div className="lattice-panel-heading"><div><h2>Canonical source</h2><p>{format.toUpperCase()} input normalizes to a JSON-compatible model.</p></div><span className={parseError ? 'lattice-bad' : 'lattice-good'}>{parseError ? 'Parse error' : 'Valid'}</span></div>
-        <LatticeEditor value={source} format={format} onChange={setSource} />
+        <div className="lattice-panel-heading"><div><h2>Canonical source</h2><p>{format.toUpperCase()} input normalizes to a JSON-compatible model.</p></div><span className={revisionState === 'current' ? 'lattice-good' : 'lattice-bad'} data-testid="revision-status">{revisionLabel}</span></div>
+        <LatticeEditor value={source} format={format} onChange={editSource} />
         {parseError ? <div className="lattice-error" role="alert">{parseError}</div> : null}
       </section>
 
@@ -320,7 +355,7 @@ export default function LatticeWorkspace() {
 
     <div className="lattice-dock">
       <details open><summary>Privacy & diff</summary><div className="lattice-dock-grid">
-        <div><h3>Privacy Shield</h3><label>Protection mode<select value={privacyMode} onChange={(event) => setPrivacyMode(event.target.value as 'mask' | 'mock')}><option value="mask">Mask detected values</option><option value="mock">Deterministic mock values</option></select></label><p data-testid="privacy-summary">{privacyEnabled ? `${privacy.findings.length} protected values` : 'Shield off · source unchanged'}</p><button type="button" onClick={exportProtectedJson}>Export protected JSON</button><small>Heuristic detector: review before sharing.</small></div>
+        <div><h3>Privacy Shield</h3><label>Protection mode<select value={privacyMode} onChange={(event) => setPrivacyMode(event.target.value as 'mask' | 'mock')}><option value="mask">Mask detected values</option><option value="mock">Deterministic mock values</option></select></label><p data-testid="privacy-summary">{privacyEnabled ? `${privacy.findings.length} protected values` : 'Shield off · source unchanged'}</p><button type="button" disabled={!normalizedExportReady} onClick={exportProtectedJson}>Export protected JSON</button><small>Heuristic detector: review before sharing.</small></div>
         <div><h3>Structural diff</h3><label>Comparison JSON<textarea aria-label="Comparison JSON" value={comparison} onChange={(event) => setComparison(event.target.value)} /></label><p data-testid="diff-summary">{diffSummary}</p></div>
       </div></details>
 
@@ -333,16 +368,17 @@ export default function LatticeWorkspace() {
     </div>
 
     <div className="lattice-exportbar" aria-label="JSON Lattice export controls">
-      <button type="button" disabled={!layout} onClick={exportSvg}>Export SVG</button>
-      <button type="button" disabled={!layout} onClick={() => void exportRaster('png')}>Export PNG</button>
-      <button type="button" disabled={!layout} onClick={() => void exportRaster('jpeg')}>Export JPEG</button>
-      <button type="button" onClick={() => downloadText(buildFlatCsv(history.present), 'json-lattice.csv', 'text/csv;charset=utf-8')}>Export CSV</button>
-      <button type="button" onClick={() => exportFormat('json')}>Export JSON</button>
-      <button type="button" onClick={() => exportFormat('yaml')}>Export YAML</button>
-      <button type="button" onClick={() => exportFormat('toml')}>Export TOML</button>
+      <button type="button" disabled={!layout || !normalizedExportReady} onClick={exportSvg}>Export SVG</button>
+      <button type="button" disabled={!layout || !normalizedExportReady} onClick={() => void exportRaster('png')}>Export PNG</button>
+      <button type="button" disabled={!layout || !normalizedExportReady} onClick={() => void exportRaster('jpeg')}>Export JPEG</button>
+      <button type="button" disabled={!normalizedExportReady} onClick={() => downloadText(buildFlatCsv(history.present), 'json-lattice.csv', 'text/csv;charset=utf-8')}>Export CSV</button>
+      <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('json')}>Export JSON</button>
+      <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('yaml')}>Export YAML</button>
+      <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('toml')}>Export TOML</button>
+      <button type="button" onClick={exportRawSource}>Export raw source</button>
       <button type="button" onClick={() => { window.localStorage.removeItem(STORAGE_KEY); setStatus('Saved JSON Lattice session cleared from this browser.'); }}>Clear saved session</button>
     </div>
     <div className="lattice-status" role="status">{status}</div>
-    <p className="lattice-disclaimer">Privacy Shield is heuristic, foreign-key links are convention-based suggestions, and browser/Wasm memory is finite. Processing stays local to this browser.</p>
+    <p className="lattice-disclaimer">Normalized/vector/raster exports are bound to the current parsed revision. Raw source export preserves editor text exactly. Privacy Shield is heuristic, foreign-key links are convention-based suggestions, and browser/Wasm memory is finite. Processing stays local to this browser.</p>
   </div>;
 }

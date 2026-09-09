@@ -50,4 +50,11 @@ describe('deployment and bundler contracts', () => {
     expect(workflow).toContain('group: pages');
     expect(workflow).toContain('queue: max');
   });
+
+  it('selects PR browser specs from the PR base/head diff instead of synthetic merge-ref noise', () => {
+    const workflow = read('.github/workflows/pages.yml');
+    expect(workflow).toContain('HEAD_SHA: ${{ github.event.pull_request.head.sha }}');
+    expect(workflow).toContain('git diff --name-only "$BASE_SHA"..."$HEAD_SHA"');
+    expect(workflow).not.toContain('git diff --name-only "$BASE_SHA"...HEAD');
+  });
 });

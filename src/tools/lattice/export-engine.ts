@@ -3,6 +3,14 @@ import type { LatticeGraphModel, LatticeGraphNode } from './graph-engine';
 import type { LatticeLayoutModel, LatticePoint } from './layout-engine';
 import { buildJsonTreeRows } from './query-engine';
 
+const MAX_SAFE_RASTER_DIMENSION = 4096;
+const MAX_SAFE_RASTER_PIXELS = MAX_SAFE_RASTER_DIMENSION * MAX_SAFE_RASTER_DIMENSION;
+const KEY_FONT_SIZE = 14;
+const KEY_LINE_HEIGHT = 18;
+const VALUE_FONT_SIZE = 12;
+const VALUE_LINE_HEIGHT = 15;
+const APPROX_MONO_GLYPH_RATIO = 0.62;
+
 const escapeXml = (value: string): string => value
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -29,6 +37,22 @@ const nodeCenter = (layout: LatticeLayoutModel, id: string): LatticePoint | null
   return node ? { x: node.x + node.width / 2, y: node.y + node.height / 2 } : null;
 };
 
+const wrapMonospace = (value: string, contentWidth: number, fontSize: number): string[] => {
+  const maxChars = Math.max(1, Math.floor(contentWidth / (fontSize * APPROX_MONO_GLYPH_RATIO)));
+  const lines: string[] = [];
+  for (const sourceLine of value.split(/\r?\n/u)) {
+    if (!sourceLine.length) {
+      lines.push('');
+      continue;
+    }
+    for (let offset = 0; offset < sourceLine.length; offset += maxChars) lines.push(sourceLine.slice(offset, offset + maxChars));
+  }
+  return lines.length ? lines : [''];
+};
+
+const renderTspans = (lines: readonly string[], startY: number, lineHeight: number): string =>
+  lines.map((line, index) => `<tspan x="12" y="${startY + index * lineHeight}">${escapeXml(line)}</tspan>`).join('');
+
 export const buildLatticeSvg = (
   graph: LatticeGraphModel,
   layout: LatticeLayoutModel,
@@ -46,7 +70,14 @@ export const buildLatticeSvg = (
     if (!box) return '';
     const key = node.path ? node.key : '$';
     const value = primitiveLabel(node);
-    return `<g class="node" data-path="${escapeXml(node.path)}" transform="translate(${box.x} ${box.y})"><rect width="${box.width}" height="${box.height}" rx="10"/><text class="key" x="12" y="24">${escapeXml(key)}</text><text class="value" x="12" y="48">${escapeXml(value.slice(0, 80))}</text><text class="type" x="12" y="${Math.max(62, box.height - 10)}">${escapeXml(node.type)}</text></g>`;
+    const contentWidth = Math.max(1, box.width - 24);
+    const keyLines = wrapMonospace(key, contentWidth, KEY_FONT_SIZE);
+    const valueLines = wrapMonospace(value, contentWidth, VALUE_FONT_SIZE);
+    const keyStartY = 24;
+    const valueStartY = 48 + Math.max(0, keyLines.length - 1) * KEY_LINE_HEIGHT;
+    const typeY = Math.max(valueStartY + Math.max(1, valueLines.length) * VALUE_LINE_HEIGHT + 8, box.height - 10);
+    const fullLabel = `${key}: ${value} (${node.type})`;
+    return `<g class="node" data-path="${escapeXml(node.path)}" data-full-key="${escapeXml(key)}" data-full-value="${escapeXml(value)}" data-type="${escapeXml(node.type)}" aria-label="${escapeXml(fullLabel)}" transform="translate(${box.x} ${box.y})"><title>${escapeXml(fullLabel)}</title><rect width="${box.width}" height="${box.height}" rx="10"/><text class="key" aria-label="${escapeXml(key)}">${renderTspans(keyLines, keyStartY, KEY_LINE_HEIGHT)}</text><text class="value" aria-label="${escapeXml(value)}">${renderTspans(valueLines, valueStartY, VALUE_LINE_HEIGHT)}</text><text class="type" x="12" y="${typeY}">${escapeXml(node.type)}</text></g>`;
   }).join('');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lattice-title" viewBox="0 0 ${layout.bounds.width} ${layout.bounds.height}"><title id="lattice-title">${title}</title><style>.bg{fill:#0b1120}#structural-edges path{fill:none;stroke:#475569;stroke-width:2}#foreign-key-links path{fill:none;stroke:#38bdf8;stroke-width:1.5;stroke-dasharray:7 5}.node rect{fill:#1e293b;stroke:#475569;stroke-width:1.5}.node text{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.key{fill:#e2e8f0;font-size:14px;font-weight:700}.value{fill:#cbd5e1;font-size:12px}.type{fill:#38bdf8;font-size:10px}</style><rect class="bg" width="100%" height="100%"/><g id="structural-edges">${structuralEdges}</g><g id="foreign-key-links">${crossLinks}</g><g id="nodes">${nodes}</g></svg>`;
@@ -75,12 +106,23 @@ const svgBounds = (svg: string): { width: number; height: number } => {
   return { width, height };
 };
 
+const assertSafeRasterSize = (width: number, height: number, scale: number): { width: number; height: number } => {
+  const rasterWidth = Math.max(1, Math.ceil(width * scale));
+  const rasterHeight = Math.max(1, Math.ceil(height * scale));
+  const pixels = rasterWidth * rasterHeight;
+  if (rasterWidth > MAX_SAFE_RASTER_DIMENSION || rasterHeight > MAX_SAFE_RASTER_DIMENSION || pixels > MAX_SAFE_RASTER_PIXELS) {
+    throw new Error(`Raster export exceeds the safe canvas limit of ${MAX_SAFE_RASTER_DIMENSION} × ${MAX_SAFE_RASTER_DIMENSION} pixels. Export SVG instead or reduce the graph/scale.`);
+  }
+  return { width: rasterWidth, height: rasterHeight };
+};
+
 export const rasterizeLatticeSvg = async (
   svg: string,
   options: { readonly format?: 'png' | 'jpeg'; readonly scale?: number; readonly background?: string } = {},
 ): Promise<Blob> => {
   const { width, height } = svgBounds(svg);
   const scale = Math.min(4, Math.max(1, options.scale ?? 2));
+  const rasterSize = assertSafeRasterSize(width, height, scale);
   const format = options.format ?? 'png';
   const source = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(source);
@@ -93,8 +135,8 @@ export const rasterizeLatticeSvg = async (
       image.src = url;
     });
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.ceil(width * scale));
-    canvas.height = Math.max(1, Math.ceil(height * scale));
+    canvas.width = rasterSize.width;
+    canvas.height = rasterSize.height;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D is unavailable.');
     context.scale(scale, scale);

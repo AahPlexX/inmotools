@@ -1,5 +1,5 @@
 import type { ElkNode } from 'elkjs/lib/elk-api';
-import type { LatticeGraphModel } from './graph-engine';
+import type { LatticeGraphModel, LatticeGraphNode } from './graph-engine';
 
 export type LatticeLayoutDirection = 'LR' | 'TB' | 'RL' | 'BT';
 
@@ -62,9 +62,54 @@ export interface ElkLayoutLike {
 }
 
 const ROOT_ELK_ID = '$';
+const MIN_NODE_WIDTH = 220;
+const MAX_NODE_WIDTH = 640;
+const NODE_HORIZONTAL_PADDING = 24;
+const KEY_LINE_HEIGHT = 18;
+const VALUE_LINE_HEIGHT = 15;
 const toElkId = (path: string): string => path === '' ? ROOT_ELK_ID : path;
 const fromElkId = (id: string): string => id === ROOT_ELK_ID ? '' : id;
 const finite = (value: number | undefined): number => Number.isFinite(value) ? Number(value) : 0;
+
+let textMeasureContext: CanvasRenderingContext2D | null | undefined;
+const measureText = (text: string, fontSize: number, weight = 400): number => {
+  if (textMeasureContext === undefined) {
+    if (typeof document === 'undefined') textMeasureContext = null;
+    else {
+      const canvas = document.createElement('canvas');
+      textMeasureContext = canvas.getContext('2d');
+    }
+  }
+  if (!textMeasureContext) return text.length * fontSize * 0.62;
+  textMeasureContext.font = `${weight} ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  return textMeasureContext.measureText(text).width;
+};
+
+const nodeValueLabel = (node: LatticeGraphNode): string => {
+  if (node.value === undefined) return node.type === 'array' ? `Array (${node.childCount})` : node.type === 'object' ? `Object (${node.childCount})` : node.type;
+  if (node.value === null) return 'null';
+  return String(node.value);
+};
+
+const lineCountForWidth = (text: string, fontSize: number, contentWidth: number, weight = 400): number => {
+  const physicalLines = text.split(/\r?\n/u);
+  return Math.max(1, physicalLines.reduce((count, line) => count + Math.max(1, Math.ceil(measureText(line, fontSize, weight) / Math.max(1, contentWidth))), 0));
+};
+
+const nodeDimensions = (node: LatticeGraphNode): { width: number; height: number } => {
+  const key = node.path ? node.key : '$';
+  const value = nodeValueLabel(node);
+  const widest = Math.max(measureText(key, 14, 700), measureText(value, 12), measureText(node.type, 10));
+  const width = Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, Math.ceil(widest + NODE_HORIZONTAL_PADDING)));
+  const contentWidth = Math.max(1, width - NODE_HORIZONTAL_PADDING);
+  const keyLineCount = lineCountForWidth(key, 14, contentWidth, 700);
+  const valueLineCount = lineCountForWidth(value, 12, contentWidth);
+  const baseHeight = node.childCount > 0 ? 84 : 72;
+  const height = baseHeight
+    + Math.max(0, keyLineCount - 1) * KEY_LINE_HEIGHT
+    + Math.max(0, valueLineCount - 1) * VALUE_LINE_HEIGHT;
+  return { width, height };
+};
 
 export const layoutDirectionOption = (direction: LatticeLayoutDirection): 'RIGHT' | 'DOWN' | 'LEFT' | 'UP' => {
   if (direction === 'LR') return 'RIGHT';
@@ -84,8 +129,7 @@ export const buildElkGraph = (graph: LatticeGraphModel, direction: LatticeLayout
   },
   children: graph.nodes.map((node) => ({
     id: toElkId(node.path),
-    width: 220,
-    height: node.childCount > 0 ? 84 : 72,
+    ...nodeDimensions(node),
   })),
   edges: graph.edges.map((edge) => ({
     id: edge.id,
