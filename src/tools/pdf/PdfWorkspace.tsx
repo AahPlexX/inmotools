@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import { inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs, type PageSelectionPreset, type PdfInspection } from './pdf-engine';
 import { consumeFileInput } from '../../lib/file-input';
@@ -9,6 +9,12 @@ type PdfItem = {
   inspection: PdfInspection;
   pages: string;
   rotate: 0 | 90 | 180 | 270;
+};
+
+type PointerDrag = {
+  from: number;
+  over: number;
+  pointerId: number;
 };
 
 const OUTPUT_PREVIEW_LIMIT = 100;
@@ -25,6 +31,8 @@ export default function PdfWorkspace() {
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, or flatten.');
   const [busy, setBusy] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const pointerDragRef = useRef<PointerDrag | null>(null);
+  const [pointerDragOver, setPointerDragOver] = useState<number | null>(null);
 
   const pageStates = useMemo(() => items.map((item) => {
     try {
@@ -96,6 +104,43 @@ export default function PdfWorkspace() {
     });
   }
 
+  function pointerTargetIndex(clientX: number, clientY: number): number | null {
+    const target = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-pdf-index]');
+    if (!target) return null;
+    const index = Number(target.dataset.pdfIndex);
+    return Number.isInteger(index) ? index : null;
+  }
+
+  function startPointerDrag(index: number, event: React.PointerEvent<HTMLButtonElement>) {
+    if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    pointerDragRef.current = { from: index, over: index, pointerId: event.pointerId };
+    setPointerDragOver(index);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* synthetic test events may not own capture */ }
+    event.preventDefault();
+  }
+
+  function movePointerDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const over = pointerTargetIndex(event.clientX, event.clientY);
+    if (over !== null && over !== drag.over) {
+      pointerDragRef.current = { ...drag, over };
+      setPointerDragOver(over);
+    }
+    event.preventDefault();
+  }
+
+  function finishPointerDrag(event: React.PointerEvent<HTMLButtonElement>, cancelled = false) {
+    const drag = pointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const over = cancelled ? drag.from : pointerTargetIndex(event.clientX, event.clientY) ?? drag.over;
+    pointerDragRef.current = null;
+    setPointerDragOver(null);
+    try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* capture may already be released */ }
+    if (!cancelled && over !== drag.from) reorder(drag.from, over);
+    event.preventDefault();
+  }
+
   function update(index: number, patch: Partial<PdfItem>) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   }
@@ -155,9 +200,10 @@ export default function PdfWorkspace() {
         const evenPreset = pageSelectionPreset('even', item.inspection.pageCount);
         return <div
           className="notice"
-          style={{ marginTop: 14 }}
+          style={{ marginTop: 14, outline: pointerDragOver === index ? '2px solid currentColor' : undefined, outlineOffset: pointerDragOver === index ? 2 : undefined }}
           key={item.id}
           data-testid="pdf-item"
+          data-pdf-index={index}
           draggable
           onDragStart={(event) => { setDragIndex(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); }}
           onDragOver={(event) => { if (dragIndex !== null && dragIndex !== index) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
@@ -165,6 +211,20 @@ export default function PdfWorkspace() {
           onDragEnd={() => setDragIndex(null)}
           aria-label={`PDF queue item ${index + 1}: ${item.file.name}`}
         >
+          <div className="button-row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
+            <button
+              className="action-button secondary"
+              type="button"
+              draggable={false}
+              style={{ touchAction: 'none', cursor: 'grab' }}
+              aria-label={`Drag ${item.file.name} to reorder`}
+              onDragStart={(event) => event.preventDefault()}
+              onPointerDown={(event) => startPointerDrag(index, event)}
+              onPointerMove={movePointerDrag}
+              onPointerUp={(event) => finishPointerDrag(event)}
+              onPointerCancel={(event) => finishPointerDrag(event, true)}
+            >Drag</button>
+          </div>
           <div className="workspace-grid three">
             <div>
               <strong style={{ overflowWrap: 'anywhere' }}>{item.file.name}</strong>
@@ -185,7 +245,7 @@ export default function PdfWorkspace() {
             <div className="field"><label htmlFor={`rotate-${index}`}>Rotate output</label><select id={`rotate-${index}`} value={item.rotate} onChange={(event) => update(index, { rotate: Number(event.target.value) as PdfItem['rotate'] })}><option value="0">No rotation</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
           </div>
           <div className="button-row"><button className="action-button secondary" type="button" disabled={index === 0} onClick={() => move(index, -1)}>Move up</button><button className="action-button secondary" type="button" disabled={index === items.length - 1} onClick={() => move(index, 1)}>Move down</button><button className="action-button secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item.file.name} from the queue`}>Remove</button></div>
-          <small>Drag this card to reorder with a pointer, or use Move up / Move down for keyboard and touch-independent ordering.</small>
+          <small>Use the Drag handle with mouse, pen, or touch, or use Move up / Move down as the non-drag ordering alternative.</small>
         </div>;
       })}
 
