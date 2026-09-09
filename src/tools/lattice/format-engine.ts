@@ -26,11 +26,14 @@ export const normalizeJsonValue = (value: unknown): JsonValue => {
   return String(value);
 };
 
+// XML and CSV have no schema that can distinguish an identifier such as
+// "00123" from a number without risking irreversible data loss. Preserve
+// scalar fields as text by default; callers can normalize types explicitly.
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@',
-  parseTagValue: true,
-  parseAttributeValue: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
   trimValues: true,
 });
 
@@ -48,7 +51,7 @@ export const parseStructuredText = (text: string, format: StructuredFormat): Jso
 
   const parsed = Papa.parse<Record<string, unknown>>(text, {
     header: true,
-    dynamicTyping: true,
+    dynamicTyping: false,
     skipEmptyLines: 'greedy',
   });
   const fatal = parsed.errors.find((item) => item.type === 'Quotes' || item.type === 'Delimiter');
