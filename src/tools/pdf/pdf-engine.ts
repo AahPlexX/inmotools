@@ -14,6 +14,8 @@ export interface PdfInspection {
   encrypted: boolean;
 }
 
+export type PageSelectionPreset = 'all' | 'odd' | 'even' | 'reverse';
+
 const METADATA_READERS = [
   ['Title', (doc: PDFDocument) => doc.getTitle()],
   ['Author', (doc: PDFDocument) => doc.getAuthor()],
@@ -51,12 +53,20 @@ export function parsePageSelection(value: string, max: number): number[] {
   return pages;
 }
 
-export function pageSelectionPreset(kind: 'all' | 'odd' | 'even' | 'reverse', max: number): string {
+/**
+ * Returns null when a preset has no pages. Empty string remains reserved for
+ * the explicit “all pages” selection, so an empty even/odd result can never be
+ * mistaken for all pages by parsePageSelection().
+ */
+export function pageSelectionPreset(kind: PageSelectionPreset, max: number): string | null {
+  if (!Number.isInteger(max) || max < 1) throw new Error('PDF must contain at least one page.');
   if (kind === 'all') return '';
   const pages = Array.from({ length: max }, (_, index) => index + 1);
-  if (kind === 'odd') return pages.filter((page) => page % 2 === 1).join(',');
-  if (kind === 'even') return pages.filter((page) => page % 2 === 0).join(',');
-  return pages.reverse().join(',');
+  let selected: number[];
+  if (kind === 'odd') selected = pages.filter((page) => page % 2 === 1);
+  else if (kind === 'even') selected = pages.filter((page) => page % 2 === 0);
+  else selected = pages.reverse();
+  return selected.length ? selected.join(',') : null;
 }
 
 export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
@@ -75,9 +85,6 @@ export async function combinePdfs(buffers: Uint8Array[]): Promise<Uint8Array> {
 }
 
 export async function flattenAndSanitizePdf(bytes: Uint8Array): Promise<Uint8Array> {
-  // Rebuild into a fresh document instead of editing the source in place. This
-  // intentionally leaves source-level catalog metadata behind while copying the
-  // selected page objects and their visible content.
   return splicePdfs([{ bytes, flatten: true }]);
 }
 
@@ -87,10 +94,16 @@ export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array
   for (const selection of selections) {
     const source = await PDFDocument.load(selection.bytes.slice(), { updateMetadata: false });
     if (source.isEncrypted) throw new Error('Encrypted PDFs are not supported and cannot be safely modified by this tool.');
-    if (selection.flatten) {
-      const form = source.getForm();
-      if (form.getFields().length) form.flatten({ updateFieldAppearances: false });
+
+    const form = source.getForm();
+    const formFieldCount = form.getFields().length;
+    if (formFieldCount && selection.flatten !== true) {
+      throw new Error(
+        `Editable AcroForm preservation is not supported when copying pages. This source contains ${formFieldCount} form field${formFieldCount === 1 ? '' : 's'}. Enable flattening before processing so the current field appearances are preserved as page content instead of being silently discarded.`,
+      );
     }
+    if (formFieldCount) form.flatten({ updateFieldAppearances: false });
+
     const indices = selection.pages?.length ? selection.pages.map((page) => page - 1) : source.getPageIndices();
     if (indices.some((index) => index < 0 || index >= source.getPageCount())) throw new Error('A selected page is outside the document page range.');
     const pages = await output.copyPages(source, indices);
@@ -99,9 +112,6 @@ export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array
       output.addPage(page);
     });
   }
-  // The fresh output document does not inherit source catalog-level document
-  // metadata. Explicitly clear Info as a defence in depth in case pdf-lib adds
-  // generated metadata in a future release.
   output.context.trailerInfo.Info = undefined;
   return new Uint8Array(await output.save({ updateFieldAppearances: false }));
 }
