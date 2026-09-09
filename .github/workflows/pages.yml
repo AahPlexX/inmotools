@@ -20,9 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # PR validation computes the exact base-to-head path set so it can run
-          # the relevant browser surface without serializing every tool behind
-          # the entire catalog suite. Main still runs the full E2E matrix.
+          # PR validation executes on GitHub's synthetic merge ref so tool tests
+          # see the latest base integration, but path selection below compares
+          # only the PR's own base/head SHAs to avoid unrelated main changes.
           fetch-depth: 0
       - name: Setup pnpm and Node
         uses: pnpm/setup@v2
@@ -41,6 +41,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -49,7 +50,7 @@ jobs:
             exit 0
           fi
 
-          git diff --name-only "$BASE_SHA"...HEAD > /tmp/inmotools-changed-paths.txt
+          git diff --name-only "$BASE_SHA"..."$HEAD_SHA" > /tmp/inmotools-changed-paths.txt
           E2E_SPECS="$(node scripts/select-e2e-specs.mjs /tmp/inmotools-changed-paths.txt)"
           if [[ -z "$E2E_SPECS" || "$E2E_SPECS" == "__FULL_SUITE__" ]]; then
             echo "Cross-cutting or unmapped change detected; running the full browser suite."

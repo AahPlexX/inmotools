@@ -17,6 +17,17 @@ const setSource = async (page: Parameters<typeof test>[0] extends never ? never 
   await editor.fill(value);
 };
 
+const expectButtonsDisabledNow = async (page: any, names: string[]) => {
+  const states = await page.evaluate((expectedNames: string[]) => {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
+    return expectedNames.map((name) => ({
+      name,
+      disabled: buttons.find((button) => button.textContent?.trim() === name)?.disabled ?? false,
+    }));
+  }, names);
+  expect(states).toEqual(names.map((name) => ({ name, disabled: true })));
+};
+
 test('JSON Lattice catalog link, exact alias, and generic route open the same local workspace', async ({ page }) => {
   await page.goto('./#/');
   const catalogLink = page.getByRole('link', { name: /JSON Lattice Studio/ });
@@ -103,7 +114,7 @@ test('blocks exports while source edits are pending or invalid instead of export
   const editor = page.locator('[aria-label="JSON Lattice source"]');
   await editor.fill('{"status":"pending"}');
   await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
-  for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
+  await expectButtonsDisabledNow(page, normalizedExports);
   const rawExport = page.getByRole('button', { name: 'Export raw source' });
   await expect(rawExport).toBeEnabled();
 
