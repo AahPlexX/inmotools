@@ -17,32 +17,113 @@ _unsupported = sorted(set(__regex_flags) - set('gimsxau'))
 if _unsupported:
     raise ValueError('Unsupported Python flag' + ('s' if len(_unsupported) != 1 else '') + ': ' + ', '.join(_unsupported))
 _compiled = re.compile(__regex_pattern, sum((_flag_map[ch] for ch in __regex_flags if ch in _flag_map), re.NOFLAG))
+_display_limit = 5000
+_count_limit = 100000
 _rows = []
-for _match in _compiled.finditer(__regex_subject):
-    _rows.append({
-        'match': _match.group(0),
-        'index': _match.start(),
-        'end': _match.end(),
-        'groups': [value if value is not None else '' for value in _match.groups()],
-        'namedGroups': {key: value for key, value in _match.groupdict().items() if value is not None},
-    })
-    if 'g' not in __regex_flags or len(_rows) >= 5000:
+_total = 0
+_exact = True
+_iterator = iter(_compiled.finditer(__regex_subject))
+while True:
+    _match = next(_iterator, None)
+    if _match is None:
         break
-json.dumps({'pythonVersion': platform.python_version(), 'matches': _rows})
+    _total += 1
+    if len(_rows) < _display_limit:
+        _rows.append({
+            'match': _match.group(0),
+            'index': _match.start(),
+            'end': _match.end(),
+            'groups': [value if value is not None else '' for value in _match.groups()],
+            'namedGroups': {key: value for key, value in _match.groupdict().items() if value is not None},
+        })
+    if 'g' not in __regex_flags:
+        break
+    if _total >= _count_limit:
+        if next(_iterator, None) is not None:
+            _exact = False
+        break
+json.dumps({
+    'pythonVersion': platform.python_version(),
+    'matches': _rows,
+    'totalMatches': _total if _exact else None,
+    'totalMatchesExact': _exact,
+    'omittedCount': max(0, _total - len(_rows)) if _exact else None,
+    'truncated': (not _exact) or _total > len(_rows),
+})
 `;
+
+interface PythonExecutionPayload {
+  readonly pythonVersion: string;
+  readonly matches: RegexMatchRecord[];
+  readonly totalMatches: number | null;
+  readonly totalMatchesExact: boolean;
+  readonly omittedCount: number | null;
+  readonly truncated: boolean;
+}
+
+const buildCodePointToUtf16Map = (subject: string): number[] => {
+  const map = [0];
+  let utf16Index = 0;
+  for (const codePoint of subject) {
+    utf16Index += codePoint.length;
+    map.push(utf16Index);
+  }
+  return map;
+};
 
 const execute = async (request: RunRequest): Promise<RegexRunResult> => {
   const started = now();
   try {
     const runtime = await getRuntime();
+    const executionStarted = now();
     runtime.globals.set('__regex_pattern', request.pattern);
     runtime.globals.set('__regex_flags', request.flags);
     runtime.globals.set('__regex_subject', request.subject);
     const raw = runtime.runPython(PYTHON_RUNNER);
-    const parsed = JSON.parse(String(raw)) as { pythonVersion: string; matches: RegexMatchRecord[] };
-    return { engine: `Python ${parsed.pythonVersion} · Pyodide ${pyodideVersion} · WebAssembly`, capability: 'execution', matches: parsed.matches, durationMs: now() - started, error: null };
+    const parsed = JSON.parse(String(raw)) as PythonExecutionPayload;
+    const codePointToUtf16 = buildCodePointToUtf16Map(request.subject);
+    const matches = parsed.matches.map((match) => ({
+      ...match,
+      index: codePointToUtf16[match.index] ?? request.subject.length,
+      end: codePointToUtf16[match.end] ?? request.subject.length,
+    }));
+    const executionMs = now() - executionStarted;
+    return {
+      engine: `Python ${parsed.pythonVersion} · Pyodide ${pyodideVersion} · WebAssembly`,
+      capability: 'execution',
+      matches,
+      durationMs: now() - started,
+      startupMs: 0,
+      executionMs,
+      offsetUnit: 'utf16-code-unit',
+      error: null,
+      truncated: parsed.truncated,
+      omittedCount: parsed.omittedCount,
+      totalMatches: parsed.totalMatches,
+      totalMatchesExact: parsed.totalMatchesExact,
+      nextStartIndex: null,
+      startIndex: 0,
+      matchLimit: 5_000,
+    };
   } catch (error) {
-    return { engine: `Python · Pyodide ${pyodideVersion} · WebAssembly`, capability: 'execution', matches: [], durationMs: now() - started, error: error instanceof Error ? error.message : String(error) };
+    const durationMs = now() - started;
+    return {
+      engine: `Python · Pyodide ${pyodideVersion} · WebAssembly`,
+      capability: 'execution',
+      matches: [],
+      durationMs,
+      startupMs: 0,
+      executionMs: durationMs,
+      offsetUnit: 'utf16-code-unit',
+      error: error instanceof Error ? error.message : String(error),
+      truncated: false,
+      omittedCount: 0,
+      totalMatches: 0,
+      totalMatchesExact: true,
+      nextStartIndex: null,
+      startIndex: 0,
+      matchLimit: 5_000,
+    };
   } finally {
     const runtime = await runtimePromise?.catch(() => undefined);
     runtime?.globals.delete('__regex_pattern');
