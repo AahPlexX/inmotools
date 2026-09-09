@@ -3,6 +3,7 @@ import {
   bytesToHex,
   hexToBytes,
   matchLineRule,
+  PacketFrameLimitError,
   PacketStreamFramer,
   validateLineRule,
 } from '../../src/tools/hardware/packet-engine';
@@ -46,5 +47,23 @@ describe('hardware packet helpers', () => {
     expect(framer.push(bytes.slice(euroIndex + 1, euroIndex + 2))).toEqual([]);
     const frames = framer.push(bytes.slice(euroIndex + 2));
     expect(frames.map((frame) => frame.text)).toEqual(['price=10€', 'next=OK']);
+  });
+
+  it('bounds an unterminated newline frame and clears the retained buffer after rejection', () => {
+    const framer = new PacketStreamFramer('line', 8);
+    expect(framer.push(new TextEncoder().encode('12345678'))).toEqual([]);
+    expect(() => framer.push(new TextEncoder().encode('9'))).toThrow(PacketFrameLimitError);
+    expect(framer.push(new TextEncoder().encode('OK\n')).map((frame) => frame.text)).toEqual(['OK']);
+  });
+
+  it('preserves complete frames that precede an oversized frame in the same read', () => {
+    const framer = new PacketStreamFramer('line', 4);
+    try {
+      framer.push(new TextEncoder().encode('OK\nTOO-LONG\n'));
+      throw new Error('Expected a frame limit error.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(PacketFrameLimitError);
+      expect((error as PacketFrameLimitError).completedFrames.map((frame) => frame.text)).toEqual(['OK']);
+    }
   });
 });
