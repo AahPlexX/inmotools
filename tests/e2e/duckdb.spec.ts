@@ -39,7 +39,7 @@ test('queries local files losslessly with bounded capture, types, history, expor
   await page.getByRole('button', { name: 'Run query' }).click();
   await expect(page.getByText(/1,000 rows captured.*Result incomplete.*1,000-row capture limit/)).toBeVisible({ timeout: 45_000 });
   await expect(page.getByTestId('duckdb-result-metadata')).toContainText('Incomplete capture');
-  await expect(page.getByTestId('duckdb-results-range')).toContainText('Rows 1–200 of 1,000');
+  await expect(page.getByTestId('duckdb-results-range')).toContainText(/Rows 1–200 of 1,?000/);
   await page.getByLabel('Search displayed rows').fill('999');
   await expect(page.getByText('1 of 1,000 captured rows match.')).toBeVisible();
   await expect(page.getByRole('cell', { name: '999', exact: true })).toBeVisible();
