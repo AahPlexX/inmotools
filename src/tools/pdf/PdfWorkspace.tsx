@@ -30,7 +30,6 @@ export default function PdfWorkspace() {
   const [flatten, setFlatten] = useState(true);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, or flatten.');
   const [busy, setBusy] = useState(false);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const pointerDragRef = useRef<PointerDrag | null>(null);
   const [pointerDragOver, setPointerDragOver] = useState<number | null>(null);
 
@@ -115,7 +114,7 @@ export default function PdfWorkspace() {
     if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
     pointerDragRef.current = { from: index, over: index, pointerId: event.pointerId };
     setPointerDragOver(index);
-    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* synthetic test events may not own capture */ }
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* pointer capture is optional */ }
     event.preventDefault();
   }
 
@@ -204,11 +203,6 @@ export default function PdfWorkspace() {
           key={item.id}
           data-testid="pdf-item"
           data-pdf-index={index}
-          draggable
-          onDragStart={(event) => { setDragIndex(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); }}
-          onDragOver={(event) => { if (dragIndex !== null && dragIndex !== index) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
-          onDrop={(event) => { event.preventDefault(); if (dragIndex !== null) reorder(dragIndex, index); setDragIndex(null); }}
-          onDragEnd={() => setDragIndex(null)}
           aria-label={`PDF queue item ${index + 1}: ${item.file.name}`}
         >
           <div className="button-row" style={{ justifyContent: 'flex-end', marginBottom: 8 }}>
@@ -218,7 +212,6 @@ export default function PdfWorkspace() {
               draggable={false}
               style={{ touchAction: 'none', cursor: 'grab' }}
               aria-label={`Drag ${item.file.name} to reorder`}
-              onDragStart={(event) => event.preventDefault()}
               onPointerDown={(event) => startPointerDrag(index, event)}
               onPointerMove={movePointerDrag}
               onPointerUp={(event) => finishPointerDrag(event)}
