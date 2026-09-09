@@ -2,6 +2,8 @@ import onigWasmUrl from 'vscode-oniguruma/release/onig.wasm?url';
 import type { RegexMatchRecord, RegexRunResult } from './regex-types';
 
 const now = () => typeof performance !== 'undefined' ? performance.now() : Date.now();
+const DISPLAY_MATCH_LIMIT = 5_000;
+const COUNT_LIMIT = 100_000;
 let runtimePromise: Promise<typeof import('vscode-oniguruma')> | undefined;
 
 const getRuntime = () => {
@@ -20,37 +22,93 @@ const preparePattern = (pattern: string, flags: string) => {
   return flags.includes('i') ? `(?i:${pattern})` : pattern;
 };
 
+const advanceUtf16CodePoint = (subject: string, index: number): number => {
+  if (index >= subject.length) return index + 1;
+  const codePoint = subject.codePointAt(index);
+  return index + (codePoint !== undefined && codePoint > 0xffff ? 2 : 1);
+};
+
 export const executeOnigurumaRegex = async (pattern: string, flags: string, subject: string): Promise<RegexRunResult> => {
   const started = now();
   let scanner: import('vscode-oniguruma').OnigScanner | undefined;
   let onigString: import('vscode-oniguruma').OnigString | undefined;
   try {
+    const runtimeStarted = now();
     const runtime = await getRuntime();
+    const startupMs = now() - runtimeStarted;
+    const executionStarted = now();
     scanner = runtime.createOnigScanner([preparePattern(pattern, flags)]);
     onigString = runtime.createOnigString(subject);
     const matches: RegexMatchRecord[] = [];
     let cursor = 0;
+    let totalMatches = 0;
+    let totalMatchesExact = true;
     const global = flags.includes('g');
-    while (cursor <= subject.length && matches.length < 5000) {
+
+    while (cursor <= subject.length) {
       const found = scanner.findNextMatchSync(onigString, cursor);
       if (!found) break;
       const whole = found.captureIndices[0];
       if (!whole || whole.start < 0 || whole.end < whole.start) break;
-      matches.push({
-        match: subject.slice(whole.start, whole.end),
-        index: whole.start,
-        end: whole.end,
-        groups: found.captureIndices.slice(1).map((capture) => capture.start >= 0 && capture.end >= capture.start ? subject.slice(capture.start, capture.end) : ''),
-        namedGroups: {},
-      });
+      totalMatches += 1;
+      if (matches.length < DISPLAY_MATCH_LIMIT) {
+        matches.push({
+          match: subject.slice(whole.start, whole.end),
+          index: whole.start,
+          end: whole.end,
+          groups: found.captureIndices.slice(1).map((capture) => capture.start >= 0 && capture.end >= capture.start ? subject.slice(capture.start, capture.end) : ''),
+          namedGroups: {},
+        });
+      }
       if (!global) break;
-      const nextCursor = whole.end > whole.start ? whole.end : whole.end + 1;
+      const nextCursor = whole.end > whole.start ? whole.end : advanceUtf16CodePoint(subject, whole.end);
       if (nextCursor <= cursor) break;
       cursor = nextCursor;
+      if (totalMatches >= COUNT_LIMIT) {
+        const probe = scanner.findNextMatchSync(onigString, cursor);
+        if (probe) totalMatchesExact = false;
+        break;
+      }
     }
-    return { engine: 'Oniguruma · WebAssembly (vscode-oniguruma 2.0.1)', capability: 'execution', matches, durationMs: now() - started, error: null };
+
+    const executionMs = now() - executionStarted;
+    const truncated = !totalMatchesExact || totalMatches > matches.length;
+    return {
+      engine: 'Oniguruma · WebAssembly (vscode-oniguruma 2.0.1)',
+      capability: 'execution',
+      matches,
+      durationMs: now() - started,
+      startupMs,
+      executionMs,
+      offsetUnit: 'utf16-code-unit',
+      error: null,
+      truncated,
+      omittedCount: totalMatchesExact ? Math.max(0, totalMatches - matches.length) : null,
+      totalMatches: totalMatchesExact ? totalMatches : null,
+      totalMatchesExact,
+      nextStartIndex: null,
+      startIndex: 0,
+      matchLimit: DISPLAY_MATCH_LIMIT,
+    };
   } catch (error) {
-    return { engine: 'Oniguruma · WebAssembly (vscode-oniguruma 2.0.1)', capability: 'execution', matches: [], durationMs: now() - started, error: error instanceof Error ? error.message : String(error) };
+    const durationMs = now() - started;
+    return {
+      engine: 'Oniguruma · WebAssembly (vscode-oniguruma 2.0.1)',
+      capability: 'execution',
+      matches: [],
+      durationMs,
+      startupMs: durationMs,
+      executionMs: 0,
+      offsetUnit: 'utf16-code-unit',
+      error: error instanceof Error ? error.message : String(error),
+      truncated: false,
+      omittedCount: 0,
+      totalMatches: 0,
+      totalMatchesExact: true,
+      nextStartIndex: null,
+      startIndex: 0,
+      matchLimit: DISPLAY_MATCH_LIMIT,
+    };
   } finally {
     onigString?.dispose();
     scanner?.dispose();

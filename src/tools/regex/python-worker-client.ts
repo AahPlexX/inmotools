@@ -37,9 +37,25 @@ const getWorker = (): Promise<Worker> => {
 };
 
 const runOnce = async (pattern: string, flags: string, subject: string, timeoutMs: number): Promise<RegexRunResult> => {
+  const hadWorker = workerPromise !== null;
+  const initializationStarted = performance.now();
   let worker: Worker;
-  try { worker = await getWorker(); } catch (error) {
-    return { engine: ENGINE, capability: 'execution', matches: [], durationMs: 0, error: error instanceof Error ? error.message : String(error) };
+  let startupMs = 0;
+  try {
+    worker = await getWorker();
+    startupMs = hadWorker ? 0 : performance.now() - initializationStarted;
+  } catch (error) {
+    const durationMs = performance.now() - initializationStarted;
+    return {
+      engine: ENGINE,
+      capability: 'execution',
+      matches: [],
+      durationMs,
+      startupMs: durationMs,
+      executionMs: 0,
+      offsetUnit: 'utf16-code-unit',
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
   return new Promise((resolve) => {
     const id = ++requestId;
@@ -51,17 +67,43 @@ const runOnce = async (pattern: string, flags: string, subject: string, timeoutM
     const onMessage = (event: MessageEvent<{ type: string; requestId?: number; result?: RegexRunResult }>) => {
       if (event.data.type !== 'result' || event.data.requestId !== id || !event.data.result) return;
       cleanup();
-      resolve(event.data.result);
+      const executionMs = event.data.result.executionMs ?? event.data.result.durationMs;
+      resolve({
+        ...event.data.result,
+        startupMs,
+        executionMs,
+        durationMs: startupMs + executionMs,
+        offsetUnit: 'utf16-code-unit',
+      });
     };
     const onError = () => {
       cleanup();
       resetWorker(worker);
-      resolve({ engine: ENGINE, capability: 'execution', matches: [], durationMs: 0, error: 'Python runtime worker failed during execution.' });
+      resolve({
+        engine: ENGINE,
+        capability: 'execution',
+        matches: [],
+        durationMs: startupMs,
+        startupMs,
+        executionMs: 0,
+        offsetUnit: 'utf16-code-unit',
+        error: 'Python runtime worker failed during execution.',
+      });
     };
     const timer = window.setTimeout(() => {
       cleanup();
       resetWorker(worker);
-      resolve({ engine: ENGINE, capability: 'execution', matches: [], durationMs: timeoutMs, error: `Execution stopped by the ${timeoutMs} ms watchdog target.`, timedOut: true });
+      resolve({
+        engine: ENGINE,
+        capability: 'execution',
+        matches: [],
+        durationMs: startupMs + timeoutMs,
+        startupMs,
+        executionMs: timeoutMs,
+        offsetUnit: 'utf16-code-unit',
+        error: `Execution stopped by the ${timeoutMs} ms watchdog target.`,
+        timedOut: true,
+      });
     }, timeoutMs);
     worker.addEventListener('message', onMessage);
     worker.addEventListener('error', onError);
