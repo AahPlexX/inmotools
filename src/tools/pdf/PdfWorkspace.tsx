@@ -132,9 +132,16 @@ export default function PdfWorkspace() {
   function movePointerDrag(event: React.PointerEvent<HTMLButtonElement>) {
     const drag = pointerDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    if (event.clientY < DRAG_EDGE_PX) window.scrollBy(0, -DRAG_SCROLL_PX);
-    else if (event.clientY > window.innerHeight - DRAG_EDGE_PX) window.scrollBy(0, DRAG_SCROLL_PX);
-    const over = pointerTargetIndex(event.clientY);
+    let over: number | null;
+    if (event.clientY < DRAG_EDGE_PX) {
+      window.scrollBy(0, -DRAG_SCROLL_PX);
+      over = Math.max(0, drag.over - 1);
+    } else if (event.clientY > window.innerHeight - DRAG_EDGE_PX) {
+      window.scrollBy(0, DRAG_SCROLL_PX);
+      over = Math.min(items.length - 1, drag.over + 1);
+    } else {
+      over = pointerTargetIndex(event.clientY);
+    }
     if (over !== null && over !== drag.over) {
       pointerDragRef.current = { ...drag, over };
       setPointerDragOver(over);
@@ -145,7 +152,8 @@ export default function PdfWorkspace() {
   function finishPointerDrag(event: React.PointerEvent<HTMLButtonElement>, cancelled = false) {
     const drag = pointerDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const over = cancelled ? drag.from : pointerTargetIndex(event.clientY) ?? drag.over;
+    const hit = pointerTargetIndex(event.clientY);
+    const over = cancelled ? drag.from : hit === null || hit === drag.from ? drag.over : hit;
     pointerDragRef.current = null;
     setPointerDragOver(null);
     try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* capture may already be released */ }
