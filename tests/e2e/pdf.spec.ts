@@ -37,6 +37,11 @@ test('keeps an empty Even preset distinct from All and previews/reorders output 
   const cards = page.getByTestId('pdf-item');
   await cards.nth(0).dragTo(cards.nth(1));
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['second.pdf · page 1', 'first.pdf · page 1']);
+
+  // Pointer drag is optional convenience; the explicit controls remain the
+  // device-agnostic ordering path for keyboard and touch-only users.
+  await cards.nth(0).getByRole('button', { name: 'Move down' }).click();
+  await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
   await expect(page.getByText('Output pages').locator('..')).toContainText('2');
 });
 

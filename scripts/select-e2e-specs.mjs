@@ -22,7 +22,7 @@ const TOOL_SPECS = new Map([
   ['music', ['tests/e2e/music.spec.ts']],
   ['nutrition', ['tests/e2e/nutrition.spec.ts']],
   ['otel', ['tests/e2e/otel.spec.ts']],
-  ['pdf', ['tests/e2e/audit-hardening.spec.ts']],
+  ['pdf', ['tests/e2e/pdf.spec.ts']],
   ['regex', ['tests/e2e/regex-matrix.spec.ts', 'tests/e2e/regex-matrix-audit.spec.ts']],
   ['shader', ['tests/e2e/audit-hardening.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
