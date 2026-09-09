@@ -20,6 +20,14 @@ describe('JSON Lattice audit regressions', () => {
     expect(longNode?.height).toBeGreaterThan(shortNode?.height ?? 0);
   });
 
+  it('reserves wrapped height for long keys after node width reaches its cap', () => {
+    const longKey = 'very-long-property-key-'.repeat(40);
+    const request = buildElkGraph(buildGraphModel({ [longKey]: 'value' }), 'LR');
+    const node = request.children?.find((candidate) => candidate.id !== '$');
+    expect(node?.width).toBe(640);
+    expect(node?.height).toBeGreaterThan(72);
+  });
+
   it('keeps full node labels in SVG metadata instead of silently truncating them', () => {
     const longValue = '0123456789'.repeat(12);
     const graph = buildGraphModel({ identifier: longValue });
@@ -34,6 +42,23 @@ describe('JSON Lattice audit regressions', () => {
     const svg = buildLatticeSvg(graph, layout);
     expect(svg).toContain(`data-full-value="${longValue}"`);
     expect(svg).toContain(longValue);
+  });
+
+  it('wraps long SVG keys while retaining the complete key in metadata', () => {
+    const longKey = 'field-'.repeat(80);
+    const graph = buildGraphModel({ [longKey]: 'value' });
+    const path = `/${longKey}`;
+    const layout: LatticeLayoutModel = {
+      bounds: { width: 700, height: 260 },
+      nodes: new Map([
+        ['', { id: '', x: 10, y: 10, width: 220, height: 84 }],
+        [path, { id: path, x: 20, y: 110, width: 640, height: 150 }],
+      ]),
+      edges: [],
+    };
+    const svg = buildLatticeSvg(graph, layout);
+    expect(svg).toContain(`data-full-key="${longKey}"`);
+    expect(svg.match(/<tspan x="12" y="(?:24|42|60|78|96|114|132|150|168|186|204|222|240)">/gu)?.length ?? 0).toBeGreaterThan(1);
   });
 
   it('rejects unsafe raster dimensions before creating a browser canvas', async () => {

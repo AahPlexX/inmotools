@@ -65,6 +65,7 @@ const ROOT_ELK_ID = '$';
 const MIN_NODE_WIDTH = 220;
 const MAX_NODE_WIDTH = 640;
 const NODE_HORIZONTAL_PADDING = 24;
+const KEY_LINE_HEIGHT = 18;
 const VALUE_LINE_HEIGHT = 15;
 const toElkId = (path: string): string => path === '' ? ROOT_ELK_ID : path;
 const fromElkId = (id: string): string => id === ROOT_ELK_ID ? '' : id;
@@ -90,14 +91,23 @@ const nodeValueLabel = (node: LatticeGraphNode): string => {
   return String(node.value);
 };
 
+const lineCountForWidth = (text: string, fontSize: number, contentWidth: number, weight = 400): number => {
+  const physicalLines = text.split(/\r?\n/u);
+  return Math.max(1, physicalLines.reduce((count, line) => count + Math.max(1, Math.ceil(measureText(line, fontSize, weight) / Math.max(1, contentWidth))), 0));
+};
+
 const nodeDimensions = (node: LatticeGraphNode): { width: number; height: number } => {
   const key = node.path ? node.key : '$';
   const value = nodeValueLabel(node);
   const widest = Math.max(measureText(key, 14, 700), measureText(value, 12), measureText(node.type, 10));
   const width = Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, Math.ceil(widest + NODE_HORIZONTAL_PADDING)));
-  const valueLineCount = Math.max(1, Math.ceil(measureText(value, 12) / Math.max(1, width - NODE_HORIZONTAL_PADDING)));
+  const contentWidth = Math.max(1, width - NODE_HORIZONTAL_PADDING);
+  const keyLineCount = lineCountForWidth(key, 14, contentWidth, 700);
+  const valueLineCount = lineCountForWidth(value, 12, contentWidth);
   const baseHeight = node.childCount > 0 ? 84 : 72;
-  const height = baseHeight + Math.max(0, valueLineCount - 1) * VALUE_LINE_HEIGHT;
+  const height = baseHeight
+    + Math.max(0, keyLineCount - 1) * KEY_LINE_HEIGHT
+    + Math.max(0, valueLineCount - 1) * VALUE_LINE_HEIGHT;
   return { width, height };
 };
 

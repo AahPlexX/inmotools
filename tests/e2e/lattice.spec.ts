@@ -104,7 +104,8 @@ test('blocks exports while source edits are pending or invalid instead of export
   await editor.fill('{"status":"pending"}');
   await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
   for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Export raw source' })).toBeEnabled();
+  const rawExport = page.getByRole('button', { name: 'Export raw source' });
+  await expect(rawExport).toBeEnabled();
 
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
   await expect(page.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
@@ -113,7 +114,10 @@ test('blocks exports while source edits are pending or invalid instead of export
   await editor.fill('{');
   await expect(page.getByTestId('revision-status')).toContainText(/invalid/i, { timeout: 2_000 });
   for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Export raw source' })).toBeEnabled();
+  await expect(rawExport).toBeEnabled();
+  const rawDownload = page.waitForEvent('download');
+  await rawExport.click();
+  expect((await rawDownload).suggestedFilename()).toBe('json-lattice-source.json');
 });
 
 test('exposes local vector/raster/data exports without serious accessibility or overflow defects', async ({ page }) => {
@@ -134,4 +138,26 @@ test('exposes local vector/raster/data exports without serious accessibility or 
   const results = await new AxeBuilder({ page }).analyze();
   const severe = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
   expect(severe).toEqual([]);
+});
+
+test('reflows after real content load in phone portrait, phone landscape, and tablet viewports', async ({ page }) => {
+  const viewports = [
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 768, height: 1024 },
+  ];
+  const longKey = 'extremely-long-property-key-'.repeat(30);
+  const longValue = 'extremely-long-value-token-'.repeat(40);
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('./#/json-lattice');
+    await setSource(page, JSON.stringify({ [longKey]: longValue, nested: { status: 'loaded' } }, null, 2));
+    await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
+    await expect(page.locator(`[data-node-path="/${longKey}"]`)).toBeVisible();
+    const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(documentOverflow).toBeLessThanOrEqual(1);
+    await expect(page.getByRole('button', { name: 'Export raw source' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export JSON' })).toBeVisible();
+  }
 });
