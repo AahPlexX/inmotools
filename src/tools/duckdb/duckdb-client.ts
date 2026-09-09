@@ -73,6 +73,11 @@ type ArrowTypeLike = {
   toString?: () => string;
 };
 
+type ArrowFieldLike = {
+  name: string;
+  type: unknown;
+};
+
 function typeLabel(type: unknown): string {
   if (type === null || type === undefined) return 'unknown';
   try {
@@ -245,24 +250,24 @@ export function startLocalQuery(
 ): LocalQueryTask {
   let settled = false;
   const promise = (async () => {
-    // DuckDB-Wasm 1.32 requires allowStreamResult=true to yield batches while a
-    // pending query is running. This lets the Workbench stop retaining rows once
-    // its explicit browser-memory/result cap is reached.
+    // DuckDB-Wasm's streaming send() returns an async Arrow reader whose schema
+    // may not be populated until the first RecordBatch arrives. Discover field
+    // metadata from batches while streaming instead of forcing materialization.
     const reader = await connection.send(sql, true);
-    const fields = reader.schema.fields;
-    const columns = fields.map((field) => field.name);
-    const types = fields.map((field) => typeLabel(field.type));
+    let fields: ArrowFieldLike[] | null = null;
     const values: QueryValue[][] = [];
     let capturedBytes = 0;
     let limitedBy: QueryLimitReason = null;
 
     outer: for await (const batch of reader) {
+      const batchFields = batch.schema.fields as ArrowFieldLike[];
+      if (!fields) fields = batchFields;
       for (let rowIndex = 0; rowIndex < batch.numRows; rowIndex += 1) {
         if (limits.maxRows !== undefined && values.length >= limits.maxRows) {
           limitedBy = 'rows';
           break outer;
         }
-        const row = fields.map((field, columnIndex) =>
+        const row = batchFields.map((field, columnIndex) =>
           normalizeDuckDbValue(batch.getChildAt(columnIndex)?.get(rowIndex), field.type));
         const rowBytes = estimateRowBytes(row);
         if (limits.maxBytes !== undefined && capturedBytes + rowBytes > limits.maxBytes) {
@@ -274,10 +279,17 @@ export function startLocalQuery(
       }
     }
 
+    if (!fields) {
+      const readerSchema = reader.schema as { fields?: ArrowFieldLike[] } | undefined;
+      fields = readerSchema?.fields ?? [];
+    }
+
     if (limitedBy) {
       try { await connection.cancelSent(); } catch { /* Query may already have completed. */ }
     }
 
+    const columns = fields.map((field) => field.name);
+    const types = fields.map((field) => typeLabel(field.type));
     return buildQueryResult(columns, values, {
       types,
       complete: limitedBy === null,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQueryResult, normalizeDuckDbValue } from '../../src/tools/duckdb/duckdb-client';
+import { buildQueryResult, normalizeDuckDbValue, startLocalQuery } from '../../src/tools/duckdb/duckdb-client';
 
 describe('DuckDB result normalization', () => {
   it('preserves bigint precision as text instead of converting to Number', () => {
@@ -29,5 +29,31 @@ describe('DuckDB result normalization', () => {
     expect(result.values).toEqual([[1, 2]]);
     expect(result.rows).toEqual([{ duplicate: 2 }]);
     expect(Object.keys(result)).not.toContain('rows');
+  });
+
+  it('derives schema from the first streamed RecordBatch when the reader schema is not ready yet', async () => {
+    const integerType = { toString: () => 'Int64' };
+    const fields = [{ name: 'exact_value', type: integerType }];
+    const batch = {
+      schema: { fields },
+      numRows: 1,
+      getChildAt: () => ({ get: () => BigInt('9007199254740993') }),
+    };
+    const reader = {
+      schema: undefined,
+      async *[Symbol.asyncIterator]() {
+        yield batch;
+      },
+    };
+    const connection = {
+      send: async () => reader,
+      cancelSent: async () => false,
+    };
+
+    const result = await startLocalQuery(connection as never, 'SELECT 1').promise;
+    expect(result.columns).toEqual(['exact_value']);
+    expect(result.types).toEqual(['Int64']);
+    expect(result.values).toEqual([['9007199254740993']]);
+    expect(result.complete).toBe(true);
   });
 });
