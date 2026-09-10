@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { PagedTable } from '../../components/PagedTable';
@@ -52,6 +52,7 @@ export default function SubtitleWorkspace() {
   const [preview, setPreview] = useState<CorrectionOutput | null>(null);
   const [applied, setApplied] = useState<CorrectionOutput | null>(null);
   const [status, setStatus] = useState('Set two trusted anchors, then preview the linear correction.');
+  const inputRevision = useRef(0);
 
   const parseState = useMemo(() => {
     try {
@@ -80,17 +81,21 @@ export default function SubtitleWorkspace() {
 
   async function loadFile(next: File | null) {
     if (!next) return;
+    const revision = ++inputRevision.current;
     try {
       const text = await next.text();
+      if (inputRevision.current !== revision) return;
       setSourceText(text);
       setSourceName(next.name);
       invalidateCorrection(`Loaded ${next.name} locally. Existing correction output was cleared.`);
     } catch (error) {
+      if (inputRevision.current !== revision) return;
       setStatus(`Could not read that file: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
   }
 
   function updateSource(next: string) {
+    inputRevision.current += 1;
     setSourceText(next);
     invalidateCorrection('Source changed. Preview the correction again before applying or downloading.');
   }
