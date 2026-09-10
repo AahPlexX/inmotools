@@ -44,8 +44,14 @@ export const executePcre2Regex = async (pattern: string, flags: string, subject:
     const executionStarted = now();
     const isGlobal = flags.includes('g');
     const numericFlags = parseFlags(flags.replace('g', ''));
-    const allRows = runtime.matchAll(pattern, subject, numericFlags, { matchLimit: 100_000, depthLimit: 1_000 });
-    const selectedRows = isGlobal ? allRows.slice(0, DISPLAY_MATCH_LIMIT) : allRows.slice(0, 1);
+    const options = { matchLimit: 100_000, depthLimit: 1_000 };
+    const allRows = isGlobal
+      ? runtime.matchAll(pattern, subject, numericFlags, options)
+      : (() => {
+          const first = runtime.match(pattern, subject, numericFlags, options);
+          return first ? [first] : [];
+        })();
+    const selectedRows = isGlobal ? allRows.slice(0, DISPLAY_MATCH_LIMIT) : allRows;
     const matches: RegexMatchRecord[] = selectedRows.map((row) => ({
       match: row.match,
       index: row.index,
@@ -54,7 +60,7 @@ export const executePcre2Regex = async (pattern: string, flags: string, subject:
       namedGroups: Object.fromEntries(Object.entries(row.namedGroups ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
     }));
     const executionMs = now() - executionStarted;
-    const totalMatches = isGlobal ? allRows.length : Math.min(allRows.length, 1);
+    const totalMatches = isGlobal ? allRows.length : matches.length;
     const truncated = isGlobal && allRows.length > DISPLAY_MATCH_LIMIT;
     return {
       engine: 'PCRE2 10.47.5 · WebAssembly',
