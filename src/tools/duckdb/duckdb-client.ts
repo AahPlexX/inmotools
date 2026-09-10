@@ -70,6 +70,7 @@ export interface QueryLimits {
 type ArrowTypeLike = {
   precision?: unknown;
   scale?: unknown;
+  children?: unknown;
   toString?: () => string;
 };
 
@@ -86,6 +87,18 @@ function typeLabel(type: unknown): string {
   } catch {
     return 'unknown';
   }
+}
+
+function childFields(type: unknown): ArrowFieldLike[] {
+  if (!type || typeof type !== 'object') return [];
+  const children = (type as ArrowTypeLike).children;
+  if (!Array.isArray(children)) return [];
+  return children.filter((field): field is ArrowFieldLike => Boolean(
+    field
+    && typeof field === 'object'
+    && typeof (field as ArrowFieldLike).name === 'string'
+    && 'type' in field,
+  ));
 }
 
 function decimalScale(type: unknown): number | null {
@@ -150,24 +163,25 @@ function encodeBinary(bytes: Uint8Array): QueryValue {
   return { $binary: `hex:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}` };
 }
 
-function normalizeObject(value: object, seen: WeakSet<object>): QueryValue {
+function normalizeObject(value: object, fieldType: unknown, seen: WeakSet<object>): QueryValue {
   if (seen.has(value)) return '[Circular]';
   seen.add(value);
   try {
     const withJson = value as { toJSON?: () => unknown };
     if (typeof withJson.toJSON === 'function') {
       const converted = withJson.toJSON();
-      if (converted !== value) return normalizeDuckDbValue(converted, undefined, seen);
+      if (converted !== value) return normalizeDuckDbValue(converted, fieldType, seen);
     }
 
     const withArray = value as { toArray?: () => unknown };
     if (typeof withArray.toArray === 'function') {
       const converted = withArray.toArray();
-      if (converted !== value) return normalizeDuckDbValue(converted, undefined, seen);
+      if (converted !== value) return normalizeDuckDbValue(converted, fieldType, seen);
     }
 
+    const childTypeByName = new Map(childFields(fieldType).map((field) => [field.name, field.type]));
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, normalizeDuckDbValue(item, undefined, seen)]),
+      Object.entries(value).map(([key, item]) => [key, normalizeDuckDbValue(item, childTypeByName.get(key), seen)]),
     );
   } finally {
     seen.delete(value);
@@ -188,13 +202,22 @@ export function normalizeDuckDbValue(value: unknown, fieldType?: unknown, seen =
   if (value instanceof Date) return value.toISOString();
   if (value instanceof ArrayBuffer) return encodeBinary(new Uint8Array(value));
 
+  const children = childFields(fieldType);
+  const listChildType = children.length === 1 ? children[0].type : undefined;
+
   if (ArrayBuffer.isView(value)) {
     if (isBinaryType(fieldType)) return encodeBinary(bytesFromView(value));
     if (value instanceof DataView) return encodeBinary(bytesFromView(value));
-    return Array.from(value as unknown as ArrayLike<unknown>, (item) => normalizeDuckDbValue(item, undefined, seen));
+    return Array.from(value as unknown as ArrayLike<unknown>, (item) => normalizeDuckDbValue(item, listChildType, seen));
   }
 
-  if (Array.isArray(value)) return value.map((item) => normalizeDuckDbValue(item, undefined, seen));
+  if (Array.isArray(value)) {
+    return value.map((item, index) => normalizeDuckDbValue(
+      item,
+      children.length === 1 ? listChildType : children[index]?.type,
+      seen,
+    ));
+  }
   if (value instanceof Map) {
     return {
       $map: Array.from(value.entries(), ([key, item]) => [
@@ -203,7 +226,7 @@ export function normalizeDuckDbValue(value: unknown, fieldType?: unknown, seen =
       ]),
     };
   }
-  if (typeof value === 'object') return normalizeObject(value, seen);
+  if (typeof value === 'object') return normalizeObject(value, fieldType, seen);
   return String(value);
 }
 
