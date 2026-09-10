@@ -28,11 +28,30 @@ const clearancePolygon = (component: PlanComponent): Point2D[] => {
   const halfW = Math.max(0, component.clearance.dimensions.x / 2 + component.clearance.bufferOffset);
   const halfD = Math.max(0, component.clearance.dimensions.y / 2 + component.clearance.bufferOffset);
   return [
-    { x: -halfW, y: -halfD }, { x: halfW, y: -halfD }, { x: halfW, y: halfD }, { x: -halfW, y: halfD },
+    { x: -halfW, y: -halfD },
+    { x: halfW, y: -halfD },
+    { x: halfW, y: halfD },
+    { x: -halfW, y: halfD },
   ].map((point) => {
     const rotated = rotatePoint(point, component.rotation);
     return { x: component.position.x + rotated.x, y: component.position.y + rotated.y };
   });
+};
+
+const wallPolygon = (start: Point2D, end: Point2D, thickness: number): Point2D[] => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= Number.EPSILON) return [];
+  const half = Math.max(0, thickness) / 2;
+  const nx = -dy / length * half;
+  const ny = dx / length * half;
+  return [
+    { x: start.x + nx, y: start.y + ny },
+    { x: end.x + nx, y: end.y + ny },
+    { x: end.x - nx, y: end.y - ny },
+    { x: start.x - nx, y: start.y - ny },
+  ];
 };
 
 const pointSegmentDistance = (point: Point2D, start: Point2D, end: Point2D) => {
@@ -43,8 +62,6 @@ const pointSegmentDistance = (point: Point2D, start: Point2D, end: Point2D) => {
   return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
 };
 
-// Snap targets are a direct projection of current geometry, so they stay cheap
-// enough to derive on demand while drafting rather than only inside the worker pass.
 export const buildSnapTargets = (project: FloorplanProject): SnapTarget[] => {
   const vertexById = new Map(project.vertices.map((vertex) => [vertex.id, vertex.position]));
   const snapTargets: SnapTarget[] = project.vertices.map((vertex) => ({ id: vertex.id, point: vertex.position, kind: 'vertex' }));
@@ -68,10 +85,10 @@ export const analyzeFloorplan = (project: FloorplanProject): FloorplanAnalysis =
   const clearanceViolations: ClearanceViolation[] = [];
   for (const component of project.components) {
     if (component.clearance.adaRuleKey === 'ada_turning_circle' && Math.min(component.clearance.dimensions.x, component.clearance.dimensions.y) < 1525) {
-      clearanceViolations.push({ id: `${component.id}:ada-turn`, componentId: component.id, rule: 'ada_turning_circle', message: 'ADA turning-space guide requires a 1525 mm clear diameter.' });
+      clearanceViolations.push({ id: `${component.id}:ada-turn`, componentId: component.id, rule: 'ada_turning_circle', message: 'ADA turning-space planning guide uses a 1525 mm clear diameter.' });
     }
     if (component.clearance.adaRuleKey === 'ada_door_approach' && component.clearance.dimensions.x < 455) {
-      clearanceViolations.push({ id: `${component.id}:ada-door`, componentId: component.id, rule: 'ada_door_approach', message: 'Door approach guide requires 455 mm latch-side pull clearance.' });
+      clearanceViolations.push({ id: `${component.id}:ada-door`, componentId: component.id, rule: 'ada_door_approach', message: 'Door-approach planning guide uses 455 mm latch-side pull clearance.' });
     }
   }
 
@@ -98,14 +115,14 @@ export const analyzeFloorplan = (project: FloorplanProject): FloorplanAnalysis =
   }
 
   for (const component of project.components) {
-    const radius = component.clearance.shape === 'circle'
-      ? component.clearance.dimensions.x / 2 + component.clearance.bufferOffset
-      : Math.min(component.clearance.dimensions.x, component.clearance.dimensions.y) / 2 + component.clearance.bufferOffset;
     for (const wall of project.walls) {
       const start = vertexById.get(wall.startVertexId);
       const end = vertexById.get(wall.endVertexId);
       if (!start || !end) continue;
-      if (pointSegmentDistance(component.position, start, end) < radius + wall.thickness / 2) {
+      const intersectsWall = component.clearance.shape === 'circle'
+        ? pointSegmentDistance(component.position, start, end) < component.clearance.dimensions.x / 2 + component.clearance.bufferOffset + wall.thickness / 2
+        : satOverlap(clearancePolygon(component), wallPolygon(start, end, wall.thickness));
+      if (intersectsWall) {
         clearanceViolations.push({ id: `${component.id}:${wall.id}:wall`, componentId: component.id, rule: 'wall_clearance', message: 'Component clearance envelope intersects a wall.' });
         break;
       }
