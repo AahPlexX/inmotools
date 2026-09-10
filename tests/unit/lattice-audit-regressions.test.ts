@@ -10,6 +10,16 @@ describe('JSON Lattice audit regressions', () => {
     expect(parseStructuredText('<root><id>00123</id><qty>42</qty></root>', 'xml')).toEqual({ root: { id: '00123', qty: 42 } });
   });
 
+  it('rejects malformed XML instead of normalizing mismatched element tags', () => {
+    expect(() => parseStructuredText('<a>one</b>', 'xml')).toThrow(/XML.*(?:invalid|well-formed|parse)|mismatched|closing/i);
+  });
+
+  it('rejects JSON numbers that JavaScript cannot preserve exactly', () => {
+    expect(() => parseStructuredText('{"id":9007199254740993}', 'json')).toThrow(/precision|safe integer|exact/i);
+    expect(() => parseStructuredText('{"value":1e400}', 'json')).toThrow(/precision|range|finite|exact/i);
+    expect(parseStructuredText('{"id":9007199254740991}', 'json')).toEqual({ id: 9007199254740991 });
+  });
+
   it('sizes graph nodes from label length instead of swapping one fixed box for another', () => {
     const shortRequest = buildElkGraph(buildGraphModel({ id: 'short' }), 'LR');
     const longRequest = buildElkGraph(buildGraphModel({ id: 'customer-identifier-'.repeat(20) }), 'LR');
