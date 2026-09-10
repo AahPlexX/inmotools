@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessDataset, ppbToUgM3 } from '../../src/tools/aethercast/aethercast-engine';
+import { assessDataset, ppbToUgM3, ppmToUgM3 } from '../../src/tools/aethercast/aethercast-engine';
 import { parseCsvWithMapping, parseTimestampInZone } from '../../src/tools/aethercast/aethercast-import';
 import type { AetherCastDataset, AetherCastSettings, HourlyAtmosphericPoint } from '../../src/tools/aethercast/aethercast-types';
 
@@ -41,6 +41,38 @@ function so2Series(ppbValues: readonly number[]): AetherCastDataset {
   };
 }
 
+function ozoneSeries(ppm: number, hours = 8): AetherCastDataset {
+  const start = Date.parse('2026-06-01T00:00:00Z');
+  const ozone = ppmToUgM3(ppm, 48);
+  const points: HourlyAtmosphericPoint[] = Array.from({ length: hours }, (_, index) => {
+    const epochMs = start + index * 3_600_000;
+    return {
+      isoTimestamp: new Date(epochMs).toISOString(),
+      epochMs,
+      pm25: null,
+      pm10: null,
+      carbonMonoxideUgM3: null,
+      nitrogenDioxide: null,
+      sulphurDioxide: null,
+      ozone,
+      uvIndex: null,
+      uvIndexClearSky: null,
+      windSpeedMs: null,
+      providedUsAqi: null,
+      providedEuropeanAqi: null,
+    };
+  });
+  return {
+    importSource: 'csv-mapped',
+    latitude: null,
+    longitude: null,
+    elevationMeters: null,
+    timezone: 'UTC',
+    points,
+    truncatedRows: 0,
+  };
+}
+
 describe('AetherCast September 2026 audit regressions', () => {
   it('uses the EPA fixed AQI 200 SO2 rule when the hourly peak is at least 305 ppb but the 24-hour average is below 305 ppb', () => {
     const values = Array<number>(24).fill(10);
@@ -50,6 +82,13 @@ describe('AetherCast September 2026 audit regressions', () => {
     expect(latest?.pollutants.so2.subIndex).toBe(200);
     expect(latest?.compositeAqi).toBe(200);
     expect(latest?.pollutants.so2.epaAveragingLabel).toContain('fixed at 200');
+  });
+
+  it('uses one-hour ozone breakpoints above the defined eight-hour AQI range', () => {
+    const latest = assessDataset(ozoneSeries(0.300), settings).at(-1);
+    expect(latest?.pollutants.o3.subIndex).toBeCloseTo(248.26, 1);
+    expect(latest?.compositeAqi).toBe(248);
+    expect(latest?.pollutants.o3.epaAveragingLabel).toMatch(/1-hour.*301|8-hour.*through 300|high-ozone/i);
   });
 
   it('rejects impossible Gregorian calendar dates instead of normalizing them', () => {
