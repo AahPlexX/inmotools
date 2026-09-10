@@ -19,17 +19,15 @@ describe('log structurer audit regressions', () => {
   it('reports source line numbers for document-mode matches and gaps', () => {
     const result = structureLogLines('id=1\nnoise\nid=2', String.raw`id=(?<id>\d+)`, {}, 'document');
     expect(result.rowLineNumbers).toEqual([1, 3]);
-    expect(result.unmatched).toEqual(['', 'noise', '']);
-    expect(result.unmatchedLineNumbers).toEqual([1, 2, 2]);
+    expect(result.unmatched).toEqual(['noise']);
+    expect(result.unmatchedLineNumbers).toEqual([2]);
   });
 
-  it('preserves whitespace and blank unmatched slices in whole-document mode', () => {
+  it('preserves whitespace and genuine blank unmatched lines in whole-document mode', () => {
     const input = '  before  \n\nid=1\n\tbetween\t\n\nid=2\n  after  ';
     const result = structureLogLines(input, String.raw`id=(?<id>\d+)`, {}, 'document');
-    expect(result.unmatched).toEqual(['  before  ', '', '', '\tbetween\t', '', '', '  after  ']);
-    expect(result.unmatched.join('\n')).toContain('  before  ');
-    expect(result.unmatched.join('\n')).toContain('\tbetween\t');
-    expect(result.unmatched.join('\n')).toContain('  after  ');
+    expect(result.unmatched).toEqual(['  before  ', '', '\tbetween\t', '', '  after  ']);
+    expect(result.unmatchedLineNumbers).toEqual([1, 2, 4, 5, 7]);
   });
 
   it('quotes unmatched TSV fields containing tabs without changing their text', () => {
