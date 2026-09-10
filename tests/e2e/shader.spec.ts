@@ -15,6 +15,8 @@ const readDownload = async (page: Page, buttonName: string) => {
   return Buffer.concat(chunks).toString('utf8');
 };
 
+const desktopOnly = (projectName: string) => test.skip(projectName !== 'desktop-chromium', 'Lifecycle detail is covered once in desktop Chromium.');
+
 test('a failed compile cannot replace the last linked shader used for export', async ({ page }) => {
   await page.goto('./#/tools/glsl-sandbox');
   await waitForLinkedShader(page);
@@ -96,4 +98,70 @@ void main(){outColor=texture(u_texture0,vec2(0.5));}`);
 
   const loadedFrame = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
   expect(loadedFrame).not.toBe(placeholderFrame);
+});
+
+test('texture decode failures are reported instead of silently leaving a placeholder', async ({ page }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  await page.goto('./#/tools/glsl-sandbox');
+  await waitForLinkedShader(page);
+
+  await page.locator('#shader-texture-0').setInputFiles({
+    name: 'broken-texture.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('this is not a valid PNG'),
+  });
+
+  await expect(page.locator('.status-line')).toContainText(/texture 0.*could not be decoded|failed to decode.*texture 0/i, { timeout: 5_000 });
+});
+
+test('a lost WebGL context can be restored and rebuilds the linked shader resources', async ({ page }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  await page.goto('./#/tools/glsl-sandbox');
+  await waitForLinkedShader(page);
+  const canvas = page.getByLabel('Live WebGL2 fragment shader preview');
+
+  const supported = await canvas.evaluate((element: HTMLCanvasElement) => Boolean(element.getContext('webgl2')?.getExtension('WEBGL_lose_context')));
+  test.skip(!supported, 'WEBGL_lose_context is unavailable in this browser.');
+
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  });
+  await page.waitForTimeout(150);
+  const lostStatus = await page.locator('.status-line').textContent();
+
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.restoreContext();
+  });
+  await page.waitForTimeout(800);
+  const restoredStatus = await page.locator('.status-line').textContent();
+
+  expect(lostStatus).toMatch(/context lost/i);
+  expect(restoredStatus).toMatch(/restored|compiled and linked successfully|linked with \d+ compiler message/i);
+});
+
+test('keyboard arrows update u_mouse and redraw a paused focused preview', async ({ page }, testInfo) => {
+  desktopOnly(testInfo.project.name);
+  await page.goto('./#/tools/glsl-sandbox');
+  await waitForLinkedShader(page);
+
+  const source = page.getByLabel('Fragment shader source');
+  await source.fill(`#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+void main(){outColor=vec4(u_mouse.x/max(u_resolution.x,1.0),0.0,0.0,1.0);}`);
+  await page.getByRole('button', { name: 'Compile now' }).click();
+  await waitForLinkedShader(page);
+  await page.getByRole('button', { name: 'Pause time' }).click();
+
+  const canvas = page.getByLabel('Live WebGL2 fragment shader preview');
+  await canvas.focus();
+  await page.waitForTimeout(100);
+  const before = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(150);
+  const after = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
+
+  expect(after).not.toBe(before);
 });
