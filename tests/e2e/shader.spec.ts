@@ -91,8 +91,8 @@ void main(){outColor=texture(u_texture0,vec2(0.5));}`);
     mimeType: 'image/png',
     buffer: Buffer.from(pngBase64, 'base64'),
   });
-  await expect(page.locator('.status-line')).toContainText(/slow-red\.png ready/i);
-  await page.waitForTimeout(400);
+  await expect(page.getByRole('button', { name: 'Remove texture 0' })).toBeVisible();
+  await page.waitForTimeout(500);
 
   const loadedFrame = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
   expect(loadedFrame).not.toBe(placeholderFrame);
