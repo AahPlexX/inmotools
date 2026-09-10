@@ -22,7 +22,20 @@ export interface CronCalendarOptions {
 export const MAX_COMPARISON_ZONES = 24;
 const UNAVAILABLE = 'Unavailable';
 const REFERENCE_WITH_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/i;
+const REFERENCE_DATE_PARTS = /^([+-]?\d{4,6})-(\d{2})-(\d{2})T/i;
 const utf8 = new TextEncoder();
+
+function hasValidReferenceCalendarDate(value: string): boolean {
+  const match = REFERENCE_DATE_PARTS.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || month < 1 || month > 12 || day < 1) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= daysInMonth[month - 1];
+}
 
 export function getCronRuns(expression: string, options: CronRunOptions = {}): Date[] {
   const count = options.count ?? 30;
@@ -37,6 +50,7 @@ export function getCronRuns(expression: string, options: CronRunOptions = {}): D
 export function parseReferenceInstant(value: string): Date {
   const text = value.trim();
   if (!REFERENCE_WITH_OFFSET.test(text)) throw new Error('Reference instant must include Z or an explicit UTC offset such as +05:30.');
+  if (!hasValidReferenceCalendarDate(text)) throw new Error('Reference instant is not a valid ISO 8601 date and time.');
   const date = new Date(text);
   if (!Number.isFinite(date.getTime())) throw new Error('Reference instant is not a valid ISO 8601 date and time.');
   return date;
