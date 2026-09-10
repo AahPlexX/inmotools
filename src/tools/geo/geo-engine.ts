@@ -20,15 +20,26 @@ function roundCoordinates(value: unknown, decimals: number): unknown {
   return value.map((item) => roundCoordinates(item, decimals));
 }
 
+function copyWithoutBbox(value: JsonObject): JsonObject {
+  const copy = { ...value };
+  delete copy.bbox;
+  return copy;
+}
+
 function roundGeometry(geometry: JsonObject | null, decimals: number): JsonObject | null {
   if (!geometry) return geometry;
-  if (geometry.type === 'GeometryCollection') return { ...geometry, geometries: (geometry.geometries ?? []).map((item: JsonObject) => roundGeometry(item, decimals)) };
-  return { ...geometry, coordinates: roundCoordinates(geometry.coordinates, decimals) };
+  const copy = copyWithoutBbox(geometry);
+  if (geometry.type === 'GeometryCollection') return { ...copy, geometries: (geometry.geometries ?? []).map((item: JsonObject) => roundGeometry(item, decimals)) };
+  return { ...copy, coordinates: roundCoordinates(geometry.coordinates, decimals) };
+}
+
+function roundFeature(item: JsonObject, decimals: number): JsonObject {
+  return { ...copyWithoutBbox(item), geometry: roundGeometry(item.geometry, decimals) };
 }
 
 export function roundGeoCoordinates<T extends JsonObject>(input: T, decimals: number): T {
-  if (input.type === 'FeatureCollection') return { ...input, features: (input.features ?? []).map((item: JsonObject) => ({ ...item, geometry: roundGeometry(item.geometry, decimals) })) } as T;
-  if (input.type === 'Feature') return { ...input, geometry: roundGeometry(input.geometry, decimals) } as T;
+  if (input.type === 'FeatureCollection') return { ...copyWithoutBbox(input), features: (input.features ?? []).map((item: JsonObject) => roundFeature(item, decimals)) } as T;
+  if (input.type === 'Feature') return roundFeature(input, decimals) as T;
   return roundGeometry(input, decimals) as T;
 }
 
