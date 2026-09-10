@@ -38,7 +38,7 @@ function roundFeature(item: JsonObject, decimals: number): JsonObject {
 }
 
 export function roundGeoCoordinates<T extends JsonObject>(input: T, decimals: number): T {
-  if (input.type === 'FeatureCollection') return { ...copyWithoutBbox(input), features: (input.features ?? []).map((item: JsonObject) => roundFeature(item, decimals)) } as T;
+  if (input.type === 'FeatureCollection') return { ...copyWithoutBbox(input), features: (input.features ?? []).map((item: JsonObject) => roundFeature(item, decimals)) } as unknown as T;
   if (input.type === 'Feature') return roundFeature(input, decimals) as T;
   return roundGeometry(input, decimals) as T;
 }
