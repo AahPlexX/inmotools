@@ -193,27 +193,29 @@ export const FloorplanCanvas = ({
   };
 
   return (
-    <div
-      className="plancraft-canvas-wrap"
-      ref={wrapRef}
-      data-pan-x={project.viewport.panX}
-      data-pan-y={project.viewport.panY}
-      data-scale={project.viewport.scale}
-    >
-      <canvas className="plancraft-canvas" ref={baseRef} aria-hidden="true" />
-      <canvas
-        className="plancraft-canvas plancraft-overlay"
-        ref={overlayRef}
-        data-testid="floorplan-overlay"
-        aria-label="Interactive floor plan drafting canvas"
-        role="application"
-        tabIndex={0}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        onWheel={handleWheel}
-      />
+    <div className="plancraft-canvas-shell">
+      <div
+        className="plancraft-canvas-wrap"
+        ref={wrapRef}
+        data-pan-x={project.viewport.panX}
+        data-pan-y={project.viewport.panY}
+        data-scale={project.viewport.scale}
+      >
+        <canvas className="plancraft-canvas" ref={baseRef} aria-hidden="true" />
+        <canvas
+          className="plancraft-canvas plancraft-overlay"
+          ref={overlayRef}
+          data-testid="floorplan-overlay"
+          aria-label="Interactive floor plan drafting canvas"
+          role="application"
+          tabIndex={0}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onWheel={handleWheel}
+        />
+      </div>
       <div className="plancraft-view-controls" role="group" aria-label="Viewport controls">
         <button type="button" aria-label="Pan view left" onClick={() => onPan(VIEWPORT_PAN_STEP_PX, 0)}>←</button>
         <button type="button" aria-label="Pan view up" onClick={() => onPan(0, VIEWPORT_PAN_STEP_PX)}>↑</button>
