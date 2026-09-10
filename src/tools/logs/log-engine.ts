@@ -132,12 +132,24 @@ function structureWholeDocument(input: string, pattern: string, flags: LogPatter
 }
 
 function pushGap(unmatched: string[], lineNumbers: number[], gap: string, startingLine: number): void {
-  gap.split(/\r?\n/).forEach((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    unmatched.push(trimmed);
-    lineNumbers.push(startingLine + index);
-  });
+  if (!gap.length) return;
+  const beginsWithBreak = /^(?:\r\n|\n)/.test(gap);
+  const endsWithBreak = /(?:\r\n|\n)$/.test(gap);
+  const lines = gap.split(/\r?\n/);
+  let first = 0;
+  let last = lines.length;
+  let line = startingLine;
+
+  if (beginsWithBreak) {
+    first += 1;
+    line += 1;
+  }
+  if (endsWithBreak) last -= 1;
+
+  for (let index = first; index < last; index += 1) {
+    unmatched.push(lines[index]);
+    lineNumbers.push(line + index - first);
+  }
 }
 
 export type ColumnKind = 'integer' | 'decimal' | 'timestamp' | 'text' | 'empty';
@@ -177,6 +189,16 @@ function csvCell(value: unknown): string {
 
 export function rowsToCsv(rows: Array<Record<string, unknown>>, columns: string[]): string {
   return [columns.map(csvCell).join(','), ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(','))].join('\r\n');
+}
+
+function tsvCell(value: unknown): string {
+  const text = String(value ?? '');
+  return /["\t\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function unmatchedToTsv(unmatched: string[], lineNumbers: number[]): string {
+  const rows = unmatched.map((line, index) => [lineNumbers[index] ?? '?', line].map(tsvCell).join('\t'));
+  return ['source_line\ttext', ...rows].join('\r\n');
 }
 
 export function rowsToMarkdown(rows: Array<Record<string, unknown>>, columns: string[]): string {
