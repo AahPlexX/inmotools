@@ -159,8 +159,9 @@ const projectBounds = (project: FloorplanProject) => {
 
 const isExportLayerId = (value: string): value is ExportLayerId => (ALL_EXPORT_LAYERS as readonly string[]).includes(value);
 const projectVisibleLayers = (project: FloorplanProject): ExportLayerId[] => project.layers
-  .filter((layer) => layer.visible && isExportLayerId(layer.id))
-  .map((layer) => layer.id);
+  .filter((layer) => layer.visible)
+  .map((layer) => layer.id)
+  .filter(isExportLayerId);
 const layerSet = (project: FloorplanProject, options: ExportOptions = {}) => new Set<ExportLayerId>(options.layers ?? projectVisibleLayers(project));
 const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
