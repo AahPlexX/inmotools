@@ -68,6 +68,27 @@ describe('HAR sanitizer', () => {
     expect(serialized).not.toContain('body-secret');
   });
 
+  it('preserves unsupported exponent numeric lexemes instead of rounding or converting them to null', async () => {
+    const parseHarJson=(harEngine as unknown as {parseHarJson:(text:string)=>any}).parseHarJson;
+    const stringifyHarJson=(harEngine as unknown as {stringifyHarJson:(value:unknown,space?:number)=>string}).stringifyHarJson;
+    const source='{"log":{"version":"1.2","_unsafeExponent":9007199254740993e0,"_hugeExponent":1e400,"entries":[]}}';
+    const result=await sanitizeHar(parseHarJson(source),{mode:'redact',categories:{headers:false,cookies:false,query:false,bodies:false}});
+    const serialized=stringifyHarJson(result.har);
+    expect(serialized).toContain('9007199254740993e0');
+    expect(serialized).toContain('1e400');
+    expect(serialized).not.toContain('9007199254740992');
+    expect(serialized).not.toContain('null');
+  });
+
+  it('preserves a literal __proto__ member as ordinary JSON data during cloning', async () => {
+    const parseHarJson=(harEngine as unknown as {parseHarJson:(text:string)=>any}).parseHarJson;
+    const stringifyHarJson=(harEngine as unknown as {stringifyHarJson:(value:unknown,space?:number)=>string}).stringifyHarJson;
+    const parsed=parseHarJson('{"log":{"version":"1.2","__proto__":{"safe":"kept"},"entries":[]}}');
+    const result=await sanitizeHar(parsed,{mode:'redact',categories:{headers:false,cookies:false,query:false,bodies:false}});
+    expect(Object.prototype.hasOwnProperty.call(result.har.log,'__proto__')).toBe(true);
+    expect(stringifyHarJson(result.har)).toContain('"__proto__":{"safe":"kept"}');
+  });
+
   it('does not double-count SSL inside connect in waterfall phases', () => {
     const row=buildWaterfallRows(makeHar())[0];
     expect(row.phases).toMatchObject({blocked:0,dns:5,connect:7,ssl:8,send:2,wait:70,receive:28});
