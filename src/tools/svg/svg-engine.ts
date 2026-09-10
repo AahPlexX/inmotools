@@ -103,7 +103,7 @@ function deriveViewBox(attributes: string): ViewBoxResolution {
 
 const ROOT_ATTRS_TO_PRESERVE = new Set([
   'class', 'style', 'fill', 'stroke', 'color', 'opacity', 'fill-opacity', 'stroke-opacity',
-  'fill-rule', 'clip-rule', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'fill-rule', 'clip-rule', 'clip-path', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
   'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'paint-order', 'vector-effect',
   'shape-rendering', 'color-interpolation', 'color-interpolation-filters', 'color-rendering',
   'image-rendering', 'text-rendering', 'transform', 'transform-origin', 'overflow',
@@ -118,10 +118,8 @@ function preservedRootAttributes(attributes: string): string {
   return kept.length ? ` ${kept.join(' ')}` : '';
 }
 
-function prefixInternalIds(markup: string, symbolId: string): string {
+function buildInternalIdMapping(markup: string, symbolId: string): Map<string, string> {
   const rawIds = Array.from(markup.matchAll(/\sid=(['"])([^'"]+)\1/gi), (match) => match[2]);
-  if (!rawIds.length) return markup;
-
   const used = new Set<string>();
   const mapping = new Map<string, string>();
   for (const rawId of rawIds) {
@@ -129,7 +127,10 @@ function prefixInternalIds(markup: string, symbolId: string): string {
     const base = `${symbolId}--${slugify(rawId)}`;
     mapping.set(rawId, allocateUniqueId(base, used));
   }
+  return mapping;
+}
 
+function rewriteInternalIdReferences(markup: string, mapping: ReadonlyMap<string, string>): string {
   let rewritten = markup;
   for (const [rawId, nextId] of mapping) {
     const escaped = escapeRegExp(rawId);
@@ -161,8 +162,9 @@ export function compileSvgSprite(sources: SvgSource[], options: SvgCompileOption
       const id = allocateUniqueId(slugify(source.name), symbolIds);
       const viewBox = deriveViewBox(svgMatch[1]);
       if (viewBox.warning) warnings.push({ name: source.name, message: viewBox.warning });
-      const rootAttributes = preservedRootAttributes(svgMatch[1]);
-      const content = prefixInternalIds(svgMatch[2], id);
+      const idMapping = buildInternalIdMapping(svgMatch[2], id);
+      const rootAttributes = rewriteInternalIdReferences(preservedRootAttributes(svgMatch[1]), idMapping);
+      const content = rewriteInternalIdReferences(svgMatch[2], idMapping);
       const symbol = `<symbol id="${id}"${viewBox.value ? ` viewBox="${viewBox.value}"` : ''}${rootAttributes}>${content}</symbol>`;
       files.push({
         name: source.name,
