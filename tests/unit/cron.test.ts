@@ -44,6 +44,12 @@ describe('cron schedule projection', () => {
     expect(parseReferenceInstant('2026-09-09T07:00:00-05:00').toISOString()).toBe('2026-09-09T12:00:00.000Z');
     expect(() => parseReferenceInstant('2026-09-09T12:00:00')).toThrow(/explicit UTC offset/i);
   });
+
+  it('rejects impossible ISO calendar dates instead of allowing Date rollover', () => {
+    expect(() => parseReferenceInstant('2026-02-30T12:00:00Z')).toThrow(/valid ISO 8601 date and time/i);
+    expect(() => parseReferenceInstant('2025-02-29T12:00:00+00:00')).toThrow(/valid ISO 8601 date and time/i);
+    expect(parseReferenceInstant('2024-02-29T12:00:00Z').toISOString()).toBe('2024-02-29T12:00:00.000Z');
+  });
 });
 
 describe('timezone validation and discovery', () => {
