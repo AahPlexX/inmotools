@@ -31,6 +31,19 @@ test('PlanCraft export inputs stay usable and truthful across target viewports',
   for (const viewport of targetViewports) {
     await page.setViewportSize(viewport);
     await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
+
+    const narrowInteractionLayout = viewport.width <= 767 || (viewport.height <= 460 && viewport.width > viewport.height);
+    if (narrowInteractionLayout) {
+      const canvasBox = await page.getByTestId('floorplan-overlay').boundingBox();
+      const controlsBox = await page.getByRole('group', { name: 'Viewport controls' }).boundingBox();
+      expect(canvasBox, `${viewport.width}x${viewport.height} canvas box`).not.toBeNull();
+      expect(controlsBox, `${viewport.width}x${viewport.height} controls box`).not.toBeNull();
+      expect(
+        controlsBox!.y,
+        `${viewport.width}x${viewport.height} viewport controls must not cover the drafting canvas`,
+      ).toBeGreaterThanOrEqual(canvasBox!.y + canvasBox!.height - 1);
+    }
+
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${viewport.width}x${viewport.height} document overflow`).toBeLessThanOrEqual(1);
   }
