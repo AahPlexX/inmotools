@@ -29,7 +29,7 @@ const UNSAFE_TABLES: Record<string, string> = {
   MVAR: 'metric variations (MVAR)',
   COLR: 'color glyph layers (COLR)',
   CPAL: 'color palettes (CPAL)',
-  SVG: 'SVG glyphs',
+  'SVG ': 'SVG glyphs',
   CBDT: 'bitmap color glyphs (CBDT)',
   CBLC: 'bitmap locations (CBLC)',
   sbix: 'Apple bitmap glyphs (sbix)',
