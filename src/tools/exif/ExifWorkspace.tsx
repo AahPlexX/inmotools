@@ -112,7 +112,11 @@ export default function ExifWorkspace() {
     urls.current.clear();
   }
 
-  useEffect(() => () => revokeAllUrls(), []);
+  useEffect(() => () => {
+    selectionVersion.current += 1;
+    operationRevision.current += 1;
+    revokeAllUrls();
+  }, []);
 
   const active = useMemo(
     () => items.find((item) => item.id === activeId) ?? items[0] ?? null,
