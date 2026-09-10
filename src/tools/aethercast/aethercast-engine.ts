@@ -230,10 +230,10 @@ function epaSubIndex(key: PollutantKey, points: readonly HourlyAtmosphericPoint[
     const eightHour = rollingAverage(points, index, key, 8);
     const eightHourPpm = eightHour === null ? null : truncateTo(ugM3ToPpb(eightHour, O3_MOLAR_MASS) / 1000, 3);
     const oneHourPpm = point.ozone === null ? null : truncateTo(ugM3ToPpb(point.ozone, O3_MOLAR_MASS) / 1000, 3);
-    const eightIndex = eightHourPpm === null ? null : interpolate(eightHourPpm, EPA_O3_8HR_PPM);
+    const eightIndex = eightHourPpm === null || eightHourPpm > 0.200 ? null : interpolate(eightHourPpm, EPA_O3_8HR_PPM);
     const oneIndex = oneHourPpm === null || oneHourPpm < 0.125 ? null : interpolate(oneHourPpm, EPA_O3_1HR_PPM);
     const available = [eightIndex, oneIndex].filter((value): value is number => value !== null);
-    return { value: available.length ? Math.max(...available) : null, averaging: '8-hour rolling ozone AQI plus the EPA 1-hour high-ozone rule; this is not the operational AirNow ozone NowCast' };
+    return { value: available.length ? Math.max(...available) : null, averaging: 'EPA ozone AQI: 8-hour rolling concentrations are defined through 0.200 ppm (AQI 300); the 1-hour high-ozone rule supplies higher-range values' };
   }
 
   const oneHourPpb = point.sulphurDioxide === null ? null : truncateTo(ugM3ToPpb(point.sulphurDioxide, SO2_MOLAR_MASS), 0);
