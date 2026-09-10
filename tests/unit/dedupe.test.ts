@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import { describe, expect, it } from 'vitest';
 import { findDuplicateClusters, jaroWinkler, levenshteinSimilarity, mergeCluster, pairScore, phoneticKeys } from '../../src/tools/dedupe/dedupe-engine';
-import { matrixToRows, rowsToCsv } from '../../src/tools/dedupe/dedupe-table';
+import { matrixToRows, parseCsvMatrix, rowsToCsv } from '../../src/tools/dedupe/dedupe-table';
 
 const rows=[{name:'Steven Smith',company:'North Shore Health',email:'steven@example.com'},{name:'Stephen Smith',company:'Northshore Health',email:'steven@example.com'},{name:'Maria Gonzales',company:'Acme Logistics',email:'maria@acme.test'},{name:'Marya Gonzalez',company:'Acme Logistics',email:'maria@acme.test'},{name:'Completely Different',company:'Elsewhere',email:'other@example.test'}];
 
@@ -15,8 +15,9 @@ describe('fuzzy deduplication engine',()=>{
 });
 
 describe('tabular import/export integrity',()=>{
+ it('rejects malformed quoted CSV rather than accepting a partial row',()=>{expect(()=>parseCsvMatrix('name,email\r\n"Ada,a@example.com\r\n')).toThrow(/CSV parse failed|quote/i)});
  it('makes normalized header collisions unique and reports them',()=>{const table=matrixToRows([['Email',' email ','Name'],['a','b','Ada']]);expect(table.headers).toEqual(['Email','email 2','Name']);expect(table.rows[0]).toMatchObject({Email:'a','email 2':'b',Name:'Ada'});expect(table.diagnostics.some(item=>item.kind==='renamed-header')).toBe(true)});
  it('preserves cells beyond the header row with generated headers',()=>{const table=matrixToRows([['Name'],['Ada','extra','third']]);expect(table.headers).toEqual(['Name','Column 2','Column 3']);expect(table.rows[0]).toEqual({Name:'Ada','Column 2':'extra','Column 3':'third'});expect(table.diagnostics.some(item=>item.kind==='extra-columns')).toBe(true)});
  it('protects spreadsheet exports from formula execution prefixes',()=>{const csv=rowsToCsv([{name:'=HYPERLINK("bad")',safe:'Ada'}],['name','safe']);expect(csv).toContain("'=HYPERLINK");expect(csv).toContain('Ada')});
- it('neutralizes control and full-width spreadsheet formula initiators while preserving cell boundaries',()=>{const dangerous=['=1','+1','-1','@SUM(A1)','\t=1','\r=1','\n=1','＝1','＋1','－1','＠1'];const csv=rowsToCsv(dangerous.map(value=>({value})),['value']);const parsed=Papa.parse<string[]>(csv,{delimiter:','});expect(parsed.errors).toEqual([]);expect(parsed.data.slice(1).map(row=>row[0])).toEqual(dangerous.map(value=>`'${value}`))});
+ it('neutralizes formula-like values while preserving ordinary signed numeric and phone values exactly',()=>{const values=['=1+1','+SUM(A1:A2)','-cmd','@SUM(A1:A2)','\t=1','\r=1','\n=1','＝1','＋SUM(A1:A2)','－cmd','＠SUM(A1:A2)','-7.5','+15551234567'];const csv=rowsToCsv(values.map(value=>({value})),['value']);const parsed=Papa.parse<string[]>(csv,{delimiter:','});expect(parsed.errors).toEqual([]);expect(parsed.data.slice(1).map(row=>row[0])).toEqual(["'=1+1","'+SUM(A1:A2)","'-cmd","'@SUM(A1:A2)","'\t=1","'\r=1","'\n=1","'＝1","'＋SUM(A1:A2)","'－cmd","'＠SUM(A1:A2)",'-7.5','+15551234567'])});
 });
