@@ -12,6 +12,18 @@ describe('DuckDB result normalization', () => {
     expect(normalizeDuckDbValue(BigInt(-5), decimalType)).toBe('-0.05');
   });
 
+  it('propagates Arrow decimal child metadata through lists', () => {
+    const decimalType = { precision: 10, scale: 2, toString: () => 'Decimal[10,2]' };
+    const listType = { children: [{ name: 'item', type: decimalType }], toString: () => 'List<Decimal[10,2]>' };
+    expect(normalizeDuckDbValue([[12345, 0, 0, 0]], listType)).toEqual(['123.45']);
+  });
+
+  it('propagates Arrow decimal child metadata through structures', () => {
+    const decimalType = { precision: 10, scale: 2, toString: () => 'Decimal[10,2]' };
+    const structType = { children: [{ name: 'amount', type: decimalType }], toString: () => 'Struct<amount: Decimal[10,2]>' };
+    expect(normalizeDuckDbValue({ amount: [12345, 0, 0, 0] }, structType)).toEqual({ amount: '123.45' });
+  });
+
   it('preserves lists, structs, maps, and binary values structurally', () => {
     expect(normalizeDuckDbValue([1, 2])).toEqual([1, 2]);
     expect(normalizeDuckDbValue({ name: 'Ada', flags: [true, false] })).toEqual({ name: 'Ada', flags: [true, false] });
