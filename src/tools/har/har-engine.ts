@@ -21,14 +21,27 @@ function isRawJsonNumber(value: unknown): value is RawJsonNumber {
   return Boolean(value && typeof value === 'object' && RAW_JSON_NUMBER in value);
 }
 
+function shouldProtectJsonNumber(token: string): boolean {
+  if (!/[.eE]/.test(token)) {
+    try {
+      const integer = BigInt(token);
+      return integer > MAX_SAFE_INTEGER_BIGINT || integer < MIN_SAFE_INTEGER_BIGINT;
+    } catch {
+      return false;
+    }
+  }
+  const numeric = Number(token);
+  return !Number.isFinite(numeric) || (Number.isInteger(numeric) && !Number.isSafeInteger(numeric));
+}
+
 /**
- * Protect integer JSON tokens that JavaScript cannot represent exactly before
- * JSON.parse gets a chance to round them. This lexical pass deliberately only
- * replaces number tokens outside JSON strings, then the reviver restores a
+ * Protect JSON number tokens that JavaScript cannot represent safely before
+ * JSON.parse gets a chance to round or overflow them. The lexical pass only
+ * considers number tokens outside JSON strings, then the reviver restores a
  * private wrapper whose original numeric lexeme can be emitted losslessly.
  */
 export function parseHarJson(text: string): any {
-  let marker = '__INMOTOOLS_HAR_RAW_INTEGER__';
+  let marker = '__INMOTOOLS_HAR_RAW_NUMBER__';
   while (text.includes(marker)) marker += '_';
 
   const replacements = new Map<string, string>();
@@ -59,19 +72,12 @@ export function parseHarJson(text: string): any {
       const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(index));
       if (match) {
         const token = match[0];
-        if (!/[.eE]/.test(token)) {
-          try {
-            const integer = BigInt(token);
-            if (integer > MAX_SAFE_INTEGER_BIGINT || integer < MIN_SAFE_INTEGER_BIGINT) {
-              const placeholder = `${marker}${replacements.size}`;
-              replacements.set(placeholder, token);
-              protectedText += JSON.stringify(placeholder);
-              index += token.length;
-              continue;
-            }
-          } catch {
-            // Invalid JSON will still be rejected by JSON.parse below.
-          }
+        if (shouldProtectJsonNumber(token)) {
+          const placeholder = `${marker}${replacements.size}`;
+          replacements.set(placeholder, token);
+          protectedText += JSON.stringify(placeholder);
+          index += token.length;
+          continue;
         }
         protectedText += token;
         index += token.length;
@@ -92,8 +98,8 @@ export function parseHarJson(text: string): any {
   });
 }
 
-/** Serialize parsed HAR data while emitting protected unsafe integers as their
- * original numeric JSON lexemes rather than strings or rounded Numbers. */
+/** Serialize parsed HAR data while emitting protected unsafe numbers as their
+ * original numeric JSON lexemes rather than strings, rounded Numbers, or null. */
 export function stringifyHarJson(value: unknown, space = 0): string {
   const indentUnit = ' '.repeat(Math.min(10, Math.max(0, Math.trunc(space))));
   const seen = new Set<object>();
@@ -145,7 +151,7 @@ function cloneValue<T>(value: T): T {
   if (isRawJsonNumber(value)) return rawJsonNumber(value[RAW_JSON_NUMBER]) as T;
   if (Array.isArray(value)) return value.map((item) => cloneValue(item)) as T;
   if (!value || typeof value !== 'object') return value;
-  const output: Record<string, unknown> = {};
+  const output = Object.create(null) as Record<string, unknown>;
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = cloneValue(child);
   return output as T;
 }
@@ -234,7 +240,9 @@ async function sanitizeStructured(value: unknown, policy: HarSanitizePolicy): Pr
   if (isRawJsonNumber(value)) return rawJsonNumber(value[RAW_JSON_NUMBER]);
   if (Array.isArray(value)) return Promise.all(value.map((item) => sanitizeStructured(item, policy)));
   if (!value || typeof value !== 'object') return value;
-  const output: Record<string, unknown> = {}; for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = isSensitiveName(key) ? await replacement(child, policy) : await sanitizeStructured(child, policy); return output;
+  const output = Object.create(null) as Record<string, unknown>;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = isSensitiveName(key) ? await replacement(child, policy) : await sanitizeStructured(child, policy);
+  return output;
 }
 async function sanitizeHeaders(headers: any[], policy: HarSanitizePolicy) { for (const header of headers ?? []) if (isSensitiveName(String(header?.name ?? ''))) header.value = await replacement(header.value, policy); }
 async function sanitizeCookies(cookies: any[], policy: HarSanitizePolicy) { for (const cookie of cookies ?? []) cookie.value = await replacement(cookie.value, policy); }
