@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { XMLBuilder, XMLParser } from 'fast-xml-parser';
+import { XMLBuilder, XMLParser, XMLValidator } from 'fast-xml-parser';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import YAML from 'yaml';
 
@@ -46,6 +46,44 @@ const inferSchemaFreeValue = (value: unknown): unknown => {
   return value;
 };
 
+function assertJsonNumbersPreservable(text: string): void {
+  let index = 0;
+  let inString = false;
+  let escaped = false;
+
+  while (index < text.length) {
+    const character = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      index += 1;
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+      index += 1;
+      continue;
+    }
+
+    if (character === '-' || (character >= '0' && character <= '9')) {
+      const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(index));
+      if (match) {
+        const token = match[0];
+        const numeric = Number(token);
+        if (!Number.isFinite(numeric) || (Number.isInteger(numeric) && !Number.isSafeInteger(numeric))) {
+          throw new Error(`JSON numeric precision or range cannot be preserved exactly: ${token}. Quote this value as text before importing it.`);
+        }
+        index += token.length;
+        continue;
+      }
+    }
+
+    index += 1;
+  }
+}
+
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@',
@@ -61,10 +99,20 @@ const xmlBuilder = new XMLBuilder({
 });
 
 export const parseStructuredText = (text: string, format: StructuredFormat): JsonValue => {
-  if (format === 'json') return normalizeJsonValue(JSON.parse(text));
+  if (format === 'json') {
+    assertJsonNumbersPreservable(text);
+    return normalizeJsonValue(JSON.parse(text));
+  }
   if (format === 'yaml') return normalizeJsonValue(YAML.parse(text));
   if (format === 'toml') return normalizeJsonValue(parseToml(text));
-  if (format === 'xml') return normalizeJsonValue(inferSchemaFreeValue(xmlParser.parse(text)));
+  if (format === 'xml') {
+    const validation = XMLValidator.validate(text);
+    if (validation !== true) {
+      const message = validation.err?.msg || 'Document is not well-formed XML.';
+      throw new Error(`XML parse failed: ${message}`);
+    }
+    return normalizeJsonValue(inferSchemaFreeValue(xmlParser.parse(text)));
+  }
 
   const parsed = Papa.parse<Record<string, unknown>>(text, {
     header: true,
