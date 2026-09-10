@@ -4,6 +4,7 @@ import type { DedupeRow } from './dedupe-engine';
 export type DedupeTableDiagnostic = { kind: 'renamed-header' | 'extra-columns'; message: string };
 
 const DANGEROUS_SPREADSHEET_PREFIX = /^[=+\-@\t\r\n＝＋－＠]/u;
+const SIGNED_NUMERIC_TEXT = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u;
 
 export function normalizeHeaderKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -63,6 +64,7 @@ export function matrixToRows(matrix: unknown[][]): { headers: string[]; rows: De
 
 function spreadsheetSafeText(value: unknown): string {
   const text = String(value ?? '');
+  if (SIGNED_NUMERIC_TEXT.test(text)) return text;
   return DANGEROUS_SPREADSHEET_PREFIX.test(text) ? `'${text}` : text;
 }
 
