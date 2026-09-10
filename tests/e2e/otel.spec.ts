@@ -13,3 +13,19 @@ test('keeps reused span IDs isolated by trace and exposes searchable span naviga
  await page.locator('#otel-search').fill('does-not-exist');
  await expect(page.getByText(/No spans match/)).toBeVisible();
 });
+
+test('matches the backing canvas to a narrow rendered width and caps vertical bitmap allocation',async({page})=>{
+ await page.setViewportSize({width:280,height:760});
+ const spans=Array.from({length:80},(_,index)=>({traceID:'trace-many',spanID:String(index).padStart(16,'0'),operationName:`overlap-${index}`,references:[],startTime:1000000,duration:100000,processID:'p',tags:[]}));
+ const many={data:[{traceID:'trace-many',processes:{p:{serviceName:'svc'}},spans}]};
+ await page.goto('./#/tools/otel-flamegraph');
+ await page.locator('#otel-file').setInputFiles({name:'many.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(many))});
+ const canvas=page.getByRole('img',{name:/Trace flamegraph/}).or(page.locator('canvas[aria-label^="Trace flamegraph"]'));
+ await expect(canvas).toBeVisible();
+ const metrics=await canvas.evaluate((node:HTMLCanvasElement)=>({rectWidth:node.getBoundingClientRect().width,width:node.width,height:node.height,dpr:window.devicePixelRatio,touchAction:getComputedStyle(node).touchAction}));
+ expect(metrics.rectWidth).toBeLessThan(320);
+ expect(metrics.width).toBeLessThanOrEqual(Math.ceil(metrics.rectWidth*metrics.dpr)+1);
+ expect(metrics.height).toBeLessThanOrEqual(Math.ceil(520*metrics.dpr));
+ expect(metrics.touchAction).toContain('pan-y');
+ expect(metrics.touchAction).toContain('pinch-zoom');
+});
