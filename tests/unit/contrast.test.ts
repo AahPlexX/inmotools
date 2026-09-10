@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildContrastMatrix, parseTokenLines, resolveBackdrop, resolvePair, tokenCssName, wcagContrast } from '../../src/tools/contrast/contrast-engine';
+import { buildContrastMatrix, MAX_CONTRAST_TOKENS, parseTokenLines, readableMetricTextColor, resolveBackdrop, resolvePair, tokenCssName, wcagContrast } from '../../src/tools/contrast/contrast-engine';
 
 const source=`\n--ink: #111111;\naccent: rgb(32 91 214);\nsoft = hsl(220 100% 96%);\nperceptual: oklch(62% 0.18 255);\nbad: definitely-not-a-color;\n`;
 
@@ -10,5 +10,7 @@ describe('APCA / OKLCH contrast engine',()=>{
  it('rejects translucent backdrops because pair resolution would otherwise be ambiguous',()=>{expect(()=>resolveBackdrop('rgb(255 255 255 / 50%)')).toThrow(/opaque/i);});
  it('rejects duplicate exported token names, including differently cased aliases',()=>{const result=parseTokenLines('accent:#000;\nACCENT:#fff;\n--ink:#111;\n--ink:#222;');expect(result.tokens.map(token=>tokenCssName(token.name))).toEqual(['--accent','--ink']);expect(result.errors).toHaveLength(2);expect(result.errors.every(error=>/Duplicate exported token name/i.test(error.message))).toBe(true);});
  it('builds directional non-self pairings with separate APCA and WCAG values',()=>{const parsed=parseTokenLines('--black:#000;\n--white:#fff;\n--red:#c00;');const cells=buildContrastMatrix(parsed.tokens,'body');expect(cells).toHaveLength(6);expect(cells.some(cell=>cell.foreground===cell.background)).toBe(false);const forward=cells.find(cell=>cell.foreground.name==='--black'&&cell.background.name==='--white');const reverse=cells.find(cell=>cell.foreground.name==='--white'&&cell.background.name==='--black');expect(forward?.apcaLc).not.toBe(reverse?.apcaLc);expect(forward?.wcag).toBeCloseTo(21,6);});
+ it('rejects token sets that would exceed the bounded synchronous matrix budget',()=>{const tokens=parseTokenLines(Array.from({length:MAX_CONTRAST_TOKENS+1},(_,index)=>`token-${index}: rgb(${index%256} 0 0);`).join('\n')).tokens;expect(tokens).toHaveLength(MAX_CONTRAST_TOKENS+1);expect(()=>buildContrastMatrix(tokens,'body')).toThrow(/limited|tokens|matrix/i);});
+ it('chooses readable UI metric text independently of the tested foreground token',()=>{expect(readableMetricTextColor('#ffffff')).toBe('#000000');expect(readableMetricTextColor('#000000')).toBe('#ffffff');expect(wcagContrast(readableMetricTextColor('#ffffff'),'#ffffff')).toBeGreaterThanOrEqual(4.5);expect(wcagContrast(readableMetricTextColor('#000000'),'#000000')).toBeGreaterThanOrEqual(4.5);});
  it('computes conventional WCAG 2 ratios independently of APCA',()=>{expect(wcagContrast('#000000','#ffffff')).toBeCloseTo(21,6);expect(wcagContrast('#ffffff','#000000')).toBeCloseTo(21,6);expect(wcagContrast('#777777','#777777')).toBeCloseTo(1,6);});
 });
