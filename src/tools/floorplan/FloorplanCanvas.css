@@ -1,3 +1,10 @@
+.plancraft-canvas-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  background: var(--pc-canvas);
+}
+
 .plancraft-view-controls {
   position: absolute;
   right: 10px;
@@ -93,14 +100,26 @@
   }
 
   .plancraft-view-controls {
-    right: 8px;
-    bottom: 8px;
-    max-width: calc(100% - 16px);
+    position: static;
+    width: 100%;
+    max-width: none;
+    grid-template-columns: repeat(3, minmax(44px, 1fr));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
   }
 }
 
 @media (max-height: 460px) and (orientation: landscape) {
   .plancraft-view-controls {
+    position: static;
+    width: 100%;
+    max-width: none;
     grid-template-columns: repeat(6, minmax(44px, 1fr));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
   }
 }
