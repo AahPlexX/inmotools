@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { PagedTable } from '../../components/PagedTable';
 import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
-import { buildPatternFlags, extractGroupNames, rowsToCsv, rowsToMarkdown, type LogPatternFlags, type LogScanMode, type StructuredLogs } from './log-engine';
+import { buildPatternFlags, extractGroupNames, rowsToCsv, rowsToMarkdown, unmatchedToTsv, type LogPatternFlags, type LogScanMode, type StructuredLogs } from './log-engine';
 import { isCancellation, runLogStructuring } from './log-runner';
 
 const SAMPLE='2026-08-29 INFO service started\n2026-08-29 ERROR disk full\nunmatched line';
 const DEFAULT_PATTERN='^(?<date>\\d{4}-\\d{2}-\\d{2})\\s+(?<level>INFO|WARN|ERROR)\\s+(?<message>.+)$';
 const DEBOUNCE_MS=300,MAX_INPUT_BYTES=8*1024*1024,UNMATCHED_PREVIEW=500;
+const SOURCE_LINE_KEY='meta:source-line';
+const CAPTURE_KEY_PREFIX='capture:';
 const EMPTY:StructuredLogs={columns:[],rows:[],unmatched:[],kinds:{}};
 const describeCount=(count:number,singular:string,plural:string)=>`${count} ${count===1?singular:plural}`;
 function fullCell(value:string):ReactNode{if(value.length<=100&&!/[\r\n]/.test(value))return value;const summary=value.replace(/\s+/g,' ').slice(0,100);return <details><summary style={{overflowWrap:'anywhere'}}>{summary}{value.length>100?'…':''}</summary><pre className="code-output" tabIndex={0} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{value}</pre></details>;}
@@ -19,8 +21,9 @@ export default function LogWorkspace(){
  const cancelRun=()=>{if(debounceRef.current!==null){clearTimeout(debounceRef.current);debounceRef.current=null;}runRef.current?.cancel();runRef.current=null;setRunning(false);setResult(EMPTY);setError('Stopped. Edit the pattern or the input to run again.');};
  const {rows,columns,unmatched,kinds,rowLineNumbers=[],unmatchedLineNumbers=[]}=result;const declaredGroups=useMemo(()=>extractGroupNames(pattern),[pattern]);const stem=sourceName.replace(/\.[^.]+$/,'')||'structured-logs';const exportable=rows.length>0&&columns.length>0&&!running&&!error;
  const displayRows=useMemo(()=>rows.map((row,index)=>({row,line:rowLineNumbers[index]??null})),[rowLineNumbers,rows]);
+ const tableColumns=useMemo(()=>[{key:SOURCE_LINE_KEY,label:'Source line'},...columns.map((column)=>({key:`${CAPTURE_KEY_PREFIX}${column}`,label:<>{column}<span className="log-column-kind"> {kinds[column]}</span></>}))],[columns,kinds]);
  const save=(kind:'csv'|'json'|'md')=>{if(kind==='csv')downloadText(rowsToCsv(rows,columns),`${stem}.csv`,'text/csv;charset=utf-8');if(kind==='json')downloadText(JSON.stringify(rows,null,2),`${stem}.json`,'application/json');if(kind==='md')downloadText(rowsToMarkdown(rows,columns),`${stem}.md`,'text/markdown;charset=utf-8');};
- const saveUnmatched=()=>{const text=unmatched.map((line,index)=>`${unmatchedLineNumbers[index]??'?'}\t${line}`).join('\r\n');downloadText(`source_line\ttext\r\n${text}`,`${stem}.unmatched.tsv`,'text/tab-separated-values;charset=utf-8');};
+ const saveUnmatched=()=>{downloadText(unmatchedToTsv(unmatched,unmatchedLineNumbers),`${stem}.unmatched.tsv`,'text/tab-separated-values;charset=utf-8');};
  const loadFile=useCallback(async(file:File|undefined)=>{if(!file)return;try{const text=await file.text();if(text.length>MAX_INPUT_BYTES){setInput(text.slice(0,MAX_INPUT_BYTES));setStatusNote(`${file.name} is larger than 8 MB, so only the first 8 MB was loaded.`);}else{setInput(text);setStatusNote('');}setSourceName(file.name);}catch{setError('That file could not be read in this browser.');}},[]);
  const onFileChange=(event:ChangeEvent<HTMLInputElement>)=>consumeFileInput(event.target,()=>loadFile(event.target.files?.[0]));const toggle=(key:keyof LogPatternFlags)=>(event:ChangeEvent<HTMLInputElement>)=>setFlags((current)=>({...current,[key]:event.target.checked}));
  return <><div className="workspace-header"><div><h2>Regex schema extractor</h2><p>Named capture groups become columns; unmatched lines remain visible and exportable.</p></div></div><div className="workspace-body">
@@ -31,7 +34,7 @@ export default function LogWorkspace(){
  <div className="field" style={{marginTop:16}}><label htmlFor="log-input">Log text</label><textarea id="log-input" value={input} onChange={(event)=>setInput(event.target.value)}/></div>
  <div className={`status-line ${error?'error':'good'}`} role="status" data-testid="log-status">{error||(running?'Applying the pattern in a background worker…':rows.length>0&&columns.length===0?`The pattern matched ${describeCount(rows.length,'time','times')} but declares no named groups, so there are no columns to extract. Wrap the part you want in (?<name>…).`:`${describeCount(rows.length,'matched record','matched records')} · ${describeCount(unmatched.length,'unmatched line','unmatched lines')}${result.skippedEmptyMatches?` · ${describeCount(result.skippedEmptyMatches,'empty match','empty matches')} skipped`:''}`)}</div>
  <div className="button-row">{running?<button className="action-button secondary" type="button" onClick={cancelRun} data-testid="log-cancel">Stop</button>:null}<button className="action-button secondary" type="button" disabled={!exportable} onClick={()=>save('csv')}>Export CSV</button><button className="action-button secondary" type="button" disabled={!exportable} onClick={()=>save('json')}>Export JSON</button><button className="action-button secondary" type="button" disabled={!exportable} onClick={()=>save('md')}>Export Markdown</button><button className="action-button secondary" type="button" disabled={!unmatched.length||running||Boolean(error)} onClick={saveUnmatched}>Export unmatched TSV</button></div>
- {rows.length>0&&columns.length>0?<PagedTable testId="log-table" caption="Structured log rows" columns={[{key:'__source_line',label:'Source line'},...columns.map((column)=>({key:column,label:<>{column}<span className="log-column-kind"> {kinds[column]}</span></>}))]} rows={displayRows} rowKey={(item,index)=>`${item.line??'record'}-${index}`} renderCell={(item,key)=>key==='__source_line'?(item.line??'—'):fullCell(item.row[key]??'')}/>:null}
+ {rows.length>0&&columns.length>0?<PagedTable testId="log-table" caption="Structured log rows" columns={tableColumns} rows={displayRows} rowKey={(item,index)=>`${item.line??'record'}-${index}`} renderCell={(item,key)=>{if(key===SOURCE_LINE_KEY)return item.line??'—';const column=key.startsWith(CAPTURE_KEY_PREFIX)?key.slice(CAPTURE_KEY_PREFIX.length):key;return fullCell(item.row[column]??'');}}/>:null}
  {unmatched.length?<details style={{marginTop:18}}><summary>Review unmatched lines ({unmatched.length})</summary><pre className="code-output" tabIndex={0}>{unmatched.slice(0,UNMATCHED_PREVIEW).map((line,index)=>`L${unmatchedLineNumbers[index]??'?'}  ${line}`).join('\n')}</pre>{unmatched.length>UNMATCHED_PREVIEW?<small>Showing the first {UNMATCHED_PREVIEW} of {unmatched.length} unmatched lines. Export includes all {unmatched.length}.</small>:null}</details>:null}
  </div></>;
 }
