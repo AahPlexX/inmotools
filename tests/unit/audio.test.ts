@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampAudioSample, encodePcm24Wav, equalPowerMix, renderedChannelCount, validateFilterRange, validateImpulseChannels } from '../../src/tools/audio/audio-engine';
+import { clampAudioSample, convolutionTailMs, encodePcm24Wav, equalPowerMix, renderedChannelCount, validateFilterRange, validateImpulseChannels } from '../../src/tools/audio/audio-engine';
 
 const ascii=(view:DataView,offset:number,length:number)=>String.fromCharCode(...Array.from({length},(_,index)=>view.getUint8(offset+index)));
 function signed24(view:DataView,offset:number){const raw=view.getUint8(offset)|(view.getUint8(offset+1)<<8)|(view.getUint8(offset+2)<<16);return raw&0x800000?raw|~0xffffff:raw}
@@ -9,6 +9,7 @@ describe('room graph configuration',()=>{
  it('accepts only ConvolverNode-supported IR channel counts',()=>{for(const count of[1,2,4])expect(()=>validateImpulseChannels(count)).not.toThrow();for(const count of[0,3,6,8])expect(()=>validateImpulseChannels(count)).toThrow(/mono, stereo, or 4-channel/i);});
  it('caps filter frequencies to the current Nyquist range',()=>{expect(validateFilterRange(80,24_000,44_100)).toEqual({lowCutHz:80,highCutHz:22049});expect(validateFilterRange(30_000,31_000,48_000)).toEqual({lowCutHz:23980,highCutHz:23999});});
  it('keeps offline rendering channel counts compatible with the convolution graph',()=>{expect(renderedChannelCount(1,1)).toBe(1);expect(renderedChannelCount(2,4)).toBe(4);expect(()=>renderedChannelCount(2,6)).toThrow(/ConvolverNode/i);});
+ it('includes the active pre-delay when scheduling convolution tail cleanup',()=>{expect(convolutionTailMs(1.5,18)).toBe(1518);expect(convolutionTailMs(1.5,500)).toBe(2000);expect(convolutionTailMs(1.5,5000)).toBe(3500);});
 });
 
 describe('PCM24 WAV encoder',()=>{
