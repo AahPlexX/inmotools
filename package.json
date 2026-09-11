@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@12.1.0",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "dev": "pnpm prepare:pyodide && vite",
     "build": "pnpm prepare:pyodide && tsc --noEmit -p tsconfig.app.json && vite build",
@@ -79,7 +79,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/hast": "3.0.5",
     "@types/mdast": "4.0.4",
