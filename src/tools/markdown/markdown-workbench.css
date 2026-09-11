@@ -1,0 +1,188 @@
+/* Markdown Workbench-specific presentation. Kept with the lazy workspace so
+   these rules load only when the Markdown tool is opened. */
+.markdown-workbench-toolbar {
+  align-items: stretch;
+  gap: 8px;
+}
+
+.markdown-workbench-toolbar-section {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.markdown-workbench-toolbar-section .markdown-workbench-toolbar-group {
+  align-items: center;
+}
+
+.markdown-workbench-toolbar-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.markdown-workbench-export-section {
+  flex: 1 1 100%;
+  border-color: var(--line-strong);
+}
+
+.markdown-workbench-export-section .markdown-workbench-toolbar-group {
+  margin-left: 0;
+}
+
+/* The Markdown renderer already emits semantic h1-h6 elements. Explicit
+   preview typography preserves those levels instead of inheriting the app's
+   global heading reset, which made every level look like ordinary prose. */
+.markdown-workbench-preview :is(h1, h2, h3, h4, h5, h6) {
+  margin: 1.25em 0 .5em;
+  color: var(--ink);
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.markdown-workbench-preview :is(h1, h2, h3):first-child {
+  margin-top: 0;
+}
+
+.markdown-workbench-preview h1 { font-size: 1.9rem; }
+.markdown-workbench-preview h2 { font-size: 1.55rem; }
+.markdown-workbench-preview h3 { font-size: 1.3rem; }
+.markdown-workbench-preview h4 { font-size: 1.15rem; }
+.markdown-workbench-preview h5 { font-size: 1rem; }
+.markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
+
+.markdown-workbench-help-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: min(82vh, 720px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 22px 60px rgb(15 23 42 / .24);
+}
+
+.markdown-workbench-help-dialog::backdrop {
+  background: rgb(11 18 32 / .48);
+}
+
+.markdown-workbench-help-header {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.markdown-workbench-help-header h2 {
+  margin: 2px 0 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.markdown-workbench-help-eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.markdown-workbench-help-close {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.markdown-workbench-help-close:hover { border-color: var(--signal); }
+.markdown-workbench-help-close:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.markdown-workbench-help-body {
+  max-height: calc(min(82vh, 720px) - 72px);
+  padding: 18px;
+  overflow: auto;
+}
+
+.markdown-workbench-help-intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.markdown-workbench-help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: 12px;
+}
+
+.markdown-workbench-help-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-strong);
+}
+
+.markdown-workbench-help-item h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.markdown-workbench-help-item pre {
+  max-width: 100%;
+  margin: 6px 0 0;
+  padding: 7px 8px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.markdown-workbench-help-item code {
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (max-width: 860px) {
+  .markdown-workbench-toolbar-section {
+    flex: 1 1 min(100%, 280px);
+  }
+
+  .markdown-workbench-export-section {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .markdown-workbench-toolbar-section {
+    flex-basis: 100%;
+  }
+
+  .markdown-workbench-help-header {
+    align-items: flex-start;
+  }
+}
