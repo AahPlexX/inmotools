@@ -78,6 +78,7 @@ test('Vector Studio creates, precisely edits, exports metadata, and reflows with
   await xInput.press('Enter');
   await expect(xInput).toHaveValue('120');
 
+  await page.getByRole('button', { name: 'Select tool' }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(xInput).toHaveValue('121');
   await page.getByRole('button', { name: 'Align left' }).click();
@@ -97,6 +98,20 @@ test('Vector Studio creates, precisely edits, exports metadata, and reflows with
   await expect(page.getByRole('button', { name: 'Rectangle tool' })).toBeVisible();
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflows).toBe(false);
+});
+
+test('Vector Studio mirrors the live artboard with the same axis transform used by export', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  await page.getByRole('button', { name: 'Rectangle tool' }).click();
+  await page.getByTestId('vector-canvas').click({ position: { x: 260, y: 190 } });
+  await page.getByRole('button', { name: 'Mirror H' }).click();
+
+  const liveShape = page.locator('[data-vector-element]').first().locator('rect').first();
+  await expect(liveShape).toHaveAttribute('transform', /scale\(-1 1\)/);
+
+  await page.getByRole('tab', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Preview SVG source' }).click();
+  await expect(page.getByLabel('Vector SVG export source')).toContainText('scale(-1 1)');
 });
 
 test('Vector Studio pan tool moves the artboard viewport rather than acting as a decorative control', async ({ page }) => {
@@ -135,6 +150,7 @@ test('Vector Studio imports project JSON and offers accessible non-drag layer or
   await expect(page.getByTestId('vector-layer')).toContainText('Imported rectangle');
   await page.getByRole('tab', { name: 'Layers' }).click();
   await page.getByTestId('vector-layer').click();
+  await page.getByRole('tab', { name: 'Design' }).click();
   await page.getByRole('button', { name: 'Bring forward' }).click();
   await page.getByRole('button', { name: 'Bring to front' }).click();
   await expect(page.locator('#vector-artboard-width')).toHaveValue('640');
