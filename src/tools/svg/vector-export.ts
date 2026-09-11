@@ -25,6 +25,19 @@ function safeId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_.:-]/g, '-');
 }
 
+function elementTransform(element: VectorElement): string | null {
+  const flipX = Boolean(element.flipX);
+  const flipY = Boolean(element.flipY);
+  if (!element.rotation && !flipX && !flipY) return null;
+  const cx = element.x + element.width / 2;
+  const cy = element.y + element.height / 2;
+  const operations = [`translate(${number(cx)} ${number(cy)})`];
+  if (element.rotation) operations.push(`rotate(${number(element.rotation)})`);
+  if (flipX || flipY) operations.push(`scale(${flipX ? -1 : 1} ${flipY ? -1 : 1})`);
+  operations.push(`translate(${number(-cx)} ${number(-cy)})`);
+  return operations.join(' ');
+}
+
 interface PaintSerialization {
   value: string;
   definition?: string;
@@ -73,7 +86,8 @@ function styleAttributes(element: VectorElement, fill: string): string {
     if (element.stroke.dash.trim()) attrs.push(`stroke-dasharray="${escapeAttribute(element.stroke.dash.trim())}"`);
   }
   if (element.blendMode !== 'normal') attrs.push(`style="mix-blend-mode:${element.blendMode}"`);
-  if (element.rotation) attrs.push(`transform="rotate(${number(element.rotation)} ${number(element.x + element.width / 2)} ${number(element.y + element.height / 2)})"`);
+  const transform = elementTransform(element);
+  if (transform) attrs.push(`transform="${escapeAttribute(transform)}"`);
   return attrs.join(' ');
 }
 
@@ -106,11 +120,14 @@ function serializeElement(element: VectorElement, definitions: string[]): string
       if (element.pathId) return `<text ${common} ${textAttrs}>${description}<textPath href="#${escapeAttribute(safeId(element.pathId))}">${text}</textPath></text>`;
       return `<text ${common} ${textAttrs} x="${number(element.x)}" y="${number(element.y + element.fontSize)}">${description}${text}</text>`;
     }
-    case 'image':
-      return `<image id="${id}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" opacity="${number(element.opacity)}" href="${escapeAttribute(element.href)}" preserveAspectRatio="${escapeAttribute(element.preserveAspectRatio)}">${description}</image>`;
+    case 'image': {
+      const transform = elementTransform(element);
+      return `<image id="${id}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''} href="${escapeAttribute(element.href)}" preserveAspectRatio="${escapeAttribute(element.preserveAspectRatio)}">${description}</image>`;
+    }
     case 'group': {
       const children = element.children.map((child) => serializeElement(child, definitions)).join('');
-      return `<g id="${id}" opacity="${number(element.opacity)}"${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}>${description}${children}</g>`;
+      const transform = elementTransform(element);
+      return `<g id="${id}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''}${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}>${description}${children}</g>`;
     }
     case 'symbol-instance':
       return `<use ${common} href="#${escapeAttribute(safeId(element.symbolId))}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}">${description}</use>`;
