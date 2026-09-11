@@ -26,9 +26,9 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current verified implementation head before this tracker-only commit: `edbf8530a7cab3188945f4a21deab97c0d43fc28`
+- Current verified implementation head before this tracker-only commit: `df69b7d98bd5305023b8a1d49727445c401537c9`
 - Current phase: **Task 4 / Milestone D — spec-gap closure, hardening, integration, deployment verification**
-- Last fully verified exact-head CI evidence: workflow run `34642478005` completed successfully for `edbf8530a7cab3188945f4a21deab97c0d43fc28`; repository unit tests, production build, and the expanded focused Photo Studio browser suite all succeeded on the PR merge state.
+- Last fully verified exact-head CI evidence: workflow run `34643353378` completed successfully for `df69b7d98bd5305023b8a1d49727445c401537c9`; all 658 repository unit tests, production build, and all 22 focused Photo Studio browser tests succeeded on the PR merge state.
 
 ## Verified progress
 
@@ -40,19 +40,22 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Texture, clarity, sharpening, luminance/chroma denoise, and chromatic-aberration correction exist in the pixel engine.
 - [x] Tone-curve editing is wired into normal recipe history and preview/export behavior with accessible graph + numeric editing.
 - [x] Embedded-XMP container writer has focused unit coverage for JPEG APP1, PNG XMP `iTXt`, and WebP `XMP ` / VP8X behavior.
-- [x] Single-photo export now uses unified export orchestration with safe editable filename, resize policy, output sharpening, metadata policy, standards-compatible XMP embedding attempt, and pixel-export-preserving fallback.
+- [x] Single-photo export uses unified export orchestration with safe editable filename, resize policy, output sharpening, metadata policy, standards-compatible XMP embedding attempt, and pixel-export-preserving fallback.
 - [x] Batch export is exposed in the production dialog, processes sequentially with per-file status, shares format/resize/sharpening/metadata policy, and does not retain completed full-resolution blobs in the batch summary.
 - [x] Recipe JSON export/import, editable presets, history, and snapshot restore paths remain wired.
-- [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening control, production batch queue completion, keyboard history, and 320 CSS px editor/export-dialog reflow.
-- [x] Exact-head CI at `edbf8530a7cab3188945f4a21deab97c0d43fc28` passed repository unit tests, production build, and focused Photo Studio browser tests through PR validation run `34642478005`.
+- [x] RGB + luminance histogram is presented in the live preview toolbar with four distinct channels.
+- [x] Highlight/shadow clipping warnings render as a zoom-synchronized non-destructive overlay computed from the actual rendered preview pixels.
+- [x] Color sampler reads the rendered preview in intrinsic image coordinates and reports hexadecimal, RGB, HSL, and alpha when relevant.
+- [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening, production batch queue completion, RGB histogram, clipping overlay, color sampler, keyboard history, and 320 CSS px editor/export-dialog reflow.
+- [x] Exact-head CI at `df69b7d98bd5305023b8a1d49727445c401537c9` passed all 658 repository unit tests, production build, and all 22 focused Photo Studio browser tests through PR validation run `34643353378`.
 
 ## Spec inventory blockers discovered during audit
 
 These remain release blockers because they are promised by the design specification but are not yet fully represented in the production UI/behavior:
 
-- [ ] RGB histogram presentation; current mini histogram exposes luminance only even though RGB bins are available.
-- [ ] Clipping-warning overlay/toggle for highlight/shadow clipping.
-- [ ] Color sampler with RGB, HSL, and hexadecimal readout.
+- [x] RGB histogram presentation.
+- [x] Clipping-warning overlay/toggle for highlight/shadow clipping.
+- [x] Color sampler with RGB, HSL, and hexadecimal readout.
 - [ ] Individual-control reset affordances rather than reset-all only.
 - [ ] Named snapshots; current snapshots are auto-numbered.
 - [ ] Explicit long-edge and short-edge export resize modes.
@@ -62,7 +65,7 @@ These remain release blockers because they are promised by the design specificat
 
 ## Remaining release work
 
-1. Close the spec inventory blockers above with real UI/renderer behavior and focused tests; do not lower or reinterpret the completion goal to avoid them.
+1. Close the remaining spec inventory blockers above with real UI/renderer behavior and focused tests; do not lower or reinterpret the completion goal to avoid them.
 2. Re-audit the complete design feature list after blocker closure and account for every promised capability as implemented, intentionally deferred, or removed from the release specification before merge.
 3. Reconcile `feat/photo-studio` with the latest moving `main` without rewriting other agents' branches; resolve only genuine integration conflicts.
 4. Review the exact changed-file set for Photo-only scope, private/internal prompt leakage, and unrelated regressions.
