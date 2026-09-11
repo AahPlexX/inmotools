@@ -43,3 +43,25 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
   await expect(page.getByRole('cell', { name: 'first.png', exact: true })).toHaveCount(0);
   await expect(page.getByRole('cell', { name: 'second.png', exact: true })).toBeVisible();
 });
+
+
+test('leaving during encoding prevents a later download', async ({ page }) => {
+  await page.goto('./#/tools/exif-scrubber');
+  await page.getByLabel('Choose image').setInputFiles({ name: 'pending.png', mimeType: 'image/png', buffer: onePixelPng });
+  await expect(page.getByRole('button', { name: 'Sanitize and download' })).toBeEnabled();
+  await page.evaluate(() => {
+    const original = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (callback, ...args) {
+      original.call(this, (blob) => { (window as any).finishAuditEncoding = () => callback(blob); }, ...args);
+    };
+  });
+  const downloads: string[] = [];
+  page.on('download', (download) => downloads.push(download.suggestedFilename()));
+  await page.getByRole('button', { name: 'Sanitize and download' }).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).finishAuditEncoding)).toBe('function');
+  await page.getByRole('link', { name: '← All tools', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Local workbench', exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).finishAuditEncoding());
+  await page.waitForTimeout(300);
+  expect(downloads).toEqual([]);
+});

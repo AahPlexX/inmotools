@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'node:module';
 import { buildQueryResult, normalizeDuckDbValue, startLocalQuery } from '../../src/tools/duckdb/duckdb-client';
 
 describe('DuckDB result normalization', () => {
+  it('normalizes actual Arrow list vectors nested in structs', () => {
+    const require = createRequire(import.meta.url);
+    const arrow = createRequire(require.resolve('@duckdb/duckdb-wasm'))('apache-arrow');
+    const decimal = new arrow.Decimal(2, 10, 128);
+    const vector = arrow.makeVector({ type: decimal, data: new Int32Array([12345, 0, 0, 0]) });
+    const list = new arrow.List(new arrow.Field('item', decimal));
+    expect(normalizeDuckDbValue(vector, list)).toEqual(['123.45']);
+    const struct = new arrow.Struct([new arrow.Field('amounts', list)]);
+    expect(normalizeDuckDbValue({ amounts: vector }, struct)).toEqual({ amounts: ['123.45'] });
+  });
   it('preserves bigint precision as text instead of converting to Number', () => {
     expect(normalizeDuckDbValue(BigInt('9007199254740993'))).toBe('9007199254740993');
   });

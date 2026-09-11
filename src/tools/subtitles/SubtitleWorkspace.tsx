@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { PagedTable } from '../../components/PagedTable';
@@ -53,6 +53,7 @@ export default function SubtitleWorkspace() {
   const [applied, setApplied] = useState<CorrectionOutput | null>(null);
   const [status, setStatus] = useState('Set two trusted anchors, then preview the linear correction.');
   const inputRevision = useRef(0);
+  useEffect(() => () => { inputRevision.current += 1; }, []);
 
   const parseState = useMemo(() => {
     try {
