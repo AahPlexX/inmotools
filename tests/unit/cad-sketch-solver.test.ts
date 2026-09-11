@@ -161,4 +161,117 @@ describe('CAD constrained sketch solver', () => {
     const circle = result.sketch.entities.find((entity) => entity.id === 'circle' && entity.type === 'circle');
     expect(circle && circle.type === 'circle' ? circle.radius : Number.NaN).toBeCloseTo(5, 7);
   });
+
+  it('solves parallel line geometry while retaining independent line placement', () => {
+    const sketch: CadSketch = {
+      id: 'parallel-lines',
+      label: 'Parallel sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'a0', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'a1', type: 'point', x: 10, y: 0, construction: false },
+        { id: 'b0', type: 'point', x: 0, y: 5, construction: false },
+        { id: 'b1', type: 'point', x: 3, y: 6, construction: false },
+        { id: 'a', type: 'line', startPointId: 'a0', endPointId: 'a1', construction: false },
+        { id: 'b', type: 'line', startPointId: 'b0', endPointId: 'b1', construction: false },
+      ],
+      constraints: [
+        { id: 'fix-a0', type: 'fixed-point', pointId: 'a0', x: 0, y: 0, enabled: true },
+        { id: 'fix-a1', type: 'fixed-point', pointId: 'a1', x: 10, y: 0, enabled: true },
+        { id: 'fix-b0', type: 'fixed-point', pointId: 'b0', x: 0, y: 5, enabled: true },
+        { id: 'length-b', type: 'distance', pointAId: 'b0', pointBId: 'b1', value: 4, enabled: true },
+        { id: 'parallel-pair', type: 'parallel', lineAId: 'a', lineBId: 'b', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.constraintState).toBe('fully');
+    const b1 = result.sketch.entities.find((entity) => entity.id === 'b1' && entity.type === 'point');
+    expect(Math.abs((b1 && b1.type === 'point' ? b1.x : Number.NaN) - 0)).toBeCloseTo(4, 7);
+    expect(b1 && b1.type === 'point' ? b1.y : Number.NaN).toBeCloseTo(5, 7);
+  });
+
+  it('solves concentric circles by sharing the same solved center', () => {
+    const sketch: CadSketch = {
+      id: 'concentric-circles',
+      label: 'Concentric sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'c1-center', type: 'point', x: 2, y: 3, construction: false },
+        { id: 'c2-center', type: 'point', x: 8, y: -4, construction: false },
+        { id: 'c1', type: 'circle', centerPointId: 'c1-center', radius: 3, construction: false },
+        { id: 'c2', type: 'circle', centerPointId: 'c2-center', radius: 7, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-c1-center', type: 'fixed-point', pointId: 'c1-center', x: 2, y: 3, enabled: true },
+        { id: 'radius-c1', type: 'radius', circleId: 'c1', value: 3, enabled: true },
+        { id: 'radius-c2', type: 'radius', circleId: 'c2', value: 7, enabled: true },
+        { id: 'concentric', type: 'concentric', circleAId: 'c1', circleBId: 'c2', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.constraintState).toBe('fully');
+    const center = result.sketch.entities.find((entity) => entity.id === 'c2-center' && entity.type === 'point');
+    expect(center && center.type === 'point' ? center.x : Number.NaN).toBeCloseTo(2, 8);
+    expect(center && center.type === 'point' ? center.y : Number.NaN).toBeCloseTo(3, 8);
+  });
+
+  it('solves equal line lengths without duplicating a driving dimension', () => {
+    const sketch: CadSketch = {
+      id: 'equal-lines',
+      label: 'Equal lines sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'a0', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'a1', type: 'point', x: 6, y: 0, construction: false },
+        { id: 'b0', type: 'point', x: 0, y: 4, construction: false },
+        { id: 'b1', type: 'point', x: 3, y: 5, construction: false },
+        { id: 'a', type: 'line', startPointId: 'a0', endPointId: 'a1', construction: false },
+        { id: 'b', type: 'line', startPointId: 'b0', endPointId: 'b1', construction: false },
+      ],
+      constraints: [
+        { id: 'fix-a0', type: 'fixed-point', pointId: 'a0', x: 0, y: 0, enabled: true },
+        { id: 'fix-a1', type: 'fixed-point', pointId: 'a1', x: 6, y: 0, enabled: true },
+        { id: 'fix-b0', type: 'fixed-point', pointId: 'b0', x: 0, y: 4, enabled: true },
+        { id: 'horizontal-b', type: 'horizontal', lineId: 'b', enabled: true },
+        { id: 'equal-length', type: 'equal-length', lineAId: 'a', lineBId: 'b', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.constraintState).toBe('fully');
+    const b1 = result.sketch.entities.find((entity) => entity.id === 'b1' && entity.type === 'point');
+    expect(Math.abs(b1 && b1.type === 'point' ? b1.x : Number.NaN)).toBeCloseTo(6, 7);
+    expect(b1 && b1.type === 'point' ? b1.y : Number.NaN).toBeCloseTo(4, 7);
+  });
+
+  it('solves equal circle radii while preserving independently fixed centers', () => {
+    const sketch: CadSketch = {
+      id: 'equal-radii',
+      label: 'Equal radii sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'c1-center', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'c2-center', type: 'point', x: 12, y: 0, construction: false },
+        { id: 'c1', type: 'circle', centerPointId: 'c1-center', radius: 5, construction: false },
+        { id: 'c2', type: 'circle', centerPointId: 'c2-center', radius: 2, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-c1-center', type: 'fixed-point', pointId: 'c1-center', x: 0, y: 0, enabled: true },
+        { id: 'fix-c2-center', type: 'fixed-point', pointId: 'c2-center', x: 12, y: 0, enabled: true },
+        { id: 'radius-c1', type: 'radius', circleId: 'c1', value: 5, enabled: true },
+        { id: 'equal-radius', type: 'equal-radius', circleAId: 'c1', circleBId: 'c2', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.constraintState).toBe('fully');
+    const c2 = result.sketch.entities.find((entity) => entity.id === 'c2' && entity.type === 'circle');
+    expect(c2 && c2.type === 'circle' ? c2.radius : Number.NaN).toBeCloseTo(5, 8);
+  });
 });
