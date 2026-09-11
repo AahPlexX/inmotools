@@ -8,13 +8,14 @@ const waitForWaitingWorker = (registration) => new Promise((resolve) => {
 
   let settled = false;
   let installing = registration.installing;
+  let timeoutId = 0;
 
   const finish = (worker = null) => {
     if (settled) return;
     settled = true;
     registration.removeEventListener('updatefound', onUpdateFound);
     if (installing) installing.removeEventListener('statechange', onStateChange);
-    window.clearTimeout(timeoutId);
+    if (timeoutId) window.clearTimeout(timeoutId);
     resolve(worker ?? registration.waiting ?? null);
   };
 
@@ -35,7 +36,7 @@ const waitForWaitingWorker = (registration) => new Promise((resolve) => {
   registration.addEventListener('updatefound', onUpdateFound);
   watchInstalling();
 
-  const timeoutId = window.setTimeout(() => finish(registration.waiting), 5_000);
+  if (!settled) timeoutId = window.setTimeout(() => finish(registration.waiting), 5_000);
 });
 
 const recoverPreFixMarkdownClient = async () => {
