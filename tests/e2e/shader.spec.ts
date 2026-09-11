@@ -17,6 +17,26 @@ const readDownload = async (page: Page, buttonName: string) => {
 
 const desktopOnly = (projectName: string) => test.skip(projectName !== 'desktop-chromium', 'Lifecycle detail is covered once in desktop Chromium.');
 
+// WebGL clears its default drawing buffer after compositing. Sample synchronously
+// after the real draw, without changing the application's context attributes.
+const observeShaderPixels = async (page: Page) => {
+  await page.addInitScript(() => {
+    const drawArrays = WebGL2RenderingContext.prototype.drawArrays;
+    WebGL2RenderingContext.prototype.drawArrays = function (...args) {
+      drawArrays.apply(this, args);
+      if (!(this.canvas instanceof HTMLCanvasElement)
+        || this.canvas.getAttribute('aria-label') !== 'Live WebGL2 fragment shader preview') return;
+      const pixel = new Uint8Array(4);
+      this.readPixels(Math.floor(this.drawingBufferWidth / 2), Math.floor(this.drawingBufferHeight / 2),
+        1, 1, this.RGBA, this.UNSIGNED_BYTE, pixel);
+      (window as unknown as { shaderPixel: number[] }).shaderPixel = Array.from(pixel);
+    };
+  });
+};
+
+const readShaderPixel = (page: Page) => page.evaluate(() =>
+  (window as unknown as { shaderPixel?: number[] }).shaderPixel ?? []);
+
 test('a failed compile cannot replace the last linked shader used for export', async ({ page }) => {
   await page.goto('./#/tools/glsl-sandbox');
   await waitForLinkedShader(page);
@@ -60,6 +80,7 @@ test('a paused preview redraws after its rendered size changes and stays bounded
 });
 
 test('a texture that finishes loading after a paused frame triggers another draw', async ({ page }) => {
+  await observeShaderPixels(page);
   await page.goto('./#/tools/glsl-sandbox');
   await waitForLinkedShader(page);
 
@@ -73,9 +94,7 @@ void main(){outColor=texture(u_texture0,vec2(0.5));}`);
   await waitForLinkedShader(page);
   await page.getByRole('button', { name: 'Pause time' }).click();
 
-  const canvas = page.getByLabel('Live WebGL2 fragment shader preview');
-  await page.waitForTimeout(100);
-  const placeholderFrame = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
+  await expect.poll(() => readShaderPixel(page)).toEqual([0, 0, 0, 255]);
 
   const pngBase64 = await page.evaluate(() => {
     const imageCanvas = document.createElement('canvas');
@@ -94,10 +113,7 @@ void main(){outColor=texture(u_texture0,vec2(0.5));}`);
     buffer: Buffer.from(pngBase64, 'base64'),
   });
   await expect(page.getByRole('button', { name: 'Remove texture 0' })).toBeVisible();
-  await page.waitForTimeout(500);
-
-  const loadedFrame = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
-  expect(loadedFrame).not.toBe(placeholderFrame);
+  await expect.poll(() => readShaderPixel(page)).toEqual([255, 0, 0, 255]);
 });
 
 test('texture decode failures are reported instead of silently leaving a placeholder', async ({ page }, testInfo) => {
@@ -139,6 +155,7 @@ test('a lost WebGL context can be restored and rebuilds the linked shader resour
 
 test('keyboard arrows update u_mouse and redraw a paused focused preview', async ({ page }, testInfo) => {
   desktopOnly(testInfo.project.name);
+  await observeShaderPixels(page);
   await page.goto('./#/tools/glsl-sandbox');
   await waitForLinkedShader(page);
 
@@ -155,11 +172,8 @@ void main(){outColor=vec4(u_mouse.x/max(u_resolution.x,1.0),0.0,0.0,1.0);}`);
 
   const canvas = page.getByLabel('Live WebGL2 fragment shader preview');
   await canvas.focus();
-  await page.waitForTimeout(100);
-  const before = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
+  await expect.poll(() => readShaderPixel(page)).toEqual([0, 0, 0, 255]);
   await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(150);
-  const after = await canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
-
-  expect(after).not.toBe(before);
+  await expect.poll(async () => (await readShaderPixel(page))[0]).toBeGreaterThan(127);
+  expect((await readShaderPixel(page)).slice(1)).toEqual([0, 0, 255]);
 });
