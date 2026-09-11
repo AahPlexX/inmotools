@@ -3,6 +3,7 @@ import type { ToolDefinition, ToolSlug } from '../catalog';
 import { ToolLayout } from '../components/ToolLayout';
 
 const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType }>> = {
+  'photo-studio': () => import('./photo/PhotoWorkspace'),
   'exif-scrubber': () => import('./exif/ExifWorkspace'),
   'duckdb-workbench': () => import('./duckdb/DuckDbWorkspace'),
   'subtitle-drift': () => import('./subtitles/SubtitleWorkspace'),
