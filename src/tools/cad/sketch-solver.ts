@@ -1,5 +1,6 @@
 import type {
   CadSketch,
+  SketchCircleEntity,
   SketchConstraint,
   SketchLineEntity,
   SketchPointEntity,
@@ -12,6 +13,11 @@ interface PointIndex {
   offset: number;
 }
 
+interface CircleIndex {
+  circle: SketchCircleEntity;
+  offset: number;
+}
+
 interface SolveCoreResult {
   values: number[];
   converged: boolean;
@@ -21,6 +27,7 @@ interface SolveCoreResult {
 
 const DEFAULT_TOLERANCE = 1e-9;
 const DEFAULT_MAX_ITERATIONS = 80;
+const MIN_GEOMETRY_SCALE = 1e-12;
 
 function finite(value: number, label: string): number {
   if (!Number.isFinite(value)) throw new Error(`${label} must be finite.`);
@@ -53,11 +60,28 @@ function lineIndex(sketch: CadSketch): Map<string, SketchLineEntity> {
   return result;
 }
 
-function initialValues(points: Map<string, PointIndex>): number[] {
-  const values = Array.from({ length: points.size * 2 }, () => 0);
+function circleIndex(sketch: CadSketch, startOffset: number): Map<string, CircleIndex> {
+  const result = new Map<string, CircleIndex>();
+  let offset = startOffset;
+  for (const entity of sketch.entities) {
+    if (entity.type !== 'circle') continue;
+    if (result.has(entity.id)) throw new Error(`Duplicate sketch circle '${entity.id}'.`);
+    result.set(entity.id, { circle: entity, offset });
+    offset += 1;
+  }
+  return result;
+}
+
+function initialValues(points: Map<string, PointIndex>, circles: Map<string, CircleIndex>): number[] {
+  const values = Array.from({ length: points.size * 2 + circles.size }, () => 0);
   for (const { point, offset } of points.values()) {
     values[offset] = finite(point.x, `Point '${point.id}' x`);
     values[offset + 1] = finite(point.y, `Point '${point.id}' y`);
+  }
+  for (const { circle, offset } of circles.values()) {
+    const radius = finite(circle.radius, `Circle '${circle.id}' radius`);
+    if (radius <= 0) throw new Error(`Circle '${circle.id}' radius must be positive.`);
+    values[offset] = radius;
   }
   return values;
 }
@@ -79,11 +103,29 @@ function linePoints(
   return [coordinates(values, points, line.startPointId), coordinates(values, points, line.endPointId)];
 }
 
+function circleRadius(values: readonly number[], circles: Map<string, CircleIndex>, circleId: string): number {
+  const entry = circles.get(circleId);
+  if (!entry) throw new Error(`Constraint references missing circle '${circleId}'.`);
+  return values[entry.offset]!;
+}
+
+function circleCenter(
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  circles: Map<string, CircleIndex>,
+  circleId: string,
+): [number, number] {
+  const entry = circles.get(circleId);
+  if (!entry) throw new Error(`Constraint references missing circle '${circleId}'.`);
+  return coordinates(values, points, entry.circle.centerPointId);
+}
+
 function residualForConstraint(
   constraint: SketchConstraint,
   values: readonly number[],
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
 ): number[] {
   switch (constraint.type) {
     case 'fixed-point': {
@@ -106,6 +148,33 @@ function residualForConstraint(
       const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
       return [b[0] - a[0], b[1] - a[1]];
     }
+    case 'radius': {
+      const target = finite(constraint.value, `Radius constraint '${constraint.id}' value`);
+      if (target <= 0) throw new Error(`Radius constraint '${constraint.id}' value must be positive.`);
+      return [circleRadius(values, circles, constraint.circleId) - target];
+    }
+    case 'perpendicular': {
+      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
+      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const adx = a1[0] - a0[0];
+      const ady = a1[1] - a0[1];
+      const bdx = b1[0] - b0[0];
+      const bdy = b1[1] - b0[1];
+      const scale = Math.hypot(adx, ady) * Math.hypot(bdx, bdy);
+      if (scale <= MIN_GEOMETRY_SCALE) throw new Error(`Perpendicular constraint '${constraint.id}' requires non-zero line lengths.`);
+      return [(adx * bdx + ady * bdy) / scale];
+    }
+    case 'tangent': {
+      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
+      const radius = circleRadius(values, circles, constraint.circleId);
+      const dx = bx - ax;
+      const dy = by - ay;
+      const length = Math.hypot(dx, dy);
+      if (length <= MIN_GEOMETRY_SCALE) throw new Error(`Tangent constraint '${constraint.id}' requires a non-zero line length.`);
+      const distance = Math.abs(dx * (cy - ay) - dy * (cx - ax)) / length;
+      return [distance - radius];
+    }
   }
 }
 
@@ -114,8 +183,9 @@ function residualVector(
   values: readonly number[],
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
 ): number[] {
-  return constraints.flatMap((constraint) => residualForConstraint(constraint, values, points, lines));
+  return constraints.flatMap((constraint) => residualForConstraint(constraint, values, points, lines, circles));
 }
 
 function norm(values: readonly number[]): number {
@@ -127,8 +197,9 @@ function numericJacobian(
   values: readonly number[],
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
 ): number[][] {
-  const base = residualVector(constraints, values, points, lines);
+  const base = residualVector(constraints, values, points, lines, circles);
   const jacobian = Array.from({ length: base.length }, () => Array.from({ length: values.length }, () => 0));
   for (let column = 0; column < values.length; column += 1) {
     const step = Math.max(1e-7, Math.abs(values[column]!) * 1e-7);
@@ -136,8 +207,8 @@ function numericJacobian(
     const minus = [...values];
     plus[column] = plus[column]! + step;
     minus[column] = minus[column]! - step;
-    const plusResidual = residualVector(constraints, plus, points, lines);
-    const minusResidual = residualVector(constraints, minus, points, lines);
+    const plusResidual = residualVector(constraints, plus, points, lines, circles);
+    const minusResidual = residualVector(constraints, minus, points, lines, circles);
     for (let row = 0; row < base.length; row += 1) {
       jacobian[row]![column] = (plusResidual[row]! - minusResidual[row]!) / (2 * step);
     }
@@ -224,18 +295,19 @@ function solveCore(
   startingValues: readonly number[],
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
   tolerance: number,
   maxIterations: number,
 ): SolveCoreResult {
   let values = [...startingValues];
   let damping = 1e-6;
-  let residuals = residualVector(constraints, values, points, lines);
+  let residuals = residualVector(constraints, values, points, lines, circles);
   let error = norm(residuals);
   if (error <= tolerance || constraints.length === 0) return { values, converged: true, residual: error, iterations: 0 };
 
   let iterations = 0;
   for (; iterations < maxIterations; iterations += 1) {
-    const jacobian = numericJacobian(constraints, values, points, lines);
+    const jacobian = numericJacobian(constraints, values, points, lines, circles);
     let accepted = false;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const { matrix, rhs } = normalEquations(jacobian, residuals, damping);
@@ -245,7 +317,7 @@ function solveCore(
         continue;
       }
       const trial = values.map((value, index) => value + delta[index]!);
-      const trialResiduals = residualVector(constraints, trial, points, lines);
+      const trialResiduals = residualVector(constraints, trial, points, lines, circles);
       const trialError = norm(trialResiduals);
       if (trialError < error) {
         values = trial;
@@ -263,32 +335,42 @@ function solveCore(
   return { values, converged: error <= tolerance, residual: error, iterations };
 }
 
-function sketchWithValues(sketch: CadSketch, values: readonly number[], points: Map<string, PointIndex>): CadSketch {
+function sketchWithValues(
+  sketch: CadSketch,
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  circles: Map<string, CircleIndex>,
+): CadSketch {
   return {
     ...sketch,
     entities: sketch.entities.map((entity) => {
-      if (entity.type !== 'point') return { ...entity };
-      const entry = points.get(entity.id);
-      if (!entry) return { ...entity };
-      return { ...entity, x: values[entry.offset]!, y: values[entry.offset + 1]! };
+      if (entity.type === 'point') {
+        const entry = points.get(entity.id);
+        return entry ? { ...entity, x: values[entry.offset]!, y: values[entry.offset + 1]! } : { ...entity };
+      }
+      if (entity.type === 'circle') {
+        const entry = circles.get(entity.id);
+        return entry ? { ...entity, radius: values[entry.offset]! } : { ...entity };
+      }
+      return { ...entity };
     }),
     constraints: sketch.constraints.map((constraint) => ({ ...constraint })),
   };
 }
 
 function conflictIds(
-  sketch: CadSketch,
   constraints: readonly SketchConstraint[],
   values: readonly number[],
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
   tolerance: number,
   maxIterations: number,
 ): string[] {
   const conflicts: string[] = [];
   for (const candidate of constraints) {
     const reduced = constraints.filter((constraint) => constraint.id !== candidate.id);
-    const result = solveCore(reduced, values, points, lines, tolerance, maxIterations);
+    const result = solveCore(reduced, values, points, lines, circles, tolerance, maxIterations);
     if (result.converged) conflicts.push(candidate.id);
   }
   return conflicts.length ? conflicts : constraints.map((constraint) => constraint.id);
@@ -303,11 +385,12 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
 
   const points = pointIndex(sketch);
   const lines = lineIndex(sketch);
+  const circles = circleIndex(sketch, points.size * 2);
   const constraints = activeConstraints(sketch);
-  const initial = initialValues(points);
-  let core = solveCore(constraints, initial, points, lines, tolerance, maxIterations);
+  const initial = initialValues(points, circles);
+  let core = solveCore(constraints, initial, points, lines, circles, tolerance, maxIterations);
 
-  const hardJacobian = numericJacobian(constraints, core.values, points, lines);
+  const hardJacobian = numericJacobian(constraints, core.values, points, lines, circles);
   const degreesOfFreedom = Math.max(0, core.values.length - matrixRank(hardJacobian));
 
   if (core.converged && degreesOfFreedom > 0 && options.dragTarget) {
@@ -316,24 +399,24 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
     const seeded = [...core.values];
     seeded[target.offset] = finite(options.dragTarget.x, 'Drag target x');
     seeded[target.offset + 1] = finite(options.dragTarget.y, 'Drag target y');
-    const dragged = solveCore(constraints, seeded, points, lines, tolerance, maxIterations);
+    const dragged = solveCore(constraints, seeded, points, lines, circles, tolerance, maxIterations);
     if (dragged.converged) core = dragged;
   }
 
   if (!core.converged) {
     return {
-      sketch: sketchWithValues(sketch, core.values, points),
+      sketch: sketchWithValues(sketch, core.values, points, circles),
       converged: false,
       constraintState: 'over',
       degreesOfFreedom,
       residual: core.residual,
-      conflicts: conflictIds(sketch, constraints, initial, points, lines, tolerance, maxIterations),
+      conflicts: conflictIds(constraints, initial, points, lines, circles, tolerance, maxIterations),
       iterations: core.iterations,
     };
   }
 
   return {
-    sketch: sketchWithValues(sketch, core.values, points),
+    sketch: sketchWithValues(sketch, core.values, points, circles),
     converged: true,
     constraintState: degreesOfFreedom === 0 ? 'fully' : 'under',
     degreesOfFreedom,
