@@ -66,6 +66,28 @@ test('loads a local photo, edits, compares, undoes, and opens export', async ({ 
   await expect(page.getByLabel('Output sharpening')).toBeVisible();
 });
 
+test('RGB histogram, clipping warnings, and color sampler inspect the rendered preview', async ({ page }) => {
+  await openFixture(page);
+  const histogram = page.getByRole('img', { name: 'Live RGB and luminance histogram' });
+  await expect(histogram).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel]')).toHaveCount(4);
+  await expect(histogram.locator('[data-histogram-channel="red"]')).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel="green"]')).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel="blue"]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Clipping warnings' }).click();
+  await expect(page.getByRole('button', { name: 'Clipping warnings' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('photo-clipping-overlay')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Color sampler' }).click();
+  await expect(page.getByRole('button', { name: 'Color sampler' })).toHaveAttribute('aria-pressed', 'true');
+  await clickPhoto(page, 0.5, 0.5);
+  const readout = page.getByRole('status', { name: 'Sampled color readout' });
+  await expect(readout).toContainText(/#[0-9A-F]{6}/);
+  await expect(readout).toContainText(/RGB \d+, \d+, \d+/);
+  await expect(readout).toContainText(/HSL \d+°, \d+%, \d+%/);
+});
+
 test('geometry, detail, and local tools produce reversible recipe state', async ({ page }) => {
   await openFixture(page);
   await page.getByText('Detail & noise', { exact: true }).click();
