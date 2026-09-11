@@ -45,7 +45,7 @@ test('catalog link, exact alias, and generic route open the same local workspace
   await expect(page.getByTestId('markdown-workbench')).toBeVisible();
 
   await page.goto('./#/tools/markdown-workbench');
-  await expect(page.getByTestId('suite-title')).toContainText('Markdown, Math & Citation Publishing Workbench');
+  await expect(page.getByTestId('suite-title')).toContainText('Markdown Workbench — Write, Preview & Export Markdown');
   await expect(page.getByTestId('privacy-status')).toContainText(/local|browser|device/i);
   await expect(page.getByTestId('markdown-workbench')).toBeVisible();
 });
