@@ -9,6 +9,7 @@ import {
   distributeSelection,
   duplicateSelection,
   groupSelection,
+  mirrorSelection,
   moveSelection,
   pushHistory,
   radialRepeatSelection,
@@ -100,6 +101,18 @@ describe('vector document engine', () => {
     document = addElement(document, rect('c', 0, 0));
     expect(reorderSelection(document, ['a'], 'front').elements.map((element) => element.id)).toEqual(['b', 'c', 'a']);
     expect(reorderSelection(document, ['c'], 'back').elements.map((element) => element.id)).toEqual(['c', 'a', 'b']);
+  });
+
+  test('mirrors geometry independently on each axis instead of faking a rotation', () => {
+    const document = addElement(createVectorDocument(), rect('a', 10, 20, 80, 40));
+    const horizontal = mirrorSelection(document, ['a'], 'horizontal');
+    expect(horizontal.elements[0]).toMatchObject({ x: 10, y: 20, rotation: 0, flipX: true, flipY: false });
+
+    const both = mirrorSelection(horizontal, ['a'], 'vertical');
+    expect(both.elements[0]).toMatchObject({ x: 10, y: 20, rotation: 0, flipX: true, flipY: true });
+
+    const restored = mirrorSelection(both, ['a'], 'horizontal');
+    expect(restored.elements[0]).toMatchObject({ flipX: false, flipY: true });
   });
 
   test('snaps to grid and nearby object guides with deterministic thresholds', () => {
