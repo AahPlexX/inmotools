@@ -8,6 +8,7 @@ import { downloadBytes, downloadText } from '../../lib/download';
 import { requestSupportPrompt } from '../../lib/support';
 import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
+import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
 import { computeScrollOffset } from './scroll-sync';
@@ -44,6 +45,7 @@ import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
 import type { CitationStyleId, DraftRecord, ProjectHistory } from './markdown-types';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
+import './markdown-workbench.css';
 
 type ViewMode = 'source' | 'split';
 
@@ -81,6 +83,7 @@ export default function MarkdownWorkspace() {
   const [fontSize, setFontSize] = useState(13);
   const [vimMode, setVimMode] = useState(false);
   const [spellcheck, setSpellcheck] = useState(true);
+  const [syntaxSuggestions, setSyntaxSuggestions] = useState(true);
   const [revealRequest, setRevealRequest] = useState<{ line: number; nonce: number }>();
 
   const [bibliographyText, setBibliographyText] = useState('');
@@ -466,34 +469,49 @@ export default function MarkdownWorkspace() {
   return (
     <div className="markdown-workbench" data-testid="markdown-workbench">
       <div className="markdown-workbench-toolbar" role="toolbar" aria-label="Markdown Workbench controls">
-        <div className="markdown-workbench-toolbar-group">
-          <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
-          <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
+        <div className="markdown-workbench-toolbar-section" role="group" aria-label="View and history">
+          <span className="markdown-workbench-toolbar-label">View &amp; history</span>
+          <div className="markdown-workbench-toolbar-group">
+            <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
+            <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
+            <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo">Undo</button>
+            <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo">Redo</button>
+          </div>
         </div>
-        <div className="markdown-workbench-toolbar-group">
-          <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo">Undo</button>
-          <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo">Redo</button>
+
+        <div className="markdown-workbench-toolbar-section" role="group" aria-label="Document">
+          <span className="markdown-workbench-toolbar-label">Document</span>
+          <div className="markdown-workbench-toolbar-group">
+            <button type="button" onClick={() => fileInputRef.current?.click()}>Open .md</button>
+            <button type="button" onClick={startNewDraft}>New</button>
+            <button type="button" onClick={saveDraftNow}>Save draft</button>
+            <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileInputChange} aria-label="Open a local Markdown file" />
+          </div>
         </div>
-        <div className="markdown-workbench-toolbar-group">
-          <button type="button" onClick={() => fileInputRef.current?.click()}>Open .md</button>
-          <button type="button" onClick={startNewDraft}>New</button>
-          <button type="button" onClick={saveDraftNow}>Save draft</button>
-          <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileInputChange} aria-label="Open a local Markdown file" />
+
+        <div className="markdown-workbench-toolbar-section" role="group" aria-label="Editor">
+          <span className="markdown-workbench-toolbar-label">Editor</span>
+          <div className="markdown-workbench-toolbar-group">
+            <label className="markdown-workbench-check"><input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />Wrap lines</label>
+            <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
+            <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
+            <label className="markdown-workbench-check"><input type="checkbox" checked={syntaxSuggestions} onChange={(event) => setSyntaxSuggestions(event.target.checked)} />Syntax suggestions</label>
+            <label className="markdown-workbench-font-size">Font<input type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /></label>
+            <MarkdownSyntaxHelp />
+          </div>
         </div>
-        <div className="markdown-workbench-toolbar-group">
-          <label className="markdown-workbench-check"><input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />Wrap lines</label>
-          <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
-          <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
-          <label className="markdown-workbench-font-size">Font<input type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /></label>
-        </div>
-        <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
-          <button type="button" onClick={exportMarkdown}>Markdown</button>
-          <button type="button" onClick={exportRenderedMarkdown}>Rendered Markdown</button>
-          <button type="button" onClick={() => void exportHtml()}>Standalone HTML</button>
-          <button type="button" onClick={printDocument}>Print / PDF</button>
-          <button type="button" onClick={() => void exportDocx()}>DOCX</button>
-          <button type="button" onClick={() => void exportEpub()}>EPUB (structural)</button>
-          <button type="button" onClick={exportAstJson}>AST JSON</button>
+
+        <div className="markdown-workbench-toolbar-section markdown-workbench-export-section" role="group" aria-label="Export as">
+          <span className="markdown-workbench-toolbar-label">Export as</span>
+          <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
+            <button type="button" onClick={exportMarkdown}>Markdown</button>
+            <button type="button" onClick={exportRenderedMarkdown}>Rendered Markdown</button>
+            <button type="button" onClick={() => void exportHtml()}>Standalone HTML</button>
+            <button type="button" onClick={printDocument}>Print / PDF</button>
+            <button type="button" onClick={() => void exportDocx()}>DOCX</button>
+            <button type="button" onClick={() => void exportEpub()}>EPUB (structural)</button>
+            <button type="button" onClick={exportAstJson}>AST JSON</button>
+          </div>
         </div>
       </div>
 
@@ -519,6 +537,7 @@ export default function MarkdownWorkspace() {
             fontSize={fontSize}
             vimMode={vimMode}
             spellcheck={spellcheck}
+            syntaxSuggestions={syntaxSuggestions}
             revealRequest={revealRequest}
           />
         </div>
