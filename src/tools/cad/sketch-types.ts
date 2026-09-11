@@ -14,7 +14,15 @@ export interface SketchLineEntity {
   construction: boolean;
 }
 
-export type SketchEntity = SketchPointEntity | SketchLineEntity;
+export interface SketchCircleEntity {
+  id: string;
+  type: 'circle';
+  centerPointId: string;
+  radius: number;
+  construction: boolean;
+}
+
+export type SketchEntity = SketchPointEntity | SketchLineEntity | SketchCircleEntity;
 
 interface ConstraintBase {
   id: string;
@@ -51,12 +59,33 @@ export interface CoincidentConstraint extends ConstraintBase {
   pointBId: string;
 }
 
+export interface RadiusConstraint extends ConstraintBase {
+  type: 'radius';
+  circleId: string;
+  value: number;
+}
+
+export interface PerpendicularConstraint extends ConstraintBase {
+  type: 'perpendicular';
+  lineAId: string;
+  lineBId: string;
+}
+
+export interface TangentConstraint extends ConstraintBase {
+  type: 'tangent';
+  lineId: string;
+  circleId: string;
+}
+
 export type SketchConstraint =
   | FixedPointConstraint
   | HorizontalConstraint
   | VerticalConstraint
   | DistanceConstraint
-  | CoincidentConstraint;
+  | CoincidentConstraint
+  | RadiusConstraint
+  | PerpendicularConstraint
+  | TangentConstraint;
 
 export type SketchPlane =
   | { kind: 'origin'; plane: 'XY' | 'XZ' | 'YZ' }
