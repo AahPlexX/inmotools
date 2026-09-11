@@ -80,6 +80,16 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 1800,
+    modulePreload: {
+      // Chrome rejects this tiny shared-runtime preload when extensions inject
+      // isolated-world code, producing a cross-world mismatch warning. Keep
+      // Vite's dynamic-import preload optimization, but let the entry module
+      // fetch Rolldown's runtime normally instead of hinting it from HTML.
+      resolveDependencies: (_filename, dependencies, context) =>
+        context.hostType === 'html'
+          ? dependencies.filter((dependency) => !dependency.includes('rolldown-runtime-'))
+          : dependencies,
+    },
     rolldownOptions: {
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
