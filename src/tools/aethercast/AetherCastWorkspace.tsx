@@ -122,6 +122,8 @@ export default function AetherCastWorkspace() {
   const liveRequestIdRef = useRef(0);
   const locationSearchRef = useRef<AbortController | null>(null);
   const locationSearchIdRef = useRef(0);
+  const browserLocationIntentIdRef = useRef(0);
+  const browserLocationPendingRef = useRef(false);
 
   const assessments = useMemo(() => (dataset ? assessDataset(dataset, settings) : []), [dataset, settings]);
   const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.points) : []), [dataset]);
@@ -146,6 +148,21 @@ export default function AetherCastWorkspace() {
       writeSettings(next);
       return next;
     });
+  }, []);
+
+  const invalidatePendingBrowserLocation = useCallback(() => {
+    browserLocationIntentIdRef.current += 1;
+    if (browserLocationPendingRef.current) {
+      browserLocationPendingRef.current = false;
+      setLiveLoading(false);
+    }
+  }, []);
+
+  const cancelLocationSearch = useCallback(() => {
+    locationSearchRef.current?.abort();
+    locationSearchIdRef.current += 1;
+    setLocationSearchLoading(false);
+    setLocationResults([]);
   }, []);
 
   const applyDataset = useCallback((next: AetherCastDataset, errors: string[]) => {
@@ -187,11 +204,12 @@ export default function AetherCastWorkspace() {
         if (!disposed) await loadLiveLocation(saved, false);
         return;
       }
+      const intentId = ++browserLocationIntentIdRef.current;
       try {
         const location = await getBrowserLiveLocation();
-        if (!disposed) await loadLiveLocation(location, true);
+        if (!disposed && intentId === browserLocationIntentIdRef.current) await loadLiveLocation(location, true);
       } catch (error) {
-        if (!disposed && !isAbortError(error)) {
+        if (!disposed && intentId === browserLocationIntentIdRef.current && !isAbortError(error)) {
           setLiveError('Location access is unavailable. Search by city or postal code to load live conditions.');
         }
       }
@@ -199,6 +217,8 @@ export default function AetherCastWorkspace() {
     void initializeLiveData();
     return () => {
       disposed = true;
+      browserLocationIntentIdRef.current += 1;
+      browserLocationPendingRef.current = false;
       liveFetchRef.current?.abort();
       locationSearchRef.current?.abort();
     };
@@ -213,16 +233,26 @@ export default function AetherCastWorkspace() {
   }, [dataset?.importSource, liveLocation, loadLiveLocation]);
 
   const useBrowserLocation = useCallback(async () => {
+    cancelLocationSearch();
+    const intentId = ++browserLocationIntentIdRef.current;
+    browserLocationPendingRef.current = true;
     setLiveLoading(true);
     setLiveError(null);
     try {
       const location = await getBrowserLiveLocation();
+      if (intentId !== browserLocationIntentIdRef.current) return;
+      browserLocationPendingRef.current = false;
       await loadLiveLocation(location, true);
     } catch (error) {
+      if (intentId !== browserLocationIntentIdRef.current) return;
       if (!isAbortError(error)) setLiveError('Location access is unavailable. Search by city or postal code instead.');
-      setLiveLoading(false);
+    } finally {
+      if (intentId === browserLocationIntentIdRef.current && browserLocationPendingRef.current) {
+        browserLocationPendingRef.current = false;
+        setLiveLoading(false);
+      }
     }
-  }, [loadLiveLocation]);
+  }, [cancelLocationSearch, loadLiveLocation]);
 
   const submitLocationSearch = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -232,6 +262,7 @@ export default function AetherCastWorkspace() {
       setLocationResults([]);
       return;
     }
+    invalidatePendingBrowserLocation();
     const requestId = ++locationSearchIdRef.current;
     locationSearchRef.current?.abort();
     const controller = new AbortController();
@@ -250,15 +281,18 @@ export default function AetherCastWorkspace() {
     } finally {
       if (requestId === locationSearchIdRef.current) setLocationSearchLoading(false);
     }
-  }, [locationQuery]);
+  }, [invalidatePendingBrowserLocation, locationQuery]);
 
   const chooseLocation = useCallback((location: LiveLocation) => {
-    setLocationResults([]);
+    invalidatePendingBrowserLocation();
+    cancelLocationSearch();
     setLocationSearchError(null);
     void loadLiveLocation(location, true);
-  }, [loadLiveLocation]);
+  }, [cancelLocationSearch, invalidatePendingBrowserLocation, loadLiveLocation]);
 
   const handleFile = useCallback(async (file: File) => {
+    invalidatePendingBrowserLocation();
+    cancelLocationSearch();
     liveFetchRef.current?.abort();
     liveRequestIdRef.current += 1;
     setLiveLocation(null);
@@ -289,7 +323,7 @@ export default function AetherCastWorkspace() {
     const result = looksLikeAetherExport ? parseAetherCastExport(text) : parseOpenMeteoJson(text);
     setImportErrors(result.errors);
     if (result.dataset) applyDataset(result.dataset, result.errors);
-  }, [applyDataset, dataset?.timezone]);
+  }, [applyDataset, cancelLocationSearch, dataset?.timezone, invalidatePendingBrowserLocation]);
 
   const onFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
