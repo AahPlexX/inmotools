@@ -15,7 +15,7 @@ import {
   TextRun,
 } from 'docx';
 import JSZip from 'jszip';
-import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingContent } from 'mdast';
+import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingContent, Nodes, Definition } from 'mdast';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
 
@@ -39,6 +39,7 @@ export const buildStandaloneMarkdownHtml = (
 <style>
   body { font-family: Georgia, 'Times New Roman', serif; max-width: 46rem; margin: 2.5rem auto; padding: 0 1.5rem; line-height: 1.6; color: #1a1a1a; overflow-wrap: anywhere; }
   table { border-collapse: collapse; width: max-content; min-width: 100%; }
+  .table-scroll { overflow: auto; max-width: 100%; }
   th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
   pre { background: #f5f5f5; padding: 0.75rem; overflow: auto; max-width: 100%; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -49,7 +50,7 @@ ${options.additionalCss ?? ''}
 </style>
 </head>
 <body>
-${bodyHtml}
+${bodyHtml.replace(/<table(?=[\s>])/gi, '<div class="table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table').replace(/<\/table\s*>/gi, '</table></div>')}
 </body>
 </html>`;
 
@@ -248,7 +249,30 @@ const nodeToDocxElements = (
   return [];
 };
 
-export const buildDocxDocument = (tree: MdastRoot, resolveImage?: MathImageResolver): Document => {
+function resolveDocxReferences(tree: MdastRoot): MdastRoot {
+  const definitions = new Map<string, Definition>();
+  const key = (identifier: string) => identifier.trim().replace(/\s+/g, ' ').toUpperCase();
+  const collect = (node: Nodes) => {
+    if (node.type === 'definition' && !definitions.has(key(node.identifier))) definitions.set(key(node.identifier), node);
+    if ('children' in node) node.children.forEach(collect);
+  };
+  collect(tree);
+  const resolve = (node: Nodes): Nodes => {
+    if (node.type === 'linkReference' || node.type === 'imageReference') {
+      const definition = definitions.get(key(node.identifier));
+      if (definition) {
+        return node.type === 'linkReference'
+          ? { type: 'link', url: definition.url, title: definition.title, children: node.children }
+          : { type: 'image', url: definition.url, title: definition.title, alt: node.alt };
+      }
+    }
+    return 'children' in node ? { ...node, children: node.children.map(resolve) } as Nodes : node;
+  };
+  return resolve(tree) as MdastRoot;
+}
+
+export const buildDocxDocument = (inputTree: MdastRoot, resolveImage?: MathImageResolver): Document => {
+  const tree = resolveDocxReferences(inputTree);
   const footnoteDefinitions = tree.children.filter((node) => node.type === 'footnoteDefinition');
   const footnoteIds = new Map<string, number>();
   footnoteDefinitions.forEach((definition, index) => footnoteIds.set(normalizeFootnoteIdentifier(definition.identifier), index + 1));

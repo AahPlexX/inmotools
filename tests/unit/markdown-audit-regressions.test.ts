@@ -6,12 +6,28 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { describe, expect, it } from 'vitest';
 import { bundleStylesheetAssetsForEpub } from '../../src/tools/markdown/export-assets';
-import { buildEpubArchive, renderDocxToBytes } from '../../src/tools/markdown/export-engine';
+import { buildEpubArchive, buildStandaloneMarkdownHtml, renderDocxToBytes } from '../../src/tools/markdown/export-engine';
 
 const parseToMdast = (source: string): MdastRoot =>
   unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(source) as MdastRoot;
 
 describe('Markdown audit regressions', () => {
+  it('resolves reference links and images in DOCX without mutating the input AST', async () => {
+    const tree = parseToMdast('[Docs][API]\n\n![Diagram][image]\n\n[api]: https://example.test/docs\n[image]: https://example.test/image.png');
+    const before = JSON.stringify(tree);
+    const zip = await JSZip.loadAsync(await renderDocxToBytes(tree));
+    const relations = await zip.file('word/_rels/document.xml.rels')!.async('string');
+    expect(relations).toContain('https://example.test/docs');
+    expect(relations).toContain('https://example.test/image.png');
+    expect(JSON.stringify(tree)).toBe(before);
+  });
+
+  it('contains exported tables in a keyboard-accessible scrolling region', () => {
+    const html = buildStandaloneMarkdownHtml('Table', '<p>Before</p><table><tr><td>Data</td></tr></table><p>After</p>');
+    expect(html).toContain('class="table-scroll" role="region" aria-label="Scrollable table" tabindex="0"><table>');
+    expect(html).toContain('</table></div><p>After</p>');
+    expect(html).toContain('.table-scroll { overflow: auto; max-width: 100%; }');
+  });
   it('preserves DOCX footnote references and definitions', async () => {
     const bytes = await renderDocxToBytes(parseToMdast('Body with a note.[^audit]\n\n[^audit]: Footnote content survives export.'));
     const zip = await JSZip.loadAsync(bytes);

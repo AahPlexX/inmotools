@@ -18,9 +18,9 @@ function wav(seconds: number) {
 }
 async function loadAudioPair(page: import('@playwright/test').Page) {
  await page.locator('#audio-dry').setInputFiles({name:'dry.wav',mimeType:'audio/wav',buffer:wav(.2)});
- await expect(page.getByRole('status')).toContainText('dry.wav decoded');
+ await expect(page.locator('.status-line[role="status"]')).toContainText('dry.wav decoded');
  await page.locator('#audio-ir').setInputFiles({name:'room.wav',mimeType:'audio/wav',buffer:wav(.5)});
- await expect(page.getByRole('status')).toContainText('room.wav decoded');
+ await expect(page.locator('.status-line[role="status"]')).toContainText('room.wav decoded');
 }
 
 test('a cancelled render cannot finish or reset a newer render',async({page})=>{
@@ -52,9 +52,9 @@ test('extending pre-delay during the tail postpones graph cleanup',async({page})
  await page.goto('./#/tools/convolution-room-profiler');
  await loadAudioPair(page);
  await page.getByRole('button',{name:'Play preview'}).click();
- await expect(page.getByRole('status')).toContainText('remaining convolution tail');
+ await expect(page.locator('.status-line[role="status"]')).toContainText('remaining convolution tail');
  await page.locator('#audio-predelay').fill('1500');
  await page.waitForTimeout(900);
- await expect(page.getByRole('status')).toContainText('remaining convolution tail');
- await expect(page.getByRole('status')).toContainText('audio graph released',{timeout:5000});
+ await expect(page.locator('.status-line[role="status"]')).toContainText('remaining convolution tail');
+ await expect(page.locator('.status-line[role="status"]')).toContainText('audio graph released',{timeout:5000});
 });

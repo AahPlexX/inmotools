@@ -37,7 +37,7 @@ test('simulator exercises framing, pause-display capture, rules, filtering, coun
   await page.getByRole('button', { name: 'Export retained CSV' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('packet-capture.csv');
-  await expect(page.locator('.status-line')).toContainText(/Exported .* retained capture entr/);
+  await expect(page.locator('.status-line')).toContainText(/Exported .* entries retained when export was requested/);
 });
 
 test('catches a locked Web Serial writer instead of escaping send error handling', async ({ page }) => {
