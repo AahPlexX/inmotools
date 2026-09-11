@@ -24,7 +24,7 @@ export function canonicalToneCurve(points: readonly TonePoint[]): TonePoint[] {
 
   for (let index = 1; index < sorted.length - 1; index += 1) {
     const lower = sorted[index - 1].x + MIN_POINT_GAP;
-    const upper = sorted[index + 1]?.x - MIN_POINT_GAP ?? 1 - MIN_POINT_GAP;
+    const upper = sorted[index + 1].x - MIN_POINT_GAP;
     sorted[index].x = Math.min(upper, Math.max(lower, sorted[index].x));
   }
 
