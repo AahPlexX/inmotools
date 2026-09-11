@@ -10,6 +10,14 @@ describe('deployment and bundler contracts', () => {
     expect(config).not.toContain('rollupOptions');
   });
 
+  it('filters only the Rolldown HTML preload while retaining Vite dynamic-import preload support', () => {
+    const config = read('vite.config.ts');
+    expect(config).toContain('modulePreload');
+    expect(config).toContain("context.hostType === 'html'");
+    expect(config).toContain("!dependency.includes('rolldown-runtime-')");
+    expect(config).not.toContain('modulePreload: false');
+  });
+
   it('does not aggressively replace the active service worker during an open lazy-loaded session', () => {
     const config = read('vite.config.ts');
     expect(config).toContain("registerType: 'prompt'");
