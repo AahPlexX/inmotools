@@ -10,6 +10,11 @@ import {
   undoHistory,
 } from '../../src/tools/photo/photo-engine';
 import { safePhotoFilename, serializePhotoXmp } from '../../src/tools/photo/photo-metadata';
+import {
+  fitDimensionsWithinLimits,
+  isRenderResultCurrent,
+  normalizeQuarterTurns,
+} from '../../src/tools/photo/photo-renderer';
 
 describe('Photo Studio engine', () => {
   test('neutral recipe preserves an opaque mid-gray pixel', () => {
@@ -31,6 +36,15 @@ describe('Photo Studio engine', () => {
     expect(recipe.exposure).toBe(5);
     expect(recipe.saturation).toBe(-1);
     expect(recipe.sharpenAmount).toBe(2);
+  });
+
+  test('recipe normalization rejects an empty crop', () => {
+    const recipe = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      crop: { x: 0.4, y: 0.4, width: 0, height: 0.2 },
+    });
+    expect(recipe.crop.width).toBeGreaterThan(0);
+    expect(recipe.crop.x + recipe.crop.width).toBeLessThanOrEqual(1);
   });
 
   test('history undo and redo preserve recipe revisions', () => {
@@ -71,5 +85,24 @@ describe('Photo Studio engine', () => {
     expect(safePhotoFilename('portrait.CR2', 'image/jpeg')).toBe('portrait-edited.jpg');
     expect(safePhotoFilename('portrait.jpg', 'image/webp')).toBe('portrait-edited.webp');
     expect(safePhotoFilename('portrait.webp', 'image/png')).toBe('portrait-edited.png');
+  });
+
+  test('stale render results cannot replace the active revision', () => {
+    expect(isRenderResultCurrent(7, { revision: 6 })).toBe(false);
+    expect(isRenderResultCurrent(7, { revision: 7 })).toBe(true);
+  });
+
+  test('quarter-turn normalization is stable for negative and large rotations', () => {
+    expect(normalizeQuarterTurns(-1)).toBe(3);
+    expect(normalizeQuarterTurns(5)).toBe(1);
+    expect(normalizeQuarterTurns(8)).toBe(0);
+  });
+
+  test('export dimensions preserve aspect ratio under edge and area limits', () => {
+    expect(fitDimensionsWithinLimits(8000, 4000, 4096, 16_777_216)).toEqual({ width: 4096, height: 2048, scaled: true });
+    expect(fitDimensionsWithinLimits(3000, 2000, 4096, 16_777_216)).toEqual({ width: 3000, height: 2000, scaled: false });
+    const areaLimited = fitDimensionsWithinLimits(6000, 4000, 10_000, 12_000_000);
+    expect(areaLimited.width * areaLimited.height).toBeLessThanOrEqual(12_000_000);
+    expect(areaLimited.width / areaLimited.height).toBeCloseTo(1.5, 2);
   });
 });
