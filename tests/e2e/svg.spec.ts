@@ -118,19 +118,35 @@ test('Vector Studio pan tool moves the artboard viewport rather than acting as a
   await page.setViewportSize({ width: 800, height: 700 });
   await page.goto('./#/tools/svg-sprite-compiler');
   await page.getByRole('button', { name: 'Zoom to 100 percent' }).click();
+  await page.getByRole('button', { name: 'Pan tool' }).click();
+
   const scroller = page.locator('.vector-canvas-scroll');
+  const canvas = page.getByTestId('vector-canvas');
+  await scroller.scrollIntoViewIfNeeded();
   await scroller.evaluate((element) => { element.scrollLeft = 320; element.scrollTop = 220; });
   const before = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
   expect(before.left).toBeGreaterThan(0);
+  expect(before.top).toBeGreaterThan(0);
 
-  await page.getByRole('button', { name: 'Pan tool' }).click();
-  const scrollerBox = await scroller.boundingBox();
-  if (!scrollerBox) throw new Error('Vector artboard viewport has no bounding box.');
-  const startX = scrollerBox.x + Math.min(120, scrollerBox.width / 3);
-  const startY = scrollerBox.y + Math.min(120, scrollerBox.height / 3);
+  const [scrollerBox, canvasBox] = await Promise.all([scroller.boundingBox(), canvas.boundingBox()]);
+  const viewport = page.viewportSize();
+  if (!scrollerBox || !canvasBox || !viewport) throw new Error('Vector artboard has no visible viewport geometry.');
+
+  const visibleLeft = Math.max(scrollerBox.x, canvasBox.x, 0);
+  const visibleTop = Math.max(scrollerBox.y, canvasBox.y, 0);
+  const visibleRight = Math.min(scrollerBox.x + scrollerBox.width, canvasBox.x + canvasBox.width, viewport.width);
+  const visibleBottom = Math.min(scrollerBox.y + scrollerBox.height, canvasBox.y + canvasBox.height, viewport.height);
+  if (visibleRight - visibleLeft < 120 || visibleBottom - visibleTop < 100) {
+    throw new Error('Vector artboard does not expose enough visible area to exercise pan.');
+  }
+
+  const startX = visibleLeft + 24;
+  const startY = visibleTop + 24;
+  const endX = Math.min(startX + 80, visibleRight - 8);
+  const endY = Math.min(startY + 60, visibleBottom - 8);
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 80, startY + 60, { steps: 4 });
+  await page.mouse.move(endX, endY, { steps: 4 });
   await page.mouse.up();
 
   const after = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
