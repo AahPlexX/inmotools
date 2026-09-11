@@ -36,6 +36,11 @@ export interface FixedPointConstraint extends ConstraintBase {
   y: number;
 }
 
+export interface FixedEntityConstraint extends ConstraintBase {
+  type: 'fixed-entity';
+  entityId: string;
+}
+
 export interface HorizontalConstraint extends ConstraintBase {
   type: 'horizontal';
   lineId: string;
@@ -119,8 +124,16 @@ export interface PointOnCircleConstraint extends ConstraintBase {
   circleId: string;
 }
 
+export interface SymmetricPointsConstraint extends ConstraintBase {
+  type: 'symmetric-points';
+  pointAId: string;
+  pointBId: string;
+  axisLineId: string;
+}
+
 export type SketchConstraint =
   | FixedPointConstraint
+  | FixedEntityConstraint
   | HorizontalConstraint
   | VerticalConstraint
   | DistanceConstraint
@@ -134,7 +147,8 @@ export type SketchConstraint =
   | EqualRadiusConstraint
   | MidpointConstraint
   | PointOnLineConstraint
-  | PointOnCircleConstraint;
+  | PointOnCircleConstraint
+  | SymmetricPointsConstraint;
 
 export type SketchPlane =
   | { kind: 'origin'; plane: 'XY' | 'XZ' | 'YZ' }
