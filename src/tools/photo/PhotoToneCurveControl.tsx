@@ -8,6 +8,7 @@ import {
   updateTonePoint,
 } from './photo-tone-curve';
 import type { TonePoint } from './photo-types';
+import './photo-tone-curve.css';
 
 interface PhotoToneCurveControlProps {
   points: TonePoint[];
