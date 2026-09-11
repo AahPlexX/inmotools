@@ -61,6 +61,94 @@ describe('Photo Studio engine', () => {
     expect(histogram.red.reduce((sum, value) => sum + value, 0)).toBe(2);
   });
 
+  test('radial local exposure changes its target more than an outside corner', () => {
+    const pixels = new Uint8ClampedArray(5 * 5 * 4);
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      pixels[offset] = 80;
+      pixels[offset + 1] = 80;
+      pixels[offset + 2] = 80;
+      pixels[offset + 3] = 255;
+    }
+    const recipe = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      localAdjustments: [{
+        id: 'radial',
+        label: 'Radial',
+        enabled: true,
+        mask: { type: 'radial', cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, feather: 0.2, opacity: 1, invert: false },
+        effect: { exposure: 1, saturation: 0, sharpness: 0, blur: 0 },
+      }],
+    });
+    applyPixelAdjustments(pixels, 5, 5, recipe);
+    const corner = pixels[0];
+    const center = pixels[(2 * 5 + 2) * 4];
+    expect(center).toBeGreaterThan(corner + 20);
+    expect(corner).toBeCloseTo(80, 0);
+  });
+
+  test('red-eye correction reduces red dominance only inside the correction circle', () => {
+    const pixels = new Uint8ClampedArray(3 * 3 * 4);
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      pixels[offset] = 220;
+      pixels[offset + 1] = 40;
+      pixels[offset + 2] = 40;
+      pixels[offset + 3] = 255;
+    }
+    const recipe = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      retouch: [{ id: 'eye', type: 'red-eye', x: 0.5, y: 0.5, radius: 0.22, strength: 1 }],
+    });
+    applyPixelAdjustments(pixels, 3, 3, recipe);
+    const centerOffset = (1 * 3 + 1) * 4;
+    expect(pixels[centerOffset]).toBeLessThan(120);
+    expect(pixels[0]).toBe(220);
+  });
+
+  test('clone spot copies a sampled source into its target region', () => {
+    const pixels = new Uint8ClampedArray([
+      240, 20, 20, 255,
+      20, 240, 20, 255,
+      20, 20, 240, 255,
+    ]);
+    const recipe = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      retouch: [{
+        id: 'clone', type: 'clone', sourceX: 1 / 6, sourceY: 0.5, targetX: 5 / 6, targetY: 0.5,
+        radius: 0.3, feather: 0.1, opacity: 1,
+      }],
+    });
+    applyPixelAdjustments(pixels, 3, 1, recipe);
+    expect(pixels[8]).toBeGreaterThan(200);
+    expect(pixels[9]).toBeLessThan(80);
+    expect(pixels[10]).toBeLessThan(80);
+  });
+
+  test('luminance denoise reduces an isolated one-pixel spike', () => {
+    const pixels = new Uint8ClampedArray(3 * 3 * 4);
+    for (let offset = 0; offset < pixels.length; offset += 4) pixels[offset + 3] = 255;
+    const centerOffset = (1 * 3 + 1) * 4;
+    pixels[centerOffset] = 255;
+    pixels[centerOffset + 1] = 255;
+    pixels[centerOffset + 2] = 255;
+    const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, denoiseLuminance: 1 });
+    applyPixelAdjustments(pixels, 3, 3, recipe);
+    expect(pixels[centerOffset]).toBeLessThan(180);
+    expect(pixels[centerOffset]).toBeGreaterThan(0);
+  });
+
+  test('sharpening increases local edge contrast without changing flat alpha', () => {
+    const pixels = new Uint8ClampedArray([
+      90, 90, 90, 255,
+      110, 110, 110, 255,
+      130, 130, 130, 255,
+    ]);
+    const beforeDelta = pixels[8] - pixels[0];
+    const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, sharpenAmount: 1.5, sharpenRadius: 1, sharpenThreshold: 0 });
+    applyPixelAdjustments(pixels, 3, 1, recipe);
+    expect(pixels[8] - pixels[0]).toBeGreaterThan(beforeDelta);
+    expect(pixels[3]).toBe(255);
+  });
+
   test('XMP escapes text and maps reviewed rights/descriptive fields', () => {
     const xmp = serializePhotoXmp({
       title: 'A&B <test>',
