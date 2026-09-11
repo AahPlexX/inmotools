@@ -18,7 +18,7 @@ const TOOL_SPECS = new Map([
   ['hardware', ['tests/e2e/hardware.spec.ts']],
   ['lattice', ['tests/e2e/lattice.spec.ts']],
   ['logs', ['tests/e2e/audit-hardening.spec.ts']],
-  ['markdown', ['tests/e2e/markdown-workbench.spec.ts']],
+  ['markdown', ['tests/e2e/markdown-workbench.spec.ts', 'tests/e2e/markdown-workbench-ux.spec.ts']],
   ['music', ['tests/e2e/music.spec.ts']],
   ['nutrition', ['tests/e2e/nutrition.spec.ts']],
   ['otel', ['tests/e2e/otel.spec.ts']],
