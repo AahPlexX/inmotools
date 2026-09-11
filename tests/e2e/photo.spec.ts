@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 
 const FIXTURE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAUAAAADwCAIAAAD+Tyo8AAACqElEQVR42u3VQQ0AMQwDwbVU/pj7OBQ9zTyWQeJVqzVVfa6nBTzqtO+CVfW9WmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpgsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGCywqlpgwAKrqgUGC6yqFhiwwKoW2AKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwwWWFUtMGCBVdUCgwVWVQsMWGBVtcBggVXVAgMWWNUCAxZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGBVtcCABVZVCwwWWFUtMGCBVS0wYIFV1QIDFljVAgMWWFUtMGCBVS0wYIFV1QKDBVZVCwxYYFW1wGCBVdUCAxZYVS0wWGBVtcCABVa1wIAFVlULDFhgVQsMWGBVtcCABVa1wIAFVlULDBZYVS0wYIFV1QKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwxYYFULDFhgVbXAYIFV1QIDFlhVLTBYYFW1wIAFVlULDBZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGALrGqBAQusqhYYLLCqWmDAAquqBQYLrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoHBAquqBQYssKpaYLDAqmqBAQusqhYYLLCqWmDAAqtaYMACq6oFBiywqgUGLLCqWmCwwD6ZqgUGLLCqWmCwwKpqgQELrKoWGCywqlpgwAKrWmDAAquqBQYssKoFBiywqlpgwAKrWmDAAquqBQYLrKoWGLDAqmqBwQKrqgUGLLCqWmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpg+I0LLVVQ6zZs79UAAAAASUVORK5CYII=',
@@ -42,6 +42,13 @@ async function clickPhoto(page: Page, x: number, y: number) {
   await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
 }
 
+async function downloadBytes(download: Download): Promise<Buffer> {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
 test('loads a local photo, edits, compares, undoes, and opens export', async ({ page }) => {
   await openFixture(page);
   const exposure = page.getByLabel('Exposure value');
@@ -55,6 +62,8 @@ test('loads a local photo, edits, compares, undoes, and opens export', async ({ 
   await page.getByRole('button', { name: 'Export' }).click();
   await expect(page.getByRole('dialog', { name: 'Export photo' })).toBeVisible();
   await expect(page.getByLabel('File format')).toBeVisible();
+  await expect(page.getByLabel('File name')).toHaveValue('fixture-edited.jpg');
+  await expect(page.getByLabel('Output sharpening')).toBeVisible();
 });
 
 test('geometry, detail, and local tools produce reversible recipe state', async ({ page }) => {
@@ -75,6 +84,18 @@ test('geometry, detail, and local tools produce reversible recipe state', async 
   await page.getByRole('button', { name: 'Add radial mask' }).click();
   await expect(page.getByText('Radial adjustment 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+});
+
+test('tone curve points are user-editable and reversible through normal history', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Tone curve' }).click();
+  await page.getByRole('button', { name: 'Add point' }).click();
+  const output = page.getByLabel('Tone point 2 output percent');
+  await expect(output).toHaveValue('50');
+  await output.fill('70');
+  await expect(output).toHaveValue('70');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(output).toHaveValue('50');
 });
 
 test('radial masks stay spatially accurate above 100% zoom and undo as one gesture', async ({ page }) => {
@@ -143,6 +164,41 @@ test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   expect(download.suggestedFilename()).toBe('fixture-edited.xmp');
 });
 
+test('PNG export embeds reviewed XMP and honors safe custom filename plus output sharpening', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  await dialog.getByLabel('File format').selectOption('image/png');
+  await dialog.getByLabel('File name').fill('reviewed portrait');
+  await dialog.getByLabel('Output sharpening').selectOption('standard');
+  await dialog.getByLabel('Metadata policy').selectOption('custom');
+  await dialog.getByLabel('Title').fill('A&B portrait');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download photo' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('reviewed portrait.png');
+  const bytes = await downloadBytes(download);
+  expect(bytes.includes(Buffer.from('XML:com.adobe.xmp'))).toBe(true);
+  expect(bytes.includes(Buffer.from('A&amp;B portrait'))).toBe(true);
+});
+
+test('batch export queues multiple local files and reports per-file completion', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  await dialog.locator('summary').filter({ hasText: 'Batch export current recipe' }).click();
+  await dialog.locator('input[type="file"][multiple]').setInputFiles([
+    { name: 'batch-a.png', mimeType: 'image/png', buffer: FIXTURE_PNG },
+    { name: 'batch-b.png', mimeType: 'image/png', buffer: FIXTURE_PNG },
+  ]);
+  await expect(dialog.getByText('2 queued')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Export 2 photos' }).click();
+  await expect(dialog.locator('.photo-batch-status li[data-status="completed"]')).toHaveCount(2, { timeout: 15_000 });
+  await expect(dialog.getByText('batch-a.png', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('batch-b.png', { exact: true })).toBeVisible();
+});
+
 test('keyboard undo and redo work without pointer-only interaction', async ({ page }) => {
   await openFixture(page);
   const contrast = page.getByLabel('Contrast value');
@@ -154,10 +210,13 @@ test('keyboard undo and redo work without pointer-only interaction', async ({ pa
   await expect(contrast).toHaveValue('0.4');
 });
 
-test('reflows without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
+test('reflows editor and export dialog without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto('/inmotools/#/tools/photo-studio');
-  await expectWorkspace(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  await openFixture(page);
+  let overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(overflow).toBe(false);
+  await page.getByRole('button', { name: 'Export' }).click();
+  await expect(page.getByRole('dialog', { name: 'Export photo' })).toBeVisible();
+  overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
 });
