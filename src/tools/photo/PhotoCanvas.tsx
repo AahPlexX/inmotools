@@ -1,4 +1,5 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
 import type { LocalAdjustment, PhotoHistogram, RetouchOperation } from './photo-types';
 
 export interface PhotoCanvasInteraction {
@@ -118,6 +119,73 @@ export default function PhotoCanvas({
   onZoomChange,
 }: PhotoCanvasProps) {
   const [gesture, setGesture] = useState<GestureState | null>(null);
+  const [clippingVisible, setClippingVisible] = useState(false);
+  const [samplerActive, setSamplerActive] = useState(false);
+  const [sample, setSample] = useState<PhotoColorReadout | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!clippingVisible || !previewUrl) return;
+    const image = previewImageRef.current;
+    const canvas = clippingCanvasRef.current;
+    if (!image || !canvas) return;
+
+    const draw = () => {
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+      if (!context) return;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let offset = 0; offset < data.length; offset += 4) {
+        const clipping = classifyPhotoClipping(data[offset], data[offset + 1], data[offset + 2]);
+        if (clipping === 'highlight') {
+          data[offset] = 255;
+          data[offset + 1] = 64;
+          data[offset + 2] = 64;
+          data[offset + 3] = 210;
+        } else if (clipping === 'shadow') {
+          data[offset] = 59;
+          data[offset + 1] = 130;
+          data[offset + 2] = 246;
+          data[offset + 3] = 210;
+        } else {
+          data[offset] = 0;
+          data[offset + 1] = 0;
+          data[offset + 2] = 0;
+          data[offset + 3] = 0;
+        }
+      }
+      context.putImageData(imageData, 0, 0);
+    };
+
+    if (image.complete) draw();
+    else image.addEventListener('load', draw, { once: true });
+    return () => image.removeEventListener('load', draw);
+  }, [clippingVisible, previewUrl]);
+
+  function sampleAtPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    const image = previewImageRef.current;
+    if (!image?.naturalWidth || !image.naturalHeight) return;
+    const rect = image.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const nx = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const ny = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    const sx = Math.min(image.naturalWidth - 1, Math.max(0, Math.floor(nx * image.naturalWidth)));
+    const sy = Math.min(image.naturalHeight - 1, Math.max(0, Math.floor(ny * image.naturalHeight)));
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+    if (!context) return;
+    context.drawImage(image, sx, sy, 1, 1, 0, 0, 1, 1);
+    const pixel = context.getImageData(0, 0, 1, 1).data;
+    setSample(photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]));
+  }
 
   function beginGesture(event: ReactPointerEvent<HTMLDivElement>) {
     if (!interaction || !onGesture || !previewUrl) return;
@@ -135,6 +203,11 @@ export default function PhotoCanvas({
   }
 
   function endGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (samplerActive && !interaction && previewUrl) {
+      event.preventDefault();
+      sampleAtPointer(event);
+      return;
+    }
     if (!gesture || gesture.pointerId !== event.pointerId || !interaction || !onGesture) return;
     event.preventDefault();
     const end = pointerPoint(event);
@@ -149,6 +222,8 @@ export default function PhotoCanvas({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
+  const canvasInteractive = Boolean(interaction || samplerActive);
+
   return (
     <section className="photo-stage" aria-label="Photo preview">
       <div className="photo-stage-toolbar">
@@ -158,14 +233,40 @@ export default function PhotoCanvas({
           <button type="button" onClick={() => onZoomChange(Math.min(4, zoom + 0.25))} aria-label="Zoom in">+</button>
           <button type="button" onClick={() => onZoomChange(0.75)} aria-label="Fit photo">Fit</button>
         </div>
+        <div className="photo-observation-controls" role="group" aria-label="Image inspection controls">
+          <button
+            type="button"
+            aria-pressed={clippingVisible}
+            disabled={!previewUrl}
+            onClick={() => setClippingVisible((value) => !value)}
+          >Clipping warnings</button>
+          <button
+            type="button"
+            aria-pressed={samplerActive}
+            disabled={!previewUrl || Boolean(interaction)}
+            onClick={() => setSamplerActive((value) => !value)}
+          >Color sampler</button>
+        </div>
         {histogram ? (
-          <svg className="photo-mini-histogram" viewBox="0 0 256 56" role="img" aria-label="Live luminance histogram">
-            <path d={histogramPath(histogram.luminance)} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          <svg className="photo-mini-histogram" viewBox="0 0 256 56" role="img" aria-label="Live RGB and luminance histogram">
+            <path data-histogram-channel="red" d={histogramPath(histogram.red)} />
+            <path data-histogram-channel="green" d={histogramPath(histogram.green)} />
+            <path data-histogram-channel="blue" d={histogramPath(histogram.blue)} />
+            <path data-histogram-channel="luminance" d={histogramPath(histogram.luminance)} />
           </svg>
         ) : null}
       </div>
 
       {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · drag on the photo to place it</div> : null}
+      {samplerActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
+      {sample ? (
+        <div className="photo-color-readout" role="status" aria-label="Sampled color readout">
+          <strong>{sample.hex}</strong>
+          <span>RGB {sample.r}, {sample.g}, {sample.b}</span>
+          <span>HSL {sample.hue}°, {sample.saturation}%, {sample.lightness}%</span>
+          {sample.a < 255 ? <span>Alpha {Math.round(sample.a / 255 * 100)}%</span> : null}
+        </div>
+      ) : null}
 
       <div className="photo-canvas-scroller" data-photo-canvas>
         {!previewUrl ? (
@@ -176,7 +277,7 @@ export default function PhotoCanvas({
           </div>
         ) : (
           <div
-            className={`photo-image-frame${busy ? ' is-rendering' : ''}${interaction ? ' is-interactive' : ''}`}
+            className={`photo-image-frame${busy ? ' is-rendering' : ''}${canvasInteractive ? ' is-interactive' : ''}`}
             style={{ '--photo-zoom': zoom } as React.CSSProperties}
             data-testid="photo-image-frame"
             onPointerDown={beginGesture}
@@ -185,6 +286,7 @@ export default function PhotoCanvas({
             onPointerCancel={cancelGesture}
           >
             <img
+              ref={previewImageRef}
               src={previewUrl}
               alt={`Edited preview of ${sourceName || 'selected photo'}`}
               className="photo-preview-image"
@@ -197,6 +299,7 @@ export default function PhotoCanvas({
                 <span className="photo-before-label">Before</span>
               </div>
             ) : null}
+            {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
             <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
