@@ -242,5 +242,7 @@ export async function renderVectorPdf(document: VectorDocument, options: PdfExpo
   if (document.metadata.description) pdf.setSubject(document.metadata.description);
   if (document.metadata.tags.length) pdf.setKeywords(document.metadata.tags);
   const bytes = await pdf.save();
-  return new Blob([bytes], { type: 'application/pdf' });
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new Blob([copy.buffer], { type: 'application/pdf' });
 }
