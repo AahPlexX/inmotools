@@ -5,14 +5,9 @@ import { describe, expect, it } from 'vitest';
 const TRACKER = '.tasks/CAD_STUDIO.md';
 const CAD_PROGRESS_PATHS = [
   'src/tools/cad',
-  'tests/unit/cad-project.test.ts',
-  'tests/unit/cad-units.test.ts',
-  'tests/unit/cad-topology.test.ts',
-  'tests/unit/cad-parameters.test.ts',
-  'tests/unit/cad-sketch-solver.test.ts',
-  'tests/unit/cad-feature-evaluator.test.ts',
-  'tests/unit/cad-export.test.ts',
-  'tests/e2e/cad.spec.ts',
+  ':(glob)tests/unit/cad-*.test.ts',
+  ':(exclude)tests/unit/cad-progress.test.ts',
+  ':(glob)tests/e2e/cad*.spec.ts',
   'docs/superpowers/specs/2026-09-11-cad-studio-design.md',
   'docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md',
   'docs/superpowers/plans/2026-09-11-cad-studio.md',
