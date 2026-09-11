@@ -23,10 +23,14 @@ async function openFixture(page: Page) {
   await expect(page.getByTestId('photo-preview')).toBeVisible();
 }
 
+async function photoBox(page: Page) {
+  const box = await page.getByTestId('photo-preview').boundingBox();
+  if (!box) throw new Error('Rendered photo has no bounding box.');
+  return box;
+}
+
 async function dragOnPhoto(page: Page, startX: number, startY: number, endX: number, endY: number) {
-  const frame = page.getByTestId('photo-image-frame');
-  const box = await frame.boundingBox();
-  if (!box) throw new Error('Photo frame has no bounding box.');
+  const box = await photoBox(page);
   await page.mouse.move(box.x + box.width * startX, box.y + box.height * startY);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * endX, box.y + box.height * endY, { steps: 5 });
@@ -34,9 +38,7 @@ async function dragOnPhoto(page: Page, startX: number, startY: number, endX: num
 }
 
 async function clickPhoto(page: Page, x: number, y: number) {
-  const frame = page.getByTestId('photo-image-frame');
-  const box = await frame.boundingBox();
-  if (!box) throw new Error('Photo frame has no bounding box.');
+  const box = await photoBox(page);
   await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
 }
 
@@ -71,12 +73,16 @@ test('geometry, detail, and local tools produce reversible recipe state', async 
 
   await page.getByRole('button', { name: 'Local adjustments' }).click();
   await page.getByRole('button', { name: 'Add radial mask' }).click();
-  await expect(page.getByText('Radial adjustment 1')).toBeVisible();
+  await expect(page.getByText('Radial adjustment 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 });
 
-test('radial masks can be placed directly on the photo as one undoable gesture', async ({ page }) => {
+test('radial masks stay spatially accurate above 100% zoom and undo as one gesture', async ({ page }) => {
   await openFixture(page);
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText('125%');
+
   await page.getByRole('button', { name: 'Local adjustments' }).click();
   await page.getByRole('button', { name: 'Add radial mask' }).click();
   await expect(page.getByText(/Place Radial adjustment 1/)).toBeVisible();
