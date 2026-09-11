@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { downloadText } from '../../lib/download';
 import { compileSvgSprite, type SvgCompiledFile } from './svg-engine';
 import { consumeFileInput } from '../../lib/file-input';
+import VectorStudio from './VectorStudio';
 
 type Source = { name: string; text: string };
 
@@ -61,7 +62,8 @@ export default function SvgWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>Sprite compiler</h2><p>Each symbol and every internal paint/reference ID is made deterministic and collision-safe.</p></div></div>
+    <div className="workspace-body" style={{ paddingBottom: 24 }}><VectorStudio /></div>
+    <div className="workspace-header"><div><h2>Sprite & asset compiler</h2><p>Batch-optimize finished SVG assets and compile deterministic, collision-safe symbol sprites without leaving the browser.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="svg-files">Choose SVG files</label><input id="svg-files" type="file" accept="image/svg+xml,.svg" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /></div>
       <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 16 }}><input type="checkbox" checked={currentColor} onChange={(event) => updateCurrentColor(event.target.checked)} /> Normalize literal fill/stroke colors to currentColor</label>
