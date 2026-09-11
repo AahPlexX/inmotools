@@ -8,7 +8,7 @@ export function PwaUpdatePrompt() {
     if (!('serviceWorker' in navigator)) return;
 
     let disposed = false;
-    let detachRegistration = () => undefined;
+    let detachRegistration: () => void = () => {};
 
     const watchRegistration = (registration: ServiceWorkerRegistration) => {
       const syncWaitingWorker = () => {
@@ -42,6 +42,7 @@ export function PwaUpdatePrompt() {
     };
 
     void inspectRegistration();
+    void navigator.serviceWorker.ready.then(() => inspectRegistration());
     const onLoad = () => void inspectRegistration();
     window.addEventListener('load', onLoad);
 
