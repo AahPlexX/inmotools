@@ -1,0 +1,50 @@
+.photo-batch-section {
+  margin-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  padding-top: 0.9rem;
+}
+
+.photo-batch-section > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.photo-batch-picker {
+  display: inline-flex;
+  margin-block: 0.5rem;
+}
+
+.photo-batch-status {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photo-batch-status li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.45rem;
+}
+
+.photo-batch-status strong,
+.photo-batch-status span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.photo-batch-status li[data-status='failed'] span {
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .photo-batch-status li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
