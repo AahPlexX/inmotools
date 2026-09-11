@@ -119,3 +119,15 @@ test('disables additional sends while a serial write is in flight', async ({ pag
   await expect(page.getByRole('button', { name: 'Send packet' })).toBeEnabled();
   await page.getByRole('button', { name: 'Disconnect' }).click();
 });
+
+test('contains catastrophic rule matching and recovers after the rule is edited', async ({ page }) => {
+  await page.goto('./#/tools/hardware-packet-inspector');
+  await page.getByLabel('Rule 1 pattern').fill('(?:AA |AA AA )+$');
+  await page.getByLabel('Transmit hexadecimal bytes').fill('AA '.repeat(70) + 'AB');
+  await page.getByRole('button', { name: 'Send packet' }).click();
+  await expect(page.getByTestId('packet-rule-status')).toContainText('time limit');
+  await expect(page.getByRole('button', { name: 'Export retained CSV' })).toBeDisabled();
+  await page.getByLabel('Rule 1 pattern').fill('AA');
+  await expect(page.getByTestId('packet-stream')).toContainText('[error]');
+  await expect(page.getByRole('button', { name: 'Export retained CSV' })).toBeEnabled();
+});

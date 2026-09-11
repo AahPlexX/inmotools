@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadText } from '../../lib/download';
+import { createPacketRuleQueue, runPacketRules } from './rule-runner';
 import {
   bytesToHex,
   hexToBytes,
-  matchLineRule,
   PacketFrameLimitError,
   PacketStreamFramer,
   validateLineRule,
@@ -37,20 +37,11 @@ type CaptureEntry = {
   text: string;
 };
 
-type LabelledCaptureEntry = CaptureEntry & { ruleLabel: string };
 type SimulatorScenario = 'sensor-ok' | 'error-burst' | 'unicode-split';
 
 function csvCell(value: string | number) {
   const text = String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function labelCaptureEntries(entries: readonly CaptureEntry[], rules: readonly LineRule[]): LabelledCaptureEntry[] {
-  return entries.map((entry) => {
-    const subject = `${entry.text} ${entry.hex}`;
-    const rule = rules.find((candidate) => !validateLineRule(candidate) && matchLineRule(subject, candidate));
-    return { ...entry, ruleLabel: rule?.label ?? '' };
-  });
 }
 
 export default function HardwareWorkspace() {
@@ -376,9 +367,33 @@ export default function HardwareWorkspace() {
     setRuleFilter('all');
   }
 
-  const labelledCapture = useMemo(() => labelCaptureEntries(capture, rules), [capture, rules]);
   const displaySource = displaySnapshot ?? capture;
-  const displayLabelledCapture = useMemo(() => labelCaptureEntries(displaySource, rules), [displaySource, rules]);
+  const ruleEntries = useMemo(() => Array.from(new Map([...capture, ...displaySource].map((entry) => [entry.id, entry])).values()), [capture, displaySource]);
+  const [ruleResult, setRuleResult] = useState<{ entries: typeof ruleEntries; rules: typeof rules; labels: Map<number, string>; error: string } | null>(null);
+  const rulesCurrent = ruleResult?.entries === ruleEntries && ruleResult.rules === rules;
+  const rulesPending = ruleEntries.length > 0 && rules.length > 0 && !rulesCurrent;
+  const ruleError = ruleEntries.length && ruleResult?.rules === rules ? ruleResult.error : '';
+  const queueRef = useRef<ReturnType<typeof createPacketRuleQueue> | null>(null);
+  const exportRunRef = useRef<ReturnType<typeof runPacketRules> | null>(null);
+  const [exporting, setExporting] = useState(false);
+  useEffect(() => {
+    const queue = createPacketRuleQueue(rules, (entries, labels, error) => {
+      setRuleResult({ entries: entries as typeof ruleEntries, rules, labels: new Map(labels), error });
+    });
+    queueRef.current = queue;
+    setExporting(false);
+    return () => {
+      queue.cancel();
+      queueRef.current = null;
+      exportRunRef.current?.cancel();
+      exportRunRef.current = null;
+    };
+  }, [rules]);
+  useEffect(() => { if (ruleEntries.length && rules.length) queueRef.current?.update(ruleEntries); }, [ruleEntries, rules]);
+  // Previously completed labels remain valid for retained entries while new
+  // capture arrives; changed rules must never reuse old labels.
+  const labels = ruleResult?.rules === rules ? ruleResult.labels : undefined;
+  const displayLabelledCapture = useMemo(() => displaySource.map((entry) => ({ ...entry, ruleLabel: labels?.get(entry.id) ?? '' })), [displaySource, labels]);
 
   const filteredCapture = useMemo(() => {
     const needle = filterText.trim().toLocaleLowerCase();
@@ -406,14 +421,26 @@ export default function HardwareWorkspace() {
   const pageRangeEnd = pageStart + displayedCapture.length;
   const validRuleLabels = Array.from(new Set(rules.filter((rule) => !validateLineRule(rule)).map((rule) => rule.label).filter(Boolean)));
 
-  function exportCapture() {
-    if (!capture.length) return;
-    const rows = ['timestamp,direction,rule,hex,text'];
-    for (const entry of labelledCapture.slice().reverse()) {
-      rows.push([entry.timestamp, entry.direction, entry.ruleLabel, entry.hex, entry.text].map(csvCell).join(','));
+  async function exportCapture() {
+    if (!capture.length || ruleError || exportRunRef.current) return;
+    const snapshot = capture.slice();
+    const run = runPacketRules(snapshot, rules);
+    exportRunRef.current = run;
+    setExporting(true);
+    try {
+      const exportLabels = new Map(await run.promise);
+      if (exportRunRef.current !== run) return;
+      const rows = ['timestamp,direction,rule,hex,text'];
+      for (const entry of snapshot.reverse()) {
+        rows.push([entry.timestamp, entry.direction, exportLabels.get(entry.id) ?? '', entry.hex, entry.text].map(csvCell).join(','));
+      }
+      downloadText(rows.join('\r\n'), 'packet-capture.csv', 'text/csv;charset=utf-8');
+      setStatus(`Exported ${snapshot.length.toLocaleString()} entries retained when export was requested. ${evictedFrames.toLocaleString()} previously evicted entries were not available for export.`);
+    } catch (error) {
+      if (exportRunRef.current === run) setStatus(error instanceof Error ? error.message : 'Capture export failed.');
+    } finally {
+      if (exportRunRef.current === run) { exportRunRef.current = null; setExporting(false); }
     }
-    downloadText(rows.join('\r\n'), 'packet-capture.csv', 'text/csv;charset=utf-8');
-    setStatus(`Exported ${capture.length.toLocaleString()} retained capture entries. ${evictedFrames.toLocaleString()} evicted entr${evictedFrames === 1 ? 'y was' : 'ies were'} not available for export.`);
   }
 
   return <>
@@ -471,11 +498,12 @@ export default function HardwareWorkspace() {
         <button className="action-button secondary" type="button" onClick={() => void send()} disabled={sending}>{sending ? 'Sending…' : 'Send packet'}</button>
         <button className="action-button secondary" type="button" onClick={toggleDisplayPause} aria-pressed={displayPaused}>{displayPaused ? 'Resume live display' : 'Pause display'}</button>
         <button className="action-button secondary" type="button" disabled={!capture.length} onClick={clearCapture}>Clear capture</button>
-        <button className="action-button secondary" type="button" disabled={!capture.length} onClick={exportCapture}>Export retained CSV</button>
+        <button className="action-button secondary" type="button" disabled={!capture.length || exporting || Boolean(ruleError)} onClick={() => void exportCapture()}>Export retained CSV</button>
       </div>
       <p className="help-text">Pause display freezes the visible log only. Capture continues, retained entries can still be evicted at the cap, and export always uses the current retained capture.</p>
 
       <div className="status-line" role="status">{status}</div>
+      <p role="status" data-testid="packet-rule-status">{ruleError || (rulesPending ? 'Matching capture rules…' : 'Capture rules are up to date.')}</p>
 
       <section style={{ marginTop: 20 }} aria-labelledby="packet-rules-heading">
         <div className="workspace-header" style={{ padding: 0 }}><div><h3 id="packet-rules-heading">Parsing rules</h3><p>Rules label matching text or hexadecimal content and can be used as capture filters.</p></div></div>
