@@ -29,7 +29,8 @@ test('toolbar clearly groups workspace, document, editor and export controls', a
 
 test('markdown help opens an accessible syntax guide modal with supported examples', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
-  await page.getByRole('button', { name: 'Markdown help' }).click();
+  const openHelp = page.getByRole('button', { name: 'Markdown help' });
+  await openHelp.click();
 
   const dialog = page.getByRole('dialog', { name: 'Markdown syntax guide' });
   await expect(dialog).toBeVisible();
@@ -39,6 +40,11 @@ test('markdown help opens an accessible syntax guide modal with supported exampl
   await expect(dialog).toContainText('[Link text](https://example.com)');
 
   await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+
+  await openHelp.click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
 
