@@ -9,6 +9,7 @@ import {
   simplifyPoints,
   snapPoint,
 } from './vector-engine';
+import { vectorElementTransform } from './vector-transform';
 import type { VectorDocument, VectorElement, VectorFill, VectorPoint, VectorTool } from './vector-types';
 
 interface VectorCanvasProps {
@@ -27,6 +28,14 @@ interface DragState {
   last: VectorPoint;
   selection: string[];
   moved: boolean;
+}
+
+interface PanState {
+  pointerId: number;
+  clientX: number;
+  clientY: number;
+  scrollLeft: number;
+  scrollTop: number;
 }
 
 function paintId(element: VectorElement): string {
@@ -69,7 +78,7 @@ function commonProps(element: VectorElement) {
     strokeDasharray: element.stroke.dash || undefined,
     opacity: element.opacity,
     style: { mixBlendMode: element.blendMode },
-    transform: element.rotation ? `rotate(${element.rotation} ${element.x + element.width / 2} ${element.y + element.height / 2})` : undefined,
+    transform: vectorElementTransform(element) ?? undefined,
   } as const;
 }
 
@@ -85,7 +94,7 @@ function RenderElement({ element, selected, onPointerDown }: { element: VectorEl
     case 'path': shape = <path {...common} d={element.d} onPointerDown={pointer}/>; break;
     case 'text': shape = <text {...common} x={element.x} y={element.y + element.fontSize} fontFamily={element.fontFamily} fontSize={element.fontSize} fontWeight={element.fontWeight} letterSpacing={element.letterSpacing} textAnchor={element.textAnchor} onPointerDown={pointer}>{element.text}</text>; break;
     case 'image': shape = <image x={element.x} y={element.y} width={element.width} height={element.height} href={element.href} preserveAspectRatio={element.preserveAspectRatio} opacity={element.opacity} transform={common.transform} onPointerDown={pointer}/>; break;
-    case 'group': shape = <g opacity={element.opacity} style={common.style} onPointerDown={pointer}>{element.children.map((child) => <RenderElement key={child.id} element={child} selected={false} onPointerDown={onPointerDown}/>)}</g>; break;
+    case 'group': shape = <g opacity={element.opacity} style={common.style} transform={common.transform} onPointerDown={pointer}>{element.children.map((child) => <RenderElement key={child.id} element={child} selected={false} onPointerDown={onPointerDown}/>)}</g>; break;
     case 'symbol-instance': shape = <use {...common} href={`#${element.symbolId}`} x={element.x} y={element.y} width={element.width} height={element.height} onPointerDown={pointer}/>; break;
   }
   return <g data-vector-element={element.id} aria-label={element.name}>{shape}{selected ? <rect className="vector-selection-outline" x={element.x - 4} y={element.y - 4} width={Math.max(8, element.width + 8)} height={Math.max(8, element.height + 8)} pointerEvents="none"/> : null}</g>;
@@ -103,7 +112,9 @@ function defaultElement(tool: VectorTool, point: VectorPoint): VectorElement | n
 
 export default function VectorCanvas({ document, selection, tool, zoom, onDocumentChange, onSelectionChange, onStatus }: VectorCanvasProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [pan, setPan] = useState<PanState | null>(null);
   const [pencilPoints, setPencilPoints] = useState<VectorPoint[]>([]);
   const [penPoints, setPenPoints] = useState<VectorPoint[]>([]);
   const [cursor, setCursor] = useState<VectorPoint>({ x: 0, y: 0 });
@@ -139,6 +150,7 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   }
 
   function selectElement(event: ReactPointerEvent<SVGElement>, element: VectorElement) {
+    if (tool === 'pan') return;
     event.stopPropagation();
     if (tool !== 'select' || element.locked) return;
     const extend = event.shiftKey || event.ctrlKey || event.metaKey;
@@ -160,6 +172,16 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   }
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    if (tool === 'pan') {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setPan({ pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, scrollLeft: scroller.scrollLeft, scrollTop: scroller.scrollTop });
+      onStatus('Panning artboard viewport.');
+      return;
+    }
+
     const point = svgPoint(event);
     setCursor(point);
     if (tool === 'pencil') {
@@ -180,6 +202,14 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   }
 
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    if (pan?.pointerId === event.pointerId) {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      scroller.scrollLeft = pan.scrollLeft - (event.clientX - pan.clientX);
+      scroller.scrollTop = pan.scrollTop - (event.clientY - pan.clientY);
+      return;
+    }
+
     const point = svgPoint(event);
     setCursor(point);
     if (pencilPoints.length) {
@@ -239,16 +269,22 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   function handlePointerUp(event: ReactPointerEvent<SVGSVGElement>) {
     if (pencilPoints.length) finishPencil();
     if (drag?.pointerId === event.pointerId) setDrag(null);
+    if (pan?.pointerId === event.pointerId) {
+      setPan(null);
+      onStatus('Artboard viewport moved.');
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   const gridSize = Math.max(4, document.artboard.gridSize);
   return <div className="vector-canvas-shell" aria-label="Vector artboard area">
     <div className="vector-coordinate-readout" aria-live="off">x {Math.round(cursor.x)} · y {Math.round(cursor.y)} · {Math.round(zoom * 100)}%</div>
-    <div className="vector-canvas-scroll">
+    <div ref={scrollRef} className="vector-canvas-scroll">
       <svg
         ref={svgRef}
         data-testid="vector-canvas"
         className={`vector-canvas vector-tool-${tool}`}
+        style={{ cursor: tool === 'pan' ? (pan ? 'grabbing' : 'grab') : undefined }}
         viewBox={`0 0 ${document.artboard.width} ${document.artboard.height}`}
         width={document.artboard.width * zoom}
         height={document.artboard.height * zoom}
