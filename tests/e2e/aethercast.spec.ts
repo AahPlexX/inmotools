@@ -1,9 +1,57 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+const FIXED_NOW = Date.parse('2026-09-11T15:20:00Z');
+const HOUR_MS = 3_600_000;
+
+const formatChicagoHour = (epochMs: number): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(epochMs));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
+};
+
+const freezeBrowserNow = async (page: Page) => {
+  await page.addInitScript((fixedNow) => {
+    Date.now = () => fixedNow;
+  }, FIXED_NOW);
+};
+
+const installDelayedGeolocation = async (page: Page, delayMs = 1_200) => {
+  await page.addInitScript(({ delay }) => {
+    const position = {
+      coords: {
+        latitude: 41.8,
+        longitude: -71.4,
+        accuracy: 10,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      },
+      timestamp: Date.now(),
+    } as GeolocationPosition;
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition(success: PositionCallback) {
+          window.setTimeout(() => success(position), delay);
+        },
+      },
+    });
+  }, { delay: delayMs });
+};
+
 const hourlyFixture = () => {
   const start = Date.parse('2026-06-01T00:00:00Z');
-  const time = Array.from({ length: 24 }, (_, index) => new Date(start + index * 3_600_000).toISOString());
+  const time = Array.from({ length: 24 }, (_, index) => new Date(start + index * HOUR_MS).toISOString());
   const constant = (value: number) => Array<number>(24).fill(value);
   return {
     latitude: 41.8,
@@ -27,10 +75,10 @@ const hourlyFixture = () => {
 };
 
 const liveFixture = () => {
-  const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
-  const start = hour - 24 * 3_600_000;
-  const length = 48;
-  const time = Array.from({ length }, (_, index) => new Date(start + index * 3_600_000).toISOString());
+  const hour = Math.floor(FIXED_NOW / HOUR_MS) * HOUR_MS;
+  const start = hour - 24 * HOUR_MS;
+  const length = 96;
+  const time = Array.from({ length }, (_, index) => formatChicagoHour(start + index * HOUR_MS));
   const constant = (value: number) => Array<number>(length).fill(value);
   const usAqi = constant(42);
   usAqi[24] = 77;
@@ -62,6 +110,7 @@ const installLiveApiMocks = async (page: Page) => {
   const air = liveFixture();
   const airRequests: URL[] = [];
   const weatherRequests: URL[] = [];
+  const geocodingRequests: URL[] = [];
 
   await page.route('https://air-quality-api.open-meteo.com/**', async (route) => {
     airRequests.push(new URL(route.request().url()));
@@ -81,6 +130,7 @@ const installLiveApiMocks = async (page: Page) => {
     });
   });
   await page.route('https://geocoding-api.open-meteo.com/**', async (route) => {
+    geocodingRequests.push(new URL(route.request().url()));
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -99,10 +149,10 @@ const installLiveApiMocks = async (page: Page) => {
     });
   });
 
-  return { air, airRequests, weatherRequests };
+  return { air, airRequests, weatherRequests, geocodingRequests };
 };
 
-const loadFixture = async (page: import('@playwright/test').Page) => {
+const loadFixture = async (page: Page) => {
   await page.goto('./#/tools/aethercast');
   await page.getByLabel('Import an air quality and UV data file').setInputFiles({
     name: 'air-quality.json',
@@ -113,6 +163,7 @@ const loadFixture = async (page: import('@playwright/test').Page) => {
 };
 
 test('AetherCast loads live Open-Meteo data from browser geolocation without requiring an upload', async ({ page, context }) => {
+  await freezeBrowserNow(page);
   const { airRequests, weatherRequests } = await installLiveApiMocks(page);
   await context.setGeolocation({ latitude: 30.404, longitude: -90.155 });
   await context.grantPermissions(['geolocation']);
@@ -123,10 +174,16 @@ test('AetherCast loads live Open-Meteo data from browser geolocation without req
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Current location');
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Open-Meteo');
   await expect(page.getByLabel('Import an air quality and UV data file')).not.toBeVisible();
+  await expect(page.getByText('Loaded rows: 96.')).toBeVisible();
+  const reconciliation = page.getByTestId('aethercast-timestamp-reconciliation');
+  await expect(reconciliation).toContainText('96 of 96');
+  await expect(reconciliation).toContainText('0 carried an explicit UTC offset and 96 were timezone-resolved wall clocks');
 
   await expect.poll(() => airRequests.length).toBeGreaterThan(0);
   await expect.poll(() => weatherRequests.length).toBeGreaterThan(0);
   const airUrl = airRequests.at(-1)!;
+  expect(airUrl.searchParams.get('latitude')).toBe('30.404');
+  expect(airUrl.searchParams.get('longitude')).toBe('-90.155');
   expect(airUrl.searchParams.get('past_hours')).toBe('24');
   expect(airUrl.searchParams.get('forecast_hours')).toBe('72');
   expect(airUrl.searchParams.get('timezone')).toBe('auto');
@@ -135,6 +192,8 @@ test('AetherCast loads live Open-Meteo data from browser geolocation without req
     'uv_index', 'uv_index_clear_sky', 'us_aqi', 'european_aqi',
   ]));
   const weatherUrl = weatherRequests.at(-1)!;
+  expect(weatherUrl.searchParams.get('latitude')).toBe('30.404');
+  expect(weatherUrl.searchParams.get('longitude')).toBe('-90.155');
   expect(weatherUrl.searchParams.get('hourly')).toBe('wind_speed_10m');
   expect(weatherUrl.searchParams.get('wind_speed_unit')).toBe('ms');
 
@@ -143,19 +202,68 @@ test('AetherCast loads live Open-Meteo data from browser geolocation without req
   await expect(snapshot).not.toContainText('199');
 });
 
-test('AetherCast location search is a no-upload fallback when geolocation is unavailable', async ({ page }) => {
-  await installLiveApiMocks(page);
+for (const search of [
+  { label: 'city', query: 'Madisonville, LA' },
+  { label: 'postal code', query: '70447' },
+]) {
+  test(`AetherCast ${search.label} search is a no-upload fallback when geolocation is unavailable`, async ({ page }) => {
+    await freezeBrowserNow(page);
+    const { airRequests, weatherRequests, geocodingRequests } = await installLiveApiMocks(page);
+    await page.goto('./#/tools/aethercast');
+
+    await page.getByLabel('Search city or postal code').fill(search.query);
+    await page.getByRole('button', { name: 'Search locations' }).click();
+    const result = page.getByRole('button', { name: 'Madisonville, Louisiana, United States' });
+    await expect(result).toBeVisible();
+    await result.click();
+
+    await expect(page.getByRole('table')).toBeVisible();
+    await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+    await expect(page.getByTestId('aethercast-live-source')).toContainText('Open-Meteo');
+    expect(geocodingRequests.at(-1)?.searchParams.get('name')).toBe(search.query);
+    expect(airRequests.at(-1)?.searchParams.get('latitude')).toBe('30.404');
+    expect(airRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
+    expect(weatherRequests.at(-1)?.searchParams.get('latitude')).toBe('30.404');
+    expect(weatherRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
+  });
+}
+
+test('AetherCast keeps a manually selected location when initial geolocation resolves late', async ({ page }) => {
+  await freezeBrowserNow(page);
+  const { airRequests } = await installLiveApiMocks(page);
+  await installDelayedGeolocation(page);
   await page.goto('./#/tools/aethercast');
 
   await page.getByLabel('Search city or postal code').fill('Madisonville, LA');
   await page.getByRole('button', { name: 'Search locations' }).click();
-  const result = page.getByRole('button', { name: 'Madisonville, Louisiana, United States' });
-  await expect(result).toBeVisible();
-  await result.click();
-
-  await expect(page.getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: 'Madisonville, Louisiana, United States' }).click();
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
-  await expect(page.getByTestId('aethercast-live-source')).toContainText('Open-Meteo');
+
+  await page.waitForTimeout(1_400);
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+  expect(airRequests.at(-1)?.searchParams.get('latitude')).toBe('30.404');
+  expect(airRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
+});
+
+test('AetherCast keeps an imported fallback dataset when initial geolocation resolves late', async ({ page }) => {
+  await freezeBrowserNow(page);
+  const { airRequests } = await installLiveApiMocks(page);
+  await installDelayedGeolocation(page);
+  await page.goto('./#/tools/aethercast');
+
+  await page.getByLabel('Import an air quality and UV data file').setInputFiles({
+    name: 'air-quality.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(hourlyFixture())),
+  });
+  await expect(page.getByRole('table')).toBeVisible();
+  const snapshot = page.getByRole('region', { name: 'Selected snapshot' });
+  await expect(snapshot.locator('p').filter({ hasText: 'Imported provider US AQI' })).toContainText('42');
+
+  await page.waitForTimeout(1_400);
+  await expect(page.getByTestId('aethercast-live-source')).toHaveCount(0);
+  await expect(snapshot.locator('p').filter({ hasText: 'Imported provider US AQI' })).toContainText('42');
+  expect(airRequests).toHaveLength(0);
 });
 
 test('AetherCast exposes timestamp reconciliation, pollutant coverage, averaging windows, and provider-vs-calculated indices', async ({ page }) => {
