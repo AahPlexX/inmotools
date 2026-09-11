@@ -24,7 +24,9 @@ async function openFixture(page: Page) {
 }
 
 async function photoBox(page: Page) {
-  const box = await page.getByTestId('photo-preview').boundingBox();
+  const preview = page.getByTestId('photo-preview');
+  await preview.scrollIntoViewIfNeeded();
+  const box = await preview.boundingBox();
   if (!box) throw new Error('Rendered photo has no bounding box.');
   return box;
 }
