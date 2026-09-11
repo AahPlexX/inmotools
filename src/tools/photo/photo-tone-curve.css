@@ -1,0 +1,119 @@
+.photo-tone-curve {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.photo-tone-curve-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.photo-tone-curve-header > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.photo-tone-curve-header span {
+  font-size: 0.78rem;
+  color: var(--text-muted, #6b7280);
+}
+
+.photo-tone-curve-graph {
+  display: block;
+  width: min(100%, 24rem);
+  aspect-ratio: 1;
+  max-height: 19rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.photo-tone-curve-grid line {
+  stroke: currentColor;
+  stroke-opacity: 0.1;
+  stroke-width: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.photo-tone-curve-reference {
+  stroke: currentColor;
+  stroke-opacity: 0.25;
+  stroke-width: 0.7;
+  stroke-dasharray: 2.5 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.photo-tone-curve-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.photo-tone-curve-point {
+  fill: Canvas;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.photo-tone-point-list {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.photo-tone-point-row {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 0.8fr) minmax(6rem, 1fr) minmax(6rem, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.photo-tone-point-row > span {
+  align-self: center;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.photo-tone-point-row label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.72rem;
+}
+
+.photo-tone-point-row input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .photo-tone-point-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .photo-tone-point-row > span,
+  .photo-tone-point-row > button {
+    align-self: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-tone-curve *,
+  .photo-tone-curve *::before,
+  .photo-tone-curve *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
