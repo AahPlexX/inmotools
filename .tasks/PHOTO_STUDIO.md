@@ -26,10 +26,9 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current verified implementation head before this tracker-only commit: `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce`
-- Current `main` observed during this checkpoint: `fbfade09aec3f73eb70a4d202949329036883947`
-- Current phase: **Task 4 — export/metadata/batch hardening, workspace integration, final verification**
-- Last fully verified exact-head CI evidence: workflow run `34641753678` completed successfully for `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce`; unit tests, production build, and focused browser tests all succeeded on the PR merge state.
+- Current verified implementation head before this tracker-only commit: `edbf8530a7cab3188945f4a21deab97c0d43fc28`
+- Current phase: **Task 4 / Milestone D — spec-gap closure, hardening, integration, deployment verification**
+- Last fully verified exact-head CI evidence: workflow run `34642478005` completed successfully for `edbf8530a7cab3188945f4a21deab97c0d43fc28`; repository unit tests, production build, and the expanded focused Photo Studio browser suite all succeeded on the PR merge state.
 
 ## Verified progress
 
@@ -39,25 +38,37 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Zoom interaction regression coverage includes above-100% zoom placement.
 - [x] Lens distortion and horizontal/vertical perspective transforms are implemented in the shared geometry path.
 - [x] Texture, clarity, sharpening, luminance/chroma denoise, and chromatic-aberration correction exist in the pixel engine.
+- [x] Tone-curve editing is wired into normal recipe history and preview/export behavior with accessible graph + numeric editing.
 - [x] Embedded-XMP container writer has focused unit coverage for JPEG APP1, PNG XMP `iTXt`, and WebP `XMP ` / VP8X behavior.
-- [x] Batch engine contract exists for sequential processing and per-file failure isolation without retaining output blobs in the summary.
-- [x] Safe editable export-filename contract exists.
-- [x] Unified single/batch export orchestration exists for metadata policy, embedding fallback, output sharpening, and filename handling.
-- [x] Tone-curve editing helpers and a self-contained accessible control exist with focused invariants for point ordering, endpoint anchoring, add/update/remove/reset behavior, graph insertion, and responsive/reduced-motion styling.
-- [x] Exact-head CI at `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce` passed the repository unit suite, production build, and focused Photo Studio browser tests through PR validation run `34641753678`.
+- [x] Single-photo export now uses unified export orchestration with safe editable filename, resize policy, output sharpening, metadata policy, standards-compatible XMP embedding attempt, and pixel-export-preserving fallback.
+- [x] Batch export is exposed in the production dialog, processes sequentially with per-file status, shares format/resize/sharpening/metadata policy, and does not retain completed full-resolution blobs in the batch summary.
+- [x] Recipe JSON export/import, editable presets, history, and snapshot restore paths remain wired.
+- [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening control, production batch queue completion, keyboard history, and 320 CSS px editor/export-dialog reflow.
+- [x] Exact-head CI at `edbf8530a7cab3188945f4a21deab97c0d43fc28` passed repository unit tests, production build, and focused Photo Studio browser tests through PR validation run `34642478005`.
+
+## Spec inventory blockers discovered during audit
+
+These remain release blockers because they are promised by the design specification but are not yet fully represented in the production UI/behavior:
+
+- [ ] RGB histogram presentation; current mini histogram exposes luminance only even though RGB bins are available.
+- [ ] Clipping-warning overlay/toggle for highlight/shadow clipping.
+- [ ] Color sampler with RGB, HSL, and hexadecimal readout.
+- [ ] Individual-control reset affordances rather than reset-all only.
+- [ ] Named snapshots; current snapshots are auto-numbered.
+- [ ] Explicit long-edge and short-edge export resize modes.
+- [ ] Explicit safe-size export choice/warning before an oversized render, rather than relying only on automatic safe scaling and post-render status.
+- [ ] Browser coverage for unsupported encoder messaging and stale-render rejection at the workspace level if not already proven by equivalent focused coverage.
+- [ ] Final feature-inventory accounting for before/after interaction wording, custom crop-ratio intent, copy/paste recipe semantics, and any other design-language mismatch discovered during final audit.
 
 ## Remaining release work
 
-1. Wire the unified export orchestration into `PhotoWorkspace.tsx` so actual single-photo downloads use embedded metadata with sidecar fallback and editable filenames.
-2. Expose and verify batch workflow in the production workspace using the same export policy.
-3. Wire `PhotoToneCurveControl` into the production edit inspector and prove changes flow through recipe history, preview, and export.
-4. Finish any remaining project/recipe import-export UI needed by the design contract and prove normalized round-trip behavior.
-5. Add focused browser coverage for the newly exposed export, metadata, batch, and tone-curve workflows; keep 320 CSS px reflow coverage.
-6. Re-read the design/spec feature inventory and account for every promised capability; remove or explicitly defer anything not intended for the deterministic completion goal.
-7. Reconcile `feat/photo-studio` with the latest moving `main` without rewriting other agents' branches; resolve only genuine integration conflicts.
-8. Run fresh final unit/build/focused E2E against the exact merge state, then merge only if green.
-9. Verify the exact merged `main` SHA in the Pages deployment and uncached live route.
-10. Close shared task records only after all preceding gates are evidenced.
+1. Close the spec inventory blockers above with real UI/renderer behavior and focused tests; do not lower or reinterpret the completion goal to avoid them.
+2. Re-audit the complete design feature list after blocker closure and account for every promised capability as implemented, intentionally deferred, or removed from the release specification before merge.
+3. Reconcile `feat/photo-studio` with the latest moving `main` without rewriting other agents' branches; resolve only genuine integration conflicts.
+4. Review the exact changed-file set for Photo-only scope, private/internal prompt leakage, and unrelated regressions.
+5. Run fresh final unit/build/focused E2E against the exact merge state, then merge only if green.
+6. Verify the exact merged `main` SHA in the Pages deployment and perform an uncached live-route check.
+7. Close shared task records only after all preceding gates are evidenced.
 
 ## Anti-staleness rule
 
