@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { downloadBlob } from '../../lib/download';
 import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
+import PhotoExportDialog from './PhotoExportDialog';
+import PhotoToneCurveControl from './PhotoToneCurveControl';
 import {
   DEFAULT_RECIPE,
   commitHistory,
@@ -9,12 +11,8 @@ import {
   redoHistory,
   undoHistory,
 } from './photo-engine';
+import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
-import {
-  safePhotoFilename,
-  serializePhotoXmp,
-  stripLocationMetadata,
-} from './photo-metadata';
 import {
   disposePhotoRenderer,
   isRenderResultCurrent,
@@ -25,9 +23,7 @@ import {
 import type {
   LocalAdjustment,
   PhotoCapabilities,
-  PhotoExportMetadata,
   PhotoHistory,
-  PhotoOutputMime,
   PhotoRecipe,
   PhotoSnapshot,
   RetouchOperation,
@@ -35,8 +31,6 @@ import type {
 import './photo.css';
 
 type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'inspect';
-type MetadataPolicy = 'strip' | 'rights' | 'custom';
-type ResizeMode = 'original' | 'percent' | 'width' | 'height';
 
 interface SourcePhoto {
   file: File;
@@ -185,13 +179,6 @@ function SimpleControl({
   return <AdjustmentControl spec={{ key: 'exposure', label, min, max, step }} value={value} onChange={onChange} />;
 }
 
-function photoNaturalDimensions(source: SourcePhoto, recipe: PhotoRecipe) {
-  const width = Math.max(1, Math.round(source.width * recipe.crop.width));
-  const height = Math.max(1, Math.round(source.height * recipe.crop.height));
-  const turns = ((Math.round(recipe.rotateQuarterTurns) % 4) + 4) % 4;
-  return turns % 2 ? { width: height, height: width } : { width, height };
-}
-
 function recipeWithPatch(recipe: PhotoRecipe, patch: Partial<PhotoRecipe>): PhotoRecipe {
   return normalizeRecipe({ ...recipe, ...patch });
 }
@@ -217,14 +204,6 @@ export default function PhotoWorkspace() {
   const [status, setStatus] = useState('Open a photo to begin editing locally.');
   const [capabilities, setCapabilities] = useState<PhotoCapabilities | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
-  const [outputMime, setOutputMime] = useState<PhotoOutputMime>('image/jpeg');
-  const [quality, setQuality] = useState(0.92);
-  const [resizeMode, setResizeMode] = useState<ResizeMode>('original');
-  const [resizeValue, setResizeValue] = useState(100);
-  const [jpegBackground, setJpegBackground] = useState('#ffffff');
-  const [metadataPolicy, setMetadataPolicy] = useState<MetadataPolicy>('strip');
-  const [metadata, setMetadata] = useState<PhotoExportMetadata>({ ppi: 300 });
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -353,7 +332,6 @@ export default function PhotoWorkspace() {
       setSnapshots([]);
       setCompare(false);
       setZoom(0.75);
-      setMetadata({ ppi: 300 });
       setCanvasInteraction(null);
       setStatus(`${file.name} opened locally · ${width} × ${height} · ${formatBytes(file.size)}`);
     } catch (error) {
@@ -565,91 +543,6 @@ export default function PhotoWorkspace() {
     }
   }
 
-  function metadataForPolicy(): PhotoExportMetadata {
-    if (metadataPolicy === 'strip') return {};
-    if (metadataPolicy === 'rights') {
-      return stripLocationMetadata({
-        title: metadata.title,
-        headline: metadata.headline,
-        description: metadata.description,
-        creator: metadata.creator,
-        credit: metadata.credit,
-        copyright: metadata.copyright,
-        usageTerms: metadata.usageTerms,
-        source: metadata.source,
-        jobIdentifier: metadata.jobIdentifier,
-        rating: metadata.rating,
-        label: metadata.label,
-        keywords: metadata.keywords,
-        hierarchicalKeywords: metadata.hierarchicalKeywords,
-        altText: metadata.altText,
-        extendedDescription: metadata.extendedDescription,
-        ppi: metadata.ppi,
-      });
-    }
-    return metadata;
-  }
-
-  function sidecarName() {
-    if (!source) return 'photo-edited.xmp';
-    const imageName = safePhotoFilename(source.name, outputMime);
-    return imageName.replace(/\.[^.]+$/, '.xmp');
-  }
-
-  function downloadXmp() {
-    const xmp = serializePhotoXmp(metadataForPolicy());
-    downloadBlob(new Blob([xmp], { type: 'application/rdf+xml' }), sidecarName());
-    setStatus('XMP sidecar created from the reviewed export metadata.');
-  }
-
-  function exportDimensions() {
-    if (!source) return {};
-    const natural = photoNaturalDimensions(source, recipe);
-    if (resizeMode === 'original') return {};
-    if (resizeMode === 'percent') {
-      const scale = Math.max(1, resizeValue) / 100;
-      return { requestedWidth: Math.round(natural.width * scale), requestedHeight: Math.round(natural.height * scale) };
-    }
-    if (resizeMode === 'width') {
-      const width = Math.max(1, Math.round(resizeValue));
-      return { requestedWidth: width, requestedHeight: Math.max(1, Math.round(width * natural.height / natural.width)) };
-    }
-    const height = Math.max(1, Math.round(resizeValue));
-    return { requestedWidth: Math.max(1, Math.round(height * natural.width / natural.height)), requestedHeight: height };
-  }
-
-  async function exportPhoto() {
-    if (!source || exportBusy) return;
-    const revision = ++renderRevisionRef.current;
-    setExportBusy(true);
-    setStatus('Rendering full export locally…');
-    try {
-      const result = await renderPhoto({
-        file: source.file,
-        recipe,
-        revision,
-        mode: 'export',
-        outputMime,
-        quality,
-        jpegBackground,
-        ...exportDimensions(),
-      });
-      downloadBlob(result.blob, safePhotoFilename(source.name, outputMime));
-      const safety = result.scaledForSafety ? ` Device limits required a safe ${result.width} × ${result.height} render.` : '';
-      setStatus(`Photo exported locally as ${result.width} × ${result.height}.${safety}`);
-    } catch (error) {
-      setStatus(`Export failed: ${error instanceof Error ? error.message : 'unknown encoding error'}`);
-    } finally {
-      setExportBusy(false);
-    }
-  }
-
-  const encoderSupport = useMemo(() => ({
-    'image/jpeg': capabilities?.jpeg ?? true,
-    'image/png': capabilities?.png ?? true,
-    'image/webp': capabilities?.webp ?? true,
-  }), [capabilities]);
-
   function renderEditPanel() {
     return (
       <>
@@ -664,6 +557,10 @@ export default function PhotoWorkspace() {
               <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
             ))}
           </div>
+        </details>
+        <details className="photo-section">
+          <summary>Tone curve</summary>
+          <PhotoToneCurveControl points={recipe.toneCurve} onChange={(toneCurve) => patchRecipe({ toneCurve })} />
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>
@@ -921,7 +818,7 @@ export default function PhotoWorkspace() {
     return renderEditPanel();
   }
 
-  const naturalDimensions = source ? photoNaturalDimensions(source, recipe) : null;
+  const naturalDimensions = source ? photoNaturalDimensions(source.width, source.height, recipe) : null;
 
   return (
     <div className="photo-studio">
@@ -993,98 +890,14 @@ export default function PhotoWorkspace() {
         <span className="photo-status-message">{status}</span>
       </footer>
 
-      {exportOpen && source ? (
-        <div className="photo-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}>
-          <section className="photo-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-export-title">
-            <header className="photo-dialog-header">
-              <div>
-                <h2 id="photo-export-title">Export photo</h2>
-                <p>Render a new copy from the current recipe and choose exactly which descriptive metadata travels with it.</p>
-              </div>
-              <button type="button" onClick={() => setExportOpen(false)} aria-label="Close export dialog">Close</button>
-            </header>
-
-            <div className="photo-export-grid">
-              <label>File format
-                <select aria-label="File format" value={outputMime} onChange={(event) => setOutputMime(event.target.value as PhotoOutputMime)}>
-                  <option value="image/jpeg" disabled={!encoderSupport['image/jpeg']}>JPEG{!encoderSupport['image/jpeg'] ? ' — unsupported' : ''}</option>
-                  <option value="image/png" disabled={!encoderSupport['image/png']}>PNG{!encoderSupport['image/png'] ? ' — unsupported' : ''}</option>
-                  <option value="image/webp" disabled={!encoderSupport['image/webp']}>WebP{!encoderSupport['image/webp'] ? ' — unsupported' : ''}</option>
-                </select>
-              </label>
-              <label>Quality
-                <input type="number" min={1} max={100} step={1} value={Math.round(quality * 100)} disabled={outputMime === 'image/png'} onChange={(event) => setQuality(Math.min(1, Math.max(0.01, readNumber(event.target.value, 92) / 100)))} />
-              </label>
-              <label>Resize
-                <select value={resizeMode} onChange={(event) => setResizeMode(event.target.value as ResizeMode)}>
-                  <option value="original">Edited dimensions</option>
-                  <option value="percent">Percentage</option>
-                  <option value="width">Exact width</option>
-                  <option value="height">Exact height</option>
-                </select>
-              </label>
-              {resizeMode !== 'original' ? (
-                <label>{resizeMode === 'percent' ? 'Percent' : resizeMode === 'width' ? 'Width in pixels' : 'Height in pixels'}
-                  <input type="number" min={1} max={resizeMode === 'percent' ? 400 : 50000} value={resizeValue} onChange={(event) => setResizeValue(Math.max(1, readNumber(event.target.value, 100)))} />
-                </label>
-              ) : <div />}
-              {outputMime === 'image/jpeg' ? (
-                <label>Transparent-area background
-                  <input type="color" value={jpegBackground} onChange={(event) => setJpegBackground(event.target.value)} />
-                </label>
-              ) : null}
-              <label>Metadata policy
-                <select aria-label="Metadata policy" value={metadataPolicy} onChange={(event) => setMetadataPolicy(event.target.value as MetadataPolicy)}>
-                  <option value="strip">Strip metadata</option>
-                  <option value="rights">Descriptive + rights only</option>
-                  <option value="custom">Custom reviewed metadata</option>
-                </select>
-              </label>
-            </div>
-
-            {metadataPolicy !== 'strip' ? (
-              <div className="photo-metadata-grid">
-                <label>Title<input aria-label="Title" value={metadata.title ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, title: event.target.value }))} /></label>
-                <label>Creator<input aria-label="Creator" value={metadata.creator ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, creator: event.target.value }))} /></label>
-                <label>Headline<input value={metadata.headline ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, headline: event.target.value }))} /></label>
-                <label>Credit<input value={metadata.credit ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, credit: event.target.value }))} /></label>
-                <label className="photo-wide">Description<textarea value={metadata.description ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, description: event.target.value }))} /></label>
-                <label>Copyright notice<input value={metadata.copyright ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, copyright: event.target.value }))} /></label>
-                <label>Usage terms<input value={metadata.usageTerms ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, usageTerms: event.target.value }))} /></label>
-                <label>Source<input value={metadata.source ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, source: event.target.value }))} /></label>
-                <label>Job identifier<input value={metadata.jobIdentifier ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, jobIdentifier: event.target.value }))} /></label>
-                <label>Rating<input type="number" min={0} max={5} step={1} value={metadata.rating ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, rating: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                <label>Label<input value={metadata.label ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, label: event.target.value }))} /></label>
-                <label className="photo-wide">Keywords<input aria-label="Keywords" value={(metadata.keywords ?? []).join(', ')} onChange={(event) => setMetadata((current) => ({ ...current, keywords: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} /></label>
-                <label className="photo-wide">Hierarchical keywords<input value={(metadata.hierarchicalKeywords ?? []).join(', ')} onChange={(event) => setMetadata((current) => ({ ...current, hierarchicalKeywords: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} /></label>
-                <label>Accessibility alt text<input value={metadata.altText ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, altText: event.target.value }))} /></label>
-                <label>Extended accessibility description<input value={metadata.extendedDescription ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, extendedDescription: event.target.value }))} /></label>
-                <label>PPI<input type="number" min={1} max={2400} step={1} value={metadata.ppi ?? 300} onChange={(event) => setMetadata((current) => ({ ...current, ppi: readNumber(event.target.value, 300) }))} /></label>
-                {metadataPolicy === 'custom' ? (
-                  <>
-                    <label>City<input value={metadata.city ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, city: event.target.value }))} /></label>
-                    <label>State / province<input value={metadata.state ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, state: event.target.value }))} /></label>
-                    <label>Country<input value={metadata.country ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, country: event.target.value }))} /></label>
-                    <label>Sublocation<input value={metadata.sublocation ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, sublocation: event.target.value }))} /></label>
-                    <label>GPS latitude<input type="number" min={-90} max={90} step="any" value={metadata.latitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, latitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>GPS longitude<input type="number" min={-180} max={180} step="any" value={metadata.longitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, longitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>GPS altitude<input type="number" step="any" value={metadata.altitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, altitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>Creation date<input type="datetime-local" value={metadata.creationDate ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, creationDate: event.target.value }))} /></label>
-                  </>
-                ) : null}
-              </div>
-            ) : (
-              <p className="photo-export-note">The rendered image contains new pixels only. Source camera and location metadata is not copied automatically.</p>
-            )}
-
-            <p className="photo-export-note">XMP sidecar export preserves the reviewed metadata independently of browser image-encoder limitations. Pixel export remains available even if metadata serialization fails.</p>
-            <div className="photo-dialog-actions">
-              <button type="button" onClick={downloadXmp}>Download XMP sidecar</button>
-              <button type="button" onClick={() => void exportPhoto()} disabled={exportBusy}>{exportBusy ? 'Rendering…' : 'Download photo'}</button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <PhotoExportDialog
+        open={exportOpen}
+        source={source}
+        recipe={recipe}
+        capabilities={capabilities}
+        onClose={() => setExportOpen(false)}
+        onStatus={setStatus}
+      />
     </div>
   );
 }
