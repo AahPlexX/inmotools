@@ -113,8 +113,9 @@ function defaultElement(tool: VectorTool, point: VectorPoint): VectorElement | n
 export default function VectorCanvas({ document, selection, tool, zoom, onDocumentChange, onSelectionChange, onStatus }: VectorCanvasProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const panRef = useRef<PanState | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [pan, setPan] = useState<PanState | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
   const [pencilPoints, setPencilPoints] = useState<VectorPoint[]>([]);
   const [penPoints, setPenPoints] = useState<VectorPoint[]>([]);
   const [cursor, setCursor] = useState<VectorPoint>({ x: 0, y: 0 });
@@ -177,7 +178,8 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
       if (!scroller) return;
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
-      setPan({ pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, scrollLeft: scroller.scrollLeft, scrollTop: scroller.scrollTop });
+      panRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, scrollLeft: scroller.scrollLeft, scrollTop: scroller.scrollTop };
+      setIsPanning(true);
       onStatus('Panning artboard viewport.');
       return;
     }
@@ -202,11 +204,12 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   }
 
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
-    if (pan?.pointerId === event.pointerId) {
+    const activePan = panRef.current;
+    if (activePan?.pointerId === event.pointerId) {
       const scroller = scrollRef.current;
       if (!scroller) return;
-      scroller.scrollLeft = pan.scrollLeft - (event.clientX - pan.clientX);
-      scroller.scrollTop = pan.scrollTop - (event.clientY - pan.clientY);
+      scroller.scrollLeft = activePan.scrollLeft - (event.clientX - activePan.clientX);
+      scroller.scrollTop = activePan.scrollTop - (event.clientY - activePan.clientY);
       return;
     }
 
@@ -269,8 +272,9 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
   function handlePointerUp(event: ReactPointerEvent<SVGSVGElement>) {
     if (pencilPoints.length) finishPencil();
     if (drag?.pointerId === event.pointerId) setDrag(null);
-    if (pan?.pointerId === event.pointerId) {
-      setPan(null);
+    if (panRef.current?.pointerId === event.pointerId) {
+      panRef.current = null;
+      setIsPanning(false);
       onStatus('Artboard viewport moved.');
     }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -284,7 +288,7 @@ export default function VectorCanvas({ document, selection, tool, zoom, onDocume
         ref={svgRef}
         data-testid="vector-canvas"
         className={`vector-canvas vector-tool-${tool}`}
-        style={{ cursor: tool === 'pan' ? (pan ? 'grabbing' : 'grab') : undefined }}
+        style={{ cursor: tool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : undefined }}
         viewBox={`0 0 ${document.artboard.width} ${document.artboard.height}`}
         width={document.artboard.width * zoom}
         height={document.artboard.height * zoom}
