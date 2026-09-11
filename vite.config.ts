@@ -26,14 +26,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,wasm}'],
         // pyodide/** and duckdb-*.wasm avoid precaching the DuckDB/Pyodide-scale
         // WASM/runtime payload for every visitor (see .tasks/NEXT.md TASK-003).
-        // The Markdown Workbench entries below apply the same discipline to its
-        // own heavy, lazily-loaded dependencies, so a visitor who never
-        // opens that tool never downloads them by default; they are instead
-        // cached at runtime on first actual use via the service worker's
-        // default runtime-caching behavior for same-origin requests.
-        //   - MarkdownWorkspace-*.{js,css}: the tool's own chunk, which
-        //     bundles citeproc-js, docx, and jszip directly (they are not
-        //     split into separate chunks by the bundler).
+        // MarkdownWorkspace itself stays precached so an already-open client can
+        // still enter the tool after a deployment replaces hashed assets. Its
+        // heavy optional diagram/style/font dependencies remain lazy and can be
+        // recovered through the waiting-service-worker path if version skew is
+        // encountered while loading one of those secondary chunks.
         //   - diagram.worker-*.js: the Graphviz Worker chunk; @hpcc-js/wasm-graphviz's
         //     WASM binary is inlined into this chunk rather than emitted as
         //     a separate .wasm file, so the whole chunk must be excluded.
@@ -48,7 +45,6 @@ export default defineConfig({
         globIgnores: [
           'pyodide/**',
           '**/duckdb-*.wasm',
-          'assets/MarkdownWorkspace-*.{js,css}',
           'assets/diagram.worker-*.js',
           'assets/mermaid-parser.core-*.js',
           'assets/cytoscape.esm-*.js',

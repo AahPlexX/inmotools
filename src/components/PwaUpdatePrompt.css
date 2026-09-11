@@ -1,0 +1,97 @@
+.pwa-update-prompt {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  display: grid;
+  gap: 0.875rem;
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.875rem;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 18%);
+}
+
+.pwa-update-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pwa-update-copy strong {
+  font-size: 1rem;
+}
+
+.pwa-update-copy span {
+  color: #475569;
+  line-height: 1.45;
+}
+
+.pwa-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pwa-update-actions button {
+  min-height: 2.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.625rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pwa-update-primary {
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.pwa-update-secondary {
+  border: 1px solid #94a3b8;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.pwa-update-actions button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (max-width: 32rem) {
+  .pwa-update-prompt {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: calc(100vw - 1.5rem);
+  }
+
+  .pwa-update-actions button {
+    flex: 1 1 9rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .pwa-update-prompt {
+    border-color: #475569;
+    background: #0f172a;
+    color: #f8fafc;
+  }
+
+  .pwa-update-copy span {
+    color: #cbd5e1;
+  }
+
+  .pwa-update-primary {
+    border-color: #f8fafc;
+    background: #f8fafc;
+    color: #0f172a;
+  }
+
+  .pwa-update-secondary {
+    border-color: #64748b;
+    background: #1e293b;
+    color: #f8fafc;
+  }
+}
