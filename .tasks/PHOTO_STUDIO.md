@@ -26,11 +26,10 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current branch head recorded by this tracker: `5d842b1d07c31f3b383a2e37b4fec8bf50e0b693`
-- Current `main` observed before this update: `fbfade09aec3f73eb70a4d202949329036883947`
+- Current verified implementation head before this tracker-only commit: `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce`
+- Current `main` observed during this checkpoint: `fbfade09aec3f73eb70a4d202949329036883947`
 - Current phase: **Task 4 — export/metadata/batch hardening, workspace integration, final verification**
-- Last fully verified exact-head CI evidence: workflow run `34633141208` completed successfully for `25e6754056835864fe0240da7fe12aa1ee2a4948`.
-- Newer tone-curve commits are **not yet final evidence** until a workflow for the newer head completes successfully.
+- Last fully verified exact-head CI evidence: workflow run `34641753678` completed successfully for `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce`; unit tests, production build, and focused browser tests all succeeded on the PR merge state.
 
 ## Verified progress
 
@@ -44,8 +43,8 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Batch engine contract exists for sequential processing and per-file failure isolation without retaining output blobs in the summary.
 - [x] Safe editable export-filename contract exists.
 - [x] Unified single/batch export orchestration exists for metadata policy, embedding fallback, output sharpening, and filename handling.
-- [x] Exact-head CI at `25e6754056835864fe0240da7fe12aa1ee2a4948` passed the repository unit suite, production build, and focused Photo Studio browser tests through PR validation run `34633141208`.
-- [x] Tone-curve editing helpers and a self-contained accessible control now exist with focused invariants for point ordering, endpoint anchoring, add/update/remove/reset behavior, graph insertion, and responsive/reduced-motion styling.
+- [x] Tone-curve editing helpers and a self-contained accessible control exist with focused invariants for point ordering, endpoint anchoring, add/update/remove/reset behavior, graph insertion, and responsive/reduced-motion styling.
+- [x] Exact-head CI at `a0ec4ee85af8a5042cdf55fc9dddce13ac4dc0ce` passed the repository unit suite, production build, and focused Photo Studio browser tests through PR validation run `34641753678`.
 
 ## Remaining release work
 
