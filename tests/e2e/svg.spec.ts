@@ -25,8 +25,6 @@ test('compiles collision-safe symbols, isolates bad files, previews safely, and 
   expect(internal).toBeTruthy();
   expect(text).toContain(`url(#${internal})`);
 
-  // Every compiled symbol gets light/dark image-context previews instead of
-  // injecting uploaded SVG markup directly into the application DOM.
   await expect(page.getByRole('img', { name: /preview/i })).toHaveCount(8);
 
   await page.getByRole('checkbox', { name: /Normalize literal/ }).uncheck();
@@ -87,6 +85,7 @@ test('Vector Studio creates, precisely edits, exports metadata, and reflows with
   await expect(page.getByTestId('vector-layer')).toHaveCount(2);
   await page.getByRole('button', { name: 'Send backward' }).click();
 
+  await page.getByRole('tab', { name: 'Export' }).click();
   await page.locator('#vector-export-title').fill('Launch mark');
   await page.locator('#vector-export-tags').fill('brand, launch, web');
   await page.getByRole('button', { name: 'Preview SVG source' }).click();
@@ -100,6 +99,29 @@ test('Vector Studio creates, precisely edits, exports metadata, and reflows with
   expect(overflows).toBe(false);
 });
 
+test('Vector Studio pan tool moves the artboard viewport rather than acting as a decorative control', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 700 });
+  await page.goto('./#/tools/svg-sprite-compiler');
+  await page.getByRole('button', { name: 'Zoom to 100 percent' }).click();
+  const scroller = page.locator('.vector-canvas-scroll');
+  await scroller.evaluate((element) => { element.scrollLeft = 320; element.scrollTop = 220; });
+  const before = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
+  expect(before.left).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: 'Pan tool' }).click();
+  const canvas = page.getByTestId('vector-canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Vector canvas has no bounding box.');
+  await page.mouse.move(box.x + 180, box.y + 150);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 260, box.y + 210, { steps: 4 });
+  await page.mouse.up();
+
+  const after = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
+  expect(after.left).toBeLessThan(before.left);
+  expect(after.top).toBeLessThan(before.top);
+});
+
 test('Vector Studio imports project JSON and offers accessible non-drag layer ordering', async ({ page }) => {
   await page.goto('./#/tools/svg-sprite-compiler');
   const project = {
@@ -111,6 +133,7 @@ test('Vector Studio imports project JSON and offers accessible non-drag layer or
   };
   await page.locator('#vector-project-import').setInputFiles({ name: 'fixture.inmovector.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
   await expect(page.getByTestId('vector-layer')).toContainText('Imported rectangle');
+  await page.getByRole('tab', { name: 'Layers' }).click();
   await page.getByTestId('vector-layer').click();
   await page.getByRole('button', { name: 'Bring forward' }).click();
   await page.getByRole('button', { name: 'Bring to front' }).click();
