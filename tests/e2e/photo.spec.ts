@@ -5,9 +5,15 @@ const FIXTURE_PNG = Buffer.from(
   'base64',
 );
 
+async function expectWorkspace(page: Page) {
+  const workspace = page.getByTestId('suite-workspace');
+  await expect(workspace.getByRole('heading', { name: 'Photo Studio', exact: true })).toBeVisible();
+  return workspace;
+}
+
 async function openFixture(page: Page) {
   await page.goto('/inmotools/#/tools/photo-studio');
-  await expect(page.getByRole('heading', { name: /Photo Studio/i })).toBeVisible();
+  await expectWorkspace(page);
   await page.setInputFiles('[data-testid="photo-file-input"]', {
     name: 'fixture.png',
     mimeType: 'image/png',
@@ -72,7 +78,7 @@ test('keyboard undo and redo work without pointer-only interaction', async ({ pa
 test('reflows without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/inmotools/#/tools/photo-studio');
-  await expect(page.getByRole('heading', { name: /Photo Studio/i })).toBeVisible();
+  await expectWorkspace(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
 });
