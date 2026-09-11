@@ -1,6 +1,6 @@
 # Repository Governance
 
-**As of:** 2026-08-31
+**As of:** 2026-09-11
 
 This file is the north-star single source of truth (SSOT) for repository governance. It applies to every human or automated actor performing Create, Read, Update, or Delete operations in this repository.
 
@@ -15,6 +15,7 @@ Use these verified repository locations as the authoritative directory for their
 - `package.json` — executable project scripts and dependency declarations.
 - `.github/workflows/pages.yml` — CI validation and GitHub Pages deployment pipeline.
 - `.tasks/` — repository task-tracking state when task planning is in use.
+- `.tasks/PROJECT_COMPLETION.md` — deterministic repository/workstream completion gates and progress-freshness contract.
 - `docs/superpowers/specs/` — project design/specification records.
 - `docs/superpowers/plans/` — project implementation-plan records.
 
@@ -90,7 +91,21 @@ If secret-scanning or repository evidence indicates sensitive material exists, r
 
 Never place private chain-of-thought, hidden reasoning, scratchpad material, confidence percentages, uncertainty meta-commentary, or model/provider-specific instructions in repository artifacts. Repository rationale must be concise, factual, and maintainability-relevant.
 
-### 7. Validate against the verified project baseline
+### 7. Keep completion and progress state deterministic and current
+
+`.tasks/PROJECT_COMPLETION.md` defines the repository finish line. The existing `.tasks` state files are the live progress record and must remain synchronized with implementation state.
+
+- Accepted active work belongs in `IN_PROGRESS.md`; accepted queued work belongs in `NEXT.md`; deferred work belongs in `BACKLOG.md`.
+- A material milestone change must update the corresponding task state in the same execution cycle.
+- Newly discovered material work must be recorded before the execution cycle ends; it may not disappear merely because it is outside the current patch.
+- Work may move to `DONE.md` and `WORK_LOG.md` only after the applicable completion gates have fresh evidence.
+- Rejected scope must move to `REJECTED.md` with rationale rather than being silently removed.
+- Parallel branches do not create separate truth. Their intended progress must reconcile into the main task state when integrated.
+- If implementation state and `.tasks` disagree, task tracking is stale and the repository cannot be declared complete until they are reconciled.
+
+Do not weaken completion criteria to make the project appear finished. New user-approved scope may reopen a previously complete project by entering the task-state system.
+
+### 8. Validate against the verified project baseline
 
 Use the current validation entrypoints declared by `package.json` and the CI behavior defined by `.github/workflows/pages.yml`; do not rely on remembered commands.
 
@@ -98,7 +113,7 @@ Capture the pre-write baseline before attributing failures to a change. If the b
 
 Do not claim a test, build, deployment, route, or feature passes without fresh evidence from the corresponding validation surface.
 
-### 8. Close with a post-execution verification pass
+### 9. Close with a post-execution verification pass
 
 Before declaring completion, re-read final repository state and verify:
 
@@ -110,7 +125,8 @@ Before declaring completion, re-read final repository state and verify:
 - no destructive history operation occurred unless explicitly justified and authorized;
 - the final change set is atomic and scoped;
 - the working tree is clean when a local checkout exists, or remote-only execution is accurately reported;
-- validation evidence is fresh and accurately characterized; and
+- validation evidence is fresh and accurately characterized;
+- `.tasks` accurately reflects active, queued, deferred, rejected, and completed work; and
 - no secrets, confidence disclosures, private reasoning, or model/provider-specific instructions leaked into repository artifacts.
 
 Any failed condition remains an open item or blocker and must be reported as such.
@@ -131,4 +147,5 @@ Keep the execution report outside the repository. It must include, as applicable
 
 ## Change history
 
+- **2026-09-11:** Added the deterministic project-completion contract to the SSOT directory and made task-state freshness a binding lifecycle invariant.
 - **2026-08-31:** Created the repository-wide governance SSOT, consolidated governing CRUD rules into one neutral root document, and retired redundant instruction surfaces.
