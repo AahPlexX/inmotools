@@ -45,7 +45,8 @@ function histogramPath(values: number[], width = 256, height = 56): string {
 }
 
 function pointerPoint(event: ReactPointerEvent<HTMLElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
+  const image = event.currentTarget.querySelector<HTMLElement>('.photo-preview-image');
+  const rect = (image ?? event.currentTarget).getBoundingClientRect();
   const x = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
   const y = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
   return {
