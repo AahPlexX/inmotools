@@ -9,6 +9,7 @@ import {
   sampleHistogram,
   undoHistory,
 } from '../../src/tools/photo/photo-engine';
+import { mapPhotoGeometryPoint, warpPhotoGeometryPixels } from '../../src/tools/photo/photo-geometry';
 import { safePhotoFilename, serializePhotoXmp } from '../../src/tools/photo/photo-metadata';
 import {
   fitDimensionsWithinLimits,
@@ -147,6 +148,41 @@ describe('Photo Studio engine', () => {
     applyPixelAdjustments(pixels, 3, 1, recipe);
     expect(pixels[8] - pixels[0]).toBeGreaterThan(beforeDelta);
     expect(pixels[3]).toBe(255);
+  });
+
+  test('neutral geometry mapping is an exact identity', () => {
+    expect(mapPhotoGeometryPoint(0.2, 0.7, 0, 0, 0)).toEqual({ x: 0.2, y: 0.7 });
+    expect(mapPhotoGeometryPoint(0.5, 0.5, 0.8, -0.6, 0.9)).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  test('lens and perspective corrections displace edges while keeping finite coordinates', () => {
+    const lens = mapPhotoGeometryPoint(0.8, 0.8, 0.8, 0, 0);
+    expect(lens.x).toBeGreaterThan(0.8);
+    expect(lens.y).toBeGreaterThan(0.8);
+
+    const top = mapPhotoGeometryPoint(0.8, 0.2, 0, 0.7, 0);
+    const bottom = mapPhotoGeometryPoint(0.8, 0.8, 0, 0.7, 0);
+    expect(top.x).not.toBeCloseTo(bottom.x, 5);
+    expect(Number.isFinite(top.x)).toBe(true);
+    expect(Number.isFinite(bottom.x)).toBe(true);
+  });
+
+  test('neutral geometry warp is byte-for-byte lossless', () => {
+    const pixels = new Uint8ClampedArray([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      255, 255, 255, 255,
+    ]);
+    expect([...warpPhotoGeometryPixels(pixels, 2, 2, 0, 0, 0)]).toEqual([...pixels]);
+  });
+
+  test('geometry warp preserves dimensions and produces transparent pixels outside the corrected source', () => {
+    const pixels = new Uint8ClampedArray(5 * 5 * 4).fill(255);
+    const warped = warpPhotoGeometryPixels(pixels, 5, 5, 1, 0, 0);
+    expect(warped).toHaveLength(pixels.length);
+    const transparentPixels = Array.from({ length: 25 }, (_, index) => warped[index * 4 + 3]).filter((alpha) => alpha === 0);
+    expect(transparentPixels.length).toBeGreaterThan(0);
   });
 
   test('XMP escapes text and maps reviewed rights/descriptive fields', () => {
