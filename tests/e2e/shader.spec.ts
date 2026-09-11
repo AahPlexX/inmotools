@@ -124,19 +124,17 @@ test('a lost WebGL context can be restored and rebuilds the linked shader resour
   test.skip(!supported, 'WEBGL_lose_context is unavailable in this browser.');
 
   await canvas.evaluate((element: HTMLCanvasElement) => {
-    element.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+    const extension = element.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+    if (!extension) throw new Error('Context loss extension disappeared before the test.');
+    (window as unknown as { restoreShaderContext: () => void }).restoreShaderContext = () => extension.restoreContext();
+    extension.loseContext();
   });
-  await page.waitForTimeout(150);
-  const lostStatus = await page.locator('.status-line').textContent();
+  await expect(page.locator('.status-line')).toContainText('context lost');
 
-  await canvas.evaluate((element: HTMLCanvasElement) => {
-    element.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.restoreContext();
+  await page.evaluate(() => {
+    (window as unknown as { restoreShaderContext: () => void }).restoreShaderContext();
   });
-  await page.waitForTimeout(800);
-  const restoredStatus = await page.locator('.status-line').textContent();
-
-  expect(lostStatus).toMatch(/context lost/i);
-  expect(restoredStatus).toMatch(/restored|compiled and linked successfully|linked with \d+ compiler message/i);
+  await waitForLinkedShader(page);
 });
 
 test('keyboard arrows update u_mouse and redraw a paused focused preview', async ({ page }, testInfo) => {
