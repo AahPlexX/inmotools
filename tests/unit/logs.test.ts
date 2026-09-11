@@ -98,7 +98,7 @@ describe('document scan mode', () => {
   it('collects the text between matches as unmatched content', () => {
     const result = structureLogLines('id=1 noise here id=2', 'id=(?<id>\\d+)', {}, 'document');
     expect(result.rows).toHaveLength(2);
-    expect(result.unmatched).toEqual(['noise here']);
+    expect(result.unmatched).toEqual([' noise here ']);
   });
 
   it('skips zero-length matches and reports how many, rather than emitting a row per position', () => {

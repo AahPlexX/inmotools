@@ -110,7 +110,7 @@ function structureWholeDocument(input: string, pattern: string, flags: LogPatter
       continue;
     }
     const start = match.index ?? 0;
-    pushGap(unmatched, unmatchedLineNumbers, input.slice(cursor, start), lineNumberAt(lineStarts, cursor));
+    pushGap(unmatched, unmatchedLineNumbers, input.slice(cursor, start), lineNumberAt(lineStarts, cursor), cursor === 0 || input[cursor - 1] === '\n');
     cursor = start + match[0].length;
 
     const groups = match.groups ?? {};
@@ -119,7 +119,7 @@ function structureWholeDocument(input: string, pattern: string, flags: LogPatter
     rowLineNumbers.push(lineNumberAt(lineStarts, start));
   }
 
-  pushGap(unmatched, unmatchedLineNumbers, input.slice(cursor), lineNumberAt(lineStarts, cursor));
+  pushGap(unmatched, unmatchedLineNumbers, input.slice(cursor), lineNumberAt(lineStarts, cursor), cursor === 0 || input[cursor - 1] === '\n');
   return {
     columns: discovered,
     rows,
@@ -131,7 +131,7 @@ function structureWholeDocument(input: string, pattern: string, flags: LogPatter
   };
 }
 
-function pushGap(unmatched: string[], lineNumbers: number[], gap: string, startingLine: number): void {
+function pushGap(unmatched: string[], lineNumbers: number[], gap: string, startingLine: number, startsAtLineBoundary: boolean): void {
   if (!gap.length) return;
   const beginsWithBreak = /^(?:\r\n|\n)/.test(gap);
   const endsWithBreak = /(?:\r\n|\n)$/.test(gap);
@@ -140,7 +140,7 @@ function pushGap(unmatched: string[], lineNumbers: number[], gap: string, starti
   let last = lines.length;
   let line = startingLine;
 
-  if (beginsWithBreak) {
+  if (beginsWithBreak && !startsAtLineBoundary) {
     first += 1;
     line += 1;
   }

@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { extractGroupNames, rowsToCsv, structureLogLines, unmatchedToTsv } from '../../src/tools/logs/log-engine';
 
 describe('log structurer audit regressions', () => {
+  it('preserves a blank first line and a blank line following a consumed newline', () => {
+    const result = structureLogLines('\nMATCH\n\nrest', '(?<value>MATCH\\n)', {}, 'document');
+    expect(result.unmatched).toEqual(['', '', 'rest']);
+    expect(result.unmatchedLineNumbers).toEqual([1, 3, 4]);
+  });
   it('derives escaped named captures from ECMAScript regex semantics', () => {
     const pattern = String.raw`(?<plain>\w+)-(?<\u0061>a)`;
     expect(extractGroupNames(pattern)).toEqual(['plain', 'a']);

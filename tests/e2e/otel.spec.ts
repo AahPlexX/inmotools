@@ -29,3 +29,15 @@ test('matches the backing canvas to a narrow rendered width and caps vertical bi
  expect(metrics.touchAction).toContain('pan-y');
  expect(metrics.touchAction).toContain('pinch-zoom');
 });
+
+test('ordinary wheel scrolling reaches later lanes without changing timeline zoom', async ({ page, isMobile }) => {
+ test.skip(isMobile, 'Mouse wheel behavior is checked in the desktop project.');
+ const spans=Array.from({length:80},(_,index)=>({traceID:'trace-many',spanID:String(index).padStart(16,'0'),operationName:`overlap-${index}`,references:[],startTime:1000000,duration:100000,processID:'p',tags:[]}));
+ await page.goto('./#/tools/otel-flamegraph');
+ await page.locator('#otel-file').setInputFiles({name:'many.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({data:[{traceID:'trace-many',processes:{p:{serviceName:'svc'}},spans}]}))});
+ const canvas=page.locator('canvas[aria-label^="Trace flamegraph"]');
+ await expect(canvas).toBeVisible();
+ await canvas.hover();
+ await page.mouse.wheel(0, 400);
+ await expect.poll(() => page.getByRole('region', { name: 'Scrollable trace flamegraph' }).evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+});

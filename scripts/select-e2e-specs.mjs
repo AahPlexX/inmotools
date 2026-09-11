@@ -24,7 +24,7 @@ const TOOL_SPECS = new Map([
   ['otel', ['tests/e2e/otel.spec.ts']],
   ['pdf', ['tests/e2e/pdf.spec.ts']],
   ['regex', ['tests/e2e/regex-matrix.spec.ts', 'tests/e2e/regex-matrix-audit.spec.ts']],
-  ['shader', ['tests/e2e/audit-hardening.spec.ts']],
+  ['shader', ['tests/e2e/shader.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],

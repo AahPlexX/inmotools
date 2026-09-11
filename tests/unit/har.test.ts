@@ -112,3 +112,21 @@ describe('base64 bodies', () => {
     expect(readBody({encoding:'base64',text:'not base64 at all!!'}).wasBase64).toBe(false);
   });
 });
+
+it('round-trips significant decimal digits and underflow without changing valid numeric metadata', () => {
+  const source = '{"exact":0.123456789012345678901,"tiny":1e-400,"ordinary":0.125,"scientific":1.25e2}';
+  const parsed = harEngine.parseHarJson(source);
+  const output = harEngine.stringifyHarJson(parsed);
+  expect(output).toContain('0.123456789012345678901');
+  expect(output).toContain('1e-400');
+  expect(parsed.ordinary).toBe(0.125);
+  expect(parsed.scientific).toBe(125);
+});
+
+it('uses protected decimal timings for the waterfall while preserving their exact lexeme', () => {
+  const parsed = harEngine.parseHarJson('{"log":{"entries":[{"startedDateTime":"2026-01-01T00:00:00Z","time":123.456789012345678901,"timings":{"wait":123.456789012345678901}}]}}');
+  const row = harEngine.buildWaterfallRows(parsed)[0];
+  expect(row.totalMs).toBeCloseTo(123.45678901234568);
+  expect(row.phases.wait).toBeCloseTo(123.45678901234568);
+  expect(harEngine.stringifyHarJson(parsed)).toContain('123.456789012345678901');
+});

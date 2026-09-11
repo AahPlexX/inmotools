@@ -14,11 +14,21 @@ const MAX_SAFE_INTEGER_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_INTEGER_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
 function rawJsonNumber(source: string): RawJsonNumber {
-  return Object.freeze({ [RAW_JSON_NUMBER]: source });
+  return Object.freeze({ [RAW_JSON_NUMBER]: source, [Symbol.toPrimitive]: (hint: string) => hint === 'number' ? Number(source) : source });
 }
 
 function isRawJsonNumber(value: unknown): value is RawJsonNumber {
   return Boolean(value && typeof value === 'object' && RAW_JSON_NUMBER in value);
+}
+
+function normalizedDecimal(token: string): string {
+  const [coefficient, exponent = '0'] = token.toLowerCase().split('e');
+  const negative = coefficient.startsWith('-');
+  const [whole, fraction = ''] = coefficient.replace(/^-/, '').split('.');
+  const digits = (whole + fraction).replace(/^0+/, '').replace(/0+$/, '');
+  if (!digits) return '0';
+  const trailingZeros = (whole + fraction).match(/0+$/)?.[0].length ?? 0;
+  return `${negative ? '-' : ''}${digits}e${BigInt(exponent) - BigInt(fraction.length) + BigInt(trailingZeros)}`;
 }
 
 function shouldProtectJsonNumber(token: string): boolean {
@@ -31,7 +41,10 @@ function shouldProtectJsonNumber(token: string): boolean {
     }
   }
   const numeric = Number(token);
-  return !Number.isFinite(numeric) || (Number.isInteger(numeric) && !Number.isSafeInteger(numeric));
+  if (!Number.isFinite(numeric) || (Number.isInteger(numeric) && !Number.isSafeInteger(numeric))) return true;
+  // Avoid constructing enormous exponents; retaining the token is lossless.
+  if ((token.split(/[eE]/)[1]?.length ?? 0) > 6) return true;
+  return normalizedDecimal(token) !== normalizedDecimal(String(numeric));
 }
 
 /**
@@ -314,7 +327,10 @@ export async function sanitizeHar<T extends HarLike>(har: T, policy: HarSanitize
   return { har: output, findings: originalFindings, originalFindings, outputFindings, changedFindings, remainingFindings };
 }
 
-const phaseValue = (value: unknown) => typeof value === 'number' && value > 0 ? value : 0;
+const phaseValue = (value: unknown) => {
+  const numeric = typeof value === 'number' ? value : isRawJsonNumber(value) ? Number(value[RAW_JSON_NUMBER]) : 0;
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+};
 export function buildWaterfallRows(har: HarLike) {
   const entries = har.log?.entries ?? [];
   const times = entries.map((entry) => Date.parse(entry.startedDateTime)).filter(Number.isFinite);
