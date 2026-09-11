@@ -71,10 +71,34 @@ export interface PerpendicularConstraint extends ConstraintBase {
   lineBId: string;
 }
 
+export interface ParallelConstraint extends ConstraintBase {
+  type: 'parallel';
+  lineAId: string;
+  lineBId: string;
+}
+
 export interface TangentConstraint extends ConstraintBase {
   type: 'tangent';
   lineId: string;
   circleId: string;
+}
+
+export interface ConcentricConstraint extends ConstraintBase {
+  type: 'concentric';
+  circleAId: string;
+  circleBId: string;
+}
+
+export interface EqualLengthConstraint extends ConstraintBase {
+  type: 'equal-length';
+  lineAId: string;
+  lineBId: string;
+}
+
+export interface EqualRadiusConstraint extends ConstraintBase {
+  type: 'equal-radius';
+  circleAId: string;
+  circleBId: string;
 }
 
 export type SketchConstraint =
@@ -85,7 +109,11 @@ export type SketchConstraint =
   | CoincidentConstraint
   | RadiusConstraint
   | PerpendicularConstraint
-  | TangentConstraint;
+  | ParallelConstraint
+  | TangentConstraint
+  | ConcentricConstraint
+  | EqualLengthConstraint
+  | EqualRadiusConstraint;
 
 export type SketchPlane =
   | { kind: 'origin'; plane: 'XY' | 'XZ' | 'YZ' }
