@@ -164,6 +164,17 @@ function residualForConstraint(
       if (scale <= MIN_GEOMETRY_SCALE) throw new Error(`Perpendicular constraint '${constraint.id}' requires non-zero line lengths.`);
       return [(adx * bdx + ady * bdy) / scale];
     }
+    case 'parallel': {
+      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
+      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const adx = a1[0] - a0[0];
+      const ady = a1[1] - a0[1];
+      const bdx = b1[0] - b0[0];
+      const bdy = b1[1] - b0[1];
+      const scale = Math.hypot(adx, ady) * Math.hypot(bdx, bdy);
+      if (scale <= MIN_GEOMETRY_SCALE) throw new Error(`Parallel constraint '${constraint.id}' requires non-zero line lengths.`);
+      return [(adx * bdy - ady * bdx) / scale];
+    }
     case 'tangent': {
       const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
       const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
@@ -175,6 +186,20 @@ function residualForConstraint(
       const distance = Math.abs(dx * (cy - ay) - dy * (cx - ax)) / length;
       return [distance - radius];
     }
+    case 'concentric': {
+      const [ax, ay] = circleCenter(values, points, circles, constraint.circleAId);
+      const [bx, by] = circleCenter(values, points, circles, constraint.circleBId);
+      return [bx - ax, by - ay];
+    }
+    case 'equal-length': {
+      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
+      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const aLength = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
+      const bLength = Math.hypot(b1[0] - b0[0], b1[1] - b0[1]);
+      return [bLength - aLength];
+    }
+    case 'equal-radius':
+      return [circleRadius(values, circles, constraint.circleBId) - circleRadius(values, circles, constraint.circleAId)];
   }
 }
 
