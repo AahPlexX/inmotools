@@ -59,6 +59,8 @@ export function baseElement(type: VectorElement['type'], name: string, x: number
     width,
     height,
     rotation: 0,
+    flipX: false,
+    flipY: false,
     opacity: 1,
     visible: true,
     locked: false,
@@ -351,7 +353,12 @@ export function radialRepeatSelection(document: VectorDocument, selection: reado
 
 export function mirrorSelection(document: VectorDocument, selection: readonly string[], axis: 'horizontal' | 'vertical'): VectorDocument {
   const ids = new Set(selection);
-  return mapElements(document, ids, (element) => ({ ...element, rotation: axis === 'horizontal' ? -element.rotation : 180 - element.rotation } as VectorElement));
+  return mapElements(document, ids, (element) => {
+    if (element.locked) return element;
+    return axis === 'horizontal'
+      ? ({ ...element, flipX: !Boolean(element.flipX), flipY: Boolean(element.flipY) } as VectorElement)
+      : ({ ...element, flipX: Boolean(element.flipX), flipY: !Boolean(element.flipY) } as VectorElement);
+  });
 }
 
 export function createHistory(document: VectorDocument, limit = 80): VectorHistory {
