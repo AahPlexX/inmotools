@@ -6,7 +6,7 @@
 **Authoritative design:** `docs/superpowers/specs/2026-09-11-cad-studio-design.md`
 **Authoritative plan:** `docs/superpowers/plans/2026-09-11-cad-studio.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `9a4dcd6f2092d08ae369c3f5b45c20b0eeb48bfd`
+**Last tracked implementation commit:** `ee81f295bb1224bc7911d1d483cd2382ec153442`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 12
 **Completed user-facing capabilities:** 0 / 100
@@ -58,6 +58,7 @@ Infrastructure that enables a capability does not count as the capability itself
 - Topology-reference RED was observed on `7ef0e3bab07581c809121f64a00c35a3f49461d2`; implementation on `211abe88e5023cb0245afa404d06b6618e2f2f7a` passed unit tests and build.
 - Parameter-expression RED was observed on `6a1e5f32a05d6cf21728c20a0bab63a328aa673b`; the implementation plus tolerance-correct test at `93bcc6d60340d81a0c4b968e9dc2883858807fb5` passed the complete unit suite and production build.
 - Constrained-sketch solver contracts were added at `36c750764db204ac33634abbfcfa5ac552b3abe6`. Serializable sketch types and the initial deterministic hard-constraint solver through `9a4dcd6f2092d08ae369c3f5b45c20b0eeb48bfd` now pass the complete unit suite and production build. The freshness guard passes in the same validation path.
+- Curved-constraint RED contracts were added at `ee81f295bb1224bc7911d1d483cd2382ec153442` for circle radius as a geometric degree of freedom, perpendicular line pairs, and line-circle tangency. The first validation run reached unit tests and failed as expected; the ledger is now aligned so the next run can isolate feature-contract failures from the freshness guard before implementation.
 - The initial solver supports point/line entities plus fixed-point, horizontal, vertical, point-distance, coincident, DOF rank analysis, disabled constraints, soft drag seeding, and explicit conflict reporting. This is not yet the full 17–32 constraint capability set.
 - G4 remains incomplete until the remaining required constraint/dimension family, sketch entities, and end-user sketch operations are implemented and green.
 - Final PR/browser/main/Pages status is intentionally owned by G11, so transient CI state changes do not force this ledger into a self-triggering update loop.
