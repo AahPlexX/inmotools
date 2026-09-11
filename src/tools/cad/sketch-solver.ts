@@ -200,6 +200,26 @@ function residualForConstraint(
     }
     case 'equal-radius':
       return [circleRadius(values, circles, constraint.circleBId) - circleRadius(values, circles, constraint.circleAId)];
+    case 'midpoint': {
+      const [px, py] = coordinates(values, points, constraint.pointId);
+      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      return [px - (ax + bx) / 2, py - (ay + by) / 2];
+    }
+    case 'point-on-line': {
+      const [px, py] = coordinates(values, points, constraint.pointId);
+      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const dx = bx - ax;
+      const dy = by - ay;
+      const length = Math.hypot(dx, dy);
+      if (length <= MIN_GEOMETRY_SCALE) throw new Error(`Point-on-line constraint '${constraint.id}' requires a non-zero line length.`);
+      return [(dx * (py - ay) - dy * (px - ax)) / length];
+    }
+    case 'point-on-circle': {
+      const [px, py] = coordinates(values, points, constraint.pointId);
+      const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
+      const radius = circleRadius(values, circles, constraint.circleId);
+      return [Math.hypot(px - cx, py - cy) - radius];
+    }
   }
 }
 
