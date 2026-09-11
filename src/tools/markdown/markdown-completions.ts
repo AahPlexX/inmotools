@@ -83,6 +83,11 @@ const optionsForPrefix = (typed: string): Completion[] => {
  * Suggestions intentionally activate only at the start of a Markdown line.
  * That keeps normal prose quiet while making structural Markdown syntax easy
  * to discover. Ctrl/Cmd+Space on an empty line exposes the complete palette.
+ *
+ * The source has already filtered options by Markdown punctuation, so the
+ * completion plugin's default label-based fuzzy filtering is disabled. If it
+ * were left enabled, a trigger such as "#" would be compared with labels such
+ * as "Heading 1" and every valid suggestion would be filtered out.
  */
 export const markdownSyntaxCompletions: CompletionSource = (context) => {
   const line = context.state.doc.lineAt(context.pos);
@@ -92,7 +97,7 @@ export const markdownSyntaxCompletions: CompletionSource = (context) => {
 
   if (typed.length === 0) {
     if (!context.explicit) return null;
-    return { from: context.pos, options: ALL_OPTIONS };
+    return { from: context.pos, options: ALL_OPTIONS, filter: false };
   }
 
   const options = optionsForPrefix(typed);
@@ -101,5 +106,6 @@ export const markdownSyntaxCompletions: CompletionSource = (context) => {
   return {
     from: line.from + indent.length,
     options,
+    filter: false,
   };
 };
