@@ -346,9 +346,11 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const context = getContext2d(canvas);
     const imageData = context.getImageData(0, 0, target.width, target.height);
     const processed = await processPixels(imageData.data, target.width, target.height, recipe, request.revision);
-    const processedImage = new ImageData(processed, target.width, target.height);
+    const ownedPixels = new Uint8ClampedArray(processed.length);
+    ownedPixels.set(processed);
+    const processedImage = new ImageData(ownedPixels, target.width, target.height);
     context.putImageData(processedImage, 0, 0);
-    const histogram = sampleHistogram(processed);
+    const histogram = sampleHistogram(ownedPixels);
 
     const mime = request.outputMime ?? 'image/png';
     const outputCanvas = mime === 'image/jpeg'
