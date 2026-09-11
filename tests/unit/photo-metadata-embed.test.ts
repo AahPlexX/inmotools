@@ -67,13 +67,14 @@ describe('Photo Studio embedded XMP', () => {
   test('WebP upgrades a simple file to VP8X and sets the XMP feature bit', () => {
     const xmp = '<x:xmpmeta>webp metadata</x:xmpmeta>';
     const output = embedPhotoXmpBytes(minimalWebp(), 'image/webp', xmp, { width: 1, height: 1 });
-    expect(decoder.decode(output.slice(0, 12))).toBe('RIFF\u0012\u0000\u0000\u0000WEBP');
+    expect(decoder.decode(output.slice(0, 4))).toBe('RIFF');
+    expect(decoder.decode(output.slice(8, 12))).toBe('WEBP');
     const text = decoder.decode(output);
     expect(text).toContain('VP8X');
     expect(text).toContain('XMP ');
     expect(text).toContain(xmp);
     expect(output[20] & 0x04).toBe(0x04);
-    const riffSize = output[4] | (output[5] << 8) | (output[6] << 16) | (output[7] << 24);
+    const riffSize = (output[4] | (output[5] << 8) | (output[6] << 16) | ((output[7] << 24) >>> 0)) >>> 0;
     expect(riffSize).toBe(output.length - 8);
   });
 });
