@@ -26,10 +26,11 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Branch head when this tracker was established: `25e6754056835864fe0240da7fe12aa1ee2a4948`
-- Current `main` observed before tracker creation: `fbfade09aec3f73eb70a4d202949329036883947`
+- Current branch head recorded by this tracker: `5d842b1d07c31f3b383a2e37b4fec8bf50e0b693`
+- Current `main` observed before this update: `fbfade09aec3f73eb70a4d202949329036883947`
 - Current phase: **Task 4 — export/metadata/batch hardening, workspace integration, final verification**
-- Last exact-head CI evidence: workflow run `34633141208` completed successfully for `25e6754056835864fe0240da7fe12aa1ee2a4948`.
+- Last fully verified exact-head CI evidence: workflow run `34633141208` completed successfully for `25e6754056835864fe0240da7fe12aa1ee2a4948`.
+- Newer tone-curve commits are **not yet final evidence** until a workflow for the newer head completes successfully.
 
 ## Verified progress
 
@@ -44,12 +45,13 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Safe editable export-filename contract exists.
 - [x] Unified single/batch export orchestration exists for metadata policy, embedding fallback, output sharpening, and filename handling.
 - [x] Exact-head CI at `25e6754056835864fe0240da7fe12aa1ee2a4948` passed the repository unit suite, production build, and focused Photo Studio browser tests through PR validation run `34633141208`.
+- [x] Tone-curve editing helpers and a self-contained accessible control now exist with focused invariants for point ordering, endpoint anchoring, add/update/remove/reset behavior, graph insertion, and responsive/reduced-motion styling.
 
 ## Remaining release work
 
 1. Wire the unified export orchestration into `PhotoWorkspace.tsx` so actual single-photo downloads use embedded metadata with sidecar fallback and editable filenames.
 2. Expose and verify batch workflow in the production workspace using the same export policy.
-3. Expose a usable tone-curve editor/control path backed by the existing recipe/renderer behavior; verify it is not inert.
+3. Wire `PhotoToneCurveControl` into the production edit inspector and prove changes flow through recipe history, preview, and export.
 4. Finish any remaining project/recipe import-export UI needed by the design contract and prove normalized round-trip behavior.
 5. Add focused browser coverage for the newly exposed export, metadata, batch, and tone-curve workflows; keep 320 CSS px reflow coverage.
 6. Re-read the design/spec feature inventory and account for every promised capability; remove or explicitly defer anything not intended for the deterministic completion goal.
