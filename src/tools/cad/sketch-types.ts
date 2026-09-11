@@ -58,6 +58,26 @@ export interface DistanceConstraint extends ConstraintBase {
   value: number;
 }
 
+export interface HorizontalDistanceConstraint extends ConstraintBase {
+  type: 'horizontal-distance';
+  pointAId: string;
+  pointBId: string;
+  value: number;
+}
+
+export interface VerticalDistanceConstraint extends ConstraintBase {
+  type: 'vertical-distance';
+  pointAId: string;
+  pointBId: string;
+  value: number;
+}
+
+export interface LengthConstraint extends ConstraintBase {
+  type: 'length';
+  lineId: string;
+  value: number;
+}
+
 export interface CoincidentConstraint extends ConstraintBase {
   type: 'coincident';
   pointAId: string;
@@ -67,6 +87,19 @@ export interface CoincidentConstraint extends ConstraintBase {
 export interface RadiusConstraint extends ConstraintBase {
   type: 'radius';
   circleId: string;
+  value: number;
+}
+
+export interface DiameterConstraint extends ConstraintBase {
+  type: 'diameter';
+  circleId: string;
+  value: number;
+}
+
+export interface AngleConstraint extends ConstraintBase {
+  type: 'angle';
+  lineAId: string;
+  lineBId: string;
   value: number;
 }
 
@@ -137,8 +170,13 @@ export type SketchConstraint =
   | HorizontalConstraint
   | VerticalConstraint
   | DistanceConstraint
+  | HorizontalDistanceConstraint
+  | VerticalDistanceConstraint
+  | LengthConstraint
   | CoincidentConstraint
   | RadiusConstraint
+  | DiameterConstraint
+  | AngleConstraint
   | PerpendicularConstraint
   | ParallelConstraint
   | TangentConstraint
