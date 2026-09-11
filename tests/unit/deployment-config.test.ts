@@ -35,6 +35,13 @@ describe('deployment and bundler contracts', () => {
     expect(entry).toContain('installPreloadErrorRecovery');
   });
 
+  it('ships a transitional rescue module for the stranded pre-fix Markdown chunk', () => {
+    const rescue = read('public/assets/MarkdownWorkspace-ybsZj5Uw.js');
+    expect(rescue).toContain("postMessage({ type: 'SKIP_WAITING' })");
+    expect(rescue).toContain("addEventListener('controllerchange'");
+    expect(rescue).toContain("getRegistration('/inmotools/')");
+  });
+
   it('keeps Pages deployment independent from browser validation while limiting deploys to main', () => {
     const workflow = read('.github/workflows/pages.yml');
     expect(workflow).toContain('validate:');
