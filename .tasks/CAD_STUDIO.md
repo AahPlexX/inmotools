@@ -6,8 +6,8 @@
 **Authoritative design:** `docs/superpowers/specs/2026-09-11-cad-studio-design.md`
 **Authoritative plan:** `docs/superpowers/plans/2026-09-11-cad-studio.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `6a1e5f32a05d6cf21728c20a0bab63a328aa673b`
-**Current gate:** G4 — named parameters and dimensional formulas
+**Last tracked implementation commit:** `5cd7550aa8c8ccd8e5846487b736be56bb25244f`
+**Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 12
 **Completed user-facing capabilities:** 0 / 100
 
@@ -49,15 +49,16 @@ The authoritative capability descriptions are numbered 1–100 in the design spe
 | 93–100 | Lightweight components | 0 / 8 |
 | **Total** |  | **0 / 100** |
 
-Infrastructure that enables a capability does not count as the capability itself. For example, the project engine and unit system are complete foundations but do not yet make capability 70 or 71 complete until the end-user parameter workflow exists and is validated.
+Infrastructure that enables a capability does not count as the capability itself. For example, the project engine, topology resolver, unit system, and parameter-expression engine are complete foundations but do not yet make capability 70 or 71 complete until the end-user parameter workflow exists and is validated.
 
 ## Current evidence snapshot
 
 - Project-engine RED was observed on commit `9b07be3ddda937815d32da93454ea123dcdbd293`; production implementation then passed unit tests and production build on `02f9d306c5dd9eb89c42076f7e185a0c5efbd79a`.
 - Unit-conversion RED was observed on `abcbe017fa4a6a9bc832f48b8d65e52707fcf22f`; implementation on `74f70c2caa9982ad3780d54efc9ffda8cdeb7a30` passed unit tests and build.
 - Topology-reference RED was observed on `7ef0e3bab07581c809121f64a00c35a3f49461d2`; implementation on `211abe88e5023cb0245afa404d06b6618e2f2f7a` passed unit tests and build.
-- Parameter-expression contracts were added at `6a1e5f32a05d6cf21728c20a0bab63a328aa673b` and are intentionally RED until `parameter-engine.ts` is implemented.
-- `main` currently contains unrelated concurrent Vector/Photo work; CAD remains isolated until the integration gate.
+- Parameter-expression RED was observed on `6a1e5f32a05d6cf21728c20a0bab63a328aa673b`; production implementation is now at `5cd7550aa8c8ccd8e5846487b736be56bb25244f` and awaits its GREEN CI result before parameter work is treated as validated.
+- G4 remains incomplete until the constrained sketch model, solver, degrees-of-freedom analysis, drag solve, and conflict isolation are implemented and green.
+- `main` contains unrelated concurrent work; CAD remains isolated until the integration gate.
 
 ## Freshness invariant
 
