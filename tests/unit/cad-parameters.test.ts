@@ -7,7 +7,9 @@ import {
 
 describe('CAD parameter expressions', () => {
   it('evaluates unit literals into canonical millimeters and radians', () => {
-    expect(evaluateParameterExpression('1 in + 12.7 mm', {})).toMatchObject({ dimension: 'length', value: 38.1 });
+    const length = evaluateParameterExpression('1 in + 12.7 mm', {});
+    expect(length.dimension).toBe('length');
+    expect(length.value).toBeCloseTo(38.1, 12);
     expect(evaluateParameterExpression('90 deg', {})).toMatchObject({ dimension: 'angle' });
     expect(evaluateParameterExpression('90 deg', {}).value).toBeCloseTo(Math.PI / 2, 12);
   });
