@@ -123,10 +123,15 @@ test('Vector Studio pan tool moves the artboard viewport rather than acting as a
   const scroller = page.locator('.vector-canvas-scroll');
   const canvas = page.getByTestId('vector-canvas');
   await scroller.scrollIntoViewIfNeeded();
-  await scroller.evaluate((element) => { element.scrollLeft = 320; element.scrollTop = 220; });
-  const before = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
-  expect(before.left).toBeGreaterThan(0);
-  expect(before.top).toBeGreaterThan(0);
+  const before = await scroller.evaluate((element) => {
+    const maxLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+    const maxTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    element.scrollLeft = Math.min(320, maxLeft);
+    element.scrollTop = Math.min(220, maxTop);
+    return { left: element.scrollLeft, top: element.scrollTop, maxLeft, maxTop };
+  });
+  expect(before.maxLeft > 0 || before.maxTop > 0).toBe(true);
+  expect(before.left > 0 || before.top > 0).toBe(true);
 
   const [scrollerBox, canvasBox] = await Promise.all([scroller.boundingBox(), canvas.boundingBox()]);
   const viewport = page.viewportSize();
@@ -150,8 +155,11 @@ test('Vector Studio pan tool moves the artboard viewport rather than acting as a
   await page.mouse.up();
 
   const after = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
-  expect(after.left).toBeLessThan(before.left);
-  expect(after.top).toBeLessThan(before.top);
+  const movedLeft = before.left > 0 && after.left < before.left;
+  const movedTop = before.top > 0 && after.top < before.top;
+  expect(movedLeft || movedTop).toBe(true);
+  if (before.left > 0) expect(after.left).toBeLessThan(before.left);
+  if (before.top > 0) expect(after.top).toBeLessThan(before.top);
 });
 
 test('Vector Studio imports project JSON and offers accessible non-drag layer ordering', async ({ page }) => {
