@@ -1,9 +1,12 @@
 import type {
   ColorGrade,
   HslAdjustment,
+  LocalAdjustment,
   PhotoHistogram,
   PhotoHistory,
+  PhotoMask,
   PhotoRecipe,
+  RetouchOperation,
   TonePoint,
 } from './photo-types';
 
@@ -128,57 +131,151 @@ function normalizeGrade(grade: ColorGrade): ColorGrade {
   };
 }
 
+function normalizeMask(mask: PhotoMask): PhotoMask {
+  const base = {
+    feather: clamp(mask.feather, 0, 1),
+    opacity: clamp(mask.opacity, 0, 1),
+    invert: Boolean(mask.invert),
+  };
+  switch (mask.type) {
+    case 'brush':
+      return {
+        type: 'brush',
+        points: mask.points.slice(0, 5000).map((point) => ({
+          x: clamp(point.x, 0, 1),
+          y: clamp(point.y, 0, 1),
+          pressure: clamp(point.pressure, 0, 1),
+        })),
+        radius: clamp(mask.radius, 0.001, 1),
+        ...base,
+      };
+    case 'radial':
+      return {
+        type: 'radial',
+        cx: clamp(mask.cx, 0, 1),
+        cy: clamp(mask.cy, 0, 1),
+        rx: clamp(mask.rx, 0.001, 1),
+        ry: clamp(mask.ry, 0.001, 1),
+        ...base,
+      };
+    case 'linear':
+      return {
+        type: 'linear',
+        x1: clamp(mask.x1, 0, 1),
+        y1: clamp(mask.y1, 0, 1),
+        x2: clamp(mask.x2, 0, 1),
+        y2: clamp(mask.y2, 0, 1),
+        ...base,
+      };
+    case 'luminance': {
+      const min = clamp(Math.min(mask.min, mask.max), 0, 1);
+      const max = clamp(Math.max(mask.min, mask.max), min, 1);
+      return { type: 'luminance', min, max, ...base };
+    }
+    case 'hue':
+      return {
+        type: 'hue',
+        center: ((Number.isFinite(mask.center) ? mask.center : 0) % 360 + 360) % 360,
+        range: clamp(mask.range, 0, 180),
+        ...base,
+      };
+  }
+}
+
+function normalizeLocalAdjustment(adjustment: LocalAdjustment): LocalAdjustment {
+  return {
+    id: adjustment.id || 'local-adjustment',
+    label: adjustment.label || 'Local adjustment',
+    enabled: adjustment.enabled !== false,
+    mask: normalizeMask(adjustment.mask),
+    effect: {
+      exposure: clamp(adjustment.effect.exposure, -5, 5),
+      saturation: clamp(adjustment.effect.saturation, -1, 1),
+      sharpness: clamp(adjustment.effect.sharpness, -1, 2),
+      blur: clamp(adjustment.effect.blur, 0, 1),
+    },
+  };
+}
+
+function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
+  if (operation.type === 'red-eye') {
+    return {
+      id: operation.id || 'red-eye',
+      type: 'red-eye',
+      x: clamp(operation.x, 0, 1),
+      y: clamp(operation.y, 0, 1),
+      radius: clamp(operation.radius, 0.001, 1),
+      strength: clamp(operation.strength, 0, 1),
+    };
+  }
+  return {
+    id: operation.id || operation.type,
+    type: operation.type,
+    sourceX: clamp(operation.sourceX, 0, 1),
+    sourceY: clamp(operation.sourceY, 0, 1),
+    targetX: clamp(operation.targetX, 0, 1),
+    targetY: clamp(operation.targetY, 0, 1),
+    radius: clamp(operation.radius, 0.001, 1),
+    feather: clamp(operation.feather, 0, 1),
+    opacity: clamp(operation.opacity, 0, 1),
+  };
+}
+
 export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
-  const cropWidth = clamp(recipe.crop?.width ?? 1, 0.001, 1);
-  const cropHeight = clamp(recipe.crop?.height ?? 1, 0.001, 1);
-  const cropX = clamp(recipe.crop?.x ?? 0, 0, 1 - cropWidth);
-  const cropY = clamp(recipe.crop?.y ?? 0, 0, 1 - cropHeight);
+  const source = cloneRecipe({ ...DEFAULT_RECIPE, ...recipe });
+  const cropWidth = clamp(source.crop?.width ?? 1, 0.001, 1);
+  const cropHeight = clamp(source.crop?.height ?? 1, 0.001, 1);
+  const cropX = clamp(source.crop?.x ?? 0, 0, 1 - cropWidth);
+  const cropY = clamp(source.crop?.y ?? 0, 0, 1 - cropHeight);
 
   return {
-    ...cloneRecipe({ ...DEFAULT_RECIPE, ...recipe }),
+    ...source,
     version: 1,
     crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
-    straighten: clamp(recipe.straighten, -45, 45),
-    rotateQuarterTurns: Math.round(recipe.rotateQuarterTurns ?? 0) % 4,
-    lensDistortion: clamp(recipe.lensDistortion, -1, 1),
-    perspectiveHorizontal: clamp(recipe.perspectiveHorizontal, -1, 1),
-    perspectiveVertical: clamp(recipe.perspectiveVertical, -1, 1),
+    straighten: clamp(source.straighten, -45, 45),
+    rotateQuarterTurns: Math.round(source.rotateQuarterTurns ?? 0) % 4,
+    lensDistortion: clamp(source.lensDistortion, -1, 1),
+    perspectiveHorizontal: clamp(source.perspectiveHorizontal, -1, 1),
+    perspectiveVertical: clamp(source.perspectiveVertical, -1, 1),
 
-    exposure: clamp(recipe.exposure, -5, 5),
-    contrast: clamp(recipe.contrast, -1, 1),
-    highlights: clamp(recipe.highlights, -1, 1),
-    shadows: clamp(recipe.shadows, -1, 1),
-    whites: clamp(recipe.whites, -1, 1),
-    blacks: clamp(recipe.blacks, -1, 1),
-    midtone: clamp(recipe.midtone, -1, 1),
-    toneCurve: normalizeToneCurve(recipe.toneCurve),
+    exposure: clamp(source.exposure, -5, 5),
+    contrast: clamp(source.contrast, -1, 1),
+    highlights: clamp(source.highlights, -1, 1),
+    shadows: clamp(source.shadows, -1, 1),
+    whites: clamp(source.whites, -1, 1),
+    blacks: clamp(source.blacks, -1, 1),
+    midtone: clamp(source.midtone, -1, 1),
+    toneCurve: normalizeToneCurve(source.toneCurve),
 
-    temperature: clamp(recipe.temperature, -1, 1),
-    tint: clamp(recipe.tint, -1, 1),
-    saturation: clamp(recipe.saturation, -1, 1),
-    vibrance: clamp(recipe.vibrance, -1, 1),
-    hsl: normalizeHsl(recipe.hsl),
-    shadowGrade: normalizeGrade(recipe.shadowGrade),
-    midtoneGrade: normalizeGrade(recipe.midtoneGrade),
-    highlightGrade: normalizeGrade(recipe.highlightGrade),
-    blackAndWhiteMix: Array.from({ length: HSL_SECTORS }, (_, index) => clamp(recipe.blackAndWhiteMix[index] ?? 1, 0, 2)),
+    temperature: clamp(source.temperature, -1, 1),
+    tint: clamp(source.tint, -1, 1),
+    saturation: clamp(source.saturation, -1, 1),
+    vibrance: clamp(source.vibrance, -1, 1),
+    hsl: normalizeHsl(source.hsl),
+    shadowGrade: normalizeGrade(source.shadowGrade),
+    midtoneGrade: normalizeGrade(source.midtoneGrade),
+    highlightGrade: normalizeGrade(source.highlightGrade),
+    blackAndWhiteMix: Array.from({ length: HSL_SECTORS }, (_, index) => clamp(source.blackAndWhiteMix[index] ?? 1, 0, 2)),
 
-    texture: clamp(recipe.texture, -1, 1),
-    clarity: clamp(recipe.clarity, -1, 1),
-    dehaze: clamp(recipe.dehaze, -1, 1),
-    sharpenAmount: clamp(recipe.sharpenAmount, 0, 2),
-    sharpenRadius: clamp(recipe.sharpenRadius, 0.1, 5),
-    sharpenThreshold: clamp(recipe.sharpenThreshold, 0, 1),
-    denoiseLuminance: clamp(recipe.denoiseLuminance, 0, 1),
-    denoiseChroma: clamp(recipe.denoiseChroma, 0, 1),
-    chromaticAberration: clamp(recipe.chromaticAberration, -1, 1),
+    texture: clamp(source.texture, -1, 1),
+    clarity: clamp(source.clarity, -1, 1),
+    dehaze: clamp(source.dehaze, -1, 1),
+    sharpenAmount: clamp(source.sharpenAmount, 0, 2),
+    sharpenRadius: clamp(source.sharpenRadius, 0.1, 5),
+    sharpenThreshold: clamp(source.sharpenThreshold, 0, 1),
+    denoiseLuminance: clamp(source.denoiseLuminance, 0, 1),
+    denoiseChroma: clamp(source.denoiseChroma, 0, 1),
+    chromaticAberration: clamp(source.chromaticAberration, -1, 1),
 
-    vignette: clamp(recipe.vignette, -1, 1),
-    vignetteMidpoint: clamp(recipe.vignetteMidpoint, 0, 1),
-    vignetteFeather: clamp(recipe.vignetteFeather, 0.01, 1),
-    grain: clamp(recipe.grain, 0, 1),
-    grainSize: clamp(recipe.grainSize, 0.5, 3),
-    grainColor: clamp(recipe.grainColor, 0, 1),
+    vignette: clamp(source.vignette, -1, 1),
+    vignetteMidpoint: clamp(source.vignetteMidpoint, 0, 1),
+    vignetteFeather: clamp(source.vignetteFeather, 0.01, 1),
+    grain: clamp(source.grain, 0, 1),
+    grainSize: clamp(source.grainSize, 0.5, 3),
+    grainColor: clamp(source.grainColor, 0, 1),
+
+    localAdjustments: source.localAdjustments.map(normalizeLocalAdjustment),
+    retouch: source.retouch.map(normalizeRetouch),
   };
 }
 
@@ -315,20 +412,31 @@ function isNeutralGlobal(recipe: PhotoRecipe): boolean {
     && recipe.grain === 0;
 }
 
+function hasSpatialDetail(recipe: PhotoRecipe): boolean {
+  return recipe.texture !== 0
+    || recipe.clarity !== 0
+    || recipe.sharpenAmount !== 0
+    || recipe.denoiseLuminance !== 0
+    || recipe.denoiseChroma !== 0
+    || recipe.chromaticAberration !== 0;
+}
+
+function hasLocalWork(recipe: PhotoRecipe): boolean {
+  return recipe.localAdjustments.some((adjustment) => adjustment.enabled
+    && adjustment.mask.opacity > 0
+    && (adjustment.effect.exposure !== 0
+      || adjustment.effect.saturation !== 0
+      || adjustment.effect.sharpness !== 0
+      || adjustment.effect.blur !== 0));
+}
+
 function seededNoise(x: number, y: number): number {
   const value = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
   return (value - Math.floor(value)) * 2 - 1;
 }
 
-export function applyPixelAdjustments(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  inputRecipe: PhotoRecipe,
-): void {
-  const recipe = inputRecipe === DEFAULT_RECIPE ? inputRecipe : normalizeRecipe(inputRecipe);
+function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
   if (isNeutralGlobal(recipe)) return;
-
   const exposureScale = 2 ** recipe.exposure;
   const temperature = recipe.temperature;
   const tint = recipe.tint;
@@ -351,8 +459,7 @@ export function applyPixelAdjustments(
     const highlightGain = recipe.highlights * highlightMask * 0.55;
     const whiteGain = recipe.whites * smoothstep(0.68, 1, luminance) * 0.4;
     const blackGain = recipe.blacks * (1 - smoothstep(0, 0.32, luminance)) * 0.35;
-    const toneGain = shadowGain + highlightGain + whiteGain + blackGain;
-    const tonalScale = Math.max(0, 1 + toneGain);
+    const tonalScale = Math.max(0, 1 + shadowGain + highlightGain + whiteGain + blackGain);
     r *= tonalScale;
     g *= tonalScale;
     b *= tonalScale;
@@ -423,6 +530,336 @@ export function applyPixelAdjustments(
     data[offset + 1] = Math.round(sg * 255);
     data[offset + 2] = Math.round(sb * 255);
   }
+}
+
+function boxBlur(source: Uint8ClampedArray, width: number, height: number, radius: number): Uint8ClampedArray {
+  const r = Math.max(1, Math.min(6, Math.round(radius)));
+  const output = new Uint8ClampedArray(source.length);
+  if (width <= 0 || height <= 0) return output;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let alpha = 0;
+      let count = 0;
+      const top = Math.max(0, y - r);
+      const bottom = Math.min(height - 1, y + r);
+      const left = Math.max(0, x - r);
+      const right = Math.min(width - 1, x + r);
+      for (let sy = top; sy <= bottom; sy += 1) {
+        for (let sx = left; sx <= right; sx += 1) {
+          const offset = (sy * width + sx) * 4;
+          red += source[offset];
+          green += source[offset + 1];
+          blue += source[offset + 2];
+          alpha += source[offset + 3];
+          count += 1;
+        }
+      }
+      const target = (y * width + x) * 4;
+      output[target] = Math.round(red / count);
+      output[target + 1] = Math.round(green / count);
+      output[target + 2] = Math.round(blue / count);
+      output[target + 3] = Math.round(alpha / count);
+    }
+  }
+  return output;
+}
+
+function applyLuminanceDenoise(data: Uint8ClampedArray, width: number, height: number, amount: number): void {
+  if (amount <= 0) return;
+  const source = new Uint8ClampedArray(data);
+  const blurred = boxBlur(source, width, height, 1 + amount * 2);
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (source[offset + 3] === 0) continue;
+    const sourceLuma = source[offset] * 0.2126 + source[offset + 1] * 0.7152 + source[offset + 2] * 0.0722;
+    const blurredLuma = blurred[offset] * 0.2126 + blurred[offset + 1] * 0.7152 + blurred[offset + 2] * 0.0722;
+    const delta = (blurredLuma - sourceLuma) * amount;
+    data[offset] = clamp(Math.round(source[offset] + delta), 0, 255);
+    data[offset + 1] = clamp(Math.round(source[offset + 1] + delta), 0, 255);
+    data[offset + 2] = clamp(Math.round(source[offset + 2] + delta), 0, 255);
+  }
+}
+
+function applyChromaDenoise(data: Uint8ClampedArray, width: number, height: number, amount: number): void {
+  if (amount <= 0) return;
+  const source = new Uint8ClampedArray(data);
+  const blurred = boxBlur(source, width, height, 2);
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (source[offset + 3] === 0) continue;
+    const sourceLuma = source[offset] * 0.2126 + source[offset + 1] * 0.7152 + source[offset + 2] * 0.0722;
+    const blurredLuma = blurred[offset] * 0.2126 + blurred[offset + 1] * 0.7152 + blurred[offset + 2] * 0.0722;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const sourceChroma = source[offset + channel] - sourceLuma;
+      const blurredChroma = blurred[offset + channel] - blurredLuma;
+      data[offset + channel] = clamp(Math.round(sourceLuma + sourceChroma * (1 - amount) + blurredChroma * amount), 0, 255);
+    }
+  }
+}
+
+function applyUnsharp(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  amount: number,
+  threshold = 0,
+): void {
+  if (Math.abs(amount) <= EPSILON) return;
+  const source = new Uint8ClampedArray(data);
+  const blurred = boxBlur(source, width, height, radius);
+  const thresholdBytes = clamp(threshold, 0, 1) * 255;
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (source[offset + 3] === 0) continue;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const difference = source[offset + channel] - blurred[offset + channel];
+      if (Math.abs(difference) < thresholdBytes) continue;
+      data[offset + channel] = clamp(Math.round(source[offset + channel] + difference * amount), 0, 255);
+    }
+  }
+}
+
+function applyChromaticCorrection(data: Uint8ClampedArray, width: number, height: number, amount: number): void {
+  const shift = Math.round(amount * 2);
+  if (!shift || width <= 1) return;
+  const source = new Uint8ClampedArray(data);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const target = (y * width + x) * 4;
+      const redX = clamp(x + shift, 0, width - 1);
+      const blueX = clamp(x - shift, 0, width - 1);
+      data[target] = source[(y * width + redX) * 4];
+      data[target + 2] = source[(y * width + blueX) * 4 + 2];
+    }
+  }
+}
+
+function applySpatialDetail(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
+  if (!hasSpatialDetail(recipe)) return;
+  applyLuminanceDenoise(data, width, height, recipe.denoiseLuminance);
+  applyChromaDenoise(data, width, height, recipe.denoiseChroma);
+  if (recipe.texture !== 0) applyUnsharp(data, width, height, 1, recipe.texture * 0.65, 0.01);
+  if (recipe.clarity !== 0) applyUnsharp(data, width, height, 3, recipe.clarity * 0.55, 0.015);
+  if (recipe.sharpenAmount > 0) applyUnsharp(data, width, height, recipe.sharpenRadius, recipe.sharpenAmount * 0.75, recipe.sharpenThreshold);
+  applyChromaticCorrection(data, width, height, recipe.chromaticAberration);
+}
+
+function circularHueDistance(a: number, b: number): number {
+  const raw = Math.abs((((a - b) % 360) + 360) % 360);
+  return Math.min(raw, 360 - raw);
+}
+
+function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: number): number {
+  let best = 0;
+  for (const point of mask.points) {
+    const distance = Math.hypot(x - point.x, y - point.y);
+    if (distance > mask.radius) continue;
+    const inner = mask.radius * (1 - mask.feather);
+    const edge = mask.feather <= EPSILON
+      ? (distance <= mask.radius ? 1 : 0)
+      : 1 - smoothstep(inner, mask.radius, distance);
+    best = Math.max(best, edge * point.pressure);
+  }
+  return best;
+}
+
+function maskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
+  let weight = 0;
+  if (mask.type === 'radial') {
+    const dx = (x - mask.cx) / Math.max(EPSILON, mask.rx);
+    const dy = (y - mask.cy) / Math.max(EPSILON, mask.ry);
+    const distance = Math.hypot(dx, dy);
+    weight = mask.feather <= EPSILON
+      ? (distance <= 1 ? 1 : 0)
+      : 1 - smoothstep(Math.max(0, 1 - mask.feather), 1, distance);
+  } else if (mask.type === 'linear') {
+    const vx = mask.x2 - mask.x1;
+    const vy = mask.y2 - mask.y1;
+    const lengthSquared = Math.max(EPSILON, vx * vx + vy * vy);
+    const projection = ((x - mask.x1) * vx + (y - mask.y1) * vy) / lengthSquared;
+    const halfFeather = Math.max(0.005, mask.feather * 0.5);
+    weight = smoothstep(0.5 - halfFeather, 0.5 + halfFeather, projection);
+  } else if (mask.type === 'luminance') {
+    const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
+    const feather = Math.max(0.001, mask.feather * 0.25);
+    const lower = smoothstep(mask.min - feather, mask.min + feather, luminance);
+    const upper = 1 - smoothstep(mask.max - feather, mask.max + feather, luminance);
+    weight = Math.min(lower, upper);
+  } else if (mask.type === 'hue') {
+    const [hue] = rgbToHsl(red / 255, green / 255, blue / 255);
+    const distance = circularHueDistance(hue, mask.center);
+    const featherDegrees = Math.max(1, mask.feather * 60);
+    weight = 1 - smoothstep(mask.range, mask.range + featherDegrees, distance);
+  } else {
+    weight = brushWeight(mask, x, y);
+  }
+  const resolved = mask.invert ? 1 - weight : weight;
+  return clamp(resolved * mask.opacity, 0, 1);
+}
+
+function applyLocalColorEffect(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  adjustment: LocalAdjustment,
+): void {
+  const exposureScale = 2 ** adjustment.effect.exposure;
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    const offset = pixel * 4;
+    if (data[offset + 3] === 0) continue;
+    const x = (pixel % width + 0.5) / width;
+    const y = (Math.floor(pixel / width) + 0.5) / height;
+    const weight = maskWeight(adjustment.mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
+    if (weight <= EPSILON) continue;
+
+    if (adjustment.effect.exposure !== 0) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        const linear = srgbToLinear(data[offset + channel]);
+        const adjusted = linear * (1 + (exposureScale - 1) * weight);
+        data[offset + channel] = linearToSrgb(adjusted);
+      }
+    }
+
+    if (adjustment.effect.saturation !== 0) {
+      const [hue, saturation, lightness] = rgbToHsl(data[offset] / 255, data[offset + 1] / 255, data[offset + 2] / 255);
+      const targetSaturation = clamp(saturation * (1 + adjustment.effect.saturation), 0, 1);
+      const mixedSaturation = saturation + (targetSaturation - saturation) * weight;
+      const [r, g, b] = hslToRgb(hue, mixedSaturation, lightness);
+      data[offset] = Math.round(r * 255);
+      data[offset + 1] = Math.round(g * 255);
+      data[offset + 2] = Math.round(b * 255);
+    }
+  }
+}
+
+function applyLocalSpatialEffect(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  adjustment: LocalAdjustment,
+): void {
+  if (adjustment.effect.sharpness === 0 && adjustment.effect.blur === 0) return;
+  const source = new Uint8ClampedArray(data);
+  const blurred = boxBlur(source, width, height, 2);
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    const offset = pixel * 4;
+    if (source[offset + 3] === 0) continue;
+    const x = (pixel % width + 0.5) / width;
+    const y = (Math.floor(pixel / width) + 0.5) / height;
+    const weight = maskWeight(adjustment.mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
+    if (weight <= EPSILON) continue;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const difference = source[offset + channel] - blurred[offset + channel];
+      const sharpened = source[offset + channel] + difference * adjustment.effect.sharpness;
+      const softened = source[offset + channel] + (blurred[offset + channel] - source[offset + channel]) * adjustment.effect.blur;
+      const target = adjustment.effect.blur > 0 ? softened : sharpened;
+      data[offset + channel] = clamp(Math.round(source[offset + channel] + (target - source[offset + channel]) * weight), 0, 255);
+    }
+  }
+}
+
+function applyLocalAdjustments(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
+  if (!hasLocalWork(recipe)) return;
+  for (const adjustment of recipe.localAdjustments) {
+    if (!adjustment.enabled || adjustment.mask.opacity <= 0) continue;
+    applyLocalColorEffect(data, width, height, adjustment);
+    applyLocalSpatialEffect(data, width, height, adjustment);
+  }
+}
+
+function pixelFromNormalized(value: number, size: number): number {
+  return clamp(Math.round(value * size - 0.5), 0, Math.max(0, size - 1));
+}
+
+function retouchCircleWeight(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  radius: number,
+  feather: number,
+): number {
+  const distance = Math.hypot(x - cx, y - cy);
+  if (distance >= radius) return 0;
+  if (feather <= EPSILON) return 1;
+  return 1 - smoothstep(radius * Math.max(0, 1 - feather), radius, distance);
+}
+
+function applyRedEye(data: Uint8ClampedArray, width: number, height: number, operation: Extract<RetouchOperation, { type: 'red-eye' }>): void {
+  for (let py = 0; py < height; py += 1) {
+    for (let px = 0; px < width; px += 1) {
+      const x = (px + 0.5) / width;
+      const y = (py + 0.5) / height;
+      const weight = retouchCircleWeight(x, y, operation.x, operation.y, operation.radius, 0.35) * operation.strength;
+      if (weight <= EPSILON) continue;
+      const offset = (py * width + px) * 4;
+      const targetRed = Math.max(data[offset + 1], data[offset + 2]) * 1.08;
+      data[offset] = clamp(Math.round(data[offset] + (targetRed - data[offset]) * weight), 0, 255);
+    }
+  }
+}
+
+function applyCloneOrHeal(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  operation: Extract<RetouchOperation, { type: 'clone' | 'heal' }>,
+): void {
+  const source = new Uint8ClampedArray(data);
+  const sourceCenterX = pixelFromNormalized(operation.sourceX, width);
+  const sourceCenterY = pixelFromNormalized(operation.sourceY, height);
+  const targetCenterX = pixelFromNormalized(operation.targetX, width);
+  const targetCenterY = pixelFromNormalized(operation.targetY, height);
+  const sourceCenterOffset = (sourceCenterY * width + sourceCenterX) * 4;
+  const targetCenterOffset = (targetCenterY * width + targetCenterX) * 4;
+  const centerCorrection = operation.type === 'heal'
+    ? [0, 1, 2].map((channel) => source[targetCenterOffset + channel] - source[sourceCenterOffset + channel])
+    : [0, 0, 0];
+
+  for (let py = 0; py < height; py += 1) {
+    for (let px = 0; px < width; px += 1) {
+      const nx = (px + 0.5) / width;
+      const ny = (py + 0.5) / height;
+      const weight = retouchCircleWeight(nx, ny, operation.targetX, operation.targetY, operation.radius, operation.feather) * operation.opacity;
+      if (weight <= EPSILON) continue;
+      const sourceX = clamp(sourceCenterX + (px - targetCenterX), 0, width - 1);
+      const sourceY = clamp(sourceCenterY + (py - targetCenterY), 0, height - 1);
+      const sampleOffset = (sourceY * width + sourceX) * 4;
+      const targetOffset = (py * width + px) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const sample = clamp(source[sampleOffset + channel] + centerCorrection[channel], 0, 255);
+        data[targetOffset + channel] = clamp(Math.round(source[targetOffset + channel] + (sample - source[targetOffset + channel]) * weight), 0, 255);
+      }
+    }
+  }
+}
+
+function applyRetouch(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
+  for (const operation of recipe.retouch) {
+    if (operation.type === 'red-eye') applyRedEye(data, width, height, operation);
+    else applyCloneOrHeal(data, width, height, operation);
+  }
+}
+
+export function applyPixelAdjustments(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  inputRecipe: PhotoRecipe,
+): void {
+  const recipe = inputRecipe === DEFAULT_RECIPE ? inputRecipe : normalizeRecipe(inputRecipe);
+  if (width <= 0 || height <= 0 || data.length < width * height * 4) return;
+  const isFullyNeutral = isNeutralGlobal(recipe)
+    && !hasSpatialDetail(recipe)
+    && !hasLocalWork(recipe)
+    && recipe.retouch.length === 0;
+  if (isFullyNeutral) return;
+
+  applyGlobalAdjustments(data, width, height, recipe);
+  applySpatialDetail(data, width, height, recipe);
+  applyLocalAdjustments(data, width, height, recipe);
+  applyRetouch(data, width, height, recipe);
 }
 
 export function sampleHistogram(data: Uint8ClampedArray): PhotoHistogram {
