@@ -124,12 +124,13 @@ test('Vector Studio pan tool moves the artboard viewport rather than acting as a
   expect(before.left).toBeGreaterThan(0);
 
   await page.getByRole('button', { name: 'Pan tool' }).click();
-  const canvas = page.getByTestId('vector-canvas');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Vector canvas has no bounding box.');
-  await page.mouse.move(box.x + 180, box.y + 150);
+  const scrollerBox = await scroller.boundingBox();
+  if (!scrollerBox) throw new Error('Vector artboard viewport has no bounding box.');
+  const startX = scrollerBox.x + Math.min(120, scrollerBox.width / 3);
+  const startY = scrollerBox.y + Math.min(120, scrollerBox.height / 3);
+  await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(box.x + 260, box.y + 210, { steps: 4 });
+  await page.mouse.move(startX + 80, startY + 60, { steps: 4 });
   await page.mouse.up();
 
   const after = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
