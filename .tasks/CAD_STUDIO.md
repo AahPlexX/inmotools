@@ -6,7 +6,7 @@
 **Authoritative design:** `docs/superpowers/specs/2026-09-11-cad-studio-design.md`
 **Authoritative plan:** `docs/superpowers/plans/2026-09-11-cad-studio.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `353a4e1847900c33fb9c32cabeeb21cda743c603`
+**Last tracked implementation commit:** `b9b7702f85fde0c94ebf0af9a072e5a3260cc0e1`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 12
 **Completed user-facing capabilities:** 0 / 100
@@ -60,8 +60,9 @@ Infrastructure that enables a capability does not count as the capability itself
 - Constrained-sketch solver contracts were added at `36c750764db204ac33634abbfcfa5ac552b3abe6`. Serializable sketch types and the initial deterministic hard-constraint solver through `9a4dcd6f2092d08ae369c3f5b45c20b0eeb48bfd` pass the complete unit suite and production build.
 - Curved-constraint RED contracts were added at `ee81f295bb1224bc7911d1d483cd2382ec153442` for circle radius as a geometric degree of freedom, perpendicular line pairs, and line-circle tangency. With the ledger aligned, run `34641504540` failed exactly those three contracts while 651 other tests passed and the CAD freshness guard stayed green.
 - Production support for circle radius variables plus perpendicular and line-circle tangent residuals is committed through `de62580fb701fbcfcc1d6df9a95022f2805a1d97`. On its implementation run all eight sketch-solver tests passed; after ledger alignment, run `34641746787` passed the complete unit suite and production build against the PR synthetic merge with current `main`.
-- Relational-constraint RED contracts were added at `353a4e1847900c33fb9c32cabeeb21cda743c603` for parallel lines, concentric circles, equal line length, and equal circle radius. Validation and production implementation are pending at this checkpoint.
-- The solver currently models point/line/circle entities plus fixed-point, horizontal, vertical, point-distance, coincident, radius, perpendicular, tangent, DOF rank analysis, disabled constraints, soft drag seeding, and explicit conflict reporting. This is not yet the full 17–32 constraint capability set.
+- Relational-constraint RED contracts were added at `353a4e1847900c33fb9c32cabeeb21cda743c603`. Aligned run `34641939226` failed exactly the four new parallel, concentric, equal-length, and equal-radius contracts while the previous eight sketch tests, the CAD freshness guard, and 654 other tests passed.
+- Production support for parallel, concentric, equal-length, and equal-radius relationships is committed through `b9b7702f85fde0c94ebf0af9a072e5a3260cc0e1`. Validation of that GREEN implementation is pending at this checkpoint.
+- The solver now models point/line/circle entities plus fixed-point, horizontal, vertical, point-distance, coincident, radius, perpendicular, parallel, tangent, concentric, equal-length, equal-radius, DOF rank analysis, disabled constraints, soft drag seeding, and explicit conflict reporting. This is not yet the full 17–32 constraint capability set.
 - G4 remains incomplete until the remaining required constraint/dimension family, sketch entities, and end-user sketch operations are implemented and green.
 - Final PR/browser/main/Pages status is intentionally owned by G11, so transient CI state changes do not force this ledger into a self-triggering update loop.
 - `main` contains unrelated concurrent work; CAD remains isolated until the integration gate.
