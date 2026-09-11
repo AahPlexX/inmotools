@@ -185,6 +185,22 @@ function residualForConstraint(
       const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
       return [Math.hypot(b[0] - a[0], b[1] - a[1]) - constraint.value];
     }
+    case 'horizontal-distance': {
+      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const target = finite(constraint.value, `Horizontal-distance constraint '${constraint.id}' value`);
+      return [(b[0] - a[0]) - target];
+    }
+    case 'vertical-distance': {
+      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const target = finite(constraint.value, `Vertical-distance constraint '${constraint.id}' value`);
+      return [(b[1] - a[1]) - target];
+    }
+    case 'length': {
+      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const target = finite(constraint.value, `Length constraint '${constraint.id}' value`);
+      if (target <= 0) throw new Error(`Length constraint '${constraint.id}' value must be positive.`);
+      return [Math.hypot(bx - ax, by - ay) - target];
+    }
     case 'coincident': {
       const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
       return [b[0] - a[0], b[1] - a[1]];
@@ -193,6 +209,24 @@ function residualForConstraint(
       const target = finite(constraint.value, `Radius constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Radius constraint '${constraint.id}' value must be positive.`);
       return [circleRadius(values, circles, constraint.circleId) - target];
+    }
+    case 'diameter': {
+      const target = finite(constraint.value, `Diameter constraint '${constraint.id}' value`);
+      if (target <= 0) throw new Error(`Diameter constraint '${constraint.id}' value must be positive.`);
+      return [2 * circleRadius(values, circles, constraint.circleId) - target];
+    }
+    case 'angle': {
+      const target = finite(constraint.value, `Angle constraint '${constraint.id}' value`);
+      if (target < 0 || target > Math.PI) throw new Error(`Angle constraint '${constraint.id}' value must be between 0 and pi radians.`);
+      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
+      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const adx = a1[0] - a0[0];
+      const ady = a1[1] - a0[1];
+      const bdx = b1[0] - b0[0];
+      const bdy = b1[1] - b0[1];
+      const scale = Math.hypot(adx, ady) * Math.hypot(bdx, bdy);
+      if (scale <= MIN_GEOMETRY_SCALE) throw new Error(`Angle constraint '${constraint.id}' requires non-zero line lengths.`);
+      return [(adx * bdx + ady * bdy) / scale - Math.cos(target)];
     }
     case 'perpendicular': {
       const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
