@@ -65,3 +65,54 @@ test('allows the same SVG filename to be selected again after recompiling', asyn
   await expect(page.getByLabel('Compiled SVG sprite source')).toContainText('class="second"');
   await expect(page.getByLabel('Compiled SVG sprite source')).not.toContainText('class="first"');
 });
+
+test('Vector Studio creates, precisely edits, exports metadata, and reflows without drag-only controls', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  await expect(page.getByRole('heading', { name: 'Vector Studio' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Rectangle tool' }).click();
+  const canvas = page.getByTestId('vector-canvas');
+  await canvas.click({ position: { x: 260, y: 190 } });
+  await expect(page.getByTestId('vector-layer')).toHaveCount(1);
+
+  const xInput = page.locator('#vector-x');
+  await xInput.fill('120');
+  await xInput.press('Enter');
+  await expect(xInput).toHaveValue('120');
+
+  await page.keyboard.press('ArrowRight');
+  await expect(xInput).toHaveValue('121');
+  await page.getByRole('button', { name: 'Align left' }).click();
+  await page.getByRole('button', { name: 'Duplicate selection' }).click();
+  await expect(page.getByTestId('vector-layer')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Send backward' }).click();
+
+  await page.locator('#vector-export-title').fill('Launch mark');
+  await page.locator('#vector-export-tags').fill('brand, launch, web');
+  await page.getByRole('button', { name: 'Preview SVG source' }).click();
+  const source = page.getByLabel('Vector SVG export source');
+  await expect(source).toContainText('<title>Launch mark</title>');
+  await expect(source).toContainText('<inmo:tag>brand</inmo:tag>');
+
+  await page.setViewportSize({ width: 360, height: 760 });
+  await expect(page.getByRole('button', { name: 'Rectangle tool' })).toBeVisible();
+  const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflows).toBe(false);
+});
+
+test('Vector Studio imports project JSON and offers accessible non-drag layer ordering', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  const project = {
+    format: 'inmotools-vector', version: 1, id: 'fixture', name: 'Fixture',
+    artboard: { width: 640, height: 480, background: '#fff', exportBackground: false, gridVisible: true, gridSize: 20, snapToGrid: true, snapToObjects: true },
+    metadata: { title: '', description: '', creator: '', rights: '', license: '', language: 'en', tags: [], custom: '' },
+    symbols: [], swatches: ['#111827', '#ffffff', '#7c3aed', '#2563eb', '#06b6d4', '#f59e0b'],
+    elements: [{ id: 'fixture-rect', type: 'rect', name: 'Imported rectangle', x: 20, y: 20, width: 100, height: 80, rotation: 0, opacity: 1, visible: true, locked: false, fill: { kind: 'solid', color: '#7c3aed' }, stroke: { color: '#111827', width: 0, linecap: 'round', linejoin: 'round', dash: '' }, blendMode: 'normal', cornerRadius: 12, title: '', description: '' }],
+  };
+  await page.locator('#vector-project-import').setInputFiles({ name: 'fixture.inmovector.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
+  await expect(page.getByTestId('vector-layer')).toContainText('Imported rectangle');
+  await page.getByTestId('vector-layer').click();
+  await page.getByRole('button', { name: 'Bring forward' }).click();
+  await page.getByRole('button', { name: 'Bring to front' }).click();
+  await expect(page.locator('#vector-artboard-width')).toHaveValue('640');
+});
