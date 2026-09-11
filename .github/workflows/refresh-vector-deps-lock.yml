@@ -1,0 +1,40 @@
+name: Refresh vector dependency lock
+
+on:
+  push:
+    branches:
+      - chore/vector-deps-pins
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    if: ${{ !contains(github.event.head_commit.message, '[lockfile-refresh]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Regenerate lockfile
+        run: pnpm install --lockfile-only
+
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "Lockfile already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore(deps): refresh pnpm lockfile [lockfile-refresh]"
+          git push origin HEAD:chore/vector-deps-pins
