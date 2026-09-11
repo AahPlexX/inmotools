@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addElement, createVectorDocument } from '../../src/tools/svg/vector-engine';
+import { addElement, createVectorDocument, mirrorSelection } from '../../src/tools/svg/vector-engine';
 import {
   buildInlineEmbed,
   buildSvgDataUri,
@@ -62,6 +62,13 @@ describe('Vector Studio export', () => {
     expect(svg).toContain('launch &amp; web');
     expect(svg).toContain('North &amp; Pine &lt;Studio&gt;');
     expect(svg).toContain('linearGradient');
+  });
+
+  test('serializes true axis reflection around an element center', () => {
+    const document = mirrorSelection(addElement(createVectorDocument(), textElement), ['wordmark'], 'horizontal');
+    const svg = serializeVectorSvg(document);
+    expect(svg).toContain('scale(-1 1)');
+    expect(svg).toContain('translate(-280 -220)');
   });
 
   test('omits hidden elements and preserves locked artwork as normal SVG content', () => {
