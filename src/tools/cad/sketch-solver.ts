@@ -120,6 +120,45 @@ function circleCenter(
   return coordinates(values, points, entry.circle.centerPointId);
 }
 
+function fixedEntityResidual(
+  entityId: string,
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  lines: Map<string, SketchLineEntity>,
+  circles: Map<string, CircleIndex>,
+): number[] {
+  const point = points.get(entityId);
+  if (point) {
+    return [values[point.offset]! - point.point.x, values[point.offset + 1]! - point.point.y];
+  }
+
+  const line = lines.get(entityId);
+  if (line) {
+    const start = points.get(line.startPointId);
+    const end = points.get(line.endPointId);
+    if (!start || !end) throw new Error(`Fixed line '${entityId}' references missing endpoint geometry.`);
+    return [
+      values[start.offset]! - start.point.x,
+      values[start.offset + 1]! - start.point.y,
+      values[end.offset]! - end.point.x,
+      values[end.offset + 1]! - end.point.y,
+    ];
+  }
+
+  const circle = circles.get(entityId);
+  if (circle) {
+    const center = points.get(circle.circle.centerPointId);
+    if (!center) throw new Error(`Fixed circle '${entityId}' references a missing center point.`);
+    return [
+      values[center.offset]! - center.point.x,
+      values[center.offset + 1]! - center.point.y,
+      values[circle.offset]! - circle.circle.radius,
+    ];
+  }
+
+  throw new Error(`Fixed-entity constraint references missing entity '${entityId}'.`);
+}
+
 function residualForConstraint(
   constraint: SketchConstraint,
   values: readonly number[],
@@ -132,6 +171,8 @@ function residualForConstraint(
       const [x, y] = coordinates(values, points, constraint.pointId);
       return [x - constraint.x, y - constraint.y];
     }
+    case 'fixed-entity':
+      return fixedEntityResidual(constraint.entityId, values, points, lines, circles);
     case 'horizontal': {
       const [[, ay], [, by]] = linePoints(values, points, lines, constraint.lineId);
       return [by - ay];
@@ -219,6 +260,22 @@ function residualForConstraint(
       const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
       const radius = circleRadius(values, circles, constraint.circleId);
       return [Math.hypot(px - cx, py - cy) - radius];
+    }
+    case 'symmetric-points': {
+      const [pointA, pointB] = [
+        coordinates(values, points, constraint.pointAId),
+        coordinates(values, points, constraint.pointBId),
+      ];
+      const [axisStart, axisEnd] = linePoints(values, points, lines, constraint.axisLineId);
+      const dx = axisEnd[0] - axisStart[0];
+      const dy = axisEnd[1] - axisStart[1];
+      const length = Math.hypot(dx, dy);
+      if (length <= MIN_GEOMETRY_SCALE) throw new Error(`Symmetry constraint '${constraint.id}' requires a non-zero axis line.`);
+      const midpointX = (pointA[0] + pointB[0]) / 2;
+      const midpointY = (pointA[1] + pointB[1]) / 2;
+      const midpointOnAxis = (dx * (midpointY - axisStart[1]) - dy * (midpointX - axisStart[0])) / length;
+      const pairPerpendicularToAxis = (dx * (pointB[0] - pointA[0]) + dy * (pointB[1] - pointA[1])) / length;
+      return [midpointOnAxis, pairPerpendicularToAxis];
     }
   }
 }
