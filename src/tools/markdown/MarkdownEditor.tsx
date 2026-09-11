@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownKeymap } from '@codemirror/lang-markdown';
 import { searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
+import { markdownSyntaxCompletions } from './markdown-completions';
 
 // CodeMirror 6 markdown source editor, mirroring the wiring pattern already
 // used by this catalog's other CodeMirror-based tools (see LatticeEditor.tsx,
@@ -28,6 +29,7 @@ export interface MarkdownEditorProps {
   readonly fontSize: number;
   readonly vimMode: boolean;
   readonly spellcheck: boolean;
+  readonly syntaxSuggestions: boolean;
   // Incremented by the parent to request that a given line be scrolled into
   // view and focused (used by the document outline). A counter rather than a
   // bare line number so selecting the same heading twice still re-reveals it.
@@ -42,6 +44,7 @@ export default function MarkdownEditor({
   fontSize,
   vimMode,
   spellcheck,
+  syntaxSuggestions,
   revealRequest,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -59,6 +62,7 @@ export default function MarkdownEditor({
   const vimCompartment = useRef(new Compartment()).current;
   const wrapCompartment = useRef(new Compartment()).current;
   const attributesCompartment = useRef(new Compartment()).current;
+  const suggestionsCompartment = useRef(new Compartment()).current;
 
   // Latest-value refs let the mount effect below seed the initial state
   // without taking a dependency on props that must not trigger a rebuild.
@@ -67,19 +71,21 @@ export default function MarkdownEditor({
   const spellcheckRef = useRef(spellcheck);
   const lineWrappingRef = useRef(lineWrapping);
   const vimModeRef = useRef(vimMode);
+  const syntaxSuggestionsRef = useRef(syntaxSuggestions);
   valueRef.current = value;
   fontSizeRef.current = fontSize;
   spellcheckRef.current = spellcheck;
   lineWrappingRef.current = lineWrapping;
   vimModeRef.current = vimMode;
+  syntaxSuggestionsRef.current = syntaxSuggestions;
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onCursorLineChangeRef.current = onCursorLineChange; }, [onCursorLineChange]);
 
-  // Built once per mount. `value`, `fontSize`, `spellcheck`, `lineWrapping`
-  // and `vimMode` are intentionally absent from the dependency list: the
-  // initial document is seeded here and every later change is applied through
-  // the effects below instead of by rebuilding the view.
+  // Built once per mount. `value`, `fontSize`, `spellcheck`, `lineWrapping`,
+  // `vimMode`, and `syntaxSuggestions` are intentionally absent from the
+  // dependency list: the initial document is seeded here and every later
+  // change is applied through the effects below instead of rebuilding the view.
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -92,6 +98,10 @@ export default function MarkdownEditor({
       }),
       EditorView.editorAttributes.of({ style: `font-size:${size}px` }),
     ];
+
+    const buildSuggestions = (enabled: boolean) => enabled
+      ? autocompletion({ override: [markdownSyntaxCompletions], activateOnTyping: true })
+      : [];
 
     const state = EditorState.create({
       doc: valueRef.current,
@@ -106,6 +116,7 @@ export default function MarkdownEditor({
         closeBrackets(),
         markdown(),
         wrapCompartment.of(lineWrappingRef.current ? EditorView.lineWrapping : []),
+        suggestionsCompartment.of(buildSuggestions(syntaxSuggestionsRef.current)),
         keymap.of([...closeBracketsKeymap, ...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         attributesCompartment.of(buildAttributes(fontSizeRef.current, spellcheckRef.current)),
         EditorView.updateListener.of((update) => {
@@ -129,7 +140,7 @@ export default function MarkdownEditor({
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
     return () => { view.destroy(); viewRef.current = null; };
-  }, [vimCompartment, wrapCompartment, attributesCompartment]);
+  }, [vimCompartment, wrapCompartment, attributesCompartment, suggestionsCompartment]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
@@ -142,6 +153,16 @@ export default function MarkdownEditor({
       effects: wrapCompartment.reconfigure(lineWrapping ? EditorView.lineWrapping : []),
     });
   }, [lineWrapping, wrapCompartment]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: suggestionsCompartment.reconfigure(
+        syntaxSuggestions
+          ? autocompletion({ override: [markdownSyntaxCompletions], activateOnTyping: true })
+          : [],
+      ),
+    });
+  }, [syntaxSuggestions, suggestionsCompartment]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
