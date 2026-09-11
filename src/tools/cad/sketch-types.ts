@@ -101,6 +101,24 @@ export interface EqualRadiusConstraint extends ConstraintBase {
   circleBId: string;
 }
 
+export interface MidpointConstraint extends ConstraintBase {
+  type: 'midpoint';
+  pointId: string;
+  lineId: string;
+}
+
+export interface PointOnLineConstraint extends ConstraintBase {
+  type: 'point-on-line';
+  pointId: string;
+  lineId: string;
+}
+
+export interface PointOnCircleConstraint extends ConstraintBase {
+  type: 'point-on-circle';
+  pointId: string;
+  circleId: string;
+}
+
 export type SketchConstraint =
   | FixedPointConstraint
   | HorizontalConstraint
@@ -113,7 +131,10 @@ export type SketchConstraint =
   | TangentConstraint
   | ConcentricConstraint
   | EqualLengthConstraint
-  | EqualRadiusConstraint;
+  | EqualRadiusConstraint
+  | MidpointConstraint
+  | PointOnLineConstraint
+  | PointOnCircleConstraint;
 
 export type SketchPlane =
   | { kind: 'origin'; plane: 'XY' | 'XZ' | 'YZ' }
