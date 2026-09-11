@@ -1,7 +1,7 @@
 export type AqiCategory = 'GOOD' | 'MODERATE' | 'UNHEALTHY_SENSITIVE' | 'UNHEALTHY' | 'VERY_UNHEALTHY' | 'HAZARDOUS' | 'BEYOND_INDEX';
 export type EaqiBand = 'GOOD' | 'FAIR' | 'MODERATE' | 'POOR' | 'VERY_POOR' | 'EXTREMELY_POOR';
 export type FitzpatrickType = 1 | 2 | 3 | 4 | 5 | 6;
-export type ImportSource = 'open-meteo-json' | 'csv-mapped' | 'aethercast-export';
+export type ImportSource = 'open-meteo-live' | 'open-meteo-json' | 'csv-mapped' | 'aethercast-export';
 export type VulnerabilityLens = 'NONE' | 'ASTHMA' | 'CARDIOVASCULAR' | 'PEDIATRIC' | 'PHOTOSENSITIVE';
 export type IndexStandard = 'US_EPA' | 'EUROPEAN_EAQI';
 export type UnitSystem = 'METRIC' | 'US';

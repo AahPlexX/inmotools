@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const hourlyFixture = () => {
   const start = Date.parse('2026-06-01T00:00:00Z');
@@ -26,6 +26,82 @@ const hourlyFixture = () => {
   };
 };
 
+const liveFixture = () => {
+  const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+  const start = hour - 24 * 3_600_000;
+  const length = 48;
+  const time = Array.from({ length }, (_, index) => new Date(start + index * 3_600_000).toISOString());
+  const constant = (value: number) => Array<number>(length).fill(value);
+  const usAqi = constant(42);
+  usAqi[24] = 77;
+  usAqi[25] = 77;
+  usAqi[length - 1] = 199;
+  return {
+    latitude: 30.404,
+    longitude: -90.155,
+    elevation: 4,
+    timezone: 'America/Chicago',
+    utc_offset_seconds: -18_000,
+    hourly: {
+      time,
+      pm2_5: constant(8),
+      pm10: constant(18),
+      carbon_monoxide: constant(300),
+      nitrogen_dioxide: constant(15),
+      sulphur_dioxide: constant(10),
+      ozone: constant(50),
+      uv_index: constant(4),
+      uv_index_clear_sky: constant(5),
+      us_aqi: usAqi,
+      european_aqi: constant(28),
+    },
+  };
+};
+
+const installLiveApiMocks = async (page: Page) => {
+  const air = liveFixture();
+  const airRequests: URL[] = [];
+  const weatherRequests: URL[] = [];
+
+  await page.route('https://air-quality-api.open-meteo.com/**', async (route) => {
+    airRequests.push(new URL(route.request().url()));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(air) });
+  });
+  await page.route('https://api.open-meteo.com/v1/forecast**', async (route) => {
+    weatherRequests.push(new URL(route.request().url()));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        latitude: air.latitude,
+        longitude: air.longitude,
+        timezone: air.timezone,
+        hourly: { time: air.hourly.time, wind_speed_10m: Array<number>(air.hourly.time.length).fill(2) },
+      }),
+    });
+  });
+  await page.route('https://geocoding-api.open-meteo.com/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        results: [{
+          id: 4332455,
+          name: 'Madisonville',
+          latitude: air.latitude,
+          longitude: air.longitude,
+          timezone: air.timezone,
+          country: 'United States',
+          country_code: 'US',
+          admin1: 'Louisiana',
+        }],
+      }),
+    });
+  });
+
+  return { air, airRequests, weatherRequests };
+};
+
 const loadFixture = async (page: import('@playwright/test').Page) => {
   await page.goto('./#/tools/aethercast');
   await page.getByLabel('Import an air quality and UV data file').setInputFiles({
@@ -35,6 +111,52 @@ const loadFixture = async (page: import('@playwright/test').Page) => {
   });
   await expect(page.getByRole('table')).toBeVisible();
 };
+
+test('AetherCast loads live Open-Meteo data from browser geolocation without requiring an upload', async ({ page, context }) => {
+  const { airRequests, weatherRequests } = await installLiveApiMocks(page);
+  await context.setGeolocation({ latitude: 30.404, longitude: -90.155 });
+  await context.grantPermissions(['geolocation']);
+
+  await page.goto('./#/tools/aethercast');
+
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Current location');
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Open-Meteo');
+  await expect(page.getByLabel('Import an air quality and UV data file')).not.toBeVisible();
+
+  await expect.poll(() => airRequests.length).toBeGreaterThan(0);
+  await expect.poll(() => weatherRequests.length).toBeGreaterThan(0);
+  const airUrl = airRequests.at(-1)!;
+  expect(airUrl.searchParams.get('past_hours')).toBe('24');
+  expect(airUrl.searchParams.get('forecast_hours')).toBe('72');
+  expect(airUrl.searchParams.get('timezone')).toBe('auto');
+  expect(airUrl.searchParams.get('hourly')?.split(',')).toEqual(expect.arrayContaining([
+    'pm2_5', 'pm10', 'carbon_monoxide', 'nitrogen_dioxide', 'sulphur_dioxide', 'ozone',
+    'uv_index', 'uv_index_clear_sky', 'us_aqi', 'european_aqi',
+  ]));
+  const weatherUrl = weatherRequests.at(-1)!;
+  expect(weatherUrl.searchParams.get('hourly')).toBe('wind_speed_10m');
+  expect(weatherUrl.searchParams.get('wind_speed_unit')).toBe('ms');
+
+  const snapshot = page.getByRole('region', { name: 'Selected snapshot' });
+  await expect(snapshot.locator('p').filter({ hasText: 'Imported provider US AQI' })).toContainText('77');
+  await expect(snapshot).not.toContainText('199');
+});
+
+test('AetherCast location search is a no-upload fallback when geolocation is unavailable', async ({ page }) => {
+  await installLiveApiMocks(page);
+  await page.goto('./#/tools/aethercast');
+
+  await page.getByLabel('Search city or postal code').fill('Madisonville, LA');
+  await page.getByRole('button', { name: 'Search locations' }).click();
+  const result = page.getByRole('button', { name: 'Madisonville, Louisiana, United States' });
+  await expect(result).toBeVisible();
+  await result.click();
+
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Open-Meteo');
+});
 
 test('AetherCast exposes timestamp reconciliation, pollutant coverage, averaging windows, and provider-vs-calculated indices', async ({ page }) => {
   await loadFixture(page);

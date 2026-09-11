@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { assessDataset } from './aethercast-engine';
 import { detectAnomalies } from './aethercast-anomaly';
 import { buildActivityWindows } from './aethercast-activity';
@@ -12,6 +12,15 @@ import {
   type CsvGasUnit,
   type CsvUnitMap,
 } from './aethercast-import';
+import {
+  fetchLiveAetherCastDataset,
+  getBrowserLiveLocation,
+  LIVE_REFRESH_MS,
+  readSavedLiveLocation,
+  searchOpenMeteoLocations,
+  writeSavedLiveLocation,
+  type LiveLocation,
+} from './aethercast-live';
 import { exportCanvasPng, exportCsv, exportJson, exportPdfBrief } from './aethercast-export';
 import { readSettings, writeSettings } from './aethercast-persistence';
 import { AetherCastForecastCanvas } from './AetherCastForecastCanvas';
@@ -62,6 +71,19 @@ const dataTimeLabel = (dataset: AetherCastDataset): string => {
   return `Latest dataset timestamp is ${Math.round(Math.abs(deltaHours))} hours old.`;
 };
 
+const nearestPointIndex = (dataset: AetherCastDataset, target = Date.now()): number => {
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < dataset.points.length; index += 1) {
+    const distance = Math.abs(dataset.points[index].epochMs - target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+};
+
 const pollutantCoverageLabel = (assessment: HourlyAssessment, standard: IndexStandard): string => {
   if (standard === 'US_EPA') {
     const available = EPA_POLLUTANTS.filter((key) => assessment.pollutants[key].subIndex !== null);
@@ -77,6 +99,9 @@ const pollutantCoverageLabel = (assessment: HourlyAssessment, standard: IndexSta
   return `${available.length}/5${available.length ? `: ${available.join(', ')}` : ''}`;
 };
 
+const errorMessage = (error: unknown): string => error instanceof Error ? error.message : 'The live data request failed.';
+const isAbortError = (error: unknown): boolean => error instanceof DOMException && error.name === 'AbortError';
+
 export default function AetherCastWorkspace() {
   const [dataset, setDataset] = useState<AetherCastDataset | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -84,7 +109,19 @@ export default function AetherCastWorkspace() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [pendingCsv, setPendingCsv] = useState<PendingCsv | null>(null);
+  const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationResults, setLocationResults] = useState<LiveLocation[]>([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+  const [locationSearchError, setLocationSearchError] = useState<string | null>(null);
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
+  const liveFetchRef = useRef<AbortController | null>(null);
+  const liveRequestIdRef = useRef(0);
+  const locationSearchRef = useRef<AbortController | null>(null);
+  const locationSearchIdRef = useRef(0);
 
   const assessments = useMemo(() => (dataset ? assessDataset(dataset, settings) : []), [dataset, settings]);
   const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.points) : []), [dataset]);
@@ -112,14 +149,122 @@ export default function AetherCastWorkspace() {
   }, []);
 
   const applyDataset = useCallback((next: AetherCastDataset, errors: string[]) => {
+    const nearest = nearestPointIndex(next);
     setDataset(next);
     setImportErrors(errors);
     setPendingCsv(null);
-    setActiveIndex(null);
-    setPage(0);
+    setActiveIndex(nearest);
+    setPage(Math.floor(nearest / PAGE_SIZE));
   }, []);
 
+  const loadLiveLocation = useCallback(async (location: LiveLocation, persist = true) => {
+    const requestId = ++liveRequestIdRef.current;
+    liveFetchRef.current?.abort();
+    const controller = new AbortController();
+    liveFetchRef.current = controller;
+    setLiveLoading(true);
+    setLiveError(null);
+    try {
+      const result = await fetchLiveAetherCastDataset(location, controller.signal);
+      if (requestId !== liveRequestIdRef.current) return;
+      setLiveLocation(location);
+      setLastFetchedAt(result.fetchedAt);
+      applyDataset(result.dataset, result.warnings);
+      if (persist) writeSavedLiveLocation(location);
+    } catch (error) {
+      if (isAbortError(error) || requestId !== liveRequestIdRef.current) return;
+      setLiveError(errorMessage(error));
+    } finally {
+      if (requestId === liveRequestIdRef.current) setLiveLoading(false);
+    }
+  }, [applyDataset]);
+
+  useEffect(() => {
+    let disposed = false;
+    const initializeLiveData = async () => {
+      const saved = readSavedLiveLocation();
+      if (saved) {
+        if (!disposed) await loadLiveLocation(saved, false);
+        return;
+      }
+      try {
+        const location = await getBrowserLiveLocation();
+        if (!disposed) await loadLiveLocation(location, true);
+      } catch (error) {
+        if (!disposed && !isAbortError(error)) {
+          setLiveError('Location access is unavailable. Search by city or postal code to load live conditions.');
+        }
+      }
+    };
+    void initializeLiveData();
+    return () => {
+      disposed = true;
+      liveFetchRef.current?.abort();
+      locationSearchRef.current?.abort();
+    };
+  }, [loadLiveLocation]);
+
+  useEffect(() => {
+    if (!liveLocation || dataset?.importSource !== 'open-meteo-live') return undefined;
+    const timer = window.setInterval(() => {
+      void loadLiveLocation(liveLocation, false);
+    }, LIVE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [dataset?.importSource, liveLocation, loadLiveLocation]);
+
+  const useBrowserLocation = useCallback(async () => {
+    setLiveLoading(true);
+    setLiveError(null);
+    try {
+      const location = await getBrowserLiveLocation();
+      await loadLiveLocation(location, true);
+    } catch (error) {
+      if (!isAbortError(error)) setLiveError('Location access is unavailable. Search by city or postal code instead.');
+      setLiveLoading(false);
+    }
+  }, [loadLiveLocation]);
+
+  const submitLocationSearch = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = locationQuery.trim();
+    if (query.length < 2) {
+      setLocationSearchError('Enter at least two characters to search.');
+      setLocationResults([]);
+      return;
+    }
+    const requestId = ++locationSearchIdRef.current;
+    locationSearchRef.current?.abort();
+    const controller = new AbortController();
+    locationSearchRef.current = controller;
+    setLocationSearchLoading(true);
+    setLocationSearchError(null);
+    try {
+      const results = await searchOpenMeteoLocations(query, controller.signal);
+      if (requestId !== locationSearchIdRef.current) return;
+      setLocationResults(results);
+      if (results.length === 0) setLocationSearchError('No matching locations were found. Try a city, postal code, or broader place name.');
+    } catch (error) {
+      if (isAbortError(error) || requestId !== locationSearchIdRef.current) return;
+      setLocationSearchError(errorMessage(error));
+      setLocationResults([]);
+    } finally {
+      if (requestId === locationSearchIdRef.current) setLocationSearchLoading(false);
+    }
+  }, [locationQuery]);
+
+  const chooseLocation = useCallback((location: LiveLocation) => {
+    setLocationResults([]);
+    setLocationSearchError(null);
+    void loadLiveLocation(location, true);
+  }, [loadLiveLocation]);
+
   const handleFile = useCallback(async (file: File) => {
+    liveFetchRef.current?.abort();
+    liveRequestIdRef.current += 1;
+    setLiveLocation(null);
+    setLastFetchedAt(null);
+    setLiveLoading(false);
+    setLiveError(null);
     const text = await file.text();
     const lowerName = file.name.toLowerCase();
     if (lowerName.endsWith('.csv') || file.type === 'text/csv') {
@@ -165,7 +310,7 @@ export default function AetherCastWorkspace() {
   const handleExportPdf = useCallback(async () => {
     if (!dataset) return;
     await exportPdfBrief(dataset, assessments, anomalies, settings.activeStandard);
-    requestSupportPrompt({ key: 'aethercast-export', message: 'Compiled a local air-quality and UV brief from your imported data. If this helped your planning, support independent tool development with a coffee.' });
+    requestSupportPrompt({ key: 'aethercast-export', message: 'Compiled an air-quality and UV brief from the loaded data. If this helped your planning, support independent tool development with a coffee.' });
   }, [dataset, assessments, anomalies, settings.activeStandard]);
 
   const handleExportCsv = useCallback(() => {
@@ -188,6 +333,43 @@ export default function AetherCastWorkspace() {
   const selectedCoverage = activeAssessment
     ? settings.activeStandard === 'US_EPA' ? activeAssessment.usAqiCoverage : activeAssessment.europeanAqiCoverage
     : 'NONE';
+
+  const livePanel = (
+    <section className="aethercast-live-panel" aria-labelledby="aethercast-live-heading">
+      <div className="aethercast-section-heading">
+        <div>
+          <h3 id="aethercast-live-heading">Live air quality &amp; UV</h3>
+          <p>Use your current location or search a place. AetherCast loads the data directly—no download or upload step.</p>
+        </div>
+        <button type="button" onClick={() => void useBrowserLocation()} disabled={liveLoading}>Use my location</button>
+      </div>
+      <form className="aethercast-live-form" onSubmit={submitLocationSearch}>
+        <label>
+          Search city or postal code
+          <input value={locationQuery} onChange={(event) => setLocationQuery(event.target.value)} autoComplete="postal-code" placeholder="City or postal code" />
+        </label>
+        <button type="submit" disabled={locationSearchLoading}>{locationSearchLoading ? 'Searching…' : 'Search locations'}</button>
+      </form>
+      {locationSearchError ? <p className="aethercast-inline-error" role="alert">{locationSearchError}</p> : null}
+      {locationResults.length > 0 ? (
+        <div className="aethercast-location-results" aria-label="Location search results">
+          {locationResults.map((location) => (
+            <button type="button" key={`${location.label}-${location.latitude}-${location.longitude}`} onClick={() => chooseLocation(location)}>{location.label}</button>
+          ))}
+        </div>
+      ) : null}
+      {liveLoading ? <p className="aethercast-live-progress" role="status">Loading live Open-Meteo conditions…</p> : null}
+      {liveLocation && dataset?.importSource === 'open-meteo-live' ? (
+        <div className="aethercast-live-source" data-testid="aethercast-live-source" role="status">
+          <strong>Live Open-Meteo feed for {liveLocation.label}</strong>
+          <span>{lastFetchedAt ? `Updated ${new Date(lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. ` : ''}Refreshes every 15 minutes while this tool is open.</span>
+          <span>Forecast-model data, not a local regulatory monitor or sensor. Air-quality data: Copernicus Atmosphere Monitoring Service (CAMS) via <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>.</span>
+          <button type="button" onClick={() => void loadLiveLocation(liveLocation, false)} disabled={liveLoading}>Refresh now</button>
+        </div>
+      ) : null}
+      {liveError ? <p className="aethercast-inline-error" role="alert">{liveError}</p> : null}
+    </section>
+  );
 
   const csvMapper = pendingCsv ? (
     <section className="aethercast-csv-mapper" aria-labelledby="aethercast-csv-heading">
@@ -225,13 +407,21 @@ export default function AetherCastWorkspace() {
     </section>
   ) : null;
 
+  const importFallback = (
+    <details className="aethercast-import-fallback">
+      <summary>Advanced: import a saved dataset</summary>
+      <p>Optional fallback for Open-Meteo JSON, an AetherCast JSON export, or mapped CSV data.</p>
+      <input type="file" accept="application/json,.json,.csv,text/csv" onChange={onFileInputChange} aria-label="Import an air quality and UV data file" />
+    </details>
+  );
+
   if (!dataset) {
     return (
       <div className="aethercast-empty">
-        <p>Import Open-Meteo Air Quality JSON, a previously exported AetherCast JSON file, or a CSV. CSV files open a mapping step so columns, units, and timezone are explicit before any calculation.</p>
+        {livePanel}
         {importErrors.length > 0 && <ul className="aethercast-errors" role="alert">{importErrors.map((message) => <li key={message}>{message}</li>)}</ul>}
-        <input type="file" accept="application/json,.json,.csv,text/csv" onChange={onFileInputChange} aria-label="Import an air quality and UV data file" />
         {csvMapper}
+        {importFallback}
       </div>
     );
   }
@@ -240,8 +430,9 @@ export default function AetherCastWorkspace() {
 
   return (
     <div className="aethercast-workspace">
+      {livePanel}
+
       <div className="aethercast-toolbar">
-        <label>Replace dataset<input type="file" accept="application/json,.json,.csv,text/csv" onChange={onFileInputChange} /></label>
         <label>
           Standard
           <select value={settings.activeStandard} onChange={(event) => updateSettings({ activeStandard: event.target.value as AetherCastSettings['activeStandard'] })}>
@@ -262,10 +453,11 @@ export default function AetherCastWorkspace() {
         </label>
       </div>
 
+      {importFallback}
       {csvMapper}
       {importErrors.length > 0 && <ul className="aethercast-errors" role="alert">{importErrors.map((message) => <li key={message}>{message}</li>)}</ul>}
 
-      <p className="aethercast-data-age" role="status">{dataTimeLabel(dataset)} Timezone: {dataset.timezone ?? 'unspecified'}. Imported rows: {dataset.points.length.toLocaleString()}{dataset.truncatedRows ? `; ${dataset.truncatedRows.toLocaleString()} rows omitted or invalid.` : '.'}</p>
+      <p className="aethercast-data-age" role="status">{dataTimeLabel(dataset)} Timezone: {dataset.timezone ?? 'unspecified'}. Loaded rows: {dataset.points.length.toLocaleString()}{dataset.truncatedRows ? `; ${dataset.truncatedRows.toLocaleString()} rows omitted or invalid.` : '.'}</p>
 
       {reconciliation && (
         <section className="aethercast-list-section" aria-label="Timestamp reconciliation" data-testid="aethercast-timestamp-reconciliation">
@@ -284,7 +476,7 @@ export default function AetherCastWorkspace() {
           <p><span>Imported provider European AQI</span><strong>{activeAssessment.point.providedEuropeanAqi ?? 'not supplied'}</strong></p>
           <p><span>UV Index</span><strong>{activeAssessment.point.uvIndex ?? 'unknown'}</strong></p>
           <p><span>Skin-type timing heuristic</span><strong>{formatBurn(activeAssessment.burnMinutes)}</strong></p>
-          <p className="aethercast-health-note">Imported provider indices are comparison-only and never replace the locally calculated values. The timing estimate is not a safe-exposure limit. UV risk depends on more than skin type, and WHO recommends sun-protection measures when UVI reaches 3 or above.</p>
+          <p className="aethercast-health-note">Provider indices are comparison-only and never replace the locally calculated values. The timing estimate is not a safe-exposure limit. UV risk depends on more than skin type, and WHO recommends sun-protection measures when UVI reaches 3 or above.</p>
         </section>
       )}
 
@@ -328,7 +520,7 @@ export default function AetherCastWorkspace() {
 
       <div className="aethercast-table-wrap">
         <table id={TABLE_ID} className="aethercast-table">
-          <caption>Hourly readout. This page shows {pageRows.length} of {assessments.length} rows; pagination controls expose the complete imported range.</caption>
+          <caption>Hourly readout. This page shows {pageRows.length} of {assessments.length} rows; pagination controls expose the complete loaded range.</caption>
           <thead><tr><th>Time</th><th>{settings.activeStandard === 'US_EPA' ? 'Calculated US AQI' : 'Calculated European index'}</th><th>Band</th><th>Coverage</th><th>Pollutants contributing</th><th>Provider US AQI</th><th>Provider European AQI</th><th>PM2.5 µg/m³</th><th>O3 µg/m³</th><th>UV</th></tr></thead>
           <tbody>
             {pageRows.map((assessment, offset) => {
@@ -351,7 +543,7 @@ export default function AetherCastWorkspace() {
 
       <section className="aethercast-list-section" aria-label="Screening anomalies">
         <h3>Screening anomalies ({anomalies.length})</h3>
-        {anomalies.length ? <ul>{anomalies.map((event) => <li key={`${event.type}-${event.startTimestamp}`}>{event.type === 'WILDFIRE_SCREEN' ? 'Wildfire screen' : 'Thermal inversion'} — {event.startTimestamp} ({event.confirmed ? 'corroborated' : 'unconfirmed'}): {event.advisoryMessage}</li>)}</ul> : <p>None detected in the imported range.</p>}
+        {anomalies.length ? <ul>{anomalies.map((event) => <li key={`${event.type}-${event.startTimestamp}`}>{event.type === 'WILDFIRE_SCREEN' ? 'Wildfire screen' : 'Thermal inversion'} — {event.startTimestamp} ({event.confirmed ? 'corroborated' : 'unconfirmed'}): {event.advisoryMessage}</li>)}</ul> : <p>None detected in the loaded range.</p>}
       </section>
 
       <div className="aethercast-exports">

@@ -10,7 +10,10 @@
 .aethercast-data-age,
 .aethercast-health-note,
 .aethercast-list-section,
-.aethercast-csv-mapper {
+.aethercast-csv-mapper,
+.aethercast-live-panel,
+.aethercast-live-source,
+.aethercast-import-fallback {
   overflow-wrap: anywhere;
 }
 
@@ -27,7 +30,8 @@
 .aethercast-toolbar label,
 .aethercast-mapping-grid label,
 .aethercast-unit-grid label,
-.aethercast-timezone-field {
+.aethercast-timezone-field,
+.aethercast-live-form label {
   display: grid;
   gap: 0.4rem;
   min-width: 0;
@@ -41,18 +45,123 @@
 .aethercast-timezone-field input,
 .aethercast-csv-mapper button,
 .aethercast-table-controls button,
-.aethercast-exports button {
+.aethercast-exports button,
+.aethercast-live-panel button,
+.aethercast-live-form input,
+.aethercast-import-fallback input {
   min-height: 44px;
 }
 
-.aethercast-csv-mapper {
-  display: grid;
-  gap: 1rem;
+.aethercast-csv-mapper,
+.aethercast-live-panel,
+.aethercast-import-fallback {
+  min-width: 0;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface-strong);
+}
+
+.aethercast-csv-mapper,
+.aethercast-live-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.aethercast-live-panel {
+  border-color: color-mix(in srgb, var(--signal) 38%, var(--line));
+  background: color-mix(in srgb, var(--signal-soft) 48%, var(--surface-strong));
+}
+
+.aethercast-live-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
   min-width: 0;
+}
+
+.aethercast-live-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.aethercast-location-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.aethercast-live-panel button,
+.aethercast-location-results button,
+.aethercast-import-fallback summary {
+  cursor: pointer;
+}
+
+.aethercast-live-panel button,
+.aethercast-location-results button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.aethercast-location-results button {
+  text-align: left;
+}
+
+.aethercast-live-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 1rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--signal);
+  background: var(--signal-soft);
+}
+
+.aethercast-live-source strong,
+.aethercast-live-source span {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.aethercast-live-source button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+
+.aethercast-live-source a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.aethercast-live-progress,
+.aethercast-inline-error {
+  margin: 0;
+}
+
+.aethercast-inline-error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.aethercast-import-fallback summary {
+  font-weight: 800;
+}
+
+.aethercast-import-fallback p {
+  margin: 0.75rem 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.aethercast-import-fallback input {
+  max-width: 100%;
 }
 
 .aethercast-section-heading,
@@ -280,7 +389,9 @@
   .aethercast-toolbar,
   .aethercast-mapping-grid,
   .aethercast-unit-grid,
-  .aethercast-status {
+  .aethercast-status,
+  .aethercast-live-form,
+  .aethercast-live-source {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -289,6 +400,15 @@
     align-items: stretch;
   }
 
+  .aethercast-live-source strong,
+  .aethercast-live-source span,
+  .aethercast-live-source button {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .aethercast-live-form button,
+  .aethercast-live-source button,
   .aethercast-table-controls > div,
   .aethercast-exports {
     width: 100%;
@@ -307,7 +427,9 @@
   }
 
   .aethercast-status > p,
-  .aethercast-csv-mapper {
+  .aethercast-csv-mapper,
+  .aethercast-live-panel,
+  .aethercast-import-fallback {
     padding-block: 0.65rem;
   }
 }
