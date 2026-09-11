@@ -41,8 +41,9 @@ test('loads a local photo, edits, compares, undoes, and opens export', async ({ 
 test('geometry and local tools produce reversible recipe state', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Crop & geometry' }).click();
-  await page.getByLabel('Crop width percent').fill('75');
-  await page.getByLabel('Crop width percent').press('Enter');
+  const cropWidth = page.getByRole('spinbutton', { name: 'Crop width percent value', exact: true });
+  await cropWidth.fill('75');
+  await cropWidth.press('Enter');
   await page.getByRole('button', { name: 'Rotate right' }).click();
   await page.getByRole('button', { name: 'Local adjustments' }).click();
   await page.getByRole('button', { name: 'Add radial mask' }).click();
@@ -57,7 +58,7 @@ test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await dialog.getByLabel('Metadata policy').selectOption('custom');
   await dialog.getByLabel('Title').fill('A&B portrait');
   await dialog.getByLabel('Creator').fill('Example Photographer');
-  await dialog.getByLabel('Keywords').fill('portrait, example');
+  await dialog.getByRole('textbox', { name: 'Keywords', exact: true }).fill('portrait, example');
   const downloadPromise = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'Download XMP sidecar' }).click();
   const download = await downloadPromise;
