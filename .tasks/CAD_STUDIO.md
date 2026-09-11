@@ -6,7 +6,7 @@
 **Authoritative design:** `docs/superpowers/specs/2026-09-11-cad-studio-design.md`
 **Authoritative plan:** `docs/superpowers/plans/2026-09-11-cad-studio.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `1702978bc2ef5d74c4590d1506f28ba47fecd859`
+**Last tracked implementation commit:** `f628e4ac2fd79b0051419f221f3465cc8f289125`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 12
 **Completed user-facing capabilities:** 0 / 100
@@ -66,7 +66,8 @@ Infrastructure that enables a capability does not count as the capability itself
 - Production support for midpoint, point-on-line, and point-on-circle positional relationships is committed through `bb8b6c0e1ef39b20384f8934e0d096cec075612a`. After ledger alignment, run `34642643122` passed the complete unit suite and production build against the PR synthetic merge with current `main`.
 - Symmetry/lock RED contracts were added at `d723256959be8b7cf5794559698702674a33aad2` for mirrored point pairs across a construction axis, whole-line lock, and whole-circle lock. Aligned run `34642828134` failed exactly those three contracts while 661 tests passed, including the prior sketch suites and CAD freshness guard.
 - Production support for generic point/line/circle geometry lock and point-pair symmetry is committed through `1702978bc2ef5d74c4590d1506f28ba47fecd859`. Its implementation run passed all symmetry/lock tests and 663 tests overall with only the intentionally stale tracker guard failing; after ledger alignment, run `34643021601` passed the complete unit suite and production build against the PR synthetic merge with current `main`.
-- The solver now models point/line/circle entities plus fixed-point, fixed-entity, horizontal, vertical, point-distance, coincident, radius, perpendicular, parallel, tangent, concentric, equal-length, equal-radius, midpoint, point-on-line, point-on-circle, symmetric-points, DOF rank analysis, disabled constraints, soft drag seeding, and explicit conflict reporting. This is not yet the full 17–32 constraint capability set.
+- Dimensional RED contracts were added at `f628e4ac2fd79b0051419f221f3465cc8f289125` for horizontal/vertical point distance, explicit line length, circle diameter, and line angle in canonical radians. Validation and production implementation are pending at this checkpoint.
+- The solver currently models point/line/circle entities plus fixed-point, fixed-entity, horizontal, vertical, point-distance, coincident, radius, perpendicular, parallel, tangent, concentric, equal-length, equal-radius, midpoint, point-on-line, point-on-circle, symmetric-points, DOF rank analysis, disabled constraints, soft drag seeding, and explicit conflict reporting. This is not yet the full 17–32 constraint capability set.
 - G4 remains incomplete until the remaining required constraint/dimension family, sketch entities, and end-user sketch operations are implemented and green.
 - Final PR/browser/main/Pages status is intentionally owned by G11, so transient CI state changes do not force this ledger into a self-triggering update loop.
 - `main` contains unrelated concurrent work; CAD remains isolated until the integration gate.
