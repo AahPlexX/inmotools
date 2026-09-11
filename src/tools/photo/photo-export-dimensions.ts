@@ -1,6 +1,6 @@
 import type { PhotoRecipe } from './photo-types';
 
-export type PhotoResizeMode = 'original' | 'percent' | 'width' | 'height';
+export type PhotoResizeMode = 'original' | 'percent' | 'width' | 'height' | 'long-edge' | 'short-edge';
 
 export interface PhotoDimensions {
   width: number;
@@ -23,6 +23,15 @@ export function photoNaturalDimensions(
   return turns % 2 ? { width: height, height: width } : { width, height };
 }
 
+function scaledDimensions(natural: PhotoDimensions, target: number, basis: number): RequestedPhotoDimensions {
+  const safeTarget = Math.max(1, Math.round(Number.isFinite(target) ? target : basis));
+  const scale = safeTarget / Math.max(1, basis);
+  return {
+    requestedWidth: Math.max(1, Math.round(natural.width * scale)),
+    requestedHeight: Math.max(1, Math.round(natural.height * scale)),
+  };
+}
+
 export function requestedPhotoDimensions(
   sourceWidth: number,
   sourceHeight: number,
@@ -41,17 +50,8 @@ export function requestedPhotoDimensions(
     };
   }
 
-  if (mode === 'width') {
-    const width = Math.max(1, Math.round(Number.isFinite(value) ? value : natural.width));
-    return {
-      requestedWidth: width,
-      requestedHeight: Math.max(1, Math.round(width * natural.height / natural.width)),
-    };
-  }
-
-  const height = Math.max(1, Math.round(Number.isFinite(value) ? value : natural.height));
-  return {
-    requestedWidth: Math.max(1, Math.round(height * natural.width / natural.height)),
-    requestedHeight: height,
-  };
+  if (mode === 'width') return scaledDimensions(natural, value, natural.width);
+  if (mode === 'height') return scaledDimensions(natural, value, natural.height);
+  if (mode === 'long-edge') return scaledDimensions(natural, value, Math.max(natural.width, natural.height));
+  return scaledDimensions(natural, value, Math.min(natural.width, natural.height));
 }
