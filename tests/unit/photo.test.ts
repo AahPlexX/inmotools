@@ -10,6 +10,7 @@ import {
   undoHistory,
 } from '../../src/tools/photo/photo-engine';
 import { mapPhotoGeometryPoint, warpPhotoGeometryPixels } from '../../src/tools/photo/photo-geometry';
+import { applyLocalGesture, placeRetouchPoint } from '../../src/tools/photo/photo-interaction';
 import { safePhotoFilename, serializePhotoXmp } from '../../src/tools/photo/photo-metadata';
 import {
   fitDimensionsWithinLimits,
@@ -183,6 +184,62 @@ describe('Photo Studio engine', () => {
     expect(warped).toHaveLength(pixels.length);
     const transparentPixels = Array.from({ length: 25 }, (_, index) => warped[index * 4 + 3]).filter((alpha) => alpha === 0);
     expect(transparentPixels.length).toBeGreaterThan(0);
+  });
+
+  test('radial direct manipulation moves the center and sizes the mask without mutating the source recipe', () => {
+    const source = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      localAdjustments: [{
+        id: 'radial', label: 'Radial', enabled: true,
+        mask: { type: 'radial', cx: 0.5, cy: 0.5, rx: 0.2, ry: 0.2, feather: 0.4, opacity: 1, invert: false },
+        effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+      }],
+    });
+    const next = applyLocalGesture(source, 'radial', { x: 0.25, y: 0.3 }, { x: 0.65, y: 0.7 });
+    const mask = next.localAdjustments[0].mask;
+    expect(mask.type).toBe('radial');
+    if (mask.type !== 'radial') throw new Error('expected radial mask');
+    expect(mask.cx).toBeCloseTo(0.25);
+    expect(mask.cy).toBeCloseTo(0.3);
+    expect(mask.rx).toBeCloseTo(0.4);
+    expect(mask.ry).toBeCloseTo(0.4);
+    expect(source.localAdjustments[0].mask).not.toEqual(mask);
+  });
+
+  test('brush direct manipulation appends a complete gesture as one recipe change', () => {
+    const source = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      localAdjustments: [{
+        id: 'brush', label: 'Brush', enabled: true,
+        mask: { type: 'brush', points: [], radius: 0.1, feather: 0.4, opacity: 1, invert: false },
+        effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+      }],
+    });
+    const next = applyLocalGesture(source, 'brush', { x: 0.1, y: 0.1 }, { x: 0.3, y: 0.4 }, [
+      { x: 0.1, y: 0.1, pressure: 0.5 },
+      { x: 0.2, y: 0.25, pressure: 0.75 },
+      { x: 0.3, y: 0.4, pressure: 1 },
+    ]);
+    const mask = next.localAdjustments[0].mask;
+    expect(mask.type).toBe('brush');
+    if (mask.type !== 'brush') throw new Error('expected brush mask');
+    expect(mask.points).toHaveLength(3);
+    expect(mask.points[2]).toEqual({ x: 0.3, y: 0.4, pressure: 1 });
+  });
+
+  test('retouch direct placement independently sets source and target points', () => {
+    const source = normalizeRecipe({
+      ...DEFAULT_RECIPE,
+      retouch: [{ id: 'clone', type: 'clone', sourceX: 0.2, sourceY: 0.2, targetX: 0.8, targetY: 0.8, radius: 0.05, feather: 0.5, opacity: 1 }],
+    });
+    const sampled = placeRetouchPoint(source, 'clone', { x: 0.15, y: 0.25 }, 'source');
+    const placed = placeRetouchPoint(sampled, 'clone', { x: 0.7, y: 0.6 }, 'target');
+    const operation = placed.retouch[0];
+    if (operation.type === 'red-eye') throw new Error('expected clone operation');
+    expect(operation.sourceX).toBeCloseTo(0.15);
+    expect(operation.sourceY).toBeCloseTo(0.25);
+    expect(operation.targetX).toBeCloseTo(0.7);
+    expect(operation.targetY).toBeCloseTo(0.6);
   });
 
   test('XMP escapes text and maps reviewed rights/descriptive fields', () => {
