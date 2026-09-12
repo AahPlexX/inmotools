@@ -68,6 +68,40 @@ test('loads a local photo, edits, compares, undoes, and opens export', async ({ 
   await expect(page.getByLabel('Output sharpening')).toBeVisible();
 });
 
+test('individual adjustment reset restores only that control to its neutral value', async ({ page }) => {
+  await openFixture(page);
+  const exposure = page.getByLabel('Exposure value');
+  const contrast = page.getByLabel('Contrast value');
+  await exposure.fill('1.4');
+  await exposure.press('Enter');
+  await contrast.fill('0.36');
+  await contrast.press('Enter');
+  await page.getByRole('button', { name: 'Reset Exposure' }).click();
+  await expect(exposure).toHaveValue('0');
+  await expect(contrast).toHaveValue('0.36');
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+});
+
+test('named snapshots save and restore a user-labelled recipe state', async ({ page }) => {
+  await openFixture(page);
+  const exposure = page.getByLabel('Exposure value');
+  await exposure.fill('1.2');
+  await exposure.press('Enter');
+  await page.getByRole('button', { name: 'Inspect & workflow' }).click();
+  const snapshotName = page.getByRole('textbox', { name: 'Snapshot name' });
+  await snapshotName.fill('Warm proof');
+  await page.getByRole('button', { name: 'Save snapshot' }).click();
+  await expect(page.getByRole('button', { name: /Warm proof/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await exposure.fill('-0.8');
+  await exposure.press('Enter');
+  await page.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await page.getByRole('button', { name: /Warm proof/ }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await expect(exposure).toHaveValue('1.2');
+});
+
 test('RGB histogram, clipping warnings, and color sampler inspect the rendered preview', async ({ page }) => {
   await openFixture(page);
   const histogram = page.getByRole('img', { name: 'Live RGB and luminance histogram' });
