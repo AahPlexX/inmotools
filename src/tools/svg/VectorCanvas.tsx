@@ -8,6 +8,7 @@ import {
   pointsToPath,
   simplifyPoints,
   snapPoint,
+  topLevelSelectionId,
 } from './vector-engine';
 import { vectorElementTransform } from './vector-transform';
 import type { VectorDocument, VectorElement, VectorFill, VectorPoint, VectorTool } from './vector-types';
@@ -214,11 +215,13 @@ export default function VectorCanvas({ document, selection, tool, zoom, drawSett
   function selectElement(event: ReactPointerEvent<SVGElement>, element: VectorElement) {
     if (tool === 'pan') return;
     event.stopPropagation();
-    if (tool !== 'select' || element.locked) return;
+    const selectionId = topLevelSelectionId(document, element.id);
+    const selectable = selectionId ? document.elements.find((candidate) => candidate.id === selectionId) : null;
+    if (tool !== 'select' || !selectionId || selectable?.locked) return;
     const extend = event.shiftKey || event.ctrlKey || event.metaKey;
     const nextSelection = extend
-      ? selection.includes(element.id) ? selection.filter((id) => id !== element.id) : [...selection, element.id]
-      : [element.id];
+      ? selection.includes(selectionId) ? selection.filter((id) => id !== selectionId) : [...selection, selectionId]
+      : [selectionId];
     onSelectionChange(nextSelection);
     const point = svgPoint(event);
     event.currentTarget.setPointerCapture(event.pointerId);
