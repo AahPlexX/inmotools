@@ -14,7 +14,9 @@
 
 .crystal-workspace__header h2,
 .crystal-workspace__starter h3,
-.crystal-viewport__heading-row h3 {
+.crystal-viewport__heading-row h3,
+.crystal-structure-panel h3,
+.crystal-editor-card h4 {
   margin: 0;
 }
 
@@ -44,14 +46,17 @@
   min-width: 0;
 }
 
-.crystal-workspace__starter label {
+.crystal-workspace__starter label,
+.crystal-structure-panel label {
   display: grid;
   gap: 6px;
   min-width: 0;
   font-weight: 700;
 }
 
-.crystal-workspace__starter select {
+.crystal-workspace__starter select,
+.crystal-structure-panel select,
+.crystal-structure-panel input {
   width: 100%;
   min-width: 0;
 }
@@ -66,7 +71,8 @@
   background: var(--surface-strong);
 }
 
-.crystal-viewport-shell {
+.crystal-viewport-shell,
+.crystal-structure-panel {
   display: grid;
   gap: 12px;
   min-width: 0;
@@ -76,7 +82,9 @@
   background: var(--surface);
 }
 
-.crystal-viewport__heading-row {
+.crystal-viewport__heading-row,
+.crystal-structure-panel__topbar,
+.crystal-editor-card__heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -91,7 +99,10 @@
   min-width: min(100%, 18rem);
 }
 
-.crystal-viewport__toolbar {
+.crystal-viewport__toolbar,
+.crystal-history-controls,
+.crystal-site-actions,
+.crystal-site-row-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -100,7 +111,10 @@
   min-width: 0;
 }
 
-.crystal-viewport__toolbar button {
+.crystal-viewport__toolbar button,
+.crystal-history-controls button,
+.crystal-site-actions button,
+.crystal-site-row-actions button {
   min-height: 36px;
   white-space: normal;
 }
@@ -151,16 +165,147 @@
   padding-left: 20px;
 }
 
+.crystal-structure-panel {
+  gap: 16px;
+}
+
+.crystal-structure-panel__topbar > div:first-child,
+.crystal-editor-card__heading > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.crystal-structure-panel__topbar p,
+.crystal-editor-card p,
+.crystal-measurement-list p {
+  margin: 0;
+}
+
+.crystal-editor-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.crystal-editor-card__heading p,
+.crystal-supercell-preview,
+.crystal-measurement-list {
+  color: var(--muted);
+}
+
+.crystal-cell-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.crystal-editor-error {
+  padding: 10px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+}
+
+.crystal-site-actions label {
+  min-width: min(100%, 180px);
+}
+
+.crystal-site-table-wrap {
+  min-width: 0;
+}
+
+.crystal-site-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.crystal-site-table th,
+.crystal-site-table td {
+  padding: 8px 6px;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.crystal-site-table th {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.crystal-site-table input {
+  max-width: 100%;
+}
+
+.crystal-site-row-actions {
+  justify-content: flex-start;
+}
+
+.crystal-geometry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.crystal-repeat-grid,
+.crystal-measurement-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.crystal-measurement-controls button {
+  align-self: end;
+  min-height: 40px;
+}
+
+.crystal-measurement-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crystal-measurement-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 980px) {
+  .crystal-cell-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .crystal-geometry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   .crystal-workspace__starter {
     grid-template-columns: 1fr;
   }
 
-  .crystal-workspace__selectors {
+  .crystal-workspace__selectors,
+  .crystal-repeat-grid,
+  .crystal-measurement-controls {
     grid-template-columns: 1fr;
   }
 
-  .crystal-viewport-shell {
+  .crystal-viewport-shell,
+  .crystal-structure-panel {
     padding: 12px;
   }
 
@@ -168,14 +313,74 @@
     height: clamp(18rem, 52vh, 30rem);
   }
 
-  .crystal-viewport__toolbar {
+  .crystal-viewport__toolbar,
+  .crystal-history-controls,
+  .crystal-site-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .crystal-site-table,
+  .crystal-site-table tbody,
+  .crystal-site-table tr,
+  .crystal-site-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .crystal-site-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .crystal-site-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .crystal-site-table td {
+    display: grid;
+    gap: 4px;
+    padding: 0;
+  }
+
+  .crystal-site-table td::before {
+    content: attr(data-label);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .crystal-site-table td:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .crystal-cell-grid,
+  .crystal-site-table tr {
+    grid-template-columns: 1fr;
+  }
+
+  .crystal-site-table td:last-child {
+    grid-column: auto;
   }
 }
 
 @media (max-width: 420px) {
-  .crystal-viewport__toolbar button {
+  .crystal-viewport__toolbar button,
+  .crystal-history-controls button,
+  .crystal-site-actions button {
     flex: 1 1 auto;
   }
 }
