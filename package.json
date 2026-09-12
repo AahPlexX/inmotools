@@ -94,5 +94,10 @@
     "vite": "8.2.2",
     "vite-plugin-pwa": "1.3.0",
     "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "overrides": {
+      "lodash-es": "4.18.1"
+    }
   }
 }
