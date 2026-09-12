@@ -7,11 +7,77 @@ export interface PdfSelection {
   flatten?: boolean;
 }
 
+export interface PdfBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PdfPageInspection {
+  page: number;
+  width: number;
+  height: number;
+  rotation: number;
+  mediaBox: PdfBox;
+  cropBox: PdfBox;
+  bleedBox: PdfBox;
+  trimBox: PdfBox;
+}
+
 export interface PdfInspection {
   pageCount: number;
   formFieldCount: number;
   metadataFields: string[];
   encrypted: boolean;
+  pages: PdfPageInspection[];
+}
+
+export interface PdfMetadataEdits {
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string[];
+  creator?: string;
+  producer?: string;
+  language?: string;
+  creationDate?: Date;
+  modificationDate?: Date;
+}
+
+interface PdfFormFieldBase {
+  name: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  required?: boolean;
+  readOnly?: boolean;
+}
+
+export interface PdfTextFieldDefinition extends PdfFormFieldBase {
+  type: 'text';
+  value?: string;
+  multiline?: boolean;
+}
+
+export interface PdfCheckBoxDefinition extends PdfFormFieldBase {
+  type: 'checkbox';
+  checked?: boolean;
+}
+
+export interface PdfDropdownDefinition extends PdfFormFieldBase {
+  type: 'dropdown';
+  options: string[];
+  selected?: string;
+}
+
+export type PdfFormFieldDefinition = PdfTextFieldDefinition | PdfCheckBoxDefinition | PdfDropdownDefinition;
+
+export interface PdfOutputOptions {
+  metadata?: PdfMetadataEdits;
+  formFields?: PdfFormFieldDefinition[];
 }
 
 export type PageSelectionPreset = 'all' | 'odd' | 'even' | 'reverse';
@@ -26,6 +92,112 @@ const METADATA_READERS = [
   ['Creation date', (doc: PDFDocument) => doc.getCreationDate()],
   ['Modification date', (doc: PDFDocument) => doc.getModificationDate()],
 ] as const;
+
+const cleanText = (value: string | undefined): string | undefined => {
+  const cleaned = value?.trim();
+  return cleaned ? cleaned : undefined;
+};
+
+const cleanKeywords = (values: string[] | undefined): string[] => (
+  values?.map((value) => value.trim()).filter(Boolean) ?? []
+);
+
+function applyMetadata(document: PDFDocument, metadata: PdfMetadataEdits | undefined): void {
+  if (!metadata) {
+    document.context.trailerInfo.Info = undefined;
+    return;
+  }
+
+  const title = cleanText(metadata.title);
+  const author = cleanText(metadata.author);
+  const subject = cleanText(metadata.subject);
+  const creator = cleanText(metadata.creator);
+  const producer = cleanText(metadata.producer);
+  const language = cleanText(metadata.language);
+  const keywords = cleanKeywords(metadata.keywords);
+
+  if (title) document.setTitle(title);
+  if (author) document.setAuthor(author);
+  if (subject) document.setSubject(subject);
+  if (keywords.length) document.setKeywords(keywords);
+  if (creator) document.setCreator(creator);
+  if (producer) document.setProducer(producer);
+  if (language) document.setLanguage(language);
+  if (metadata.creationDate) document.setCreationDate(metadata.creationDate);
+  if (metadata.modificationDate) document.setModificationDate(metadata.modificationDate);
+}
+
+function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
+  if (!definition.name.trim()) throw new Error('Form field names cannot be blank.');
+  if (!Number.isInteger(definition.page) || definition.page < 1 || definition.page > document.getPageCount()) {
+    throw new Error(`Form field ${definition.name} targets page ${definition.page}, which is outside the output document.`);
+  }
+
+  const values = [definition.x, definition.y, definition.width, definition.height];
+  if (!values.every(Number.isFinite) || definition.x < 0 || definition.y < 0 || definition.width <= 0 || definition.height <= 0) {
+    throw new Error(`Form field ${definition.name} must use finite, positive page geometry.`);
+  }
+
+  const page = document.getPage(definition.page - 1);
+  if (definition.x + definition.width > page.getWidth() || definition.y + definition.height > page.getHeight()) {
+    throw new Error(`Form field ${definition.name} extends outside output page ${definition.page}.`);
+  }
+}
+
+function applyFieldFlags(field: { enableReadOnly(): void; enableRequired(): void }, definition: PdfFormFieldBase): void {
+  if (definition.readOnly) field.enableReadOnly();
+  if (definition.required) field.enableRequired();
+}
+
+function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinition[]): void {
+  if (!definitions.length) return;
+  const form = document.getForm();
+  const seen = new Set<string>();
+
+  for (const definition of definitions) {
+    validateFieldDefinition(document, definition);
+    const name = definition.name.trim();
+    if (seen.has(name) || form.getFieldMaybe(name)) throw new Error(`Form field name ${name} is duplicated.`);
+    seen.add(name);
+    const page = document.getPage(definition.page - 1);
+    const rect = {
+      x: definition.x,
+      y: definition.y,
+      width: definition.width,
+      height: definition.height,
+    };
+
+    if (definition.type === 'text') {
+      const field = form.createTextField(name);
+      applyFieldFlags(field, definition);
+      if (definition.multiline) field.enableMultiline();
+      if (definition.value !== undefined) field.setText(definition.value);
+      field.addToPage(page, rect);
+      continue;
+    }
+
+    if (definition.type === 'checkbox') {
+      const field = form.createCheckBox(name);
+      applyFieldFlags(field, definition);
+      field.addToPage(page, rect);
+      if (definition.checked) field.check();
+      continue;
+    }
+
+    if (!definition.options.length) throw new Error(`Dropdown ${name} must contain at least one option.`);
+    const options = definition.options.map((option) => option.trim());
+    if (options.some((option) => !option)) throw new Error(`Dropdown ${name} cannot contain blank options.`);
+    if (new Set(options).size !== options.length) throw new Error(`Dropdown ${name} cannot contain duplicate options.`);
+    if (definition.selected !== undefined && !options.includes(definition.selected)) {
+      throw new Error(`Dropdown ${name} selected value must match one of its options.`);
+    }
+    const field = form.createDropdown(name);
+    applyFieldFlags(field, definition);
+    field.setOptions(options);
+    if (definition.selected !== undefined) field.select(definition.selected);
+    field.addToPage(page, rect);
+  }
+}
 
 export function parsePageSelection(value: string, max: number): number[] {
   if (!Number.isInteger(max) || max < 1) throw new Error('PDF must contain at least one page.');
@@ -77,6 +249,16 @@ export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
     formFieldCount: form.getFields().length,
     metadataFields: METADATA_READERS.filter(([, read]) => read(document) !== undefined).map(([label]) => label),
     encrypted: document.isEncrypted,
+    pages: document.getPages().map((page, index) => ({
+      page: index + 1,
+      width: page.getWidth(),
+      height: page.getHeight(),
+      rotation: page.getRotation().angle,
+      mediaBox: page.getMediaBox(),
+      cropBox: page.getCropBox(),
+      bleedBox: page.getBleedBox(),
+      trimBox: page.getTrimBox(),
+    })),
   };
 }
 
@@ -88,7 +270,7 @@ export async function flattenAndSanitizePdf(bytes: Uint8Array): Promise<Uint8Arr
   return splicePdfs([{ bytes, flatten: true }]);
 }
 
-export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array> {
+export async function splicePdfs(selections: PdfSelection[], options: PdfOutputOptions = {}): Promise<Uint8Array> {
   if (!selections.length) throw new Error('Add at least one PDF.');
   const output = await PDFDocument.create({ updateMetadata: false });
   for (const selection of selections) {
@@ -112,6 +294,8 @@ export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array
       output.addPage(page);
     });
   }
-  output.context.trailerInfo.Info = undefined;
-  return new Uint8Array(await output.save({ updateFieldAppearances: false }));
+
+  applyFormFields(output, options.formFields ?? []);
+  applyMetadata(output, options.metadata);
+  return new Uint8Array(await output.save({ updateFieldAppearances: Boolean(options.formFields?.length) }));
 }
