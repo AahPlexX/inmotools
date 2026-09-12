@@ -72,6 +72,19 @@ describe('Crystal metadata editing', () => {
     expect(diff.omitted).toContain('_custom_note');
     expect(diff.preserved).toContain('_custom_a');
   });
+
+  it('treats a supplied custom CIF map as the complete edited set', () => {
+    const source = createStarterStructure('bcc');
+    const withTwo = setExportMetadata(source, {
+      customCifTags: { _custom_keep: 'yes', _custom_remove: 'no' },
+    });
+    const withOne = setExportMetadata(withTwo, {
+      customCifTags: { _custom_keep: 'yes' },
+    });
+
+    expect(withOne.metadata.customCifTags).toEqual({ _custom_keep: 'yes' });
+    expect(withOne.metadata.customCifTags).not.toHaveProperty('_custom_remove');
+  });
 });
 
 describe('Crystal structure export', () => {
