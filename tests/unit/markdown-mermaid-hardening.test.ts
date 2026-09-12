@@ -33,6 +33,22 @@ describe('Mermaid render contract', () => {
     expect(result.diagramType).toBe('flowchart-v2');
     expect(result.bindFunctions).toBe(bindFunctions);
   });
+
+  it('turns Mermaid 12 Gantt metadata crashes into a line-specific authoring error', async () => {
+    const source = [
+      'gantt',
+      '  title Schedule',
+      '  dateFormat YYYY-MM-DD',
+      '  Alpha :a1, 2026-01-05, 3d',
+      '  Beta :b1, 2026-01-12, 2d, extra',
+    ].join('\n');
+    const render = vi.fn().mockRejectedValue(new TypeError("Cannot read properties of undefined (reading 'type')"));
+
+    const result = await renderMermaidDiagram(render, 'gantt-1', source);
+    expect(result).toEqual({
+      error: 'Mermaid Gantt task on line 5 has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.',
+    });
+  });
 });
 
 describe('idle scheduling', () => {
