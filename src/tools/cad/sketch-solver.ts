@@ -270,6 +270,118 @@ function ellipsePointState(
   };
 }
 
+function normalizedEllipseCoordinates(
+  point: [number, number],
+  frame: ReturnType<typeof ellipseFrame>,
+): [number, number] {
+  const rx = point[0] - frame.cx;
+  const ry = point[1] - frame.cy;
+  return [
+    (rx * frame.ux + ry * frame.uy) / frame.majorRadius,
+    (rx * frame.vx + ry * frame.vy) / frame.minorRadius,
+  ];
+}
+
+function lineClosestPointToCenter(
+  lineId: string,
+  cx: number,
+  cy: number,
+  values: readonly number[],
+  index: SketchIndex,
+): { distance: number; angle: number } {
+  const [[ax, ay], [bx, by]] = linePoints(values, index, lineId);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= MIN_GEOMETRY_SCALE * MIN_GEOMETRY_SCALE) {
+    throw new Error(`Tangent-curve constraint requires line '${lineId}' to have non-zero length.`);
+  }
+  const parameter = ((cx - ax) * dx + (cy - ay) * dy) / lengthSquared;
+  const qx = ax + parameter * dx;
+  const qy = ay + parameter * dy;
+  return { distance: Math.hypot(qx - cx, qy - cy), angle: Math.atan2(qy - cy, qx - cx) };
+}
+
+function ellipseLineTangencyState(
+  lineId: string,
+  frame: ReturnType<typeof ellipseFrame>,
+  values: readonly number[],
+  index: SketchIndex,
+): { residual: number; contactParameter: number } {
+  const [a, b] = linePoints(values, index, lineId);
+  const [ax, ay] = normalizedEllipseCoordinates(a, frame);
+  const [bx, by] = normalizedEllipseCoordinates(b, frame);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= MIN_GEOMETRY_SCALE * MIN_GEOMETRY_SCALE) {
+    throw new Error(`Tangent-curve constraint requires line '${lineId}' to have non-zero length.`);
+  }
+  const parameter = -(ax * dx + ay * dy) / lengthSquared;
+  const qx = ax + parameter * dx;
+  const qy = ay + parameter * dy;
+  const distance = Math.hypot(qx, qy);
+  if (distance <= MIN_GEOMETRY_SCALE) {
+    throw new Error(`Tangent-curve constraint line '${lineId}' passes through the ellipse center and has no unique tangent contact.`);
+  }
+  const scale = Math.min(frame.majorRadius, frame.minorRadius);
+  return { residual: (distance - 1) * scale, contactParameter: Math.atan2(qy, qx) };
+}
+
+function tangentCurveResidual(
+  constraintId: string,
+  lineId: string,
+  curveId: string,
+  values: readonly number[],
+  index: SketchIndex,
+): number[] {
+  if (index.circles.has(curveId)) {
+    const [cx, cy] = circleCenter(values, index, curveId);
+    const state = lineClosestPointToCenter(lineId, cx, cy, values, index);
+    return [state.distance - circleRadius(values, index, curveId)];
+  }
+
+  const arc = index.arcs.get(curveId);
+  if (arc) {
+    const [cx, cy] = coordinates(values, index, arc.centerPointId);
+    const [sx, sy] = coordinates(values, index, arc.startPointId);
+    const [ex, ey] = coordinates(values, index, arc.endPointId);
+    const radius = Math.hypot(sx - cx, sy - cy);
+    if (radius <= MIN_GEOMETRY_SCALE) throw new Error(`Arc '${arc.id}' start point must differ from its center.`);
+    const state = lineClosestPointToCenter(lineId, cx, cy, values, index);
+    const startAngle = Math.atan2(sy - cy, sx - cx);
+    const endAngle = Math.atan2(ey - cy, ex - cx);
+    return [
+      state.distance - radius,
+      radius * directedSpanViolation(state.angle, startAngle, endAngle, arc.clockwise),
+    ];
+  }
+
+  const ellipse = index.ellipses.get(curveId);
+  if (ellipse) {
+    const state = ellipseLineTangencyState(lineId, ellipseFrame(ellipse, values, index), values, index);
+    return [state.residual];
+  }
+
+  const ellipticalArc = index.ellipticalArcs.get(curveId);
+  if (ellipticalArc) {
+    const frame = ellipseFrame(ellipticalArc, values, index);
+    const state = ellipseLineTangencyState(lineId, frame, values, index);
+    const start = ellipsePointState(ellipticalArc.startPointId, frame, values, index);
+    const end = ellipsePointState(ellipticalArc.endPointId, frame, values, index);
+    const scale = Math.min(frame.majorRadius, frame.minorRadius);
+    return [
+      state.residual,
+      scale * directedSpanViolation(state.contactParameter, start.parameter, end.parameter, ellipticalArc.clockwise),
+    ];
+  }
+
+  if (index.splines.has(curveId)) {
+    throw new Error(`Tangent-curve constraint '${constraintId}' does not yet support spline '${curveId}'.`);
+  }
+  throw new Error(`Tangent-curve constraint '${constraintId}' references missing supported curve '${curveId}'.`);
+}
+
 function pointOnCurveResidual(
   constraintId: string,
   pointId: string,
@@ -480,6 +592,8 @@ function residualForConstraint(constraint: SketchConstraint, values: readonly nu
       const distance = Math.abs(dx * (cy - ay) - dy * (cx - ax)) / length;
       return [distance - radius];
     }
+    case 'tangent-curve':
+      return tangentCurveResidual(constraint.id, constraint.lineId, constraint.curveId, values, index);
     case 'concentric': {
       const [ax, ay] = curveCenter(values, index, constraint.circleAId);
       const [bx, by] = curveCenter(values, index, constraint.circleBId);
