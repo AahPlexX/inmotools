@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
 import type { LocalAdjustment, PhotoHistogram, RetouchOperation } from './photo-types';
+import './photo-comparison.css';
 
 export interface PhotoCanvasInteraction {
   kind: 'local' | 'retouch';
@@ -35,6 +36,8 @@ interface GestureState {
   start: PhotoCanvasGesture['start'];
   path: PhotoCanvasGesture['path'];
 }
+
+type PhotoCompareMode = 'split' | 'side-by-side';
 
 function histogramPath(values: number[], width = 256, height = 56): string {
   const max = Math.max(1, ...values);
@@ -122,8 +125,15 @@ export default function PhotoCanvas({
   const [clippingVisible, setClippingVisible] = useState(false);
   const [samplerActive, setSamplerActive] = useState(false);
   const [sample, setSample] = useState<PhotoColorReadout | null>(null);
+  const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
+  const [compareSplit, setCompareSplit] = useState(50);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    setCompareMode('split');
+    setCompareSplit(50);
+  }, [originalUrl]);
 
   useEffect(() => {
     if (!clippingVisible || !previewUrl) return;
@@ -166,7 +176,7 @@ export default function PhotoCanvas({
     if (image.complete) draw();
     else image.addEventListener('load', draw, { once: true });
     return () => image.removeEventListener('load', draw);
-  }, [clippingVisible, previewUrl]);
+  }, [clippingVisible, compareMode, previewUrl]);
 
   function sampleAtPointer(event: ReactPointerEvent<HTMLDivElement>) {
     const image = previewImageRef.current;
@@ -223,6 +233,32 @@ export default function PhotoCanvas({
   }
 
   const canvasInteractive = Boolean(interaction || samplerActive);
+  const comparisonActive = Boolean(compare && originalUrl && previewUrl);
+
+  function editedSurface(className: string, testId?: string) {
+    return (
+      <div
+        className={`${className}${busy ? ' is-rendering' : ''}${canvasInteractive ? ' is-interactive' : ''}`}
+        data-testid={testId}
+        onPointerDown={beginGesture}
+        onPointerMove={moveGesture}
+        onPointerUp={endGesture}
+        onPointerCancel={cancelGesture}
+      >
+        <img
+          ref={previewImageRef}
+          src={previewUrl ?? undefined}
+          alt={`Edited preview of ${sourceName || 'selected photo'}`}
+          className="photo-preview-image"
+          data-testid="photo-preview"
+          draggable={false}
+        />
+        {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
+        <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
+        {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
+      </div>
+    );
+  }
 
   return (
     <section className="photo-stage" aria-label="Photo preview">
@@ -233,6 +269,28 @@ export default function PhotoCanvas({
           <button type="button" onClick={() => onZoomChange(Math.min(4, zoom + 0.25))} aria-label="Zoom in">+</button>
           <button type="button" onClick={() => onZoomChange(0.75)} aria-label="Fit photo">Fit</button>
         </div>
+        {comparisonActive ? (
+          <div className="photo-comparison-controls" role="group" aria-label="Before and after comparison controls">
+            <div className="photo-comparison-mode-buttons">
+              <button type="button" aria-pressed={compareMode === 'split'} onClick={() => setCompareMode('split')}>Split</button>
+              <button type="button" aria-pressed={compareMode === 'side-by-side'} onClick={() => setCompareMode('side-by-side')}>Side by side</button>
+            </div>
+            {compareMode === 'split' ? (
+              <label className="photo-compare-range">
+                <span>Split {compareSplit}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={compareSplit}
+                  aria-label="Before/after split position"
+                  onChange={(event) => setCompareSplit(Number(event.target.value))}
+                />
+              </label>
+            ) : null}
+          </div>
+        ) : null}
         <div className="photo-observation-controls" role="group" aria-label="Image inspection controls">
           <button
             type="button"
@@ -275,10 +333,25 @@ export default function PhotoCanvas({
             <h3>Open a photo to begin</h3>
             <p>Your source stays on this device. Every adjustment remains reversible until you export a new copy.</p>
           </div>
+        ) : comparisonActive && compareMode === 'side-by-side' ? (
+          <div
+            className="photo-compare-side-by-side"
+            data-testid="photo-compare-side-by-side"
+            style={{ '--photo-zoom': zoom } as React.CSSProperties}
+          >
+            <div className="photo-compare-pane photo-compare-before-pane" data-testid="photo-compare-before-image">
+              <img src={originalUrl ?? undefined} alt={`Original before view of ${sourceName || 'selected photo'}`} draggable={false} />
+              <span className="photo-compare-pane-label">Before</span>
+            </div>
+            <div className="photo-compare-pane-wrap" data-testid="photo-compare-after-image">
+              {editedSurface('photo-compare-pane photo-compare-after-pane')}
+              <span className="photo-compare-pane-label">After</span>
+            </div>
+          </div>
         ) : (
           <div
             className={`photo-image-frame${busy ? ' is-rendering' : ''}${canvasInteractive ? ' is-interactive' : ''}`}
-            style={{ '--photo-zoom': zoom } as React.CSSProperties}
+            style={{ '--photo-zoom': zoom, '--photo-compare-split': `${compareSplit}%` } as React.CSSProperties}
             data-testid="photo-image-frame"
             onPointerDown={beginGesture}
             onPointerMove={moveGesture}
@@ -293,11 +366,14 @@ export default function PhotoCanvas({
               data-testid="photo-preview"
               draggable={false}
             />
-            {compare && originalUrl ? (
-              <div className="photo-before-overlay" aria-hidden="true">
-                <img src={originalUrl} alt="" draggable={false} />
-                <span className="photo-before-label">Before</span>
-              </div>
+            {comparisonActive ? (
+              <>
+                <div className="photo-before-overlay" data-testid="photo-before-overlay" aria-hidden="true">
+                  <img src={originalUrl ?? undefined} alt="" draggable={false} />
+                  <span className="photo-before-label">Before</span>
+                </div>
+                <span className="photo-compare-divider" aria-hidden="true" />
+              </>
             ) : null}
             {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
             <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
