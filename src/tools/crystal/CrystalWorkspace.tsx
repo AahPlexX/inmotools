@@ -1,14 +1,17 @@
 import { useCallback, useState } from 'react';
+import CrystalExportDialog from './CrystalExportDialog';
+import CrystalMetadataDialog from './CrystalMetadataDialog';
 import CrystalStructurePanel from './CrystalStructurePanel';
 import CrystalViewport from './CrystalViewport';
 import { createStarterStructure } from './document-engine';
-import { createCrystalHistory, type CrystalHistory } from './history-engine';
+import { commitCrystalHistory, createCrystalHistory, type CrystalHistory } from './history-engine';
 import type { CrystalMeasurement } from './project-engine';
 import {
   STARTER_STRUCTURES,
   STARTER_STRUCTURE_IDS,
   type StarterStructureId,
 } from './starter-structures';
+import type { CrystalDocument } from './crystal-types';
 import type { CrystalRepresentation } from './viewport-model';
 import './crystal-workspace.css';
 
@@ -39,6 +42,10 @@ export default function CrystalWorkspace() {
     setMeasurements((current) => current.filter((measurement) => measurement.siteIds.every((id) => validSiteIds.has(id))));
     setHistory(nextHistory);
   }, []);
+
+  const handleMetadataSave = useCallback((nextDocument: CrystalDocument) => {
+    handleHistoryChange(commitCrystalHistory(history, nextDocument));
+  }, [handleHistoryChange, history]);
 
   const handleStarterChange = (next: StarterStructureId) => {
     const nextDocument = createStarterStructure(next);
@@ -87,6 +94,17 @@ export default function CrystalWorkspace() {
           <span>{selected.description}</span>
           <span>{document.sites.length.toLocaleString()} sites in the working cell</span>
           <span>{selectedSiteIds.size.toLocaleString()} selected</span>
+        </div>
+      </section>
+
+      <section className="crystal-workspace__document-actions" aria-labelledby="crystal-document-actions-heading">
+        <div>
+          <h3 id="crystal-document-actions-heading">Data &amp; output</h3>
+          <p>Review document metadata, inspect preserved CIF content, or export the current working structure.</p>
+        </div>
+        <div className="crystal-workspace__document-buttons">
+          <CrystalMetadataDialog document={document} onSave={handleMetadataSave} />
+          <CrystalExportDialog document={document} measurements={measurements} />
         </div>
       </section>
 
