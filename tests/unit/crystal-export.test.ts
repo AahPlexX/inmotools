@@ -105,7 +105,8 @@ describe('Crystal structure export', () => {
     expect(poscar.text).toContain('Na Cl');
     expect(extxyz.text).toMatch(/^\d+\nLattice="/);
     expect(extxyz.text).toContain('Properties=species:S:1:pos:R:3');
-    expect(extxyz.text).toContain('Na 0 0 0');
+    expect(extxyz.text).toContain('Cl 0 0 0');
+    expect(extxyz.text).toContain('Na 2.8201 0 0');
   });
 
   it('exports measurements CSV with explicit units and RFC 4180-safe labels', () => {
