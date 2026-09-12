@@ -6,7 +6,7 @@
 **Authoritative design:** `docs/superpowers/specs/2026-09-11-cad-studio-design.md`
 **Authoritative plan:** `docs/superpowers/plans/2026-09-11-cad-studio.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `afa238c9c6c2cec4ac6e2d752525f8cbd9bbc7af`
+**Last tracked implementation commit:** `dfda96a0ad55112cfd2de466b3959a728e32a062`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 12
 **Completed user-facing capabilities:** 0 / 100
@@ -23,7 +23,7 @@ A capability counts only when production behavior exists, relevant validation pa
 - [x] **G1 — Serializable parametric project engine.** Project/history types, downstream dependency closure, suppression, dirty propagation, dependency-safe reorder, undo/redo, and history limits are implemented and unit-tested.
 - [x] **G2 — Canonical units foundation.** Canonical millimeter/radian storage and supported length/angle conversions reject non-finite values and pass unit/build validation.
 - [x] **G3 — Semantic topology references.** Provenance + geometry fingerprint scoring resolves unique references and explicitly returns ambiguous/missing rather than silently retargeting geometry.
-- [ ] **G4 — Parameters and constrained sketch system.** Named dimensional formulas, cycle/error handling, sketch entities, geometric/dimensional constraints, DOF analysis, drag solve, deterministic conflict isolation, and the public sketch-analysis contract are green.
+- [ ] **G4 — Parameters and constrained sketch system.** Named dimensional formulas, cycle/error handling, sketch entities, geometric/dimensional constraints, DOF analysis, drag solve, deterministic conflict isolation, and public sketch analysis are green.
 - [ ] **G5 — Exact OCCT worker kernel.** Re-verified exact dependencies are pinned, route-lazy WASM initializes in a dedicated worker, revision cancellation works, and analytic geometry fixtures + STEP round-trip pass.
 - [ ] **G6 — Exact solid/surface feature evaluator.** Required primitives, extrude/revolve/sweep/loft, booleans, hole, fillet/chamfer, shell/thicken/draft/offset/split/rib, pattern/mirror/helix/thread/text, datums, surfaces, and healing are functional.
 - [ ] **G7 — CAD workspace and sketch interaction.** Responsive workspace, model tree, contextual inspector, precision sketch editing, selection, camera/navigation, exact numeric alternatives, undo/redo, feature diagnostics, and command access are functional.
@@ -48,11 +48,11 @@ A capability counts only when production behavior exists, relevant validation pa
 ## Current evidence
 
 - G1–G3 remain green from their committed unit/build checkpoints.
-- The sketch solver currently supports point/line/circle geometry, fixed-point/fixed-entity, horizontal/vertical, coincident, distance/horizontal-distance/vertical-distance, length/radius/diameter/angle, perpendicular/parallel/tangent/concentric/equal-length/equal-radius, midpoint/point-on-line/point-on-circle/symmetric-points, disabled constraints, DOF rank analysis, soft drag seeding, and deterministic conflict reporting.
-- Formula/reference-dimension RED was established at `143dfa230912d34d3d2a66bef2d3733bc84a085f`.
-- Formula-bound driving dimensions and non-controlling reference measurements are implemented through `13884f5ffd31a358574a0b8ebe4c49280571c407`. Its implementation run passed all four new tests and 671 tests overall; only the intentionally stale tracker guard failed. The tracker-aligned run `34661768357` has passed the full unit stage; production-build/browser completion remains transient G11 evidence.
-- Public sketch-analysis RED contract was added at `afa238c9c6c2cec4ac6e2d752525f8cbd9bbc7af`. Production implementation is pending at this checkpoint.
+- The sketch solver supports point/line/circle geometry, fixed-point/fixed-entity, horizontal/vertical, coincident, distance/horizontal-distance/vertical-distance, length/radius/diameter/angle, perpendicular/parallel/tangent/concentric/equal-length/equal-radius, midpoint/point-on-line/point-on-circle/symmetric-points, disabled constraints, DOF rank analysis, soft drag seeding, and deterministic conflict reporting.
+- Formula/reference-dimension RED was established at `143dfa230912d34d3d2a66bef2d3733bc84a085f`; production support through `13884f5ffd31a358574a0b8ebe4c49280571c407` passed all four new tests. Tracker-aligned run `34661768357` passed the full unit suite and production build.
+- Public sketch-analysis RED was established through `afa238c9c6c2cec4ac6e2d752525f8cbd9bbc7af`; after isolating the analysis façade boundary in `08e286ceabd8c1802ded8ce6d4c4bbec9041aec4`, production support is committed at `dfda96a0ad55112cfd2de466b3959a728e32a062`. GREEN validation is pending at this checkpoint.
 - The prior aligned dimensional checkpoint run `34643533639` passed all 668 unit tests and production build. Its browser failure was isolated to the concurrently developed Vector Studio `svg-sprite-compiler` route, not CAD.
+- G4 remains open until its full planned sketch/entity contract and numerical dependency policy are satisfied; internal foundations do not count as completed user-facing capabilities.
 - `main` contains unrelated concurrent work; CAD remains isolated until G11 reconciliation.
 
 ## Freshness invariant
