@@ -19,8 +19,8 @@ export interface MermaidRenderResult {
 export type MermaidRenderFn = (id: string, source: string) => Promise<MermaidRenderResult>;
 
 export type PreparedMermaidSource =
-  | { readonly source: string; readonly error?: undefined }
-  | { readonly source?: undefined; readonly error: string };
+  | { readonly ok: true; readonly source: string }
+  | { readonly ok: false; readonly error: string };
 
 export const prepareMermaidSource = (source: string): PreparedMermaidSource => {
   // Mermaid syntax does not require trailing whitespace. Removing it prevents
@@ -29,10 +29,11 @@ export const prepareMermaidSource = (source: string): PreparedMermaidSource => {
   const prepared = source.trimEnd();
   if (prepared.length > MAX_MERMAID_SOURCE_CHARS) {
     return {
+      ok: false,
       error: `Mermaid diagram is too large (${prepared.length.toLocaleString()} characters). The limit is ${MAX_MERMAID_SOURCE_CHARS.toLocaleString()} characters.`,
     };
   }
-  return { source: prepared };
+  return { ok: true, source: prepared };
 };
 
 const findInvalidGanttMetadataLine = (source: string): number | undefined => {
@@ -56,7 +57,7 @@ export const renderMermaidDiagram = async (
   source: string,
 ): Promise<MermaidRenderResult | { error: string }> => {
   const prepared = prepareMermaidSource(source);
-  if (prepared.error) return { error: prepared.error };
+  if (!prepared.ok) return { error: prepared.error };
 
   // Mermaid 12.0.0 still accepts Gantt task rows with more metadata fields than
   // its renderer can compile, then throws an internal TypeError. Detect that
