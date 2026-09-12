@@ -1,3 +1,4 @@
+import { solveSketch } from './sketch-solver';
 import type {
   CadSketch,
   SketchCircleEntity,
@@ -108,6 +109,21 @@ function existingRelationships(constraints: readonly SketchConstraint[]): {
     }
   }
   return { horizontal, vertical, coincident, tangent };
+}
+
+function inferredRelationshipKey(constraint: SketchConstraint): string | null {
+  switch (constraint.type) {
+    case 'horizontal':
+      return `horizontal\u0000${constraint.lineId}`;
+    case 'vertical':
+      return `vertical\u0000${constraint.lineId}`;
+    case 'coincident':
+      return `coincident\u0000${unorderedPairKey(constraint.pointAId, constraint.pointBId)}`;
+    case 'tangent':
+      return `tangent\u0000${constraint.lineId}\u0000${constraint.circleId}`;
+    default:
+      return null;
+  }
 }
 
 function proposalId(type: string, ...ids: string[]): string {
@@ -232,4 +248,30 @@ export function proposeSketchConstraints(
   }
 
   return proposals.sort(compareProposals);
+}
+
+export function acceptSketchConstraintProposal(
+  sketch: CadSketch,
+  proposal: SketchConstraintProposal,
+): CadSketch {
+  const relationshipKey = inferredRelationshipKey(proposal.constraint);
+  if (!relationshipKey || !proposal.constraint.id.startsWith(`proposal:${proposal.constraint.type}:`)) {
+    throw new Error(`Constraint '${proposal.constraint.id}' is not an accept-able inferred relationship.`);
+  }
+
+  const duplicate = sketch.constraints.some((constraint) => inferredRelationshipKey(constraint) === relationshipKey);
+  if (duplicate) {
+    throw new Error(`Sketch already has an equivalent constraint for proposal '${proposal.constraint.id}'.`);
+  }
+
+  const candidate: CadSketch = {
+    ...sketch,
+    entities: sketch.entities.map((entity) => ({ ...entity })),
+    constraints: [...sketch.constraints.map((constraint) => ({ ...constraint })), { ...proposal.constraint }],
+  };
+  const solved = solveSketch(candidate);
+  if (!solved.converged) {
+    throw new Error(`Constraint proposal '${proposal.constraint.id}' is no longer satisfiable in the current sketch.`);
+  }
+  return solved.sketch;
 }
