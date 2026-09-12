@@ -1,4 +1,51 @@
-import { expect, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
+import { expect, test, type Download, type Page } from '@playwright/test';
+
+const localCif = `data_local
+_cell_length_a 5
+_cell_length_b 5
+_cell_length_c 5
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Na1 Na 0 0 0 1
+Cl1 Cl 0.5 0.5 0.5 1
+`;
+
+async function downloadBase64(download: Download): Promise<string> {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('base64');
+}
+
+async function pngCornerAlpha(page: Page, download: Download): Promise<number> {
+  const encoded = await downloadBase64(download);
+  return page.evaluate(async (base64) => new Promise<number>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('2D canvas unavailable while inspecting PNG'));
+        return;
+      }
+      context.drawImage(image, 0, 0);
+      resolve(context.getImageData(0, 0, 1, 1).data[3] ?? 0);
+    };
+    image.onerror = () => reject(new Error('Downloaded PNG could not be decoded'));
+    image.src = `data:image/png;base64,${base64}`;
+  }), encoded);
+}
 
 test('opens Crystal Lattice Studio through the catalog and keeps the engine local', async ({ page }) => {
   await page.goto('./#/');
@@ -130,4 +177,103 @@ test('previews metadata impact and downloads a selected scientific format', asyn
   await dialog.getByRole('button', { name: 'Download CIF 2.0' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.cif$/i);
+});
+
+test('opens a local file without uploading it and allows the same file to be selected again', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  const writes: string[] = [];
+  page.on('request', (request) => {
+    if (['POST', 'PUT', 'PATCH'].includes(request.method())) writes.push(request.url());
+  });
+
+  const input = page.getByTestId('crystal-structure-file-input');
+  const file = { name: 'local.cif', mimeType: 'chemical/x-cif', buffer: Buffer.from(localCif) };
+  await input.setInputFiles(file);
+  await expect(page.getByTestId('crystal-file-status')).toContainText('Imported local.cif');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('2 sites');
+  await expect(page.getByLabel('Cell a (Å)')).toHaveValue('5');
+  await expect(input).toHaveValue('');
+
+  await page.getByLabel('Cell a (Å)').fill('7');
+  await page.getByLabel('Cell a (Å)').press('Tab');
+  await expect(page.getByLabel('Cell a (Å)')).toHaveValue('7');
+
+  await input.setInputFiles(file);
+  await expect(page.getByLabel('Cell a (Å)')).toHaveValue('5');
+  await expect(input).toHaveValue('');
+  expect(writes).toEqual([]);
+});
+
+test('saves and reopens a project with structure and view selections', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Cell a (Å)').fill('4');
+  await page.getByLabel('Cell a (Å)').press('Tab');
+  await page.getByRole('combobox', { name: 'Representation' }).selectOption('space-fill');
+  await page.getByRole('button', { name: 'Use orthographic projection' }).click();
+
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export crystal' });
+  await dialog.getByLabel('Export format').selectOption('project');
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download Crystal project' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.crystal\.json$/i);
+  const savedPath = await download.path();
+  expect(savedPath).not.toBeNull();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
+  await page.getByRole('combobox', { name: 'Representation' }).selectOption('sticks');
+  await page.getByRole('button', { name: 'Use perspective projection' }).click();
+  await expect(page.getByLabel('Cell a (Å)')).toHaveValue('5.6402');
+
+  const projectInput = page.getByTestId('crystal-project-file-input');
+  await projectInput.setInputFiles(savedPath!);
+  await expect(page.getByTestId('crystal-file-status')).toContainText('Opened project');
+  await expect(page.getByLabel('Cell a (Å)')).toHaveValue('4');
+  await expect(page.getByRole('combobox', { name: 'Representation' })).toHaveValue('space-fill');
+  await expect(page.getByRole('button', { name: 'Use perspective projection' })).toBeEnabled();
+  await expect(projectInput).toHaveValue('');
+});
+
+test('downloads a true vector SVG publication graphic', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export crystal' });
+  await dialog.getByLabel('Export format').selectOption('svg');
+
+  const preview = dialog.getByTestId('crystal-export-preview');
+  await expect(preview).toContainText('<svg');
+  await expect(preview).toContainText('<circle');
+  await expect(preview).toContainText('Fe1');
+  await expect(preview).not.toContainText('data:image/png');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download SVG' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.svg$/i);
+});
+
+test('PNG publication export honors transparent and solid backgrounds', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export crystal' });
+  await dialog.getByLabel('Export format').selectOption('png');
+  await dialog.getByLabel('Image width (px)').fill('320');
+  await dialog.getByLabel('Image height (px)').fill('240');
+
+  await dialog.getByLabel('PNG background').selectOption('transparent');
+  const transparentDownloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download PNG' }).click();
+  const transparentDownload = await transparentDownloadPromise;
+  expect(transparentDownload.suggestedFilename()).toMatch(/\.png$/i);
+  expect(await pngCornerAlpha(page, transparentDownload)).toBeLessThan(255);
+
+  await dialog.getByLabel('PNG background').selectOption('white');
+  const solidDownloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download PNG' }).click();
+  const solidDownload = await solidDownloadPromise;
+  expect(await pngCornerAlpha(page, solidDownload)).toBe(255);
 });
