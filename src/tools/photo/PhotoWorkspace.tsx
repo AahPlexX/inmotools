@@ -231,6 +231,7 @@ export default function PhotoWorkspace() {
   const [exportOpen, setExportOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
   const [snapshotName, setSnapshotName] = useState('');
+  const [editClipboard, setEditClipboard] = useState<PhotoRecipe | null>(null);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
@@ -562,6 +563,20 @@ export default function PhotoWorkspace() {
     commitRecipe(snapshot.recipe);
     setCanvasInteraction(null);
     setStatus(`${snapshot.name} restored.`);
+  }
+
+  function copyEdits() {
+    if (!source) return;
+    setEditClipboard(normalizeRecipe(recipe));
+    setCanvasInteraction(null);
+    setStatus('Edits copied. Open another photo or paste them here.');
+  }
+
+  function pasteEdits() {
+    if (!source || !editClipboard) return;
+    commitRecipe(editClipboard);
+    setCanvasInteraction(null);
+    setStatus('Copied edits applied as one undo step.');
   }
 
   function downloadRecipe() {
@@ -946,6 +961,8 @@ export default function PhotoWorkspace() {
         </label>
         <button type="button" onClick={undo} disabled={!history.past.length} aria-label="Undo">Undo</button>
         <button type="button" onClick={redo} disabled={!history.future.length} aria-label="Redo">Redo</button>
+        <button type="button" onClick={copyEdits} disabled={!source}>Copy edits</button>
+        <button type="button" onClick={pasteEdits} disabled={!source || !editClipboard}>Paste edits</button>
         <button
           type="button"
           data-testid="photo-compare"
@@ -998,7 +1015,7 @@ export default function PhotoWorkspace() {
         {source ? <span data-testid="photo-source-dimensions">{source.width} × {source.height}</span> : null}
         {naturalDimensions ? <span>Edited frame {naturalDimensions.width} × {naturalDimensions.height}</span> : null}
         <span>Zoom {Math.round(zoom * 100)}%</span>
-        <span className="photo-status-message">{status}</span>
+        <span className="photo-status-message" role="status">{status}</span>
       </footer>
 
       <PhotoExportDialog
