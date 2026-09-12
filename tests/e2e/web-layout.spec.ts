@@ -63,3 +63,11 @@ test('reflows editing controls in portrait and landscape without page overflow',
     }
   }
 });
+
+test('switches the preview presentation orientation without changing CSS width', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByLabel('Preview orientation', { exact: true }).selectOption('landscape');
+  await expect(page.getByRole('region', { name: '375 pixel landscape preview' })).toBeVisible();
+  await expect(page.locator('iframe[title="Layout at 375 pixels, landscape"]')).toBeVisible();
+});
