@@ -1,0 +1,77 @@
+name: Mermaid export convergence patch
+
+on:
+  push:
+    branches:
+      - fix/markdown-mermaid-audit-20260912
+    paths:
+      - .github/workflows/mermaid-export-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply exact Markdown export patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('src/tools/markdown/MarkdownWorkspace.tsx')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "import { renderMarkdown } from './render-engine';\n",
+                  "import { renderMarkdown } from './render-engine';\nimport { renderDiagramBlocks } from './diagram-renderer';\n",
+              ),
+              (
+                  """  const buildExportBodyHtml = useCallback((): { html: string; usedFallback: boolean } => {\n    const live = previewHostRef.current\n      ?.querySelector<HTMLElement>('.markdown-workbench-preview')\n      ?.innerHTML;\n    if (live && live.trim()) return { html: live, usedFallback: false };\n    return { html: renderMarkdown(preparedSource).html, usedFallback: true };\n  }, [preparedSource]);\n""",
+                  """  const buildExportBodyHtml = useCallback(async (): Promise<string> => {\n    const live = previewHostRef.current\n      ?.querySelector<HTMLElement>('.markdown-workbench-preview')\n      ?.innerHTML;\n    if (live && live.trim()) return live;\n\n    // Source view has no mounted preview to scrape. Build the same rendered\n    // document in a detached DOM host and run the shared diagram pass so\n    // every HTML-derived export receives Mermaid/Graphviz SVGs consistently.\n    const scratch = document.createElement('div');\n    scratch.innerHTML = renderMarkdown(preparedSource).html;\n    await renderDiagramBlocks(scratch);\n    return scratch.innerHTML;\n  }, [preparedSource]);\n""",
+              ),
+              (
+                  """    const { html: bodyHtml, usedFallback } = buildExportBodyHtml();\n""",
+                  """    const bodyHtml = await buildExportBodyHtml();\n""",
+              ),
+              (
+                  """    setStatus(usedFallback\n      ? `Exported ${filenameStem}.html as a self-contained file from source. Open Split view first if you need rendered diagrams included.`\n      : `Exported ${filenameStem}.html as a self-contained offline file with KaTeX fonts and images bundled.`);\n""",
+                  """    setStatus(`Exported ${filenameStem}.html as a self-contained offline file with rendered diagrams, KaTeX fonts, and images bundled.`);\n""",
+              ),
+              (
+                  """      const { html: bodyHtml } = buildExportBodyHtml();\n""",
+                  """      const bodyHtml = await buildExportBodyHtml();\n""",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one patch anchor, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+          git diff --check -- src/tools/markdown/MarkdownWorkspace.tsx
+
+      - name: Remove one-use workflow and commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/mermaid-export-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/tools/markdown/MarkdownWorkspace.tsx
+          git commit -m 'fix(markdown): render diagrams consistently in exports'
+          git push origin HEAD:${{ github.ref_name }}
