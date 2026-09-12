@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createStarterStructure, setCrystalCell } from '../../src/tools/crystal/document-engine';
 import { importCrystalText } from '../../src/tools/crystal/structure-import-engine';
 import { parseCif } from '../../src/tools/crystal/cif-engine';
+import { buildCrystalSvg } from '../../src/tools/crystal/crystal-graphics-export';
 import {
   computeMetadataDiff,
   removeCifTag,
@@ -138,5 +139,22 @@ describe('Crystal structure export', () => {
     expect(out.text).toContain('id,kind,label,site_ids,value,unit');
     expect(out.text).toContain('"corner, center"');
     expect(out.text).toContain('Å');
+  });
+
+  it('builds a true vector SVG with crystal primitives and labels', () => {
+    const svg = buildCrystalSvg(createStarterStructure('nacl'), {
+      width: 800,
+      height: 600,
+      showCell: true,
+      showLabels: true,
+      background: 'transparent',
+      representation: 'ball-stick',
+    });
+
+    expect(svg).toContain('<svg');
+    expect(svg).toMatch(/<circle|<line/);
+    expect(svg).toContain('<text');
+    expect(svg).toContain('Na1');
+    expect(svg).not.toContain('data:image/png');
   });
 });
