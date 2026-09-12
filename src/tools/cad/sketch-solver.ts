@@ -42,6 +42,7 @@ interface SolveCoreResult {
 const DEFAULT_TOLERANCE = 1e-9;
 const DEFAULT_MAX_ITERATIONS = 80;
 const MIN_GEOMETRY_SCALE = 1e-12;
+const TAU = Math.PI * 2;
 
 function finite(value: number, label: string): number {
   if (!Number.isFinite(value)) throw new Error(`${label} must be finite.`);
@@ -199,6 +200,115 @@ function curveRadius(values: readonly number[], index: SketchIndex, curveId: str
     return radius;
   }
   throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
+}
+
+function normalizeAngle(angle: number): number {
+  const normalized = angle % TAU;
+  return normalized < 0 ? normalized + TAU : normalized;
+}
+
+function directedSpanViolation(angle: number, startAngle: number, endAngle: number, clockwise: boolean): number {
+  const total = clockwise ? normalizeAngle(startAngle - endAngle) : normalizeAngle(endAngle - startAngle);
+  const position = clockwise ? normalizeAngle(startAngle - angle) : normalizeAngle(angle - startAngle);
+  return position <= total ? 0 : position - total;
+}
+
+function pointOnCircularArcResidual(
+  pointId: string,
+  arc: SketchArcEntity,
+  values: readonly number[],
+  index: SketchIndex,
+): number[] {
+  const [px, py] = coordinates(values, index, pointId);
+  const [cx, cy] = coordinates(values, index, arc.centerPointId);
+  const [sx, sy] = coordinates(values, index, arc.startPointId);
+  const [ex, ey] = coordinates(values, index, arc.endPointId);
+  const radius = Math.hypot(sx - cx, sy - cy);
+  if (radius <= MIN_GEOMETRY_SCALE) throw new Error(`Arc '${arc.id}' start point must differ from its center.`);
+  const radial = Math.hypot(px - cx, py - cy) - radius;
+  const angle = Math.atan2(py - cy, px - cx);
+  const startAngle = Math.atan2(sy - cy, sx - cx);
+  const endAngle = Math.atan2(ey - cy, ex - cx);
+  return [radial, radius * directedSpanViolation(angle, startAngle, endAngle, arc.clockwise)];
+}
+
+function ellipseFrame(
+  curve: SketchEllipseEntity | SketchEllipticalArcEntity,
+  values: readonly number[],
+  index: SketchIndex,
+): { cx: number; cy: number; majorRadius: number; minorRadius: number; ux: number; uy: number; vx: number; vy: number } {
+  const [cx, cy] = coordinates(values, index, curve.centerPointId);
+  const [mx, my] = coordinates(values, index, curve.majorAxisPointId);
+  const dx = mx - cx;
+  const dy = my - cy;
+  const majorRadius = Math.hypot(dx, dy);
+  const minorRadius = finite(curve.minorRadius, `Ellipse '${curve.id}' minor radius`);
+  if (majorRadius <= MIN_GEOMETRY_SCALE) throw new Error(`Ellipse '${curve.id}' major axis must have non-zero length.`);
+  if (minorRadius <= MIN_GEOMETRY_SCALE) throw new Error(`Ellipse '${curve.id}' minor radius must be positive.`);
+  const ux = dx / majorRadius;
+  const uy = dy / majorRadius;
+  return { cx, cy, majorRadius, minorRadius, ux, uy, vx: -uy, vy: ux };
+}
+
+function ellipsePointState(
+  pointId: string,
+  frame: ReturnType<typeof ellipseFrame>,
+  values: readonly number[],
+  index: SketchIndex,
+): { membership: number; parameter: number } {
+  const [px, py] = coordinates(values, index, pointId);
+  const rx = px - frame.cx;
+  const ry = py - frame.cy;
+  const localMajor = rx * frame.ux + ry * frame.uy;
+  const localMinor = rx * frame.vx + ry * frame.vy;
+  const normalizedMajor = localMajor / frame.majorRadius;
+  const normalizedMinor = localMinor / frame.minorRadius;
+  const scale = Math.min(frame.majorRadius, frame.minorRadius);
+  return {
+    membership: (Math.hypot(normalizedMajor, normalizedMinor) - 1) * scale,
+    parameter: Math.atan2(normalizedMinor, normalizedMajor),
+  };
+}
+
+function pointOnCurveResidual(
+  constraintId: string,
+  pointId: string,
+  curveId: string,
+  values: readonly number[],
+  index: SketchIndex,
+): number[] {
+  if (index.circles.has(curveId)) {
+    const [px, py] = coordinates(values, index, pointId);
+    const [cx, cy] = circleCenter(values, index, curveId);
+    return [Math.hypot(px - cx, py - cy) - circleRadius(values, index, curveId)];
+  }
+
+  const arc = index.arcs.get(curveId);
+  if (arc) return pointOnCircularArcResidual(pointId, arc, values, index);
+
+  const ellipse = index.ellipses.get(curveId);
+  if (ellipse) {
+    const frame = ellipseFrame(ellipse, values, index);
+    return [ellipsePointState(pointId, frame, values, index).membership];
+  }
+
+  const ellipticalArc = index.ellipticalArcs.get(curveId);
+  if (ellipticalArc) {
+    const frame = ellipseFrame(ellipticalArc, values, index);
+    const point = ellipsePointState(pointId, frame, values, index);
+    const start = ellipsePointState(ellipticalArc.startPointId, frame, values, index);
+    const end = ellipsePointState(ellipticalArc.endPointId, frame, values, index);
+    const scale = Math.min(frame.majorRadius, frame.minorRadius);
+    return [
+      point.membership,
+      scale * directedSpanViolation(point.parameter, start.parameter, end.parameter, ellipticalArc.clockwise),
+    ];
+  }
+
+  if (index.splines.has(curveId)) {
+    throw new Error(`Point-on-curve constraint '${constraintId}' does not yet support spline '${curveId}'.`);
+  }
+  throw new Error(`Point-on-curve constraint '${constraintId}' references missing supported curve '${curveId}'.`);
 }
 
 function arcIntrinsicResiduals(values: readonly number[], index: SketchIndex): number[] {
@@ -404,6 +514,8 @@ function residualForConstraint(constraint: SketchConstraint, values: readonly nu
       const radius = circleRadius(values, index, constraint.circleId);
       return [Math.hypot(px - cx, py - cy) - radius];
     }
+    case 'point-on-curve':
+      return pointOnCurveResidual(constraint.id, constraint.pointId, constraint.curveId, values, index);
     case 'symmetric-points': {
       const [pointA, pointB] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
       const [axisStart, axisEnd] = linePoints(values, index, constraint.axisLineId);
