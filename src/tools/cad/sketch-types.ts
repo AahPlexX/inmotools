@@ -173,6 +173,12 @@ export interface TangentConstraint extends ConstraintBase {
   circleId: string;
 }
 
+export interface TangentCurveConstraint extends ConstraintBase {
+  type: 'tangent-curve';
+  lineId: string;
+  curveId: string;
+}
+
 export interface ConcentricConstraint extends ConstraintBase {
   type: 'concentric';
   circleAId: string;
@@ -238,6 +244,7 @@ export type SketchConstraint =
   | PerpendicularConstraint
   | ParallelConstraint
   | TangentConstraint
+  | TangentCurveConstraint
   | ConcentricConstraint
   | EqualLengthConstraint
   | EqualRadiusConstraint
