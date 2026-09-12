@@ -30,6 +30,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'energy-macro-planner': () => import('./nutrition/NutritionWorkspace'),
   'aethercast': () => import('./aethercast/AetherCastWorkspace'),
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
+  'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
