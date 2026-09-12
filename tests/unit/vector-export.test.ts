@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addElement, composeSelection, createVectorDocument, mirrorSelection } from '../../src/tools/svg/vector-engine';
+import { addElement, composeSelection, createVectorDocument, groupSelection, mirrorSelection } from '../../src/tools/svg/vector-engine';
 import {
   buildInlineEmbed,
   buildSvgDataUri,
@@ -106,6 +106,36 @@ describe('Vector Studio export', () => {
     expect(differenceSvg).toContain('<mask id="mask-');
     expect(differenceSvg).toContain('mask="url(#mask-');
     expect(differenceSvg).toContain('fill="#000000"');
+  });
+
+  test('serializes every descendant of a grouped difference cutter as black luminance', () => {
+    const cutterA: VectorElement = {
+      ...compositionShape,
+      id: 'cutter-a',
+      x: 140,
+      width: 90,
+      fill: { kind: 'solid', color: '#ff0000' },
+    };
+    const cutterB: VectorElement = {
+      ...compositionShape,
+      id: 'cutter-b',
+      x: 230,
+      width: 90,
+      fill: { kind: 'solid', color: '#00ff00' },
+    };
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, cutterA);
+    source = addElement(source, cutterB);
+    const grouped = groupSelection(source, ['cutter-a', 'cutter-b']);
+    const differenced = composeSelection(grouped.document, ['art', grouped.selection[0]], 'difference').document;
+    const svg = serializeVectorSvg(differenced);
+    const maskMarkup = svg.match(/<mask\b[^>]*>([\s\S]*?)<\/mask>/)?.[0] ?? '';
+
+    expect(maskMarkup).not.toBe('');
+    expect(maskMarkup).not.toContain('#ff0000');
+    expect(maskMarkup).not.toContain('#00ff00');
+    expect((maskMarkup.match(/fill="#000000"/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
   test('omits hidden elements and preserves locked artwork as normal SVG content', () => {
