@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeSketchConstraints } from '../../src/tools/cad/sketch-solver';
+import { analyzeSketchConstraints } from '../../src/tools/cad/sketch-analysis';
 import type { CadSketch } from '../../src/tools/cad/sketch-types';
 
 function underConstrainedSketch(): CadSketch {
