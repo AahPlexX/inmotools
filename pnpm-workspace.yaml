@@ -1,2 +1,5 @@
 allowBuilds:
   exifreader@4.44.0: true
+
+overrides:
+  lodash-es: 4.18.1
