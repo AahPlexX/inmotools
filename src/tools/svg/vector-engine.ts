@@ -126,23 +126,24 @@ export function moveSelection(document: VectorDocument, selection: readonly stri
   return mapElements(document, ids, (element) => element.locked ? element : moveElement(element, dx, dy));
 }
 
-function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
-  const moved = moveElement(element, dx, dy);
-  if (moved.type === 'group') {
+function reidentifyElement(element: VectorElement): VectorElement {
+  if (element.type === 'group') {
     return {
-      ...moved,
+      ...element,
       id: createVectorId('group'),
-      name: `${element.name} copy`,
-      children: moved.children.map((child) => ({ ...child, id: createVectorId(child.type) } as VectorElement)),
-      composition: moved.composition
-        ? {
-            ...moved.composition,
-            shape: { ...moved.composition.shape, id: createVectorId(moved.composition.shape.type) } as VectorElement,
-          }
+      children: element.children.map(reidentifyElement),
+      composition: element.composition
+        ? { ...element.composition, shape: reidentifyElement(element.composition.shape) }
         : undefined,
     };
   }
-  return { ...moved, id: createVectorId(element.type), name: `${element.name} copy` } as VectorElement;
+  return { ...element, id: createVectorId(element.type) } as VectorElement;
+}
+
+function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
+  const moved = moveElement(element, dx, dy);
+  const clone = reidentifyElement(moved);
+  return { ...clone, name: `${element.name} copy` } as VectorElement;
 }
 
 export function duplicateSelection(document: VectorDocument, selection: readonly string[], dx = 12, dy = 12): VectorSelectionResult {
