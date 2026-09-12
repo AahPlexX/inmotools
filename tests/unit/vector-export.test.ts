@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addElement, createVectorDocument, mirrorSelection } from '../../src/tools/svg/vector-engine';
+import { addElement, composeSelection, createVectorDocument, mirrorSelection } from '../../src/tools/svg/vector-engine';
 import {
   buildInlineEmbed,
   buildSvgDataUri,
@@ -33,6 +33,25 @@ const textElement: VectorElement = {
   textAnchor: 'start',
   title: 'Primary wordmark',
   description: 'Brand text with special characters',
+};
+
+const compositionShape: VectorElement = {
+  id: 'composition-shape',
+  type: 'ellipse',
+  name: 'Composition shape',
+  x: 160,
+  y: 150,
+  width: 180,
+  height: 120,
+  rotation: 0,
+  opacity: 1,
+  visible: true,
+  locked: false,
+  fill: { kind: 'solid', color: '#ffffff' },
+  stroke: { color: '#111827', width: 0, linecap: 'round', linejoin: 'round', dash: '' },
+  blendMode: 'normal',
+  title: '',
+  description: '',
 };
 
 describe('Vector Studio export', () => {
@@ -69,6 +88,24 @@ describe('Vector Studio export', () => {
     const svg = serializeVectorSvg(document);
     expect(svg).toContain('scale(-1 1)');
     expect(svg).toContain('translate(-280 -220)');
+  });
+
+  test('serializes clip and difference compositions with native SVG definitions', () => {
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, compositionShape);
+
+    const clipped = composeSelection(source, ['art', 'composition-shape'], 'clip').document;
+    const clipSvg = serializeVectorSvg(clipped);
+    expect(clipSvg).toContain('<clipPath id="clip-');
+    expect(clipSvg).toContain('clip-path="url(#clip-');
+    expect(clipSvg).toContain('id="composition-shape"');
+
+    const differenced = composeSelection(source, ['art', 'composition-shape'], 'difference').document;
+    const differenceSvg = serializeVectorSvg(differenced);
+    expect(differenceSvg).toContain('<mask id="mask-');
+    expect(differenceSvg).toContain('mask="url(#mask-');
+    expect(differenceSvg).toContain('fill="#000000"');
   });
 
   test('omits hidden elements and preserves locked artwork as normal SVG content', () => {
