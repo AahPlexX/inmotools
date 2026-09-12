@@ -29,6 +29,11 @@ interface ConstraintBase {
   enabled: boolean;
 }
 
+interface DrivingDimensionConstraintBase extends ConstraintBase {
+  value: number;
+  expression?: string;
+}
+
 export interface FixedPointConstraint extends ConstraintBase {
   type: 'fixed-point';
   pointId: string;
@@ -51,31 +56,27 @@ export interface VerticalConstraint extends ConstraintBase {
   lineId: string;
 }
 
-export interface DistanceConstraint extends ConstraintBase {
+export interface DistanceConstraint extends DrivingDimensionConstraintBase {
   type: 'distance';
   pointAId: string;
   pointBId: string;
-  value: number;
 }
 
-export interface HorizontalDistanceConstraint extends ConstraintBase {
+export interface HorizontalDistanceConstraint extends DrivingDimensionConstraintBase {
   type: 'horizontal-distance';
   pointAId: string;
   pointBId: string;
-  value: number;
 }
 
-export interface VerticalDistanceConstraint extends ConstraintBase {
+export interface VerticalDistanceConstraint extends DrivingDimensionConstraintBase {
   type: 'vertical-distance';
   pointAId: string;
   pointBId: string;
-  value: number;
 }
 
-export interface LengthConstraint extends ConstraintBase {
+export interface LengthConstraint extends DrivingDimensionConstraintBase {
   type: 'length';
   lineId: string;
-  value: number;
 }
 
 export interface CoincidentConstraint extends ConstraintBase {
@@ -84,23 +85,20 @@ export interface CoincidentConstraint extends ConstraintBase {
   pointBId: string;
 }
 
-export interface RadiusConstraint extends ConstraintBase {
+export interface RadiusConstraint extends DrivingDimensionConstraintBase {
   type: 'radius';
   circleId: string;
-  value: number;
 }
 
-export interface DiameterConstraint extends ConstraintBase {
+export interface DiameterConstraint extends DrivingDimensionConstraintBase {
   type: 'diameter';
   circleId: string;
-  value: number;
 }
 
-export interface AngleConstraint extends ConstraintBase {
+export interface AngleConstraint extends DrivingDimensionConstraintBase {
   type: 'angle';
   lineAId: string;
   lineBId: string;
-  value: number;
 }
 
 export interface PerpendicularConstraint extends ConstraintBase {
