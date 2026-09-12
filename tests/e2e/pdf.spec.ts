@@ -94,3 +94,34 @@ test('authors export metadata from the visible workstation and reflows at 320 CS
   await expect(page.getByLabel('Output filename')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test('inserts blank pages, edits page boxes, and writes metadata dates through the visible workstation', async ({ page }) => {
+  await page.goto('./#/tools/pdf-sanitizer');
+  await page.getByLabel('Add PDF files').setInputFiles({ name: 'packet.pdf', mimeType: 'application/pdf', buffer: await plainPdf() });
+
+  await page.getByLabel('Output creation date/time (UTC)').fill('2026-09-12T10:30');
+  await page.getByLabel('Output modification date/time (UTC)').fill('2026-09-12T14:45');
+
+  await expect(page.getByRole('heading', { name: 'Blank page insertion' })).toBeVisible();
+  await page.getByLabel('Blank page size').selectOption('letter');
+  await page.getByLabel('Insert blank pages after').selectOption('1');
+  await page.getByRole('button', { name: 'Stage blank pages' }).click();
+  await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveCount(2);
+  await expect(page.getByTestId('pdf-output-preview').locator('li').nth(1)).toContainText('Blank page');
+
+  await expect(page.getByRole('heading', { name: 'Page geometry' })).toBeVisible();
+  await page.getByLabel('Geometry output page').selectOption({ index: 1 });
+  await page.getByLabel('CropBox x').fill('10');
+  await page.getByLabel('CropBox y').fill('20');
+  await page.getByLabel('CropBox width').fill('500');
+  await page.getByLabel('CropBox height').fill('700');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Process and download' }).click();
+  const output = await PDFDocument.load(await downloadBytes(await downloadPromise), { updateMetadata: false });
+  expect(output.getPageCount()).toBe(2);
+  expect(output.getCreationDate()?.toISOString()).toBe('2026-09-12T10:30:00.000Z');
+  expect(output.getModificationDate()?.toISOString()).toBe('2026-09-12T14:45:00.000Z');
+  expect(output.getPage(1).getSize()).toEqual({ width: 612, height: 792 });
+  expect(output.getPage(1).getCropBox()).toEqual({ x: 10, y: 20, width: 500, height: 700 });
+});
