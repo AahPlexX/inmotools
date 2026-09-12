@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `ebb6e06ba1113c44cb0efb3ee1641370178170c2`
+**Last tracked implementation commit:** `a14fc812e64a5d30e2426a43488b295fefedfeef`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 16
 **Capability target:** 195
@@ -69,7 +69,8 @@ A capability counts only when production behavior exists, relevant validation pa
 - Formula/reference-dimension support through `13884f5ffd31a358574a0b8ebe4c49280571c407` passed its four new tests; tracker-aligned run `34661768357` passed the full unit suite and production build.
 - Public sketch-analysis production is committed at `dfda96a0ad55112cfd2de466b3959a728e32a062`; its tracker-aligned run `34661965781` passed the full unit suite and production build.
 - The approved feasibility-gap expansion is committed in spec `8b4fd135152e034726e9c3e1b9edaaf2ae42787a` and implementation plan `ebb6e06ba1113c44cb0efb3ee1641370178170c2`, raising the current floor from 100 to 195 user-facing capabilities and making later feasible additions increase rather than replace that floor.
-- Expanded completion-guard RED is committed at `4395264842f82c70f3cf1dd88b5f08f6f8fda44c`. Run `34663532004` produced the intended result: 671 tests passed and exactly three `cad-progress` assertions failed because the pre-expansion ledger still declared the stale implementation SHA, 12 gates, and no 195-capability target.
+- Expanded completion-guard RED is committed at `4395264842f82c70f3cf1dd88b5f08f6f8fda44c`. Run `34663532004` produced the intended result: 671 tests passed and exactly three `cad-progress` assertions failed because the pre-expansion ledger still declared the stale implementation SHA, 12 gates, and no 195-capability target. Tracker-aligned run `34663647772` then passed the full unit suite and production build under the expanded 16-gate/195-capability contract.
+- Sketch profile-diagnostics RED is committed at `0ef1b890aa02ce3569eb08a394e15b582a1f581a`; run `34663713223` failed for the intended missing `sketch-diagnostics` module while 673 existing tests passed. Production implementation is committed at `a14fc812e64a5d30e2426a43488b295fefedfeef`; run `34663779694` passed all five new diagnostics tests and 678 tests overall, with only the expected pre-ledger freshness mismatch remaining.
 - Current dependency research still corroborates `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`; fresh verification remains mandatory immediately before package installation and no lockfile is hand-edited.
 - Explicit current environment exclusions are IGES I/O (kernel omits TKDEIGES), automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until the adapter exposes and validates the required path. There are no current `other` exclusions.
 - G4 remains open until the expanded sketch/entity/intelligence contract and numerical dependency policy are satisfied; internal foundations do not count as completed user-facing capabilities.
