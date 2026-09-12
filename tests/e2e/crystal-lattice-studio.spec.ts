@@ -93,3 +93,41 @@ test('previews and applies a bounded supercell and measures a periodic distance'
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByTestId('crystal-site-count')).toContainText('2 sites');
 });
+
+test('edits document metadata through the same undoable history', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+
+  await page.getByRole('button', { name: 'Data & metadata' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Data & metadata' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Title').fill('Reviewed BCC structure');
+  await dialog.getByLabel('Creator').fill('Local crystallographer');
+  await dialog.getByRole('button', { name: 'Save metadata' }).click();
+  await expect(dialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: 'Data & metadata' }).click();
+  await expect(dialog.getByLabel('Title')).toHaveValue('Reviewed BCC structure');
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.getByRole('button', { name: 'Data & metadata' }).click();
+  await expect(dialog.getByLabel('Title')).toHaveValue('α-Iron — body-centered cubic');
+});
+
+test('previews metadata impact and downloads a selected scientific format', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export crystal' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Export format').selectOption('cif2');
+  await expect(dialog.getByTestId('crystal-export-generated')).toContainText('_cell_length_a');
+  await expect(dialog.getByTestId('crystal-export-preview')).toContainText('#\\#CIF_2.0');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download CIF 2.0' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.cif$/i);
+});
