@@ -192,8 +192,8 @@ export default function PdfWorkspace() {
   const [outputFilename, setOutputFilename] = useState('');
   const [blankPreset, setBlankPreset] = useState<BlankPreset>('letter');
   const [blankOrientation, setBlankOrientation] = useState<'portrait' | 'landscape'>('portrait');
-  const [blankWidthInches, setBlankWidthInches] = useState(BLANK_PRESETS.letter.width);
-  const [blankHeightInches, setBlankHeightInches] = useState(BLANK_PRESETS.letter.height);
+  const [blankWidthInches, setBlankWidthInches] = useState<number>(BLANK_PRESETS.letter.width);
+  const [blankHeightInches, setBlankHeightInches] = useState<number>(BLANK_PRESETS.letter.height);
   const [blankCount, setBlankCount] = useState(1);
   const [blankAfterPage, setBlankAfterPage] = useState(0);
   const [blankPages, setBlankPages] = useState<BlankPageStage[]>([]);
