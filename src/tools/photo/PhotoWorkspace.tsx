@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { downloadBlob } from '../../lib/download';
-import PhotoCanvas from './PhotoCanvas';
+import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
+import PhotoExportDialog from './PhotoExportDialog';
+import PhotoToneCurveControl from './PhotoToneCurveControl';
 import {
   DEFAULT_RECIPE,
   commitHistory,
@@ -9,11 +11,8 @@ import {
   redoHistory,
   undoHistory,
 } from './photo-engine';
-import {
-  safePhotoFilename,
-  serializePhotoXmp,
-  stripLocationMetadata,
-} from './photo-metadata';
+import { photoNaturalDimensions } from './photo-export-dimensions';
+import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
 import {
   disposePhotoRenderer,
   isRenderResultCurrent,
@@ -24,9 +23,7 @@ import {
 import type {
   LocalAdjustment,
   PhotoCapabilities,
-  PhotoExportMetadata,
   PhotoHistory,
-  PhotoOutputMime,
   PhotoRecipe,
   PhotoSnapshot,
   RetouchOperation,
@@ -34,8 +31,6 @@ import type {
 import './photo.css';
 
 type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'inspect';
-type MetadataPolicy = 'strip' | 'rights' | 'custom';
-type ResizeMode = 'original' | 'percent' | 'width' | 'height';
 
 interface SourcePhoto {
   file: File;
@@ -54,6 +49,8 @@ interface AdjustmentSpec {
   key: keyof Pick<PhotoRecipe,
     'exposure' | 'contrast' | 'highlights' | 'shadows' | 'whites' | 'blacks' | 'midtone'
     | 'temperature' | 'tint' | 'saturation' | 'vibrance' | 'dehaze'
+    | 'texture' | 'clarity' | 'sharpenAmount' | 'sharpenRadius' | 'sharpenThreshold'
+    | 'denoiseLuminance' | 'denoiseChroma' | 'chromaticAberration'
     | 'vignette' | 'vignetteMidpoint' | 'vignetteFeather' | 'grain' | 'grainSize' | 'grainColor'>;
   label: string;
   min: number;
@@ -78,6 +75,17 @@ const COLOR_CONTROLS: AdjustmentSpec[] = [
   { key: 'saturation', label: 'Saturation', min: -1, max: 1, step: 0.02 },
   { key: 'vibrance', label: 'Vibrance', min: -1, max: 1, step: 0.02 },
   { key: 'dehaze', label: 'Dehaze', min: -1, max: 1, step: 0.02 },
+];
+
+const DETAIL_CONTROLS: AdjustmentSpec[] = [
+  { key: 'texture', label: 'Texture', min: -1, max: 1, step: 0.02 },
+  { key: 'clarity', label: 'Clarity', min: -1, max: 1, step: 0.02 },
+  { key: 'sharpenAmount', label: 'Sharpen amount', min: 0, max: 2, step: 0.02 },
+  { key: 'sharpenRadius', label: 'Sharpen radius', min: 0.1, max: 5, step: 0.1, neutral: 1 },
+  { key: 'sharpenThreshold', label: 'Sharpen threshold', min: 0, max: 1, step: 0.01 },
+  { key: 'denoiseLuminance', label: 'Luminance denoise', min: 0, max: 1, step: 0.02 },
+  { key: 'denoiseChroma', label: 'Color denoise', min: 0, max: 1, step: 0.02 },
+  { key: 'chromaticAberration', label: 'Chromatic edge correction', min: -1, max: 1, step: 0.02 },
 ];
 
 const FINISH_CONTROLS: AdjustmentSpec[] = [
@@ -122,14 +130,30 @@ function AdjustmentControl({
   spec,
   value,
   onChange,
+  onReset,
 }: {
   spec: AdjustmentSpec;
   value: number;
   onChange: (value: number) => void;
+  onReset?: () => void;
 }) {
+  const neutral = spec.neutral ?? 0;
   return (
     <label className="photo-control">
-      <span>{spec.label}</span>
+      <span className="photo-inline-actions">
+        <span>{spec.label}</span>
+        {onReset ? (
+          <button
+            type="button"
+            aria-label={`Reset ${spec.label}`}
+            disabled={Math.abs(value - neutral) < 1e-9}
+            onClick={(event) => {
+              event.preventDefault();
+              onReset();
+            }}
+          >Reset</button>
+        ) : null}
+      </span>
       <input
         type="range"
         min={spec.min}
@@ -159,6 +183,7 @@ function SimpleControl({
   min,
   max,
   step,
+  neutral = 0,
   onChange,
 }: {
   label: string;
@@ -166,16 +191,17 @@ function SimpleControl({
   min: number;
   max: number;
   step: number;
+  neutral?: number;
   onChange: (value: number) => void;
 }) {
-  return <AdjustmentControl spec={{ key: 'exposure', label, min, max, step }} value={value} onChange={onChange} />;
-}
-
-function photoNaturalDimensions(source: SourcePhoto, recipe: PhotoRecipe) {
-  const width = Math.max(1, Math.round(source.width * recipe.crop.width));
-  const height = Math.max(1, Math.round(source.height * recipe.crop.height));
-  const turns = ((Math.round(recipe.rotateQuarterTurns) % 4) + 4) % 4;
-  return turns % 2 ? { width: height, height: width } : { width, height };
+  return (
+    <AdjustmentControl
+      spec={{ key: 'exposure', label, min, max, step, neutral }}
+      value={value}
+      onChange={onChange}
+      onReset={() => onChange(neutral)}
+    />
+  );
 }
 
 function recipeWithPatch(recipe: PhotoRecipe, patch: Partial<PhotoRecipe>): PhotoRecipe {
@@ -203,15 +229,11 @@ export default function PhotoWorkspace() {
   const [status, setStatus] = useState('Open a photo to begin editing locally.');
   const [capabilities, setCapabilities] = useState<PhotoCapabilities | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
-  const [outputMime, setOutputMime] = useState<PhotoOutputMime>('image/jpeg');
-  const [quality, setQuality] = useState(0.92);
-  const [resizeMode, setResizeMode] = useState<ResizeMode>('original');
-  const [resizeValue, setResizeValue] = useState(100);
-  const [jpegBackground, setJpegBackground] = useState('#ffffff');
-  const [metadataPolicy, setMetadataPolicy] = useState<MetadataPolicy>('strip');
-  const [metadata, setMetadata] = useState<PhotoExportMetadata>({ ppi: 300 });
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
+  const [snapshotName, setSnapshotName] = useState('');
+  const [customRatioWidth, setCustomRatioWidth] = useState('5');
+  const [customRatioHeight, setCustomRatioHeight] = useState('4');
+  const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
   const renderRevisionRef = useRef(0);
@@ -219,6 +241,12 @@ export default function PhotoWorkspace() {
   const sourceUrlRef = useRef<string | null>(null);
 
   const recipe = history.present;
+  const parsedCustomRatioWidth = Number(customRatioWidth);
+  const parsedCustomRatioHeight = Number(customRatioHeight);
+  const customRatioIsValid = Number.isFinite(parsedCustomRatioWidth)
+    && Number.isFinite(parsedCustomRatioHeight)
+    && parsedCustomRatioWidth > 0
+    && parsedCustomRatioHeight > 0;
 
   const releasePreviewUrl = useCallback(() => {
     if (!previewUrlRef.current) return;
@@ -336,9 +364,10 @@ export default function PhotoWorkspace() {
       setSource({ file, name: file.name, originalUrl, width, height });
       setHistory(createHistory(DEFAULT_RECIPE));
       setSnapshots([]);
+      setSnapshotName('');
       setCompare(false);
       setZoom(0.75);
-      setMetadata({ ppi: 300 });
+      setCanvasInteraction(null);
       setStatus(`${file.name} opened locally · ${width} × ${height} · ${formatBytes(file.size)}`);
     } catch (error) {
       setStatus(`Could not decode ${file.name}: ${error instanceof Error ? error.message : 'unsupported image data'}`);
@@ -348,6 +377,7 @@ export default function PhotoWorkspace() {
   function resetAll() {
     if (!source) return;
     setHistory((current) => commitHistory(current, DEFAULT_RECIPE));
+    setCanvasInteraction(null);
     setStatus('All editing adjustments reset.');
   }
 
@@ -389,6 +419,24 @@ export default function PhotoWorkspace() {
     }
   }
 
+  function applyCustomCropRatio() {
+    if (!customRatioIsValid) return;
+    applyCropRatio(parsedCustomRatioWidth / parsedCustomRatioHeight);
+    setStatus(`Applied custom crop ratio ${customRatioWidth}:${customRatioHeight}.`);
+  }
+
+  function localInteraction(adjustment: LocalAdjustment): PhotoCanvasInteraction | null {
+    if (adjustment.mask.type === 'radial' || adjustment.mask.type === 'linear' || adjustment.mask.type === 'brush') {
+      return {
+        kind: 'local',
+        id: adjustment.id,
+        mode: adjustment.mask.type,
+        label: adjustment.mask.type === 'brush' ? `Paint ${adjustment.label}` : `Place ${adjustment.label}`,
+      };
+    }
+    return null;
+  }
+
   function addLocalAdjustment(type: LocalAdjustment['mask']['type']) {
     const id = crypto.randomUUID?.() ?? `local-${Date.now()}-${recipe.localAdjustments.length}`;
     const index = recipe.localAdjustments.length + 1;
@@ -401,7 +449,7 @@ export default function PhotoWorkspace() {
           ? { type: 'luminance', min: 0.2, max: 0.8, ...base }
           : type === 'hue'
             ? { type: 'hue', center: 30, range: 35, ...base }
-            : { type: 'brush', points: [{ x: 0.5, y: 0.5, pressure: 1 }], radius: 0.12, ...base };
+            : { type: 'brush', points: [], radius: 0.12, ...base };
     const label = `${type === 'radial' ? 'Radial' : type === 'linear' ? 'Linear' : type === 'luminance' ? 'Luminance range' : type === 'hue' ? 'Hue range' : 'Brush'} adjustment ${index}`;
     const adjustment: LocalAdjustment = {
       id,
@@ -411,6 +459,8 @@ export default function PhotoWorkspace() {
       effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
     };
     patchRecipe({ localAdjustments: [...recipe.localAdjustments.map(cloneLocalAdjustment), adjustment] });
+    setPanel('local');
+    setCanvasInteraction(localInteraction(adjustment));
   }
 
   function updateLocal(id: string, update: (item: LocalAdjustment) => LocalAdjustment) {
@@ -421,6 +471,19 @@ export default function PhotoWorkspace() {
 
   function removeLocal(id: string) {
     patchRecipe({ localAdjustments: recipe.localAdjustments.filter((item) => item.id !== id).map(cloneLocalAdjustment) });
+    if (canvasInteraction?.id === id) setCanvasInteraction(null);
+  }
+
+  function retouchInteraction(operation: RetouchOperation, placement: 'source' | 'target' = 'target'): PhotoCanvasInteraction {
+    if (operation.type === 'red-eye') {
+      return { kind: 'retouch', id: operation.id, mode: 'red-eye', label: 'Place red-eye correction' };
+    }
+    return {
+      kind: 'retouch',
+      id: operation.id,
+      mode: placement === 'source' ? 'retouch-source' : 'retouch-target',
+      label: `${placement === 'source' ? 'Set source for' : 'Set target for'} ${operation.type} spot`,
+    };
   }
 
   function addRetouch(type: RetouchOperation['type']) {
@@ -431,10 +494,50 @@ export default function PhotoWorkspace() {
         ? { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.55, opacity: 1 }
         : { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.75, opacity: 0.8 };
     patchRecipe({ retouch: [...recipe.retouch.map((item) => ({ ...item })), operation] });
+    setPanel('retouch');
+    setCanvasInteraction(retouchInteraction(operation, operation.type === 'red-eye' ? 'target' : 'source'));
+  }
+
+  function updateRetouch(id: string, update: (item: RetouchOperation) => RetouchOperation) {
+    patchRecipe({ retouch: recipe.retouch.map((item) => item.id === id ? update({ ...item }) : ({ ...item })) });
   }
 
   function removeRetouch(id: string) {
     patchRecipe({ retouch: recipe.retouch.filter((item) => item.id !== id).map((item) => ({ ...item })) });
+    if (canvasInteraction?.id === id) setCanvasInteraction(null);
+  }
+
+  function handleCanvasGesture(gesture: PhotoCanvasGesture) {
+    if (!canvasInteraction) return;
+    const interaction = canvasInteraction;
+    setHistory((current) => {
+      const next = interaction.kind === 'local'
+        ? applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path)
+        : placeRetouchPoint(
+          current.present,
+          interaction.id,
+          gesture.end,
+          interaction.mode === 'retouch-source' ? 'source' : 'target',
+        );
+      return commitHistory(current, next);
+    });
+
+    if (interaction.kind === 'local') {
+      if (interaction.mode !== 'brush') setCanvasInteraction(null);
+      setStatus(interaction.mode === 'brush' ? 'Brush stroke added as one undo step.' : 'Local mask placed on the photo.');
+      return;
+    }
+
+    if (interaction.mode === 'retouch-source') {
+      const operation = recipe.retouch.find((item) => item.id === interaction.id);
+      if (operation && operation.type !== 'red-eye') {
+        setCanvasInteraction(retouchInteraction(operation, 'target'));
+        setStatus('Source sampled. Now place the target on the photo.');
+      }
+      return;
+    }
+    setCanvasInteraction(null);
+    setStatus(interaction.mode === 'red-eye' ? 'Red-eye correction placed.' : 'Retouch target placed.');
   }
 
   function applyPreset(patch: Partial<PhotoRecipe>) {
@@ -443,18 +546,21 @@ export default function PhotoWorkspace() {
 
   function saveSnapshot() {
     if (!source) return;
+    const requestedName = snapshotName.trim();
     const next: PhotoSnapshot = {
       id: crypto.randomUUID?.() ?? `snapshot-${Date.now()}`,
-      name: `Snapshot ${snapshots.length + 1}`,
+      name: requestedName || `Snapshot ${snapshots.length + 1}`,
       createdAt: new Date().toISOString(),
       recipe: normalizeRecipe(recipe),
     };
     setSnapshots((current) => [...current, next]);
+    setSnapshotName('');
     setStatus(`${next.name} saved.`);
   }
 
   function restoreSnapshot(snapshot: PhotoSnapshot) {
     commitRecipe(snapshot.recipe);
+    setCanvasInteraction(null);
     setStatus(`${snapshot.name} restored.`);
   }
 
@@ -473,96 +579,12 @@ export default function PhotoWorkspace() {
       const parsed = JSON.parse(await file.text()) as { recipe?: PhotoRecipe };
       if (!parsed.recipe || parsed.recipe.version !== 1) throw new Error('Unsupported recipe version.');
       commitRecipe(normalizeRecipe({ ...DEFAULT_RECIPE, ...parsed.recipe }));
+      setCanvasInteraction(null);
       setStatus(`${file.name} recipe applied.`);
     } catch (error) {
       setStatus(`Recipe import failed: ${error instanceof Error ? error.message : 'invalid JSON'}`);
     }
   }
-
-  function metadataForPolicy(): PhotoExportMetadata {
-    if (metadataPolicy === 'strip') return {};
-    if (metadataPolicy === 'rights') {
-      return stripLocationMetadata({
-        title: metadata.title,
-        headline: metadata.headline,
-        description: metadata.description,
-        creator: metadata.creator,
-        credit: metadata.credit,
-        copyright: metadata.copyright,
-        usageTerms: metadata.usageTerms,
-        source: metadata.source,
-        jobIdentifier: metadata.jobIdentifier,
-        rating: metadata.rating,
-        label: metadata.label,
-        keywords: metadata.keywords,
-        hierarchicalKeywords: metadata.hierarchicalKeywords,
-        altText: metadata.altText,
-        extendedDescription: metadata.extendedDescription,
-        ppi: metadata.ppi,
-      });
-    }
-    return metadata;
-  }
-
-  function sidecarName() {
-    if (!source) return 'photo-edited.xmp';
-    const imageName = safePhotoFilename(source.name, outputMime);
-    return imageName.replace(/\.[^.]+$/, '.xmp');
-  }
-
-  function downloadXmp() {
-    const xmp = serializePhotoXmp(metadataForPolicy());
-    downloadBlob(new Blob([xmp], { type: 'application/rdf+xml' }), sidecarName());
-    setStatus('XMP sidecar created from the reviewed export metadata.');
-  }
-
-  function exportDimensions() {
-    if (!source) return {};
-    const natural = photoNaturalDimensions(source, recipe);
-    if (resizeMode === 'original') return {};
-    if (resizeMode === 'percent') {
-      const scale = Math.max(1, resizeValue) / 100;
-      return { requestedWidth: Math.round(natural.width * scale), requestedHeight: Math.round(natural.height * scale) };
-    }
-    if (resizeMode === 'width') {
-      const width = Math.max(1, Math.round(resizeValue));
-      return { requestedWidth: width, requestedHeight: Math.max(1, Math.round(width * natural.height / natural.width)) };
-    }
-    const height = Math.max(1, Math.round(resizeValue));
-    return { requestedWidth: Math.max(1, Math.round(height * natural.width / natural.height)), requestedHeight: height };
-  }
-
-  async function exportPhoto() {
-    if (!source || exportBusy) return;
-    const revision = ++renderRevisionRef.current;
-    setExportBusy(true);
-    setStatus('Rendering full export locally…');
-    try {
-      const result = await renderPhoto({
-        file: source.file,
-        recipe,
-        revision,
-        mode: 'export',
-        outputMime,
-        quality,
-        jpegBackground,
-        ...exportDimensions(),
-      });
-      downloadBlob(result.blob, safePhotoFilename(source.name, outputMime));
-      const safety = result.scaledForSafety ? ` Device limits required a safe ${result.width} × ${result.height} render.` : '';
-      setStatus(`Photo exported locally as ${result.width} × ${result.height}.${safety}`);
-    } catch (error) {
-      setStatus(`Export failed: ${error instanceof Error ? error.message : 'unknown encoding error'}`);
-    } finally {
-      setExportBusy(false);
-    }
-  }
-
-  const encoderSupport = useMemo(() => ({
-    'image/jpeg': capabilities?.jpeg ?? true,
-    'image/png': capabilities?.png ?? true,
-    'image/webp': capabilities?.webp ?? true,
-  }), [capabilities]);
 
   function renderEditPanel() {
     return (
@@ -575,15 +597,45 @@ export default function PhotoWorkspace() {
           <summary>Light & tone</summary>
           <div className="photo-control-list">
             {LIGHT_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
+        </details>
+        <details className="photo-section">
+          <summary>Tone curve</summary>
+          <PhotoToneCurveControl points={recipe.toneCurve} onChange={(toneCurve) => patchRecipe({ toneCurve })} />
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>
           <div className="photo-control-list">
             {COLOR_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
+            ))}
+          </div>
+        </details>
+        <details className="photo-section">
+          <summary>Detail & noise</summary>
+          <div className="photo-control-list">
+            {DETAIL_CONTROLS.map((spec) => (
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -622,7 +674,7 @@ export default function PhotoWorkspace() {
           {recipe.blackAndWhite ? (
             <div className="photo-control-list">
               {recipe.blackAndWhiteMix.map((value, index) => (
-                <SimpleControl key={HSL_LABELS[index]} label={`${HSL_LABELS[index]} mix`} value={value} min={0} max={2} step={0.02} onChange={(next) => updateBwMix(index, next)} />
+                <SimpleControl key={HSL_LABELS[index]} label={`${HSL_LABELS[index]} mix`} value={value} min={0} max={2} step={0.02} neutral={1} onChange={(next) => updateBwMix(index, next)} />
               ))}
             </div>
           ) : null}
@@ -631,7 +683,13 @@ export default function PhotoWorkspace() {
           <summary>Finishing</summary>
           <div className="photo-control-list">
             {FINISH_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -644,7 +702,7 @@ export default function PhotoWorkspace() {
       <>
         <div className="photo-inspector-header">
           <h2>Crop & geometry</h2>
-          <p>Frame precisely with normalized crop coordinates so the same edit scales cleanly to export resolution.</p>
+          <p>Frame precisely and correct optical or keystone distortion with the same reversible recipe used at export resolution.</p>
         </div>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => applyCropRatio(null)}>Original</button>
@@ -654,11 +712,43 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => applyCropRatio(16 / 9)}>16:9</button>
         </div>
         <div className="photo-control-list">
-          <SimpleControl label="Crop left percent" value={Math.round(recipe.crop.x * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('x', value)} />
-          <SimpleControl label="Crop top percent" value={Math.round(recipe.crop.y * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('y', value)} />
-          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 1000) / 10} min={0.1} max={100} step={0.1} onChange={(value) => cropPercent('width', value)} />
-          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 1000) / 10} min={0.1} max={100} step={0.1} onChange={(value) => cropPercent('height', value)} />
+          <label className="photo-control">
+            <span>Custom ratio width</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={customRatioWidth}
+              aria-label="Custom ratio width"
+              aria-invalid={customRatioWidth !== '' && !(Number.isFinite(parsedCustomRatioWidth) && parsedCustomRatioWidth > 0)}
+              onChange={(event) => setCustomRatioWidth(event.target.value)}
+            />
+          </label>
+          <label className="photo-control">
+            <span>Custom ratio height</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={customRatioHeight}
+              aria-label="Custom ratio height"
+              aria-invalid={customRatioHeight !== '' && !(Number.isFinite(parsedCustomRatioHeight) && parsedCustomRatioHeight > 0)}
+              onChange={(event) => setCustomRatioHeight(event.target.value)}
+            />
+          </label>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={!source || !customRatioIsValid} onClick={applyCustomCropRatio}>Apply custom ratio</button>
+          </div>
+        </div>
+        <div className="photo-control-list">
+          <SimpleControl label="Crop left percent" value={Math.round(recipe.crop.x * 10000) / 100} min={0} max={99.99} step={0.01} onChange={(value) => cropPercent('x', value)} />
+          <SimpleControl label="Crop top percent" value={Math.round(recipe.crop.y * 10000) / 100} min={0} max={99.99} step={0.01} onChange={(value) => cropPercent('y', value)} />
+          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 10000) / 100} min={0.01} max={100} step={0.01} neutral={100} onChange={(value) => cropPercent('width', value)} />
+          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 10000) / 100} min={0.01} max={100} step={0.01} neutral={100} onChange={(value) => cropPercent('height', value)} />
           <SimpleControl label="Straighten degrees" value={recipe.straighten} min={-45} max={45} step={0.1} onChange={(value) => patchRecipe({ straighten: value })} />
+          <SimpleControl label="Lens distortion" value={recipe.lensDistortion} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ lensDistortion: value })} />
+          <SimpleControl label="Horizontal perspective" value={recipe.perspectiveHorizontal} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ perspectiveHorizontal: value })} />
+          <SimpleControl label="Vertical perspective" value={recipe.perspectiveVertical} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ perspectiveVertical: value })} />
         </div>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => patchRecipe({ rotateQuarterTurns: recipe.rotateQuarterTurns - 1 })}>Rotate left</button>
@@ -685,22 +775,47 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => addLocalAdjustment('hue')}>Add hue range</button>
         </div>
         {recipe.localAdjustments.length ? recipe.localAdjustments.map((adjustment) => (
-          <article className="photo-local-card" key={adjustment.id}>
+          <article className="photo-local-card" key={adjustment.id} data-testid="photo-local-adjustment">
             <header><strong>{adjustment.label}</strong></header>
             <label className="photo-check">
               <input type="checkbox" checked={adjustment.enabled} onChange={(event) => updateLocal(adjustment.id, (item) => ({ ...item, enabled: event.target.checked }))} />
               Enabled
             </label>
+            {localInteraction(adjustment) ? (
+              <button
+                type="button"
+                aria-pressed={canvasInteraction?.kind === 'local' && canvasInteraction.id === adjustment.id}
+                onClick={() => setCanvasInteraction(localInteraction(adjustment))}
+              >{adjustment.mask.type === 'brush' ? 'Paint on photo' : 'Place on photo'}</button>
+            ) : null}
             <SimpleControl label={`${adjustment.label} exposure`} value={adjustment.effect.exposure} min={-4} max={4} step={0.1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, exposure: value } }))} />
             <SimpleControl label={`${adjustment.label} saturation`} value={adjustment.effect.saturation} min={-1} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, saturation: value } }))} />
-            <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
-            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
+            <SimpleControl label={`${adjustment.label} sharpness`} value={adjustment.effect.sharpness} min={-1} max={2} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, sharpness: value } }))} />
+            <SimpleControl label={`${adjustment.label} blur`} value={adjustment.effect.blur} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, blur: value } }))} />
+            <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
+            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={1} step={0.02} neutral={0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
+            {adjustment.mask.type === 'brush' ? (
+              <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
+            ) : null}
+            {adjustment.mask.type === 'luminance' ? (
+              <>
+                <SimpleControl label={`${adjustment.label} minimum`} value={adjustment.mask.min} min={0} max={1} step={0.01} neutral={0.2} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, min: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} maximum`} value={adjustment.mask.max} min={0} max={1} step={0.01} neutral={0.8} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, max: value } }) : item)} />
+              </>
+            ) : null}
+            {adjustment.mask.type === 'hue' ? (
+              <>
+                <SimpleControl label={`${adjustment.label} hue center`} value={adjustment.mask.center} min={0} max={359} step={1} neutral={30} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, center: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} hue range`} value={adjustment.mask.range} min={0} max={180} step={1} neutral={35} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, range: value } }) : item)} />
+              </>
+            ) : null}
             <div className="photo-inline-actions">
               <button type="button" onClick={() => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, invert: !item.mask.invert } }))}>{adjustment.mask.invert ? 'Use normal mask' : 'Invert mask'}</button>
+              {adjustment.mask.type === 'brush' && adjustment.mask.points.length ? <button type="button" onClick={() => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, points: [] } }) : item)}>Clear brush</button> : null}
               <button type="button" onClick={() => removeLocal(adjustment.id)}>Remove</button>
             </div>
           </article>
-        )) : <p className="photo-export-note">Add a mask to make targeted edits. Each mask remains editable and removable.</p>}
+        )) : <p className="photo-export-note">Add a mask to make targeted edits. Spatial masks can be placed directly on the photo; each mask remains editable and removable.</p>}
       </>
     );
   }
@@ -718,13 +833,30 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => addRetouch('heal')}>Add healing spot</button>
         </div>
         {recipe.retouch.map((operation, index) => (
-          <article className="photo-local-card" key={operation.id}>
+          <article className="photo-local-card" key={operation.id} data-testid="photo-retouch-operation">
             <header><strong>{operation.type === 'red-eye' ? 'Red-eye' : operation.type === 'clone' ? 'Clone' : 'Healing'} operation {index + 1}</strong></header>
             <p className="photo-export-note">
               {operation.type === 'red-eye'
                 ? `Center ${Math.round(operation.x * 100)}%, ${Math.round(operation.y * 100)}% · radius ${Math.round(operation.radius * 100)}%`
                 : `Source ${Math.round(operation.sourceX * 100)}%, ${Math.round(operation.sourceY * 100)}% → target ${Math.round(operation.targetX * 100)}%, ${Math.round(operation.targetY * 100)}%`}
             </p>
+            {operation.type === 'red-eye' ? (
+              <>
+                <button type="button" aria-pressed={canvasInteraction?.id === operation.id} onClick={() => setCanvasInteraction(retouchInteraction(operation))}>Place on photo</button>
+                <SimpleControl label={`Red-eye ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} neutral={0.04} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, radius: value }) : item)} />
+                <SimpleControl label={`Red-eye ${index + 1} strength`} value={operation.strength} min={0} max={1} step={0.02} neutral={0.8} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, strength: value }) : item)} />
+              </>
+            ) : (
+              <>
+                <div className="photo-inline-actions">
+                  <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-source'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'source'))}>Set source on photo</button>
+                  <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-target'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'target'))}>Set target on photo</button>
+                </div>
+                <SimpleControl label={`${operation.type} ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} neutral={0.06} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, radius: value }) : item)} />
+                <SimpleControl label={`${operation.type} ${index + 1} feather`} value={operation.feather} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 0.55 : 0.75} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, feather: value }) : item)} />
+                <SimpleControl label={`${operation.type} ${index + 1} opacity`} value={operation.opacity} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 1 : 0.8} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, opacity: value }) : item)} />
+              </>
+            )}
             <button type="button" onClick={() => removeRetouch(operation.id)}>Remove operation</button>
           </article>
         ))}
@@ -754,6 +886,21 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section" open>
           <summary>Snapshots</summary>
+          <div className="photo-metadata-grid">
+            <label>
+              Snapshot name
+              <input
+                type="text"
+                value={snapshotName}
+                maxLength={80}
+                placeholder={`Snapshot ${snapshots.length + 1}`}
+                onChange={(event) => setSnapshotName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && source) saveSnapshot();
+                }}
+              />
+            </label>
+          </div>
           <div className="photo-inline-actions"><button type="button" onClick={saveSnapshot} disabled={!source}>Save snapshot</button></div>
           {snapshots.map((snapshot) => (
             <button className="photo-snapshot-card" type="button" key={snapshot.id} onClick={() => restoreSnapshot(snapshot)}>
@@ -782,7 +929,7 @@ export default function PhotoWorkspace() {
     return renderEditPanel();
   }
 
-  const naturalDimensions = source ? photoNaturalDimensions(source, recipe) : null;
+  const naturalDimensions = source ? photoNaturalDimensions(source.width, source.height, recipe) : null;
 
   return (
     <div className="photo-studio">
@@ -809,7 +956,7 @@ export default function PhotoWorkspace() {
         >Before/after</button>
         <button type="button" onClick={resetAll} disabled={!source}>Reset edits</button>
         <span className="photo-spacer" />
-        <span className="photo-feature-count">50+ reversible image controls</span>
+        <span className="photo-feature-count">60+ reversible image controls</span>
         <button type="button" onClick={() => setExportOpen(true)} disabled={!source} aria-label="Export">Export</button>
       </header>
 
@@ -822,7 +969,7 @@ export default function PhotoWorkspace() {
             ['retouch', 'Retouch'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
-            <button type="button" key={id} aria-pressed={panel === id} onClick={() => setPanel(id)}>{label}</button>
+            <button type="button" key={id} aria-pressed={panel === id} onClick={() => { setPanel(id); if (id !== 'local' && id !== 'retouch') setCanvasInteraction(null); }}>{label}</button>
           ))}
         </nav>
 
@@ -834,6 +981,10 @@ export default function PhotoWorkspace() {
           sourceName={source?.name}
           histogram={preview?.result.histogram ?? null}
           busy={previewBusy}
+          localAdjustments={recipe.localAdjustments}
+          retouch={recipe.retouch}
+          interaction={canvasInteraction}
+          onGesture={handleCanvasGesture}
           onZoomChange={setZoom}
         />
 
@@ -850,98 +1001,14 @@ export default function PhotoWorkspace() {
         <span className="photo-status-message">{status}</span>
       </footer>
 
-      {exportOpen && source ? (
-        <div className="photo-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}>
-          <section className="photo-dialog" role="dialog" aria-modal="true" aria-labelledby="photo-export-title">
-            <header className="photo-dialog-header">
-              <div>
-                <h2 id="photo-export-title">Export photo</h2>
-                <p>Render a new copy from the current recipe and choose exactly which descriptive metadata travels with it.</p>
-              </div>
-              <button type="button" onClick={() => setExportOpen(false)} aria-label="Close export dialog">Close</button>
-            </header>
-
-            <div className="photo-export-grid">
-              <label>File format
-                <select aria-label="File format" value={outputMime} onChange={(event) => setOutputMime(event.target.value as PhotoOutputMime)}>
-                  <option value="image/jpeg" disabled={!encoderSupport['image/jpeg']}>JPEG{!encoderSupport['image/jpeg'] ? ' — unsupported' : ''}</option>
-                  <option value="image/png" disabled={!encoderSupport['image/png']}>PNG{!encoderSupport['image/png'] ? ' — unsupported' : ''}</option>
-                  <option value="image/webp" disabled={!encoderSupport['image/webp']}>WebP{!encoderSupport['image/webp'] ? ' — unsupported' : ''}</option>
-                </select>
-              </label>
-              <label>Quality
-                <input type="number" min={1} max={100} step={1} value={Math.round(quality * 100)} disabled={outputMime === 'image/png'} onChange={(event) => setQuality(Math.min(1, Math.max(0.01, readNumber(event.target.value, 92) / 100)))} />
-              </label>
-              <label>Resize
-                <select value={resizeMode} onChange={(event) => setResizeMode(event.target.value as ResizeMode)}>
-                  <option value="original">Edited dimensions</option>
-                  <option value="percent">Percentage</option>
-                  <option value="width">Exact width</option>
-                  <option value="height">Exact height</option>
-                </select>
-              </label>
-              {resizeMode !== 'original' ? (
-                <label>{resizeMode === 'percent' ? 'Percent' : resizeMode === 'width' ? 'Width in pixels' : 'Height in pixels'}
-                  <input type="number" min={1} max={resizeMode === 'percent' ? 400 : 50000} value={resizeValue} onChange={(event) => setResizeValue(Math.max(1, readNumber(event.target.value, 100)))} />
-                </label>
-              ) : <div />}
-              {outputMime === 'image/jpeg' ? (
-                <label>Transparent-area background
-                  <input type="color" value={jpegBackground} onChange={(event) => setJpegBackground(event.target.value)} />
-                </label>
-              ) : null}
-              <label>Metadata policy
-                <select aria-label="Metadata policy" value={metadataPolicy} onChange={(event) => setMetadataPolicy(event.target.value as MetadataPolicy)}>
-                  <option value="strip">Strip metadata</option>
-                  <option value="rights">Descriptive + rights only</option>
-                  <option value="custom">Custom reviewed metadata</option>
-                </select>
-              </label>
-            </div>
-
-            {metadataPolicy !== 'strip' ? (
-              <div className="photo-metadata-grid">
-                <label>Title<input aria-label="Title" value={metadata.title ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, title: event.target.value }))} /></label>
-                <label>Creator<input aria-label="Creator" value={metadata.creator ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, creator: event.target.value }))} /></label>
-                <label>Headline<input value={metadata.headline ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, headline: event.target.value }))} /></label>
-                <label>Credit<input value={metadata.credit ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, credit: event.target.value }))} /></label>
-                <label className="photo-wide">Description<textarea value={metadata.description ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, description: event.target.value }))} /></label>
-                <label>Copyright notice<input value={metadata.copyright ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, copyright: event.target.value }))} /></label>
-                <label>Usage terms<input value={metadata.usageTerms ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, usageTerms: event.target.value }))} /></label>
-                <label>Source<input value={metadata.source ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, source: event.target.value }))} /></label>
-                <label>Job identifier<input value={metadata.jobIdentifier ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, jobIdentifier: event.target.value }))} /></label>
-                <label>Rating<input type="number" min={0} max={5} step={1} value={metadata.rating ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, rating: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                <label>Label<input value={metadata.label ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, label: event.target.value }))} /></label>
-                <label className="photo-wide">Keywords<input aria-label="Keywords" value={(metadata.keywords ?? []).join(', ')} onChange={(event) => setMetadata((current) => ({ ...current, keywords: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} /></label>
-                <label className="photo-wide">Hierarchical keywords<input value={(metadata.hierarchicalKeywords ?? []).join(', ')} onChange={(event) => setMetadata((current) => ({ ...current, hierarchicalKeywords: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) }))} /></label>
-                <label>Accessibility alt text<input value={metadata.altText ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, altText: event.target.value }))} /></label>
-                <label>Extended accessibility description<input value={metadata.extendedDescription ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, extendedDescription: event.target.value }))} /></label>
-                <label>PPI<input type="number" min={1} max={2400} step={1} value={metadata.ppi ?? 300} onChange={(event) => setMetadata((current) => ({ ...current, ppi: readNumber(event.target.value, 300) }))} /></label>
-                {metadataPolicy === 'custom' ? (
-                  <>
-                    <label>City<input value={metadata.city ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, city: event.target.value }))} /></label>
-                    <label>State / province<input value={metadata.state ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, state: event.target.value }))} /></label>
-                    <label>Country<input value={metadata.country ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, country: event.target.value }))} /></label>
-                    <label>Sublocation<input value={metadata.sublocation ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, sublocation: event.target.value }))} /></label>
-                    <label>GPS latitude<input type="number" min={-90} max={90} step="any" value={metadata.latitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, latitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>GPS longitude<input type="number" min={-180} max={180} step="any" value={metadata.longitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, longitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>GPS altitude<input type="number" step="any" value={metadata.altitude ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, altitude: event.target.value === '' ? undefined : readNumber(event.target.value, 0) }))} /></label>
-                    <label>Creation date<input type="datetime-local" value={metadata.creationDate ?? ''} onChange={(event) => setMetadata((current) => ({ ...current, creationDate: event.target.value }))} /></label>
-                  </>
-                ) : null}
-              </div>
-            ) : (
-              <p className="photo-export-note">The rendered image contains new pixels only. Source camera and location metadata is not copied automatically.</p>
-            )}
-
-            <p className="photo-export-note">XMP sidecar export preserves the reviewed metadata independently of browser image-encoder limitations. Pixel export remains available even if metadata serialization fails.</p>
-            <div className="photo-dialog-actions">
-              <button type="button" onClick={downloadXmp}>Download XMP sidecar</button>
-              <button type="button" onClick={() => void exportPhoto()} disabled={exportBusy}>{exportBusy ? 'Rendering…' : 'Download photo'}</button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <PhotoExportDialog
+        open={exportOpen}
+        source={source}
+        recipe={recipe}
+        capabilities={capabilities}
+        onClose={() => setExportOpen(false)}
+        onStatus={setStatus}
+      />
     </div>
   );
 }

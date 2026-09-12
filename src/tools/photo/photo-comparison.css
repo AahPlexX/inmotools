@@ -1,0 +1,155 @@
+.photo-comparison-controls {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.photo-comparison-mode-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.photo-comparison-mode-buttons button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent, #4f46e5) 26%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #4f46e5) 72%, var(--photo-border));
+}
+
+.photo-compare-range {
+  display: grid;
+  grid-template-columns: auto minmax(7rem, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  min-width: min(15rem, 100%);
+  font-size: 0.82rem;
+}
+
+.photo-compare-range input[type="range"] {
+  width: 100%;
+  min-width: 7rem;
+}
+
+.photo-compare-range input[type="range"]:focus-visible {
+  outline: 3px solid var(--focus-ring, #60a5fa);
+  outline-offset: 2px;
+}
+
+/* Scale the complete editing surface so before/after pixels, overlays, clipping,
+   and pointer coordinates share one transform at every zoom level. */
+.photo-studio .photo-image-frame {
+  transform: scale(var(--photo-zoom, 1));
+}
+
+.photo-studio .photo-image-frame .photo-preview-image,
+.photo-studio .photo-image-frame .photo-before-overlay img,
+.photo-studio .photo-image-frame .photo-edit-overlay,
+.photo-studio .photo-compare-pane .photo-preview-image,
+.photo-studio .photo-compare-pane .photo-edit-overlay {
+  transform: none;
+}
+
+.photo-studio .photo-before-overlay {
+  inset: 0;
+  overflow: hidden;
+  border-right: 0;
+  clip-path: inset(0 calc(100% - var(--photo-compare-split, 50%)) 0 0);
+}
+
+.photo-studio .photo-before-overlay img {
+  position: absolute;
+  inset: 0 auto auto 0;
+}
+
+.photo-compare-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--photo-compare-split, 50%);
+  width: 2px;
+  transform: translateX(-1px);
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.photo-clipping-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.photo-compare-side-by-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  width: max-content;
+  min-width: 0;
+  transform: scale(var(--photo-zoom, 1));
+  transform-origin: center center;
+}
+
+.photo-compare-pane-wrap,
+.photo-compare-pane {
+  position: relative;
+  flex: 0 0 auto;
+  width: max-content;
+  line-height: 0;
+}
+
+.photo-compare-pane {
+  overflow: visible;
+  background: #111827;
+  box-shadow: 0 1.2rem 3rem rgb(0 0 0 / 0.38);
+}
+
+.photo-compare-pane img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none;
+  image-rendering: auto;
+}
+
+.photo-compare-pane.is-interactive {
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.photo-compare-pane-label {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  z-index: 4;
+  line-height: 1.2;
+  padding: 0.28rem 0.45rem;
+  border-radius: 0.45rem;
+  background: rgb(0 0 0 / 0.72);
+  color: white;
+  font-size: 0.78rem;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .photo-comparison-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .photo-compare-range {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .photo-compare-range input[type="range"] {
+    min-width: 0;
+  }
+}
