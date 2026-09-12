@@ -14,6 +14,7 @@ import {
 import type { CrystalDocument } from './crystal-types';
 import type { CrystalRepresentation } from './viewport-model';
 import './crystal-workspace.css';
+import './crystal-dialog.css';
 
 const REPRESENTATIONS: readonly { id: CrystalRepresentation; name: string }[] = [
   { id: 'ball-stick', name: 'Ball and stick' },
