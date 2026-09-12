@@ -26,10 +26,11 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current material implementation head before this tracker-only commit: `5394c88b560af6ab5933968771334502da9c207e`
+- Current material implementation head before this tracker-only commit: `93a3535252c843cc27146030373e377b9e35f12a`
 - Current phase: **Capability expansion Phase 0 — close the original release contract cleanly**
-- Current verified merge-state evidence: PR workflow run `34706122558` completed successfully for Photo head `5394c88b560af6ab5933968771334502da9c207e`; the repository unit suite, production build, and the complete focused Photo Studio browser matrix all passed on the PR merge state.
-- Most recent intentional RED evidence: workflow run `34705869311` passed 702 repository unit tests and the production build, then ran 40 focused Photo browser cases; all 36 pre-existing cases passed and only the four new desktop/mobile comparison cases failed because `Split` and `Side by side` did not yet exist.
+- Current verification state: PR workflow run `34725983140` is validating Photo head `93a3535252c843cc27146030373e377b9e35f12a`; repository unit tests and the production build have passed, while browser validation is still in progress. Do not treat Task 0.4 as GREEN until that browser step succeeds.
+- Current verified merge-state evidence: PR workflow run `34706122558` completed successfully for earlier Photo head `5394c88b560af6ab5933968771334502da9c207e`; the repository unit suite, production build, and the complete focused Photo Studio browser matrix all passed on that PR merge state.
+- Most recent intentional RED evidence: workflow run `34706499377` for head `8682b9a5b241c6d9ec9899f722a0b31de3ab7ed6` passed repository unit tests and the production build, then failed browser validation at the new copy/paste contract because the production `Copy edits` / `Paste edits` behavior did not yet exist.
 - Historical exact-head CI evidence: workflow run `34662031647` completed successfully for `735f9f915cf8427c95444d3296ce065e688a2ea0`; all 661 repository unit tests, production build, and all 24 focused Photo Studio browser tests succeeded on that earlier PR merge state.
 
 ## Verified progress
@@ -55,9 +56,10 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] The export dialog exposes planned dimensions before render and blocks known-oversized single exports until the user explicitly selects the offered verified-safe dimensions.
 - [x] Safe export planning honors both edge and area ceilings and preserves aspect ratio.
 - [x] Before/after comparison now supports an explicit split mode with a pointer-draggable, keyboard-operable split slider plus a side-by-side mode; both surfaces share synchronized zoom and preserve image-space registration for overlays and direct editing.
-- [x] Photo source changes now select the full focused Photo browser matrix (`photo.spec.ts`, `photo-controls.spec.ts`, and `photo-compare.spec.ts`) rather than silently omitting specialized Photo specs.
+- [x] Photo source changes select the full focused Photo browser matrix (`photo.spec.ts`, `photo-controls.spec.ts`, `photo-compare.spec.ts`, and `photo-copy-paste.spec.ts`) rather than silently omitting specialized Photo specs.
 - [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening, production batch queue completion, RGB histogram, clipping overlay, color sampler, individual resets, named snapshots, exact custom crop ratio, long-/short-edge sizing, explicit safe-size selection, keyboard history, synchronized split/side-by-side comparison, and 320 CSS px editor/export-dialog reflow.
 - [x] Exact Photo head `5394c88b560af6ab5933968771334502da9c207e` passed repository unit tests, production build, and the full focused Photo browser matrix through PR validation run `34706122558`.
+- [ ] In-session copy/paste implementation exists at `93a3535252c843cc27146030373e377b9e35f12a`: Copy stores an independent normalized recipe snapshot, source changes preserve the in-session clipboard, and Paste routes through one normal history commit. Browser GREEN evidence is still pending run `34725983140`.
 
 ## Original spec inventory blockers discovered during audit
 
@@ -72,22 +74,22 @@ These remain release blockers because they are promised by the design specificat
 - [x] Explicit safe-size export choice/warning before an oversized render.
 - [x] True validated custom crop ratio.
 - [x] Draggable and side-by-side before/after comparison.
-- [ ] In-session copy/paste recipe semantics across sources as one undo step.
-- [ ] Browser coverage for unsupported encoder messaging and stale-render rejection at the workspace level if not already proven by equivalent focused coverage.
+- [ ] In-session copy/paste recipe semantics across sources as one undo step — implementation is present at `93a3535252c843cc27146030373e377b9e35f12a`; exact browser GREEN evidence is pending.
+- [ ] Explicit unsupported-encoder and stale-render accounting. Deterministic source/unit evidence has been reviewed; close this blocker in Task 0.5 only after Task 0.4 reaches GREEN, without adding a weaker timing-sensitive race test.
 
 ## Capability expansion execution
 
 - [x] Phase 0 / Task 0.1 — individual scalar resets.
 - [x] Phase 0 / Task 0.2 — validated custom crop ratio, implemented at `b3fb5239dbd8910fd0edbb3071d9cf482bc9fa7f` with exact 5:4-on-4:3 desktop/mobile browser evidence.
 - [x] Phase 0 / Task 0.3 — draggable and side-by-side comparison, implemented at `5394c88b560af6ab5933968771334502da9c207e` with strict RED evidence in run `34705869311` and GREEN merge-state evidence in run `34706122558`.
-- [ ] Phase 0 / Task 0.4 — in-session copy/paste edits.
+- [ ] Phase 0 / Task 0.4 — in-session copy/paste edits; implementation committed at `93a3535252c843cc27146030373e377b9e35f12a`, exact browser verification pending run `34725983140`.
 - [ ] Phase 0 / Task 0.5 — final base-contract evidence and explicit unsupported-encoder/stale-render accounting.
 - [ ] Phases 1–7 — source acquisition and persistence; composition/scopes/tone/color; selection/masking/brushes; layers/compositing/detail; multi-image processing; workflow/export depth; final capability ledger, integration, and deployment.
 
 ## Remaining release work
 
-1. Implement Phase 0 / Task 0.4 in-session copy/paste edits across sources as one undo step.
-2. Complete Phase 0 / Task 0.5 evidence and explicitly account for unsupported encoder messaging and stale-render rejection.
+1. Finish exact browser verification for Phase 0 / Task 0.4 and only then mark in-session copy/paste GREEN.
+2. Close Phase 0 / Task 0.5 by recording the already-audited deterministic unsupported-encoder and stale-render evidence; do not manufacture timing-sensitive browser races when stronger source/unit evidence exists.
 3. Continue Phases 1–7 in the ordered, Photo-only batches defined by `docs/superpowers/plans/2026-09-12-photo-studio-capability-expansion.md`; maintain the 164-item capability ledger without silent omissions.
 4. Reconcile `feat/photo-studio` with the latest moving `main` only when the planned integration gate is reached; do not rewrite parallel-agent branches.
 5. Review the exact changed-file set, run exact merge-state validation, verify the Pages deployment, and close shared task records only after every completion gate is evidenced.
