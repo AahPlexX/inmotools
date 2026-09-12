@@ -8,6 +8,7 @@ import type { DiagramRenderRequest, DiagramRenderResponse } from './markdown-typ
 
 export const MAX_MERMAID_SOURCE_CHARS = 50_000;
 const REQUIRED_IDLE_TIMEOUT_MS = 500;
+const GANTT_TASK_TAGS = new Set(['active', 'done', 'crit', 'milestone', 'vert']);
 
 export interface MermaidRenderResult {
   readonly svg: string;
@@ -34,6 +35,21 @@ export const prepareMermaidSource = (source: string): PreparedMermaidSource => {
   return { source: prepared };
 };
 
+const findInvalidGanttMetadataLine = (source: string): number | undefined => {
+  if (!/^\s*gantt\b/m.test(source)) return undefined;
+
+  const lines = source.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const separator = lines[index].indexOf(':');
+    if (separator < 0) continue;
+
+    const metadata = lines[index].slice(separator + 1).split(',').map((item) => item.trim());
+    while (metadata.length > 0 && GANTT_TASK_TAGS.has(metadata[0])) metadata.shift();
+    if (metadata.length > 3) return index + 1;
+  }
+  return undefined;
+};
+
 export const renderMermaidDiagram = async (
   render: MermaidRenderFn,
   id: string,
@@ -41,6 +57,16 @@ export const renderMermaidDiagram = async (
 ): Promise<MermaidRenderResult | { error: string }> => {
   const prepared = prepareMermaidSource(source);
   if (prepared.error) return { error: prepared.error };
+
+  // Mermaid 12.0.0 still accepts Gantt task rows with more metadata fields than
+  // its renderer can compile, then throws an internal TypeError. Detect that
+  // exact malformed row before dispatch so authors get a useful source line.
+  const invalidGanttLine = findInvalidGanttMetadataLine(prepared.source);
+  if (invalidGanttLine !== undefined) {
+    return {
+      error: `Mermaid Gantt task on line ${invalidGanttLine} has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.`,
+    };
+  }
 
   try {
     return await render(id, prepared.source);
