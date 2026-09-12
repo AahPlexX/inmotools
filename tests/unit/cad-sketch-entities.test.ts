@@ -117,10 +117,14 @@ describe('CAD advanced sketch entities', () => {
     };
 
     const issues = validateSketchEntityGeometry(sketch);
+    const affectedEntities = [...new Set(issues.map((issue) => issue.entityId))];
+    const ellipseMessages = issues.filter((issue) => issue.entityId === 'bad-ellipse').map((issue) => issue.message).join(' ');
+    const splineMessages = issues.filter((issue) => issue.entityId === 'bad-spline').map((issue) => issue.message).join(' ');
 
-    expect(issues.map((issue) => issue.entityId)).toEqual(['bad-ellipse', 'bad-spline']);
-    expect(issues[0]?.message).toMatch(/minor radius|major axis/i);
-    expect(issues[1]?.message).toMatch(/fit points/i);
+    expect(affectedEntities).toEqual(['bad-ellipse', 'bad-spline']);
+    expect(ellipseMessages).toMatch(/minor radius/i);
+    expect(ellipseMessages).toMatch(/major axis/i);
+    expect(splineMessages).toMatch(/fit points/i);
   });
 
   it('accepts well-formed arc, ellipse, elliptical arc, and spline geometry', () => {
