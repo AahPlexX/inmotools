@@ -28,7 +28,8 @@ If any box above is unchecked, Photo Studio is not complete.
 - Pull request: `#29`
 - Current material implementation head before this tracker-only commit: `b3fb5239dbd8910fd0edbb3071d9cf482bc9fa7f`
 - Current phase: **Capability expansion Phase 0 — close the original release contract cleanly**
-- Current local verification: at `b3fb5239dbd8910fd0edbb3071d9cf482bc9fa7f`, all 57 Photo Studio unit tests, the production build, and all 36 desktop/mobile Photo Studio browser tests passed. Exact-head PR CI is pending after push.
+- Current local verification: at `b3fb5239dbd8910fd0edbb3071d9cf482bc9fa7f`, all 57 Photo Studio unit tests, the production build, and all 36 desktop/mobile Photo Studio browser tests passed.
+- Current PR verification: run `34696697429` passed unit tests but its merge-state build stopped in `src/tools/crystal/cif-engine.ts` on two pre-existing nullability errors outside this branch; `feat/photo-studio` does not contain that file. `main` received the upstream Crystal fix at `1d25269135a6436dbab955d5c423aec3d64ba5bf`; fresh PR merge-state validation is required.
 - Last fully verified exact-head CI evidence: workflow run `34662031647` completed successfully for `735f9f915cf8427c95444d3296ce065e688a2ea0`; all 661 repository unit tests, production build, and all 24 focused Photo Studio browser tests succeeded on the PR merge state.
 
 ## Verified progress
