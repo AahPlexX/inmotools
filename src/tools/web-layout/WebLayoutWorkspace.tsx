@@ -46,7 +46,8 @@ export default function WebLayoutWorkspace() {
   const [status, setStatus] = useState('Ready. Choose a block or adjust the layout.');
   const [saveStatus, setSaveStatus] = useState('Checking local draft…');
   const [ready, setReady] = useState(false);
-  const [widths, setWidths] = useState([375, 768, 1440]);\n  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [widths, setWidths] = useState([375, 768, 1440]);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [kind, setKind] = useState<BlockKind>('card');
   const [importBusy, setImportBusy] = useState(false);
   const importRevision = useRef(0);
