@@ -207,7 +207,9 @@ export function parseCif(text: string, versionHint?: CifVersion): CifDocument {
     }
 
     const activeBlock = current;
-    if (!activeBlock) failAt('CIF data must appear inside a data_ block', token);
+    if (!activeBlock) {
+      throw new CifParseError('CIF data must appear inside a data_ block', token.line, token.column);
+    }
 
     if (lower === 'stop_') { cursor += 1; continue; }
 
