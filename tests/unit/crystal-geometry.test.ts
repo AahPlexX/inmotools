@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createStarterStructure } from '../../src/tools/crystal/starter-structures';
+import { createStarterStructure } from '../../src/tools/crystal/document-engine';
 import {
   expandSupercell,
   findPeriodicBonds,
