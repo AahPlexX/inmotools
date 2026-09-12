@@ -183,6 +183,7 @@ function SimpleControl({
   min,
   max,
   step,
+  neutral = 0,
   onChange,
 }: {
   label: string;
@@ -190,9 +191,17 @@ function SimpleControl({
   min: number;
   max: number;
   step: number;
+  neutral?: number;
   onChange: (value: number) => void;
 }) {
-  return <AdjustmentControl spec={{ key: 'exposure', label, min, max, step }} value={value} onChange={onChange} />;
+  return (
+    <AdjustmentControl
+      spec={{ key: 'exposure', label, min, max, step, neutral }}
+      value={value}
+      onChange={onChange}
+      onReset={() => onChange(neutral)}
+    />
+  );
 }
 
 function recipeWithPatch(recipe: PhotoRecipe, patch: Partial<PhotoRecipe>): PhotoRecipe {
@@ -651,7 +660,7 @@ export default function PhotoWorkspace() {
           {recipe.blackAndWhite ? (
             <div className="photo-control-list">
               {recipe.blackAndWhiteMix.map((value, index) => (
-                <SimpleControl key={HSL_LABELS[index]} label={`${HSL_LABELS[index]} mix`} value={value} min={0} max={2} step={0.02} onChange={(next) => updateBwMix(index, next)} />
+                <SimpleControl key={HSL_LABELS[index]} label={`${HSL_LABELS[index]} mix`} value={value} min={0} max={2} step={0.02} neutral={1} onChange={(next) => updateBwMix(index, next)} />
               ))}
             </div>
           ) : null}
@@ -691,8 +700,8 @@ export default function PhotoWorkspace() {
         <div className="photo-control-list">
           <SimpleControl label="Crop left percent" value={Math.round(recipe.crop.x * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('x', value)} />
           <SimpleControl label="Crop top percent" value={Math.round(recipe.crop.y * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('y', value)} />
-          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 1000) / 10} min={0.1} max={100} step={0.1} onChange={(value) => cropPercent('width', value)} />
-          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 1000) / 10} min={0.1} max={100} step={0.1} onChange={(value) => cropPercent('height', value)} />
+          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 1000) / 10} min={0.1} max={100} step={0.1} neutral={100} onChange={(value) => cropPercent('width', value)} />
+          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 1000) / 10} min={0.1} max={100} step={0.1} neutral={100} onChange={(value) => cropPercent('height', value)} />
           <SimpleControl label="Straighten degrees" value={recipe.straighten} min={-45} max={45} step={0.1} onChange={(value) => patchRecipe({ straighten: value })} />
           <SimpleControl label="Lens distortion" value={recipe.lensDistortion} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ lensDistortion: value })} />
           <SimpleControl label="Horizontal perspective" value={recipe.perspectiveHorizontal} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ perspectiveHorizontal: value })} />
@@ -740,21 +749,21 @@ export default function PhotoWorkspace() {
             <SimpleControl label={`${adjustment.label} saturation`} value={adjustment.effect.saturation} min={-1} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, saturation: value } }))} />
             <SimpleControl label={`${adjustment.label} sharpness`} value={adjustment.effect.sharpness} min={-1} max={2} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, sharpness: value } }))} />
             <SimpleControl label={`${adjustment.label} blur`} value={adjustment.effect.blur} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, blur: value } }))} />
-            <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
-            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
+            <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
+            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={1} step={0.02} neutral={0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
             {adjustment.mask.type === 'brush' ? (
-              <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
+              <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
             ) : null}
             {adjustment.mask.type === 'luminance' ? (
               <>
-                <SimpleControl label={`${adjustment.label} minimum`} value={adjustment.mask.min} min={0} max={1} step={0.01} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, min: value } }) : item)} />
-                <SimpleControl label={`${adjustment.label} maximum`} value={adjustment.mask.max} min={0} max={1} step={0.01} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, max: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} minimum`} value={adjustment.mask.min} min={0} max={1} step={0.01} neutral={0.2} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, min: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} maximum`} value={adjustment.mask.max} min={0} max={1} step={0.01} neutral={0.8} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'luminance' ? ({ ...item, mask: { ...item.mask, max: value } }) : item)} />
               </>
             ) : null}
             {adjustment.mask.type === 'hue' ? (
               <>
-                <SimpleControl label={`${adjustment.label} hue center`} value={adjustment.mask.center} min={0} max={359} step={1} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, center: value } }) : item)} />
-                <SimpleControl label={`${adjustment.label} hue range`} value={adjustment.mask.range} min={0} max={180} step={1} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, range: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} hue center`} value={adjustment.mask.center} min={0} max={359} step={1} neutral={30} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, center: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} hue range`} value={adjustment.mask.range} min={0} max={180} step={1} neutral={35} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'hue' ? ({ ...item, mask: { ...item.mask, range: value } }) : item)} />
               </>
             ) : null}
             <div className="photo-inline-actions">
@@ -791,8 +800,8 @@ export default function PhotoWorkspace() {
             {operation.type === 'red-eye' ? (
               <>
                 <button type="button" aria-pressed={canvasInteraction?.id === operation.id} onClick={() => setCanvasInteraction(retouchInteraction(operation))}>Place on photo</button>
-                <SimpleControl label={`Red-eye ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, radius: value }) : item)} />
-                <SimpleControl label={`Red-eye ${index + 1} strength`} value={operation.strength} min={0} max={1} step={0.02} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, strength: value }) : item)} />
+                <SimpleControl label={`Red-eye ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} neutral={0.04} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, radius: value }) : item)} />
+                <SimpleControl label={`Red-eye ${index + 1} strength`} value={operation.strength} min={0} max={1} step={0.02} neutral={0.8} onChange={(value) => updateRetouch(operation.id, (item) => item.type === 'red-eye' ? ({ ...item, strength: value }) : item)} />
               </>
             ) : (
               <>
@@ -800,9 +809,9 @@ export default function PhotoWorkspace() {
                   <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-source'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'source'))}>Set source on photo</button>
                   <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-target'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'target'))}>Set target on photo</button>
                 </div>
-                <SimpleControl label={`${operation.type} ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, radius: value }) : item)} />
-                <SimpleControl label={`${operation.type} ${index + 1} feather`} value={operation.feather} min={0} max={1} step={0.02} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, feather: value }) : item)} />
-                <SimpleControl label={`${operation.type} ${index + 1} opacity`} value={operation.opacity} min={0} max={1} step={0.02} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, opacity: value }) : item)} />
+                <SimpleControl label={`${operation.type} ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} neutral={0.06} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, radius: value }) : item)} />
+                <SimpleControl label={`${operation.type} ${index + 1} feather`} value={operation.feather} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 0.55 : 0.75} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, feather: value }) : item)} />
+                <SimpleControl label={`${operation.type} ${index + 1} opacity`} value={operation.opacity} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 1 : 0.8} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, opacity: value }) : item)} />
               </>
             )}
             <button type="button" onClick={() => removeRetouch(operation.id)}>Remove operation</button>
