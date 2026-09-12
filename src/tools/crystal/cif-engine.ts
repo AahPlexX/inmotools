@@ -206,7 +206,8 @@ export function parseCif(text: string, versionHint?: CifVersion): CifDocument {
       failAt('This CIF construct is not supported by the structure document parser', token);
     }
 
-    if (!current) failAt('CIF data must appear inside a data_ block', token);
+    const activeBlock = current;
+    if (!activeBlock) failAt('CIF data must appear inside a data_ block', token);
 
     if (lower === 'stop_') { cursor += 1; continue; }
 
@@ -236,14 +237,14 @@ export function parseCif(text: string, versionHint?: CifVersion): CifDocument {
         rows.push(row.map((item) => item.value));
         rawValues.push(row.map((item) => item.raw));
       }
-      current.entries.push({ kind:'loop', tags, rows, rawValues });
+      activeBlock.entries.push({ kind:'loop', tags, rows, rawValues });
       continue;
     }
 
     if (isWordToken(token) && token.value.startsWith('_')) {
       const valueToken = tokens[cursor + 1];
       if (!valueToken || controlWord(valueToken) !== null) failAt(`Missing value for CIF data name ${token.value}`, token);
-      current.entries.push({ kind:'scalar', tag:token.value, value:valueToken.value, rawValue:valueToken.raw });
+      activeBlock.entries.push({ kind:'scalar', tag:token.value, value:valueToken.value, rawValue:valueToken.raw });
       cursor += 2;
       continue;
     }
