@@ -181,7 +181,11 @@ function curveCenter(values: readonly number[], index: SketchIndex, curveId: str
   if (index.circles.has(curveId)) return circleCenter(values, index, curveId);
   const arc = index.arcs.get(curveId);
   if (arc) return coordinates(values, index, arc.centerPointId);
-  throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
+  const ellipse = index.ellipses.get(curveId);
+  if (ellipse) return coordinates(values, index, ellipse.centerPointId);
+  const ellipticalArc = index.ellipticalArcs.get(curveId);
+  if (ellipticalArc) return coordinates(values, index, ellipticalArc.centerPointId);
+  throw new Error(`Constraint references missing centered curve '${curveId}'.`);
 }
 
 function curveRadius(values: readonly number[], index: SketchIndex, curveId: string): number {
