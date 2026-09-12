@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `a04e6ed61af2c3a9ac4c7539881c68ce0490cb08`
+**Last tracked implementation commit:** `bd6762384d916247cc739fed2a9f96dd9fca860d`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 16
 **Capability target:** 195
@@ -68,10 +68,11 @@ A capability counts only when production behavior exists, relevant validation pa
 - Spline evaluator `6801c6606a7508c548c773e68263a90edd291e7e` and spline contact solver `8b54e05f1d098146226e46a88c1d9010b0e73ccb` are validated; aligned runs `34715985946` and `34716384305` passed the full unit suite and production build.
 - Exact-kernel protocol `fb5f59fea1344d3e159074f00ca615c48f151c70` defines revisioned serializable requests/results, opaque worker-only exact shapes, structured errors/operations, preview/final quality, and zero-copy response transferables. Aligned run `34716646196` passed unit/build validation.
 - Worker session `df93fbeb4eb7a50468615092db8175c4190efe6e` provides monotonic revisions, invalidation, generation-based hard-restart semantics, stale-response rejection, and single-consumption guarantees. The later aligned synthetic merge passed unit/build after concurrent Crystal work was repaired by its owning agent.
-- Worker lifecycle client `a04e6ed61af2c3a9ac4c7539881c68ce0490cb08` binds workers to immutable generations, accepts only the latest current response, hard-terminates/recreates on restart, transfers import buffers zero-copy, suppresses invalidated work, and prevents requests after disposal. Run `34716893962` passed all four focused lifecycle tests and **788 tests overall**; only the expected stale tracker SHA remained before this tracker-only alignment.
+- Worker lifecycle client `a04e6ed61af2c3a9ac4c7539881c68ce0490cb08` binds workers to immutable generations, accepts only the latest current response, hard-terminates/recreates on restart, transfers import buffers zero-copy, suppresses invalidated work, and prevents requests after disposal. Run `34716893962` passed all four focused lifecycle tests and 788 tests overall; tracker-aligned run `34716947437` passed the full unit suite and production build.
+- Worker runtime boundary `bd6762384d916247cc739fed2a9f96dd9fca860d` lazily initializes one injected executor, rejects malformed requests before initialization, preserves explicit `unsupported-browser` capability failures, maps operation-specific execution failures, validates executor payload kinds, and posts response buffers through the zero-copy transfer list. Run `34717048859` passed all five focused runtime tests and **793 tests overall**; only the expected stale tracker SHA remained before this tracker-only alignment.
 - Fresh dependency verification still corroborates `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`. The connected execution environment does not expose a repository shell/package-manager write path, so `package.json`/`pnpm-lock.yaml` remain intentionally untouched rather than hand-edited; dependency installation remains a mechanical G4/G5 blocker.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
-- G4 remains open solely on the numerical-library/dependency policy. G5 protocol/revision/transport work is underway but G5 remains open until verified dependencies are installed and the real OCCT adapter/worker, browser capability handling, analytic fixtures, and exact round-trips pass.
+- G4 remains open solely on the numerical-library/dependency policy. G5 protocol/revision/transport/runtime work is underway but G5 remains open until verified dependencies are installed and the real OCCT adapter/worker, browser capability handling, analytic fixtures, and exact round-trips pass.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. Recent compares show CAD branch-side changes confined to CAD code/tests/docs/tracker despite ongoing branch divergence.
 
 ## Freshness invariant
