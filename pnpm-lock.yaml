@@ -295,6 +295,9 @@ importers:
       vscode-oniguruma:
         specifier: 2.0.1
         version: 2.0.1
+      wasm-feature-detect:
+        specifier: 1.9.0
+        version: 1.9.0
       woff2-encoder:
         specifier: 2.0.0
         version: 2.0.0
@@ -4096,6 +4099,9 @@ packages:
 
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
+
+  wasm-feature-detect@1.9.0:
+    resolution: {integrity: sha512-zonE+xlIIYtxPy++L24ow0hAD8CICb4+FgPyROd3buyXIqsJvUEDkBgfCCoXOd1Hu3DUr0GOfnPIdcGV+YpNaA==}
 
   web-namespaces@2.0.1:
     resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
@@ -8377,6 +8383,8 @@ snapshots:
   vscode-oniguruma@2.0.1: {}
 
   w3c-keyname@2.2.8: {}
+
+  wasm-feature-detect@1.9.0: {}
 
   web-namespaces@2.0.1: {}
 
