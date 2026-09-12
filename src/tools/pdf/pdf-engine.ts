@@ -103,10 +103,11 @@ const cleanKeywords = (values: string[] | undefined): string[] => (
 );
 
 function applyMetadata(document: PDFDocument, metadata: PdfMetadataEdits | undefined): void {
-  if (!metadata) {
-    document.context.trailerInfo.Info = undefined;
-    return;
-  }
+  // Re-establish the privacy boundary before writing any replacement values.
+  // This prevents explicit metadata mode from ever inheriting incidental Info
+  // entries created earlier in the output lifecycle.
+  document.context.trailerInfo.Info = undefined;
+  if (!metadata) return;
 
   const title = cleanText(metadata.title);
   const author = cleanText(metadata.author);
