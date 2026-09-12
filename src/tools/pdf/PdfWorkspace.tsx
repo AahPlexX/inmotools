@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
-import { inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs, type PageSelectionPreset, type PdfInspection } from './pdf-engine';
+import {
+  inspectPdf,
+  pageSelectionPreset,
+  parsePageSelection,
+  splicePdfs,
+  type PageSelectionPreset,
+  type PdfInspection,
+  type PdfMetadataEdits,
+} from './pdf-engine';
 import { consumeFileInput } from '../../lib/file-input';
 
 type PdfItem = {
@@ -11,6 +19,26 @@ type PdfItem = {
   rotate: 0 | 90 | 180 | 270;
 };
 
+type MetadataDraft = {
+  title: string;
+  author: string;
+  subject: string;
+  keywords: string;
+  creator: string;
+  producer: string;
+  language: string;
+};
+
+const EMPTY_METADATA: MetadataDraft = {
+  title: '',
+  author: '',
+  subject: '',
+  keywords: '',
+  creator: '',
+  producer: '',
+  language: '',
+};
+
 const OUTPUT_PREVIEW_LIMIT = 100;
 
 const bytesLabel = (bytes: number) => {
@@ -19,10 +47,38 @@ const bytesLabel = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
+const trimmed = (value: string) => value.trim() || undefined;
+
+function metadataForExport(draft: MetadataDraft): PdfMetadataEdits | undefined {
+  const keywords = draft.keywords.split(',').map((value) => value.trim()).filter(Boolean);
+  const metadata: PdfMetadataEdits = {
+    title: trimmed(draft.title),
+    author: trimmed(draft.author),
+    subject: trimmed(draft.subject),
+    keywords: keywords.length ? keywords : undefined,
+    creator: trimmed(draft.creator),
+    producer: trimmed(draft.producer),
+    language: trimmed(draft.language),
+  };
+  return Object.values(metadata).some((value) => value !== undefined) ? metadata : undefined;
+}
+
+function safePdfFilename(value: string, fallback: string): string {
+  const candidate = value.trim() || fallback;
+  const safe = candidate
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+    .replace(/^\.+/, '')
+    .trim();
+  const resolved = safe || fallback;
+  return /\.pdf$/i.test(resolved) ? resolved : `${resolved}.pdf`;
+}
+
 export default function PdfWorkspace() {
   const [items, setItems] = useState<PdfItem[]>([]);
   const [flatten, setFlatten] = useState(true);
-  const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, or flatten.');
+  const [metadata, setMetadata] = useState<MetadataDraft>(EMPTY_METADATA);
+  const [outputFilename, setOutputFilename] = useState('');
+  const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
 
   const pageStates = useMemo(() => items.map((item) => {
@@ -38,6 +94,8 @@ export default function PdfWorkspace() {
   const sourceBytes = items.reduce((sum, item) => sum + item.file.size, 0);
   const formFieldTotal = items.reduce((sum, item) => sum + item.inspection.formFieldCount, 0);
   const formPolicyBlocked = formFieldTotal > 0 && !flatten;
+  const authoredMetadata = metadataForExport(metadata);
+  const authoredMetadataCount = authoredMetadata ? Object.values(authoredMetadata).filter((value) => value !== undefined).length : 0;
 
   const outputPreview = useMemo(() => {
     const rows: Array<{ key: string; source: string; page: number; rotate: PdfItem['rotate'] }> = [];
@@ -68,12 +126,12 @@ export default function PdfWorkspace() {
           next.push({ id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`, file, inspection, pages: '', rotate: 0 });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'unknown error';
-          if (/encrypt/i.test(message)) throw new Error(`${file.name} is encrypted. pdf-lib cannot safely modify encrypted PDFs; decrypt it in an authorized PDF application first.`);
+          if (/encrypt/i.test(message)) throw new Error(`${file.name} is encrypted. This workstation cannot safely modify it with the current engine; decrypt it in an authorized PDF application first.`);
           throw new Error(`${file.name}: ${message}`);
         }
       }
       setItems((current) => [...current, ...next]);
-      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections and form handling before processing.`);
+      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, form handling, document properties, and the export filename before processing.`);
     } catch (error) {
       setStatus(`Could not read PDF: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -99,6 +157,10 @@ export default function PdfWorkspace() {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   }
 
+  function updateMetadata<Key extends keyof MetadataDraft>(key: Key, value: MetadataDraft[Key]) {
+    setMetadata((current) => ({ ...current, [key]: value }));
+  }
+
   function applyPreset(index: number, preset: PageSelectionPreset) {
     const selection = pageSelectionPreset(preset, items[index].inspection.pageCount);
     if (selection === null) {
@@ -116,6 +178,12 @@ export default function PdfWorkspace() {
     return `merged-${items.length}-documents.pdf`;
   }
 
+  function resetExportProperties() {
+    setMetadata(EMPTY_METADATA);
+    setOutputFilename('');
+    setStatus('Output properties cleared. Source metadata will remain omitted unless you enter replacement values.');
+  }
+
   async function process() {
     if (!items.length || hasPageError || formPolicyBlocked) return;
     setBusy(true);
@@ -126,17 +194,21 @@ export default function PdfWorkspace() {
         rotate: item.rotate,
         flatten,
       })));
-      const bytes = await splicePdfs(selections);
+      const bytes = await splicePdfs(selections, { metadata: authoredMetadata });
       const outputInspection = await inspectPdf(bytes);
       if (flatten && formFieldTotal > 0 && outputInspection.formFieldCount !== 0) {
         throw new Error('Output verification found editable form fields after flattening; no download was created.');
       }
-      downloadBytes(bytes, outputName(), 'application/pdf');
+      const filename = safePdfFilename(outputFilename, outputName());
+      downloadBytes(bytes, filename, 'application/pdf');
       const delta = bytes.byteLength - sourceBytes;
       const formSummary = formFieldTotal > 0
         ? ` ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} flattened; output inspection found ${outputInspection.formFieldCount} editable fields.`
         : ' Output inspection found no editable form fields.';
-      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${formSummary}`);
+      const metadataSummary = authoredMetadataCount
+        ? ` ${authoredMetadataCount} replacement metadata propert${authoredMetadataCount === 1 ? 'y was' : 'ies were'} intentionally written.`
+        : ' No replacement metadata was written.';
+      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${formSummary}${metadataSummary}`);
     } catch (error) {
       setStatus(`PDF processing failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -145,7 +217,7 @@ export default function PdfWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>PDF splice and sanitizer</h2><p>File order becomes output order; page lists can reorder or repeat pages within each file.</p></div></div>
+    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, page selection, rotation, form flattening, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input id="pdf-files" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append to the current queue instead of replacing it.</small></div>
 
@@ -194,6 +266,22 @@ export default function PdfWorkspace() {
 
       {items.length ? <div className="metric-row" style={{ marginTop: 18 }}><div className="metric"><span>Documents</span><strong>{items.length}</strong></div><div className="metric"><span>Output pages</span><strong>{hasPageError ? '—' : outputPageCount}</strong></div><div className="metric"><span>Source size</span><strong>{bytesLabel(sourceBytes)}</strong></div></div> : null}
 
+      {items.length ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-properties-title">
+        <h3 id="pdf-properties-title" style={{ margin: 0 }}>Document properties &amp; export</h3>
+        <p className="help-text">Source standard metadata is not copied into the rebuilt output. Only replacement values entered here are intentionally written. Leave a field blank to omit it.</p>
+        <div className="workspace-grid three" style={{ marginTop: 14 }}>
+          <div className="field"><label htmlFor="pdf-output-title">Output title</label><input id="pdf-output-title" value={metadata.title} onChange={(event) => updateMetadata('title', event.target.value)} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="pdf-output-author">Output author</label><input id="pdf-output-author" value={metadata.author} onChange={(event) => updateMetadata('author', event.target.value)} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="pdf-output-subject">Output subject</label><input id="pdf-output-subject" value={metadata.subject} onChange={(event) => updateMetadata('subject', event.target.value)} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="pdf-output-keywords">Output keywords</label><input id="pdf-output-keywords" value={metadata.keywords} onChange={(event) => updateMetadata('keywords', event.target.value)} placeholder="filed, reviewed, archive" autoComplete="off" /><small>Separate tags with commas.</small></div>
+          <div className="field"><label htmlFor="pdf-output-creator">Output creator</label><input id="pdf-output-creator" value={metadata.creator} onChange={(event) => updateMetadata('creator', event.target.value)} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="pdf-output-producer">Output producer</label><input id="pdf-output-producer" value={metadata.producer} onChange={(event) => updateMetadata('producer', event.target.value)} autoComplete="off" /></div>
+          <div className="field"><label htmlFor="pdf-output-language">Document language</label><input id="pdf-output-language" value={metadata.language} onChange={(event) => updateMetadata('language', event.target.value)} placeholder="en-US" autoComplete="off" /><small>Use a BCP 47 language tag when known.</small></div>
+          <div className="field"><label htmlFor="pdf-output-filename">Output filename</label><input id="pdf-output-filename" value={outputFilename} onChange={(event) => setOutputFilename(event.target.value)} placeholder={outputName()} autoComplete="off" /><small>Leave blank for {outputName()}. “.pdf” is added when omitted.</small></div>
+        </div>
+        <div className="button-row"><button className="action-button secondary" type="button" onClick={resetExportProperties}>Clear replacement properties</button></div>
+      </section> : null}
+
       {items.length && !hasPageError ? <section className="notice" style={{ marginTop: 18 }} data-testid="pdf-output-preview" aria-labelledby="pdf-preview-title">
         <strong id="pdf-preview-title">Output page order preview</strong>
         <p className="help-text">Structural preview of the planned source page order and rotation before export. {outputPageCount > OUTPUT_PREVIEW_LIMIT ? `Showing the first ${OUTPUT_PREVIEW_LIMIT} of ${outputPageCount} pages.` : `${outputPageCount} page${outputPageCount === 1 ? '' : 's'} planned.`}</p>
@@ -213,9 +301,9 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
-      <div className="notice"><strong>Sanitization scope</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata is not intentionally carried forward. Selected page content and page-level annotations are preserved; this is not a malware scanner, redaction tool, or guarantee that visible/private information inside page content has been removed.</p></div>
+      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata is not intentionally carried forward. Replacement metadata above is opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
   </>;
 }
