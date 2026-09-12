@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { combinePdfs, flattenAndSanitizePdf, inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs } from '../../src/tools/pdf/pdf-engine';
 
@@ -81,10 +81,7 @@ describe('PDF binary processing', () => {
 
   it('writes explicit workstation metadata without restoring source metadata', async () => {
     const source = await onePagePdf('Sensitive source title');
-    const output = await (splicePdfs as unknown as (
-      selections: Array<{ bytes: Uint8Array }>,
-      options: { metadata: { title: string; author: string; subject: string; keywords: string[]; creator: string; producer: string; language: string } },
-    ) => Promise<Uint8Array>)([{ bytes: source }], {
+    const output = await splicePdfs([{ bytes: source }], {
       metadata: {
         title: 'Filed copy',
         author: 'Records team',
@@ -102,14 +99,34 @@ describe('PDF binary processing', () => {
     expect(loaded.getKeywords()).toBe('filed reviewed');
     expect(loaded.getCreator()).toBe('InMoTools PDF Workstation');
     expect(loaded.getProducer()).toBe('InMoTools PDF Workstation');
+    expect(loaded.catalog.get(PDFName.of('Lang'))).toBeDefined();
+  });
+
+  it('keeps unspecified source Info metadata out of partial replacement exports', async () => {
+    const source = await PDFDocument.create();
+    source.addPage([300, 200]);
+    source.setTitle('Sensitive source title');
+    source.setAuthor('Sensitive source author');
+    source.setSubject('Sensitive source subject');
+    source.setCreator('Sensitive source creator');
+    source.setProducer('Sensitive source producer');
+    source.setKeywords(['sensitive', 'source']);
+
+    const output = await splicePdfs([{ bytes: new Uint8Array(await source.save()) }], {
+      metadata: { title: 'Public replacement title' },
+    });
+    const loaded = await PDFDocument.load(output, { updateMetadata: false });
+    expect(loaded.getTitle()).toBe('Public replacement title');
+    expect(loaded.getAuthor()).toBeUndefined();
+    expect(loaded.getSubject()).toBeUndefined();
+    expect(loaded.getCreator()).toBeUndefined();
+    expect(loaded.getProducer()).toBeUndefined();
+    expect(loaded.getKeywords()).toBeUndefined();
   });
 
   it('authors deterministic workstation form fields onto copied output pages', async () => {
     const source = await onePagePdf('Forms');
-    const output = await (splicePdfs as unknown as (
-      selections: Array<{ bytes: Uint8Array }>,
-      options: { formFields: Array<Record<string, unknown>> },
-    ) => Promise<Uint8Array>)([{ bytes: source }], {
+    const output = await splicePdfs([{ bytes: source }], {
       formFields: [
         { type: 'text', name: 'client.name', page: 1, x: 20, y: 140, width: 140, height: 24, value: 'Ada', required: true },
         { type: 'checkbox', name: 'client.approved', page: 1, x: 20, y: 100, width: 18, height: 18, checked: true },
@@ -132,7 +149,7 @@ describe('PDF binary processing', () => {
     page.setBleedBox(5, 10, 280, 175);
     page.setTrimBox(15, 25, 240, 140);
     const inspected = await inspectPdf(new Uint8Array(await doc.save()));
-    expect((inspected as typeof inspected & { pages: unknown[] }).pages).toEqual([
+    expect(inspected.pages).toEqual([
       {
         page: 1,
         width: 300,
