@@ -1,44 +1,70 @@
 import type { DiagramRenderRequest, DiagramRenderResponse } from './markdown-types';
 
 // Mermaid dispatch runs on the main thread by necessity: Mermaid's renderer
-// creates and measures real DOM elements internally, and a dedicated Worker
-// has no DOM available to it. To avoid blocking typing responsiveness,
-// callers are expected to debounce and schedule this during browser idle
-// time (see scheduleIdle below) rather than calling it synchronously on
-// every keystroke.
-//
-// The actual mermaid.render call is injected as a parameter (rather than
-// imported directly and called here) so this module's scheduling and error
-// handling logic is unit-testable without loading the real Mermaid library,
-// which requires a browser-like environment this project's plain Vitest
-// setup does not provide.
+// creates and measures real DOM elements internally. Keep the input bounded,
+// remove trailing whitespace that is semantically irrelevant to Mermaid, and
+// schedule required work with an explicit timeout so it cannot wait forever
+// for an idle period.
 
-export type MermaidRenderFn = (id: string, source: string) => Promise<{ svg: string }>;
+export const MAX_MERMAID_SOURCE_CHARS = 50_000;
+const REQUIRED_IDLE_TIMEOUT_MS = 500;
+
+export interface MermaidRenderResult {
+  readonly svg: string;
+  readonly diagramType?: string;
+  readonly bindFunctions?: (element: Element) => void;
+}
+
+export type MermaidRenderFn = (id: string, source: string) => Promise<MermaidRenderResult>;
+
+export type PreparedMermaidSource =
+  | { readonly source: string; readonly error?: undefined }
+  | { readonly source?: undefined; readonly error: string };
+
+export const prepareMermaidSource = (source: string): PreparedMermaidSource => {
+  // Mermaid syntax does not require trailing whitespace. Removing it prevents
+  // large pasted whitespace tails from becoming parser work while preserving
+  // meaningful whitespace inside labels and diagram statements.
+  const prepared = source.trimEnd();
+  if (prepared.length > MAX_MERMAID_SOURCE_CHARS) {
+    return {
+      error: `Mermaid diagram is too large (${prepared.length.toLocaleString()} characters). The limit is ${MAX_MERMAID_SOURCE_CHARS.toLocaleString()} characters.`,
+    };
+  }
+  return { source: prepared };
+};
 
 export const renderMermaidDiagram = async (
   render: MermaidRenderFn,
   id: string,
   source: string,
-): Promise<{ svg?: string; error?: string }> => {
+): Promise<MermaidRenderResult | { error: string }> => {
+  const prepared = prepareMermaidSource(source);
+  if (prepared.error) return { error: prepared.error };
+
   try {
-    const result = await render(id, source);
-    return { svg: result.svg };
+    return await render(id, prepared.source);
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Mermaid rendering failed.' };
   }
 };
 
-// requestIdleCallback is not implemented in every browser; fall back to a
-// short setTimeout so idle-scheduled work still eventually runs.
-export const scheduleIdle = (callback: () => void): void => {
+// requestIdleCallback is not implemented in every browser. Required preview
+// work gets a timeout per MDN guidance and every scheduled callback exposes a
+// cancellation handle so superseded renders do not accumulate queued work.
+export const scheduleIdle = (callback: () => void): (() => void) => {
   const withIdle = globalThis as typeof globalThis & {
-    requestIdleCallback?: (cb: () => void) => number;
+    requestIdleCallback?: (cb: () => void, options?: { timeout?: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
   };
+
   if (typeof withIdle.requestIdleCallback === 'function') {
-    withIdle.requestIdleCallback(callback);
-  } else {
-    setTimeout(callback, 0);
+    const id = withIdle.requestIdleCallback(callback, { timeout: REQUIRED_IDLE_TIMEOUT_MS });
+    return () => withIdle.cancelIdleCallback?.(id);
   }
+
+  const id = setTimeout(callback, 0);
+  return () => clearTimeout(id);
 };
 
 // Graphviz-only Worker orchestration. Mirrors the request/response
