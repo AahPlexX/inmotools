@@ -11,6 +11,7 @@ import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
+import { renderDiagramBlocks } from './diagram-renderer';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
@@ -301,12 +302,19 @@ export default function MarkdownWorkspace() {
     if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
   }, []);
 
-  const buildExportBodyHtml = useCallback((): { html: string; usedFallback: boolean } => {
+  const buildExportBodyHtml = useCallback(async (): Promise<string> => {
     const live = previewHostRef.current
       ?.querySelector<HTMLElement>('.markdown-workbench-preview')
       ?.innerHTML;
-    if (live && live.trim()) return { html: live, usedFallback: false };
-    return { html: renderMarkdown(preparedSource).html, usedFallback: true };
+    if (live && live.trim()) return live;
+
+    // Source view has no mounted preview to scrape. Build the same rendered
+    // document in a detached DOM host and run the shared diagram pass so
+    // every HTML-derived export receives Mermaid/Graphviz SVGs consistently.
+    const scratch = document.createElement('div');
+    scratch.innerHTML = renderMarkdown(preparedSource).html;
+    await renderDiagramBlocks(scratch);
+    return scratch.innerHTML;
   }, [preparedSource]);
 
   const noteExport = (message: string) => {
@@ -328,7 +336,7 @@ export default function MarkdownWorkspace() {
   const exportHtml = async () => {
     setStatus('Preparing standalone HTML and bundling its assets…');
     await waitForPreviewSettled();
-    const { html: bodyHtml, usedFallback } = buildExportBodyHtml();
+    const bodyHtml = await buildExportBodyHtml();
     const [images, katexCss] = await Promise.all([
       bundleHtmlImages(bodyHtml, document.baseURI, 'inline'),
       inlineStylesheetAssets(katexExportCss, document.baseURI),
@@ -340,9 +348,7 @@ export default function MarkdownWorkspace() {
     }
     const html = buildStandaloneMarkdownHtml(effectiveTitle, images.html, { additionalCss: katexCss.css });
     downloadText(html, `${filenameStem}.html`, 'text/html;charset=utf-8');
-    setStatus(usedFallback
-      ? `Exported ${filenameStem}.html as a self-contained file from source. Open Split view first if you need rendered diagrams included.`
-      : `Exported ${filenameStem}.html as a self-contained offline file with KaTeX fonts and images bundled.`);
+    setStatus(`Exported ${filenameStem}.html as a self-contained offline file with rendered diagrams, KaTeX fonts, and images bundled.`);
     noteExport('Exported a self-contained offline HTML file locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
@@ -367,7 +373,7 @@ export default function MarkdownWorkspace() {
     setStatus('Packaging EPUB and bundling referenced images…');
     try {
       await waitForPreviewSettled();
-      const { html: bodyHtml } = buildExportBodyHtml();
+      const bodyHtml = await buildExportBodyHtml();
       const bundled = await bundleHtmlImages(bodyHtml, document.baseURI, 'epub');
       if (bundled.unresolved.length > 0) {
         setStatus(`EPUB export stopped: ${bundled.unresolved.length} referenced image${bundled.unresolved.length === 1 ? '' : 's'} could not be bundled.`);
