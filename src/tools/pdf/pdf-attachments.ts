@@ -7,6 +7,7 @@ import {
   PDFName,
   PDFNumber,
   PDFRawStream,
+  PDFStream,
   PDFString,
 } from 'pdf-lib';
 
@@ -165,11 +166,11 @@ function decodeAttachment(raw: RawAttachment, includeBytes: boolean): { inventor
     ?? raw.treeName;
   const description = decodeLiteral(raw.fileSpec.lookupMaybe(DescKey, PDFString, PDFHexString));
   const ef = raw.fileSpec.lookupMaybe(EFKey, PDFDict);
-  const stream = ef?.lookupMaybe(UFKey, PDFRawStream) ?? ef?.lookupMaybe(FKey, PDFRawStream);
-  if (!stream) {
+  const stream = ef?.lookupMaybe(UFKey, PDFStream) ?? ef?.lookupMaybe(FKey, PDFStream);
+  if (!(stream instanceof PDFRawStream)) {
     return {
       inventory: { name: filename, description },
-      warning: `Embedded file ${filename} has no decodable /EF stream and cannot be extracted.`,
+      warning: `Embedded file ${filename} has no decodable /EF raw stream and cannot be extracted.`,
     };
   }
 
