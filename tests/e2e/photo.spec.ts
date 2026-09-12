@@ -207,6 +207,32 @@ test('PNG export embeds reviewed XMP and honors safe custom filename plus output
   expect(bytes.includes(Buffer.from('A&amp;B portrait'))).toBe(true);
 });
 
+test('long and short edge sizing expose planned output and require an explicit safe choice for oversized export', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  const resize = dialog.getByLabel('Resize');
+  const value = dialog.getByLabel('Resize value');
+
+  await resize.selectOption('long-edge');
+  await value.fill('200');
+  await expect(dialog.getByText('Planned output · 200 × 150')).toBeVisible();
+
+  await resize.selectOption('short-edge');
+  await value.fill('120');
+  await expect(dialog.getByText('Planned output · 160 × 120')).toBeVisible();
+
+  await resize.selectOption('long-edge');
+  await value.fill('10000');
+  await expect(dialog.getByRole('alert')).toContainText('Planned output · 10000 × 7500');
+  await expect(dialog.getByRole('button', { name: 'Choose safe size to export' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: /Use verified safe size/ })).toBeVisible();
+  await dialog.getByRole('button', { name: /Use verified safe size/ }).click();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(dialog.getByText('Planned output · 4096 × 3072')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Download photo' })).toBeEnabled();
+});
+
 test('batch export queues multiple local files and reports per-file completion', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();
