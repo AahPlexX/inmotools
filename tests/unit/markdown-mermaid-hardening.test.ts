@@ -10,13 +10,14 @@ describe('Mermaid source hardening', () => {
   it('rejects oversized source before Mermaid can silently replace it', () => {
     const source = `flowchart LR\nA-->B\n${'x'.repeat(MAX_MERMAID_SOURCE_CHARS + 1)}`;
     const result = prepareMermaidSource(source);
-    expect(result.source).toBeUndefined();
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected oversized Mermaid source to be rejected.');
     expect(result.error).toMatch(/too large/i);
   });
 
   it('removes trailing whitespace that can trigger pathological parser work without changing diagram content', () => {
     const result = prepareMermaidSource('flowchart LR\nA-->B\n' + ' '.repeat(10_000));
-    expect(result).toEqual({ source: 'flowchart LR\nA-->B' });
+    expect(result).toEqual({ ok: true, source: 'flowchart LR\nA-->B' });
   });
 });
 
