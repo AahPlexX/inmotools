@@ -43,7 +43,7 @@ test('keeps an empty Even preset distinct from All and reorders output without r
   // Step controls remain available as the simplest adjacent-movement option.
   await page.getByTestId('pdf-item').nth(0).getByRole('button', { name: 'Move down' }).click();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
-  await expect(page.getByText('Output pages').locator('..')).toContainText('2');
+  await expect(page.getByText('Output pages', { exact: true }).locator('..')).toContainText('2');
 });
 
 test('blocks unsupported editable-form preservation and verifies flattened output before download', async ({ page }) => {
