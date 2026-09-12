@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { detectCrystalFormat, importCrystalText } from '../../src/tools/crystal/structure-import-engine';
 
+const expectVectorClose = (actual: readonly number[], expected: readonly number[]): void => {
+  expect(actual).toHaveLength(expected.length);
+  expected.forEach((value, index) => expect(actual[index]).toBeCloseTo(value, 12));
+};
+
 const poscarDirect = `NaCl direct
 1.0
 5 0 0
@@ -92,7 +97,7 @@ describe('crystal structure import adapters', () => {
     expect(direct.format).toBe('poscar');
     expect(direct.document.cell.a).toBeCloseTo(5, 10);
     expect(direct.document.sites.map((site) => site.element)).toEqual(['Na', 'Cl']);
-    expect(direct.document.sites[1]!.fractional).toEqual([0.5, 0.5, 0.5]);
+    expectVectorClose(direct.document.sites[1]!.fractional, [0.5, 0.5, 0.5]);
     expect(direct.document.sourceText).toBe(poscarDirect);
 
     const cartesian = importCrystalText('cartesian.vasp', poscarCartesian);
@@ -105,7 +110,7 @@ describe('crystal structure import adapters', () => {
     expect(imported.document.cell.a).toBeCloseTo(2, 10);
     expect(imported.document.cell.b).toBeCloseTo(3, 10);
     expect(imported.document.cell.c).toBeCloseTo(4, 10);
-    expect(imported.document.sites[0]!.fractional).toEqual([0.5, 0.5, 0.5]);
+    expectVectorClose(imported.document.sites[0]!.fractional, [0.5, 0.5, 0.5]);
   });
 
   it('imports plain XYZ with an explicit nonperiodic-display assumption warning', () => {
@@ -123,7 +128,7 @@ describe('crystal structure import adapters', () => {
     expect(imported.document.cell.a).toBeCloseTo(5, 10);
     expect(imported.document.cell.b).toBeCloseTo(6, 10);
     expect(imported.document.cell.c).toBeCloseTo(7, 10);
-    expect(imported.document.sites[1]!.fractional).toEqual([0.5, 0.5, 0.5]);
+    expectVectorClose(imported.document.sites[1]!.fractional, [0.5, 0.5, 0.5]);
     expect(imported.warnings).toEqual([]);
   });
 
