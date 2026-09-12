@@ -1,15 +1,18 @@
 import { useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { downloadBlob, downloadText } from '../../lib/download';
-import VectorCanvas from './VectorCanvas';
+import VectorCanvas, { type VectorDrawSettings } from './VectorCanvas';
 import {
   addElement,
   alignSelection,
   baseElement,
+  composeSelection,
   createHistory,
   createVectorDocument,
   distributeSelection,
   duplicateSelection,
+  fitZoomForViewport,
   groupSelection,
+  mirrorDuplicateSelection,
   mirrorSelection,
   moveSelection,
   pushHistory,
@@ -56,6 +59,13 @@ const EXPORT_DEFAULTS: VectorExportSettings = {
   quality: 0.92,
   responsive: true,
   includeBackground: false,
+};
+
+const DRAW_DEFAULTS: VectorDrawSettings = {
+  polygonSides: 6,
+  starPoints: 5,
+  starInnerRatio: 0.45,
+  pencilSmoothing: 2,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -170,6 +180,8 @@ export default function VectorStudio() {
   const [selection, setSelection] = useState<string[]>([]);
   const [tool, setTool] = useState<VectorTool>('select');
   const [zoom, setZoom] = useState(0.7);
+  const [drawSettings, setDrawSettings] = useState<VectorDrawSettings>(DRAW_DEFAULTS);
+  const [newSwatch, setNewSwatch] = useState('#7c3aed');
   const [status, setStatus] = useState('Ready. Choose a tool or start with a template.');
   const [exportSettings, setExportSettings] = useState<VectorExportSettings>(EXPORT_DEFAULTS);
   const [sourcePreview, setSourcePreview] = useState('');
@@ -254,7 +266,19 @@ export default function VectorStudio() {
   function ungroup() {
     if (!primary || primary.type !== 'group') return;
     const result = ungroupSelection(document, primary.id);
-    commit(result.document, result.selection, 'Group released into editable objects.');
+    commit(result.document, result.selection, primary.composition ? 'Composition released into its original editable objects.' : 'Group released into editable objects.');
+  }
+
+  function compose(mode: 'clip' | 'difference') {
+    if (selection.length < 2) return;
+    const result = composeSelection(document, selection, mode);
+    commit(result.document, result.selection, mode === 'clip' ? 'Created a reversible SVG clip composition.' : 'Created a reversible SVG difference mask.');
+  }
+
+  function symmetryDuplicate(axis: 'horizontal' | 'vertical') {
+    if (!selection.length) return;
+    const result = mirrorDuplicateSelection(document, selection, axis, { x: document.artboard.width / 2, y: document.artboard.height / 2 });
+    commit(result.document, result.selection, `Created an editable ${axis} symmetry duplicate.`);
   }
 
   function repeatGrid() {
@@ -293,6 +317,48 @@ export default function VectorStudio() {
       elements: [...document.elements.filter((element) => !selectedIds.has(element.id)), instance],
     };
     commit(next, [instance.id], 'Selection converted to a reusable SVG symbol component.');
+  }
+
+  function viewportElement(): HTMLElement | null {
+    return rootRef.current?.querySelector<HTMLElement>('.vector-canvas-scroll') ?? null;
+  }
+
+  function fitArtboard() {
+    const viewport = viewportElement();
+    if (!viewport) return;
+    const nextZoom = fitZoomForViewport(document.artboard.width, document.artboard.height, viewport.clientWidth, viewport.clientHeight, 64);
+    setZoom(nextZoom);
+    requestAnimationFrame(() => {
+      const current = viewportElement();
+      if (!current) return;
+      current.scrollLeft = Math.max(0, (document.artboard.width * nextZoom - current.clientWidth) / 2 + 32);
+      current.scrollTop = Math.max(0, (document.artboard.height * nextZoom - current.clientHeight) / 2 + 32);
+    });
+    setStatus(`Fit artboard at ${Math.round(nextZoom * 100)}%.`);
+  }
+
+  function fitSelection() {
+    if (!bounds) return;
+    const viewport = viewportElement();
+    if (!viewport) return;
+    const nextZoom = fitZoomForViewport(Math.max(1, bounds.width), Math.max(1, bounds.height), viewport.clientWidth, viewport.clientHeight, 112);
+    setZoom(nextZoom);
+    requestAnimationFrame(() => {
+      const current = viewportElement();
+      if (!current) return;
+      current.scrollLeft = Math.max(0, bounds.cx * nextZoom - current.clientWidth / 2 + 32);
+      current.scrollTop = Math.max(0, bounds.cy * nextZoom - current.clientHeight / 2 + 32);
+    });
+    setStatus(`Focused selection at ${Math.round(nextZoom * 100)}%.`);
+  }
+
+  function saveSwatch() {
+    const normalized = newSwatch.toLowerCase();
+    if (document.swatches.some((swatch) => swatch.toLowerCase() === normalized)) {
+      setStatus(`${newSwatch} is already saved.`);
+      return;
+    }
+    commit({ ...document, swatches: [...document.swatches, newSwatch] }, selection, `Saved ${newSwatch} to document swatches.`);
   }
 
   function updateArtboard(patch: Partial<VectorDocument['artboard']>) {
@@ -418,7 +484,8 @@ export default function VectorStudio() {
         <button type="button" onClick={undo} disabled={!history.past.length} aria-label="Undo">↶ <span>Undo</span></button>
         <button type="button" onClick={redo} disabled={!history.future.length} aria-label="Redo">↷ <span>Redo</span></button>
         <button type="button" onClick={() => setZoom((value) => clamp(Number((value - 0.1).toFixed(2)), 0.2, 3))} aria-label="Zoom out">−</button>
-        <button type="button" onClick={() => setZoom(0.7)} aria-label="Fit artboard">Fit</button>
+        <button type="button" onClick={fitArtboard} aria-label="Fit artboard">Fit</button>
+        <button type="button" onClick={fitSelection} disabled={!bounds} aria-label="Fit selection">Selection</button>
         <button type="button" onClick={() => setZoom(1)} aria-label="Zoom to 100 percent">100%</button>
         <button type="button" onClick={() => setZoom((value) => clamp(Number((value + 0.1).toFixed(2)), 0.2, 3))} aria-label="Zoom in">+</button>
       </div>
@@ -445,10 +512,17 @@ export default function VectorStudio() {
       </aside>
 
       <main className="vector-stage">
-        <VectorCanvas document={document} selection={selection} tool={tool} zoom={zoom} onDocumentChange={(next, nextSelection) => commit(next, nextSelection ?? selection)} onSelectionChange={setSelection} onStatus={setStatus}/>
+        <VectorCanvas document={document} selection={selection} tool={tool} zoom={zoom} drawSettings={drawSettings} onDocumentChange={(next, nextSelection) => commit(next, nextSelection ?? selection)} onSelectionChange={setSelection} onStatus={setStatus}/>
       </main>
 
       <aside className={`vector-inspector ${panel !== 'design' ? 'vector-mobile-hidden' : ''}`} aria-label="Vector inspector">
+        {(tool === 'polygon' || tool === 'star' || tool === 'pencil') ? <section className="vector-panel vector-tool-options" aria-label="Tool settings">
+          <div className="vector-panel-heading"><h3>Tool settings</h3><span>{TOOLS.find((item) => item.id === tool)?.label}</span></div>
+          {tool === 'polygon' ? <label>Polygon sides<input aria-label="Polygon sides" type="number" min="3" max="64" step="1" value={drawSettings.polygonSides} onChange={(event) => setDrawSettings((current) => ({ ...current, polygonSides: clamp(Math.round(Number(event.target.value) || 3), 3, 64) }))}/></label> : null}
+          {tool === 'star' ? <div className="vector-field-grid two"><label>Star points<input aria-label="Star points" type="number" min="2" max="64" step="1" value={drawSettings.starPoints} onChange={(event) => setDrawSettings((current) => ({ ...current, starPoints: clamp(Math.round(Number(event.target.value) || 2), 2, 64) }))}/></label><label>Star inner ratio<input aria-label="Star inner ratio" type="number" min="0.05" max="0.95" step="0.05" value={drawSettings.starInnerRatio} onChange={(event) => setDrawSettings((current) => ({ ...current, starInnerRatio: clamp(Number(event.target.value) || 0.05, 0.05, 0.95) }))}/></label></div> : null}
+          {tool === 'pencil' ? <label>Pencil smoothing<input aria-label="Pencil smoothing" type="range" min="0.25" max="12" step="0.25" value={drawSettings.pencilSmoothing} onChange={(event) => setDrawSettings((current) => ({ ...current, pencilSmoothing: clamp(Number(event.target.value), 0.25, 12) }))}/><span className="vector-control-value">{drawSettings.pencilSmoothing.toFixed(2)}</span></label> : null}
+        </section> : null}
+
         <section className="vector-panel">
           <div className="vector-panel-heading"><h3>Precision</h3><span>{selection.length ? `${selection.length} selected` : 'Nothing selected'}</span></div>
           {primary ? <>
@@ -493,10 +567,17 @@ export default function VectorStudio() {
           <div className="vector-button-row wrap">
             <button type="button" onClick={() => commit(mirrorSelection(document, selection, 'horizontal'), selection, 'Selection mirrored horizontally.')} disabled={!selection.length}>Mirror H</button>
             <button type="button" onClick={() => commit(mirrorSelection(document, selection, 'vertical'), selection, 'Selection mirrored vertically.')} disabled={!selection.length}>Mirror V</button>
+            <button type="button" onClick={() => symmetryDuplicate('horizontal')} disabled={!selection.length} aria-label="Symmetry duplicate horizontal">Symmetry H</button>
+            <button type="button" onClick={() => symmetryDuplicate('vertical')} disabled={!selection.length} aria-label="Symmetry duplicate vertical">Symmetry V</button>
             <button type="button" onClick={repeatGrid} disabled={!selection.length}>3×3 repeat</button>
             <button type="button" onClick={repeatRadial} disabled={!selection.length}>Radial ×8</button>
             <button type="button" onClick={createSymbol} disabled={!selection.length}>Make symbol</button>
           </div>
+          <div className="vector-button-row wrap">
+            <button type="button" onClick={() => compose('clip')} disabled={selection.length < 2} aria-label="Clip selection">Clip</button>
+            <button type="button" onClick={() => compose('difference')} disabled={selection.length < 2} aria-label="Difference selection">Difference</button>
+          </div>
+          <p className="vector-hint">Clip and Difference stay reversible: ungroup the composition to recover the original source objects.</p>
         </section>
 
         <section className="vector-panel">
@@ -508,6 +589,7 @@ export default function VectorStudio() {
             {primary.fill.kind === 'radial-gradient' ? <div className="vector-field-grid two"><label>Center<input type="color" value={primary.fill.start} onChange={(event) => changeFill({ start: event.target.value })}/></label><label>Edge<input type="color" value={primary.fill.end} onChange={(event) => changeFill({ end: event.target.value })}/></label></div> : null}
             {primary.fill.kind === 'pattern' ? <><label>Pattern<select value={primary.fill.pattern} onChange={(event) => changeFill({ pattern: event.target.value })}><option value="stripes">Stripes</option><option value="dots">Dots</option><option value="grid">Grid</option></select></label><div className="vector-field-grid two"><label>Size<input type="number" min="2" value={primary.fill.size} onChange={(event) => changeFill({ size: Number(event.target.value) })}/></label><label>Angle<input type="number" value={primary.fill.rotation} onChange={(event) => changeFill({ rotation: Number(event.target.value) })}/></label></div></> : null}
             <div className="vector-swatch-row" aria-label="Document swatches">{document.swatches.map((swatch) => <button key={swatch} type="button" className="vector-swatch" style={{ background: swatch }} aria-label={`Apply ${swatch} fill`} onClick={() => updateSelected({ fill: { kind: 'solid', color: swatch } } as Partial<VectorElement>)}/>)}</div>
+            <div className="vector-swatch-editor"><label>New swatch color<input aria-label="New swatch color" type="color" value={newSwatch} onChange={(event) => setNewSwatch(event.target.value)}/></label><button type="button" onClick={saveSwatch} aria-label="Save swatch">Save swatch</button></div>
             <div className="vector-field-grid two"><label>Stroke<input type="color" value={primary.stroke.color} onChange={(event) => updateSelected({ stroke: { ...primary.stroke, color: event.target.value } } as Partial<VectorElement>)}/></label><label>Width<input type="number" min="0" step="0.5" value={primary.stroke.width} onChange={(event) => updateSelected({ stroke: { ...primary.stroke, width: Math.max(0, Number(event.target.value)) } } as Partial<VectorElement>)}/></label></div>
             <div className="vector-field-grid two"><label>Cap<select value={primary.stroke.linecap} onChange={(event) => updateSelected({ stroke: { ...primary.stroke, linecap: event.target.value as 'butt' | 'round' | 'square' } } as Partial<VectorElement>)}><option value="butt">Butt</option><option value="round">Round</option><option value="square">Square</option></select></label><label>Join<select value={primary.stroke.linejoin} onChange={(event) => updateSelected({ stroke: { ...primary.stroke, linejoin: event.target.value as 'miter' | 'round' | 'bevel' } } as Partial<VectorElement>)}><option value="miter">Miter</option><option value="round">Round</option><option value="bevel">Bevel</option></select></label></div>
             <label>Dash pattern<input placeholder="8 4" value={primary.stroke.dash} onChange={(event) => updateSelected({ stroke: { ...primary.stroke, dash: event.target.value } } as Partial<VectorElement>)}/></label>
@@ -535,6 +617,7 @@ export default function VectorStudio() {
           <h3>Artboard</h3>
           <label>Preset<select defaultValue="custom" onChange={(event) => event.target.value !== 'custom' && applyPreset(event.target.value)}><option value="custom">Custom</option><option value="1920x1080">HD landscape</option><option value="1080x1080">Square social</option><option value="1080x1350">Portrait social</option><option value="512x512">App icon</option><option value="1200x628">Share card</option><option value="2480x3508">A4 at 300 ppi ratio</option></select></label>
           <div className="vector-field-grid two"><label>Width<input id="vector-artboard-width" type="number" min="1" max="100000" value={document.artboard.width} onChange={(event) => updateArtboard({ width: clamp(Number(event.target.value), 1, 100000) })}/></label><label>Height<input id="vector-artboard-height" type="number" min="1" max="100000" value={document.artboard.height} onChange={(event) => updateArtboard({ height: clamp(Number(event.target.value), 1, 100000) })}/></label></div>
+          <div className="vector-button-row wrap"><button type="button" onClick={fitArtboard}>Fit artboard</button><button type="button" onClick={fitSelection} disabled={!bounds}>Fit selection</button></div>
           <label>Preview background<input type="color" value={document.artboard.background} onChange={(event) => updateArtboard({ background: event.target.value })}/></label>
           <label className="vector-check"><input type="checkbox" checked={document.artboard.gridVisible} onChange={(event) => updateArtboard({ gridVisible: event.target.checked })}/> Show grid</label>
           <label className="vector-check"><input type="checkbox" checked={document.artboard.snapToGrid} onChange={(event) => updateArtboard({ snapToGrid: event.target.checked })}/> Snap to grid</label>
@@ -573,6 +656,6 @@ export default function VectorStudio() {
       </aside>
     </div>
 
-    <div className="vector-status" role="status"><span>{status}</span><span>{document.elements.length} objects · {document.artboard.width} × {document.artboard.height}</span></div>
+    <div className="vector-status" role="status"><span>{status}</span><span>{document.elements.length} objects · {document.artboard.width} × {document.artboard.height} · {Math.round(zoom * 100)}%</span></div>
   </section>;
 }
