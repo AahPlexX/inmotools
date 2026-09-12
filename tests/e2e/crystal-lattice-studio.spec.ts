@@ -18,8 +18,16 @@ test('renders an interactive crystal viewport for the selected starter', async (
 
   await expect(page.getByRole('img', { name: /interactive crystal structure/i })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Fit structure' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '+X', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '+Y', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '+Z', exact: true })).toBeEnabled();
   await expect(page.getByRole('combobox', { name: 'Representation' })).toHaveValue('ball-stick');
 
   await page.getByRole('combobox', { name: 'Representation' }).selectOption('space-fill');
   await expect(page.getByRole('combobox', { name: 'Representation' })).toHaveValue('space-fill');
+
+  const projectionToggle = page.getByRole('button', { name: 'Use orthographic projection' });
+  await expect(projectionToggle).toBeEnabled();
+  await projectionToggle.click();
+  await expect(page.getByRole('button', { name: 'Use perspective projection' })).toBeEnabled();
 });
