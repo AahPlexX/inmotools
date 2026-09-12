@@ -93,12 +93,12 @@ test('named snapshots save and restore a user-labelled recipe state', async ({ p
   await page.getByRole('button', { name: 'Save snapshot' }).click();
   await expect(page.getByRole('button', { name: /Warm proof/ })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await exposure.fill('-0.8');
   await exposure.press('Enter');
   await page.getByRole('button', { name: 'Inspect & workflow' }).click();
   await page.getByRole('button', { name: /Warm proof/ }).click();
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(exposure).toHaveValue('1.2');
 });
 
