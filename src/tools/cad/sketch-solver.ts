@@ -1,5 +1,6 @@
 import type {
   CadSketch,
+  SketchArcEntity,
   SketchCircleEntity,
   SketchConstraint,
   SketchLineEntity,
@@ -72,6 +73,16 @@ function circleIndex(sketch: CadSketch, startOffset: number): Map<string, Circle
   return result;
 }
 
+function arcIndex(sketch: CadSketch): Map<string, SketchArcEntity> {
+  const result = new Map<string, SketchArcEntity>();
+  for (const entity of sketch.entities) {
+    if (entity.type !== 'arc') continue;
+    if (result.has(entity.id)) throw new Error(`Duplicate sketch arc '${entity.id}'.`);
+    result.set(entity.id, entity);
+  }
+  return result;
+}
+
 function initialValues(points: Map<string, PointIndex>, circles: Map<string, CircleIndex>): number[] {
   const values = Array.from({ length: points.size * 2 + circles.size }, () => 0);
   for (const { point, offset } of points.values()) {
@@ -120,6 +131,55 @@ function circleCenter(
   return coordinates(values, points, entry.circle.centerPointId);
 }
 
+function curveCenter(
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
+  curveId: string,
+): [number, number] {
+  if (circles.has(curveId)) return circleCenter(values, points, circles, curveId);
+  const arc = arcs.get(curveId);
+  if (arc) return coordinates(values, points, arc.centerPointId);
+  throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
+}
+
+function curveRadius(
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
+  curveId: string,
+): number {
+  if (circles.has(curveId)) return circleRadius(values, circles, curveId);
+  const arc = arcs.get(curveId);
+  if (arc) {
+    const [cx, cy] = coordinates(values, points, arc.centerPointId);
+    const [sx, sy] = coordinates(values, points, arc.startPointId);
+    const radius = Math.hypot(sx - cx, sy - cy);
+    if (radius <= MIN_GEOMETRY_SCALE) throw new Error(`Arc '${arc.id}' start point must differ from its center.`);
+    return radius;
+  }
+  throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
+}
+
+function arcIntrinsicResiduals(
+  values: readonly number[],
+  points: Map<string, PointIndex>,
+  arcs: Map<string, SketchArcEntity>,
+): number[] {
+  const residuals: number[] = [];
+  for (const arc of arcs.values()) {
+    const [cx, cy] = coordinates(values, points, arc.centerPointId);
+    const [sx, sy] = coordinates(values, points, arc.startPointId);
+    const [ex, ey] = coordinates(values, points, arc.endPointId);
+    const startRadius = Math.hypot(sx - cx, sy - cy);
+    const endRadius = Math.hypot(ex - cx, ey - cy);
+    residuals.push(endRadius - startRadius);
+  }
+  return residuals;
+}
+
 function fixedEntityResidual(
   entityId: string,
   values: readonly number[],
@@ -165,6 +225,7 @@ function residualForConstraint(
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
   circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
 ): number[] {
   switch (constraint.type) {
     case 'fixed-point': {
@@ -208,12 +269,12 @@ function residualForConstraint(
     case 'radius': {
       const target = finite(constraint.value, `Radius constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Radius constraint '${constraint.id}' value must be positive.`);
-      return [circleRadius(values, circles, constraint.circleId) - target];
+      return [curveRadius(values, points, circles, arcs, constraint.circleId) - target];
     }
     case 'diameter': {
       const target = finite(constraint.value, `Diameter constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Diameter constraint '${constraint.id}' value must be positive.`);
-      return [2 * circleRadius(values, circles, constraint.circleId) - target];
+      return [2 * curveRadius(values, points, circles, arcs, constraint.circleId) - target];
     }
     case 'angle': {
       const target = finite(constraint.value, `Angle constraint '${constraint.id}' value`);
@@ -262,8 +323,8 @@ function residualForConstraint(
       return [distance - radius];
     }
     case 'concentric': {
-      const [ax, ay] = circleCenter(values, points, circles, constraint.circleAId);
-      const [bx, by] = circleCenter(values, points, circles, constraint.circleBId);
+      const [ax, ay] = curveCenter(values, points, circles, arcs, constraint.circleAId);
+      const [bx, by] = curveCenter(values, points, circles, arcs, constraint.circleBId);
       return [bx - ax, by - ay];
     }
     case 'equal-length': {
@@ -274,7 +335,10 @@ function residualForConstraint(
       return [bLength - aLength];
     }
     case 'equal-radius':
-      return [circleRadius(values, circles, constraint.circleBId) - circleRadius(values, circles, constraint.circleAId)];
+      return [
+        curveRadius(values, points, circles, arcs, constraint.circleBId) -
+          curveRadius(values, points, circles, arcs, constraint.circleAId),
+      ];
     case 'midpoint': {
       const [px, py] = coordinates(values, points, constraint.pointId);
       const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
@@ -320,8 +384,12 @@ function residualVector(
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
   circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
 ): number[] {
-  return constraints.flatMap((constraint) => residualForConstraint(constraint, values, points, lines, circles));
+  return [
+    ...constraints.flatMap((constraint) => residualForConstraint(constraint, values, points, lines, circles, arcs)),
+    ...arcIntrinsicResiduals(values, points, arcs),
+  ];
 }
 
 function norm(values: readonly number[]): number {
@@ -334,8 +402,9 @@ function numericJacobian(
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
   circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
 ): number[][] {
-  const base = residualVector(constraints, values, points, lines, circles);
+  const base = residualVector(constraints, values, points, lines, circles, arcs);
   const jacobian = Array.from({ length: base.length }, () => Array.from({ length: values.length }, () => 0));
   for (let column = 0; column < values.length; column += 1) {
     const step = Math.max(1e-7, Math.abs(values[column]!) * 1e-7);
@@ -343,8 +412,8 @@ function numericJacobian(
     const minus = [...values];
     plus[column] = plus[column]! + step;
     minus[column] = minus[column]! - step;
-    const plusResidual = residualVector(constraints, plus, points, lines, circles);
-    const minusResidual = residualVector(constraints, minus, points, lines, circles);
+    const plusResidual = residualVector(constraints, plus, points, lines, circles, arcs);
+    const minusResidual = residualVector(constraints, minus, points, lines, circles, arcs);
     for (let row = 0; row < base.length; row += 1) {
       jacobian[row]![column] = (plusResidual[row]! - minusResidual[row]!) / (2 * step);
     }
@@ -432,18 +501,19 @@ function solveCore(
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
   circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
   tolerance: number,
   maxIterations: number,
 ): SolveCoreResult {
   let values = [...startingValues];
   let damping = 1e-6;
-  let residuals = residualVector(constraints, values, points, lines, circles);
+  let residuals = residualVector(constraints, values, points, lines, circles, arcs);
   let error = norm(residuals);
-  if (error <= tolerance || constraints.length === 0) return { values, converged: true, residual: error, iterations: 0 };
+  if (error <= tolerance || residuals.length === 0) return { values, converged: true, residual: error, iterations: 0 };
 
   let iterations = 0;
   for (; iterations < maxIterations; iterations += 1) {
-    const jacobian = numericJacobian(constraints, values, points, lines, circles);
+    const jacobian = numericJacobian(constraints, values, points, lines, circles, arcs);
     let accepted = false;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const { matrix, rhs } = normalEquations(jacobian, residuals, damping);
@@ -453,7 +523,7 @@ function solveCore(
         continue;
       }
       const trial = values.map((value, index) => value + delta[index]!);
-      const trialResiduals = residualVector(constraints, trial, points, lines, circles);
+      const trialResiduals = residualVector(constraints, trial, points, lines, circles, arcs);
       const trialError = norm(trialResiduals);
       if (trialError < error) {
         values = trial;
@@ -500,13 +570,14 @@ function conflictIds(
   points: Map<string, PointIndex>,
   lines: Map<string, SketchLineEntity>,
   circles: Map<string, CircleIndex>,
+  arcs: Map<string, SketchArcEntity>,
   tolerance: number,
   maxIterations: number,
 ): string[] {
   const conflicts: string[] = [];
   for (const candidate of constraints) {
     const reduced = constraints.filter((constraint) => constraint.id !== candidate.id);
-    const result = solveCore(reduced, values, points, lines, circles, tolerance, maxIterations);
+    const result = solveCore(reduced, values, points, lines, circles, arcs, tolerance, maxIterations);
     if (result.converged) conflicts.push(candidate.id);
   }
   return conflicts.length ? conflicts : constraints.map((constraint) => constraint.id);
@@ -522,11 +593,12 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
   const points = pointIndex(sketch);
   const lines = lineIndex(sketch);
   const circles = circleIndex(sketch, points.size * 2);
+  const arcs = arcIndex(sketch);
   const constraints = activeConstraints(sketch);
   const initial = initialValues(points, circles);
-  let core = solveCore(constraints, initial, points, lines, circles, tolerance, maxIterations);
+  let core = solveCore(constraints, initial, points, lines, circles, arcs, tolerance, maxIterations);
 
-  const hardJacobian = numericJacobian(constraints, core.values, points, lines, circles);
+  const hardJacobian = numericJacobian(constraints, core.values, points, lines, circles, arcs);
   const degreesOfFreedom = Math.max(0, core.values.length - matrixRank(hardJacobian));
 
   if (core.converged && degreesOfFreedom > 0 && options.dragTarget) {
@@ -535,7 +607,7 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
     const seeded = [...core.values];
     seeded[target.offset] = finite(options.dragTarget.x, 'Drag target x');
     seeded[target.offset + 1] = finite(options.dragTarget.y, 'Drag target y');
-    const dragged = solveCore(constraints, seeded, points, lines, circles, tolerance, maxIterations);
+    const dragged = solveCore(constraints, seeded, points, lines, circles, arcs, tolerance, maxIterations);
     if (dragged.converged) core = dragged;
   }
 
@@ -546,7 +618,7 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
       constraintState: 'over',
       degreesOfFreedom,
       residual: core.residual,
-      conflicts: conflictIds(constraints, initial, points, lines, circles, tolerance, maxIterations),
+      conflicts: conflictIds(constraints, initial, points, lines, circles, arcs, tolerance, maxIterations),
       iterations: core.iterations,
     };
   }
