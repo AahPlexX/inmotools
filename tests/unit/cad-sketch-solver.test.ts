@@ -410,4 +410,142 @@ describe('CAD constrained sketch solver', () => {
     expect(result.constraintState).toBe('over');
     expect(result.conflicts).toContain('fix-end');
   });
+
+  it('locks an arc in place through a fixed-entity constraint', () => {
+    const sketch: CadSketch = {
+      id: 'fixed-arc',
+      label: 'Fixed arc sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 0, 0),
+        point('start', 5, 0),
+        point('end', 0, 5),
+        point('other', 3, 3),
+        { id: 'arc', type: 'arc', centerPointId: 'center', startPointId: 'start', endPointId: 'end', clockwise: false, construction: false },
+      ],
+      constraints: [{ id: 'fix-arc', type: 'fixed-entity', entityId: 'arc', enabled: true }],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(2);
+    for (const id of ['center', 'start', 'end']) {
+      const entity = result.sketch.entities.find((candidate) => candidate.id === id);
+      const original = sketch.entities.find((candidate) => candidate.id === id);
+      expect(entity && entity.type === 'point' ? entity.x : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.x : Number.NaN,
+        8,
+      );
+      expect(entity && entity.type === 'point' ? entity.y : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.y : Number.NaN,
+        8,
+      );
+    }
+  });
+
+  it('locks an ellipse in place through a fixed-entity constraint', () => {
+    const sketch: CadSketch = {
+      id: 'fixed-ellipse',
+      label: 'Fixed ellipse sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 1, 1),
+        point('major', 6, 1),
+        point('other', -2, -2),
+        { id: 'ellipse', type: 'ellipse', centerPointId: 'center', majorAxisPointId: 'major', minorRadius: 2, construction: false },
+      ],
+      constraints: [{ id: 'fix-ellipse', type: 'fixed-entity', entityId: 'ellipse', enabled: true }],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(2);
+    for (const id of ['center', 'major']) {
+      const entity = result.sketch.entities.find((candidate) => candidate.id === id);
+      const original = sketch.entities.find((candidate) => candidate.id === id);
+      expect(entity && entity.type === 'point' ? entity.x : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.x : Number.NaN,
+        8,
+      );
+      expect(entity && entity.type === 'point' ? entity.y : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.y : Number.NaN,
+        8,
+      );
+    }
+  });
+
+  it('locks an elliptical arc in place through a fixed-entity constraint', () => {
+    const sketch: CadSketch = {
+      id: 'fixed-elliptical-arc',
+      label: 'Fixed elliptical arc sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 0, 0),
+        point('major', 6, 0),
+        point('start', 6, 0),
+        point('end', 0, 2),
+        point('other', 9, 9),
+        {
+          id: 'earc',
+          type: 'elliptical-arc',
+          centerPointId: 'center',
+          majorAxisPointId: 'major',
+          minorRadius: 2,
+          startPointId: 'start',
+          endPointId: 'end',
+          clockwise: false,
+          construction: false,
+        },
+      ],
+      constraints: [{ id: 'fix-earc', type: 'fixed-entity', entityId: 'earc', enabled: true }],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(2);
+    for (const id of ['center', 'major', 'start', 'end']) {
+      const entity = result.sketch.entities.find((candidate) => candidate.id === id);
+      const original = sketch.entities.find((candidate) => candidate.id === id);
+      expect(entity && entity.type === 'point' ? entity.x : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.x : Number.NaN,
+        8,
+      );
+      expect(entity && entity.type === 'point' ? entity.y : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.y : Number.NaN,
+        8,
+      );
+    }
+  });
+
+  it('locks a spline in place through a fixed-entity constraint', () => {
+    const sketch: CadSketch = {
+      id: 'fixed-spline',
+      label: 'Fixed spline sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('f0', 0, 0),
+        point('f1', 3, 4),
+        point('f2', 6, 0),
+        point('other', -5, -5),
+        { id: 'spline', type: 'spline', fitPointIds: ['f0', 'f1', 'f2'], degree: 3, closed: false, construction: false },
+      ],
+      constraints: [{ id: 'fix-spline', type: 'fixed-entity', entityId: 'spline', enabled: true }],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(2);
+    for (const id of ['f0', 'f1', 'f2']) {
+      const entity = result.sketch.entities.find((candidate) => candidate.id === id);
+      const original = sketch.entities.find((candidate) => candidate.id === id);
+      expect(entity && entity.type === 'point' ? entity.x : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.x : Number.NaN,
+        8,
+      );
+      expect(entity && entity.type === 'point' ? entity.y : Number.NaN).toBeCloseTo(
+        original && original.type === 'point' ? original.y : Number.NaN,
+        8,
+      );
+    }
+  });
 });
