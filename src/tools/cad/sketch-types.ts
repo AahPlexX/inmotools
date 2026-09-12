@@ -1,3 +1,8 @@
+export interface SketchVector2 {
+  x: number;
+  y: number;
+}
+
 export interface SketchPointEntity {
   id: string;
   type: 'point';
@@ -22,7 +27,56 @@ export interface SketchCircleEntity {
   construction: boolean;
 }
 
-export type SketchEntity = SketchPointEntity | SketchLineEntity | SketchCircleEntity;
+export interface SketchArcEntity {
+  id: string;
+  type: 'arc';
+  centerPointId: string;
+  startPointId: string;
+  endPointId: string;
+  clockwise: boolean;
+  construction: boolean;
+}
+
+export interface SketchEllipseEntity {
+  id: string;
+  type: 'ellipse';
+  centerPointId: string;
+  majorAxisPointId: string;
+  minorRadius: number;
+  construction: boolean;
+}
+
+export interface SketchEllipticalArcEntity {
+  id: string;
+  type: 'elliptical-arc';
+  centerPointId: string;
+  majorAxisPointId: string;
+  minorRadius: number;
+  startPointId: string;
+  endPointId: string;
+  clockwise: boolean;
+  construction: boolean;
+}
+
+export interface SketchSplineEntity {
+  id: string;
+  type: 'spline';
+  fitPointIds: string[];
+  degree: number;
+  closed: boolean;
+  startTangent?: SketchVector2;
+  endTangent?: SketchVector2;
+  construction: boolean;
+}
+
+export type SketchEntity =
+  | SketchPointEntity
+  | SketchLineEntity
+  | SketchCircleEntity
+  | SketchArcEntity
+  | SketchEllipseEntity
+  | SketchEllipticalArcEntity
+  | SketchSplineEntity;
 
 interface ConstraintBase {
   id: string;
