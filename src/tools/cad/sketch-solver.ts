@@ -1,4 +1,5 @@
 import { buildInterpolatingSpline, evaluateSpline, evaluateSplineDerivative } from './sketch-spline';
+import { numericalRank, solveDampedNormalEquations } from './sketch-linear-algebra';
 import type {
   CadSketch,
   SketchArcEntity,
@@ -782,80 +783,6 @@ function numericJacobian(constraints: readonly SketchConstraint[], values: reado
   return jacobian;
 }
 
-function normalEquations(jacobian: readonly number[][], residuals: readonly number[], damping: number): { matrix: number[][]; rhs: number[] } {
-  const columns = jacobian[0]?.length ?? 0;
-  const matrix = Array.from({ length: columns }, () => Array.from({ length: columns }, () => 0));
-  const rhs = Array.from({ length: columns }, () => 0);
-  for (let row = 0; row < jacobian.length; row += 1) {
-    for (let left = 0; left < columns; left += 1) {
-      const jl = jacobian[row]![left]!;
-      rhs[left] -= jl * residuals[row]!;
-      for (let right = left; right < columns; right += 1) {
-        matrix[left]![right] += jl * jacobian[row]![right]!;
-      }
-    }
-  }
-  for (let left = 0; left < columns; left += 1) {
-    matrix[left]![left] += damping;
-    for (let right = 0; right < left; right += 1) matrix[left]![right] = matrix[right]![left]!;
-  }
-  return { matrix, rhs };
-}
-
-function solveLinearSystem(matrix: readonly number[][], rhs: readonly number[]): number[] | null {
-  const size = rhs.length;
-  if (size === 0) return [];
-  const augmented = matrix.map((row, index) => [...row, rhs[index]!]);
-  for (let column = 0; column < size; column += 1) {
-    let pivot = column;
-    for (let row = column + 1; row < size; row += 1) {
-      if (Math.abs(augmented[row]![column]!) > Math.abs(augmented[pivot]![column]!)) pivot = row;
-    }
-    if (Math.abs(augmented[pivot]![column]!) < 1e-14) return null;
-    [augmented[column], augmented[pivot]] = [augmented[pivot]!, augmented[column]!];
-    const divisor = augmented[column]![column]!;
-    for (let index = column; index <= size; index += 1) augmented[column]![index] /= divisor;
-    for (let row = 0; row < size; row += 1) {
-      if (row === column) continue;
-      const factor = augmented[row]![column]!;
-      if (factor === 0) continue;
-      for (let index = column; index <= size; index += 1) {
-        augmented[row]![index] -= factor * augmented[column]![index]!;
-      }
-    }
-  }
-  return augmented.map((row) => row[size]!);
-}
-
-function matrixRank(matrix: readonly number[][], tolerance = 1e-8): number {
-  if (!matrix.length || !matrix[0]?.length) return 0;
-  const work = matrix.map((row) => [...row]);
-  const rows = work.length;
-  const columns = work[0]!.length;
-  let rank = 0;
-  let column = 0;
-  while (rank < rows && column < columns) {
-    let pivot = rank;
-    for (let row = rank + 1; row < rows; row += 1) {
-      if (Math.abs(work[row]![column]!) > Math.abs(work[pivot]![column]!)) pivot = row;
-    }
-    if (Math.abs(work[pivot]![column]!) <= tolerance) {
-      column += 1;
-      continue;
-    }
-    [work[rank], work[pivot]] = [work[pivot]!, work[rank]!];
-    const divisor = work[rank]![column]!;
-    for (let index = column; index < columns; index += 1) work[rank]![index] /= divisor;
-    for (let row = rank + 1; row < rows; row += 1) {
-      const factor = work[row]![column]!;
-      for (let index = column; index < columns; index += 1) work[row]![index] -= factor * work[rank]![index]!;
-    }
-    rank += 1;
-    column += 1;
-  }
-  return rank;
-}
-
 function solveCore(
   constraints: readonly SketchConstraint[],
   startingValues: readonly number[],
@@ -874,8 +801,7 @@ function solveCore(
     const jacobian = numericJacobian(constraints, values, index);
     let accepted = false;
     for (let attempt = 0; attempt < 8; attempt += 1) {
-      const { matrix, rhs } = normalEquations(jacobian, residuals, damping);
-      const delta = solveLinearSystem(matrix, rhs);
+      const delta = solveDampedNormalEquations(jacobian, residuals, damping);
       if (!delta) {
         damping *= 10;
         continue;
@@ -952,7 +878,7 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
   let core = solveCore(constraints, initial, index, tolerance, maxIterations);
 
   const hardJacobian = numericJacobian(constraints, core.values, index);
-  const degreesOfFreedom = Math.max(0, core.values.length - matrixRank(hardJacobian));
+  const degreesOfFreedom = Math.max(0, core.values.length - numericalRank(hardJacobian));
 
   if (core.converged && degreesOfFreedom > 0 && options.dragTarget) {
     const target = index.points.get(options.dragTarget.pointId);
