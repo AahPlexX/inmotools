@@ -274,4 +274,140 @@ describe('CAD constrained sketch solver', () => {
     const c2 = result.sketch.entities.find((entity) => entity.id === 'c2' && entity.type === 'circle');
     expect(c2 && c2.type === 'circle' ? c2.radius : Number.NaN).toBeCloseTo(5, 8);
   });
+
+  function point(id: string, x: number, y: number) {
+    return { id, type: 'point' as const, x, y, construction: false };
+  }
+
+  it('keeps an arc\'s endpoints on a common radius from its center without an explicit constraint', () => {
+    const sketch: CadSketch = {
+      id: 'arc-intrinsic-radius',
+      label: 'Arc identity sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 0, 0),
+        point('start', 5, 0),
+        point('end', 1, 5.9),
+        { id: 'arc', type: 'arc', centerPointId: 'center', startPointId: 'start', endPointId: 'end', clockwise: false, construction: false },
+      ],
+      constraints: [{ id: 'fix-center', type: 'fixed-point', pointId: 'center', x: 0, y: 0, enabled: true }],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(3);
+    const start = result.sketch.entities.find((entity) => entity.id === 'start' && entity.type === 'point');
+    const end = result.sketch.entities.find((entity) => entity.id === 'end' && entity.type === 'point');
+    const startRadius = start && start.type === 'point' ? Math.hypot(start.x, start.y) : Number.NaN;
+    const endRadius = end && end.type === 'point' ? Math.hypot(end.x, end.y) : Number.NaN;
+    expect(endRadius).toBeCloseTo(startRadius, 7);
+  });
+
+  it('solves an arc radius dimension by adjusting the shared radius from its center', () => {
+    const sketch: CadSketch = {
+      id: 'arc-radius-dimension',
+      label: 'Arc radius sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 0, 0),
+        point('start', 5, 0),
+        point('end', 0, 5),
+        { id: 'arc', type: 'arc', centerPointId: 'center', startPointId: 'start', endPointId: 'end', clockwise: false, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-center', type: 'fixed-point', pointId: 'center', x: 0, y: 0, enabled: true },
+        { id: 'radius-arc', type: 'radius', circleId: 'arc', value: 8, enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    expect(result.degreesOfFreedom).toBe(2);
+    const start = result.sketch.entities.find((entity) => entity.id === 'start' && entity.type === 'point');
+    const end = result.sketch.entities.find((entity) => entity.id === 'end' && entity.type === 'point');
+    expect(start && start.type === 'point' ? Math.hypot(start.x, start.y) : Number.NaN).toBeCloseTo(8, 7);
+    expect(end && end.type === 'point' ? Math.hypot(end.x, end.y) : Number.NaN).toBeCloseTo(8, 7);
+  });
+
+  it('shares a solved center between a circle and a concentric arc', () => {
+    const sketch: CadSketch = {
+      id: 'concentric-circle-arc',
+      label: 'Concentric circle/arc sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('c1-center', 2, 3),
+        { id: 'c1', type: 'circle', centerPointId: 'c1-center', radius: 4, construction: false },
+        point('arc-center', 8, -4),
+        point('arc-start', 9, -4),
+        point('arc-end', 8, -3),
+        { id: 'arc', type: 'arc', centerPointId: 'arc-center', startPointId: 'arc-start', endPointId: 'arc-end', clockwise: false, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-c1-center', type: 'fixed-point', pointId: 'c1-center', x: 2, y: 3, enabled: true },
+        { id: 'concentric', type: 'concentric', circleAId: 'c1', circleBId: 'arc', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    const center = result.sketch.entities.find((entity) => entity.id === 'arc-center' && entity.type === 'point');
+    expect(center && center.type === 'point' ? center.x : Number.NaN).toBeCloseTo(2, 7);
+    expect(center && center.type === 'point' ? center.y : Number.NaN).toBeCloseTo(3, 7);
+  });
+
+  it('matches an arc\'s radius to a circle through an equal-radius constraint', () => {
+    const sketch: CadSketch = {
+      id: 'equal-radius-circle-arc',
+      label: 'Equal radius circle/arc sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('c1-center', 0, 0),
+        { id: 'c1', type: 'circle', centerPointId: 'c1-center', radius: 5, construction: false },
+        point('arc-center', 12, 0),
+        point('arc-start', 14, 0),
+        point('arc-end', 12, 2),
+        { id: 'arc', type: 'arc', centerPointId: 'arc-center', startPointId: 'arc-start', endPointId: 'arc-end', clockwise: false, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-c1-center', type: 'fixed-point', pointId: 'c1-center', x: 0, y: 0, enabled: true },
+        { id: 'fix-arc-center', type: 'fixed-point', pointId: 'arc-center', x: 12, y: 0, enabled: true },
+        { id: 'radius-c1', type: 'radius', circleId: 'c1', value: 5, enabled: true },
+        { id: 'equal-radius', type: 'equal-radius', circleAId: 'c1', circleBId: 'arc', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    const start = result.sketch.entities.find((entity) => entity.id === 'arc-start' && entity.type === 'point');
+    const center = result.sketch.entities.find((entity) => entity.id === 'arc-center' && entity.type === 'point');
+    const radius =
+      start && start.type === 'point' && center && center.type === 'point'
+        ? Math.hypot(start.x - center.x, start.y - center.y)
+        : Number.NaN;
+    expect(radius).toBeCloseTo(5, 7);
+  });
+
+  it("isolates a fixed-point constraint that breaks an arc's radius identity", () => {
+    const sketch: CadSketch = {
+      id: 'arc-identity-conflict',
+      label: 'Arc identity conflict sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('center', 0, 0),
+        point('start', 5, 0),
+        point('end', 0, 7),
+        { id: 'arc', type: 'arc', centerPointId: 'center', startPointId: 'start', endPointId: 'end', clockwise: false, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-center', type: 'fixed-point', pointId: 'center', x: 0, y: 0, enabled: true },
+        { id: 'fix-start', type: 'fixed-point', pointId: 'start', x: 5, y: 0, enabled: true },
+        { id: 'fix-end', type: 'fixed-point', pointId: 'end', x: 0, y: 7, enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(false);
+    expect(result.constraintState).toBe('over');
+    expect(result.conflicts).toContain('fix-end');
+  });
 });
