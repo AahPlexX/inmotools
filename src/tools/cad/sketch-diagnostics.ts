@@ -1,5 +1,11 @@
 import type { CadSketch, SketchLineEntity, SketchPointEntity } from './sketch-types';
 
+interface ConnectableEntity {
+  entityId: string;
+  startPointId: string;
+  endPointId: string;
+}
+
 export interface SketchProfileDiagnosticsOptions {
   gapTolerance?: number;
   geometryTolerance?: number;
@@ -153,35 +159,74 @@ function interiorIntersection(
   return { x: a.ax + t * rx, y: a.ay + t * ry };
 }
 
-function adjacencyForLines(lines: readonly LineSegment[]): Map<string, LineSegment[]> {
-  const adjacency = new Map<string, LineSegment[]>();
-  const add = (pointId: string, line: LineSegment) => {
+function connectableEntities(sketch: CadSketch, points: Map<string, SketchPointEntity>): ConnectableEntity[] {
+  const result: ConnectableEntity[] = [];
+  const requirePoint = (pointId: string, entityId: string) => {
+    if (!points.has(pointId)) throw new Error(`Sketch entity '${entityId}' references missing endpoint geometry.`);
+  };
+  for (const entity of sketch.entities) {
+    if (entity.construction) continue;
+    if (entity.type === 'line' || entity.type === 'arc' || entity.type === 'elliptical-arc') {
+      requirePoint(entity.startPointId, entity.id);
+      requirePoint(entity.endPointId, entity.id);
+      result.push({ entityId: entity.id, startPointId: entity.startPointId, endPointId: entity.endPointId });
+    } else if (entity.type === 'spline' && !entity.closed) {
+      const first = entity.fitPointIds[0];
+      const last = entity.fitPointIds[entity.fitPointIds.length - 1];
+      if (first === undefined || last === undefined) {
+        throw new Error(`Sketch spline '${entity.id}' requires at least one fit point.`);
+      }
+      requirePoint(first, entity.id);
+      requirePoint(last, entity.id);
+      result.push({ entityId: entity.id, startPointId: first, endPointId: last });
+    }
+  }
+  return result;
+}
+
+function intrinsicClosedRegions(sketch: CadSketch): SketchClosedRegion[] {
+  const regions: SketchClosedRegion[] = [];
+  for (const entity of sketch.entities) {
+    if (entity.construction) continue;
+    if (entity.type === 'circle' || entity.type === 'ellipse' || (entity.type === 'spline' && entity.closed)) {
+      regions.push({ entityIds: [entity.id] });
+    }
+  }
+  return regions;
+}
+
+function adjacencyForEntities(entities: readonly ConnectableEntity[]): Map<string, ConnectableEntity[]> {
+  const adjacency = new Map<string, ConnectableEntity[]>();
+  const add = (pointId: string, entity: ConnectableEntity) => {
     const entries = adjacency.get(pointId) ?? [];
-    entries.push(line);
+    entries.push(entity);
     adjacency.set(pointId, entries);
   };
-  for (const line of lines) {
-    add(line.entity.startPointId, line);
-    add(line.entity.endPointId, line);
+  for (const entity of entities) {
+    add(entity.startPointId, entity);
+    add(entity.endPointId, entity);
   }
   return adjacency;
 }
 
-function lineComponents(lines: readonly LineSegment[], adjacency: Map<string, LineSegment[]>): LineSegment[][] {
+function entityComponents(
+  entities: readonly ConnectableEntity[],
+  adjacency: Map<string, ConnectableEntity[]>,
+): ConnectableEntity[][] {
   const visited = new Set<string>();
-  const components: LineSegment[][] = [];
-  for (const start of lines) {
-    if (visited.has(start.entity.id)) continue;
+  const components: ConnectableEntity[][] = [];
+  for (const start of entities) {
+    if (visited.has(start.entityId)) continue;
     const queue = [start];
-    const component: LineSegment[] = [];
-    visited.add(start.entity.id);
+    const component: ConnectableEntity[] = [];
+    visited.add(start.entityId);
     for (let index = 0; index < queue.length; index += 1) {
-      const line = queue[index]!;
-      component.push(line);
-      for (const pointId of [line.entity.startPointId, line.entity.endPointId]) {
+      const current = queue[index]!;
+      component.push(current);
+      for (const pointId of [current.startPointId, current.endPointId]) {
         for (const neighbor of adjacency.get(pointId) ?? []) {
-          if (visited.has(neighbor.entity.id)) continue;
-          visited.add(neighbor.entity.id);
+          if (visited.has(neighbor.entityId)) continue;
+          visited.add(neighbor.entityId);
           queue.push(neighbor);
         }
       }
@@ -191,35 +236,38 @@ function lineComponents(lines: readonly LineSegment[], adjacency: Map<string, Li
   return components;
 }
 
-function closedLineRegion(component: readonly LineSegment[], adjacency: Map<string, LineSegment[]>): SketchClosedRegion | null {
+function closedEntityRegion(
+  component: readonly ConnectableEntity[],
+  adjacency: Map<string, ConnectableEntity[]>,
+): SketchClosedRegion | null {
   if (component.length < 3) return null;
-  const componentIds = new Set(component.map((line) => line.entity.id));
-  const pointIds = new Set(component.flatMap((line) => [line.entity.startPointId, line.entity.endPointId]));
+  const componentIds = new Set(component.map((entity) => entity.entityId));
+  const pointIds = new Set(component.flatMap((entity) => [entity.startPointId, entity.endPointId]));
   for (const pointId of pointIds) {
-    const degree = (adjacency.get(pointId) ?? []).filter((line) => componentIds.has(line.entity.id)).length;
+    const degree = (adjacency.get(pointId) ?? []).filter((entity) => componentIds.has(entity.entityId)).length;
     if (degree !== 2) return null;
   }
 
   const ordered: string[] = [];
   const used = new Set<string>();
   const first = component[0]!;
-  const startPointId = first.entity.startPointId;
-  let line = first;
+  const startPointId = first.startPointId;
+  let current = first;
   let pointId = startPointId;
 
   while (ordered.length < component.length) {
-    ordered.push(line.entity.id);
-    used.add(line.entity.id);
-    const nextPointId = line.entity.startPointId === pointId ? line.entity.endPointId : line.entity.startPointId;
+    ordered.push(current.entityId);
+    used.add(current.entityId);
+    const nextPointId = current.startPointId === pointId ? current.endPointId : current.startPointId;
     if (nextPointId === startPointId) {
       return ordered.length === component.length ? { entityIds: ordered } : null;
     }
     const next = (adjacency.get(nextPointId) ?? []).find(
-      (candidate) => componentIds.has(candidate.entity.id) && !used.has(candidate.entity.id),
+      (candidate) => componentIds.has(candidate.entityId) && !used.has(candidate.entityId),
     );
     if (!next) return null;
     pointId = nextPointId;
-    line = next;
+    current = next;
   }
   return null;
 }
@@ -235,16 +283,15 @@ export function analyzeSketchProfiles(
   );
   const points = pointMap(sketch);
   const lines = lineSegments(sketch, points);
-  const adjacency = adjacencyForLines(lines);
+  const entities = connectableEntities(sketch, points);
+  const adjacency = adjacencyForEntities(entities);
 
   const closedRegions: SketchClosedRegion[] = [];
-  for (const component of lineComponents(lines, adjacency)) {
-    const region = closedLineRegion(component, adjacency);
+  for (const component of entityComponents(entities, adjacency)) {
+    const region = closedEntityRegion(component, adjacency);
     if (region) closedRegions.push(region);
   }
-  for (const entity of sketch.entities) {
-    if (entity.type === 'circle' && !entity.construction) closedRegions.push({ entityIds: [entity.id] });
-  }
+  closedRegions.push(...intrinsicClosedRegions(sketch));
 
   const openEndpoints: SketchOpenEndpoint[] = [];
   for (const [pointId, incident] of adjacency) {
