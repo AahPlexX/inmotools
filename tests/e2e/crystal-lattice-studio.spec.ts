@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Download, type Page } from '@playwright/test';
 
 const localCif = `data_local
@@ -18,6 +19,14 @@ _atom_site_occupancy
 Na1 Na 0 0 0 1
 Cl1 Cl 0.5 0.5 0.5 1
 `;
+
+const PHASE_ONE_VIEWPORTS = [
+  { name: '320 portrait', width: 320, height: 568 },
+  { name: '390 portrait', width: 390, height: 844 },
+  { name: '844 landscape', width: 844, height: 390 },
+  { name: '768 tablet', width: 768, height: 1024 },
+  { name: '1440 desktop', width: 1440, height: 900 },
+] as const;
 
 async function downloadBase64(download: Download): Promise<string> {
   const stream = await download.createReadStream();
@@ -276,4 +285,97 @@ test('PNG publication export honors transparent and solid backgrounds', async ({
   await dialog.getByRole('button', { name: 'Download PNG' }).click();
   const solidDownload = await solidDownloadPromise;
   expect(await pngCornerAlpha(page, solidDownload)).toBe(255);
+});
+
+test('Phase 1 reflows across the explicit acceptance viewport matrix', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'The explicit viewport matrix only needs one browser-project pass.');
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
+  await expect(page.getByRole('heading', { name: 'Edit the structure' })).toBeVisible();
+
+  for (const viewport of PHASE_ONE_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.getByRole('heading', { name: 'Edit the structure' }).scrollIntoViewIfNeeded();
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    const overflow = await page.evaluate(() => Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      document.body.scrollWidth - document.body.clientWidth,
+    ));
+    expect(overflow, `${viewport.name} horizontal overflow`).toBeLessThanOrEqual(1);
+  }
+});
+
+test('Phase 1 workspace has no serious or critical axe violations', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused axe pass covers the shared workspace DOM.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await expect(page.getByTestId('crystal-workspace')).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="crystal-workspace"]')
+    .analyze();
+  const severe = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+  expect(severe).toEqual([]);
+});
+
+test('Phase 1 controls are keyboard operable and dialogs restore focus', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'Keyboard acceptance only needs one browser-project pass.');
+  await page.goto('./#/tools/crystal-lattice-studio');
+
+  const starter = page.getByRole('combobox', { name: /Starter structure/ });
+  await starter.focus();
+  await expect(starter).toBeFocused();
+  await starter.press('ArrowDown');
+  await expect(starter).not.toHaveValue('nacl');
+  await starter.selectOption('bcc');
+
+  const cellA = page.getByLabel('Cell a (Å)');
+  await cellA.focus();
+  await cellA.press('ControlOrMeta+A');
+  await cellA.pressSequentially('3');
+  await expect(cellA).toHaveValue('3');
+
+  const fractionalX = page.getByLabel('Fe1 fractional x');
+  await fractionalX.focus();
+  await expect(fractionalX).toBeFocused();
+  const duplicate = page.getByRole('button', { name: 'Duplicate Fe1' });
+  await duplicate.focus();
+  await duplicate.press('Enter');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('3 sites');
+
+  const repeatA = page.getByLabel('Repeat a');
+  await repeatA.focus();
+  await repeatA.press('ControlOrMeta+A');
+  await repeatA.pressSequentially('2');
+  await expect(page.getByTestId('crystal-supercell-preview')).toContainText('2 × 1 × 1');
+
+  const measurementA = page.getByLabel('Measurement site A');
+  await measurementA.focus();
+  await expect(measurementA).toBeFocused();
+  const addMeasurement = page.getByRole('button', { name: 'Add distance measurement' });
+  await addMeasurement.focus();
+  await addMeasurement.press('Enter');
+  await expect(page.getByTestId('crystal-measurement-list')).toContainText('Å');
+
+  const presetX = page.getByRole('button', { name: '+X', exact: true });
+  await presetX.focus();
+  await presetX.press('Enter');
+  await expect(presetX).toBeFocused();
+
+  const metadataButton = page.getByRole('button', { name: 'Data & metadata' });
+  await metadataButton.focus();
+  await metadataButton.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Data & metadata' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Data & metadata' })).not.toBeVisible();
+  await expect(metadataButton).toBeFocused();
+
+  const exportButton = page.getByRole('button', { name: 'Export' });
+  await exportButton.focus();
+  await exportButton.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Export crystal' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Export crystal' })).not.toBeVisible();
+  await expect(exportButton).toBeFocused();
 });
