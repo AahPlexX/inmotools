@@ -211,8 +211,8 @@ test('long and short edge sizing expose planned output and require an explicit s
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();
   const dialog = page.getByRole('dialog', { name: 'Export photo' });
-  const resize = dialog.getByLabel('Resize');
-  const value = dialog.getByLabel('Resize value');
+  const resize = dialog.getByLabel('Resize', { exact: true });
+  const value = dialog.getByLabel('Resize value', { exact: true });
 
   await resize.selectOption('long-edge');
   await value.fill('200');
