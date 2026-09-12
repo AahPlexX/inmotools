@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { CrystalProjection } from './project-engine';
 import type { CrystalDocument } from './crystal-types';
 import {
   buildCrystalRenderModel,
@@ -8,7 +9,6 @@ import {
   type CrystalRepresentation,
 } from './viewport-model';
 
-type ProjectionMode = 'perspective' | 'orthographic';
 type ViewAxis = 'x' | 'y' | 'z';
 
 interface SavedCameraState {
@@ -27,8 +27,11 @@ interface ViewRuntime {
 export interface CrystalViewportProps {
   readonly document: CrystalDocument;
   readonly representation: CrystalRepresentation;
+  readonly projection: CrystalProjection;
   readonly selectedSiteIds: ReadonlySet<string>;
   readonly onSelectionChange: (ids: ReadonlySet<string>) => void;
+  readonly onProjectionChange: (projection: CrystalProjection) => void;
+  readonly onCanvasChange?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 const SELECTED_COLOR = new THREE.Color('#FFD166');
@@ -81,13 +84,15 @@ function setLinePositions(
 export default function CrystalViewport({
   document,
   representation,
+  projection,
   selectedSiteIds,
   onSelectionChange,
+  onProjectionChange,
+  onCanvasChange,
 }: CrystalViewportProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewRuntime | null>(null);
   const savedCameraRef = useRef<SavedCameraState | null>(null);
-  const [projection, setProjection] = useState<ProjectionMode>('perspective');
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const currentStructureKey = useMemo(() => structureKey(document), [document]);
@@ -106,12 +111,13 @@ export default function CrystalViewport({
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       setRenderError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'WebGL is unavailable in this browser.';
       setRenderError(message);
       runtimeRef.current = null;
+      onCanvasChange?.(null);
       return;
     }
 
@@ -120,6 +126,7 @@ export default function CrystalViewport({
     renderer.domElement.className = 'crystal-viewport__canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
     host.appendChild(renderer.domElement);
+    onCanvasChange?.(renderer.domElement);
 
     const scene = new THREE.Scene();
     const camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = projection === 'perspective'
@@ -287,6 +294,7 @@ export default function CrystalViewport({
         zoom: camera.zoom,
       };
       runtimeRef.current = null;
+      onCanvasChange?.(null);
       cancelAnimationFrame(animationFrame);
       observer.disconnect();
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
@@ -300,7 +308,7 @@ export default function CrystalViewport({
       renderer.dispose();
       if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement);
     };
-  }, [currentStructureKey, model, onSelectionChange, projection, representation, selectedSiteIds]);
+  }, [currentStructureKey, model, onCanvasChange, onSelectionChange, projection, representation, selectedSiteIds]);
 
   return (
     <section className="crystal-viewport-shell" aria-labelledby="crystal-viewport-heading">
@@ -317,7 +325,7 @@ export default function CrystalViewport({
           <button type="button" onClick={() => runtimeRef.current?.preset('z')}>+Z</button>
           <button
             type="button"
-            onClick={() => setProjection((current) => current === 'perspective' ? 'orthographic' : 'perspective')}
+            onClick={() => onProjectionChange(projection === 'perspective' ? 'orthographic' : 'perspective')}
           >
             {projection === 'perspective' ? 'Use orthographic projection' : 'Use perspective projection'}
           </button>
