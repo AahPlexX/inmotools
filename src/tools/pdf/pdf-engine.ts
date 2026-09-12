@@ -1,4 +1,14 @@
-import { degrees, PDFDocument } from 'pdf-lib';
+import { degrees, PDFDict, PDFDocument, PDFName } from 'pdf-lib';
+import {
+  attachPdfFiles,
+  extractPdfAttachments,
+  inspectDocumentAttachments,
+  type PdfAttachmentDefinition,
+  type PdfAttachmentInventory,
+} from './pdf-attachments';
+
+export { extractPdfAttachments } from './pdf-attachments';
+export type { PdfAttachmentDefinition, PdfAttachmentInventory, PdfExtractedAttachment } from './pdf-attachments';
 
 export interface PdfSelection {
   bytes: Uint8Array;
@@ -31,6 +41,8 @@ export interface PdfInspection {
   metadataFields: string[];
   encrypted: boolean;
   pages: PdfPageInspection[];
+  attachments: PdfAttachmentInventory[];
+  attachmentWarnings: string[];
 }
 
 export interface PdfMetadataEdits {
@@ -95,20 +107,26 @@ export interface PdfOutputOptions {
   formFields?: PdfFormFieldDefinition[];
   blankPages?: PdfBlankPageDefinition[];
   pageBoxEdits?: PdfPageBoxEdit[];
+  attachments?: PdfAttachmentDefinition[];
 }
 
 export type PageSelectionPreset = 'all' | 'odd' | 'even' | 'reverse';
 
-const METADATA_READERS = [
-  ['Title', (doc: PDFDocument) => doc.getTitle()],
-  ['Author', (doc: PDFDocument) => doc.getAuthor()],
-  ['Subject', (doc: PDFDocument) => doc.getSubject()],
-  ['Keywords', (doc: PDFDocument) => doc.getKeywords()],
-  ['Creator', (doc: PDFDocument) => doc.getCreator()],
-  ['Producer', (doc: PDFDocument) => doc.getProducer()],
-  ['Creation date', (doc: PDFDocument) => doc.getCreationDate()],
-  ['Modification date', (doc: PDFDocument) => doc.getModificationDate()],
+const METADATA_FIELDS = [
+  ['Title', 'Title'],
+  ['Author', 'Author'],
+  ['Subject', 'Subject'],
+  ['Keywords', 'Keywords'],
+  ['Creator', 'Creator'],
+  ['Producer', 'Producer'],
+  ['Creation date', 'CreationDate'],
+  ['Modification date', 'ModDate'],
 ] as const;
+
+function infoDictionary(document: PDFDocument): PDFDict | undefined {
+  const info = document.context.trailerInfo.Info;
+  return info ? document.context.lookupMaybe(info, PDFDict) : undefined;
+}
 
 const cleanText = (value: string | undefined): string | undefined => {
   const cleaned = value?.trim();
@@ -346,10 +364,12 @@ export function pageSelectionPreset(kind: PageSelectionPreset, max: number): str
 export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
   const document = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
   const form = document.getForm();
+  const info = infoDictionary(document);
+  const attachmentScan = inspectDocumentAttachments(document);
   return {
     pageCount: document.getPageCount(),
     formFieldCount: form.getFields().length,
-    metadataFields: METADATA_READERS.filter(([, read]) => read(document) !== undefined).map(([label]) => label),
+    metadataFields: info ? METADATA_FIELDS.filter(([, key]) => info.has(PDFName.of(key))).map(([label]) => label) : [],
     encrypted: document.isEncrypted,
     pages: document.getPages().map((page, index) => ({
       page: index + 1,
@@ -361,6 +381,8 @@ export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
       bleedBox: page.getBleedBox(),
       trimBox: page.getTrimBox(),
     })),
+    attachments: attachmentScan.attachments,
+    attachmentWarnings: attachmentScan.warnings,
   };
 }
 
@@ -400,6 +422,7 @@ export async function splicePdfs(selections: PdfSelection[], options: PdfOutputO
   applyBlankPages(output, options.blankPages ?? []);
   applyPageBoxEdits(output, options.pageBoxEdits ?? []);
   applyFormFields(output, options.formFields ?? []);
+  await attachPdfFiles(output, options.attachments ?? []);
   applyMetadata(output, options.metadata);
   return new Uint8Array(await output.save({ updateFieldAppearances: Boolean(options.formFields?.length) }));
 }
