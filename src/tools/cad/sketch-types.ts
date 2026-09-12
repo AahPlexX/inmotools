@@ -177,6 +177,7 @@ export interface TangentCurveConstraint extends ConstraintBase {
   type: 'tangent-curve';
   lineId: string;
   curveId: string;
+  parameter?: number;
 }
 
 export interface ConcentricConstraint extends ConstraintBase {
@@ -219,6 +220,7 @@ export interface PointOnCurveConstraint extends ConstraintBase {
   type: 'point-on-curve';
   pointId: string;
   curveId: string;
+  parameter?: number;
 }
 
 export interface SymmetricPointsConstraint extends ConstraintBase {
