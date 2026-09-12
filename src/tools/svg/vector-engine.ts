@@ -83,6 +83,17 @@ export function updateElement(document: VectorDocument, id: string, patch: Parti
   };
 }
 
+function containsElementId(element: VectorElement, id: string): boolean {
+  if (element.id === id) return true;
+  if (element.type !== 'group') return false;
+  if (element.children.some((child) => containsElementId(child, id))) return true;
+  return element.composition ? containsElementId(element.composition.shape, id) : false;
+}
+
+export function topLevelSelectionId(document: VectorDocument, elementId: string): string | null {
+  return document.elements.find((element) => containsElementId(element, elementId))?.id ?? null;
+}
+
 function mapElements(document: VectorDocument, ids: ReadonlySet<string>, mapper: (element: VectorElement) => VectorElement): VectorDocument {
   return { ...document, elements: document.elements.map((element) => ids.has(element.id) ? mapper(element) : element) };
 }
