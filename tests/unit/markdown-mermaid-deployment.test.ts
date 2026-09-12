@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 const readJson = <T>(relativeUrl: string): T =>
   JSON.parse(readFileSync(new URL(relativeUrl, import.meta.url), 'utf8')) as T;
@@ -13,11 +14,11 @@ describe('Mermaid dependency policy', () => {
     expect(packageJson.dependencies.mermaid).toBe('12.0.0');
   });
 
-  it('overrides Mermaid parser transitive lodash-es to the current patched stable release', () => {
-    const packageJson = readJson<{
-      pnpm?: { overrides?: Record<string, string> };
-    }>('../../package.json');
-    expect(packageJson.pnpm?.overrides?.['lodash-es']).toBe('4.18.1');
+  it('overrides Mermaid parser transitive lodash-es through the pnpm 12 root project settings', () => {
+    const workspace = parse(readText('../../pnpm-workspace.yaml')) as {
+      overrides?: Record<string, string>;
+    };
+    expect(workspace.overrides?.['lodash-es']).toBe('4.18.1');
   });
 });
 
