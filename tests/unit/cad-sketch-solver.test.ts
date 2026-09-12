@@ -548,4 +548,68 @@ describe('CAD constrained sketch solver', () => {
       );
     }
   });
+
+  it('shares a solved center between a circle and a concentric ellipse', () => {
+    const sketch: CadSketch = {
+      id: 'concentric-circle-ellipse',
+      label: 'Concentric circle/ellipse sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('c1-center', 2, 3),
+        { id: 'c1', type: 'circle', centerPointId: 'c1-center', radius: 4, construction: false },
+        point('ellipse-center', 8, -4),
+        point('ellipse-major', 12, -4),
+        { id: 'ellipse', type: 'ellipse', centerPointId: 'ellipse-center', majorAxisPointId: 'ellipse-major', minorRadius: 2, construction: false },
+      ],
+      constraints: [
+        { id: 'fix-c1-center', type: 'fixed-point', pointId: 'c1-center', x: 2, y: 3, enabled: true },
+        { id: 'concentric', type: 'concentric', circleAId: 'c1', circleBId: 'ellipse', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    const center = result.sketch.entities.find((entity) => entity.id === 'ellipse-center' && entity.type === 'point');
+    expect(center && center.type === 'point' ? center.x : Number.NaN).toBeCloseTo(2, 7);
+    expect(center && center.type === 'point' ? center.y : Number.NaN).toBeCloseTo(3, 7);
+  });
+
+  it('shares a solved center between an arc and a concentric elliptical arc', () => {
+    const sketch: CadSketch = {
+      id: 'concentric-arc-elliptical-arc',
+      label: 'Concentric arc/elliptical-arc sketch',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        point('arc-center', -1, -1),
+        point('arc-start', 4, -1),
+        point('arc-end', -1, 4),
+        { id: 'arc', type: 'arc', centerPointId: 'arc-center', startPointId: 'arc-start', endPointId: 'arc-end', clockwise: false, construction: false },
+        point('earc-center', 10, 10),
+        point('earc-major', 15, 10),
+        point('earc-start', 15, 10),
+        point('earc-end', 10, 12),
+        {
+          id: 'earc',
+          type: 'elliptical-arc',
+          centerPointId: 'earc-center',
+          majorAxisPointId: 'earc-major',
+          minorRadius: 2,
+          startPointId: 'earc-start',
+          endPointId: 'earc-end',
+          clockwise: false,
+          construction: false,
+        },
+      ],
+      constraints: [
+        { id: 'fix-arc-center', type: 'fixed-point', pointId: 'arc-center', x: -1, y: -1, enabled: true },
+        { id: 'concentric', type: 'concentric', circleAId: 'arc', circleBId: 'earc', enabled: true },
+      ],
+    };
+
+    const result = solveSketch(sketch);
+    expect(result.converged).toBe(true);
+    const center = result.sketch.entities.find((entity) => entity.id === 'earc-center' && entity.type === 'point');
+    expect(center && center.type === 'point' ? center.x : Number.NaN).toBeCloseTo(-1, 7);
+    expect(center && center.type === 'point' ? center.y : Number.NaN).toBeCloseTo(-1, 7);
+  });
 });
