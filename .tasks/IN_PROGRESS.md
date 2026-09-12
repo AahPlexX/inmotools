@@ -2,7 +2,7 @@
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
-  - Current milestone: initial visual layout-to-export slice is integrated and verified; next slice adds validated named CSS Grid areas with responsive reset and block placement. Focused unit evidence is 9/9 locally; clean-install CI is required after integration. Advanced features remain open.
+  - Current milestone: responsive layout-to-export slice is integrated and verified; named Grid areas and explicit portrait/landscape preview presentation are implemented with focused local tests. Clean-install CI and Pages checks for the current commit are required; advanced features remain open.
   - Completion: every ledger item implemented and verified through reachable UI, validated exports/persistence, script isolation, responsive keyboard access, exact-main checks and Pages deployment. Partial features remain open.
   - Scope: `src/tools/web-layout/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved.
 
