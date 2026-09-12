@@ -1,4 +1,5 @@
 import { applyPixelAdjustments, normalizeRecipe, sampleHistogram } from './photo-engine';
+import { warpPhotoGeometryPixels } from './photo-geometry';
 import type {
   PhotoCapabilities,
   PhotoHistogram,
@@ -108,11 +109,11 @@ async function canvasToBlob(
   mime: PhotoOutputMime,
   quality: number,
 ): Promise<Blob> {
-  if (canvas instanceof OffscreenCanvas) {
+  if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
     return canvas.convertToBlob({ type: mime, quality: mime === 'image/png' ? undefined : quality });
   }
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
+    (canvas as HTMLCanvasElement).toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error('The browser could not encode this image.')),
       mime,
       mime === 'image/png' ? undefined : quality,
@@ -345,7 +346,15 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const canvas = drawGeometry(bitmap, recipe, target.width, target.height);
     const context = getContext2d(canvas);
     const imageData = context.getImageData(0, 0, target.width, target.height);
-    const processed = await processPixels(imageData.data, target.width, target.height, recipe, request.revision);
+    const geometryPixels = warpPhotoGeometryPixels(
+      imageData.data,
+      target.width,
+      target.height,
+      recipe.lensDistortion,
+      recipe.perspectiveHorizontal,
+      recipe.perspectiveVertical,
+    );
+    const processed = await processPixels(geometryPixels, target.width, target.height, recipe, request.revision);
     const ownedPixels = new Uint8ClampedArray(processed.length);
     ownedPixels.set(processed);
     const processedImage = new ImageData(ownedPixels, target.width, target.height);

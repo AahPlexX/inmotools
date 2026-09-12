@@ -29,6 +29,7 @@
 .photo-command-bar button,
 .photo-tool-tabs button,
 .photo-inline-actions button,
+.photo-local-card button,
 .photo-dialog button,
 .photo-stage-toolbar button {
   min-height: 2.35rem;
@@ -44,6 +45,7 @@
 .photo-command-bar button:hover,
 .photo-tool-tabs button:hover,
 .photo-inline-actions button:hover,
+.photo-local-card button:hover,
 .photo-dialog button:hover,
 .photo-stage-toolbar button:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
@@ -52,6 +54,7 @@
 .photo-command-bar button:focus-visible,
 .photo-tool-tabs button:focus-visible,
 .photo-inline-actions button:focus-visible,
+.photo-local-card button:focus-visible,
 .photo-dialog button:focus-visible,
 .photo-stage-toolbar button:focus-visible,
 .photo-control input:focus-visible,
@@ -64,7 +67,13 @@
 }
 
 .photo-command-bar button:disabled,
-.photo-inline-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+.photo-inline-actions button:disabled,
+.photo-local-card button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.photo-local-card button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent, #4f46e5) 26%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #4f46e5) 72%, var(--photo-border));
+}
 
 .photo-open-label {
   display: inline-flex;
@@ -127,6 +136,15 @@
 .photo-zoom-controls { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .photo-mini-histogram { width: min(12rem, 34vw); height: 2.4rem; color: var(--photo-muted); }
 
+.photo-tool-hint {
+  padding: 0.48rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #4f46e5) 45%, var(--photo-border));
+  background: color-mix(in srgb, var(--accent, #4f46e5) 14%, transparent);
+  color: inherit;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
 .photo-canvas-scroller {
   min-height: min(62vh, 46rem);
   overflow: auto;
@@ -158,6 +176,12 @@
   transform-origin: center center;
 }
 
+.photo-image-frame.is-interactive {
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
 .photo-preview-image,
 .photo-before-overlay img {
   display: block;
@@ -167,6 +191,38 @@
   transform: scale(var(--photo-zoom, 1));
   transform-origin: center center;
   image-rendering: auto;
+}
+
+.photo-edit-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transform: scale(var(--photo-zoom, 1));
+  transform-origin: center center;
+}
+
+.photo-edit-overlay ellipse,
+.photo-edit-overlay circle,
+.photo-edit-overlay line {
+  vector-effect: non-scaling-stroke;
+  stroke: rgb(255 255 255 / 0.88);
+  stroke-width: 1.4;
+  fill: rgb(15 23 42 / 0.14);
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9));
+}
+
+.photo-edit-overlay line { fill: none; }
+.photo-edit-overlay [data-photo-mask="brush"] circle { stroke-width: 0.8; fill: rgb(96 165 250 / 0.16); }
+.photo-edit-overlay [data-photo-retouch] line { stroke-dasharray: 4 3; }
+.photo-edit-overlay .photo-retouch-source { stroke: #fbbf24; fill: rgb(251 191 36 / 0.12); }
+.photo-edit-overlay .photo-retouch-target { stroke: #22d3ee; fill: rgb(34 211 238 / 0.12); }
+.photo-edit-overlay .is-active,
+.photo-edit-overlay .is-active > * {
+  stroke: #60a5fa;
+  stroke-width: 2;
 }
 
 .photo-before-overlay {
