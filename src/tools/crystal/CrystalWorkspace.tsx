@@ -1,15 +1,16 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import CrystalStructurePanel from './CrystalStructurePanel';
 import CrystalViewport from './CrystalViewport';
 import { createStarterStructure } from './document-engine';
+import { createCrystalHistory, type CrystalHistory } from './history-engine';
+import type { CrystalMeasurement } from './project-engine';
+import {
+  STARTER_STRUCTURES,
+  STARTER_STRUCTURE_IDS,
+  type StarterStructureId,
+} from './starter-structures';
 import type { CrystalRepresentation } from './viewport-model';
 import './crystal-workspace.css';
-
-const STARTERS = [
-  { id: 'nacl', name: 'Sodium chloride', detail: 'Alternating sodium and chloride sites in a cubic crystal.' },
-  { id: 'bcc', name: 'Body-centered cubic', detail: 'A cubic lattice with a site at the center of the cell.' },
-  { id: 'diamond', name: 'Diamond', detail: 'A tetrahedrally connected carbon crystal.' },
-  { id: 'perovskite', name: 'Perovskite', detail: 'A familiar ABX₃ crystal framework.' },
-] as const;
 
 const REPRESENTATIONS: readonly { id: CrystalRepresentation; name: string }[] = [
   { id: 'ball-stick', name: 'Ball and stick' },
@@ -19,20 +20,31 @@ const REPRESENTATIONS: readonly { id: CrystalRepresentation; name: string }[] = 
   { id: 'wireframe', name: 'Wireframe' },
 ];
 
-type StarterId = (typeof STARTERS)[number]['id'];
-
 export default function CrystalWorkspace() {
-  const [starter, setStarter] = useState<StarterId>('nacl');
+  const [starter, setStarter] = useState<StarterStructureId>('nacl');
+  const [history, setHistory] = useState(() => createCrystalHistory(createStarterStructure('nacl')));
+  const [measurements, setMeasurements] = useState<readonly CrystalMeasurement[]>([]);
   const [representation, setRepresentation] = useState<CrystalRepresentation>('ball-stick');
   const [selectedSiteIds, setSelectedSiteIds] = useState<ReadonlySet<string>>(() => new Set());
-  const selected = STARTERS.find((item) => item.id === starter) ?? STARTERS[0];
-  const document = useMemo(() => createStarterStructure(starter), [starter]);
+  const document = history.present;
+  const selected = STARTER_STRUCTURES[starter];
+
   const handleSelectionChange = useCallback((ids: ReadonlySet<string>) => {
     setSelectedSiteIds(new Set(ids));
   }, []);
 
-  const handleStarterChange = (next: StarterId) => {
+  const handleHistoryChange = useCallback((nextHistory: CrystalHistory) => {
+    const validSiteIds = new Set(nextHistory.present.sites.map((site) => site.id));
+    setSelectedSiteIds((current) => new Set([...current].filter((id) => validSiteIds.has(id))));
+    setMeasurements((current) => current.filter((measurement) => measurement.siteIds.every((id) => validSiteIds.has(id))));
+    setHistory(nextHistory);
+  }, []);
+
+  const handleStarterChange = (next: StarterStructureId) => {
+    const nextDocument = createStarterStructure(next);
     setStarter(next);
+    setHistory(createCrystalHistory(nextDocument));
+    setMeasurements([]);
     setSelectedSiteIds(new Set());
   };
 
@@ -41,7 +53,7 @@ export default function CrystalWorkspace() {
       <header className="crystal-workspace__header">
         <div>
           <p className="eyebrow">Structure workspace</p>
-          <h2>Explore a crystal</h2>
+          <h2>Explore and build a crystal</h2>
         </div>
         <p role="status">Everything in this workspace stays on this device.</p>
       </header>
@@ -49,13 +61,15 @@ export default function CrystalWorkspace() {
       <section className="crystal-workspace__starter" aria-labelledby="crystal-starter-heading">
         <div>
           <h3 id="crystal-starter-heading">Choose a starter structure</h3>
-          <p>Begin with a familiar crystal and use it as a reference while you learn the workspace.</p>
+          <p>Begin with a reference structure, then inspect or edit its cell and atomic sites.</p>
         </div>
         <div className="crystal-workspace__selectors">
           <label>
             Starter structure
-            <select value={starter} onChange={(event) => handleStarterChange(event.target.value as StarterId)}>
-              {STARTERS.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+            <select value={starter} onChange={(event) => handleStarterChange(event.target.value as StarterStructureId)}>
+              {STARTER_STRUCTURE_IDS.map((id) => (
+                <option value={id} key={id}>{STARTER_STRUCTURES[id].name}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -70,8 +84,8 @@ export default function CrystalWorkspace() {
         </div>
         <div className="crystal-workspace__starter-note" aria-live="polite">
           <strong>{selected.name}</strong>
-          <span>{selected.detail}</span>
-          <span>{document.sites.length.toLocaleString()} sites in the canonical cell</span>
+          <span>{selected.description}</span>
+          <span>{document.sites.length.toLocaleString()} sites in the working cell</span>
           <span>{selectedSiteIds.size.toLocaleString()} selected</span>
         </div>
       </section>
@@ -81,6 +95,13 @@ export default function CrystalWorkspace() {
         representation={representation}
         selectedSiteIds={selectedSiteIds}
         onSelectionChange={handleSelectionChange}
+      />
+
+      <CrystalStructurePanel
+        history={history}
+        onHistoryChange={handleHistoryChange}
+        measurements={measurements}
+        onMeasurementsChange={setMeasurements}
       />
     </div>
   );
