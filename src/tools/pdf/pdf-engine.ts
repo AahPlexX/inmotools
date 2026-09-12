@@ -45,6 +45,21 @@ export interface PdfMetadataEdits {
   modificationDate?: Date;
 }
 
+export interface PdfBlankPageDefinition {
+  afterPage: number;
+  width: number;
+  height: number;
+  count?: number;
+}
+
+export interface PdfPageBoxEdit {
+  page: number;
+  mediaBox?: PdfBox;
+  cropBox?: PdfBox;
+  bleedBox?: PdfBox;
+  trimBox?: PdfBox;
+}
+
 interface PdfFormFieldBase {
   name: string;
   page: number;
@@ -78,6 +93,8 @@ export type PdfFormFieldDefinition = PdfTextFieldDefinition | PdfCheckBoxDefinit
 export interface PdfOutputOptions {
   metadata?: PdfMetadataEdits;
   formFields?: PdfFormFieldDefinition[];
+  blankPages?: PdfBlankPageDefinition[];
+  pageBoxEdits?: PdfPageBoxEdit[];
 }
 
 export type PageSelectionPreset = 'all' | 'odd' | 'even' | 'reverse';
@@ -126,6 +143,90 @@ function applyMetadata(document: PDFDocument, metadata: PdfMetadataEdits | undef
   if (language) document.setLanguage(language);
   if (metadata.creationDate) document.setCreationDate(metadata.creationDate);
   if (metadata.modificationDate) document.setModificationDate(metadata.modificationDate);
+}
+
+function validateBox(box: PdfBox, label: string): void {
+  const values = [box.x, box.y, box.width, box.height];
+  if (!values.every(Number.isFinite) || box.width <= 0 || box.height <= 0) {
+    throw new Error(`${label} must use finite coordinates and positive width/height.`);
+  }
+}
+
+function boxInside(outer: PdfBox, inner: PdfBox): boolean {
+  const epsilon = 0.0001;
+  return inner.x >= outer.x - epsilon
+    && inner.y >= outer.y - epsilon
+    && inner.x + inner.width <= outer.x + outer.width + epsilon
+    && inner.y + inner.height <= outer.y + outer.height + epsilon;
+}
+
+function applyBlankPages(document: PDFDocument, definitions: PdfBlankPageDefinition[]): void {
+  if (!definitions.length) return;
+  const copiedPageCount = document.getPageCount();
+  const normalized = definitions.map((definition, index) => ({ ...definition, index, count: definition.count ?? 1 }));
+
+  for (const definition of normalized) {
+    if (!Number.isInteger(definition.afterPage) || definition.afterPage < 0 || definition.afterPage > copiedPageCount) {
+      throw new Error(`Blank-page anchor ${definition.afterPage} must be between 0 and ${copiedPageCount}.`);
+    }
+    if (![definition.width, definition.height].every(Number.isFinite) || definition.width <= 0 || definition.height <= 0) {
+      throw new Error('Blank-page width and height must be finite positive numbers.');
+    }
+    if (!Number.isInteger(definition.count) || definition.count < 1 || definition.count > 100) {
+      throw new Error('Blank-page count must be an integer between 1 and 100.');
+    }
+  }
+
+  normalized.sort((left, right) => left.afterPage - right.afterPage || left.index - right.index);
+  let inserted = 0;
+  for (const definition of normalized) {
+    let insertIndex = definition.afterPage + inserted;
+    for (let offset = 0; offset < definition.count; offset += 1) {
+      document.insertPage(insertIndex, [definition.width, definition.height]);
+      insertIndex += 1;
+      inserted += 1;
+    }
+  }
+}
+
+function applyPageBoxEdits(document: PDFDocument, edits: PdfPageBoxEdit[]): void {
+  const seen = new Set<number>();
+  for (const edit of edits) {
+    if (!Number.isInteger(edit.page) || edit.page < 1 || edit.page > document.getPageCount()) {
+      throw new Error(`Page-box edit targets page ${edit.page}, which is outside the output document.`);
+    }
+    if (seen.has(edit.page)) throw new Error(`Page-box edits for output page ${edit.page} must be combined into one definition.`);
+    seen.add(edit.page);
+
+    const page = document.getPage(edit.page - 1);
+    if (edit.mediaBox) {
+      validateBox(edit.mediaBox, 'MediaBox');
+      page.setMediaBox(edit.mediaBox.x, edit.mediaBox.y, edit.mediaBox.width, edit.mediaBox.height);
+    }
+    if (edit.cropBox) {
+      validateBox(edit.cropBox, 'CropBox');
+      page.setCropBox(edit.cropBox.x, edit.cropBox.y, edit.cropBox.width, edit.cropBox.height);
+    }
+    if (edit.bleedBox) {
+      validateBox(edit.bleedBox, 'BleedBox');
+      page.setBleedBox(edit.bleedBox.x, edit.bleedBox.y, edit.bleedBox.width, edit.bleedBox.height);
+    }
+    if (edit.trimBox) {
+      validateBox(edit.trimBox, 'TrimBox');
+      page.setTrimBox(edit.trimBox.x, edit.trimBox.y, edit.trimBox.width, edit.trimBox.height);
+    }
+
+    const mediaBox = page.getMediaBox();
+    const constrained = [
+      ['CropBox', page.getCropBox()],
+      ['BleedBox', page.getBleedBox()],
+      ['TrimBox', page.getTrimBox()],
+    ] as const;
+    for (const [label, box] of constrained) {
+      validateBox(box, label);
+      if (!boxInside(mediaBox, box)) throw new Error(`${label} on output page ${edit.page} must remain inside its MediaBox.`);
+    }
+  }
 }
 
 function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
@@ -296,6 +397,8 @@ export async function splicePdfs(selections: PdfSelection[], options: PdfOutputO
     });
   }
 
+  applyBlankPages(output, options.blankPages ?? []);
+  applyPageBoxEdits(output, options.pageBoxEdits ?? []);
   applyFormFields(output, options.formFields ?? []);
   applyMetadata(output, options.metadata);
   return new Uint8Array(await output.save({ updateFieldAppearances: Boolean(options.formFields?.length) }));
