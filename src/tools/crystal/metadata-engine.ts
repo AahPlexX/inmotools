@@ -144,7 +144,7 @@ export function setCifLoopCell(
 export function setExportMetadata(document: CrystalDocument, patch: Partial<CrystalMetadataState>): CrystalDocument {
   const customCifTags = patch.customCifTags === undefined
     ? document.metadata.customCifTags
-    : { ...(document.metadata.customCifTags ?? {}), ...patch.customCifTags };
+    : { ...patch.customCifTags };
   const metadata: CrystalMetadataState = {
     ...document.metadata,
     ...patch,
