@@ -23,6 +23,10 @@ async function openFixture(page: Page) {
 test('split comparison has a draggable and keyboard-adjustable boundary', async ({ page }) => {
   await openFixture(page);
 
+  const splitMode = page.getByRole('button', { name: 'Split' });
+  await expect(splitMode).toBeVisible();
+  await expect(splitMode).toHaveAttribute('aria-pressed', 'true');
+
   const slider = page.getByRole('slider', { name: 'Before/after split position' });
   await expect(slider).toBeVisible();
   await expect(slider).toHaveValue('50');
