@@ -21,8 +21,8 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 - Branch: `feat/pdf-workstation`
 - Base at branch creation: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Current milestone: **A — deterministic document/export foundation**
-- Current gate: **foundation implementation is green through the metadata/privacy hardening cycle; remaining Milestone A capabilities are not yet complete**
-- Current counts: **3 verified / 15 started / 128 planned / 0 blocked / 0 excluded capabilities**
+- Current gate: **blank-page insertion, full standard metadata dates, and page-box editing are implemented and unit-green; fresh browser/build evidence is pending a clean PR merge-ref validation**
+- Current counts: **3 verified / 17 started / 126 planned / 0 blocked / 0 excluded capabilities**
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Existing `pdf-sanitizer` route/deep link is preserved; the workstation evolves that surface rather than creating a duplicate tool.
 
@@ -38,21 +38,25 @@ Completed/proven portions:
 - existing queue order/page selection/form-flatten safety remains intact;
 - standard metadata replacement UI is live for title, author, subject, keywords/tags, creator, producer, and language;
 - custom export filename is live;
-- per-page MediaBox/CropBox/BleedBox/TrimBox inspection exists in the engine;
 - text/checkbox/dropdown form authoring contracts exist in the engine;
-- metadata replacement now defensively clears the output Info dictionary before writing selected replacement fields;
+- metadata replacement defensively clears the output Info dictionary before writing selected replacement fields;
 - visible metadata export reopens correctly in browser tests and reflows at 320 CSS pixels.
 
-Still required for Milestone A exit:
+Implemented in the current validation slice (not promoted to `verified` until fresh browser/build evidence is green):
 
-- standard creation/modification date controls;
-- visual page-box editing;
-- blank-page insertion and page-size controls;
+- creation and modification date controls with deterministic UTC interpretation and reopened-byte unit proof;
+- blank-page insertion using Letter, A4, Legal, Tabloid, or custom dimensions; portrait/landscape preset handling; quantity control; and exact copied-page anchors;
+- final-output MediaBox/CropBox/BleedBox/TrimBox editing with UI and engine fail-closed containment checks;
+- final output plan/preview now includes staged blank pages and stable-key geometry edits;
+- export status now reports blank-page and page-box structural mutations.
+
+Still required for Milestone A exit after this slice is verified:
+
 - attachment authoring/inventory;
 - visible AcroForm authoring UI including radio/option-list support;
 - Bates/header/footer/watermark token overlays;
 - deterministic export-change summary broad enough to cover every Milestone A mutation;
-- focused browser evidence for the remaining behaviors.
+- focused browser evidence for all remaining behaviors.
 
 ### B — renderer and editor-layer foundation — PLANNED
 
@@ -98,6 +102,7 @@ Current review outcome:
 
 - Foundation Gauntlet found one privacy-robustness weakness: explicit metadata mode depended on the fresh output document having no incidental Info entries. The engine now clears the Info dictionary first and then writes only selected replacement values.
 - Tests were strengthened to use the real typed output-options contract instead of casting around TypeScript and to prove a partial metadata replacement cannot leak unspecified source Info fields.
+- Current page-geometry slice uses independent UI and engine validation so invalid Crop/Bleed/Trim rectangles cannot bypass the UI to reach exported bytes.
 - Full final Gauntlet remains open because most workstation milestones are still planned.
 
 Exit: zero blocker/high findings without explicit acceptance, exact-main workflows green, Pages deployment green, counts reconcile to the design.
@@ -117,22 +122,24 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **3** Document diagnostics summary — `started` (page count/size/forms/common metadata/page geometry exist; attachments, active-content, encryption/security detail remain)
 - **5** Multi-document merge with explicit output order — `started` (queue/order behavior exists; final merged-byte order needs dedicated browser proof)
 - **9** Extract selected pages to a new PDF — `started` (range/order engine and UI exist; focused download/reopen proof remains)
+- **11** Insert blank pages using common/custom sizes — `started` (engine/UI/unit proof exist; fresh browser download/reopen proof is pending)
 - **12** Duplicate pages — `started` (repeated page selections are preserved by the engine; dedicated user-flow proof remains)
 - **15** Rotate selected pages 90/180/270 degrees — `started` (engine/UI exist; focused rendered/reopened proof remains)
-- **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `started` (inspection is typed and tested; editing is not yet exposed)
+- **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `started` (engine/UI/unit proof exist; fresh browser download/reopen proof is pending)
 - **58** Existing AcroForm field inventory — `started` (field count exists; page/name/type/state/flags inventory remains)
 - **60** Text-field authoring — `started` (engine contract proven; visual authoring UI remains)
 - **61** Checkbox authoring — `started` (engine contract proven; visual authoring UI remains)
 - **63** Dropdown authoring — `started` (engine contract proven; visual authoring UI remains)
-- **96** Standard document metadata editor — `started` (title/author/subject/keywords/tags/creator/producer/language are live; creation/modification date controls remain)
+- **96** Standard document metadata editor — `started` (all standard fields including creation/modification dates are implemented; fresh browser proof for dates is pending)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
+- **131** Export operation summary describing destructive/structural/reversible changes — `started` (status now reports forms, replacement metadata, blank insertions, and page-box edits; complete action classification/summary remains)
 - **142** Responsive drawer/sheet layout for phone/tablet/split-screen/zoom/enlarged text — `started` (current foundation passes 320 CSS-pixel reflow; later workstation rails/drawers are not built)
 - **144** Drag-and-drop intake with native file-input fallback — `started` (native file fallback exists; drag/drop intake remains)
 
 ### Planned
 
-All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10–11, 13–14, 16–18, 20–57, 59, 62, 64–70, 72–95, 97–120, 122–128, 131–141, 143, 145–146**.
+All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–57, 59, 62, 64–70, 72–95, 97–120, 122–128, 132–141, 143, 145–146**.
 
 No capability is currently `blocked` or `excluded`. The architectural exclusions in the design constrain claims and implementation approach; they are not numbered capabilities.
 
@@ -159,5 +166,7 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — Engine GREEN, workflow run `34717521965`: unit tests, production build, and focused PDF browser flow passed after the minimal engine implementation.
 - 2026-09-12 — Browser TDD RED, workflow run `34717591400`: 676 unit tests and the production build passed; the only new browser failure on both desktop/mobile Chromium was the intentionally missing `Document properties & export` surface; four existing PDF browser cases remained green.
 - 2026-09-12 — Visible-workstation GREEN, workflow run `34717705502`: validation completed successfully; unit, production build, and all six focused PDF browser cases passed, including custom filename, metadata byte reopen, desktop/mobile execution, and 320 CSS-pixel reflow.
-- 2026-09-12 — Gauntlet improvement cycle: metadata output privacy was hardened by clearing Info before replacement writes; typed tests now include partial-replacement non-leakage and document-language presence.
+- 2026-09-12 — Gauntlet improvement cycle: metadata output privacy was hardened by clearing Info before replacement writes; typed tests include partial-replacement non-leakage and document-language presence.
 - 2026-09-12 — Hardened code validation, workflow run `34717903615`: unit tests, production build, and focused browser tests all completed successfully on the hardened implementation commit.
+- 2026-09-12 — Page-geometry slice unit evidence, workflow run `34725996675`: all 688 repository unit tests passed, including 12 PDF tests covering metadata dates, deterministic blank insertion, page-box persistence, and out-of-MediaBox rejection. Build/browser execution was prevented solely by an unrelated current-main syntax error in `src/tools/web-layout/WebLayoutWorkspace.tsx`.
+- 2026-09-12 — External base correction observed immediately afterward: `main` commit `e9557b99b5feb95218a72dad1581bdce627ce255` (`fix(web-layout): correct preview orientation state formatting`) corrected that parallel-tool syntax failure without PDF-scope edits.
