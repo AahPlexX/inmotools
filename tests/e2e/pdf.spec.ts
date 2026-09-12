@@ -67,3 +67,30 @@ test('blocks unsupported editable-form preservation and verifies flattened outpu
   expect(output.getForm().getFields()).toHaveLength(0);
   await expect(page.locator('.status-line')).toContainText(/1 source form field flattened; output inspection found 0 editable fields/i);
 });
+
+test('authors export metadata from the visible workstation and reflows at 320 CSS pixels', async ({ page }) => {
+  await page.goto('./#/tools/pdf-sanitizer');
+  await page.getByLabel('Add PDF files').setInputFiles({ name: 'matter.pdf', mimeType: 'application/pdf', buffer: await plainPdf() });
+
+  await expect(page.getByRole('heading', { name: 'Document properties & export' })).toBeVisible();
+  await page.getByLabel('Output title').fill('Filed copy');
+  await page.getByLabel('Output author').fill('Records team');
+  await page.getByLabel('Output subject').fill('Matter 24-001');
+  await page.getByLabel('Output keywords').fill('filed, reviewed');
+  await page.getByLabel('Document language').fill('en-US');
+  await page.getByLabel('Output filename').fill('matter-filed.pdf');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Process and download' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('matter-filed.pdf');
+  const output = await PDFDocument.load(await downloadBytes(download), { updateMetadata: false });
+  expect(output.getTitle()).toBe('Filed copy');
+  expect(output.getAuthor()).toBe('Records team');
+  expect(output.getSubject()).toBe('Matter 24-001');
+  expect(output.getKeywords()).toBe('filed reviewed');
+
+  await page.setViewportSize({ width: 320, height: 800 });
+  await expect(page.getByLabel('Output filename')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
