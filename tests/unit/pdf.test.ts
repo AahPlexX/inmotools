@@ -81,6 +81,8 @@ describe('PDF binary processing', () => {
 
   it('writes explicit workstation metadata without restoring source metadata', async () => {
     const source = await onePagePdf('Sensitive source title');
+    const creationDate = new Date('2026-09-12T10:30:00.000Z');
+    const modificationDate = new Date('2026-09-12T14:45:00.000Z');
     const output = await splicePdfs([{ bytes: source }], {
       metadata: {
         title: 'Filed copy',
@@ -90,6 +92,8 @@ describe('PDF binary processing', () => {
         creator: 'InMoTools PDF Workstation',
         producer: 'InMoTools PDF Workstation',
         language: 'en-US',
+        creationDate,
+        modificationDate,
       },
     });
     const loaded = await PDFDocument.load(output, { updateMetadata: false });
@@ -99,6 +103,8 @@ describe('PDF binary processing', () => {
     expect(loaded.getKeywords()).toBe('filed reviewed');
     expect(loaded.getCreator()).toBe('InMoTools PDF Workstation');
     expect(loaded.getProducer()).toBe('InMoTools PDF Workstation');
+    expect(loaded.getCreationDate()?.toISOString()).toBe(creationDate.toISOString());
+    expect(loaded.getModificationDate()?.toISOString()).toBe(modificationDate.toISOString());
     expect(loaded.catalog.get(PDFName.of('Lang'))).toBeDefined();
   });
 
@@ -122,6 +128,51 @@ describe('PDF binary processing', () => {
     expect(loaded.getCreator()).toBeUndefined();
     expect(loaded.getProducer()).toBeUndefined();
     expect(loaded.getKeywords()).toBeUndefined();
+  });
+
+  it('inserts custom-sized blank pages at deterministic anchors', async () => {
+    const source = await PDFDocument.create();
+    source.addPage([100, 100]);
+    source.addPage([200, 100]);
+    const output = await splicePdfs([{ bytes: new Uint8Array(await source.save()) }], {
+      blankPages: [
+        { afterPage: 0, width: 612, height: 792, count: 1 },
+        { afterPage: 1, width: 595.28, height: 841.89, count: 2 },
+      ],
+    });
+    const loaded = await PDFDocument.load(output);
+    expect(loaded.getPages().map((page) => [page.getWidth(), page.getHeight()])).toEqual([
+      [612, 792],
+      [100, 100],
+      [595.28, 841.89],
+      [595.28, 841.89],
+      [200, 100],
+    ]);
+  });
+
+  it('applies final-output page-box edits and rejects boxes outside the MediaBox', async () => {
+    const source = await onePagePdf('Geometry');
+    const output = await splicePdfs([{ bytes: source }], {
+      pageBoxEdits: [{
+        page: 1,
+        mediaBox: { x: 0, y: 0, width: 400, height: 300 },
+        cropBox: { x: 10, y: 20, width: 350, height: 250 },
+        bleedBox: { x: 5, y: 10, width: 380, height: 275 },
+        trimBox: { x: 15, y: 25, width: 330, height: 225 },
+      }],
+    });
+    expect((await inspectPdf(output)).pages[0]).toMatchObject({
+      width: 400,
+      height: 300,
+      mediaBox: { x: 0, y: 0, width: 400, height: 300 },
+      cropBox: { x: 10, y: 20, width: 350, height: 250 },
+      bleedBox: { x: 5, y: 10, width: 380, height: 275 },
+      trimBox: { x: 15, y: 25, width: 330, height: 225 },
+    });
+
+    await expect(splicePdfs([{ bytes: source }], {
+      pageBoxEdits: [{ page: 1, cropBox: { x: 250, y: 0, width: 100, height: 100 } }],
+    })).rejects.toThrow(/CropBox.*MediaBox/i);
   });
 
   it('authors deterministic workstation form fields onto copied output pages', async () => {
