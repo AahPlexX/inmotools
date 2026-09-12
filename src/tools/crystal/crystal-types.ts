@@ -70,4 +70,5 @@ export interface CrystalDocument {
   readonly importedSnapshot?: ImportedCrystalSnapshot;
   readonly metadata: CrystalMetadataState;
   readonly provenance: readonly CrystalTransformRecord[];
+  readonly cif?: import('./cif-engine').CifDocument;
 }
