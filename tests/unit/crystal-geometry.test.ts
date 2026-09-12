@@ -48,8 +48,8 @@ describe('periodic crystal geometry', () => {
     expect(bonds.length).toBeGreaterThan(0);
     expect(bonds.every((bond) => bond.distance > 0)).toBe(true);
 
-    const molecular = createStarterStructure('molecular');
-    const result = findPeriodicBondsWithDiagnostics(molecular);
+    const illustrative = createStarterStructure('sc');
+    const result = findPeriodicBondsWithDiagnostics(illustrative);
     expect(result.diagnostics.some((message) => /radius|unsupported|skip/i.test(message))).toBe(true);
   });
 
