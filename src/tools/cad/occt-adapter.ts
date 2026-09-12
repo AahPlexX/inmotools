@@ -230,6 +230,14 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     throw new Error('glTF assembly export is implemented through the XCAF export layer in the G9 export workbench.');
   }
 
+  /** Releases one worker-owned native shape and permanently invalidates its token. */
+  release(shape: CadKernelShape): void {
+    const token = shape as object;
+    const handle = this.#unwrap(shape);
+    this.#kernel.release(handle);
+    this.#handles.delete(token);
+  }
+
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
