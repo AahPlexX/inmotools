@@ -130,14 +130,30 @@ function AdjustmentControl({
   spec,
   value,
   onChange,
+  onReset,
 }: {
   spec: AdjustmentSpec;
   value: number;
   onChange: (value: number) => void;
+  onReset?: () => void;
 }) {
+  const neutral = spec.neutral ?? 0;
   return (
     <label className="photo-control">
-      <span>{spec.label}</span>
+      <span className="photo-inline-actions">
+        <span>{spec.label}</span>
+        {onReset ? (
+          <button
+            type="button"
+            aria-label={`Reset ${spec.label}`}
+            disabled={Math.abs(value - neutral) < 1e-9}
+            onClick={(event) => {
+              event.preventDefault();
+              onReset();
+            }}
+          >Reset</button>
+        ) : null}
+      </span>
       <input
         type="range"
         min={spec.min}
@@ -205,6 +221,7 @@ export default function PhotoWorkspace() {
   const [capabilities, setCapabilities] = useState<PhotoCapabilities | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
+  const [snapshotName, setSnapshotName] = useState('');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
@@ -330,6 +347,7 @@ export default function PhotoWorkspace() {
       setSource({ file, name: file.name, originalUrl, width, height });
       setHistory(createHistory(DEFAULT_RECIPE));
       setSnapshots([]);
+      setSnapshotName('');
       setCompare(false);
       setZoom(0.75);
       setCanvasInteraction(null);
@@ -505,13 +523,15 @@ export default function PhotoWorkspace() {
 
   function saveSnapshot() {
     if (!source) return;
+    const requestedName = snapshotName.trim();
     const next: PhotoSnapshot = {
       id: crypto.randomUUID?.() ?? `snapshot-${Date.now()}`,
-      name: `Snapshot ${snapshots.length + 1}`,
+      name: requestedName || `Snapshot ${snapshots.length + 1}`,
       createdAt: new Date().toISOString(),
       recipe: normalizeRecipe(recipe),
     };
     setSnapshots((current) => [...current, next]);
+    setSnapshotName('');
     setStatus(`${next.name} saved.`);
   }
 
@@ -554,7 +574,13 @@ export default function PhotoWorkspace() {
           <summary>Light & tone</summary>
           <div className="photo-control-list">
             {LIGHT_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -566,7 +592,13 @@ export default function PhotoWorkspace() {
           <summary>White balance & color</summary>
           <div className="photo-control-list">
             {COLOR_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -574,7 +606,13 @@ export default function PhotoWorkspace() {
           <summary>Detail & noise</summary>
           <div className="photo-control-list">
             {DETAIL_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -622,7 +660,13 @@ export default function PhotoWorkspace() {
           <summary>Finishing</summary>
           <div className="photo-control-list">
             {FINISH_CONTROLS.map((spec) => (
-              <AdjustmentControl key={spec.key} spec={spec} value={recipe[spec.key] as number} onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)} />
+              <AdjustmentControl
+                key={spec.key}
+                spec={spec}
+                value={recipe[spec.key] as number}
+                onChange={(value) => patchRecipe({ [spec.key]: value } as Partial<PhotoRecipe>)}
+                onReset={() => patchRecipe({ [spec.key]: spec.neutral ?? 0 } as Partial<PhotoRecipe>)}
+              />
             ))}
           </div>
         </details>
@@ -790,6 +834,21 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section" open>
           <summary>Snapshots</summary>
+          <div className="photo-metadata-grid">
+            <label>
+              Snapshot name
+              <input
+                type="text"
+                value={snapshotName}
+                maxLength={80}
+                placeholder={`Snapshot ${snapshots.length + 1}`}
+                onChange={(event) => setSnapshotName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && source) saveSnapshot();
+                }}
+              />
+            </label>
+          </div>
           <div className="photo-inline-actions"><button type="button" onClick={saveSnapshot} disabled={!source}>Save snapshot</button></div>
           {snapshots.map((snapshot) => (
             <button className="photo-snapshot-card" type="button" key={snapshot.id} onClick={() => restoreSnapshot(snapshot)}>
