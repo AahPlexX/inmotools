@@ -37,6 +37,12 @@ describe('Web Layout Studio portable projects', () => {
     expect(buildHtml(project)).toContain(css);
     expect(buildCss({ ...project, layout: 'flex' })).toContain('display:flex');
   });
+  it('validates rectangular named grid areas and emits responsive placements', () => {
+    const project = { ...INITIAL_PROJECT, gridAreas: ['a a b', 'a a c'] };
+    expect(buildCss(project)).toContain('grid-template-areas:"a a b" "a a c"');
+    expect(buildCss(project)).toContain('.block:nth-child(1){grid-area:a}');
+    expect(() => parseProject(JSON.stringify({ ...project, gridAreas: ['a b', 'a a'] }))).toThrow(/rectangular|exactly/);
+  });
   it('uses a restrictive preview policy without imposing it on portable exports', () => {
     const preview = buildPreview(INITIAL_PROJECT);
     expect(preview).toContain("default-src 'none'");

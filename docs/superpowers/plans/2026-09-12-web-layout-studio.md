@@ -16,7 +16,7 @@ Implemented means code is reachable; verified means its applicable focused and b
 
 | ID | Feature | Acceptance behavior | Current state |
 |---|---|---|---|
-| WL-01 | Visual Grid builder | Track sizing, fr/minmax/repeat, auto-fit/auto-fill, named areas and accessible track resizing. | partial |
+| WL-01 | Visual Grid builder | Track sizing, fr/minmax/repeat, auto-fit/auto-fill, named areas and accessible track resizing. | partial — named-area editing and validation added; track manipulation remains |
 | WL-02 | Visual Flexbox builder | Direction, wrapping, distribution, alignment, gap and per-item sizing. | partial |
 | WL-03 | Semantic DOM tree | Nested elements, tag selection, drag-and-drop and equivalent keyboard reordering with nesting validation. | partial |
 | WL-04 | Starter page patterns | Usable learning, portfolio, landing-page and dashboard starters. | planned |
@@ -88,7 +88,7 @@ Implemented means code is reachable; verified means its applicable focused and b
 
 ## Execution phases
 
-1. Visual layout-to-export: validated structured model; semantic block controls; Grid/Flexbox; CSS-width previews; theme/typography; metadata; HTML/CSS/token/project downloads; undo and local recovery. Browser tests close the initial slice. Advanced portions of these features remain partial.
+1. Visual layout-to-export: validated structured model; semantic block controls; Grid/Flexbox; CSS-width previews; named Grid areas; theme/typography; metadata; HTML/CSS/token/project downloads; undo and local recovery. Browser tests close the initial slice. Advanced portions of these features remain partial.
 2. Nested visual construction: tree/track interaction, per-side styles, breakpoint inheritance, container queries, asset library and full component templates. Preserve keyboard alternatives.
 3. Token/style authoring: alias-safe token system, modern color and fallback handling, gradients/shadows/backdrop, motion and state controls.
 4. Isolated code workflow: verified editor dependencies, mobile fallback, formatting, parsers/compilers, worker cancellation, script execution and diagnostic bridge. Do not combine allow-scripts and allow-same-origin on user-authored previews.
