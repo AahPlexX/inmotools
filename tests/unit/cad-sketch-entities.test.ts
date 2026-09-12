@@ -14,6 +14,8 @@ function basePoints() {
     { id: 'major', type: 'point' as const, x: 10, y: 0, construction: false },
     { id: 'start', type: 'point' as const, x: 5, y: 0, construction: false },
     { id: 'end', type: 'point' as const, x: 0, y: 5, construction: false },
+    { id: 'ellipse-start', type: 'point' as const, x: 10, y: 0, construction: false },
+    { id: 'ellipse-end', type: 'point' as const, x: 0, y: 4, construction: false },
     { id: 'fit-0', type: 'point' as const, x: 0, y: 0, construction: false },
     { id: 'fit-1', type: 'point' as const, x: 4, y: 6, construction: false },
     { id: 'fit-2', type: 'point' as const, x: 8, y: 1, construction: false },
@@ -50,14 +52,17 @@ describe('CAD advanced sketch entities', () => {
       centerPointId: 'center',
       majorAxisPointId: 'major',
       minorRadius: 4,
-      startPointId: 'start',
-      endPointId: 'end',
+      startPointId: 'ellipse-start',
+      endPointId: 'ellipse-end',
       clockwise: false,
       construction: false,
     };
 
     expect(sketchEntityTopology(ellipse)).toEqual({ closed: true, endpointPointIds: [] });
-    expect(sketchEntityTopology(ellipticalArc)).toEqual({ closed: false, endpointPointIds: ['start', 'end'] });
+    expect(sketchEntityTopology(ellipticalArc)).toEqual({
+      closed: false,
+      endpointPointIds: ['ellipse-start', 'ellipse-end'],
+    });
   });
 
   it('models open and closed interpolated splines with explicit fit-point order', () => {
@@ -148,8 +153,8 @@ describe('CAD advanced sketch entities', () => {
           centerPointId: 'center',
           majorAxisPointId: 'major',
           minorRadius: 4,
-          startPointId: 'start',
-          endPointId: 'end',
+          startPointId: 'ellipse-start',
+          endPointId: 'ellipse-end',
           clockwise: false,
           construction: false,
         },
