@@ -8,6 +8,7 @@ import {
   type PhotoOutputSharpening,
 } from './photo-export';
 import {
+  planPhotoExportSize,
   requestedPhotoDimensions,
   type PhotoResizeMode,
 } from './photo-export-dimensions';
@@ -49,6 +50,14 @@ function sidecarFilename(requestedName: string, sourceName: string, mime: PhotoO
   return safeRequestedPhotoFilename(requestedName, sourceName, mime).replace(/\.[^.]+$/, '.xmp');
 }
 
+function resizeValueLabel(mode: PhotoResizeMode): string {
+  if (mode === 'percent') return 'Percent';
+  if (mode === 'width') return 'Width in pixels';
+  if (mode === 'height') return 'Height in pixels';
+  if (mode === 'long-edge') return 'Long edge in pixels';
+  return 'Short edge in pixels';
+}
+
 export default function PhotoExportDialog({
   open,
   source,
@@ -86,6 +95,21 @@ export default function PhotoExportDialog({
     'image/webp': capabilities?.webp ?? true,
   }), [capabilities]);
 
+  const sizePlan = useMemo(() => {
+    if (!source) return null;
+    return planPhotoExportSize(
+      source.width,
+      source.height,
+      recipe,
+      resizeMode,
+      resizeValue,
+      capabilities?.maxCanvasEdge ?? 4096,
+      capabilities?.maxCanvasArea ?? 4096 * 4096,
+    );
+  }, [capabilities?.maxCanvasArea, capabilities?.maxCanvasEdge, recipe, resizeMode, resizeValue, source]);
+
+  const singleSizeUnsafe = sizePlan?.requiresSafetyScaling ?? false;
+
   function changeMime(nextMime: PhotoOutputMime) {
     setRequestedName((current) => safeRequestedPhotoFilename(current, source?.name ?? 'photo', nextMime));
     setOutputMime(nextMime);
@@ -96,8 +120,20 @@ export default function PhotoExportDialog({
     return requestedPhotoDimensions(source.width, source.height, recipe, resizeMode, resizeValue);
   }
 
+  function useVerifiedSafeSize() {
+    if (!sizePlan) return;
+    const safeLongEdge = Math.max(sizePlan.safe.width, sizePlan.safe.height);
+    setResizeMode('long-edge');
+    setResizeValue(safeLongEdge);
+    onStatus(`Export size changed to the verified-safe ${sizePlan.safe.width} × ${sizePlan.safe.height} plan.`);
+  }
+
   async function exportSinglePhoto() {
     if (!source || exportBusy) return;
+    if (singleSizeUnsafe && sizePlan) {
+      onStatus(`Requested ${sizePlan.requested.width} × ${sizePlan.requested.height} output exceeds the verified local canvas limit. Choose the offered safe size before exporting.`);
+      return;
+    }
     setExportBusy(true);
     onStatus('Rendering full export locally…');
     try {
@@ -232,10 +268,12 @@ export default function PhotoExportDialog({
               <option value="percent">Percentage</option>
               <option value="width">Exact width</option>
               <option value="height">Exact height</option>
+              <option value="long-edge">Long edge</option>
+              <option value="short-edge">Short edge</option>
             </select>
           </label>
           {resizeMode !== 'original' ? (
-            <label>{resizeMode === 'percent' ? 'Percent' : resizeMode === 'width' ? 'Width in pixels' : 'Height in pixels'}
+            <label>{resizeValueLabel(resizeMode)}
               <input aria-label="Resize value" type="number" min={1} max={resizeMode === 'percent' ? 400 : 50000} value={resizeValue} onChange={(event) => setResizeValue(Math.max(1, readNumber(event.target.value, 100)))} />
             </label>
           ) : <div />}
@@ -260,6 +298,20 @@ export default function PhotoExportDialog({
             </select>
           </label>
         </div>
+
+        {sizePlan ? (
+          <div className={`photo-export-size-plan${singleSizeUnsafe ? ' is-warning' : ' is-safe'}`} role={singleSizeUnsafe ? 'alert' : 'status'} aria-live="polite">
+            <strong>Planned output · {sizePlan.requested.width} × {sizePlan.requested.height}</strong>
+            {singleSizeUnsafe ? (
+              <>
+                <span>This request exceeds Photo Studio's verified local canvas limit for this browser profile. Choose the safe plan before downloading to avoid an unusable or silently reduced render.</span>
+                <button type="button" onClick={useVerifiedSafeSize}>Use verified safe size · {sizePlan.safe.width} × {sizePlan.safe.height}</button>
+              </>
+            ) : (
+              <span>Within the verified local canvas limit.</span>
+            )}
+          </div>
+        ) : null}
 
         {metadataPolicy !== 'strip' ? (
           <div className="photo-metadata-grid">
@@ -299,12 +351,12 @@ export default function PhotoExportDialog({
         <p className="photo-export-note">JPEG, PNG, and WebP exports attempt to embed the reviewed XMP packet in the output container. If embedding fails, the pixel export still downloads and this dialog reports the fallback; a separate XMP sidecar remains available.</p>
         <div className="photo-dialog-actions">
           <button type="button" onClick={downloadXmp} disabled={metadataPolicy === 'strip'}>Download XMP sidecar</button>
-          <button type="button" onClick={() => void exportSinglePhoto()} disabled={exportBusy}>{exportBusy ? 'Rendering…' : 'Download photo'}</button>
+          <button type="button" onClick={() => void exportSinglePhoto()} disabled={exportBusy || singleSizeUnsafe}>{exportBusy ? 'Rendering…' : singleSizeUnsafe ? 'Choose safe size to export' : 'Download photo'}</button>
         </div>
 
         <details className="photo-batch-section">
           <summary>Batch export current recipe</summary>
-          <p className="photo-export-note">Files are rendered one at a time with the same format, resize, sharpening, and metadata policy. A failure is isolated to that file and full-resolution output blobs are released after each download.</p>
+          <p className="photo-export-note">Files are rendered one at a time with the same format, resize, sharpening, and metadata policy. Each file is independently constrained to verified-safe local canvas limits, a failure is isolated to that file, and full-resolution output blobs are released after each download.</p>
           <label className="photo-open-label photo-batch-picker">
             Choose batch photos
             <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/*" onChange={chooseBatch} />
