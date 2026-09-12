@@ -8,7 +8,7 @@ on:
       - .github/workflows/cad-dependency-lockfile.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -49,3 +49,12 @@ jobs:
             CAD_DEPENDENCY_BASE_SHA.txt
           if-no-files-found: error
           retention-days: 1
+
+      - name: Commit generated package state to CAD branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json pnpm-lock.yaml
+          git commit -m "chore(cad): pin exact geometry dependencies"
+          git push origin HEAD:feat/cad-studio
