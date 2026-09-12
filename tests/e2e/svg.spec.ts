@@ -214,10 +214,11 @@ test('Vector Studio exposes configurable shape tools, saved swatches, rulers, an
   await page.getByRole('tab', { name: 'Layers' }).click();
   await page.locator('#vector-artboard-width').fill('3000');
   await page.locator('#vector-artboard-width').press('Enter');
-  await page.getByRole('button', { name: 'Fit artboard' }).click();
+  const viewControls = page.locator('.vector-header-actions');
+  await viewControls.getByRole('button', { name: 'Fit artboard' }).click();
   await expect(page.getByTestId('vector-zoom-readout')).not.toHaveText('70%');
-  await expect(page.getByRole('button', { name: 'Fit selection' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Fit selection' }).click();
+  await expect(viewControls.getByRole('button', { name: 'Fit selection' })).toBeEnabled();
+  await viewControls.getByRole('button', { name: 'Fit selection' }).click();
 });
 
 test('Vector Studio exposes non-destructive clip, difference, and symmetry duplicate workflows', async ({ page }) => {
@@ -229,9 +230,9 @@ test('Vector Studio exposes non-destructive clip, difference, and symmetry dupli
   await expect(page.getByTestId('vector-layer')).toHaveCount(2);
 
   await page.getByRole('button', { name: 'Select tool' }).click();
-  const shapes = page.locator('[data-vector-element] > rect, [data-vector-element] > g > rect');
-  await shapes.nth(0).click();
-  await shapes.nth(1).click({ modifiers: ['Shift'] });
+  const artwork = page.locator('[data-vector-element]');
+  await artwork.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
+  await artwork.nth(1).locator(':scope > rect:not(.vector-selection-outline)').click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: 'Clip selection' }).click();
   await expect(page.getByTestId('vector-layer')).toHaveCount(1);
   await expect(canvas.locator('clipPath')).toHaveCount(1);
@@ -239,15 +240,15 @@ test('Vector Studio exposes non-destructive clip, difference, and symmetry dupli
 
   await page.getByRole('button', { name: 'Ungroup' }).click();
   await expect(page.getByTestId('vector-layer')).toHaveCount(2);
-  const released = page.locator('[data-vector-element] > rect, [data-vector-element] > g > rect');
-  await released.nth(0).click();
-  await released.nth(1).click({ modifiers: ['Shift'] });
+  const released = page.locator('[data-vector-element]');
+  await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
+  await released.nth(1).locator(':scope > rect:not(.vector-selection-outline)').click({ modifiers: ['Shift'] });
   await page.getByRole('button', { name: 'Difference selection' }).click();
   await expect(canvas.locator('mask')).toHaveCount(1);
   await expect(canvas.locator('g[mask]')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Ungroup' }).click();
-  await released.nth(0).click();
+  await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
   await page.getByRole('button', { name: 'Symmetry duplicate horizontal' }).click();
   await expect(page.getByTestId('vector-layer')).toHaveCount(3);
 });
