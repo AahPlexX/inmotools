@@ -130,4 +130,80 @@ describe('CAD sketch profile diagnostics', () => {
 
     expect(result.closedRegions).toEqual([{ entityIds: ['circle'] }]);
   });
+
+  it('treats full ellipses and closed splines as intrinsic closed regions while ignoring construction curves', () => {
+    const sketch: CadSketch = {
+      id: 'advanced-closed',
+      label: 'Advanced closed profiles',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'center', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'major', type: 'point', x: 8, y: 0, construction: false },
+        { id: 's0', type: 'point', x: 12, y: 0, construction: false },
+        { id: 's1', type: 'point', x: 16, y: 4, construction: false },
+        { id: 's2', type: 'point', x: 20, y: 0, construction: false },
+        { id: 'ellipse', type: 'ellipse', centerPointId: 'center', majorAxisPointId: 'major', minorRadius: 4, construction: false },
+        { id: 'construction-ellipse', type: 'ellipse', centerPointId: 'center', majorAxisPointId: 'major', minorRadius: 2, construction: true },
+        { id: 'closed-spline', type: 'spline', fitPointIds: ['s0', 's1', 's2'], degree: 2, closed: true, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const result = analyzeSketchProfiles(sketch);
+
+    expect(result.closedRegions).toEqual([
+      { entityIds: ['ellipse'] },
+      { entityIds: ['closed-spline'] },
+    ]);
+  });
+
+  it('uses arc and line endpoints together to recognize mixed closed profiles', () => {
+    const sketch: CadSketch = {
+      id: 'mixed-loop',
+      label: 'Mixed loop',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'center', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'p0', type: 'point', x: 5, y: 0, construction: false },
+        { id: 'p1', type: 'point', x: 0, y: 5, construction: false },
+        { id: 'p2', type: 'point', x: -5, y: 0, construction: false },
+        { id: 'arc', type: 'arc', centerPointId: 'center', startPointId: 'p0', endPointId: 'p1', clockwise: false, construction: false },
+        { id: 'line-a', type: 'line', startPointId: 'p1', endPointId: 'p2', construction: false },
+        { id: 'line-b', type: 'line', startPointId: 'p2', endPointId: 'p0', construction: false },
+      ],
+      constraints: [],
+    };
+
+    const result = analyzeSketchProfiles(sketch);
+
+    expect(result.closedRegions).toEqual([{ entityIds: ['arc', 'line-a', 'line-b'] }]);
+    expect(result.openEndpoints).toEqual([]);
+  });
+
+  it('includes open spline and elliptical-arc endpoints in open-endpoint and micro-gap diagnostics', () => {
+    const sketch: CadSketch = {
+      id: 'advanced-open',
+      label: 'Advanced open profiles',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'center', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'major', type: 'point', x: 8, y: 0, construction: false },
+        { id: 'e0', type: 'point', x: 8, y: 0, construction: false },
+        { id: 'e1', type: 'point', x: 0, y: 4, construction: false },
+        { id: 's0', type: 'point', x: 0.0005, y: 4, construction: false },
+        { id: 's1', type: 'point', x: 4, y: 8, construction: false },
+        { id: 's2', type: 'point', x: 8, y: 8, construction: false },
+        { id: 'elliptical-arc', type: 'elliptical-arc', centerPointId: 'center', majorAxisPointId: 'major', minorRadius: 4, startPointId: 'e0', endPointId: 'e1', clockwise: false, construction: false },
+        { id: 'open-spline', type: 'spline', fitPointIds: ['s0', 's1', 's2'], degree: 2, closed: false, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const result = analyzeSketchProfiles(sketch, { gapTolerance: 0.001 });
+
+    expect(result.openEndpoints.map((endpoint) => endpoint.pointId).sort()).toEqual(['e0', 'e1', 's0', 's2']);
+    expect(result.gaps).toEqual([
+      expect.objectContaining({ pointAId: 'e1', pointBId: 's0', distance: expect.any(Number) }),
+    ]);
+  });
 });
