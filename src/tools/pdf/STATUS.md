@@ -132,7 +132,7 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 
 ### Planned
 
-All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10–11, 13–14, 16–18, 20–57 except 58/60/61/63/71, 59, 62, 64–70, 72–95, 97–120, 122–128, 131–141, 143, 145–146**.
+All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10–11, 13–14, 16–18, 20–57, 59, 62, 64–70, 72–95, 97–120, 122–128, 131–141, 143, 145–146**.
 
 No capability is currently `blocked` or `excluded`. The architectural exclusions in the design constrain claims and implementation approach; they are not numbered capabilities.
 
@@ -159,4 +159,5 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — Engine GREEN, workflow run `34717521965`: unit tests, production build, and focused PDF browser flow passed after the minimal engine implementation.
 - 2026-09-12 — Browser TDD RED, workflow run `34717591400`: 676 unit tests and the production build passed; the only new browser failure on both desktop/mobile Chromium was the intentionally missing `Document properties & export` surface; four existing PDF browser cases remained green.
 - 2026-09-12 — Visible-workstation GREEN, workflow run `34717705502`: validation completed successfully; unit, production build, and all six focused PDF browser cases passed, including custom filename, metadata byte reopen, desktop/mobile execution, and 320 CSS-pixel reflow.
-- 2026-09-12 — Gauntlet improvement cycle: metadata output privacy was hardened by clearing Info before replacement writes; typed tests now include partial-replacement non-leakage and document-language presence. Validation run for the hardened revision is recorded by the PR workflow before further capability promotion.
+- 2026-09-12 — Gauntlet improvement cycle: metadata output privacy was hardened by clearing Info before replacement writes; typed tests now include partial-replacement non-leakage and document-language presence.
+- 2026-09-12 — Hardened code validation, workflow run `34717903615`: unit tests, production build, and focused browser tests all completed successfully on the hardened implementation commit.
