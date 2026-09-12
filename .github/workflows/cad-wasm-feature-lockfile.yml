@@ -1,0 +1,49 @@
+name: CAD WebAssembly feature dependency generator
+
+on:
+  push:
+    branches:
+      - feat/cad-studio
+    paths:
+      - .github/workflows/cad-wasm-feature-lockfile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout CAD branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Restore current main package state
+        shell: bash
+        run: |
+          git fetch origin main
+          git rev-parse origin/main > CAD_DEPENDENCY_BASE_SHA.txt
+          git checkout origin/main -- package.json pnpm-lock.yaml
+
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Generate exact CAD dependency lockfile
+        shell: bash
+        run: |
+          pnpm add --save-exact --lockfile-only --ignore-scripts occt-wasm@5.0.0 manifold-3d@3.5.3 ml-matrix@6.15.0 wasm-feature-detect@1.9.0
+          node -e "const p=require('./package.json'); const expected={ 'occt-wasm':'5.0.0','manifold-3d':'3.5.3','ml-matrix':'6.15.0','wasm-feature-detect':'1.9.0' }; for (const [name,version] of Object.entries(expected)) { if (p.dependencies?.[name] !== version) throw new Error(name+' was not pinned exactly'); }"
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Commit generated package state
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json pnpm-lock.yaml
+          git commit -m "chore(cad): pin WebAssembly feature detector"
+          git push origin HEAD:feat/cad-studio
