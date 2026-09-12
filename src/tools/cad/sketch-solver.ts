@@ -1,3 +1,4 @@
+import { buildInterpolatingSpline, evaluateSpline, evaluateSplineDerivative } from './sketch-spline';
 import type {
   CadSketch,
   SketchArcEntity,
@@ -22,6 +23,11 @@ interface CircleIndex {
   offset: number;
 }
 
+interface ContactParameterIndex {
+  offset: number;
+  initial: number;
+}
+
 interface SketchIndex {
   points: Map<string, PointIndex>;
   lines: Map<string, SketchLineEntity>;
@@ -30,6 +36,8 @@ interface SketchIndex {
   ellipses: Map<string, SketchEllipseEntity>;
   ellipticalArcs: Map<string, SketchEllipticalArcEntity>;
   splines: Map<string, SketchSplineEntity>;
+  contactParameters: Map<string, ContactParameterIndex>;
+  variableCount: number;
 }
 
 interface SolveCoreResult {
@@ -127,21 +135,52 @@ function splineIndex(sketch: CadSketch): Map<string, SketchSplineEntity> {
   return result;
 }
 
+function contactParameterIndex(
+  sketch: CadSketch,
+  splines: Map<string, SketchSplineEntity>,
+  startOffset: number,
+): Map<string, ContactParameterIndex> {
+  const result = new Map<string, ContactParameterIndex>();
+  let offset = startOffset;
+  for (const constraint of sketch.constraints) {
+    if (!constraint.enabled) continue;
+    if (constraint.type !== 'point-on-curve' && constraint.type !== 'tangent-curve') continue;
+    if (!splines.has(constraint.curveId)) continue;
+    if (result.has(constraint.id)) throw new Error(`Duplicate spline contact constraint '${constraint.id}'.`);
+    const initial = finite(constraint.parameter ?? 0.5, `Spline contact parameter '${constraint.id}'`);
+    if (initial < 0 || initial > 1) {
+      throw new Error(`Spline contact parameter '${constraint.id}' must be between 0 and 1.`);
+    }
+    result.set(constraint.id, { offset, initial });
+    offset += 1;
+  }
+  return result;
+}
+
 function buildIndex(sketch: CadSketch): SketchIndex {
   const points = pointIndex(sketch);
+  const lines = lineIndex(sketch);
+  const circles = circleIndex(sketch, points.size * 2);
+  const arcs = arcIndex(sketch);
+  const ellipses = ellipseIndex(sketch);
+  const ellipticalArcs = ellipticalArcIndex(sketch);
+  const splines = splineIndex(sketch);
+  const contactParameters = contactParameterIndex(sketch, splines, points.size * 2 + circles.size);
   return {
     points,
-    lines: lineIndex(sketch),
-    circles: circleIndex(sketch, points.size * 2),
-    arcs: arcIndex(sketch),
-    ellipses: ellipseIndex(sketch),
-    ellipticalArcs: ellipticalArcIndex(sketch),
-    splines: splineIndex(sketch),
+    lines,
+    circles,
+    arcs,
+    ellipses,
+    ellipticalArcs,
+    splines,
+    contactParameters,
+    variableCount: points.size * 2 + circles.size + contactParameters.size,
   };
 }
 
 function initialValues(index: SketchIndex): number[] {
-  const values = Array.from({ length: index.points.size * 2 + index.circles.size }, () => 0);
+  const values = Array.from({ length: index.variableCount }, () => 0);
   for (const { point, offset } of index.points.values()) {
     values[offset] = finite(point.x, `Point '${point.id}' x`);
     values[offset + 1] = finite(point.y, `Point '${point.id}' y`);
@@ -151,6 +190,7 @@ function initialValues(index: SketchIndex): number[] {
     if (radius <= 0) throw new Error(`Circle '${circle.id}' radius must be positive.`);
     values[offset] = radius;
   }
+  for (const { offset, initial } of index.contactParameters.values()) values[offset] = initial;
   return values;
 }
 
@@ -328,6 +368,77 @@ function ellipseLineTangencyState(
   return { residual: (distance - 1) * scale, contactParameter: Math.atan2(qy, qx) };
 }
 
+function splineParameterState(
+  constraintId: string,
+  values: readonly number[],
+  index: SketchIndex,
+): { parameter: number; boundsResiduals: [number, number] } {
+  const entry = index.contactParameters.get(constraintId);
+  if (!entry) throw new Error(`Spline contact constraint '${constraintId}' has no solver parameter.`);
+  const raw = finite(values[entry.offset]!, `Spline contact parameter '${constraintId}'`);
+  return {
+    parameter: Math.max(0, Math.min(1, raw)),
+    boundsResiduals: [Math.min(0, raw), Math.max(0, raw - 1)],
+  };
+}
+
+function currentSplineCurve(splineId: string, values: readonly number[], index: SketchIndex) {
+  const spline = index.splines.get(splineId);
+  if (!spline) throw new Error(`Constraint references missing spline '${splineId}'.`);
+  const fitPoints = spline.fitPointIds.map((pointId) => {
+    const [x, y] = coordinates(values, index, pointId);
+    return { id: pointId, type: 'point' as const, x, y, construction: false };
+  });
+  const transient: CadSketch = {
+    id: `solver:${splineId}`,
+    label: spline.id,
+    plane: { kind: 'origin', plane: 'XY' },
+    entities: [...fitPoints, { ...spline, fitPointIds: [...spline.fitPointIds] }],
+    constraints: [],
+  };
+  return buildInterpolatingSpline(transient, splineId);
+}
+
+function splinePointOnCurveResidual(
+  constraintId: string,
+  pointId: string,
+  splineId: string,
+  values: readonly number[],
+  index: SketchIndex,
+): number[] {
+  const state = splineParameterState(constraintId, values, index);
+  const contact = evaluateSpline(currentSplineCurve(splineId, values, index), state.parameter);
+  const [px, py] = coordinates(values, index, pointId);
+  return [px - contact.x, py - contact.y, ...state.boundsResiduals];
+}
+
+function splineTangentCurveResidual(
+  constraintId: string,
+  lineId: string,
+  splineId: string,
+  values: readonly number[],
+  index: SketchIndex,
+): number[] {
+  const state = splineParameterState(constraintId, values, index);
+  const curve = currentSplineCurve(splineId, values, index);
+  const contact = evaluateSpline(curve, state.parameter);
+  const derivative = evaluateSplineDerivative(curve, state.parameter);
+  const [[ax, ay], [bx, by]] = linePoints(values, index, lineId);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lineLength = Math.hypot(dx, dy);
+  const derivativeLength = Math.hypot(derivative.x, derivative.y);
+  if (lineLength <= MIN_GEOMETRY_SCALE) {
+    throw new Error(`Tangent-curve constraint '${constraintId}' requires a non-zero line length.`);
+  }
+  if (derivativeLength <= MIN_GEOMETRY_SCALE) {
+    throw new Error(`Tangent-curve constraint '${constraintId}' requires a non-zero spline derivative at contact.`);
+  }
+  const contactOnLine = (dx * (contact.y - ay) - dy * (contact.x - ax)) / lineLength;
+  const directionParallel = (dx * derivative.y - dy * derivative.x) / (lineLength * derivativeLength);
+  return [contactOnLine, directionParallel, ...state.boundsResiduals];
+}
+
 function tangentCurveResidual(
   constraintId: string,
   lineId: string,
@@ -376,9 +487,7 @@ function tangentCurveResidual(
     ];
   }
 
-  if (index.splines.has(curveId)) {
-    throw new Error(`Tangent-curve constraint '${constraintId}' does not yet support spline '${curveId}'.`);
-  }
+  if (index.splines.has(curveId)) return splineTangentCurveResidual(constraintId, lineId, curveId, values, index);
   throw new Error(`Tangent-curve constraint '${constraintId}' references missing supported curve '${curveId}'.`);
 }
 
@@ -417,9 +526,7 @@ function pointOnCurveResidual(
     ];
   }
 
-  if (index.splines.has(curveId)) {
-    throw new Error(`Point-on-curve constraint '${constraintId}' does not yet support spline '${curveId}'.`);
-  }
+  if (index.splines.has(curveId)) return splinePointOnCurveResidual(constraintId, pointId, curveId, values, index);
   throw new Error(`Point-on-curve constraint '${constraintId}' references missing supported curve '${curveId}'.`);
 }
 
@@ -806,7 +913,13 @@ function sketchWithValues(sketch: CadSketch, values: readonly number[], index: S
       }
       return { ...entity };
     }),
-    constraints: sketch.constraints.map((constraint) => ({ ...constraint })),
+    constraints: sketch.constraints.map((constraint) => {
+      const entry = index.contactParameters.get(constraint.id);
+      if (entry && (constraint.type === 'point-on-curve' || constraint.type === 'tangent-curve')) {
+        return { ...constraint, parameter: Math.max(0, Math.min(1, values[entry.offset]!)) };
+      }
+      return { ...constraint };
+    }),
   };
 }
 
