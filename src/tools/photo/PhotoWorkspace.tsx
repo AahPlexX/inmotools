@@ -231,6 +231,8 @@ export default function PhotoWorkspace() {
   const [exportOpen, setExportOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
   const [snapshotName, setSnapshotName] = useState('');
+  const [customRatioWidth, setCustomRatioWidth] = useState('5');
+  const [customRatioHeight, setCustomRatioHeight] = useState('4');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
@@ -239,6 +241,12 @@ export default function PhotoWorkspace() {
   const sourceUrlRef = useRef<string | null>(null);
 
   const recipe = history.present;
+  const parsedCustomRatioWidth = Number(customRatioWidth);
+  const parsedCustomRatioHeight = Number(customRatioHeight);
+  const customRatioIsValid = Number.isFinite(parsedCustomRatioWidth)
+    && Number.isFinite(parsedCustomRatioHeight)
+    && parsedCustomRatioWidth > 0
+    && parsedCustomRatioHeight > 0;
 
   const releasePreviewUrl = useCallback(() => {
     if (!previewUrlRef.current) return;
@@ -409,6 +417,12 @@ export default function PhotoWorkspace() {
       const height = sourceRatio / ratio;
       patchRecipe({ crop: { x: 0, y: (1 - height) / 2, width: 1, height } });
     }
+  }
+
+  function applyCustomCropRatio() {
+    if (!customRatioIsValid) return;
+    applyCropRatio(parsedCustomRatioWidth / parsedCustomRatioHeight);
+    setStatus(`Applied custom crop ratio ${customRatioWidth}:${customRatioHeight}.`);
   }
 
   function localInteraction(adjustment: LocalAdjustment): PhotoCanvasInteraction | null {
@@ -698,10 +712,39 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => applyCropRatio(16 / 9)}>16:9</button>
         </div>
         <div className="photo-control-list">
-          <SimpleControl label="Crop left percent" value={Math.round(recipe.crop.x * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('x', value)} />
-          <SimpleControl label="Crop top percent" value={Math.round(recipe.crop.y * 1000) / 10} min={0} max={99.9} step={0.1} onChange={(value) => cropPercent('y', value)} />
-          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 1000) / 10} min={0.1} max={100} step={0.1} neutral={100} onChange={(value) => cropPercent('width', value)} />
-          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 1000) / 10} min={0.1} max={100} step={0.1} neutral={100} onChange={(value) => cropPercent('height', value)} />
+          <label className="photo-control">
+            <span>Custom ratio width</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={customRatioWidth}
+              aria-label="Custom ratio width"
+              aria-invalid={customRatioWidth !== '' && !(Number.isFinite(parsedCustomRatioWidth) && parsedCustomRatioWidth > 0)}
+              onChange={(event) => setCustomRatioWidth(event.target.value)}
+            />
+          </label>
+          <label className="photo-control">
+            <span>Custom ratio height</span>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={customRatioHeight}
+              aria-label="Custom ratio height"
+              aria-invalid={customRatioHeight !== '' && !(Number.isFinite(parsedCustomRatioHeight) && parsedCustomRatioHeight > 0)}
+              onChange={(event) => setCustomRatioHeight(event.target.value)}
+            />
+          </label>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={!source || !customRatioIsValid} onClick={applyCustomCropRatio}>Apply custom ratio</button>
+          </div>
+        </div>
+        <div className="photo-control-list">
+          <SimpleControl label="Crop left percent" value={Math.round(recipe.crop.x * 10000) / 100} min={0} max={99.99} step={0.01} onChange={(value) => cropPercent('x', value)} />
+          <SimpleControl label="Crop top percent" value={Math.round(recipe.crop.y * 10000) / 100} min={0} max={99.99} step={0.01} onChange={(value) => cropPercent('y', value)} />
+          <SimpleControl label="Crop width percent" value={Math.round(recipe.crop.width * 10000) / 100} min={0.01} max={100} step={0.01} neutral={100} onChange={(value) => cropPercent('width', value)} />
+          <SimpleControl label="Crop height percent" value={Math.round(recipe.crop.height * 10000) / 100} min={0.01} max={100} step={0.01} neutral={100} onChange={(value) => cropPercent('height', value)} />
           <SimpleControl label="Straighten degrees" value={recipe.straighten} min={-45} max={45} step={0.1} onChange={(value) => patchRecipe({ straighten: value })} />
           <SimpleControl label="Lens distortion" value={recipe.lensDistortion} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ lensDistortion: value })} />
           <SimpleControl label="Horizontal perspective" value={recipe.perspectiveHorizontal} min={-1} max={1} step={0.02} onChange={(value) => patchRecipe({ perspectiveHorizontal: value })} />

@@ -31,6 +31,25 @@ test('geometry scalar reset restores its own default without changing a neighbor
   await expect(lens).toHaveValue('0.25');
 });
 
+test('custom crop ratio applies a centered 5:4 frame to a 4:3 photo', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Crop & geometry' }).click();
+  const ratioWidth = page.getByLabel('Custom ratio width');
+  const applyRatio = page.getByRole('button', { name: 'Apply custom ratio' });
+  await ratioWidth.fill('0');
+  await expect(ratioWidth).toHaveAttribute('aria-invalid', 'true');
+  await expect(applyRatio).toBeDisabled();
+  await ratioWidth.fill('5');
+  await page.getByLabel('Custom ratio height').fill('4');
+  await applyRatio.click();
+
+  await expect(page.getByLabel('Crop left percent value')).toHaveValue('3.13');
+  await expect(page.getByLabel('Crop top percent value')).toHaveValue('0');
+  await expect(page.getByLabel('Crop width percent value')).toHaveValue('93.75');
+  await expect(page.getByLabel('Crop height percent value')).toHaveValue('100');
+  await expect(page.getByText('Edited frame 300 × 240')).toBeVisible();
+});
+
 test('range and local scalar resets use meaningful neutral or operation defaults', async ({ page }) => {
   await openFixture(page);
   await page.locator('summary').filter({ hasText: 'Color ranges' }).click();
