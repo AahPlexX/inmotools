@@ -26,8 +26,9 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current verified implementation head before this tracker-only commit: `df69b7d98bd5305023b8a1d49727445c401537c9`
+- Current material implementation head before this tracker-only commit: `f68b2abe917e1ae824c71480665383c6a57a289f`
 - Current phase: **Task 4 / Milestone D — spec-gap closure, hardening, integration, deployment verification**
+- Current verification: workflow run `34661855641` is validating `f68b2abe917e1ae824c71480665383c6a57a289f`; unit tests have passed and the production build has passed, while the focused browser gate is still pending at this checkpoint.
 - Last fully verified exact-head CI evidence: workflow run `34643353378` completed successfully for `df69b7d98bd5305023b8a1d49727445c401537c9`; all 658 repository unit tests, production build, and all 22 focused Photo Studio browser tests succeeded on the PR merge state.
 
 ## Verified progress
@@ -49,29 +50,39 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening, production batch queue completion, RGB histogram, clipping overlay, color sampler, keyboard history, and 320 CSS px editor/export-dialog reflow.
 - [x] Exact-head CI at `df69b7d98bd5305023b8a1d49727445c401537c9` passed all 658 repository unit tests, production build, and all 22 focused Photo Studio browser tests through PR validation run `34643353378`.
 
+## Material progress awaiting final verification
+
+- Long-edge and short-edge export sizing are implemented in the shared export-dimension contract with focused unit coverage for landscape and portrait frames.
+- The export dialog now shows planned output dimensions before render.
+- Requests above the verified local canvas ceiling surface a visible warning and disable single-photo download until the user explicitly switches to the offered safe plan.
+- The safe-plan calculation is constrained by both edge and area limits and preserves aspect ratio.
+- Focused browser coverage now exercises long-edge sizing, short-edge sizing, oversize blocking, the explicit safe-size action, and restoration of the normal download path after the safe choice.
+
 ## Spec inventory blockers discovered during audit
 
-These remain release blockers because they are promised by the design specification but are not yet fully represented in the production UI/behavior:
+These remain release blockers because they are promised by the design specification but are not yet fully represented in the production UI/behavior or have not yet cleared the exact-head browser gate:
 
 - [x] RGB histogram presentation.
 - [x] Clipping-warning overlay/toggle for highlight/shadow clipping.
 - [x] Color sampler with RGB, HSL, and hexadecimal readout.
 - [ ] Individual-control reset affordances rather than reset-all only.
 - [ ] Named snapshots; current snapshots are auto-numbered.
-- [ ] Explicit long-edge and short-edge export resize modes.
-- [ ] Explicit safe-size export choice/warning before an oversized render, rather than relying only on automatic safe scaling and post-render status.
+- [ ] Explicit long-edge and short-edge export resize modes — implementation and tests landed at `f68b2abe917e1ae824c71480665383c6a57a289f`; exact-head browser verification is pending.
+- [ ] Explicit safe-size export choice/warning before an oversized render — implementation and tests landed at `f68b2abe917e1ae824c71480665383c6a57a289f`; exact-head browser verification is pending.
 - [ ] Browser coverage for unsupported encoder messaging and stale-render rejection at the workspace level if not already proven by equivalent focused coverage.
 - [ ] Final feature-inventory accounting for before/after interaction wording, custom crop-ratio intent, copy/paste recipe semantics, and any other design-language mismatch discovered during final audit.
 
 ## Remaining release work
 
-1. Close the remaining spec inventory blockers above with real UI/renderer behavior and focused tests; do not lower or reinterpret the completion goal to avoid them.
-2. Re-audit the complete design feature list after blocker closure and account for every promised capability as implemented, intentionally deferred, or removed from the release specification before merge.
-3. Reconcile `feat/photo-studio` with the latest moving `main` without rewriting other agents' branches; resolve only genuine integration conflicts.
-4. Review the exact changed-file set for Photo-only scope, private/internal prompt leakage, and unrelated regressions.
-5. Run fresh final unit/build/focused E2E against the exact merge state, then merge only if green.
-6. Verify the exact merged `main` SHA in the Pages deployment and perform an uncached live-route check.
-7. Close shared task records only after all preceding gates are evidenced.
+1. Finish exact-head verification for the export-sizing/safe-plan batch and mark those blockers closed only if the browser gate passes.
+2. Add individual-control reset affordances and named snapshots with focused browser coverage.
+3. Resolve the remaining feature-inventory mismatches and verification gaps without lowering the completion goal.
+4. Re-audit the complete design feature list after blocker closure and account for every promised capability as implemented, intentionally deferred, or removed from the release specification before merge.
+5. Reconcile `feat/photo-studio` with the latest moving `main` without rewriting other agents' branches; resolve only genuine integration conflicts.
+6. Review the exact changed-file set for Photo-only scope, private/internal prompt leakage, and unrelated regressions.
+7. Run fresh final unit/build/focused E2E against the exact merge state, then merge only if green.
+8. Verify the exact merged `main` SHA in the Pages deployment and perform an uncached live-route check.
+9. Close shared task records only after all preceding gates are evidenced.
 
 ## Anti-staleness rule
 
