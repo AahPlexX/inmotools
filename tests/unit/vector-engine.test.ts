@@ -120,10 +120,11 @@ describe('vector document engine', () => {
 
   test('creates a separate symmetry duplicate reflected around a requested axis', () => {
     const document = addElement(createVectorDocument(), rect('a', 100, 120, 80, 40));
+    const source = structuredClone(document.elements[0]);
     const mirrored = mirrorDuplicateSelection(document, ['a'], 'horizontal', { x: 300, y: 300 });
     expect(mirrored.document.elements).toHaveLength(2);
     expect(mirrored.selection).toHaveLength(1);
-    expect(mirrored.document.elements[0]).toMatchObject({ id: 'a', x: 100, flipX: undefined });
+    expect(mirrored.document.elements[0]).toEqual(source);
     expect(mirrored.document.elements[1]).toMatchObject({ x: 420, y: 120, flipX: true, flipY: false });
   });
 
