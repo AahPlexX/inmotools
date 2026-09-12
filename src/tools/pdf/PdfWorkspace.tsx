@@ -1,17 +1,27 @@
 import { useMemo, useState } from 'react';
 import { downloadBytes } from '../../lib/download';
 import {
+  extractPdfAttachments,
   inspectPdf,
   pageSelectionPreset,
   parsePageSelection,
   splicePdfs,
   type PageSelectionPreset,
+  type PdfAttachmentDefinition,
   type PdfBlankPageDefinition,
   type PdfBox,
   type PdfInspection,
   type PdfMetadataEdits,
   type PdfPageBoxEdit,
 } from './pdf-engine';
+import PdfAttachmentPanel, { type PdfStagedAttachment } from './PdfAttachmentPanel';
+import {
+  attachmentDefinitionsFromStages,
+  attachmentStageError,
+  safeAttachmentDownloadFilename,
+  stagedAttachmentFromExtracted,
+  stagedAttachmentFromFile,
+} from './pdf-attachment-stage';
 import { consumeFileInput } from '../../lib/file-input';
 
 type PdfItem = {
@@ -199,6 +209,7 @@ export default function PdfWorkspace() {
   const [blankPages, setBlankPages] = useState<BlankPageStage[]>([]);
   const [geometryEdits, setGeometryEdits] = useState<GeometryEdits>({});
   const [geometryPageKey, setGeometryPageKey] = useState('');
+  const [stagedAttachments, setStagedAttachments] = useState<PdfStagedAttachment[]>([]);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
 
@@ -274,6 +285,13 @@ export default function PdfWorkspace() {
     return edits && Object.keys(edits).length ? [{ page: index + 1, ...edits }] : [];
   });
   const stagedBlankPageCount = blankPages.reduce((sum, definition) => sum + (definition.count ?? 1), 0);
+  const attachmentError = attachmentStageError(stagedAttachments);
+  const attachmentSources = useMemo(() => items.map((item) => ({
+    id: item.id,
+    fileName: item.file.name,
+    attachments: item.inspection.attachments,
+    warnings: item.inspection.attachmentWarnings,
+  })), [items]);
 
   async function load(list: FileList | null) {
     if (!list?.length) return;
@@ -292,7 +310,7 @@ export default function PdfWorkspace() {
         }
       }
       setItems((current) => [...current, ...next]);
-      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, form handling, page geometry, document properties, and export settings before processing.`);
+      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, forms, attachments, page geometry, document properties, and export settings before processing.`);
     } catch (error) {
       setStatus(`Could not read PDF: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -402,8 +420,46 @@ export default function PdfWorkspace() {
     setStatus('Output properties cleared. Source metadata will remain omitted unless you enter replacement values.');
   }
 
+  function addAttachmentFiles(files: File[]) {
+    setStagedAttachments((current) => [...current, ...files.map(stagedAttachmentFromFile)]);
+    setStatus(`Staged ${files.length} output attachment${files.length === 1 ? '' : 's'} locally.`);
+  }
+
+  function updateStagedAttachment(id: string, patch: Partial<PdfStagedAttachment>) {
+    setStagedAttachments((current) => current.map((attachment) => attachment.id === id ? { ...attachment, ...patch } : attachment));
+  }
+
+  async function extractedSourceAttachment(sourceId: string, attachmentName: string) {
+    const item = items.find((candidate) => candidate.id === sourceId);
+    if (!item) throw new Error('The source PDF is no longer in the queue.');
+    const attachments = await extractPdfAttachments(new Uint8Array(await item.file.arrayBuffer()));
+    const attachment = attachments.find((candidate) => candidate.name === attachmentName);
+    if (!attachment) throw new Error(`Could not extract ${attachmentName} from ${item.file.name}.`);
+    return attachment;
+  }
+
+  async function downloadSourceAttachment(sourceId: string, attachmentName: string) {
+    try {
+      const attachment = await extractedSourceAttachment(sourceId, attachmentName);
+      downloadBytes(attachment.bytes, safeAttachmentDownloadFilename(attachment.name), attachment.mimeType || 'application/octet-stream');
+      setStatus(`Extracted ${attachment.name} locally from the source PDF.`);
+    } catch (error) {
+      setStatus(`Attachment extraction failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+  }
+
+  async function includeSourceAttachment(sourceId: string, attachmentName: string) {
+    try {
+      const attachment = await extractedSourceAttachment(sourceId, attachmentName);
+      setStagedAttachments((current) => [...current, stagedAttachmentFromExtracted(attachment)]);
+      setStatus(`Staged ${attachment.name} for explicit inclusion in the rebuilt output.`);
+    } catch (error) {
+      setStatus(`Could not stage source attachment: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+  }
+
   async function process() {
-    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError) return;
+    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError) return;
     setBusy(true);
     try {
       const selections = await Promise.all(items.map(async (item, index) => ({
@@ -413,14 +469,21 @@ export default function PdfWorkspace() {
         flatten,
       })));
       const blankDefinitions: PdfBlankPageDefinition[] = blankPages.map(({ afterPage, width, height, count }) => ({ afterPage, width, height, count }));
+      const attachments: PdfAttachmentDefinition[] = await attachmentDefinitionsFromStages(stagedAttachments);
       const bytes = await splicePdfs(selections, {
         metadata: authoredMetadata,
         blankPages: blankDefinitions,
         pageBoxEdits,
+        attachments,
       });
       const outputInspection = await inspectPdf(bytes);
       if (flatten && formFieldTotal > 0 && outputInspection.formFieldCount !== 0) {
         throw new Error('Output verification found editable form fields after flattening; no download was created.');
+      }
+      const expectedAttachmentNames = attachments.map((attachment) => attachment.name).sort();
+      const actualAttachmentNames = outputInspection.attachments.map((attachment) => attachment.name).sort();
+      if (JSON.stringify(actualAttachmentNames) !== JSON.stringify(expectedAttachmentNames)) {
+        throw new Error('Output verification found an attachment inventory mismatch; no download was created.');
       }
       const filename = safePdfFilename(outputFilename, outputName());
       downloadBytes(bytes, filename, 'application/pdf');
@@ -431,7 +494,7 @@ export default function PdfWorkspace() {
       const metadataSummary = authoredMetadataCount
         ? ` ${authoredMetadataCount} replacement metadata propert${authoredMetadataCount === 1 ? 'y was' : 'ies were'} intentionally written.`
         : ' No replacement metadata was written.';
-      const structureSummary = `${stagedBlankPageCount ? ` ${stagedBlankPageCount} blank page${stagedBlankPageCount === 1 ? '' : 's'} inserted.` : ''}${pageBoxEdits.length ? ` ${pageBoxEdits.length} output page${pageBoxEdits.length === 1 ? '' : 's'} received explicit page-box edits.` : ''}`;
+      const structureSummary = `${stagedBlankPageCount ? ` ${stagedBlankPageCount} blank page${stagedBlankPageCount === 1 ? '' : 's'} inserted.` : ''}${pageBoxEdits.length ? ` ${pageBoxEdits.length} output page${pageBoxEdits.length === 1 ? '' : 's'} received explicit page-box edits.` : ''}${attachments.length ? ` ${attachments.length} embedded attachment${attachments.length === 1 ? '' : 's'} explicitly authored.` : ' No embedded source attachments were carried forward.'}`;
       setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${formSummary}${metadataSummary}${structureSummary}`);
     } catch (error) {
       setStatus(`PDF processing failed: ${error instanceof Error ? error.message : 'unknown error'}`);
@@ -441,7 +504,7 @@ export default function PdfWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, form flattening, metadata, and export naming.</p></div></div>
+    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, form flattening, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input id="pdf-files" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append to the current queue instead of replacing it.</small></div>
 
@@ -460,7 +523,7 @@ export default function PdfWorkspace() {
             <div>
               <strong style={{ overflowWrap: 'anywhere' }}>{item.file.name}</strong>
               <div className="help-text">{item.inspection.pageCount} pages · {bytesLabel(item.file.size)}</div>
-              <div className="help-text">{item.inspection.formFieldCount} AcroForm field{item.inspection.formFieldCount === 1 ? '' : 's'} · {item.inspection.metadataFields.length ? `metadata: ${item.inspection.metadataFields.join(', ')}` : 'no common Info metadata detected'}</div>
+              <div className="help-text">{item.inspection.formFieldCount} AcroForm field{item.inspection.formFieldCount === 1 ? '' : 's'} · {item.inspection.attachments.length} embedded file{item.inspection.attachments.length === 1 ? '' : 's'} · {item.inspection.metadataFields.length ? `metadata: ${item.inspection.metadataFields.join(', ')}` : 'no common Info metadata detected'}</div>
             </div>
             <div className="field">
               <label htmlFor={`pages-${index}`}>Pages</label>
@@ -507,6 +570,19 @@ export default function PdfWorkspace() {
         </div>
         <div className="button-row"><button className="action-button secondary" type="button" onClick={resetExportProperties}>Clear replacement properties</button></div>
       </section> : null}
+
+      {items.length ? <>
+        <PdfAttachmentPanel
+          sources={attachmentSources}
+          staged={stagedAttachments}
+          onAddFiles={addAttachmentFiles}
+          onUpdate={updateStagedAttachment}
+          onRemove={(id) => setStagedAttachments((current) => current.filter((attachment) => attachment.id !== id))}
+          onDownloadSource={(sourceId, name) => { void downloadSourceAttachment(sourceId, name); }}
+          onIncludeSource={(sourceId, name) => { void includeSourceAttachment(sourceId, name); }}
+        />
+        {attachmentError ? <p className="help-text" role="alert">{attachmentError}</p> : null}
+      </> : null}
 
       {items.length && !hasPageError ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-blank-pages-title">
         <h3 id="pdf-blank-pages-title" style={{ margin: 0 }}>Blank page insertion</h3>
@@ -556,9 +632,9 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
-      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata is not intentionally carried forward. Replacement metadata above is opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
+      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata and output attachments are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
   </>;
 }
