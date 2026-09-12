@@ -3,10 +3,13 @@ import type {
   SketchArcEntity,
   SketchCircleEntity,
   SketchConstraint,
+  SketchEllipseEntity,
+  SketchEllipticalArcEntity,
   SketchLineEntity,
   SketchPointEntity,
   SketchSolveOptions,
   SketchSolveResult,
+  SketchSplineEntity,
 } from './sketch-types';
 
 interface PointIndex {
@@ -17,6 +20,16 @@ interface PointIndex {
 interface CircleIndex {
   circle: SketchCircleEntity;
   offset: number;
+}
+
+interface SketchIndex {
+  points: Map<string, PointIndex>;
+  lines: Map<string, SketchLineEntity>;
+  circles: Map<string, CircleIndex>;
+  arcs: Map<string, SketchArcEntity>;
+  ellipses: Map<string, SketchEllipseEntity>;
+  ellipticalArcs: Map<string, SketchEllipticalArcEntity>;
+  splines: Map<string, SketchSplineEntity>;
 }
 
 interface SolveCoreResult {
@@ -83,13 +96,56 @@ function arcIndex(sketch: CadSketch): Map<string, SketchArcEntity> {
   return result;
 }
 
-function initialValues(points: Map<string, PointIndex>, circles: Map<string, CircleIndex>): number[] {
-  const values = Array.from({ length: points.size * 2 + circles.size }, () => 0);
-  for (const { point, offset } of points.values()) {
+function ellipseIndex(sketch: CadSketch): Map<string, SketchEllipseEntity> {
+  const result = new Map<string, SketchEllipseEntity>();
+  for (const entity of sketch.entities) {
+    if (entity.type !== 'ellipse') continue;
+    if (result.has(entity.id)) throw new Error(`Duplicate sketch ellipse '${entity.id}'.`);
+    result.set(entity.id, entity);
+  }
+  return result;
+}
+
+function ellipticalArcIndex(sketch: CadSketch): Map<string, SketchEllipticalArcEntity> {
+  const result = new Map<string, SketchEllipticalArcEntity>();
+  for (const entity of sketch.entities) {
+    if (entity.type !== 'elliptical-arc') continue;
+    if (result.has(entity.id)) throw new Error(`Duplicate sketch elliptical arc '${entity.id}'.`);
+    result.set(entity.id, entity);
+  }
+  return result;
+}
+
+function splineIndex(sketch: CadSketch): Map<string, SketchSplineEntity> {
+  const result = new Map<string, SketchSplineEntity>();
+  for (const entity of sketch.entities) {
+    if (entity.type !== 'spline') continue;
+    if (result.has(entity.id)) throw new Error(`Duplicate sketch spline '${entity.id}'.`);
+    result.set(entity.id, entity);
+  }
+  return result;
+}
+
+function buildIndex(sketch: CadSketch): SketchIndex {
+  const points = pointIndex(sketch);
+  return {
+    points,
+    lines: lineIndex(sketch),
+    circles: circleIndex(sketch, points.size * 2),
+    arcs: arcIndex(sketch),
+    ellipses: ellipseIndex(sketch),
+    ellipticalArcs: ellipticalArcIndex(sketch),
+    splines: splineIndex(sketch),
+  };
+}
+
+function initialValues(index: SketchIndex): number[] {
+  const values = Array.from({ length: index.points.size * 2 + index.circles.size }, () => 0);
+  for (const { point, offset } of index.points.values()) {
     values[offset] = finite(point.x, `Point '${point.id}' x`);
     values[offset + 1] = finite(point.y, `Point '${point.id}' y`);
   }
-  for (const { circle, offset } of circles.values()) {
+  for (const { circle, offset } of index.circles.values()) {
     const radius = finite(circle.radius, `Circle '${circle.id}' radius`);
     if (radius <= 0) throw new Error(`Circle '${circle.id}' radius must be positive.`);
     values[offset] = radius;
@@ -97,65 +153,43 @@ function initialValues(points: Map<string, PointIndex>, circles: Map<string, Cir
   return values;
 }
 
-function coordinates(values: readonly number[], points: Map<string, PointIndex>, pointId: string): [number, number] {
-  const entry = points.get(pointId);
+function coordinates(values: readonly number[], index: SketchIndex, pointId: string): [number, number] {
+  const entry = index.points.get(pointId);
   if (!entry) throw new Error(`Constraint references missing point '${pointId}'.`);
   return [values[entry.offset]!, values[entry.offset + 1]!];
 }
 
-function linePoints(
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  lineId: string,
-): [[number, number], [number, number]] {
-  const line = lines.get(lineId);
+function linePoints(values: readonly number[], index: SketchIndex, lineId: string): [[number, number], [number, number]] {
+  const line = index.lines.get(lineId);
   if (!line) throw new Error(`Constraint references missing line '${lineId}'.`);
-  return [coordinates(values, points, line.startPointId), coordinates(values, points, line.endPointId)];
+  return [coordinates(values, index, line.startPointId), coordinates(values, index, line.endPointId)];
 }
 
-function circleRadius(values: readonly number[], circles: Map<string, CircleIndex>, circleId: string): number {
-  const entry = circles.get(circleId);
+function circleRadius(values: readonly number[], index: SketchIndex, circleId: string): number {
+  const entry = index.circles.get(circleId);
   if (!entry) throw new Error(`Constraint references missing circle '${circleId}'.`);
   return values[entry.offset]!;
 }
 
-function circleCenter(
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  circles: Map<string, CircleIndex>,
-  circleId: string,
-): [number, number] {
-  const entry = circles.get(circleId);
+function circleCenter(values: readonly number[], index: SketchIndex, circleId: string): [number, number] {
+  const entry = index.circles.get(circleId);
   if (!entry) throw new Error(`Constraint references missing circle '${circleId}'.`);
-  return coordinates(values, points, entry.circle.centerPointId);
+  return coordinates(values, index, entry.circle.centerPointId);
 }
 
-function curveCenter(
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
-  curveId: string,
-): [number, number] {
-  if (circles.has(curveId)) return circleCenter(values, points, circles, curveId);
-  const arc = arcs.get(curveId);
-  if (arc) return coordinates(values, points, arc.centerPointId);
+function curveCenter(values: readonly number[], index: SketchIndex, curveId: string): [number, number] {
+  if (index.circles.has(curveId)) return circleCenter(values, index, curveId);
+  const arc = index.arcs.get(curveId);
+  if (arc) return coordinates(values, index, arc.centerPointId);
   throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
 }
 
-function curveRadius(
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
-  curveId: string,
-): number {
-  if (circles.has(curveId)) return circleRadius(values, circles, curveId);
-  const arc = arcs.get(curveId);
+function curveRadius(values: readonly number[], index: SketchIndex, curveId: string): number {
+  if (index.circles.has(curveId)) return circleRadius(values, index, curveId);
+  const arc = index.arcs.get(curveId);
   if (arc) {
-    const [cx, cy] = coordinates(values, points, arc.centerPointId);
-    const [sx, sy] = coordinates(values, points, arc.startPointId);
+    const [cx, cy] = coordinates(values, index, arc.centerPointId);
+    const [sx, sy] = coordinates(values, index, arc.startPointId);
     const radius = Math.hypot(sx - cx, sy - cy);
     if (radius <= MIN_GEOMETRY_SCALE) throw new Error(`Arc '${arc.id}' start point must differ from its center.`);
     return radius;
@@ -163,16 +197,12 @@ function curveRadius(
   throw new Error(`Constraint references missing circle or arc '${curveId}'.`);
 }
 
-function arcIntrinsicResiduals(
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  arcs: Map<string, SketchArcEntity>,
-): number[] {
+function arcIntrinsicResiduals(values: readonly number[], index: SketchIndex): number[] {
   const residuals: number[] = [];
-  for (const arc of arcs.values()) {
-    const [cx, cy] = coordinates(values, points, arc.centerPointId);
-    const [sx, sy] = coordinates(values, points, arc.startPointId);
-    const [ex, ey] = coordinates(values, points, arc.endPointId);
+  for (const arc of index.arcs.values()) {
+    const [cx, cy] = coordinates(values, index, arc.centerPointId);
+    const [sx, sy] = coordinates(values, index, arc.startPointId);
+    const [ex, ey] = coordinates(values, index, arc.endPointId);
     const startRadius = Math.hypot(sx - cx, sy - cy);
     const endRadius = Math.hypot(ex - cx, ey - cy);
     residuals.push(endRadius - startRadius);
@@ -180,107 +210,121 @@ function arcIntrinsicResiduals(
   return residuals;
 }
 
-function fixedEntityResidual(
-  entityId: string,
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-): number[] {
-  const point = points.get(entityId);
+function fixedPointResidual(values: readonly number[], index: SketchIndex, pointId: string, entityId: string): [number, number] {
+  const entry = index.points.get(pointId);
+  if (!entry) throw new Error(`Fixed entity '${entityId}' references missing point '${pointId}'.`);
+  return [values[entry.offset]! - entry.point.x, values[entry.offset + 1]! - entry.point.y];
+}
+
+function fixedEntityResidual(entityId: string, values: readonly number[], index: SketchIndex): number[] {
+  const point = index.points.get(entityId);
   if (point) {
     return [values[point.offset]! - point.point.x, values[point.offset + 1]! - point.point.y];
   }
 
-  const line = lines.get(entityId);
+  const line = index.lines.get(entityId);
   if (line) {
-    const start = points.get(line.startPointId);
-    const end = points.get(line.endPointId);
-    if (!start || !end) throw new Error(`Fixed line '${entityId}' references missing endpoint geometry.`);
     return [
-      values[start.offset]! - start.point.x,
-      values[start.offset + 1]! - start.point.y,
-      values[end.offset]! - end.point.x,
-      values[end.offset + 1]! - end.point.y,
+      ...fixedPointResidual(values, index, line.startPointId, entityId),
+      ...fixedPointResidual(values, index, line.endPointId, entityId),
     ];
   }
 
-  const circle = circles.get(entityId);
+  const circle = index.circles.get(entityId);
   if (circle) {
-    const center = points.get(circle.circle.centerPointId);
-    if (!center) throw new Error(`Fixed circle '${entityId}' references a missing center point.`);
+    return [...fixedPointResidual(values, index, circle.circle.centerPointId, entityId), values[circle.offset]! - circle.circle.radius];
+  }
+
+  const arc = index.arcs.get(entityId);
+  if (arc) {
     return [
-      values[center.offset]! - center.point.x,
-      values[center.offset + 1]! - center.point.y,
-      values[circle.offset]! - circle.circle.radius,
+      ...fixedPointResidual(values, index, arc.centerPointId, entityId),
+      ...fixedPointResidual(values, index, arc.startPointId, entityId),
+      ...fixedPointResidual(values, index, arc.endPointId, entityId),
     ];
+  }
+
+  const ellipse = index.ellipses.get(entityId);
+  if (ellipse) {
+    return [
+      ...fixedPointResidual(values, index, ellipse.centerPointId, entityId),
+      ...fixedPointResidual(values, index, ellipse.majorAxisPointId, entityId),
+    ];
+  }
+
+  const ellipticalArc = index.ellipticalArcs.get(entityId);
+  if (ellipticalArc) {
+    return [
+      ...fixedPointResidual(values, index, ellipticalArc.centerPointId, entityId),
+      ...fixedPointResidual(values, index, ellipticalArc.majorAxisPointId, entityId),
+      ...fixedPointResidual(values, index, ellipticalArc.startPointId, entityId),
+      ...fixedPointResidual(values, index, ellipticalArc.endPointId, entityId),
+    ];
+  }
+
+  const spline = index.splines.get(entityId);
+  if (spline) {
+    return spline.fitPointIds.flatMap((fitPointId) => fixedPointResidual(values, index, fitPointId, entityId));
   }
 
   throw new Error(`Fixed-entity constraint references missing entity '${entityId}'.`);
 }
 
-function residualForConstraint(
-  constraint: SketchConstraint,
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
-): number[] {
+function residualForConstraint(constraint: SketchConstraint, values: readonly number[], index: SketchIndex): number[] {
   switch (constraint.type) {
     case 'fixed-point': {
-      const [x, y] = coordinates(values, points, constraint.pointId);
+      const [x, y] = coordinates(values, index, constraint.pointId);
       return [x - constraint.x, y - constraint.y];
     }
     case 'fixed-entity':
-      return fixedEntityResidual(constraint.entityId, values, points, lines, circles);
+      return fixedEntityResidual(constraint.entityId, values, index);
     case 'horizontal': {
-      const [[, ay], [, by]] = linePoints(values, points, lines, constraint.lineId);
+      const [[, ay], [, by]] = linePoints(values, index, constraint.lineId);
       return [by - ay];
     }
     case 'vertical': {
-      const [[ax], [bx]] = linePoints(values, points, lines, constraint.lineId);
+      const [[ax], [bx]] = linePoints(values, index, constraint.lineId);
       return [bx - ax];
     }
     case 'distance': {
-      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const [a, b] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
       return [Math.hypot(b[0] - a[0], b[1] - a[1]) - constraint.value];
     }
     case 'horizontal-distance': {
-      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const [a, b] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
       const target = finite(constraint.value, `Horizontal-distance constraint '${constraint.id}' value`);
       return [(b[0] - a[0]) - target];
     }
     case 'vertical-distance': {
-      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const [a, b] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
       const target = finite(constraint.value, `Vertical-distance constraint '${constraint.id}' value`);
       return [(b[1] - a[1]) - target];
     }
     case 'length': {
-      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const [[ax, ay], [bx, by]] = linePoints(values, index, constraint.lineId);
       const target = finite(constraint.value, `Length constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Length constraint '${constraint.id}' value must be positive.`);
       return [Math.hypot(bx - ax, by - ay) - target];
     }
     case 'coincident': {
-      const [a, b] = [coordinates(values, points, constraint.pointAId), coordinates(values, points, constraint.pointBId)];
+      const [a, b] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
       return [b[0] - a[0], b[1] - a[1]];
     }
     case 'radius': {
       const target = finite(constraint.value, `Radius constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Radius constraint '${constraint.id}' value must be positive.`);
-      return [curveRadius(values, points, circles, arcs, constraint.circleId) - target];
+      return [curveRadius(values, index, constraint.circleId) - target];
     }
     case 'diameter': {
       const target = finite(constraint.value, `Diameter constraint '${constraint.id}' value`);
       if (target <= 0) throw new Error(`Diameter constraint '${constraint.id}' value must be positive.`);
-      return [2 * curveRadius(values, points, circles, arcs, constraint.circleId) - target];
+      return [2 * curveRadius(values, index, constraint.circleId) - target];
     }
     case 'angle': {
       const target = finite(constraint.value, `Angle constraint '${constraint.id}' value`);
       if (target < 0 || target > Math.PI) throw new Error(`Angle constraint '${constraint.id}' value must be between 0 and pi radians.`);
-      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
-      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const [a0, a1] = linePoints(values, index, constraint.lineAId);
+      const [b0, b1] = linePoints(values, index, constraint.lineBId);
       const adx = a1[0] - a0[0];
       const ady = a1[1] - a0[1];
       const bdx = b1[0] - b0[0];
@@ -290,8 +334,8 @@ function residualForConstraint(
       return [(adx * bdx + ady * bdy) / scale - Math.cos(target)];
     }
     case 'perpendicular': {
-      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
-      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const [a0, a1] = linePoints(values, index, constraint.lineAId);
+      const [b0, b1] = linePoints(values, index, constraint.lineBId);
       const adx = a1[0] - a0[0];
       const ady = a1[1] - a0[1];
       const bdx = b1[0] - b0[0];
@@ -301,8 +345,8 @@ function residualForConstraint(
       return [(adx * bdx + ady * bdy) / scale];
     }
     case 'parallel': {
-      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
-      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const [a0, a1] = linePoints(values, index, constraint.lineAId);
+      const [b0, b1] = linePoints(values, index, constraint.lineBId);
       const adx = a1[0] - a0[0];
       const ady = a1[1] - a0[1];
       const bdx = b1[0] - b0[0];
@@ -312,9 +356,9 @@ function residualForConstraint(
       return [(adx * bdy - ady * bdx) / scale];
     }
     case 'tangent': {
-      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
-      const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
-      const radius = circleRadius(values, circles, constraint.circleId);
+      const [[ax, ay], [bx, by]] = linePoints(values, index, constraint.lineId);
+      const [cx, cy] = circleCenter(values, index, constraint.circleId);
+      const radius = circleRadius(values, index, constraint.circleId);
       const dx = bx - ax;
       const dy = by - ay;
       const length = Math.hypot(dx, dy);
@@ -323,30 +367,27 @@ function residualForConstraint(
       return [distance - radius];
     }
     case 'concentric': {
-      const [ax, ay] = curveCenter(values, points, circles, arcs, constraint.circleAId);
-      const [bx, by] = curveCenter(values, points, circles, arcs, constraint.circleBId);
+      const [ax, ay] = curveCenter(values, index, constraint.circleAId);
+      const [bx, by] = curveCenter(values, index, constraint.circleBId);
       return [bx - ax, by - ay];
     }
     case 'equal-length': {
-      const [a0, a1] = linePoints(values, points, lines, constraint.lineAId);
-      const [b0, b1] = linePoints(values, points, lines, constraint.lineBId);
+      const [a0, a1] = linePoints(values, index, constraint.lineAId);
+      const [b0, b1] = linePoints(values, index, constraint.lineBId);
       const aLength = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
       const bLength = Math.hypot(b1[0] - b0[0], b1[1] - b0[1]);
       return [bLength - aLength];
     }
     case 'equal-radius':
-      return [
-        curveRadius(values, points, circles, arcs, constraint.circleBId) -
-          curveRadius(values, points, circles, arcs, constraint.circleAId),
-      ];
+      return [curveRadius(values, index, constraint.circleBId) - curveRadius(values, index, constraint.circleAId)];
     case 'midpoint': {
-      const [px, py] = coordinates(values, points, constraint.pointId);
-      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const [px, py] = coordinates(values, index, constraint.pointId);
+      const [[ax, ay], [bx, by]] = linePoints(values, index, constraint.lineId);
       return [px - (ax + bx) / 2, py - (ay + by) / 2];
     }
     case 'point-on-line': {
-      const [px, py] = coordinates(values, points, constraint.pointId);
-      const [[ax, ay], [bx, by]] = linePoints(values, points, lines, constraint.lineId);
+      const [px, py] = coordinates(values, index, constraint.pointId);
+      const [[ax, ay], [bx, by]] = linePoints(values, index, constraint.lineId);
       const dx = bx - ax;
       const dy = by - ay;
       const length = Math.hypot(dx, dy);
@@ -354,17 +395,14 @@ function residualForConstraint(
       return [(dx * (py - ay) - dy * (px - ax)) / length];
     }
     case 'point-on-circle': {
-      const [px, py] = coordinates(values, points, constraint.pointId);
-      const [cx, cy] = circleCenter(values, points, circles, constraint.circleId);
-      const radius = circleRadius(values, circles, constraint.circleId);
+      const [px, py] = coordinates(values, index, constraint.pointId);
+      const [cx, cy] = circleCenter(values, index, constraint.circleId);
+      const radius = circleRadius(values, index, constraint.circleId);
       return [Math.hypot(px - cx, py - cy) - radius];
     }
     case 'symmetric-points': {
-      const [pointA, pointB] = [
-        coordinates(values, points, constraint.pointAId),
-        coordinates(values, points, constraint.pointBId),
-      ];
-      const [axisStart, axisEnd] = linePoints(values, points, lines, constraint.axisLineId);
+      const [pointA, pointB] = [coordinates(values, index, constraint.pointAId), coordinates(values, index, constraint.pointBId)];
+      const [axisStart, axisEnd] = linePoints(values, index, constraint.axisLineId);
       const dx = axisEnd[0] - axisStart[0];
       const dy = axisEnd[1] - axisStart[1];
       const length = Math.hypot(dx, dy);
@@ -378,17 +416,10 @@ function residualForConstraint(
   }
 }
 
-function residualVector(
-  constraints: readonly SketchConstraint[],
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
-): number[] {
+function residualVector(constraints: readonly SketchConstraint[], values: readonly number[], index: SketchIndex): number[] {
   return [
-    ...constraints.flatMap((constraint) => residualForConstraint(constraint, values, points, lines, circles, arcs)),
-    ...arcIntrinsicResiduals(values, points, arcs),
+    ...constraints.flatMap((constraint) => residualForConstraint(constraint, values, index)),
+    ...arcIntrinsicResiduals(values, index),
   ];
 }
 
@@ -396,15 +427,8 @@ function norm(values: readonly number[]): number {
   return Math.sqrt(values.reduce((sum, value) => sum + value * value, 0));
 }
 
-function numericJacobian(
-  constraints: readonly SketchConstraint[],
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
-): number[][] {
-  const base = residualVector(constraints, values, points, lines, circles, arcs);
+function numericJacobian(constraints: readonly SketchConstraint[], values: readonly number[], index: SketchIndex): number[][] {
+  const base = residualVector(constraints, values, index);
   const jacobian = Array.from({ length: base.length }, () => Array.from({ length: values.length }, () => 0));
   for (let column = 0; column < values.length; column += 1) {
     const step = Math.max(1e-7, Math.abs(values[column]!) * 1e-7);
@@ -412,8 +436,8 @@ function numericJacobian(
     const minus = [...values];
     plus[column] = plus[column]! + step;
     minus[column] = minus[column]! - step;
-    const plusResidual = residualVector(constraints, plus, points, lines, circles, arcs);
-    const minusResidual = residualVector(constraints, minus, points, lines, circles, arcs);
+    const plusResidual = residualVector(constraints, plus, index);
+    const minusResidual = residualVector(constraints, minus, index);
     for (let row = 0; row < base.length; row += 1) {
       jacobian[row]![column] = (plusResidual[row]! - minusResidual[row]!) / (2 * step);
     }
@@ -498,22 +522,19 @@ function matrixRank(matrix: readonly number[][], tolerance = 1e-8): number {
 function solveCore(
   constraints: readonly SketchConstraint[],
   startingValues: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
+  index: SketchIndex,
   tolerance: number,
   maxIterations: number,
 ): SolveCoreResult {
   let values = [...startingValues];
   let damping = 1e-6;
-  let residuals = residualVector(constraints, values, points, lines, circles, arcs);
+  let residuals = residualVector(constraints, values, index);
   let error = norm(residuals);
   if (error <= tolerance || residuals.length === 0) return { values, converged: true, residual: error, iterations: 0 };
 
   let iterations = 0;
   for (; iterations < maxIterations; iterations += 1) {
-    const jacobian = numericJacobian(constraints, values, points, lines, circles, arcs);
+    const jacobian = numericJacobian(constraints, values, index);
     let accepted = false;
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const { matrix, rhs } = normalEquations(jacobian, residuals, damping);
@@ -522,8 +543,8 @@ function solveCore(
         damping *= 10;
         continue;
       }
-      const trial = values.map((value, index) => value + delta[index]!);
-      const trialResiduals = residualVector(constraints, trial, points, lines, circles, arcs);
+      const trial = values.map((value, column) => value + delta[column]!);
+      const trialResiduals = residualVector(constraints, trial, index);
       const trialError = norm(trialResiduals);
       if (trialError < error) {
         values = trial;
@@ -541,21 +562,16 @@ function solveCore(
   return { values, converged: error <= tolerance, residual: error, iterations };
 }
 
-function sketchWithValues(
-  sketch: CadSketch,
-  values: readonly number[],
-  points: Map<string, PointIndex>,
-  circles: Map<string, CircleIndex>,
-): CadSketch {
+function sketchWithValues(sketch: CadSketch, values: readonly number[], index: SketchIndex): CadSketch {
   return {
     ...sketch,
     entities: sketch.entities.map((entity) => {
       if (entity.type === 'point') {
-        const entry = points.get(entity.id);
+        const entry = index.points.get(entity.id);
         return entry ? { ...entity, x: values[entry.offset]!, y: values[entry.offset + 1]! } : { ...entity };
       }
       if (entity.type === 'circle') {
-        const entry = circles.get(entity.id);
+        const entry = index.circles.get(entity.id);
         return entry ? { ...entity, radius: values[entry.offset]! } : { ...entity };
       }
       return { ...entity };
@@ -567,17 +583,14 @@ function sketchWithValues(
 function conflictIds(
   constraints: readonly SketchConstraint[],
   values: readonly number[],
-  points: Map<string, PointIndex>,
-  lines: Map<string, SketchLineEntity>,
-  circles: Map<string, CircleIndex>,
-  arcs: Map<string, SketchArcEntity>,
+  index: SketchIndex,
   tolerance: number,
   maxIterations: number,
 ): string[] {
   const conflicts: string[] = [];
   for (const candidate of constraints) {
     const reduced = constraints.filter((constraint) => constraint.id !== candidate.id);
-    const result = solveCore(reduced, values, points, lines, circles, arcs, tolerance, maxIterations);
+    const result = solveCore(reduced, values, index, tolerance, maxIterations);
     if (result.converged) conflicts.push(candidate.id);
   }
   return conflicts.length ? conflicts : constraints.map((constraint) => constraint.id);
@@ -590,41 +603,38 @@ export function solveSketch(sketch: CadSketch, options: SketchSolveOptions = {})
   if (tolerance <= 0) throw new Error('Sketch tolerance must be positive.');
   if (!Number.isInteger(maxIterations) || maxIterations <= 0) throw new Error('Sketch maxIterations must be a positive integer.');
 
-  const points = pointIndex(sketch);
-  const lines = lineIndex(sketch);
-  const circles = circleIndex(sketch, points.size * 2);
-  const arcs = arcIndex(sketch);
+  const index = buildIndex(sketch);
   const constraints = activeConstraints(sketch);
-  const initial = initialValues(points, circles);
-  let core = solveCore(constraints, initial, points, lines, circles, arcs, tolerance, maxIterations);
+  const initial = initialValues(index);
+  let core = solveCore(constraints, initial, index, tolerance, maxIterations);
 
-  const hardJacobian = numericJacobian(constraints, core.values, points, lines, circles, arcs);
+  const hardJacobian = numericJacobian(constraints, core.values, index);
   const degreesOfFreedom = Math.max(0, core.values.length - matrixRank(hardJacobian));
 
   if (core.converged && degreesOfFreedom > 0 && options.dragTarget) {
-    const target = points.get(options.dragTarget.pointId);
+    const target = index.points.get(options.dragTarget.pointId);
     if (!target) throw new Error(`Drag target references missing point '${options.dragTarget.pointId}'.`);
     const seeded = [...core.values];
     seeded[target.offset] = finite(options.dragTarget.x, 'Drag target x');
     seeded[target.offset + 1] = finite(options.dragTarget.y, 'Drag target y');
-    const dragged = solveCore(constraints, seeded, points, lines, circles, arcs, tolerance, maxIterations);
+    const dragged = solveCore(constraints, seeded, index, tolerance, maxIterations);
     if (dragged.converged) core = dragged;
   }
 
   if (!core.converged) {
     return {
-      sketch: sketchWithValues(sketch, core.values, points, circles),
+      sketch: sketchWithValues(sketch, core.values, index),
       converged: false,
       constraintState: 'over',
       degreesOfFreedom,
       residual: core.residual,
-      conflicts: conflictIds(constraints, initial, points, lines, circles, arcs, tolerance, maxIterations),
+      conflicts: conflictIds(constraints, initial, index, tolerance, maxIterations),
       iterations: core.iterations,
     };
   }
 
   return {
-    sketch: sketchWithValues(sketch, core.values, points, circles),
+    sketch: sketchWithValues(sketch, core.values, index),
     converged: true,
     constraintState: degreesOfFreedom === 0 ? 'fully' : 'under',
     degreesOfFreedom,
