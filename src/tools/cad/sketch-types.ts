@@ -209,6 +209,12 @@ export interface PointOnCircleConstraint extends ConstraintBase {
   circleId: string;
 }
 
+export interface PointOnCurveConstraint extends ConstraintBase {
+  type: 'point-on-curve';
+  pointId: string;
+  curveId: string;
+}
+
 export interface SymmetricPointsConstraint extends ConstraintBase {
   type: 'symmetric-points';
   pointAId: string;
@@ -238,6 +244,7 @@ export type SketchConstraint =
   | MidpointConstraint
   | PointOnLineConstraint
   | PointOnCircleConstraint
+  | PointOnCurveConstraint
   | SymmetricPointsConstraint;
 
 export type SketchPlane =
