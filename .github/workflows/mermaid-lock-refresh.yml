@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/mermaid-lock-refresh.yml
       - package.json
+      - pnpm-workspace.yaml
       - pnpm-lock.yaml
 
 permissions:
@@ -29,33 +30,26 @@ jobs:
           runtime: node@24
           install: false
 
-      - name: Pin patched transitive dependency
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const path = 'package.json';
-          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.pnpm = pkg.pnpm || {};
-          pkg.pnpm.overrides = { ...(pkg.pnpm.overrides || {}), 'lodash-es': '4.18.1' };
-          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
-          NODE
-
-      - name: Resolve exact Mermaid dependency graph
-        run: |
-          pnpm add mermaid@12.0.0 --save-exact --lockfile-only
-          pnpm install --lockfile-only
+      - name: Regenerate exact dependency graph
+        run: pnpm install --lockfile-only --no-frozen-lockfile
 
       - name: Verify exact pins
-        run: node -e "const p=require('./package.json'); if(p.dependencies.mermaid!=='12.0.0'||p.pnpm?.overrides?.['lodash-es']!=='4.18.1') process.exit(1)"
-
-      - name: Commit generated manifest and lockfile
         run: |
-          if git diff --quiet -- package.json pnpm-lock.yaml; then
-            echo 'No dependency changes generated.'
+          node -e "const p=require('./package.json'); if(p.dependencies.mermaid!=='12.0.0') process.exit(1)"
+          node -e "const fs=require('node:fs'); const w=fs.readFileSync('pnpm-workspace.yaml','utf8'); if(!/overrides:\s*[\s\S]*lodash-es:\s*4\.18\.1/.test(w)) process.exit(1)"
+          if grep -q 'lodash-es@4.17.23' pnpm-lock.yaml; then
+            echo 'Vulnerable lodash-es 4.17.23 is still present in the lockfile.'
+            exit 1
+          fi
+
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo 'No lockfile changes generated.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json pnpm-lock.yaml
-          git commit -m 'chore(deps): pin patched Mermaid dependency graph'
+          git add pnpm-lock.yaml
+          git commit -m 'chore(deps): apply pnpm 12 dependency override'
           git push origin HEAD:${{ github.ref_name }}
