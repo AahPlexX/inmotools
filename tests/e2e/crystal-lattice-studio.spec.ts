@@ -14,12 +14,12 @@ test('opens Crystal Lattice Studio through the catalog and keeps the engine loca
 
 test('renders an interactive crystal viewport for the selected starter', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
-  await page.getByLabel('Starter structure').selectOption('nacl');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
 
   await expect(page.getByRole('img', { name: /interactive crystal structure/i })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Fit structure' })).toBeEnabled();
-  await expect(page.getByLabel('Representation')).toHaveValue('ball-stick');
+  await expect(page.getByRole('combobox', { name: 'Representation' })).toHaveValue('ball-stick');
 
-  await page.getByLabel('Representation').selectOption('space-fill');
-  await expect(page.getByLabel('Representation')).toHaveValue('space-fill');
+  await page.getByRole('combobox', { name: 'Representation' }).selectOption('space-fill');
+  await expect(page.getByRole('combobox', { name: 'Representation' })).toHaveValue('space-fill');
 });
