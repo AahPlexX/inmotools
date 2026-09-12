@@ -12,6 +12,13 @@ describe('Mermaid dependency policy', () => {
     const packageJson = readJson<{ dependencies: Record<string, string> }>('../../package.json');
     expect(packageJson.dependencies.mermaid).toBe('12.0.0');
   });
+
+  it('overrides Mermaid parser transitive lodash-es to the current patched stable release', () => {
+    const packageJson = readJson<{
+      pnpm?: { overrides?: Record<string, string> };
+    }>('../../package.json');
+    expect(packageJson.pnpm?.overrides?.['lodash-es']).toBe('4.18.1');
+  });
 });
 
 describe('Mermaid offline chunk recovery', () => {
