@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `49dfcddfa5f5add1d6778c923a5960e2f323c265`
+**Last tracked implementation commit:** `6146ef1df8f9c898dde952bd82047b708a755e12`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 16
 **Capability target:** 195
@@ -71,9 +71,10 @@ A capability counts only when production behavior exists, relevant validation pa
 - Advanced sketch entity support through `d438aed7e00b19a788b0789147e8a3521c27e3c1` adds serializable arc, ellipse, elliptical-arc, and spline contracts plus pre-kernel geometry validation. Run `34664168754` passed all five advanced-entity tests and 683 tests overall before the expected stale-ledger guard. A later aligned run passed 684/684 CAD-era unit tests; transient shared-main Crystal Studio failures were isolated and not modified under CAD-only authority.
 - Constraint-inference RED is committed at `2881645e86a75b065cfa2fa62d229d6cc1850a7c`; run `34664385049` failed for the intended missing `sketch-inference` module while the unrelated Crystal module was also transiently absent on that synthetic merge.
 - Explicit constraint proposals are implemented at `49dfcddfa5f5add1d6778c923a5960e2f323c265`. Run `34664438312` passed all five inference tests and **692 tests overall**; its only failure was the expected stale CAD progress SHA. The current-main Crystal tests were green in that run. Proposals are deterministic, non-mutating, confidence-ranked, duplicate-suppressed even against disabled equivalents, and include horizontal, vertical, coincident, and finite-line/circle tangency inference.
+- Advanced-curve RED landed at `9d53f772e5d696cfa023903888cce56955a04617` (three new fixtures covering full-ellipse/closed-spline intrinsic closure, mixed arc-and-line loops, and open-spline/elliptical-arc endpoint diagnostics). GREEN followed at `6146ef1df8f9c898dde952bd82047b708a755e12`, generalizing profile-region detection onto a shared connectable-entity abstraction (line, arc, elliptical-arc, open spline) while keeping duplicate/overlap/self-intersection checks scoped to straight lines. A local `pnpm test:unit` run passed all 8 `cad-sketch-diagnostics` cases and **690/692 tests overall**; the only failures were the expected stale CAD progress SHA (now corrected below) and a pre-existing, unrelated `markdown-citation` timeout not touched under CAD-only authority.
 - Current dependency research corroborates `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`; fresh verification remains mandatory immediately before installation and no lockfile is hand-edited.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. Unrelated-domain and superseded exclusions remain documented in the expansion spec. There are no current `other` exclusions.
-- G4 remains open until advanced profile handling and the numerical-library policy are satisfied; foundations alone do not count as completed user-facing capabilities.
+- G4 remains open: the numerical-library policy and profile/geometry diagnostics (including advanced curves) are now satisfied, but `sketch-solver.ts` still only resolves the point/line/circle constraint family — arc, ellipse, elliptical-arc, and spline entities have no geometric/dimensional constraint or DOF/conflict coverage yet, and foundations alone do not count as completed user-facing capabilities.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation.
 
 ## Freshness invariant
