@@ -1,5 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { expect, test } from '@playwright/test';
+import { extractPdfAttachments } from '../../src/tools/pdf/pdf-engine';
 
 async function plainPdf(width = 300) {
   const doc = await PDFDocument.create();
@@ -13,6 +14,16 @@ async function editableFormPdf() {
   const field = doc.getForm().createTextField('name');
   field.addToPage(page, { x: 20, y: 120, width: 150, height: 24 });
   field.setText('Editable source');
+  return Buffer.from(await doc.save());
+}
+
+async function attachmentPdf() {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 200]);
+  await doc.attach(new TextEncoder().encode('source evidence'), 'source.txt', {
+    mimeType: 'text/plain',
+    description: 'Source evidence note',
+  });
   return Buffer.from(await doc.save());
 }
 
@@ -124,4 +135,35 @@ test('inserts blank pages, edits page boxes, and writes metadata dates through t
   expect(output.getModificationDate()?.toISOString()).toBe('2026-09-12T14:45:00.000Z');
   expect(output.getPage(1).getSize()).toEqual({ width: 612, height: 792 });
   expect(output.getPage(1).getCropBox()).toEqual({ x: 10, y: 20, width: 500, height: 700 });
+});
+
+test('inventories, extracts, and authors embedded file attachments without silently carrying source files forward', async ({ page }) => {
+  await page.goto('./#/tools/pdf-sanitizer');
+  await page.getByLabel('Add PDF files').setInputFiles({ name: 'case.pdf', mimeType: 'application/pdf', buffer: await attachmentPdf() });
+
+  await expect(page.getByRole('heading', { name: 'Embedded files & attachments' })).toBeVisible();
+  await expect(page.getByTestId('pdf-source-attachment')).toContainText('source.txt');
+  await expect(page.getByTestId('pdf-source-attachment')).toContainText('Source evidence note');
+
+  const sourceDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download source.txt' }).click();
+  expect((await downloadBytes(await sourceDownload)).toString('utf8')).toBe('source evidence');
+
+  await page.getByLabel('Add output attachments').setInputFiles({
+    name: 'evidence.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('output evidence'),
+  });
+  await page.getByLabel('Attachment description for evidence.txt').fill('Filed evidence');
+  await page.getByLabel('Attachment creation date/time for evidence.txt (UTC)').fill('2026-09-12T10:30');
+  await page.getByLabel('Attachment modification date/time for evidence.txt (UTC)').fill('2026-09-12T14:45');
+
+  const outputDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Process and download' }).click();
+  const extracted = await extractPdfAttachments(new Uint8Array(await downloadBytes(await outputDownload)));
+  expect(extracted.map((attachment) => attachment.name)).toEqual(['evidence.txt']);
+  expect(new TextDecoder().decode(extracted[0].bytes)).toBe('output evidence');
+  expect(extracted[0].description).toBe('Filed evidence');
+  expect(extracted[0].creationDate?.toISOString()).toBe('2026-09-12T10:30:00.000Z');
+  expect(extracted[0].modificationDate?.toISOString()).toBe('2026-09-12T14:45:00.000Z');
 });
