@@ -127,7 +127,31 @@ function serializeElement(element: VectorElement, definitions: string[]): string
     case 'group': {
       const children = element.children.map((child) => serializeElement(child, definitions)).join('');
       const transform = elementTransform(element);
-      return `<g id="${id}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''}${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}>${description}${children}</g>`;
+      let compositionAttribute = '';
+      if (element.composition) {
+        const compositionId = `${element.composition.mode === 'clip' ? 'clip' : 'mask'}-${safeId(element.id)}`;
+        if (element.composition.mode === 'clip') {
+          const shape = serializeElement({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          definitions.push(`<clipPath id="${escapeAttribute(compositionId)}">${shape}</clipPath>`);
+          compositionAttribute = ` clip-path="url(#${escapeAttribute(compositionId)})"`;
+        } else {
+          const maskShape = serializeElement({
+            ...element.composition.shape,
+            visible: true,
+            opacity: 1,
+            fill: { kind: 'solid', color: '#000000' },
+            stroke: { ...element.composition.shape.stroke, width: 0 },
+            blendMode: 'normal',
+          } as VectorElement, definitions);
+          const maskX = element.x;
+          const maskY = element.y;
+          const maskWidth = Math.max(1, element.width);
+          const maskHeight = Math.max(1, element.height);
+          definitions.push(`<mask id="${escapeAttribute(compositionId)}" maskUnits="userSpaceOnUse" x="${number(maskX)}" y="${number(maskY)}" width="${number(maskWidth)}" height="${number(maskHeight)}" style="mask-type:luminance"><rect x="${number(maskX)}" y="${number(maskY)}" width="${number(maskWidth)}" height="${number(maskHeight)}" fill="#ffffff"/>${maskShape}</mask>`);
+          compositionAttribute = ` mask="url(#${escapeAttribute(compositionId)})"`;
+        }
+      }
+      return `<g id="${id}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''}${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}${compositionAttribute}>${description}${children}</g>`;
     }
     case 'symbol-instance':
       return `<use ${common} href="#${escapeAttribute(safeId(element.symbolId))}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}">${description}</use>`;
