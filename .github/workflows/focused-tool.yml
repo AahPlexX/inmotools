@@ -2,7 +2,7 @@ name: Focused tool validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/vector-spec-completion]
   workflow_dispatch:
 
 permissions:
