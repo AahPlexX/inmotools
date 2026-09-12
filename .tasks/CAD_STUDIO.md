@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `d438aed7e00b19a788b0789147e8a3521c27e3c1`
+**Last tracked implementation commit:** `49dfcddfa5f5add1d6778c923a5960e2f323c265`
 **Current gate:** G4 — named parameters and constrained sketch system
 **Completed gates:** 4 / 16
 **Capability target:** 195
@@ -67,12 +67,13 @@ A capability counts only when production behavior exists, relevant validation pa
 - G1–G3 remain green from committed unit/build checkpoints.
 - Parameter/formula dimensions, reference dimensions, public sketch analysis, DOF/conflict reporting, and the point/line/circle constraint family are implemented and green at their aligned checkpoints.
 - The living capability-floor policy and expanded 16-gate completion guard are committed and green; the authoritative floor is currently 195 and may increase.
-- Profile diagnostics are implemented at `a14fc812e64a5d30e2426a43488b295fefedfeef`: closed line/circle regions, open endpoints, micro-gaps, duplicate/overlapping lines, and interior self-intersections are deterministic and non-mutating. Tracker-aligned run `34663848767` passed the full unit suite and production build.
-- Advanced sketch entities are implemented through `5e945ccd65df32ceeb767b42bb0f8290b5771ea6` with serializable arc, ellipse, elliptical-arc, and spline contracts plus pre-kernel geometry validation. The final expectation correction at `d438aed7e00b19a788b0789147e8a3521c27e3c1` preserves multiple actionable diagnostics per malformed entity. Run `34664168754` passed all five advanced-entity tests and 683 tests overall before the expected stale-ledger guard.
-- Tracker-aligned run `34664264875` passed **684/684 unit tests**, including the dynamic completion guard. Its production build was blocked after unit success by a transient unrelated `main` mismatch: `ToolSlug` required `crystal-lattice-studio` while that synthetic-merge revision lacked the corresponding workspace loader. Current `main` now contains `crystal-lattice-studio: () => import('./crystal/CrystalWorkspace')`; CAD did not modify that shared code. This tracker-only commit triggers revalidation against the repaired base.
+- Profile diagnostics at `a14fc812e64a5d30e2426a43488b295fefedfeef` cover deterministic non-mutating closed line/circle regions, open endpoints, micro-gaps, duplicate/overlapping lines, and interior self-intersections. Aligned run `34663848767` passed the full unit suite and production build.
+- Advanced sketch entity support through `d438aed7e00b19a788b0789147e8a3521c27e3c1` adds serializable arc, ellipse, elliptical-arc, and spline contracts plus pre-kernel geometry validation. Run `34664168754` passed all five advanced-entity tests and 683 tests overall before the expected stale-ledger guard. A later aligned run passed 684/684 CAD-era unit tests; transient shared-main Crystal Studio failures were isolated and not modified under CAD-only authority.
+- Constraint-inference RED is committed at `2881645e86a75b065cfa2fa62d229d6cc1850a7c`; run `34664385049` failed for the intended missing `sketch-inference` module while the unrelated Crystal module was also transiently absent on that synthetic merge.
+- Explicit constraint proposals are implemented at `49dfcddfa5f5add1d6778c923a5960e2f323c265`. Run `34664438312` passed all five inference tests and **692 tests overall**; its only failure was the expected stale CAD progress SHA. The current-main Crystal tests were green in that run. Proposals are deterministic, non-mutating, confidence-ranked, duplicate-suppressed even against disabled equivalents, and include horizontal, vertical, coincident, and finite-line/circle tangency inference.
 - Current dependency research corroborates `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`; fresh verification remains mandatory immediately before installation and no lockfile is hand-edited.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. Unrelated-domain and superseded exclusions remain documented in the expansion spec. There are no current `other` exclusions.
-- G4 remains open until advanced profile handling, accepted inference proposals, and the numerical-library policy are satisfied; foundations alone do not count as completed user-facing capabilities.
+- G4 remains open until advanced profile handling and the numerical-library policy are satisfied; foundations alone do not count as completed user-facing capabilities.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation.
 
 ## Freshness invariant
