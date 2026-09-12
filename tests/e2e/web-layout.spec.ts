@@ -19,9 +19,25 @@ test('edits a layout and exports the same content, theme and metadata', async ({
   const html = Buffer.concat(chunks).toString('utf8');
   expect(html).toContain('<title>A school project</title>');
   expect(html).toContain('content="School team"');
-  expect(html).toContain('repeat(4,minmax(0,1fr))');
+  expect(html).toContain('calc((100% - 3 * var(--space)) / 4)');
   expect(html).toContain('color-scheme:dark');
   expect(html).not.toContain('<script');
+});
+
+test('keeps preview cards readable with extreme spacing and column settings', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByLabel('Desktop columns').fill('12');
+  await page.getByLabel('Gap (px)', { exact: true }).fill('120');
+  await page.getByLabel('Stack below (px)').fill('320');
+  await page.getByLabel('Stack below (px)').press('Tab');
+  const frame = page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  await expect(frame.locator('.layout')).toHaveCSS('display', 'grid');
+  const measurements = await frame.locator('body').evaluate(body => ({
+    overflow: body.ownerDocument.documentElement.scrollWidth - body.ownerDocument.documentElement.clientWidth,
+    cardWidths: Array.from(body.querySelectorAll('.block'), block => block.getBoundingClientRect().width),
+  }));
+  expect(measurements.overflow).toBeLessThanOrEqual(1);
+  expect(measurements.cardWidths.every(width => width >= 192)).toBe(true);
 });
 
 test('restores a local draft and rejects invalid import without replacing work', async ({ page }) => {

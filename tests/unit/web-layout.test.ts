@@ -31,7 +31,7 @@ describe('Web Layout Studio portable projects', () => {
   it('binds layout and breakpoint output to the same project as the preview', () => {
     const project = { ...INITIAL_PROJECT, columns: 5, breakpoint: 710, gap: 18 };
     const css = buildCss(project);
-    expect(css).toContain('repeat(5,minmax(0,1fr))');
+    expect(css).toContain('repeat(auto-fit,minmax(min(100%,max(12rem,calc((100% - 4 * var(--space)) / 5))),1fr))');
     expect(css).toContain('@media(max-width:710px)');
     expect(css).toContain('--space:18px');
     expect(buildHtml(project)).toContain(css);
