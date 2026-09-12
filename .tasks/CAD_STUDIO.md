@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `3bb56dd45d899c7164c1df230de2d3dec1a46ce4`
+**Last tracked implementation commit:** `d98ae9537f0e97a97b8c61640640952f0648d022`
 **Current gate:** G5 — exact OCCT worker kernel
 **Completed gates:** 5 / 16
 **Capability target:** 195
@@ -64,12 +64,13 @@ A capability counts only when production behavior exists, relevant validation pa
 
 ## Current evidence
 
-- G1–G3 remain green from committed unit/build checkpoints. G4 production behavior includes parameter/formula dimensions, reference dimensions, public sketch analysis, DOF/conflict reporting, profile diagnostics, accepted inference proposals, advanced curve entities, finite point-on-curve, generalized conic/arc tangency, true interpolating B-splines, and spline membership/tangency with persistent solver contact parameters.
-- Exact dependency pins are now installed through a pnpm-generated lockfile derived from the then-current `origin/main`: `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`. Commit `d1405928a4b56c07df6271522fb9278a29c5066f` changed only `package.json` and `pnpm-lock.yaml`; normal project CI subsequently completed frozen installation with all three exact versions.
-- The sketch numerical layer at `0dc25c0000365be64e48c7c1025235bbf46fc379` uses `ml-matrix@6.15.0` SVD-backed solving for damped Gauss-Newton steps and explicit singular-value rank tolerance. Its three focused tests passed. Solver integration at `3bb56dd45d899c7164c1df230de2d3dec1a46ce4` removed the custom Gaussian/rank implementation and routed solve + DOF rank through the shared numerical layer. Run `34725930685` passed **809 tests**, including all sketch/solver regression tests; only the deliberately stale tracker guard failed before this alignment.
-- Exact-kernel protocol/runtime foundation is implemented: `fb5f59fea1344d3e159074f00ca615c48f151c70` defines revisioned serializable requests/results; `df93fbeb4eb7a50468615092db8175c4190efe6e` provides revision/generation stale-result protection; `a04e6ed61af2c3a9ac4c7539881c68ce0490cb08` owns hard worker lifecycle; and `bd6762384d916247cc739fed2a9f96dd9fca860d` provides lazy runtime validation/error/transfer semantics.
-- OCCT browser capability policy at `4e54489772e61d7f206fd753c61b20bc0878eccd` centralizes the exact `occt-wasm@5.0.0` feature floor: WebAssembly, SIMD, tail calls, and Wasm exception handling. Unsupported environments receive one non-recoverable `unsupported-browser` error and kernel initialization is never invoked.
-- G4 is complete. G5 is now the active gate: real `occt-wasm` adapter/worker initialization, exact analytic fixtures, STEP/BREP round-trips, route-lazy WASM asset handling, and exact-kernel error/resource cleanup remain to be implemented and validated.
+- G1–G4 are complete. The aligned G4 checkpoint reached **810/810 unit tests**; its production build was blocked only by a concurrent `src/tools/web-layout/WebLayoutWorkspace.tsx` syntax error on the then-current synthetic main, which remains owned by the Web Layout agent.
+- Exact dependencies are pinned through pnpm-generated package state: `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`. Normal project CI frozen installation resolves those exact versions.
+- The sketch solver uses the `ml-matrix` numerical layer for SVD-backed damped Gauss-Newton solving and explicit singular-value DOF rank; the custom Gaussian/rank implementation has been removed.
+- Exact-kernel protocol/runtime foundation provides serializable revisioned requests/results, generation + revision stale-result protection, hard worker restart/disposal, zero-copy transferables, lazy runtime validation, and explicit unsupported-browser policy for WebAssembly + SIMD + tail calls + Wasm exception handling.
+- Real `occt-wasm` adapter `d98ae9537f0e97a97b8c61640640952f0648d022` keeps native handles opaque and worker-local, implements exact primitives/booleans/tessellation/engineering queries, STEP and binary BREP I/O, temporary-compound cleanup, and deterministic kernel disposal. Run `34726193130` passed all four real-WASM fixtures: a 20×10×5 box measured 1000 mm³ / 700 mm² with correct center/bounds and nonempty mesh; a cylindrical cut reduced exact volume; STEP re-import preserved 1000 mm³; binary BREP re-import preserved 1000 mm³. The run had **813 passing tests** and only the expected stale tracker guard before this alignment.
+- G5 remains open for the dedicated browser worker entrypoint/executor, route-lazy WASM asset/build verification, worker-side structured OCCT error mapping/resource cleanup, and a clean aligned build checkpoint. Revision/restart and unsupported-browser policy are already implemented.
+- Topology-ID-dependent fillet/chamfer/shell/draft resolution correctly remains deferred to G6 rather than accepting raw unstable OCCT indices. glTF/XCAF assembly export remains part of the later professional export path.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
 
