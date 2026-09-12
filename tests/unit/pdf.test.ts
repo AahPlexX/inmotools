@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { combinePdfs, flattenAndSanitizePdf, pageSelectionPreset, parsePageSelection, splicePdfs } from '../../src/tools/pdf/pdf-engine';
+import { combinePdfs, flattenAndSanitizePdf, inspectPdf, pageSelectionPreset, parsePageSelection, splicePdfs } from '../../src/tools/pdf/pdf-engine';
 
 async function onePagePdf(title: string) {
   const doc = await PDFDocument.create();
@@ -77,5 +77,72 @@ describe('PDF binary processing', () => {
     const output = await splicePdfs([{ bytes: new Uint8Array(await doc.save()), pages: [3, 1, 3] }]);
     const loaded = await PDFDocument.load(output);
     expect(loaded.getPages().map((page) => page.getWidth())).toEqual([300, 100, 300]);
+  });
+
+  it('writes explicit workstation metadata without restoring source metadata', async () => {
+    const source = await onePagePdf('Sensitive source title');
+    const output = await (splicePdfs as unknown as (
+      selections: Array<{ bytes: Uint8Array }>,
+      options: { metadata: { title: string; author: string; subject: string; keywords: string[]; creator: string; producer: string; language: string } },
+    ) => Promise<Uint8Array>)([{ bytes: source }], {
+      metadata: {
+        title: 'Filed copy',
+        author: 'Records team',
+        subject: 'Matter 24-001',
+        keywords: ['filed', 'reviewed'],
+        creator: 'InMoTools PDF Workstation',
+        producer: 'InMoTools PDF Workstation',
+        language: 'en-US',
+      },
+    });
+    const loaded = await PDFDocument.load(output, { updateMetadata: false });
+    expect(loaded.getTitle()).toBe('Filed copy');
+    expect(loaded.getAuthor()).toBe('Records team');
+    expect(loaded.getSubject()).toBe('Matter 24-001');
+    expect(loaded.getKeywords()).toBe('filed reviewed');
+    expect(loaded.getCreator()).toBe('InMoTools PDF Workstation');
+    expect(loaded.getProducer()).toBe('InMoTools PDF Workstation');
+  });
+
+  it('authors deterministic workstation form fields onto copied output pages', async () => {
+    const source = await onePagePdf('Forms');
+    const output = await (splicePdfs as unknown as (
+      selections: Array<{ bytes: Uint8Array }>,
+      options: { formFields: Array<Record<string, unknown>> },
+    ) => Promise<Uint8Array>)([{ bytes: source }], {
+      formFields: [
+        { type: 'text', name: 'client.name', page: 1, x: 20, y: 140, width: 140, height: 24, value: 'Ada', required: true },
+        { type: 'checkbox', name: 'client.approved', page: 1, x: 20, y: 100, width: 18, height: 18, checked: true },
+        { type: 'dropdown', name: 'client.status', page: 1, x: 60, y: 95, width: 100, height: 24, options: ['Draft', 'Filed'], selected: 'Filed' },
+      ],
+    });
+    const loaded = await PDFDocument.load(output);
+    const form = loaded.getForm();
+    expect(form.getFields().map((field) => field.getName())).toEqual(['client.name', 'client.approved', 'client.status']);
+    expect(form.getTextField('client.name').getText()).toBe('Ada');
+    expect(form.getTextField('client.name').isRequired()).toBe(true);
+    expect(form.getCheckBox('client.approved').isChecked()).toBe(true);
+    expect(form.getDropdown('client.status').getSelected()).toEqual(['Filed']);
+  });
+
+  it('reports final page geometry for workstation page-box tooling', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([300, 200]);
+    page.setCropBox(10, 20, 250, 150);
+    page.setBleedBox(5, 10, 280, 175);
+    page.setTrimBox(15, 25, 240, 140);
+    const inspected = await inspectPdf(new Uint8Array(await doc.save()));
+    expect((inspected as typeof inspected & { pages: unknown[] }).pages).toEqual([
+      {
+        page: 1,
+        width: 300,
+        height: 200,
+        rotation: 0,
+        mediaBox: { x: 0, y: 0, width: 300, height: 200 },
+        cropBox: { x: 10, y: 20, width: 250, height: 150 },
+        bleedBox: { x: 5, y: 10, width: 280, height: 175 },
+        trimBox: { x: 15, y: 25, width: 240, height: 140 },
+      },
+    ]);
   });
 });
