@@ -10,7 +10,8 @@ const setSource = async (page: import('@playwright/test').Page, value: string) =
   await editor.click();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
   await page.keyboard.press('Backspace');
-  await editor.pressSequentially(value);
+  if (value.length > 1_000) await page.keyboard.insertText(value);
+  else await editor.pressSequentially(value);
 };
 
 const readDownloadBytes = async (download: import('@playwright/test').Download): Promise<Buffer> => {
@@ -33,11 +34,28 @@ test('renders Mermaid in the real browser integration and preserves its source a
 
 test('shows Mermaid failures as visible accessible errors instead of title-only help', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
-  await setSource(page, '```mermaid\nflowchart LR\nA--->\n```');
+  await setSource(page, '```mermaid\nnot a diagram\n```');
 
   const error = page.getByRole('alert').filter({ hasText: /mermaid|diagram|parse|syntax/i }).first();
   await expect(error).toBeVisible({ timeout: 15_000 });
   await expect(error).not.toHaveText('');
+});
+
+test('turns the Mermaid 12 Gantt metadata crash into a line-specific authoring error', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '```mermaid',
+    'gantt',
+    '  title Schedule',
+    '  dateFormat YYYY-MM-DD',
+    '  Alpha :a1, 2026-01-05, 3d',
+    '  Beta :b1, 2026-01-12, 2d, extra',
+    '```',
+  ].join('\n'));
+
+  const error = page.getByRole('alert').filter({ hasText: /gantt task on line 5 has too many metadata items/i });
+  await expect(error).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.markdown-workbench-diagram svg')).toHaveCount(0);
 });
 
 test('rejects oversized Mermaid source before the library can substitute a different diagram', async ({ page }) => {
