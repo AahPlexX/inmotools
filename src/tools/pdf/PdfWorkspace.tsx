@@ -17,6 +17,7 @@ import {
 } from './pdf-engine';
 import PdfAttachmentPanel, { type PdfStagedAttachment } from './PdfAttachmentPanel';
 import PdfFormAuthoringPanel from './PdfFormAuthoringPanel';
+import PdfOverlayPanel from './PdfOverlayPanel';
 import {
   attachmentDefinitionsFromStages,
   attachmentStageError,
@@ -25,6 +26,14 @@ import {
   stagedAttachmentFromFile,
 } from './pdf-attachment-stage';
 import { stagedFormFieldError, type PdfOutputPageSize } from './pdf-form-stage';
+import {
+  EMPTY_OVERLAY_DRAFT,
+  overlayChangeCount,
+  overlayDraftError,
+  overlayOptionsFromDraft,
+  type PdfOverlayDraft,
+} from './pdf-overlay-stage';
+import { applyPdfOverlaysToBytes } from './pdf-overlay-export';
 import { consumeFileInput } from '../../lib/file-input';
 
 type PdfItem = {
@@ -214,6 +223,7 @@ export default function PdfWorkspace() {
   const [geometryPageKey, setGeometryPageKey] = useState('');
   const [stagedAttachments, setStagedAttachments] = useState<PdfStagedAttachment[]>([]);
   const [stagedFormFields, setStagedFormFields] = useState<PdfFormFieldDefinition[]>([]);
+  const [overlayDraft, setOverlayDraft] = useState<PdfOverlayDraft>(EMPTY_OVERLAY_DRAFT);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
 
@@ -300,6 +310,8 @@ export default function PdfWorkspace() {
   const stagedBlankPageCount = blankPages.reduce((sum, definition) => sum + (definition.count ?? 1), 0);
   const attachmentError = attachmentStageError(stagedAttachments);
   const formAuthoringError = stagedFormFieldError(stagedFormFields, formPages);
+  const overlayError = overlayDraftError(overlayDraft);
+  const overlayCount = overlayChangeCount(overlayDraft);
   const attachmentSources = useMemo(() => items.map((item) => ({
     id: item.id,
     fileName: item.file.name,
@@ -324,7 +336,7 @@ export default function PdfWorkspace() {
         }
       }
       setItems((current) => [...current, ...next]);
-      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, forms, attachments, page geometry, document properties, and export settings before processing.`);
+      setStatus(`Added ${next.length} PDF${next.length === 1 ? '' : 's'} locally. Review page selections, forms, attachments, overlays, page geometry, document properties, and export settings before processing.`);
     } catch (error) {
       setStatus(`Could not read PDF: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -473,7 +485,7 @@ export default function PdfWorkspace() {
   }
 
   async function process() {
-    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError) return;
+    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError || overlayError) return;
     setBusy(true);
     try {
       const selections = await Promise.all(items.map(async (item, index) => ({
@@ -484,13 +496,16 @@ export default function PdfWorkspace() {
       })));
       const blankDefinitions: PdfBlankPageDefinition[] = blankPages.map(({ afterPage, width, height, count }) => ({ afterPage, width, height, count }));
       const attachments: PdfAttachmentDefinition[] = await attachmentDefinitionsFromStages(stagedAttachments);
-      const bytes = await splicePdfs(selections, {
+      const filename = safePdfFilename(outputFilename, outputName());
+      const overlayOptions = await overlayOptionsFromDraft(overlayDraft, filename);
+      const rebuiltBytes = await splicePdfs(selections, {
         metadata: authoredMetadata,
         blankPages: blankDefinitions,
         pageBoxEdits,
         attachments,
         formFields: stagedFormFields,
       });
+      const bytes = await applyPdfOverlaysToBytes(rebuiltBytes, overlayOptions);
       const outputInspection = await inspectPdf(bytes);
       if (outputInspection.formFieldCount !== stagedFormFields.length) {
         throw new Error(`Output verification expected ${stagedFormFields.length} authored form field${stagedFormFields.length === 1 ? '' : 's'} but found ${outputInspection.formFieldCount}; no download was created.`);
@@ -500,7 +515,6 @@ export default function PdfWorkspace() {
       if (JSON.stringify(actualAttachmentNames) !== JSON.stringify(expectedAttachmentNames)) {
         throw new Error('Output verification found an attachment inventory mismatch; no download was created.');
       }
-      const filename = safePdfFilename(outputFilename, outputName());
       downloadBytes(bytes, filename, 'application/pdf');
       const delta = bytes.byteLength - sourceBytes;
       const sourceFormSummary = formFieldTotal > 0
@@ -512,8 +526,11 @@ export default function PdfWorkspace() {
       const metadataSummary = authoredMetadataCount
         ? ` ${authoredMetadataCount} replacement metadata propert${authoredMetadataCount === 1 ? 'y was' : 'ies were'} intentionally written.`
         : ' No replacement metadata was written.';
+      const overlaySummary = overlayCount
+        ? ` ${overlayCount} export overlay configuration${overlayCount === 1 ? ' was' : 's were'} applied across the final pages.`
+        : ' No export overlays were applied.';
       const structureSummary = `${stagedBlankPageCount ? ` ${stagedBlankPageCount} blank page${stagedBlankPageCount === 1 ? '' : 's'} inserted.` : ''}${pageBoxEdits.length ? ` ${pageBoxEdits.length} output page${pageBoxEdits.length === 1 ? '' : 's'} received explicit page-box edits.` : ''}${attachments.length ? ` ${attachments.length} embedded attachment${attachments.length === 1 ? '' : 's'} explicitly authored.` : ' No embedded source attachments were carried forward.'}`;
-      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${sourceFormSummary}${authoredFormSummary}${metadataSummary}${structureSummary}`);
+      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${sourceFormSummary}${authoredFormSummary}${metadataSummary}${overlaySummary}${structureSummary}`);
     } catch (error) {
       setStatus(`PDF processing failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -522,7 +539,7 @@ export default function PdfWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, editable forms, metadata, and export naming.</p></div></div>
+    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, editable forms, Bates/overlays, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input id="pdf-files" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append to the current queue instead of replacing it.</small></div>
 
@@ -642,6 +659,8 @@ export default function PdfWorkspace() {
         {formAuthoringError ? <p className="help-text" role="alert">{formAuthoringError}</p> : null}
       </> : null}
 
+      {items.length ? <PdfOverlayPanel value={overlayDraft} error={overlayError} onChange={setOverlayDraft} /> : null}
+
       {items.length && !hasPageError ? <section className="notice" style={{ marginTop: 18 }} data-testid="pdf-output-preview" aria-labelledby="pdf-preview-title">
         <strong id="pdf-preview-title">Output page order preview</strong>
         <p className="help-text">Structural preview of copied and staged blank pages before export. {outputPageCount > OUTPUT_PREVIEW_LIMIT ? `Showing the first ${OUTPUT_PREVIEW_LIMIT} of ${outputPageCount} pages.` : `${outputPageCount} page${outputPageCount === 1 ? '' : 's'} planned.`}</p>
@@ -663,9 +682,9 @@ export default function PdfWorkspace() {
             : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding source form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStagedFormFields([]); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError) || Boolean(overlayError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStagedFormFields([]); setOverlayDraft(EMPTY_OVERLAY_DRAFT); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
-      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, and newly authored editable fields are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
+      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, newly authored editable fields, and export overlays are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
   </>;
 }
