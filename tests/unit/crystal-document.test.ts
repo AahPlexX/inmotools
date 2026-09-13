@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addCrystalSite,
+  constrainCell,
   createEmptyCrystal,
   createStarterStructure,
   deleteCrystalSite,
@@ -76,6 +77,25 @@ describe('crystal document engine', () => {
     expect(() => updateCrystalSite(start, start.sites[0]!.id, { fractional: [Number.NaN, 0, 0] })).toThrow(/coordinate/i);
     expect(start.cell.a).toBeGreaterThan(0);
     expect(start.sites[0]!.occupancy).toBe(1);
+  });
+
+  it('keeps cubic lengths equal and angles orthogonal when a constrained length changes', () => {
+    expect(constrainCell({ a:4, b:5, c:6, alpha:80, beta:90, gamma:100 }, 'cubic', 'a'))
+      .toEqual({ a:4, b:4, c:4, alpha:90, beta:90, gamma:90 });
+  });
+
+  it('enforces hexagonal and conventional unique-b monoclinic metrics without changing unconstrained values', () => {
+    expect(constrainCell({ a:3, b:4, c:5, alpha:88, beta:92, gamma:119 }, 'hexagonal', 'b'))
+      .toEqual({ a:4, b:4, c:5, alpha:90, beta:90, gamma:120 });
+    expect(constrainCell({ a:3, b:4, c:5, alpha:88, beta:102, gamma:91 }, 'monoclinic', 'beta'))
+      .toEqual({ a:3, b:4, c:5, alpha:90, beta:102, gamma:90 });
+  });
+
+  it('uses rhombohedral axes for the trigonal constraint and leaves triclinic cells unchanged', () => {
+    const source = { a:4, b:5, c:6, alpha:75, beta:80, gamma:85 } as const;
+    expect(constrainCell(source, 'trigonal', 'gamma'))
+      .toEqual({ a:4, b:4, c:4, alpha:85, beta:85, gamma:85 });
+    expect(constrainCell(source, 'triclinic', 'gamma')).toEqual(source);
   });
 });
 
