@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addElement, createVectorDocument, mirrorSelection } from '../../src/tools/svg/vector-engine';
+import { addElement, composeSelection, createVectorDocument, groupSelection, mirrorSelection } from '../../src/tools/svg/vector-engine';
 import {
   buildInlineEmbed,
   buildSvgDataUri,
@@ -33,6 +33,25 @@ const textElement: VectorElement = {
   textAnchor: 'start',
   title: 'Primary wordmark',
   description: 'Brand text with special characters',
+};
+
+const compositionShape: VectorElement = {
+  id: 'composition-shape',
+  type: 'ellipse',
+  name: 'Composition shape',
+  x: 160,
+  y: 150,
+  width: 180,
+  height: 120,
+  rotation: 0,
+  opacity: 1,
+  visible: true,
+  locked: false,
+  fill: { kind: 'solid', color: '#ffffff' },
+  stroke: { color: '#111827', width: 0, linecap: 'round', linejoin: 'round', dash: '' },
+  blendMode: 'normal',
+  title: '',
+  description: '',
 };
 
 describe('Vector Studio export', () => {
@@ -69,6 +88,70 @@ describe('Vector Studio export', () => {
     const svg = serializeVectorSvg(document);
     expect(svg).toContain('scale(-1 1)');
     expect(svg).toContain('translate(-280 -220)');
+  });
+
+  test('serializes clip and difference compositions with native SVG definitions', () => {
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, compositionShape);
+
+    const clipped = composeSelection(source, ['art', 'composition-shape'], 'clip').document;
+    const clipSvg = serializeVectorSvg(clipped);
+    expect(clipSvg).toContain('<clipPath id="clip-');
+    expect(clipSvg).toContain('clip-path="url(#clip-');
+    expect(clipSvg).toContain('id="composition-shape"');
+
+    const differenced = composeSelection(source, ['art', 'composition-shape'], 'difference').document;
+    const differenceSvg = serializeVectorSvg(differenced);
+    expect(differenceSvg).toContain('<mask id="mask-');
+    expect(differenceSvg).toContain('mask="url(#mask-');
+    expect(differenceSvg).toContain('fill="#000000"');
+  });
+
+  test('serializes every descendant of a grouped difference cutter as black luminance', () => {
+    const cutterA: VectorElement = {
+      ...compositionShape,
+      id: 'cutter-a',
+      x: 140,
+      width: 90,
+      fill: { kind: 'solid', color: '#ff0000' },
+    };
+    const cutterB: VectorElement = {
+      ...compositionShape,
+      id: 'cutter-b',
+      x: 230,
+      width: 90,
+      fill: { kind: 'solid', color: '#00ff00' },
+    };
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, cutterA);
+    source = addElement(source, cutterB);
+    const grouped = groupSelection(source, ['cutter-a', 'cutter-b']);
+    const differenced = composeSelection(grouped.document, ['art', grouped.selection[0]], 'difference').document;
+    const svg = serializeVectorSvg(differenced);
+    const maskMarkup = svg.match(/<mask\b[^>]*>([\s\S]*?)<\/mask>/)?.[0] ?? '';
+
+    expect(maskMarkup).not.toBe('');
+    expect(maskMarkup).not.toContain('#ff0000');
+    expect(maskMarkup).not.toContain('#00ff00');
+    expect((maskMarkup.match(/fill="#000000"/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('preserves nested difference composition semantics when a composition becomes a cutter', () => {
+    const cutterA: VectorElement = { ...compositionShape, id: 'nested-a', x: 140, width: 110 };
+    const cutterB: VectorElement = { ...compositionShape, id: 'nested-b', x: 200, width: 110 };
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, cutterA);
+    source = addElement(source, cutterB);
+
+    const inner = composeSelection(source, ['nested-a', 'nested-b'], 'difference');
+    const outer = composeSelection(inner.document, ['art', inner.selection[0]], 'difference');
+    const svg = serializeVectorSvg(outer.document);
+
+    expect((svg.match(/<mask\b/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(svg).toContain('mask="url(#cutout-mask-');
   });
 
   test('omits hidden elements and preserves locked artwork as normal SVG content', () => {

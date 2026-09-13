@@ -83,6 +83,17 @@ export function updateElement(document: VectorDocument, id: string, patch: Parti
   };
 }
 
+function containsElementId(element: VectorElement, id: string): boolean {
+  if (element.id === id) return true;
+  if (element.type !== 'group') return false;
+  if (element.children.some((child) => containsElementId(child, id))) return true;
+  return element.composition ? containsElementId(element.composition.shape, id) : false;
+}
+
+export function topLevelSelectionId(document: VectorDocument, elementId: string): string | null {
+  return document.elements.find((element) => containsElementId(element, elementId))?.id ?? null;
+}
+
 function mapElements(document: VectorDocument, ids: ReadonlySet<string>, mapper: (element: VectorElement) => VectorElement): VectorDocument {
   return { ...document, elements: document.elements.map((element) => ids.has(element.id) ? mapper(element) : element) };
 }
@@ -99,6 +110,9 @@ function moveElement(element: VectorElement, dx: number, dy: number): VectorElem
       x: element.x + dx,
       y: element.y + dy,
       children: element.children.map((child) => moveElement(child, dx, dy)),
+      composition: element.composition
+        ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
+        : undefined,
     };
   }
   if (element.type === 'line') {
@@ -112,17 +126,24 @@ export function moveSelection(document: VectorDocument, selection: readonly stri
   return mapElements(document, ids, (element) => element.locked ? element : moveElement(element, dx, dy));
 }
 
-function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
-  const moved = moveElement(element, dx, dy);
-  if (moved.type === 'group') {
+function reidentifyElement(element: VectorElement): VectorElement {
+  if (element.type === 'group') {
     return {
-      ...moved,
+      ...element,
       id: createVectorId('group'),
-      name: `${element.name} copy`,
-      children: moved.children.map((child) => ({ ...child, id: createVectorId(child.type) } as VectorElement)),
+      children: element.children.map(reidentifyElement),
+      composition: element.composition
+        ? { ...element.composition, shape: reidentifyElement(element.composition.shape) }
+        : undefined,
     };
   }
-  return { ...moved, id: createVectorId(element.type), name: `${element.name} copy` } as VectorElement;
+  return { ...element, id: createVectorId(element.type) } as VectorElement;
+}
+
+function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
+  const moved = moveElement(element, dx, dy);
+  const clone = reidentifyElement(moved);
+  return { ...clone, name: `${element.name} copy` } as VectorElement;
 }
 
 export function duplicateSelection(document: VectorDocument, selection: readonly string[], dx = 12, dy = 12): VectorSelectionResult {
@@ -164,6 +185,14 @@ export function selectionBounds(document: VectorDocument, selection: readonly st
   return { x, y, right, bottom, width: right - x, height: bottom - y, cx: (x + right) / 2, cy: (y + bottom) / 2 };
 }
 
+export function fitZoomForViewport(contentWidth: number, contentHeight: number, viewportWidth: number, viewportHeight: number, totalPadding = 64): number {
+  const width = Math.max(1, contentWidth);
+  const height = Math.max(1, contentHeight);
+  const availableWidth = Math.max(1, viewportWidth - Math.max(0, totalPadding));
+  const availableHeight = Math.max(1, viewportHeight - Math.max(0, totalPadding));
+  return Math.max(0.2, Math.min(3, availableWidth / width, availableHeight / height));
+}
+
 export function groupSelection(document: VectorDocument, selection: readonly string[]): VectorSelectionResult {
   const selected = new Set(selection);
   const children = document.elements.filter((element) => selected.has(element.id));
@@ -182,14 +211,36 @@ export function groupSelection(document: VectorDocument, selection: readonly str
   return { document: { ...document, elements: remaining }, selection: [group.id] };
 }
 
+export function composeSelection(document: VectorDocument, selection: readonly string[], mode: 'clip' | 'difference'): VectorSelectionResult {
+  const selectedIds = new Set(selection);
+  const selected = document.elements.filter((element) => selectedIds.has(element.id));
+  if (selected.length < 2) return { document, selection: [...selection] };
+  const bounds = selectionBounds(document, selection);
+  if (!bounds) return { document, selection: [...selection] };
+  const shape = selected[selected.length - 1];
+  const children = selected.slice(0, -1);
+  const firstIndex = document.elements.findIndex((element) => selectedIds.has(element.id));
+  const group: VectorElement = {
+    ...baseElement('group', mode === 'clip' ? 'Clip composition' : 'Difference composition', bounds.x, bounds.y, bounds.width, bounds.height),
+    type: 'group',
+    fill: { kind: 'solid', color: 'none' },
+    children,
+    composition: { mode, shape },
+  };
+  const remaining = document.elements.filter((element) => !selectedIds.has(element.id));
+  remaining.splice(Math.max(0, firstIndex), 0, group);
+  return { document: { ...document, elements: remaining }, selection: [group.id] };
+}
+
 export function ungroupSelection(document: VectorDocument, groupId: string): VectorSelectionResult {
   const index = document.elements.findIndex((element) => element.id === groupId && element.type === 'group');
   if (index < 0) return { document, selection: [] };
   const group = document.elements[index];
   if (group.type !== 'group') return { document, selection: [] };
+  const released = group.composition ? [...group.children, group.composition.shape] : group.children;
   const elements = [...document.elements];
-  elements.splice(index, 1, ...group.children);
-  return { document: { ...document, elements }, selection: group.children.map((child) => child.id) };
+  elements.splice(index, 1, ...released);
+  return { document: { ...document, elements }, selection: released.map((child) => child.id) };
 }
 
 export type Alignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -359,6 +410,21 @@ export function mirrorSelection(document: VectorDocument, selection: readonly st
       ? ({ ...element, flipX: !Boolean(element.flipX), flipY: Boolean(element.flipY) } as VectorElement)
       : ({ ...element, flipX: Boolean(element.flipX), flipY: !Boolean(element.flipY) } as VectorElement);
   });
+}
+
+export function mirrorDuplicateSelection(document: VectorDocument, selection: readonly string[], axis: 'horizontal' | 'vertical', center: VectorPoint): VectorSelectionResult {
+  const ids = new Set(selection);
+  const originals = document.elements.filter((element) => ids.has(element.id));
+  const copies = originals.map((original) => {
+    const bounds = elementBounds(original);
+    const reflectedX = axis === 'horizontal' ? center.x * 2 - bounds.right : bounds.x;
+    const reflectedY = axis === 'vertical' ? center.y * 2 - bounds.bottom : bounds.y;
+    const clone = cloneElement(original, reflectedX - bounds.x, reflectedY - bounds.y);
+    return axis === 'horizontal'
+      ? ({ ...clone, flipX: !Boolean(clone.flipX), flipY: Boolean(clone.flipY) } as VectorElement)
+      : ({ ...clone, flipX: Boolean(clone.flipX), flipY: !Boolean(clone.flipY) } as VectorElement);
+  });
+  return { document: { ...document, elements: [...document.elements, ...copies] }, selection: copies.map((element) => element.id) };
 }
 
 export function createHistory(document: VectorDocument, limit = 80): VectorHistory {

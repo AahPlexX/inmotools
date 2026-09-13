@@ -106,9 +106,15 @@ export interface ImageElement extends VectorElementBase {
   preserveAspectRatio: string;
 }
 
+export interface VectorComposition {
+  mode: 'clip' | 'difference';
+  shape: VectorElement;
+}
+
 export interface GroupElement extends VectorElementBase {
   type: 'group';
   children: VectorElement[];
+  composition?: VectorComposition;
 }
 
 export interface SymbolElement extends VectorElementBase {
