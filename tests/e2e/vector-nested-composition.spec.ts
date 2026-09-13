@@ -32,4 +32,9 @@ test('Vector Studio preserves nested difference compositions on the live canvas'
   await expect(page.getByTestId('vector-layer')).toHaveCount(1);
   await expect(canvas.locator('mask')).toHaveCount(2);
   await expect(canvas.locator('g[mask]')).toHaveCount(2);
+
+  await page.getByRole('tab', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Preview SVG source' }).click();
+  const source = await page.getByLabel('Vector SVG export source').textContent();
+  expect((source?.match(/<mask\b/g) ?? []).length).toBeGreaterThanOrEqual(2);
 });
