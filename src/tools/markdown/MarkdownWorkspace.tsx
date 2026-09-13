@@ -529,7 +529,7 @@ export default function MarkdownWorkspace() {
         <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">Exports as <code>{filenameStem}.*</code></span>
         <div className="markdown-workbench-toolbar-group">
           <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')}>Copy Markdown</button>
-          <button type="button" onClick={() => void copyToClipboard(buildExportBodyHtml().html, 'the rendered HTML')}>Copy HTML</button>
+          <button type="button" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }}>Copy HTML</button>
         </div>
       </div>
 
