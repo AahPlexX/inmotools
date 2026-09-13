@@ -1,3 +1,7 @@
+import {
+  CadFeatureEvaluationError,
+  evaluateCadFeatures,
+} from './feature-evaluator';
 import type {
   CadKernelBodyResult,
   CadKernelOperation,
@@ -51,11 +55,7 @@ export class OcctKernelRequestExecutor {
       case 'export':
         return this.#export(request.operation);
       case 'rebuild':
-        throw new CadKernelRuntimeError(
-          'evaluation-failed',
-          'Parametric feature-tree rebuild is attached by the G6 exact feature evaluator.',
-          true,
-        );
+        return this.#rebuild(request);
       case 'measure':
         throw new CadKernelRuntimeError(
           'evaluation-failed',
@@ -89,6 +89,38 @@ export class OcctKernelRequestExecutor {
     } catch (error) {
       for (const shape of shapes) this.#kernel.release(shape);
       throw error;
+    }
+  }
+
+  #rebuild(request: CadKernelRequest): CadKernelPayload {
+    let evaluated: ReturnType<typeof evaluateCadFeatures>;
+    try {
+      evaluated = evaluateCadFeatures(request.project, this.#kernel);
+    } catch (error) {
+      throw this.#evaluationError(error);
+    }
+
+    try {
+      const bodyResults = evaluated.bodies.map((body) => {
+        try {
+          return this.#bodyResult(body.bodyId, body.shape, request.quality);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new CadFeatureEvaluationError(
+            body.sourceFeatureId,
+            `Failed to tessellate evaluated feature '${body.sourceFeatureId}': ${message}`,
+            { cause: error },
+          );
+        }
+      });
+      const nextBodies = evaluated.bodies.map((body) => ({ id: body.bodyId, shape: body.shape }));
+      const previousBodies = this.#bodies;
+      this.#bodies = nextBodies;
+      this.#releaseBodies(previousBodies);
+      return { kind: 'rebuild', bodies: bodyResults, warnings: evaluated.warnings };
+    } catch (error) {
+      this.#releaseBodies(evaluated.bodies.map((body) => ({ id: body.bodyId, shape: body.shape })));
+      throw this.#evaluationError(error);
     }
   }
 
@@ -134,6 +166,15 @@ export class OcctKernelRequestExecutor {
       mesh: this.#kernel.tessellate(shape, tessellationOptions(quality)),
       bounds: this.#kernel.bounds(shape),
     };
+  }
+
+  #evaluationError(error: unknown): CadKernelRuntimeError {
+    if (error instanceof CadKernelRuntimeError) return error;
+    if (error instanceof CadFeatureEvaluationError) {
+      return new CadKernelRuntimeError('evaluation-failed', error.message, true, error.featureId);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return new CadKernelRuntimeError('evaluation-failed', message, true);
   }
 
   #releaseBodies(bodies: readonly WorkerBody[]): void {
