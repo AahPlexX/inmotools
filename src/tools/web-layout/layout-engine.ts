@@ -1,8 +1,10 @@
+import { parseCode, escapeStyle, escapeScript, type CodeProject } from './code-tools';
 import { DEFAULT_OPTIONS, parseOptions, type LayoutOptions } from './layout-options';
 export type BlockKind = 'card' | 'accordion' | 'form' | 'navigation' | 'notice';
 export type LayoutProject = {
   version: 1;
   options?: LayoutOptions;
+  code?: CodeProject;
   title: string;
   description: string;
   author: string;
@@ -89,6 +91,7 @@ export function parseProject(input: string): LayoutProject {
   });
   if (typeof p.reset !== 'boolean') throw new Error('Invalid reset setting.');
   const result: LayoutProject = {
+    ...(p.code === undefined ? {} : { code: parseCode(p.code) }),
     ...(p.options === undefined ? {} : { options: parseOptions(p.options) }),
     version: 1, title: text(p.title, 'Title', 200), description: text(p.description, 'Description'), author: text(p.author, 'Author', 200), canonical, language,
     robots: choice(p.robots, ['index,follow', 'noindex,nofollow'], 'robots setting'),
@@ -129,6 +132,7 @@ ${p.layout === 'grid' && p.gridAreas.length ? `@container(min-width:calc(${p.col
 @media(max-width:${p.breakpoint}px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:none;flex-direction:column}.block{grid-area:auto!important;flex-basis:auto;width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media print{:root{--surface:#fff;--ink:#000;--canvas:#fff;color-scheme:light}body{background:white;color:black}.block{break-inside:avoid}main{max-width:none}}
+${p.code?.enabled ? p.code.css : ''}
 `;
 }
 
@@ -142,11 +146,18 @@ export function buildHtml(project: LayoutProject): string {
     if (b.kind === 'navigation') return `<section class="block" id="${id}"><h2>${title}</h2><p>${body}</p><nav aria-label="${title}"><a href="#page-title">Back to top</a>${p.blocks.filter(other => other.id !== b.id).map(other => `<a href="#${escapeHtml(other.id)}">${escapeHtml(other.title)}</a>`).join('')}</nav></section>`;
     return `<${b.kind === 'card' ? 'article' : 'aside'} class="block" id="${id}"><h2>${title}</h2><p>${body}</p></${b.kind === 'card' ? 'article' : 'aside'}>`;
   }).join('\n');
-  return `<!doctype html>\n<html lang="${escapeHtml(p.language)}" dir="${options.textDirection}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(options.metaTitle || p.title)}</title><meta name="description" content="${escapeHtml(options.metaDescription || p.description)}"><meta name="keywords" content="${escapeHtml(options.keywords)}">${options.customMeta.map(meta => `<meta name="${escapeHtml(meta.name)}" content="${escapeHtml(meta.content)}">`).join('')}<meta name="author" content="${escapeHtml(p.author)}"><meta name="robots" content="${p.robots}"><meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta property="og:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta name="twitter:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}">${p.canonical ? `<link rel="canonical" href="${escapeHtml(p.canonical)}"><meta property="og:url" content="${escapeHtml(p.canonical)}">` : ''}<style>${buildCss(p)}</style></head><body><main><header><h1 id="page-title">${escapeHtml(p.title)}</h1><p>${escapeHtml(p.description)}</p></header><div class="layout">${blocks}</div></main></body></html>`;
+  return `<!doctype html>\n<html lang="${escapeHtml(p.language)}" dir="${options.textDirection}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(options.metaTitle || p.title)}</title><meta name="description" content="${escapeHtml(options.metaDescription || p.description)}"><meta name="keywords" content="${escapeHtml(options.keywords)}">${options.customMeta.map(meta => `<meta name="${escapeHtml(meta.name)}" content="${escapeHtml(meta.content)}">`).join('')}<meta name="author" content="${escapeHtml(p.author)}"><meta name="robots" content="${p.robots}"><meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta property="og:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta name="twitter:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}">${p.canonical ? `<link rel="canonical" href="${escapeHtml(p.canonical)}"><meta property="og:url" content="${escapeHtml(p.canonical)}">` : ''}<style>${escapeStyle(buildCss(p))}</style></head><body><main><header><h1 id="page-title">${escapeHtml(p.title)}</h1><p>${escapeHtml(p.description)}</p></header><div class="layout">${p.code?.enabled ? p.code.html : blocks}</div></main>${p.code?.enabled && p.code.js ? `<script>${escapeScript(p.code.js)}</script>` : ''}</body></html>`;
 }
 
 export function buildPreview(p: LayoutProject): string {
-  return buildHtml(p).replace('<head>', '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; form-action \'none\'; base-uri \'none\'">');
+  let html = buildHtml(p);
+  if (p.code?.enabled && typeof document !== 'undefined') {
+    const inert = document.createElement('template');
+    inert.innerHTML = html;
+    inert.content.querySelectorAll('script,meta,base,iframe,object,embed,link').forEach(node => node.remove());
+    html = '<!doctype html><html><head></head><body>' + inert.innerHTML + '</body></html>';
+  }
+  return html.replace('<head>', '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; form-action \'none\'; base-uri \'none\'">');
 }
 
 export function projectWarnings(p: LayoutProject): string[] {

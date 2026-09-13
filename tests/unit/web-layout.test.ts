@@ -101,3 +101,14 @@ it('round-trips authoring options and escapes custom metadata while rejecting CS
   for (const tracks of ['1fr; color:red', 'url(https://example.com)', 'repeat(999, 1fr)', 'minmax(1fr, 1fr)']) expect(() => parseOptions({ ...DEFAULT_OPTIONS, tracks })).toThrow();
   expect(() => parseOptions({ ...DEFAULT_OPTIONS, customMeta: [{name:'viewport',content:'width=3000'}] })).toThrow();
 });
+
+
+it('keeps enabled source in project backups and exports matching CSS without script breakout', () => {
+  const project = { ...INITIAL_PROJECT, code: {enabled:true,html:'<p>Custom content</p>',css:'.demo{color:red}',js:'console.log("</script>")'} };
+  expect(parseProject(JSON.stringify(project))).toEqual(project);
+  expect(buildHtml(project)).toContain('<p>Custom content</p>');
+  expect(buildCss(project)).toContain('.demo{color:red}');
+  expect(buildHtml(project)).not.toContain('console.log("</script>")');
+  expect(buildHtml({...project,code:{...project.code,enabled:false}})).not.toContain('<p>Custom content</p>');
+  expect(() => parseProject(JSON.stringify({...project,code:{...project.code,js:1}}))).toThrow();
+});

@@ -59,7 +59,7 @@ test('reflows editing controls in portrait and landscape without page overflow',
     await page.setViewportSize(viewport);
     await page.goto('./#/tools/web-layout-studio');
     await expect(page.getByTestId('web-layout-studio')).toBeVisible();
-    for (const name of ['Build', 'Theme', 'Preview', 'Export']) {
+    for (const name of ['Build', 'Theme', 'Preview', 'Code', 'Export']) {
       await page.getByRole('button', { name, exact: true }).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
     }
@@ -166,4 +166,31 @@ test('authors tracks and metadata and restores a saved starter snapshot', async 
   expect(html).toContain('dir="rtl"');
   expect(html).toContain('grid-template-columns:1fr 2fr 1fr');
   expect(html).toContain('name="keywords" content="design, portfolio"');
+});
+
+
+test('formats and applies code, compiles CSS and runs scripts only with opt-in', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByRole('button', {name:'Code',exact:true}).click();
+  await page.getByLabel('HTML source',{exact:true}).fill('<article><h2>Code example</h2><p>Editable content</p></article>');
+  await page.getByRole('button',{name:'Format draft',exact:true}).click();
+  await expect(page.getByText('Formatted draft. Apply to record it in project history.',{exact:true})).toBeVisible();
+  await page.getByLabel('Use code instead of visual blocks',{exact:true}).check();
+  await page.getByRole('button',{name:'Apply code',exact:true}).click();
+  await expect(page.frameLocator('iframe[title="Layout at 375 pixels"]').getByRole('heading',{name:'Code example'})).toBeVisible();
+  await page.getByRole('button',{name:'CSS',exact:true}).click();
+  await page.getByLabel('CSS source',{exact:true}).fill('.demo { color: red; padding: 10px; }');
+  await page.getByText('Production compiler',{exact:true}).click();
+  await page.getByRole('button',{name:'Compile CSS',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Download compiled output',exact:true})).toBeVisible({timeout:20000});
+  await page.getByRole('button',{name:'JS',exact:true}).click();
+  await page.getByLabel('JS source',{exact:true}).fill('console.log("Opt-in script ran");');
+  await page.getByText('Run and inspect',{exact:true}).click();
+  await page.getByRole('button',{name:'Run / restart preview',exact:true}).click();
+  await expect(page.getByRole('list',{name:'Runtime and accessibility results'})).not.toContainText('Opt-in script ran');
+  await page.getByLabel('Allow this draft’s JavaScript to run',{exact:true}).check();
+  await page.getByRole('button',{name:'Run / restart preview',exact:true}).click();
+  await expect(page.getByRole('list',{name:'Runtime and accessibility results'})).toContainText('Opt-in script ran');
+  await page.getByRole('button',{name:'Stop preview',exact:true}).click();
+  await expect(page.locator('iframe[title="Code execution preview"]')).toHaveCount(0);
 });

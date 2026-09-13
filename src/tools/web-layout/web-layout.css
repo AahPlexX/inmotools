@@ -3,3 +3,5 @@
 .wl-frame-host.wl-actual-size{overflow:auto;max-height:75svh}.wl-field [role=alert]{color:var(--ink);overflow-wrap:anywhere}.wl-controls [hidden]{display:none}.wl-studio .status-line{overflow-wrap:anywhere}
 
 .wl-advanced{border:1px solid var(--line);padding:12px;border-radius:12px;margin-block:16px}.wl-advanced>summary{cursor:pointer;min-height:44px;overflow-wrap:anywhere}.wl-social-card{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}.wl-social-card strong{display:block}.wl-social-card p{white-space:pre-wrap}.wl-field textarea{font:inherit}
+
+.wl-monaco{height:400px;width:100%;min-width:0}.wl-source{min-height:300px!important;font-family:monospace!important;tab-size:2}.wl-run-frame{box-sizing:border-box;width:100%;height:500px;max-height:80svh;border:1px solid var(--line);background:white}.wl-code-panel{min-width:0;overflow-wrap:anywhere}.wl-code-panel details{margin-block:16px}.wl-code-panel summary{min-height:44px;cursor:pointer}
