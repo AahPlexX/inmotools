@@ -1,0 +1,49 @@
+name: CAD worker bundle proof
+
+on:
+  push:
+    branches:
+      - feat/cad-studio
+    paths:
+      - .github/workflows/cad-worker-bundle-proof.yml
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dedicated CAD worker fixture
+        shell: bash
+        run: |
+          OUT="$RUNNER_TEMP/cad-worker-bundle"
+          pnpm exec vite build tests/fixtures/cad-worker-bundle --outDir "$OUT" --emptyOutDir
+          echo "--- emitted files ---"
+          find "$OUT" -type f -printf '%P %s bytes\n' | sort
+
+          JS_COUNT=$(find "$OUT" -type f -name '*.js' | wc -l)
+          WASM_COUNT=$(find "$OUT" -type f -name '*.wasm' | wc -l)
+          echo "JavaScript files: $JS_COUNT"
+          echo "WebAssembly files: $WASM_COUNT"
+
+          if [ "$JS_COUNT" -lt 2 ]; then
+            echo "Expected a distinct main-thread bundle and dedicated worker bundle." >&2
+            exit 1
+          fi
+          if [ "$WASM_COUNT" -lt 1 ]; then
+            echo "Expected OCCT WebAssembly to be emitted as an asset." >&2
+            exit 1
+          fi
