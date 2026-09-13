@@ -53,7 +53,7 @@ test('turns the Mermaid 12 Gantt metadata crash into a line-specific authoring e
     '```',
   ].join('\n'));
 
-  const error = page.getByRole('alert').filter({ hasText: /gantt task on line 5 has too many metadata items/i });
+  const error = page.getByRole('alert').filter({ hasText: /gantt task on line 5 has too many metadata items/i }).first();
   await expect(error).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.markdown-workbench-diagram svg')).toHaveCount(0);
 });
@@ -75,6 +75,20 @@ test('Source-view standalone HTML renders Mermaid instead of exporting its code 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
   const html = (await readDownloadBytes(await downloadPromise)).toString('utf8');
+  expect(html).toContain('markdown-workbench-diagram');
+  expect(html).toContain('<svg');
+  expect(html).not.toContain('language-mermaid');
+});
+
+test('Source-view Copy HTML awaits rendered Mermaid instead of copying its code fence', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Copy diagram\n\n```mermaid\nflowchart LR\nA-->B\n```');
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Copy HTML', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Copied the rendered HTML', { timeout: 15_000 });
+  const html = await page.evaluate(() => navigator.clipboard.readText());
   expect(html).toContain('markdown-workbench-diagram');
   expect(html).toContain('<svg');
   expect(html).not.toContain('language-mermaid');
