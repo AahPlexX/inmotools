@@ -102,7 +102,7 @@ function cutoutTransform(element: VectorElement): string {
   return transform ? ` transform="${escapeAttribute(transform)}"` : '';
 }
 
-function serializeDifferenceCutout(element: VectorElement): string {
+function serializeDifferenceCutout(element: VectorElement, definitions: string[]): string {
   if (!element.visible) return '';
   const id = escapeAttribute(safeId(element.id));
   const transform = cutoutTransform(element);
@@ -124,8 +124,25 @@ function serializeDifferenceCutout(element: VectorElement): string {
       return `<text id="${id}" fill="#000000" opacity="1"${transform} font-family="${escapeAttribute(element.fontFamily)}" font-size="${number(element.fontSize)}" font-weight="${number(element.fontWeight)}" letter-spacing="${number(element.letterSpacing)}" text-anchor="${element.textAnchor}" x="${number(element.x)}" y="${number(element.y + element.fontSize)}">${escapeText(element.text)}</text>`;
     case 'image':
       return `<image id="${id}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" opacity="1"${transform} href="${escapeAttribute(element.href)}" preserveAspectRatio="${escapeAttribute(element.preserveAspectRatio)}"/>`;
-    case 'group':
-      return `<g id="${id}" opacity="1"${transform}>${element.children.map(serializeDifferenceCutout).join('')}${element.composition ? serializeDifferenceCutout(element.composition.shape) : ''}</g>`;
+    case 'group': {
+      const children = element.children.map((child) => serializeDifferenceCutout(child, definitions)).join('');
+      let compositionAttribute = '';
+      if (element.composition) {
+        const nestedId = `cutout-${element.composition.mode === 'clip' ? 'clip' : 'mask'}-${safeId(element.id)}`;
+        if (element.composition.mode === 'clip') {
+          const shape = serializeElement({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          definitions.push(`<clipPath id="${escapeAttribute(nestedId)}">${shape}</clipPath>`);
+          compositionAttribute = ` clip-path="url(#${escapeAttribute(nestedId)})"`;
+        } else {
+          const shape = serializeDifferenceCutout({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          const width = Math.max(1, element.width);
+          const height = Math.max(1, element.height);
+          definitions.push(`<mask id="${escapeAttribute(nestedId)}" maskUnits="userSpaceOnUse" x="${number(element.x)}" y="${number(element.y)}" width="${number(width)}" height="${number(height)}" style="mask-type:luminance"><rect x="${number(element.x)}" y="${number(element.y)}" width="${number(width)}" height="${number(height)}" fill="#ffffff"/>${shape}</mask>`);
+          compositionAttribute = ` mask="url(#${escapeAttribute(nestedId)})"`;
+        }
+      }
+      return `<g id="${id}" opacity="1"${transform}${compositionAttribute}>${children}</g>`;
+    }
     case 'symbol-instance':
       return `<use id="${id}" fill="#000000" stroke="#000000" opacity="1"${transform} href="#${escapeAttribute(safeId(element.symbolId))}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}"/>`;
     default:
@@ -171,7 +188,7 @@ function serializeElement(element: VectorElement, definitions: string[]): string
           definitions.push(`<clipPath id="${escapeAttribute(compositionId)}">${shape}</clipPath>`);
           compositionAttribute = ` clip-path="url(#${escapeAttribute(compositionId)})"`;
         } else {
-          const maskShape = serializeDifferenceCutout({ ...element.composition.shape, visible: true } as VectorElement);
+          const maskShape = serializeDifferenceCutout({ ...element.composition.shape, visible: true } as VectorElement, definitions);
           const maskX = element.x;
           const maskY = element.y;
           const maskWidth = Math.max(1, element.width);
