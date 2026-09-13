@@ -10,11 +10,13 @@ import {
   type PdfAttachmentDefinition,
   type PdfBlankPageDefinition,
   type PdfBox,
+  type PdfFormFieldDefinition,
   type PdfInspection,
   type PdfMetadataEdits,
   type PdfPageBoxEdit,
 } from './pdf-engine';
 import PdfAttachmentPanel, { type PdfStagedAttachment } from './PdfAttachmentPanel';
+import PdfFormAuthoringPanel from './PdfFormAuthoringPanel';
 import {
   attachmentDefinitionsFromStages,
   attachmentStageError,
@@ -22,6 +24,7 @@ import {
   stagedAttachmentFromExtracted,
   stagedAttachmentFromFile,
 } from './pdf-attachment-stage';
+import { stagedFormFieldError, type PdfOutputPageSize } from './pdf-form-stage';
 import { consumeFileInput } from '../../lib/file-input';
 
 type PdfItem = {
@@ -210,6 +213,7 @@ export default function PdfWorkspace() {
   const [geometryEdits, setGeometryEdits] = useState<GeometryEdits>({});
   const [geometryPageKey, setGeometryPageKey] = useState('');
   const [stagedAttachments, setStagedAttachments] = useState<PdfStagedAttachment[]>([]);
+  const [stagedFormFields, setStagedFormFields] = useState<PdfFormFieldDefinition[]>([]);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
 
@@ -284,8 +288,18 @@ export default function PdfWorkspace() {
     const edits = geometryEdits[row.key];
     return edits && Object.keys(edits).length ? [{ page: index + 1, ...edits }] : [];
   });
+  const formPages = useMemo<PdfOutputPageSize[]>(() => outputPlan.map((row, index) => {
+    const mediaBox = geometryEdits[row.key]?.mediaBox ?? baseBoxes(row).mediaBox;
+    return {
+      page: index + 1,
+      width: mediaBox.width,
+      height: mediaBox.height,
+      label: row.kind === 'blank' ? row.label : `${row.source} page ${row.page}`,
+    };
+  }), [geometryEdits, outputPlan]);
   const stagedBlankPageCount = blankPages.reduce((sum, definition) => sum + (definition.count ?? 1), 0);
   const attachmentError = attachmentStageError(stagedAttachments);
+  const formAuthoringError = stagedFormFieldError(stagedFormFields, formPages);
   const attachmentSources = useMemo(() => items.map((item) => ({
     id: item.id,
     fileName: item.file.name,
@@ -459,7 +473,7 @@ export default function PdfWorkspace() {
   }
 
   async function process() {
-    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError) return;
+    if (!items.length || hasPageError || formPolicyBlocked || blankPlanError || geometryError || attachmentError || formAuthoringError) return;
     setBusy(true);
     try {
       const selections = await Promise.all(items.map(async (item, index) => ({
@@ -475,10 +489,11 @@ export default function PdfWorkspace() {
         blankPages: blankDefinitions,
         pageBoxEdits,
         attachments,
+        formFields: stagedFormFields,
       });
       const outputInspection = await inspectPdf(bytes);
-      if (flatten && formFieldTotal > 0 && outputInspection.formFieldCount !== 0) {
-        throw new Error('Output verification found editable form fields after flattening; no download was created.');
+      if (outputInspection.formFieldCount !== stagedFormFields.length) {
+        throw new Error(`Output verification expected ${stagedFormFields.length} authored form field${stagedFormFields.length === 1 ? '' : 's'} but found ${outputInspection.formFieldCount}; no download was created.`);
       }
       const expectedAttachmentNames = attachments.map((attachment) => attachment.name).sort();
       const actualAttachmentNames = outputInspection.attachments.map((attachment) => attachment.name).sort();
@@ -488,14 +503,17 @@ export default function PdfWorkspace() {
       const filename = safePdfFilename(outputFilename, outputName());
       downloadBytes(bytes, filename, 'application/pdf');
       const delta = bytes.byteLength - sourceBytes;
-      const formSummary = formFieldTotal > 0
-        ? ` ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} flattened; output inspection found ${outputInspection.formFieldCount} editable fields.`
-        : ' Output inspection found no editable form fields.';
+      const sourceFormSummary = formFieldTotal > 0
+        ? ` ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} flattened into page appearances.`
+        : ' No source form fields required flattening.';
+      const authoredFormSummary = stagedFormFields.length
+        ? ` ${stagedFormFields.length} new editable form field${stagedFormFields.length === 1 ? ' was' : 's were'} authored and verified in the output.`
+        : ' No new editable form fields were authored.';
       const metadataSummary = authoredMetadataCount
         ? ` ${authoredMetadataCount} replacement metadata propert${authoredMetadataCount === 1 ? 'y was' : 'ies were'} intentionally written.`
         : ' No replacement metadata was written.';
       const structureSummary = `${stagedBlankPageCount ? ` ${stagedBlankPageCount} blank page${stagedBlankPageCount === 1 ? '' : 's'} inserted.` : ''}${pageBoxEdits.length ? ` ${pageBoxEdits.length} output page${pageBoxEdits.length === 1 ? '' : 's'} received explicit page-box edits.` : ''}${attachments.length ? ` ${attachments.length} embedded attachment${attachments.length === 1 ? '' : 's'} explicitly authored.` : ' No embedded source attachments were carried forward.'}`;
-      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${formSummary}${metadataSummary}${structureSummary}`);
+      setStatus(`Created ${outputPageCount} output page${outputPageCount === 1 ? '' : 's'} locally as ${filename} (${bytesLabel(bytes.byteLength)}; ${delta === 0 ? 'same size as sources' : `${delta > 0 ? '+' : '−'}${bytesLabel(Math.abs(delta))} versus source bytes`}).${sourceFormSummary}${authoredFormSummary}${metadataSummary}${structureSummary}`);
     } catch (error) {
       setStatus(`PDF processing failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     } finally {
@@ -504,7 +522,7 @@ export default function PdfWorkspace() {
   }
 
   return <>
-    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, form flattening, metadata, and export naming.</p></div></div>
+    <div className="workspace-header"><div><h2>PDF Workstation</h2><p>Prepare deterministic local PDF outputs: page order, selection, blank pages, page boxes, embedded files, editable forms, metadata, and export naming.</p></div></div>
     <div className="workspace-body">
       <div className="field"><label htmlFor="pdf-files">Add PDF files</label><input id="pdf-files" type="file" accept="application/pdf,.pdf" multiple onChange={(event) => consumeFileInput(event.target, () => load(event.target.files))} /><small>New selections append to the current queue instead of replacing it.</small></div>
 
@@ -611,6 +629,19 @@ export default function PdfWorkspace() {
         {geometryError ? <p className="help-text" role="alert">{geometryError}</p> : <p className="help-text">{pageBoxEdits.length} output page{pageBoxEdits.length === 1 ? '' : 's'} currently has staged page-box edits.</p>}
       </section> : null}
 
+      {items.length && !hasPageError && outputPlan.length ? <>
+        <PdfFormAuthoringPanel
+          pages={formPages}
+          staged={stagedFormFields}
+          onStage={(field) => {
+            setStagedFormFields((current) => [...current, field]);
+            setStatus(`Staged editable form field ${field.name}.`);
+          }}
+          onRemove={(index) => setStagedFormFields((current) => current.filter((_, fieldIndex) => fieldIndex !== index))}
+        />
+        {formAuthoringError ? <p className="help-text" role="alert">{formAuthoringError}</p> : null}
+      </> : null}
+
       {items.length && !hasPageError ? <section className="notice" style={{ marginTop: 18 }} data-testid="pdf-output-preview" aria-labelledby="pdf-preview-title">
         <strong id="pdf-preview-title">Output page order preview</strong>
         <p className="help-text">Structural preview of copied and staged blank pages before export. {outputPageCount > OUTPUT_PREVIEW_LIMIT ? `Showing the first ${OUTPUT_PREVIEW_LIMIT} of ${outputPageCount} pages.` : `${outputPageCount} page${outputPageCount === 1 ? '' : 's'} planned.`}</p>
@@ -621,20 +652,20 @@ export default function PdfWorkspace() {
         </ol>
       </section> : null}
 
-      <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 18 }}><input type="checkbox" checked={flatten} onChange={(event) => setFlatten(event.target.checked)} /> Flatten AcroForm fields before copying pages</label>
-      <p className="help-text">Flattening preserves current field appearances but removes editability. It does not rasterize page content.</p>
+      <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 18 }}><input type="checkbox" checked={flatten} onChange={(event) => setFlatten(event.target.checked)} /> Flatten source AcroForm fields before copying pages</label>
+      <p className="help-text">Flattening preserves source field appearances but removes their editability. Newly authored fields staged above remain editable in the rebuilt output.</p>
       {items.length ? <div className="notice" data-testid="pdf-form-policy" role={formPolicyBlocked ? 'alert' : undefined}>
         <strong>Form handling confirmation</strong>
         <p className="help-text">{formFieldTotal === 0
-          ? 'No AcroForm fields were detected in the queued sources; page copying can proceed with or without the flatten option.'
+          ? `No AcroForm fields were detected in the queued sources. ${stagedFormFields.length} new editable field${stagedFormFields.length === 1 ? ' is' : 's are'} currently staged for output.`
           : flatten
-            ? `${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} will be flattened into their current page appearances. The output is expected to contain zero editable AcroForm fields and is reinspected before download.`
-            : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding form structure.`}</p>
+            ? `${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} will be flattened into their current page appearances. ${stagedFormFields.length} newly authored editable field${stagedFormFields.length === 1 ? ' is' : 's are'} expected after export, and the output is reinspected before download.`
+            : `Processing is blocked because ${formFieldTotal} source form field${formFieldTotal === 1 ? '' : 's'} would not remain editable after cross-document page copying. Enable flattening to preserve their current appearances without silently discarding source form structure.`}</p>
       </div> : null}
 
-      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
+      <div className="button-row"><button className="action-button" type="button" disabled={!items.length || busy || hasPageError || formPolicyBlocked || Boolean(blankPlanError) || Boolean(geometryError) || Boolean(attachmentError) || Boolean(formAuthoringError)} onClick={() => void process()}>Process and download</button><button className="action-button secondary" type="button" disabled={!items.length || busy} onClick={() => { setItems([]); setMetadata(EMPTY_METADATA); setOutputFilename(''); setBlankPages([]); setGeometryEdits({}); setGeometryPageKey(''); setStagedAttachments([]); setStagedFormFields([]); setStatus('Queue cleared. Choose PDFs to begin again.'); }}>Clear queue</button></div>
       <div className="status-line" role="status">{busy ? 'Processing PDF bytes locally…' : status}</div>
-      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata and output attachments are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
+      <div className="notice"><strong>Current sanitization boundary</strong><p className="help-text">Output is rebuilt into a new PDF, so source document-level Info/catalog metadata and embedded files are not intentionally carried forward. Replacement metadata, output attachments, and newly authored editable fields are opt-in. Selected page content and page-level annotations are preserved; this stage is not yet the workstation's planned malware analysis, secure redaction, or active-content sanitization system.</p></div>
     </div>
   </>;
 }
