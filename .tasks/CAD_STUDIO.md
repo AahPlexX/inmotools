@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `09536b94fbe3d2c5cf2d00262053915f526fa11a`
+**Last tracked implementation commit:** `54dbecc1568597fecc74eefdc2199889d94f11e7`
 **Current gate:** G6 — exact solid/surface feature evaluator
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -71,10 +71,12 @@ A capability counts only when production behavior exists, relevant validation pa
 - Worker lifecycle tests explicitly prove hard restart terminates the old worker and rejects every late result from that generation; client disposal terminates the current worker and prevents future requests.
 - Aligned run `34729336137` passed the full unit suite and production TypeScript/Vite build after the worker-executor narrowing correction. Factory run `34729436992` passed both module-worker factory fixtures and all prior functional coverage for **831 passing tests** before its ledger alignment.
 - Dedicated Vite bundle proof run `34729579557` emitted `cad.worker-DJ14lOhS.js` (121,389 bytes), a separate main-thread JS bundle (4,552 bytes), and `occt-wasm-aczw1sGm.wasm` (22,226,346 bytes), proving the exact kernel is physically separated from the caller rather than folded into the main bundle.
-- Chromium runtime proof run `34729645509` launched Chrome 153 against the permanent CAD worker fixture. The real module worker passed WebAssembly/SIMD/tail-call/exception capability gating, initialized `occt-wasm`, and returned `{ proof: "response", code: "evaluation-failed", recoverable: "true" }`, which is the deliberate G6 evaluator sentinel reached only after exact-kernel initialization. The temporary proof workflow was removed immediately afterward.
-- Fresh clean-head PR run `34729683483` passed the full unit stage and production build after all G5 proof scaffolding/workflow cleanup. The later generic browser stage is release/integration evidence and is not needed to establish the isolated G5 kernel contract.
+- Chromium runtime proof run `34729645509` launched Chrome 153 against the permanent CAD worker fixture. The real module worker passed WebAssembly/SIMD/tail-call/exception capability gating, initialized `occt-wasm`, and returned `{ proof: "response", code: "evaluation-failed", recoverable: "true" }`, the deliberate G6 evaluator sentinel reached only after exact-kernel initialization. The temporary proof workflow was removed immediately afterward.
+- Fresh clean-head PR run `34729683483` passed the full unit stage and production build after all G5 proof scaffolding/workflow cleanup.
+- G6 first evaluator slice `54dbecc1568597fecc74eefdc2199889d94f11e7` replays exact box/cylinder/sphere/cone/torus primitives and fuse/cut/common/section Booleans from the serializable feature history, validates feature parameters/body ownership, honors suppression, attributes failures to feature IDs, retains only each body's final exact shape, and deterministically releases intermediate/error-path native geometry. Run `34729840514` passed all four evaluator contracts and reached **835 passing tests**; only the deliberately stale ledger guard failed before this alignment.
+- G6 remains open. The next slice connects project `rebuild` requests to this evaluator inside the worker executor, preserves feature-attributed structured errors, and proves a real OCCT rebuild produces valid mesh/bounds/exact export state before expanding to extrude/revolve/sweep/loft and topology-dependent operations.
 - The permanent `tests/fixtures/cad-worker-bundle` fixture remains as a reproducible worker/bundle/runtime probe. Heavy OCCT worker code is not registered in the generic application graph yet; the G7 CAD workspace will import the worker factory lazily when the CAD route is integrated.
-- Topology-ID-dependent fillet/chamfer/shell/draft resolution remains deliberately deferred to G6 rather than accepting raw unstable OCCT indexes. glTF/XCAF assembly export remains part of the later professional export path.
+- Topology-ID-dependent fillet/chamfer/shell/draft resolution remains deliberately deferred within G6 rather than accepting raw unstable OCCT indexes. glTF/XCAF assembly export remains part of the later professional export path.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
 
