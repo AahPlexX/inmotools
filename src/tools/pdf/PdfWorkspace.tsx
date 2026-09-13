@@ -18,6 +18,7 @@ import {
 import PdfAttachmentPanel, { type PdfStagedAttachment } from './PdfAttachmentPanel';
 import PdfFormAuthoringPanel from './PdfFormAuthoringPanel';
 import PdfOverlayPanel from './PdfOverlayPanel';
+import PdfExportSummaryPanel from './PdfExportSummaryPanel';
 import {
   attachmentDefinitionsFromStages,
   attachmentStageError,
@@ -34,6 +35,7 @@ import {
   type PdfOverlayDraft,
 } from './pdf-overlay-stage';
 import { applyPdfOverlaysToBytes } from './pdf-overlay-export';
+import { buildPdfExportSummary } from './pdf-export-summary';
 import { consumeFileInput } from '../../lib/file-input';
 
 type PdfItem = {
@@ -279,6 +281,11 @@ export default function PdfWorkspace() {
   const outputPageCount = outputPlan.length;
   const outputPreview = outputPlan.slice(0, OUTPUT_PREVIEW_LIMIT);
   const sourceBytes = items.reduce((sum, item) => sum + item.file.size, 0);
+  const sourcePageCount = items.reduce((sum, item) => sum + item.inspection.pageCount, 0);
+  const sourceAttachmentCount = items.reduce((sum, item) => sum + item.inspection.attachments.length, 0);
+  const sourceMetadataDocumentCount = items.filter((item) => item.inspection.metadataFields.length > 0).length;
+  const duplicateSelectionCount = pageStates.reduce((sum, state) => sum + Math.max(0, state.pages.length - new Set(state.pages).size), 0);
+  const rotationCount = sourcePlan.filter((row) => row.rotate !== 0).length;
   const formFieldTotal = items.reduce((sum, item) => sum + item.inspection.formFieldCount, 0);
   const formPolicyBlocked = formFieldTotal > 0 && !flatten;
   const authoredMetadata = metadataForExport(metadata);
@@ -318,6 +325,24 @@ export default function PdfWorkspace() {
     attachments: item.inspection.attachments,
     warnings: item.inspection.attachmentWarnings,
   })), [items]);
+  const exportSummary = buildPdfExportSummary({
+    sourceDocumentCount: items.length,
+    sourcePageCount,
+    outputPageCount,
+    sourceFormFieldCount: formFieldTotal,
+    flattenSourceForms: flatten,
+    sourceAttachmentCount,
+    stagedAttachmentCount: stagedAttachments.length,
+    sourceMetadataDocumentCount,
+    replacementMetadataCount: authoredMetadataCount,
+    stagedBlankPageCount,
+    duplicateSelectionCount,
+    rotationCount,
+    pageBoxEditCount: pageBoxEdits.length,
+    authoredFormFieldCount: stagedFormFields.length,
+    overlayCount,
+    filenameChanged: Boolean(outputFilename.trim()),
+  });
 
   async function load(list: FileList | null) {
     if (!list?.length) return;
@@ -670,6 +695,8 @@ export default function PdfWorkspace() {
             : <li key={row.key} style={{ overflowWrap: 'anywhere' }}>Blank page · {row.label} · {row.width.toFixed(2)} × {row.height.toFixed(2)} pt</li>)}
         </ol>
       </section> : null}
+
+      {items.length && !hasPageError ? <PdfExportSummaryPanel entries={exportSummary} /> : null}
 
       <label style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 18 }}><input type="checkbox" checked={flatten} onChange={(event) => setFlatten(event.target.checked)} /> Flatten source AcroForm fields before copying pages</label>
       <p className="help-text">Flattening preserves source field appearances but removes their editability. Newly authored fields staged above remain editable in the rebuilt output.</p>
