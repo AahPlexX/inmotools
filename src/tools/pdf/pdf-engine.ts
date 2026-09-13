@@ -72,35 +72,65 @@ export interface PdfPageBoxEdit {
   trimBox?: PdfBox;
 }
 
-interface PdfFormFieldBase {
+interface PdfFormFieldFlags {
   name: string;
+  required?: boolean;
+  readOnly?: boolean;
+}
+
+interface PdfPositionedFormFieldBase extends PdfFormFieldFlags {
   page: number;
   x: number;
   y: number;
   width: number;
   height: number;
-  required?: boolean;
-  readOnly?: boolean;
 }
 
-export interface PdfTextFieldDefinition extends PdfFormFieldBase {
+export interface PdfTextFieldDefinition extends PdfPositionedFormFieldBase {
   type: 'text';
   value?: string;
   multiline?: boolean;
 }
 
-export interface PdfCheckBoxDefinition extends PdfFormFieldBase {
+export interface PdfCheckBoxDefinition extends PdfPositionedFormFieldBase {
   type: 'checkbox';
   checked?: boolean;
 }
 
-export interface PdfDropdownDefinition extends PdfFormFieldBase {
+export interface PdfDropdownDefinition extends PdfPositionedFormFieldBase {
   type: 'dropdown';
   options: string[];
   selected?: string;
 }
 
-export type PdfFormFieldDefinition = PdfTextFieldDefinition | PdfCheckBoxDefinition | PdfDropdownDefinition;
+export interface PdfRadioOptionDefinition {
+  value: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PdfRadioGroupDefinition extends PdfFormFieldFlags {
+  type: 'radio';
+  options: PdfRadioOptionDefinition[];
+  selected?: string;
+}
+
+export interface PdfOptionListDefinition extends PdfPositionedFormFieldBase {
+  type: 'option-list';
+  options: string[];
+  selected?: string[];
+  multiselect?: boolean;
+}
+
+export type PdfFormFieldDefinition =
+  | PdfTextFieldDefinition
+  | PdfCheckBoxDefinition
+  | PdfDropdownDefinition
+  | PdfRadioGroupDefinition
+  | PdfOptionListDefinition;
 
 export interface PdfOutputOptions {
   metadata?: PdfMetadataEdits;
@@ -138,9 +168,6 @@ const cleanKeywords = (values: string[] | undefined): string[] => (
 );
 
 function applyMetadata(document: PDFDocument, metadata: PdfMetadataEdits | undefined): void {
-  // Re-establish the privacy boundary before writing any replacement values.
-  // This prevents explicit metadata mode from ever inheriting incidental Info
-  // entries created earlier in the output lifecycle.
   document.context.trailerInfo.Info = undefined;
   if (!metadata) return;
 
@@ -247,24 +274,61 @@ function applyPageBoxEdits(document: PDFDocument, edits: PdfPageBoxEdit[]): void
   }
 }
 
-function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
-  if (!definition.name.trim()) throw new Error('Form field names cannot be blank.');
+function validatePositionedGeometry(
+  document: PDFDocument,
+  label: string,
+  definition: Pick<PdfPositionedFormFieldBase, 'page' | 'x' | 'y' | 'width' | 'height'>,
+): void {
   if (!Number.isInteger(definition.page) || definition.page < 1 || definition.page > document.getPageCount()) {
-    throw new Error(`Form field ${definition.name} targets page ${definition.page}, which is outside the output document.`);
+    throw new Error(`${label} targets page ${definition.page}, which is outside the output document.`);
   }
-
   const values = [definition.x, definition.y, definition.width, definition.height];
   if (!values.every(Number.isFinite) || definition.x < 0 || definition.y < 0 || definition.width <= 0 || definition.height <= 0) {
-    throw new Error(`Form field ${definition.name} must use finite, positive page geometry.`);
+    throw new Error(`${label} must use finite, positive page geometry.`);
   }
-
   const page = document.getPage(definition.page - 1);
   if (definition.x + definition.width > page.getWidth() || definition.y + definition.height > page.getHeight()) {
-    throw new Error(`Form field ${definition.name} extends outside output page ${definition.page}.`);
+    throw new Error(`${label} extends outside output page ${definition.page}.`);
   }
 }
 
-function applyFieldFlags(field: { enableReadOnly(): void; enableRequired(): void }, definition: PdfFormFieldBase): void {
+function cleanFieldOptions(values: string[], label: string): string[] {
+  if (!values.length) throw new Error(`${label} must contain at least one option.`);
+  const options = values.map((option) => option.trim());
+  if (options.some((option) => !option)) throw new Error(`${label} cannot contain blank options.`);
+  if (new Set(options).size !== options.length) throw new Error(`${label} cannot contain duplicate options.`);
+  return options;
+}
+
+function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
+  if (!definition.name.trim()) throw new Error('Form field names cannot be blank.');
+  if (definition.type === 'radio') {
+    const options = cleanFieldOptions(definition.options.map((option) => option.value), `Radio group ${definition.name}`);
+    definition.options.forEach((option, index) => validatePositionedGeometry(document, `Radio option ${options[index]} in ${definition.name}`, option));
+    if (definition.selected !== undefined && !options.includes(definition.selected)) {
+      throw new Error(`Radio group ${definition.name} selected value must match one of its options.`);
+    }
+    return;
+  }
+
+  validatePositionedGeometry(document, `Form field ${definition.name}`, definition);
+  if (definition.type === 'dropdown') {
+    const options = cleanFieldOptions(definition.options, `Dropdown ${definition.name}`);
+    if (definition.selected !== undefined && !options.includes(definition.selected)) {
+      throw new Error(`Dropdown ${definition.name} selected value must match one of its options.`);
+    }
+  }
+  if (definition.type === 'option-list') {
+    const options = cleanFieldOptions(definition.options, `Option list ${definition.name}`);
+    const selected = definition.selected ?? [];
+    if (!definition.multiselect && selected.length > 1) throw new Error(`Option list ${definition.name} must enable multiselect before selecting multiple values.`);
+    if (selected.some((value) => !options.includes(value))) {
+      throw new Error(`Option list ${definition.name} selected values must match its declared options.`);
+    }
+  }
+}
+
+function applyFieldFlags(field: { enableReadOnly(): void; enableRequired(): void }, definition: PdfFormFieldFlags): void {
   if (definition.readOnly) field.enableReadOnly();
   if (definition.required) field.enableRequired();
 }
@@ -279,6 +343,23 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
     const name = definition.name.trim();
     if (seen.has(name) || form.getFieldMaybe(name)) throw new Error(`Form field name ${name} is duplicated.`);
     seen.add(name);
+
+    if (definition.type === 'radio') {
+      const field = form.createRadioGroup(name);
+      applyFieldFlags(field, definition);
+      for (const option of definition.options) {
+        const page = document.getPage(option.page - 1);
+        field.addOptionToPage(option.value.trim(), page, {
+          x: option.x,
+          y: option.y,
+          width: option.width,
+          height: option.height,
+        });
+      }
+      if (definition.selected !== undefined) field.select(definition.selected);
+      continue;
+    }
+
     const page = document.getPage(definition.page - 1);
     const rect = {
       x: definition.x,
@@ -304,17 +385,20 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
       continue;
     }
 
-    if (!definition.options.length) throw new Error(`Dropdown ${name} must contain at least one option.`);
-    const options = definition.options.map((option) => option.trim());
-    if (options.some((option) => !option)) throw new Error(`Dropdown ${name} cannot contain blank options.`);
-    if (new Set(options).size !== options.length) throw new Error(`Dropdown ${name} cannot contain duplicate options.`);
-    if (definition.selected !== undefined && !options.includes(definition.selected)) {
-      throw new Error(`Dropdown ${name} selected value must match one of its options.`);
+    if (definition.type === 'dropdown') {
+      const field = form.createDropdown(name);
+      applyFieldFlags(field, definition);
+      field.setOptions(definition.options.map((option) => option.trim()));
+      if (definition.selected !== undefined) field.select(definition.selected);
+      field.addToPage(page, rect);
+      continue;
     }
-    const field = form.createDropdown(name);
+
+    const field = form.createOptionList(name);
     applyFieldFlags(field, definition);
-    field.setOptions(options);
-    if (definition.selected !== undefined) field.select(definition.selected);
+    field.setOptions(definition.options.map((option) => option.trim()));
+    if (definition.multiselect) field.enableMultiselect();
+    if (definition.selected?.length) field.select(definition.multiselect ? definition.selected : definition.selected[0]);
     field.addToPage(page, rect);
   }
 }
@@ -345,11 +429,6 @@ export function parsePageSelection(value: string, max: number): number[] {
   return pages;
 }
 
-/**
- * Returns null when a preset has no pages. Empty string remains reserved for
- * the explicit “all pages” selection, so an empty even/odd result can never be
- * mistaken for all pages by parsePageSelection().
- */
 export function pageSelectionPreset(kind: PageSelectionPreset, max: number): string | null {
   if (!Number.isInteger(max) || max < 1) throw new Error('PDF must contain at least one page.');
   if (kind === 'all') return '';
