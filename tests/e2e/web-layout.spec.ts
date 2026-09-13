@@ -135,3 +135,35 @@ test('retains preview interaction until manual refresh and offers actual-size cu
   await expect(page.locator('iframe[title="Layout at 1280 pixels"]')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
+
+test('authors tracks and metadata and restores a saved starter snapshot', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByText('Starters, snapshots and reusable pages', { exact: true }).click();
+  await page.getByRole('button', { name: 'Portfolio starter', exact: true }).click();
+  await expect(page.getByLabel('Page heading', { exact: true })).toHaveValue('Work with purpose');
+  await page.getByLabel('Snapshot name', { exact: true }).fill('Before edits');
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByLabel('Page heading', { exact: true }).fill('Changed');
+  await page.getByRole('button', { name: 'Compare with current', exact: true }).click();
+  await expect(page.locator('pre').filter({ hasText: 'Saved: "Work with purpose"' })).toContainText('Current: "Changed"');
+  await page.getByRole('button', { name: 'Restore snapshot', exact: true }).click();
+  await expect(page.getByLabel('Page heading', { exact: true })).toHaveValue('Work with purpose');
+  await page.getByText('Tracks, wrapping and reading direction', { exact: true }).click();
+  await page.getByLabel('Custom grid tracks', { exact: true }).fill('1fr 2fr 1fr');
+  await page.getByRole('button', { name: 'Apply tracks', exact: true }).click();
+  await page.getByLabel('Text direction', { exact: true }).selectOption('rtl');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByText('Custom document and social metadata', { exact: true }).click();
+  await page.getByLabel('Document title', { exact: true }).fill('Published portfolio');
+  await page.getByLabel('Tags / keywords', { exact: true }).fill('design, portfolio');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download HTML', exact: true }).last().click();
+  const stream = await (await downloadPromise).createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(chunk as Buffer);
+  const html = Buffer.concat(chunks).toString('utf8');
+  expect(html).toContain('<title>Published portfolio</title>');
+  expect(html).toContain('dir="rtl"');
+  expect(html).toContain('grid-template-columns:1fr 2fr 1fr');
+  expect(html).toContain('name="keywords" content="design, portfolio"');
+});

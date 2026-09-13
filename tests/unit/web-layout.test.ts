@@ -1,3 +1,4 @@
+import { DEFAULT_OPTIONS, parseOptions } from '../../src/tools/web-layout/layout-options';
 import { describe, expect, it } from 'vitest';
 import { buildCss, buildHtml, buildPreview, buildTokens, INITIAL_PROJECT, parseProject } from '../../src/tools/web-layout/layout-engine';
 
@@ -86,4 +87,17 @@ it('exports every navigation target, multiline content and a consistent print pa
   const tokens = JSON.parse(buildTokens(project));
   expect(tokens.color.canvas.$value.hex).toBe('#111827');
   expect(tokens.typography.headingMax.$value.value).toBe(project.fontMax);
+});
+
+
+it('round-trips authoring options and escapes custom metadata while rejecting CSS injection', () => {
+  const project = { ...INITIAL_PROJECT, options: { ...DEFAULT_OPTIONS, tracks: 'repeat(3, minmax(0, 1fr))', textDirection: 'rtl' as const, metaTitle: 'A separate title', customMeta: [{ name: 'application-name', content: '"/><script>bad()</script>' }] } };
+  expect(parseProject(JSON.stringify(project))).toEqual(project);
+  const html = buildHtml(project);
+  expect(html).toContain('dir="rtl"');
+  expect(html).toContain('<title>A separate title</title>');
+  expect(html).not.toContain('<script>bad()');
+  expect(html).toContain('grid-template-columns:repeat(3, minmax(0, 1fr))');
+  for (const tracks of ['1fr; color:red', 'url(https://example.com)', 'repeat(999, 1fr)', 'minmax(1fr, 1fr)']) expect(() => parseOptions({ ...DEFAULT_OPTIONS, tracks })).toThrow();
+  expect(() => parseOptions({ ...DEFAULT_OPTIONS, customMeta: [{name:'viewport',content:'width=3000'}] })).toThrow();
 });
