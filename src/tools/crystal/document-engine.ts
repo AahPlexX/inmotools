@@ -9,6 +9,10 @@ import type {
   Vec3,
 } from './crystal-types';
 
+export type CrystalSystemConstraint = 'none' | 'cubic' | 'tetragonal' | 'orthorhombic' | 'hexagonal' | 'trigonal' | 'monoclinic' | 'triclinic';
+
+type CellField = keyof UnitCell;
+
 const wrapValue = (value: number): number => {
   const wrapped = ((value % 1) + 1) % 1;
   return Object.is(wrapped, -0) ? 0 : wrapped;
@@ -44,6 +48,64 @@ const snapshotOf = (document: Pick<CrystalDocument, 'name'|'sourceFormat'|'sourc
 });
 
 const record = (kind: string, label: string, detail?: string): CrystalTransformRecord => ({ kind, label, detail });
+
+function assertConstraintInput(cell: UnitCell, changed: CellField): void {
+  if (!(changed in cell)) throw new RangeError(`Unknown unit-cell field: ${String(changed)}`);
+  const validation = validateCell(cell);
+  if (!validation.ok) throw new RangeError(validation.error);
+}
+
+/**
+ * Apply an explicit metric constraint after one unit-cell field has changed.
+ * Trigonal uses the rhombohedral-axis setting (a=b=c; alpha=beta=gamma).
+ * Monoclinic uses the conventional unique-b setting (alpha=gamma=90°).
+ */
+export function constrainCell(cell: UnitCell, system: CrystalSystemConstraint, changed: CellField): UnitCell {
+  assertConstraintInput(cell, changed);
+  const next: UnitCell = { ...cell };
+  const changedValue = cell[changed];
+
+  switch (system) {
+    case 'none':
+    case 'triclinic':
+      break;
+    case 'cubic': {
+      const length = changed === 'a' || changed === 'b' || changed === 'c' ? changedValue : cell.a;
+      Object.assign(next, { a:length, b:length, c:length, alpha:90, beta:90, gamma:90 });
+      break;
+    }
+    case 'tetragonal': {
+      const basal = changed === 'a' || changed === 'b' ? changedValue : cell.a;
+      Object.assign(next, { a:basal, b:basal, alpha:90, beta:90, gamma:90 });
+      break;
+    }
+    case 'orthorhombic':
+      Object.assign(next, { alpha:90, beta:90, gamma:90 });
+      break;
+    case 'hexagonal': {
+      const basal = changed === 'a' || changed === 'b' ? changedValue : cell.a;
+      Object.assign(next, { a:basal, b:basal, alpha:90, beta:90, gamma:120 });
+      break;
+    }
+    case 'trigonal': {
+      const length = changed === 'a' || changed === 'b' || changed === 'c' ? changedValue : cell.a;
+      const angle = changed === 'alpha' || changed === 'beta' || changed === 'gamma' ? changedValue : cell.alpha;
+      Object.assign(next, { a:length, b:length, c:length, alpha:angle, beta:angle, gamma:angle });
+      break;
+    }
+    case 'monoclinic':
+      Object.assign(next, { alpha:90, gamma:90 });
+      break;
+    default: {
+      const exhaustive: never = system;
+      throw new RangeError(`Unknown crystal-system constraint: ${String(exhaustive)}`);
+    }
+  }
+
+  const validation = validateCell(next);
+  if (!validation.ok) throw new RangeError(validation.error);
+  return next;
+}
 
 export function createStarterStructure(id: StarterStructureId): CrystalDocument {
   const definition = STARTER_STRUCTURES[id];
