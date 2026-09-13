@@ -29,15 +29,14 @@ export default defineConfig({
         // MarkdownWorkspace itself stays precached so an already-open client can
         // still enter the tool after a deployment replaces hashed assets. Its
         // heavy optional diagram/style/font dependencies remain lazy and can be
-        // recovered through the waiting-service-worker path if version skew is
-        // encountered while loading one of those secondary chunks.
+        // recovered through runtime caches if version skew or offline reuse occurs.
         //   - diagram.worker-*.js: the Graphviz Worker chunk; @hpcc-js/wasm-graphviz's
         //     WASM binary is inlined into this chunk rather than emitted as
         //     a separate .wasm file, so the whole chunk must be excluded.
         //   - mermaid-parser.core-*.js, cytoscape.esm-*.js, and every
         //     `*Diagram-*.js` / `diagram-*.js` chunk: Mermaid's per-diagram-type
         //     code-split chunks, only loaded when a document actually
-        //     contains that diagram type.
+        //     contains that diagram type. They are runtime-cached below.
         //   - apa-*.js, ieee-*.js, chicago-author-date-*.js, mla-*.js: the
         //     bundled CSL style XML files, loaded dynamically per style.
         //   - KaTeX_*.{woff,woff2,ttf}: KaTeX's web fonts (all formats);
@@ -68,6 +67,18 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
               expiration: {
                 maxEntries: 2,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+              },
+            },
+          },
+          {
+            urlPattern: /\/assets\/(?:mermaid-parser\.core-|cytoscape\.esm-|[^/]*Diagram-|diagram-)[^/]*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mermaid-diagram-chunks',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 64,
                 maxAgeSeconds: 30 * 24 * 60 * 60,
               },
             },

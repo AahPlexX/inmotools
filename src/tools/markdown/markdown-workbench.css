@@ -60,6 +60,18 @@
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
 
+.markdown-workbench-diagram-error-message {
+  max-width: 100%;
+  margin: .5rem 0 1rem;
+  padding: .65rem .75rem;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--danger);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .markdown-workbench-help-dialog {
   width: min(760px, calc(100vw - 32px));
   max-width: 100%;
