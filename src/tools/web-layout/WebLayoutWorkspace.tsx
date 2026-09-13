@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { downloadText } from '../../lib/download';
 import { buildCss, buildHtml, buildPreview, buildTokens, INITIAL_PROJECT, parseProject, projectWarnings, type BlockKind, type LayoutProject } from './layout-engine';
 import './web-layout.css';
+import { AppearancePanel } from './AppearancePanel';
+import { BlockTreeEditor } from './BlockTreeEditor';
 import { CodePanel } from './CodePanel';
 import { ProjectLibrary } from './ProjectLibrary';
 import { LayoutOptionsPanel } from './LayoutOptionsPanel';
@@ -111,22 +113,14 @@ export default function WebLayoutWorkspace() {
   function commit(next: LayoutProject) {
     try {
       const valid = parseProject(JSON.stringify(next));
-      if (JSON.stringify(valid) === JSON.stringify(project)) return;
+      if (JSON.stringify(valid) === JSON.stringify(project)) return true;
       importRevision.current += 1;
       setImportBusy(false);
       const updated = [...history.slice(0, position + 1), valid].slice(-51);
-      setHistory(updated); setPosition(updated.length - 1); setStatus('Changes applied.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Unable to apply changes.'); }
+      setHistory(updated); setPosition(updated.length - 1); setStatus('Changes applied.'); return true;
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Unable to apply changes.'); return false; }
   }
   const patch = (change: Partial<LayoutProject>) => commit({ ...project, ...change });
-  function editBlock(id: string, change: Partial<LayoutProject['blocks'][number]>) {
-    patch({ blocks: project.blocks.map(block => block.id === id ? { ...block, ...change } : block) });
-  }
-  function move(index: number, delta: number) {
-    const blocks = [...project.blocks];
-    [blocks[index], blocks[index + delta]] = [blocks[index + delta], blocks[index]];
-    patch({ blocks });
-  }
   async function importProject(file?: File) {
     if (!file) return;
     const revision = ++importRevision.current;
@@ -172,10 +166,10 @@ export default function WebLayoutWorkspace() {
           <p className="help-text">The column count is a maximum. Cards wrap sooner when space is tight so text stays readable.</p>
           <LayoutOptionsPanel project={project} panel="layout" onChange={options => patch({ options })} /><h3>Page blocks</h3><p className="help-text">Reading order follows this list, including on phones.</p>
           <div className="wl-fields"><label className="wl-field">Add a pattern<select value={kind} onChange={event => setKind(event.target.value as BlockKind)}>{KINDS.map(value => <option key={value}>{value}</option>)}</select></label><button type="button" disabled={project.blocks.length >= 100 || importBusy} onClick={() => patch({ blocks: [...project.blocks, { id: `block-${crypto.randomUUID()}`, kind, title: `New ${kind}`, text: 'Write your content here.' }] })}>Add block</button></div>
-          <ol className="wl-blocks">{project.blocks.map((block, index) => <li key={block.id}><details><summary>{index + 1}. {block.title || 'Untitled block'} · {block.kind}</summary><label className="wl-field">Block title<input value={block.title} maxLength={200} onChange={event => editBlock(block.id, { title: event.target.value })} /></label><label className="wl-field">Block text<textarea value={block.text} maxLength={2000} onChange={event => editBlock(block.id, { text: event.target.value })} /></label><div className="button-row"><button type="button" disabled={!index} onClick={() => move(index, -1)}>Move up</button><button type="button" disabled={index === project.blocks.length - 1} onClick={() => move(index, 1)}>Move down</button><button type="button" disabled={project.blocks.length >= 100} onClick={() => patch({ blocks: [...project.blocks.slice(0,index + 1), { ...block, id: `block-${crypto.randomUUID()}` }, ...project.blocks.slice(index + 1)] })}>Duplicate</button><button type="button" onClick={() => patch({ blocks: project.blocks.filter(item => item.id !== block.id) })}>Remove</button></div></details></li>)}</ol>
+          <BlockTreeEditor blocks={project.blocks} onChange={blocks => patch({blocks})} />
         </div>
         <div hidden={tab !== 'Code'}><CodePanel project={project} onChange={code => patch({ code })} /></div>
-        {tab === 'Theme' && <><h3>Shared design values</h3><label className="wl-field">Theme<select aria-label="Theme" value={project.theme} onChange={event => patch({ theme: event.target.value as LayoutProject['theme'] })}><option value="light">Light</option><option value="dark">Dark</option><option value="contrast">High contrast</option></select></label><label className="wl-field">Accent color<input type="color" value={project.accent} onChange={event => patch({ accent: event.target.value })} /></label><p className="help-text">Accent is decorative; text retains the theme's readable foreground.</p><div className="wl-fields">{numeric('Corner radius (px)', 'radius', 0, 100)}{numeric('Heading minimum (px)', 'fontMin', 16, 96)}{numeric('Heading maximum (px)', 'fontMax', 16, 144)}</div><label className="wl-check"><input type="checkbox" checked={project.reset} onChange={event => patch({ reset: event.target.checked })} />Include responsive CSS reset</label><p className="help-text">Heading size grows smoothly between 320 and 1440 pixels. Reduced-motion and print rules are included.</p><button type="button" onClick={() => exportFile('Tokens')}>Download design tokens</button></>}
+        <div hidden={tab !== 'Theme'}><h3>Shared design values</h3><label className="wl-field">Theme<select aria-label="Theme" value={project.theme} onChange={event => patch({ theme: event.target.value as LayoutProject['theme'] })}><option value="light">Light</option><option value="dark">Dark</option><option value="contrast">High contrast</option></select></label><label className="wl-field">Accent color<input type="color" value={project.accent} onChange={event => patch({ accent: event.target.value })} /></label><p className="help-text">Accent is decorative; text retains the theme's readable foreground.</p><div className="wl-fields">{numeric('Corner radius (px)', 'radius', 0, 100)}{numeric('Heading minimum (px)', 'fontMin', 16, 96)}{numeric('Heading maximum (px)', 'fontMax', 16, 144)}</div><label className="wl-check"><input type="checkbox" checked={project.reset} onChange={event => patch({ reset: event.target.checked })} />Include responsive CSS reset</label><p className="help-text">Heading size grows smoothly between 320 and 1440 pixels. Reduced-motion and print rules are included.</p><button type="button" onClick={() => exportFile('Tokens')}>Download design tokens</button><AppearancePanel value={project.appearance} theme={project.theme} onChange={appearance=>patch({appearance})}/></div>
         {tab === 'Preview' && <><h3>Compare viewport widths</h3><label className="wl-check"><input type="checkbox" checked={actualSize} onChange={e => setActualSize(e.target.checked)} />Actual-size view (scroll inside each frame)</label>
           <label className="wl-check"><input type="checkbox" checked={livePreview} onChange={e => { setPreviewProject(project); setLivePreview(e.target.checked); }} />Refresh previews while editing</label>
           {!livePreview && <><button type="button" onClick={() => setPreviewProject(project)}>Refresh previews</button><p>Interactive preview state is retained until you refresh. Downloads always use your current project.</p></>}

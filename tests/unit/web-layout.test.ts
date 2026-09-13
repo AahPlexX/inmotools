@@ -112,3 +112,35 @@ it('keeps enabled source in project backups and exports matching CSS without scr
   expect(buildHtml({...project,code:{...project.code,enabled:false}})).not.toContain('<p>Custom content</p>');
   expect(() => parseProject(JSON.stringify({...project,code:{...project.code,js:1}}))).toThrow();
 });
+
+it('validates nested blocks and preserves descendants through duplicate, remove and export', async () => {
+  const { reparentBlock, duplicateBlock, removeBlock, orderedBlocks } = await import('../../src/tools/web-layout/block-tree');
+  const blocks = reparentBlock(INITIAL_PROJECT.blocks, 'learn', 'welcome');
+  const project = { ...INITIAL_PROJECT, blocks };
+  expect(parseProject(JSON.stringify(project))).toEqual(project);
+  expect(buildHtml(project)).toContain('<div class="block-children"><details');
+  expect(() => reparentBlock(blocks, 'welcome', 'learn')).toThrow();
+  const duplicated = duplicateBlock(blocks, 'welcome');
+  expect(duplicated).toHaveLength(5);
+  expect(orderedBlocks(duplicated).filter(entry => entry.depth === 1)).toHaveLength(2);
+  const removed = removeBlock(blocks, 'welcome');
+  expect(removed.find(b => b.id === 'learn')?.parentId).toBe('');
+  expect(removed).toHaveLength(2);
+});
+
+it('validates appearance and exports motion, layers and a final print palette', async () => {
+  const { DEFAULT_APPEARANCE, parseAppearance } = await import('../../src/tools/web-layout/appearance');
+  const appearance = parseAppearance({...DEFAULT_APPEARANCE, animated:true, palettes:{...DEFAULT_APPEARANCE.palettes,dark:{accent:'oklch(65% 0.2 240)',ink:'#eeeeee',surface:'rgb(0 0 0 / 0.5)',canvas:'#111111'}}, gradients:[{type:'conic',angle:45,stops:[{color:'#fff',position:100},{color:'#000',position:0}]}],shadows:[{x:0,y:8,blur:24,spread:2,color:'#123456',inset:false}]});
+  const project = {...INITIAL_PROJECT,theme:'dark' as const,appearance};
+  expect(parseProject(JSON.stringify(project))).toEqual(project);
+  const css = buildCss(project);
+  expect(css).toContain('conic-gradient(from 45deg,#000 0%,#fff 100%)');
+  expect(css).toContain('box-shadow:0px 8px 24px 2px #123456');
+  expect(css).toContain('@keyframes wl-enter');
+  expect(css.lastIndexOf('--ink:#000')).toBeGreaterThan(css.indexOf('--ink:#eeeeee'));
+  expect(css).toContain('prefers-reduced-motion:reduce');
+  expect(()=>parseAppearance({...appearance,blur:NaN})).toThrow();
+  expect(()=>parseAppearance({...appearance,easing:[2,0,1,1]})).toThrow();
+  expect(()=>parseAppearance({...appearance,steps:[appearance.steps[0],appearance.steps[0]]})).toThrow();
+  expect(()=>parseAppearance({...appearance,palettes:{...appearance.palettes,dark:{...appearance.palettes.dark,ink:'red;}body{display:none'}}})).toThrow();
+});

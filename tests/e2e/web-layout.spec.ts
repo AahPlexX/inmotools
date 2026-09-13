@@ -1,5 +1,34 @@
 import { expect, test } from '@playwright/test';
 
+test('applies appearance drafts to previews and exports, with print and reduced-motion recovery', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByRole('button', {name:'Theme',exact:true}).click();
+  await page.getByText('Theme color expressions', {exact:true}).click();
+  await page.getByLabel('light ink expression', {exact:true}).fill('#334455');
+  await page.getByText('Layered gradients', {exact:true}).click();
+  await page.getByRole('button', {name:'Add gradient layer',exact:true}).click();
+  await page.getByText('Motion timeline', {exact:true}).click();
+  await page.getByLabel('Animate top-level blocks').check();
+  await page.getByRole('button', {name:'Build',exact:true}).click();
+  await page.getByRole('button', {name:'Theme',exact:true}).click();
+  await expect(page.getByLabel('light ink expression', {exact:true})).toHaveValue('#334455');
+  await page.getByRole('button', {name:'Apply appearance',exact:true}).click();
+  const frame=page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  await expect(frame.locator('body')).toHaveCSS('color','rgb(51, 68, 85)');
+  await expect(frame.locator('body')).not.toHaveCSS('background-image','none');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(frame.locator('#welcome')).toHaveCSS('animation-name','none');
+  await page.emulateMedia({media:'print'});
+  await expect(frame.locator('body')).toHaveCSS('color','rgb(0, 0, 0)');
+  await expect(frame.locator('body')).toHaveCSS('background-image','none');
+  await page.emulateMedia({media:'screen'});
+  const download=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Download HTML',exact:true}).click();
+  const stream=await (await download).createReadStream();const chunks:Buffer[]=[];
+  for await(const chunk of stream!)chunks.push(chunk as Buffer);
+  expect(Buffer.concat(chunks).toString('utf8')).toContain('@keyframes wl-enter');
+});
+
 test('edits a layout and exports the same content, theme and metadata', async ({ page }) => {
   await page.goto('./#/tools/web-layout-studio');
   await expect(page.getByTestId('web-layout-studio')).toBeVisible();
@@ -193,4 +222,17 @@ test('formats and applies code, compiles CSS and runs scripts only with opt-in',
   await expect(page.getByRole('list',{name:'Runtime and accessibility results'})).toContainText('Opt-in script ran');
   await page.getByRole('button',{name:'Stop preview',exact:true}).click();
   await expect(page.locator('iframe[title="Code execution preview"]')).toHaveCount(0);
+});
+
+test('nests blocks through keyboard-accessible parent controls and preserves children on removal', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.locator('[data-block-id="learn"] > details > summary').click();
+  await page.getByLabel('Parent of How does this work?', {exact:true}).selectOption('welcome');
+  const preview=page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  await expect(preview.locator('#welcome .block-children #learn')).toHaveCount(1);
+  await page.locator('[data-block-id="welcome"] > details > summary').click();
+  await page.locator('[data-block-id="welcome"]').getByRole('button',{name:'Remove',exact:true}).click();
+  await expect(preview.locator('.layout > #learn')).toHaveCount(1);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(preview.locator('#welcome .block-children #learn')).toHaveCount(1);
 });

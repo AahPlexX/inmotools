@@ -17,23 +17,23 @@ Implemented means code is reachable; verified means its applicable focused and b
 | ID | Feature | Acceptance behavior | Current state |
 |---|---|---|---|
 | WL-01 | Visual Grid builder | Track sizing, fr/minmax/repeat, auto-fit/auto-fill, named areas and accessible track resizing. | partial — named-area editing and validation added; track manipulation remains |
-| WL-02 | Visual Flexbox builder | Direction, wrapping, distribution, alignment, gap and per-item sizing. | partial |
-| WL-03 | Semantic DOM tree | Nested elements, tag selection, drag-and-drop and equivalent keyboard reordering with nesting validation. | partial |
-| WL-04 | Starter page patterns | Usable learning, portfolio, landing-page and dashboard starters. | implemented — browser gate pending |
+| WL-02 | Visual Flexbox builder | Direction, wrapping, distribution, alignment, gap and per-item sizing. | implemented — wrapping and per-item sizing; fresh browser gate pending |
+| WL-03 | Semantic DOM tree | Nested elements, tag selection, drag-and-drop and equivalent keyboard reordering with nesting validation. | implemented — validated five-level tree, parent/tag selection, drag and sibling buttons; fresh browser gate pending |
+| WL-04 | Starter page patterns | Usable learning, portfolio, landing-page and dashboard starters. | verified — focused run 34779771042 |
 | WL-05 | Content and block editing | Add, edit, duplicate, remove and reorder blocks without changing reading order accidentally. | implemented |
 | WL-06 | Box-model workshop | Per-side margin, padding, borders, outlines, logical properties and px/rem readouts. | partial |
 | WL-07 | Fluid typography | Editable clamp ranges with viewport curves, modular scales and readable line lengths. | partial |
 | WL-08 | Breakpoint cascade editor | Mobile-first overrides, inheritance visibility and reset-to-inherited values. | partial |
 | WL-09 | Container-query lab | Resize a component parent independently and author named size queries. | planned |
-| WL-10 | Multi-viewport preview | 320–1920px presets, custom sizes, portrait/landscape, fitted and actual-size views. | partial |
+| WL-10 | Multi-viewport preview | 320–1920px presets, custom sizes, portrait/landscape, fitted and actual-size views. | verified — focused run 34779771042 |
 | WL-11 | Synchronized preview interaction | Opt-in scroll, click and form-state synchronization with event-loop prevention. | planned |
-| WL-12 | Theme manager | Light, dark and high-contrast token sets with explicit per-theme overrides. | partial |
+| WL-12 | Theme manager | Light, dark and high-contrast token sets with explicit per-theme overrides. | implemented — explicit per-theme color expressions; fresh browser gate pending |
 | WL-13 | Typed design-token manager | DTCG 2025.10 types, groups, descriptions, aliases, cycle detection and import validation. | partial |
-| WL-14 | Modern color authoring | OKLCH, color-mix, relative colors, Display-P3 and gamut/fallback diagnostics. | planned |
-| WL-15 | Gradient workshop | Linear, radial and conic gradients, stops, interpolation and layered compositions. | planned |
-| WL-16 | Elevation workshop | Multiple box/text shadows and editable blur, spread and offsets. | planned |
-| WL-17 | Backdrop workshop | Blur, saturation, brightness and transparent border styling with fallback preview. | planned |
-| WL-18 | Motion timeline | Keyframes, transitions, cubic-bezier editing and reduced-motion alternatives. | planned |
+| WL-14 | Modern color authoring | OKLCH, color-mix, relative colors, Display-P3 and gamut/fallback diagnostics. | partial — CSS expression authoring, browser-support feedback and base fallback; gamut diagnostics remain |
+| WL-15 | Gradient workshop | Linear, radial and conic gradients, stops, interpolation and layered compositions. | partial — layered linear/radial/conic gradients with editable stops; interpolation controls remain |
+| WL-16 | Elevation workshop | Multiple box/text shadows and editable blur, spread and offsets. | implemented — layered box/text shadow controls; fresh browser gate pending |
+| WL-17 | Backdrop workshop | Blur, saturation, brightness and transparent border styling with fallback preview. | partial — blur/saturation/brightness; transparent border and fallback comparison remain |
+| WL-18 | Motion timeline | Keyframes, transitions, cubic-bezier editing and reduced-motion alternatives. | partial — bounded keyframes, curve, delay/duration/iterations, reduced-motion/print behavior; transitions remain |
 | WL-19 | Form-control styling | Visible labels, inputs, checkboxes, radios, switches, ranges and local drop-zone patterns. | partial |
 | WL-20 | Accessible component scaffolds | Cards, native disclosure, notices, navigation, dialogs and form patterns with keyboard behavior. | partial |
 | WL-21 | Web Component sandbox | Custom elements, Shadow DOM and portable component export in isolated execution. | planned |
@@ -74,7 +74,7 @@ Implemented means code is reachable; verified means its applicable focused and b
 | WL-56 | Manual accessibility guide | Keyboard, reading order, focus, zoom and screen-reader review alongside automated findings. | partial — reachable implementation; see code workflow evidence and remaining acceptance |
 | WL-57 | Direction and writing-mode preview | RTL, logical spacing and vertical-writing checks with explicit source controls. | partial — direction and writing mode exported; diagnostic checks remain |
 | WL-58 | Keyboard-first editing | Keyboard tree operations, focus restoration, shortcuts and discoverable alternatives to drag. | partial |
-| WL-59 | Version comparison | Named snapshots and readable source/token differences with restore and undo. | planned |
+| WL-59 | Version comparison | Named snapshots and readable source/token differences with restore and undo. | partial — named page snapshots with field-level comparison; token/source views remain |
 | WL-60 | Safe preview controls | Script execution opt-in, opaque-origin isolation, network policy and restart without draft loss. | partial |
 
 ## Integration Ledger
@@ -128,3 +128,9 @@ Code workflow cycle 2026-09-13: added optional validated HTML/CSS/JS source to p
 Dependency evidence: 2026-09-13 npm registry dist-tags and official release pages/package manifests agree on monaco-editor 0.56.0, prettier 3.9.6, lightningcss-wasm 1.33.0, axe-core 4.13.0, terser 5.51.2 and JSZip 3.10.2. Installed exact pins. Existing shared JSZip 3.10.1 is preserved; this tool uses web-layout-zip alias npm:jszip@3.10.2. npmjs.com HTML requests returned 403; direct registry.npmjs.org metadata succeeded. NPM Sentinel was unavailable (internal error). No versions were guessed. Local pnpm 11.19.0 generated the additive lockfile changes; repository packageManager pin is unchanged. Validate with frozen installation under CI's configured runtime before marking the new dependency path verified.
 
 Validation: 13 focused units, TypeScript and production bundle pass locally. The authoring browser run passed 16/18 cases; its two new authoring cases timed out locating the text-direction select. Explicit accessible labels have been added to direction/wrapping/writing-mode selects. New code-workflow browser coverage checks actual formatting, apply-to-preview, WASM compilation and script opt-in/stop. Fresh exact-main CI and deployment evidence remain required.
+
+Nested layout and appearance cycle 2026-09-13: semantic parent/tag editing, five-level nesting validation, drag placement and equivalent sibling buttons, subtree duplication, child-preserving removal in visible reading order, and per-block spacing/border/Flexbox controls. Theme drafts now survive panel switches and offer per-theme CSS color expressions, six gradient layers with twelve stops each, eight box/text shadow layers, backdrop controls, and a twenty-stop motion timeline with curve controls. Generated print CSS restores foreground/surface colors after theme overrides; reduced-motion rules disable animations. Project parsing rejects cycles, injection, out-of-range numbers and malformed timeline endpoints. Code Apply no longer reports success when the project rejects a candidate. No dependency changes.
+
+Validation: 15 focused units, TypeScript and production bundle pass locally. Added browser cases for nested removal/undo and appearance draft/apply/export/reduced-motion/print. Local direct browser inspection was blocked by ERR_BLOCKED_BY_CLIENT at the local preview URL; do not claim screenshot verification. Focused main run 34779771042 and companion 34779770939 succeeded for the previous code-workstation commit 369139584ed7a20c17dd6818963cbf30cc9fc2d3. That commit's Pages run 34779770970 remained in progress at last check. This candidate requires its own CI result. Full sixty-feature completion remains open.
+
+Research rechecked 2026-09-13: MDN @keyframes and backdrop-filter reference; W3C WCAG 2.2 Animation from Interactions. Avoid representing same-engine previews or automated checks as cross-browser or accessibility certification.

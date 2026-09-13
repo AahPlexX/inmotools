@@ -1,3 +1,5 @@
+import { parseAppearance, appearanceCss, type Appearance } from './appearance';
+import { parseBlockStyle, validateTree, blockCss, type BlockStyle } from './block-tree';
 import { parseCode, escapeStyle, escapeScript, type CodeProject } from './code-tools';
 import { DEFAULT_OPTIONS, parseOptions, type LayoutOptions } from './layout-options';
 export type BlockKind = 'card' | 'accordion' | 'form' | 'navigation' | 'notice';
@@ -5,6 +7,7 @@ export type LayoutProject = {
   version: 1;
   options?: LayoutOptions;
   code?: CodeProject;
+  appearance?: Appearance;
   title: string;
   description: string;
   author: string;
@@ -27,7 +30,7 @@ export type LayoutProject = {
   fontMin: number;
   fontMax: number;
   reset: boolean;
-  blocks: { id: string; kind: BlockKind; title: string; text: string }[];
+  blocks: { id: string; kind: BlockKind; title: string; text: string; parentId?: string; tag?: 'article' | 'section' | 'aside' | 'div'; style?: BlockStyle }[];
 };
 
 export const INITIAL_PROJECT: LayoutProject = {
@@ -87,10 +90,13 @@ export function parseProject(input: string): LayoutProject {
     const id = text(b.id, 'Block ID', 80);
     if (!/^[a-zA-Z][\w-]*$/.test(id) || [id, `${id}-title`, `${id}-email`].some(value => ids.has(value))) throw new Error('Block identifiers must be unique and start with a letter.');
     [id, `${id}-title`, `${id}-email`].forEach(value => ids.add(value));
-    return { id, kind: choice(b.kind, ['card', 'accordion', 'form', 'navigation', 'notice'] as const, 'block kind'), title: text(b.title, 'Block title', 200), text: text(b.text, 'Block text') };
+    if (b.tag !== undefined && !['article','section','aside','div'].includes(b.tag as string)) throw new Error('Unsupported semantic block tag.');
+    return { ...(b.parentId === undefined ? {} : { parentId: text(b.parentId, 'Parent ID', 80) }), ...(b.tag === undefined ? {} : {tag: b.tag as 'article'|'section'|'aside'|'div'}), ...(b.style === undefined ? {} : {style:parseBlockStyle(b.style)}), id, kind: choice(b.kind, ['card', 'accordion', 'form', 'navigation', 'notice'] as const, 'block kind'), title: text(b.title, 'Block title', 200), text: text(b.text, 'Block text') };
   });
+  validateTree(blocks);
   if (typeof p.reset !== 'boolean') throw new Error('Invalid reset setting.');
   const result: LayoutProject = {
+    ...(p.appearance === undefined ? {} : {appearance:parseAppearance(p.appearance)}),
     ...(p.code === undefined ? {} : { code: parseCode(p.code) }),
     ...(p.options === undefined ? {} : { options: parseOptions(p.options) }),
     version: 1, title: text(p.title, 'Title', 200), description: text(p.description, 'Description'), author: text(p.author, 'Author', 200), canonical, language,
@@ -117,7 +123,7 @@ export function buildCss(p: LayoutProject): string {
   const slope = (p.fontMax - p.fontMin) / (1440 - 320);
   const areas = p.gridAreas.map(row => `"${row}"`).join(' ');
   const areaNames = [...new Set(p.gridAreas.join(' ').split(/\s+/).filter(cell => cell !== '.'))];
-  const placements = areaNames.slice(0, p.blocks.length).map((area, index) => `.block:nth-child(${index + 1}){grid-area:${area}}`).join('');
+  const placements = areaNames.slice(0, p.blocks.length).map((area, index) => `.layout>.block:nth-child(${index + 1}){grid-area:${area}}`).join('');
   return `${p.reset ? '*,*::before,*::after{box-sizing:border-box} img,video,svg{max-width:100%;height:auto} button,input,select,textarea{font:inherit}' : ''}
 :root{--accent:${p.accent};--space:${p.gap}px;--radius:${p.radius}px;--surface:${surface};--ink:${fg};--canvas:${bg};color-scheme:${dark ? 'dark' : 'light'}}
 body{margin:0;background:var(--canvas);color:var(--ink);font:1rem/1.6 system-ui,sans-serif;direction:${options.textDirection};writing-mode:${options.writingMode};overflow-wrap:anywhere}
@@ -132,6 +138,9 @@ ${p.layout === 'grid' && p.gridAreas.length ? `@container(min-width:calc(${p.col
 @media(max-width:${p.breakpoint}px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:none;flex-direction:column}.block{grid-area:auto!important;flex-basis:auto;width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media print{:root{--surface:#fff;--ink:#000;--canvas:#fff;color-scheme:light}body{background:white;color:black}.block{break-inside:avoid}main{max-width:none}}
+.block-children{display:grid;gap:var(--space);min-width:0;margin-top:var(--space)}
+${p.blocks.map(blockCss).join('\n')}
+${appearanceCss(p.appearance,p.theme)}
 ${p.code?.enabled ? p.code.css : ''}
 `;
 }
@@ -139,13 +148,17 @@ ${p.code?.enabled ? p.code.css : ''}
 export function buildHtml(project: LayoutProject): string {
   const p = parseProject(JSON.stringify(project));
   const options = p.options ?? DEFAULT_OPTIONS;
-  const blocks = p.blocks.map(b => {
+  const renderBlocks = (parentId = '', depth = 0): string => p.blocks.filter(b => (b.parentId || '') === parentId).map(b => {
+    const heading = `h${Math.min(6,2+depth)}`;
     const title = escapeHtml(b.title), body = escapeHtml(b.text), id = escapeHtml(b.id);
     if (b.kind === 'accordion') return `<details class="block" id="${id}"><summary>${title}</summary><p>${body}</p></details>`;
-    if (b.kind === 'form') return `<section class="block" id="${id}" aria-labelledby="${id}-title"><h2 id="${id}-title">${title}</h2><p>${body}</p><label for="${id}-email">Email address</label><input id="${id}-email" type="email" autocomplete="email" placeholder="you@example.com"></section>`;
-    if (b.kind === 'navigation') return `<section class="block" id="${id}"><h2>${title}</h2><p>${body}</p><nav aria-label="${title}"><a href="#page-title">Back to top</a>${p.blocks.filter(other => other.id !== b.id).map(other => `<a href="#${escapeHtml(other.id)}">${escapeHtml(other.title)}</a>`).join('')}</nav></section>`;
-    return `<${b.kind === 'card' ? 'article' : 'aside'} class="block" id="${id}"><h2>${title}</h2><p>${body}</p></${b.kind === 'card' ? 'article' : 'aside'}>`;
+    if (b.kind === 'form') return `<section class="block" id="${id}" aria-labelledby="${id}-title"><${heading} id="${id}-title">${title}</${heading}><p>${body}</p><label for="${id}-email">Email address</label><input id="${id}-email" type="email" autocomplete="email" placeholder="you@example.com"></section>`;
+    if (b.kind === 'navigation') return `<section class="block" id="${id}"><${heading}>${title}</${heading}><p>${body}</p><nav aria-label="${title}"><a href="#page-title">Back to top</a>${p.blocks.filter(other => other.id !== b.id).map(other => `<a href="#${escapeHtml(other.id)}">${escapeHtml(other.title)}</a>`).join('')}</nav></section>`;
+    const tag = b.tag ?? (b.kind === 'card' ? 'article' : 'aside');
+    const children = renderBlocks(b.id,depth+1);
+    return `<${tag} class="block" id="${id}"><${heading}>${title}</${heading}><p>${body}</p>${children ? `<div class="block-children">${children}</div>` : ''}</${tag}>`;
   }).join('\n');
+  const blocks = renderBlocks();
   return `<!doctype html>\n<html lang="${escapeHtml(p.language)}" dir="${options.textDirection}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(options.metaTitle || p.title)}</title><meta name="description" content="${escapeHtml(options.metaDescription || p.description)}"><meta name="keywords" content="${escapeHtml(options.keywords)}">${options.customMeta.map(meta => `<meta name="${escapeHtml(meta.name)}" content="${escapeHtml(meta.content)}">`).join('')}<meta name="author" content="${escapeHtml(p.author)}"><meta name="robots" content="${p.robots}"><meta property="og:type" content="website"><meta property="og:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta property="og:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escapeHtml(options.socialTitle || options.metaTitle || p.title)}"><meta name="twitter:description" content="${escapeHtml(options.socialDescription || options.metaDescription || p.description)}">${p.canonical ? `<link rel="canonical" href="${escapeHtml(p.canonical)}"><meta property="og:url" content="${escapeHtml(p.canonical)}">` : ''}<style>${escapeStyle(buildCss(p))}</style></head><body><main><header><h1 id="page-title">${escapeHtml(p.title)}</h1><p>${escapeHtml(p.description)}</p></header><div class="layout">${p.code?.enabled ? p.code.html : blocks}</div></main>${p.code?.enabled && p.code.js ? `<script>${escapeScript(p.code.js)}</script>` : ''}</body></html>`;
 }
 
@@ -153,9 +166,9 @@ export function buildPreview(p: LayoutProject): string {
   let html = buildHtml(p);
   if (p.code?.enabled && typeof document !== 'undefined') {
     const inert = document.createElement('template');
-    inert.innerHTML = html;
+    inert.innerHTML = p.code.html;
     inert.content.querySelectorAll('script,meta,base,iframe,object,embed,link').forEach(node => node.remove());
-    html = '<!doctype html><html><head></head><body>' + inert.innerHTML + '</body></html>';
+    html = buildHtml({ ...p, code: { ...p.code, html: inert.innerHTML, js: '' } });
   }
   return html.replace('<head>', '<head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; form-action \'none\'; base-uri \'none\'">');
 }
