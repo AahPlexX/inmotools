@@ -1,0 +1,51 @@
+name: Mermaid Copy HTML patch
+
+on:
+  push:
+    branches:
+      - fix/markdown-mermaid-audit-20260912
+    paths:
+      - .github/workflows/mermaid-copy-html-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout isolated branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply exact async Copy HTML fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('src/tools/markdown/MarkdownWorkspace.tsx')
+          text = path.read_text()
+          old = """          <button type=\"button\" onClick={() => void copyToClipboard(buildExportBodyHtml().html, 'the rendered HTML')}>Copy HTML</button>"""
+          new = """          <button type=\"button\" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }}>Copy HTML</button>"""
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one Copy HTML anchor, found {count}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git diff --check -- src/tools/markdown/MarkdownWorkspace.tsx
+
+      - name: Remove one-use workflow and commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/mermaid-copy-html-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/tools/markdown/MarkdownWorkspace.tsx
+          git commit -m 'fix(markdown): await rendered HTML before copying'
+          git push origin HEAD:${{ github.ref_name }}
