@@ -208,6 +208,9 @@ importers:
       lz-string:
         specifier: 1.5.0
         version: 1.5.0
+      manifold-3d:
+        specifier: 3.5.3
+        version: 3.5.3(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(@types/node@26.4.1))(esbuild-wasm@0.27.7)
       mediabunny:
         specifier: 1.55.4
         version: 1.55.4
@@ -217,6 +220,12 @@ importers:
       meshoptimizer:
         specifier: 1.2.0
         version: 1.2.0
+      ml-matrix:
+        specifier: 6.15.0
+        version: 6.15.0
+      occt-wasm:
+        specifier: 5.0.0
+        version: 5.0.0
       opentype.js:
         specifier: 2.0.0
         version: 2.0.0
@@ -286,6 +295,9 @@ importers:
       vscode-oniguruma:
         specifier: 2.0.1
         version: 2.0.1
+      wasm-feature-detect:
+        specifier: 1.9.0
+        version: 1.9.0
       woff2-encoder:
         specifier: 2.0.0
         version: 2.0.0
@@ -1122,6 +1134,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@jscadui/3mf-export@0.5.0':
+    resolution: {integrity: sha512-y5vZktqCjyi7wA38zqNlLIdZUIRZoOO9vCjLzwmL4bR0hk7B/Zm1IeffzJPFe1vFc0C1IEv3hm8caDv3doRk9g==}
 
   '@jsep-plugin/assignment@1.3.0':
     resolution: {integrity: sha512-VVgV+CXrhbMI3aSusQyclHkenWSAm95WaiKrMxRFam3JSUiIaQjoMIw2sEs/OX4XifnqeQUN4DYbJjlA8EfktQ==}
@@ -2115,6 +2130,9 @@ packages:
   colorparsley@0.1.8:
     resolution: {integrity: sha512-rObESTTTE6G5qO5WFwFxWPggpw4KfpxnLC6Ssl8bITBnNVRhDsyCeTRAUxWQNVTx2pRknKlO2nddYTxjkdNFaw==}
 
+  comlink@4.4.2:
+    resolution: {integrity: sha512-OxGdvBmJuNKSCMO4NTl1L47VRp6xn2wG4F/2hYzB6tiCb709otOxtEYCSvK80PtjODfXXZu8ds+Nw5kVCjqd2g==}
+
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
 
@@ -2129,6 +2147,10 @@ packages:
   commander@11.1.0:
     resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
     engines: {node: '>=16'}
+
+  commander@13.1.0:
+    resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
+    engines: {node: '>=18'}
 
   commander@15.0.0:
     resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
@@ -2503,6 +2525,11 @@ packages:
   es-toolkit@1.52.0:
     resolution: {integrity: sha512-XTNEJQh1tY1ZJVcf6ayP/2n4ZPyaHlW2FWs7xvw5ddPuhUVjLD3olQVQS7kf58JbAB48iL0uL/jerTrjtV3lDA==}
 
+  esbuild-wasm@0.27.7:
+    resolution: {integrity: sha512-1k03e2/tGz+sLz3/xzoZmUsIqtaGIvJa8k4UqUeqCUry83nHmlxQYZUUES0WBFUYilSQUf7nDUGAciIIklljSg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
@@ -2742,6 +2769,9 @@ packages:
 
   iota-array@1.0.0:
     resolution: {integrity: sha512-pZ2xT+LOHckCatGQ3DcG/a+QuEqvoxqkiL7tvE8nn3uuu+f6i1TtpB5/FtWFbxUuVr5PZCx8KskuGatbJDXOWA==}
+
+  is-any-array@3.0.0:
+    resolution: {integrity: sha512-o4h+tylWykC4BD1vaejp6gDxoM13bwW8FGuNs4yIKpj8xbBJcRxJx8vZpq0dCr7ZDEfeKjmsi/euolKhX6f/ww==}
 
   is-array-buffer@3.0.5:
     resolution: {integrity: sha512-DDfANUiiG2wC1qawP66qlTugJeL5HyzMpfr8lLK+jMQirGzNod0B12cFB/9q838Ru27sBwfw78/rdoU7RERz6A==}
@@ -3126,6 +3156,15 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
+  manifold-3d@3.5.3:
+    resolution: {integrity: sha512-u00Dc4IKm6W6VyVCAs6eFWNOW9V1w9/QM+xdwS/0TQKXLDtMIauxH5RXUwhOGDnvXa9uciKKYMUD2At76ffsaA==}
+    hasBin: true
+    peerDependencies:
+      '@gltf-transform/core': ^4.2.0
+      '@gltf-transform/extensions': ^4.2.0
+      '@gltf-transform/functions': ^4.2.0
+      esbuild-wasm: ^0.27.3
+
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
@@ -3300,6 +3339,18 @@ packages:
     resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
     engines: {node: '>=16 || 14 >=14.17'}
 
+  ml-array-max@2.0.0:
+    resolution: {integrity: sha512-QQZ4kENwpWmyNb98UXRDFXrmtIXuXtt1+bSbda/2KA85+F+rrJP8hZk6QOkCQXM2Th9mUDYdq/PNByPdT9ID4A==}
+
+  ml-array-min@2.0.0:
+    resolution: {integrity: sha512-GRj6Ky6sW9vGL6yIjgsHmXZ9YgrdmcQ8nCxPqEGeKc6dkfYg1XDYxGFxADUjNuZyoCd5PUscWAS4N+cFaX6hFg==}
+
+  ml-array-rescale@2.0.0:
+    resolution: {integrity: sha512-2GGtKfSno94/kIloWGvpp/U5Q5vLvLrza+SAaGsLeo6Xj4mEbA6Gqx+oTfZFkxnd1grT2X007HfJNs3T5BsiVg==}
+
+  ml-matrix@6.15.0:
+    resolution: {integrity: sha512-wFa1v6KP8bKp+fj0nYmRs1Pb5K4zRkXGKsOvLinvILENFIADncm4XlOI+S1M7yuACMGfI6cfk0IifDgd4j5xmw==}
+
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -3350,6 +3401,9 @@ packages:
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
+
+  occt-wasm@5.0.0:
+    resolution: {integrity: sha512-FDMYmmgcMEus+a4sY/4oJTIok6Ar3EDcqBzhGQa4orcQ2VIl8k5tq64ccA6COptYBz3rppMsqeqRqPIjV1lBtA==}
 
   opentype.js@2.0.0:
     resolution: {integrity: sha512-kCyjv6xdDY1W/jLWZ/L3QhhTlKUqDZMQ5+Jdlw12b3dXkKNpYBqqlMMj0YDQPShWFTMwgZI1hG14kN3XUDSg/A==}
@@ -4045,6 +4099,9 @@ packages:
 
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
+
+  wasm-feature-detect@1.9.0:
+    resolution: {integrity: sha512-zonE+xlIIYtxPy++L24ow0hAD8CICb4+FgPyROd3buyXIqsJvUEDkBgfCCoXOd1Hu3DUr0GOfnPIdcGV+YpNaA==}
 
   web-namespaces@2.0.1:
     resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
@@ -5133,6 +5190,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@jscadui/3mf-export@0.5.0': {}
+
   '@jsep-plugin/assignment@1.3.0(jsep@1.4.0)':
     dependencies:
       jsep: 1.4.0
@@ -5954,6 +6013,8 @@ snapshots:
 
   colorparsley@0.1.8: {}
 
+  comlink@4.4.2: {}
+
   comma-separated-tokens@2.0.3: {}
 
   command-line-args@5.2.1:
@@ -5971,6 +6032,8 @@ snapshots:
       typical: 7.3.0
 
   commander@11.1.0: {}
+
+  commander@13.1.0: {}
 
   commander@15.0.0: {}
 
@@ -6432,6 +6495,8 @@ snapshots:
 
   es-toolkit@1.52.0: {}
 
+  esbuild-wasm@0.27.7: {}
+
   escalade@3.2.0: {}
 
   escape-string-regexp@5.0.0: {}
@@ -6711,6 +6776,8 @@ snapshots:
   internmap@2.0.3: {}
 
   iota-array@1.0.0: {}
+
+  is-any-array@3.0.0: {}
 
   is-array-buffer@3.0.5:
     dependencies:
@@ -7022,6 +7089,21 @@ snapshots:
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  manifold-3d@3.5.3(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(@types/node@26.4.1))(esbuild-wasm@0.27.7):
+    dependencies:
+      '@gltf-transform/core': 4.4.2
+      '@gltf-transform/extensions': 4.4.2
+      '@gltf-transform/functions': 4.4.2(@types/node@26.4.1)
+      '@jridgewell/resolve-uri': 3.1.2
+      '@jridgewell/trace-mapping': 0.3.31
+      '@jscadui/3mf-export': 0.5.0
+      commander: 13.1.0
+      convert-source-map: 2.0.0
+      esbuild-wasm: 0.27.7
+      fast-xml-parser: 5.11.1
+      fflate: 0.8.3
+      magic-string: 0.30.21
 
   markdown-table@3.0.4: {}
 
@@ -7408,6 +7490,25 @@ snapshots:
 
   minipass@7.1.3: {}
 
+  ml-array-max@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-min@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-rescale@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-max: 2.0.0
+      ml-array-min: 2.0.0
+
+  ml-matrix@6.15.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-rescale: 2.0.0
+
   ms@2.1.3: {}
 
   nanoid@3.3.18: {}
@@ -7459,6 +7560,10 @@ snapshots:
       object-keys: 1.1.1
 
   obug@2.1.4: {}
+
+  occt-wasm@5.0.0:
+    dependencies:
+      comlink: 4.4.2
 
   opentype.js@2.0.0: {}
 
@@ -8278,6 +8383,8 @@ snapshots:
   vscode-oniguruma@2.0.1: {}
 
   w3c-keyname@2.2.8: {}
+
+  wasm-feature-detect@1.9.0: {}
 
   web-namespaces@2.0.1: {}
 
