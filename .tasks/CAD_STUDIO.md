@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `547e3c9c431f88447279a46a9a12f93adfc0cc8a`
+**Last tracked implementation commit:** `9b93a07216c9a82c3958a08f0dce414e6ae47d90`
 **Current gate:** G5 — exact OCCT worker kernel
 **Completed gates:** 5 / 16
 **Capability target:** 195
@@ -65,12 +65,13 @@ A capability counts only when production behavior exists, relevant validation pa
 ## Current evidence
 
 - G1–G4 are complete. The aligned G4 checkpoint reached **810/810 unit tests**; its production build was blocked only by a concurrent `src/tools/web-layout/WebLayoutWorkspace.tsx` syntax error on the then-current synthetic main, owned by the Web Layout agent.
-- Exact dependencies are pinned through pnpm-generated package state: `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, and `ml-matrix@6.15.0`. Normal project CI frozen installation resolves those exact versions.
+- Exact dependencies are pinned through pnpm-generated package state: `occt-wasm@5.0.0`, `manifold-3d@3.5.3`, `ml-matrix@6.15.0`, and `wasm-feature-detect@1.9.0`. Normal project CI frozen installation resolves those exact versions.
 - The sketch solver uses the `ml-matrix` numerical layer for SVD-backed damped Gauss-Newton solving and explicit singular-value DOF rank; the custom Gaussian/rank implementation has been removed.
 - Exact-kernel protocol/runtime foundation provides serializable revisioned requests/results, generation + revision stale-result protection, hard worker restart/disposal, zero-copy transferables, lazy runtime validation, and explicit unsupported-browser policy for WebAssembly + SIMD + tail calls + Wasm exception handling.
 - Real `occt-wasm` adapter `d98ae9537f0e97a97b8c61640640952f0648d022` keeps native handles opaque and worker-local, implements exact primitives/booleans/tessellation/engineering queries, STEP and binary BREP I/O, temporary-compound cleanup, exact-shape release, and deterministic kernel disposal. Real-WASM fixtures prove exact 20×10×5 box metrics, cylindrical Boolean volume reduction, STEP volume-preserving round-trip, and binary BREP volume-preserving round-trip.
-- Stateful OCCT worker executor `547e3c9c431f88447279a46a9a12f93adfc0cc8a` imports exact STEP/BREP into worker-owned body state, returns preview/final tessellation + bounds, exports current exact state, replaces and releases prior imported bodies, and keeps project rebuild/measure explicitly gated to G6. Run `34726379224` passed all four executor fixtures plus the real adapter fixtures for **817 passing tests**; only the deliberately stale tracker guard failed before this alignment.
-- G5 remains open for the dedicated browser worker entrypoint, a concrete browser feature probe, route-lazy WASM asset/build verification, structured worker initialization/error cleanup, and a clean aligned production-build checkpoint. Revision/restart, exact adapter, exact import/export state, and unsupported-browser policy are already implemented.
+- Stateful OCCT worker executor `547e3c9c431f88447279a46a9a12f93adfc0cc8a` imports exact STEP/BREP into worker-owned body state, returns preview/final tessellation + bounds, exports current exact state, replaces and releases prior imported bodies, and keeps project rebuild/measure explicitly gated to G6. Its real-kernel executor fixtures pass.
+- Concrete browser probe `9b93a07216c9a82c3958a08f0dce414e6ae47d90` uses the pinned `wasm-feature-detect@1.9.0` detectors for SIMD, tail calls, and WebAssembly exception handling and short-circuits safely when WebAssembly itself is unavailable. Run `34726571582` passed the two probe fixtures and all prior CAD/repository unit coverage for **819 passing tests**; only the deliberately stale tracker guard failed before this alignment.
+- G5 remains open for the dedicated browser worker entrypoint, route-lazy WASM asset/build verification, structured worker initialization/error cleanup, and a clean aligned production-build checkpoint. Revision/restart, exact adapter, exact import/export state, and concrete unsupported-browser detection are already implemented.
 - Topology-ID-dependent fillet/chamfer/shell/draft resolution correctly remains deferred to G6 rather than accepting raw unstable OCCT indices. glTF/XCAF assembly export remains part of the later professional export path.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
