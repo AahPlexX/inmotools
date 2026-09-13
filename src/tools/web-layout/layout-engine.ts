@@ -29,7 +29,7 @@ export type LayoutProject = {
 export const INITIAL_PROJECT: LayoutProject = {
   version: 1, title: 'A place for good ideas', description: 'A thoughtful space to learn, make, and share.',
   author: '', canonical: '', language: 'en', robots: 'index,follow', layout: 'grid',
-  columns: 3, gridAreas: ['a a b', 'a a c'], gap: 24, padding: 32, radius: 16, maxWidth: 1120, breakpoint: 640,
+  columns: 3, gridAreas: [], gap: 24, padding: 32, radius: 16, maxWidth: 1120, breakpoint: 640,
   direction: 'row', alignment: 'stretch', distribution: 'flex-start', theme: 'light',
   accent: '#2563eb', fontMin: 28, fontMax: 56, reset: true,
   blocks: [
@@ -53,9 +53,9 @@ const choice = <T extends string>(value: unknown, values: readonly T[], name: st
   return value as T;
 };
 function validateGridAreas(value: unknown, columns: number): string[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 12) throw new Error('Grid areas need between 1 and 12 rows.');
+  if (!Array.isArray(value) || value.length > 12) throw new Error('Grid areas allow up to 12 rows. Leave empty for automatic flow.');
   const rows = value.map(row => text(row, 'Grid area row', 240).trim().split(/\s+/));
-  if (rows.some(row => row.length !== columns || row.some(cell => cell !== '.' && !/^[a-z][a-z0-9_-]*$/i.test(cell)))) throw new Error(`Every grid-area row must contain exactly ${columns} valid names or dots.`);
+  if (rows.some(row => row.length !== columns || row.some(cell => cell !== '.' && (!/^[a-z][a-z0-9_-]*$/i.test(cell) || /^(auto|span|inherit|initial|unset|revert|revert-layer|default)$/i.test(cell))))) throw new Error(`Every grid-area row must contain exactly ${columns} non-reserved names or dots.`);
   const names = [...new Set(rows.flat().filter(cell => cell !== '.'))];
   for (const name of names) {
     const cells = rows.flatMap((row, r) => row.map((cell, c) => cell === name ? [r, c] : null)).filter(Boolean) as number[][];
@@ -89,7 +89,7 @@ export function parseProject(input: string): LayoutProject {
   const result: LayoutProject = {
     version: 1, title: text(p.title, 'Title', 200), description: text(p.description, 'Description'), author: text(p.author, 'Author', 200), canonical, language,
     robots: choice(p.robots, ['index,follow', 'noindex,nofollow'], 'robots setting'),
-    layout: choice(p.layout, ['grid', 'flex'], 'layout'), columns: number(p.columns, 'Columns', 1, 12), gridAreas: validateGridAreas((p.gridAreas && p.columns !== 3 && JSON.stringify(p.gridAreas) === JSON.stringify(['a a b', 'a a c'])) ? [Array(p.columns).fill('a').join(' ')] : (p.gridAreas ?? [Array(p.columns).fill('a').join(' ')]), p.columns),
+    layout: choice(p.layout, ['grid', 'flex'], 'layout'), columns: number(p.columns, 'Columns', 1, 12), gridAreas: validateGridAreas(p.gridAreas === undefined ? [] : p.gridAreas, p.columns),
     gap: number(p.gap, 'Gap', 0, 120), padding: number(p.padding, 'Padding', 12, 120), radius: number(p.radius, 'Radius', 0, 100),
     maxWidth: number(p.maxWidth, 'Content width', 320, 2400), breakpoint: number(p.breakpoint, 'Breakpoint', 320, 1200),
     direction: choice(p.direction, ['row', 'column'], 'direction'), alignment: choice(p.alignment, ['stretch', 'flex-start', 'center', 'flex-end'], 'alignment'),
@@ -114,13 +114,14 @@ export function buildCss(p: LayoutProject): string {
   return `${p.reset ? '*,*::before,*::after{box-sizing:border-box} img,video,svg{max-width:100%;height:auto} button,input,select,textarea{font:inherit}' : ''}
 :root{--accent:${p.accent};--space:${p.gap}px;--radius:${p.radius}px;--surface:${surface};--ink:${fg};--canvas:${bg};color-scheme:${dark ? 'dark' : 'light'}}
 body{margin:0;background:var(--canvas);color:var(--ink);font:1rem/1.6 system-ui,sans-serif;overflow-wrap:anywhere}
-main{box-sizing:border-box;max-width:${p.maxWidth}px;margin-inline:auto;padding:clamp(12px,4vw,${Math.max(12, p.padding)}px)}
+main{container-type:inline-size;box-sizing:border-box;max-width:${p.maxWidth}px;margin-inline:auto;padding:clamp(12px,4vw,${Math.max(12, p.padding)}px)}
 h1{font-size:clamp(${p.fontMin}px,${(p.fontMin - slope * 320).toFixed(4)}px + ${(slope * 100).toFixed(4)}vw,${p.fontMax}px);line-height:1.12;max-width:22ch}
 h2,summary{line-height:1.35} p{max-width:68ch} a{color:var(--ink);text-decoration-thickness:2px;text-underline-offset:3px}
-.layout{display:${p.layout};gap:var(--space);grid-template-columns:repeat(auto-fit,minmax(min(100%,max(12rem,calc((100% - ${p.columns - 1} * var(--space)) / ${p.columns}))),1fr));grid-template-areas:${p.layout === 'grid' ? areas : 'none'};flex-direction:${p.direction};flex-wrap:wrap;align-items:${p.alignment};justify-content:${p.distribution}}${p.layout === 'grid' ? placements : ''}
+.layout{display:${p.layout};gap:var(--space);grid-template-columns:repeat(auto-fit,minmax(min(100%,max(12rem,calc((100% - ${p.columns - 1} * var(--space)) / ${p.columns}))),1fr));flex-direction:${p.direction};flex-wrap:wrap;align-items:${p.alignment};justify-content:${p.distribution}}
+${p.layout === 'grid' && p.gridAreas.length ? `@container(min-width:calc(${p.columns * 12}rem + ${(p.columns - 1) * p.gap}px)){.layout{grid-template-columns:repeat(${p.columns},minmax(0,1fr));grid-template-areas:${areas}}${placements}}` : ''}
 .block{box-sizing:border-box;min-width:0;flex:1 1 220px;padding:clamp(12px,3vw,24px);border:1px solid ${dark ? '#64748b' : '#64748b'};border-top:4px solid var(--accent);border-radius:var(--radius);background:var(--surface)}
 .block h2{margin-top:0}.block p:last-child{margin-bottom:0}summary{cursor:pointer;font-weight:700;min-height:44px}label{display:block;margin-top:12px}input{box-sizing:border-box;max-width:100%;width:100%;min-height:44px;border:1px solid currentColor;border-radius:6px;padding:8px;background:var(--canvas);color:var(--ink)}nav{display:flex;flex-wrap:wrap;gap:16px}a,button{min-height:44px} :focus-visible{outline:3px solid var(--ink);outline-offset:4px}
-@media(max-width:${Math.max(p.breakpoint, 480)}px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:none;flex-direction:column}.block{grid-area:auto!important;flex-basis:auto;width:100%}}
+@media(max-width:${p.breakpoint}px){.layout{grid-template-columns:minmax(0,1fr);grid-template-areas:none;flex-direction:column}.block{grid-area:auto!important;flex-basis:auto;width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media print{body{background:white;color:black}.block{break-inside:avoid}main{max-width:none}}
 `;

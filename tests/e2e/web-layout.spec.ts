@@ -70,5 +70,27 @@ test('switches the preview presentation orientation without changing CSS width',
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   await page.getByLabel('Preview orientation', { exact: true }).selectOption('landscape');
   await expect(page.locator('section[aria-label="375 pixel landscape preview"]')).toBeVisible();
-  await expect(page.locator('iframe[title="Layout at 375 pixels, landscape"]')).toBeVisible();
+  const frame = page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  expect(await frame.locator('body').evaluate(body => ({ width: body.ownerDocument.defaultView!.innerWidth, landscape: body.ownerDocument.defaultView!.matchMedia('(orientation: landscape)').matches }))).toEqual({ width: 375, landscape: true });
+  await page.getByLabel('Preview orientation', { exact: true }).selectOption('portrait');
+  expect(await frame.locator('body').evaluate(body => body.ownerDocument.defaultView!.matchMedia('(orientation: portrait)').matches)).toBe(true);
+});
+
+test('applies area drafts, rejects invalid shapes and reflows named layouts', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  const editor = page.getByLabel('Named grid areas', { exact: true });
+  await editor.fill('a a b\na a c');
+  await page.getByRole('button', { name: 'Apply areas', exact: true }).click();
+  const wide = page.frameLocator('iframe[title="Layout at 1440 pixels"]');
+  await expect(wide.locator('.layout')).toHaveCSS('grid-template-areas', '"a a b" "a a c"');
+  await editor.fill('a a b\na b b');
+  await page.getByRole('button', { name: 'Apply areas', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('rectangle');
+  await expect(wide.locator('.layout')).toHaveCSS('grid-template-areas', '"a a b" "a a c"');
+  await page.getByLabel('Gap (px)', { exact: true }).fill('120');
+  await page.getByLabel('Gap (px)', { exact: true }).press('Tab');
+  for (const width of [375, 768, 1440]) {
+    const body = page.frameLocator(`iframe[title="Layout at ${width} pixels"]`).locator('body');
+    expect(await body.evaluate(node => node.ownerDocument.documentElement.scrollWidth - node.ownerDocument.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  }
 });

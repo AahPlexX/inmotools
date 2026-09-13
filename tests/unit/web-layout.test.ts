@@ -43,6 +43,17 @@ describe('Web Layout Studio portable projects', () => {
     expect(buildCss(project)).toContain('.block:nth-child(1){grid-area:a}');
     expect(() => parseProject(JSON.stringify({ ...project, gridAreas: ['a b', 'a a'] }))).toThrow(/rectangular|exactly/);
   });
+  it('migrates legacy projects without altering flow and rejects unsafe area maps', () => {
+    const { gridAreas: _areas, ...legacy } = INITIAL_PROJECT;
+    expect(parseProject(JSON.stringify(legacy)).gridAreas).toEqual([]);
+    for (const gridAreas of [null, ['a a b', 'a b b'], ['auto b c'], ['span b c'], ['inherit b c']]) {
+      expect(() => parseProject(JSON.stringify({ ...INITIAL_PROJECT, gridAreas }))).toThrow();
+    }
+    const mapped = { ...INITIAL_PROJECT, gridAreas: ['a a b', 'a a c'] };
+    expect(parseProject(JSON.stringify(mapped)).gridAreas).toEqual(mapped.gridAreas);
+    expect(() => parseProject(JSON.stringify({ ...mapped, columns: 4 }))).toThrow();
+    expect(buildCss(mapped)).toContain('@container(min-width:calc(36rem + 48px))');
+  });
   it('uses a restrictive preview policy without imposing it on portable exports', () => {
     const preview = buildPreview(INITIAL_PROJECT);
     expect(preview).toContain("default-src 'none'");

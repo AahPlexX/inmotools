@@ -17,6 +17,22 @@ function NumericField({ label, value, min, max, onCommit }: { label: string; val
     }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} /></label>;
 }
 
+function AreaEditor({ project, onCommit }: { project: LayoutProject; onCommit: (value: Partial<LayoutProject>) => void }) {
+  const [draft, setDraft] = useState(project.gridAreas.join('\n'));
+  const [error, setError] = useState('');
+  useEffect(() => { setDraft(project.gridAreas.join('\n')); setError(''); }, [project.gridAreas]);
+  return <div><label className="wl-field">Named grid areas<textarea aria-label="Named grid areas" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} /></label>
+    <p className="help-text">One row per line; separate names with spaces. Use dots for empty cells. Areas map to blocks in first-appearance order. Empty text restores automatic flow. Changing columns clears the area map.</p>
+    <button type="button" onClick={() => {
+      try {
+        const gridAreas = draft.trim() ? draft.trim().split(/\r?\n/) : [];
+        const valid = parseProject(JSON.stringify({ ...project, gridAreas }));
+        onCommit({ gridAreas: valid.gridAreas }); setError('');
+      } catch (issue) { setError(issue instanceof Error ? issue.message : 'Invalid area map.'); }
+    }}>Apply areas</button>{error && <p role="alert">{error}</p>}
+    <p className="help-text">Named areas activate only when every column has room for readable content. Smaller containers use automatic flow.</p></div>;
+}
+
 function Preview({ project, width, orientation }: { project: LayoutProject; width: number; orientation: 'portrait' | 'landscape' }) {
   const host = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState(280);
@@ -29,11 +45,12 @@ function Preview({ project, width, orientation }: { project: LayoutProject; widt
   }, []);
   const scale = Math.min(1, Math.max(1, available) / width);
   const source = useMemo(() => buildPreview(project), [project]);
-  return <section className="wl-preview" aria-label={`${width} pixel preview`}>
-    <div className="wl-preview-label"><strong>{width} px</strong><span>{Math.round(scale * 100)}% view scale</span></div>
-    <div ref={host} className="wl-frame-host" style={{ height: Math.max(240, 680 * scale) }}>
+  const height = Math.round(width * (orientation === 'portrait' ? 1.5 : 0.625));
+  return <section className="wl-preview" aria-label={`${width} pixel ${orientation} preview`}>
+    <div className="wl-preview-label"><strong>{width} × {height} px · {orientation}</strong><span>{Math.round(scale * 100)}% view scale</span></div>
+    <div ref={host} className="wl-frame-host" style={{ height: height * scale }}>
       <iframe title={`Layout at ${width} pixels`} sandbox="" referrerPolicy="no-referrer" srcDoc={source}
-        style={{ width, height: Math.max(680, 240 / scale), transform: `scale(${scale})` }} />
+        style={{ width, height, transform: `scale(${scale})` }} />
     </div>
   </section>;
 }
@@ -124,8 +141,8 @@ export default function WebLayoutWorkspace() {
           <label className="wl-field">Page heading<input value={project.title} maxLength={200} onChange={event => patch({ title: event.target.value })} /></label>
           <label className="wl-field">Introduction<textarea value={project.description} maxLength={2000} onChange={event => patch({ description: event.target.value })} /></label>
           <div className="wl-fields"><label className="wl-field">Layout<select value={project.layout} onChange={event => patch({ layout: event.target.value as LayoutProject['layout'] })}><option value="grid">CSS Grid</option><option value="flex">Flexbox</option></select></label>
-          {project.layout === 'grid' ? <NumericField label="Desktop columns" value={project.columns} min={1} max={12} onCommit={value => patch({ columns: value, gridAreas: [Array(value).fill('a').join(' ')] })} /> : <label className="wl-field">Direction<select value={project.direction} onChange={event => patch({ direction: event.target.value as LayoutProject['direction'] })}><option value="row">Row</option><option value="column">Column</option></select></label>}
-          {project.layout === 'grid' && <label className="wl-field">Named grid areas<textarea aria-label="Named grid areas" value={project.gridAreas.join('\n')} onChange={event => setStatus('Grid-area edits apply when the rows are valid.')} onBlur={event => { try { patch({ gridAreas: event.currentTarget.value.split('\n') }); } catch { setStatus('Grid areas must be rectangular rows with matching columns.'); } }} /><span className="help-text">One space-separated row per line. Use names or a dot for an empty cell.</span></label>}
+          {project.layout === 'grid' ? <NumericField label="Desktop columns" value={project.columns} min={1} max={12} onCommit={value => { if (value !== project.columns) patch({ columns: value, gridAreas: [] }); }} /> : <label className="wl-field">Direction<select value={project.direction} onChange={event => patch({ direction: event.target.value as LayoutProject['direction'] })}><option value="row">Row</option><option value="column">Column</option></select></label>}
+          {project.layout === 'grid' && <AreaEditor project={project} onCommit={patch} />}
           {numeric('Gap (px)', 'gap', 0, 120)}{numeric('Page padding (px)', 'padding', 12, 120)}{numeric('Content maximum (px)', 'maxWidth', 320, 2400)}{numeric('Stack below (px)', 'breakpoint', 320, 1200)}</div>
           <div className="wl-fields"><label className="wl-field">Alignment<select value={project.alignment} onChange={event => patch({ alignment: event.target.value as LayoutProject['alignment'] })}>{['stretch','flex-start','center','flex-end'].map(value => <option key={value}>{value}</option>)}</select></label><label className="wl-field">Distribution<select value={project.distribution} onChange={event => patch({ distribution: event.target.value as LayoutProject['distribution'] })}>{['flex-start','center','space-between','space-evenly'].map(value => <option key={value}>{value}</option>)}</select></label></div>
           <p className="help-text">The column count is a maximum. Cards wrap sooner when space is tight so text stays readable.</p>
