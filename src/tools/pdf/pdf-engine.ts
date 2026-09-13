@@ -1,4 +1,13 @@
-import { degrees, PDFDict, PDFDocument, PDFName } from 'pdf-lib';
+import {
+  degrees,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  StandardFonts,
+  TextAlignment,
+  type PDFFont,
+} from 'pdf-lib';
 import {
   attachPdfFiles,
   extractPdfAttachments,
@@ -72,6 +81,9 @@ export interface PdfPageBoxEdit {
   trimBox?: PdfBox;
 }
 
+export type PdfStandardFormFont = 'helvetica' | 'times-roman' | 'courier';
+export type PdfFormTextAlignment = 'left' | 'center' | 'right';
+
 interface PdfFormFieldFlags {
   name: string;
   required?: boolean;
@@ -86,21 +98,30 @@ interface PdfPositionedFormFieldBase extends PdfFormFieldFlags {
   height: number;
 }
 
-export interface PdfTextFieldDefinition extends PdfPositionedFormFieldBase {
+interface PdfFontFieldProperties {
+  font?: PdfStandardFormFont;
+  fontSize?: number;
+}
+
+export interface PdfTextFieldDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
   type: 'text';
   value?: string;
+  defaultValue?: string;
   multiline?: boolean;
+  alignment?: PdfFormTextAlignment;
 }
 
 export interface PdfCheckBoxDefinition extends PdfPositionedFormFieldBase {
   type: 'checkbox';
   checked?: boolean;
+  defaultChecked?: boolean;
 }
 
-export interface PdfDropdownDefinition extends PdfPositionedFormFieldBase {
+export interface PdfDropdownDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
   type: 'dropdown';
   options: string[];
   selected?: string;
+  defaultSelected?: string;
 }
 
 export interface PdfRadioOptionDefinition {
@@ -116,12 +137,14 @@ export interface PdfRadioGroupDefinition extends PdfFormFieldFlags {
   type: 'radio';
   options: PdfRadioOptionDefinition[];
   selected?: string;
+  defaultSelected?: string;
 }
 
-export interface PdfOptionListDefinition extends PdfPositionedFormFieldBase {
+export interface PdfOptionListDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
   type: 'option-list';
   options: string[];
   selected?: string[];
+  defaultSelected?: string[];
   multiselect?: boolean;
 }
 
@@ -152,6 +175,17 @@ const METADATA_FIELDS = [
   ['Creation date', 'CreationDate'],
   ['Modification date', 'ModDate'],
 ] as const;
+
+const FORM_FONT_NAMES: Record<PdfStandardFormFont, StandardFonts> = {
+  helvetica: StandardFonts.Helvetica,
+  'times-roman': StandardFonts.TimesRoman,
+  courier: StandardFonts.Courier,
+};
+const FORM_TEXT_ALIGNMENTS: Record<PdfFormTextAlignment, TextAlignment> = {
+  left: TextAlignment.Left,
+  center: TextAlignment.Center,
+  right: TextAlignment.Right,
+};
 
 function infoDictionary(document: PDFDocument): PDFDict | undefined {
   const info = document.context.trailerInfo.Info;
@@ -300,6 +334,12 @@ function cleanFieldOptions(values: string[], label: string): string[] {
   return options;
 }
 
+function validateFontProperties(definition: PdfFontFieldProperties, label: string): void {
+  if (definition.fontSize !== undefined && (!Number.isFinite(definition.fontSize) || definition.fontSize <= 0)) {
+    throw new Error(`${label} font size must be a finite positive number.`);
+  }
+}
+
 function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
   if (!definition.name.trim()) throw new Error('Form field names cannot be blank.');
   if (definition.type === 'radio') {
@@ -308,22 +348,36 @@ function validateFieldDefinition(document: PDFDocument, definition: PdfFormField
     if (definition.selected !== undefined && !options.includes(definition.selected)) {
       throw new Error(`Radio group ${definition.name} selected value must match one of its options.`);
     }
+    if (definition.defaultSelected !== undefined && !options.includes(definition.defaultSelected)) {
+      throw new Error(`Radio group ${definition.name} default value must match one of its options.`);
+    }
     return;
   }
 
   validatePositionedGeometry(document, `Form field ${definition.name}`, definition);
+  if (definition.type === 'text') validateFontProperties(definition, `Text field ${definition.name}`);
   if (definition.type === 'dropdown') {
+    validateFontProperties(definition, `Dropdown ${definition.name}`);
     const options = cleanFieldOptions(definition.options, `Dropdown ${definition.name}`);
     if (definition.selected !== undefined && !options.includes(definition.selected)) {
       throw new Error(`Dropdown ${definition.name} selected value must match one of its options.`);
     }
+    if (definition.defaultSelected !== undefined && !options.includes(definition.defaultSelected)) {
+      throw new Error(`Dropdown ${definition.name} default value must match one of its options.`);
+    }
   }
   if (definition.type === 'option-list') {
+    validateFontProperties(definition, `Option list ${definition.name}`);
     const options = cleanFieldOptions(definition.options, `Option list ${definition.name}`);
     const selected = definition.selected ?? [];
+    const defaultSelected = definition.defaultSelected ?? [];
     if (!definition.multiselect && selected.length > 1) throw new Error(`Option list ${definition.name} must enable multiselect before selecting multiple values.`);
+    if (!definition.multiselect && defaultSelected.length > 1) throw new Error(`Option list ${definition.name} must enable multiselect before assigning multiple default values.`);
     if (selected.some((value) => !options.includes(value))) {
       throw new Error(`Option list ${definition.name} selected values must match its declared options.`);
+    }
+    if (defaultSelected.some((value) => !options.includes(value))) {
+      throw new Error(`Option list ${definition.name} default values must match its declared options.`);
     }
   }
 }
@@ -333,10 +387,31 @@ function applyFieldFlags(field: { enableReadOnly(): void; enableRequired(): void
   if (definition.required) field.enableRequired();
 }
 
-function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinition[]): void {
+async function resolveFormFont(document: PDFDocument, definition: PdfFontFieldProperties, cache: Map<PdfStandardFormFont, PDFFont>): Promise<PDFFont | undefined> {
+  if (!definition.font && definition.fontSize === undefined) return undefined;
+  const fontKey = definition.font ?? 'helvetica';
+  const cached = cache.get(fontKey);
+  if (cached) return cached;
+  const font = await document.embedFont(FORM_FONT_NAMES[fontKey]);
+  cache.set(fontKey, font);
+  return font;
+}
+
+function setTextDefault(field: { acroField: { dict: PDFDict } }, value: string | undefined): void {
+  if (value !== undefined) field.acroField.dict.set(PDFName.of('DV'), PDFHexString.fromText(value));
+}
+
+function setChoiceDefault(field: { acroField: { dict: PDFDict } }, values: string[] | undefined): void {
+  if (!values?.length) return;
+  if (values.length === 1) field.acroField.dict.set(PDFName.of('DV'), PDFHexString.fromText(values[0]));
+  else field.acroField.dict.set(PDFName.of('DV'), field.acroField.dict.context.obj(values.map((value) => PDFHexString.fromText(value))));
+}
+
+async function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinition[]): Promise<void> {
   if (!definitions.length) return;
   const form = document.getForm();
   const seen = new Set<string>();
+  const fontCache = new Map<PdfStandardFormFont, PDFFont>();
 
   for (const definition of definitions) {
     validateFieldDefinition(document, definition);
@@ -356,6 +431,12 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
           height: option.height,
         });
       }
+      if (definition.defaultSelected !== undefined) {
+        const index = definition.options.findIndex((option) => option.value.trim() === definition.defaultSelected);
+        const onValue = field.acroField.getOnValues()[index];
+        if (!onValue) throw new Error(`Radio group ${name} could not resolve its default appearance value.`);
+        field.acroField.dict.set(PDFName.of('DV'), onValue);
+      }
       if (definition.selected !== undefined) field.select(definition.selected);
       continue;
     }
@@ -373,7 +454,12 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
       applyFieldFlags(field, definition);
       if (definition.multiline) field.enableMultiline();
       if (definition.value !== undefined) field.setText(definition.value);
-      field.addToPage(page, rect);
+      const font = await resolveFormFont(document, definition, fontCache);
+      field.addToPage(page, { ...rect, font });
+      if (definition.alignment !== undefined) field.setAlignment(FORM_TEXT_ALIGNMENTS[definition.alignment]);
+      if (definition.fontSize !== undefined) field.setFontSize(definition.fontSize);
+      setTextDefault(field, definition.defaultValue);
+      if (font) field.updateAppearances(font);
       continue;
     }
 
@@ -381,6 +467,10 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
       const field = form.createCheckBox(name);
       applyFieldFlags(field, definition);
       field.addToPage(page, rect);
+      if (definition.defaultChecked !== undefined) {
+        const onValue = field.acroField.getOnValue() ?? PDFName.of('Yes');
+        field.acroField.dict.set(PDFName.of('DV'), definition.defaultChecked ? onValue : PDFName.of('Off'));
+      }
       if (definition.checked) field.check();
       continue;
     }
@@ -390,7 +480,11 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
       applyFieldFlags(field, definition);
       field.setOptions(definition.options.map((option) => option.trim()));
       if (definition.selected !== undefined) field.select(definition.selected);
-      field.addToPage(page, rect);
+      const font = await resolveFormFont(document, definition, fontCache);
+      field.addToPage(page, { ...rect, font });
+      if (definition.fontSize !== undefined) field.acroField.setFontSize(definition.fontSize);
+      setChoiceDefault(field, definition.defaultSelected === undefined ? undefined : [definition.defaultSelected]);
+      if (font) field.updateAppearances(font);
       continue;
     }
 
@@ -399,7 +493,11 @@ function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinit
     field.setOptions(definition.options.map((option) => option.trim()));
     if (definition.multiselect) field.enableMultiselect();
     if (definition.selected?.length) field.select(definition.multiselect ? definition.selected : definition.selected[0]);
-    field.addToPage(page, rect);
+    const font = await resolveFormFont(document, definition, fontCache);
+    field.addToPage(page, { ...rect, font });
+    if (definition.fontSize !== undefined) field.acroField.setFontSize(definition.fontSize);
+    setChoiceDefault(field, definition.defaultSelected);
+    if (font) field.updateAppearances(font);
   }
 }
 
@@ -500,7 +598,7 @@ export async function splicePdfs(selections: PdfSelection[], options: PdfOutputO
 
   applyBlankPages(output, options.blankPages ?? []);
   applyPageBoxEdits(output, options.pageBoxEdits ?? []);
-  applyFormFields(output, options.formFields ?? []);
+  await applyFormFields(output, options.formFields ?? []);
   await attachPdfFiles(output, options.attachments ?? []);
   applyMetadata(output, options.metadata);
   return new Uint8Array(await output.save({ updateFieldAppearances: Boolean(options.formFields?.length) }));
