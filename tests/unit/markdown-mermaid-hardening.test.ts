@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  MAX_MERMAID_FLOWCHART_LINES,
   MAX_MERMAID_SOURCE_CHARS,
   prepareMermaidSource,
   renderMermaidDiagram,
@@ -18,6 +19,14 @@ describe('Mermaid source hardening', () => {
   it('removes trailing whitespace that can trigger pathological parser work without changing diagram content', () => {
     const result = prepareMermaidSource('flowchart LR\nA-->B\n' + ' '.repeat(10_000));
     expect(result).toEqual({ ok: true, source: 'flowchart LR\nA-->B' });
+  });
+
+  it('rejects flowcharts with enough line tokens to trigger the residual quadratic Jison path', () => {
+    const source = `flowchart LR\nA-->B\n${' \n'.repeat(MAX_MERMAID_FLOWCHART_LINES)}`;
+    const result = prepareMermaidSource(source);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('Expected token-heavy Mermaid flowchart source to be rejected.');
+    expect(result.error).toMatch(/too many lines/i);
   });
 });
 
@@ -49,6 +58,27 @@ describe('Mermaid render contract', () => {
     expect(result).toEqual({
       error: 'Mermaid Gantt task on line 5 has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.',
     });
+  });
+
+  it('does not mistake Gantt directives or accessible descriptions for task metadata', async () => {
+    const source = [
+      '---',
+      'config:',
+      '  themeVariables: { fontFamily: "A,B,C,D" }',
+      '---',
+      'gantt',
+      '  title Release: Q1,Q2,Q3,Q4',
+      '  accDescr {',
+      '    Owners: Ada,Ben,Cam,Dee',
+      '  }',
+      '  dateFormat YYYY-MM-DD',
+      '  Alpha :a1, 2026-01-05, 3d',
+    ].join('\n');
+    const render = vi.fn().mockResolvedValue({ svg: '<svg>ok</svg>', diagramType: 'gantt' });
+
+    const result = await renderMermaidDiagram(render, 'gantt-2', source);
+    expect(result.svg).toBe('<svg>ok</svg>');
+    expect(render).toHaveBeenCalledOnce();
   });
 });
 
