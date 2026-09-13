@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { CadFeature, CadProject } from '../../src/tools/cad/cad-types';
 import { createCadProject } from '../../src/tools/cad/project-engine';
 import { createOcctCadKernelAdapter, type OcctCadKernelAdapter } from '../../src/tools/cad/occt-adapter';
 import {
@@ -7,6 +8,32 @@ import {
 } from '../../src/tools/cad/occt-worker-executor';
 
 const project = createCadProject('Worker Fixture');
+
+function featureProject(feature: CadFeature): CadProject {
+  return {
+    ...createCadProject('Rebuild Fixture'),
+    features: [feature],
+    bodies: [{ id: 'body-main', label: 'Main body', featureIds: [feature.id], visible: true }],
+  };
+}
+
+function primitiveFeature(
+  id: string,
+  parameters: Record<string, unknown>,
+): CadFeature {
+  return {
+    id,
+    label: id,
+    type: 'primitive',
+    bodyId: 'body-main',
+    dependsOn: [],
+    topologyRefs: [],
+    parameters,
+    suppressed: false,
+    status: 'dirty',
+    diagnostic: null,
+  };
+}
 
 describe('CAD OCCT worker request executor', () => {
   let seedKernel: OcctCadKernelAdapter;
@@ -17,6 +44,7 @@ describe('CAD OCCT worker request executor', () => {
     seedKernel = await createOcctCadKernelAdapter();
     const box = seedKernel.box(20, 10, 5);
     boxBrep = seedKernel.exportBrep([box]);
+    seedKernel.release(box);
     executor = await createOcctKernelRequestExecutor();
   });
 
@@ -56,6 +84,7 @@ describe('CAD OCCT worker request executor', () => {
     const [roundTripped] = seedKernel.importBrep(payload.data);
     expect(roundTripped).toBeDefined();
     expect(seedKernel.volume(roundTripped!)).toBeCloseTo(1000, 8);
+    seedKernel.release(roundTripped!);
   });
 
   it('replaces prior imported worker state instead of accumulating export bodies', async () => {
@@ -76,12 +105,67 @@ describe('CAD OCCT worker request executor', () => {
     if (exported.kind === 'export') expect(exported.data).toBeInstanceOf(Uint8Array);
   });
 
-  it('fails rebuild explicitly until the G6 feature evaluator is attached', async () => {
-    await expect(executor.execute({
-      revision: 5,
-      project,
-      quality: 'preview',
-      operation: { kind: 'rebuild', dirtyFeatureIds: [] },
-    })).rejects.toMatchObject({ code: 'evaluation-failed', recoverable: true });
+  it('rebuilds a serializable primitive project into worker-owned exact state', async () => {
+    const rebuildExecutor = await createOcctKernelRequestExecutor();
+    const boxProject = featureProject(primitiveFeature('box-1', {
+      kind: 'box',
+      width: 20,
+      depth: 10,
+      height: 5,
+    }));
+
+    try {
+      const payload = await rebuildExecutor.execute({
+        revision: 5,
+        project: boxProject,
+        quality: 'final',
+        operation: { kind: 'rebuild', dirtyFeatureIds: ['box-1'] },
+      });
+
+      expect(payload.kind).toBe('rebuild');
+      if (payload.kind !== 'rebuild') return;
+      expect(payload.bodies).toHaveLength(1);
+      expect(payload.bodies[0]?.bodyId).toBe('body-main');
+      expect(payload.bodies[0]?.mesh.indices.length).toBeGreaterThan(0);
+      expect(payload.bodies[0]?.bounds).toEqual({ min: [0, 0, 0], max: [20, 10, 5] });
+
+      const exported = await rebuildExecutor.execute({
+        revision: 6,
+        project: boxProject,
+        quality: 'final',
+        operation: { kind: 'export', format: 'brep', options: {} },
+      });
+      expect(exported.kind).toBe('export');
+      if (exported.kind !== 'export' || !(exported.data instanceof Uint8Array)) return;
+      const [roundTripped] = seedKernel.importBrep(exported.data);
+      expect(seedKernel.volume(roundTripped!)).toBeCloseTo(1000, 8);
+      seedKernel.release(roundTripped!);
+    } finally {
+      rebuildExecutor.dispose();
+    }
+  });
+
+  it('attributes invalid rebuild parameters to the failing feature', async () => {
+    const rebuildExecutor = await createOcctKernelRequestExecutor();
+    const invalidProject = featureProject(primitiveFeature('bad-cylinder', {
+      kind: 'cylinder',
+      radius: 0,
+      height: 5,
+    }));
+
+    try {
+      await expect(rebuildExecutor.execute({
+        revision: 7,
+        project: invalidProject,
+        quality: 'preview',
+        operation: { kind: 'rebuild', dirtyFeatureIds: ['bad-cylinder'] },
+      })).rejects.toMatchObject({
+        code: 'evaluation-failed',
+        recoverable: true,
+        featureId: 'bad-cylinder',
+      });
+    } finally {
+      rebuildExecutor.dispose();
+    }
   });
 });
