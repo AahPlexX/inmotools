@@ -39,7 +39,7 @@ test('copies a complete edit recipe across photos and pastes it as one undo step
   await expect(page.getByText('Radial adjustment 1', { exact: true })).toBeVisible();
 
   await copy.click();
-  await expect(page.getByRole('status')).toContainText('Edits copied');
+  await expect(page.locator('.photo-status-message')).toContainText('Edits copied');
   await expect(paste).toBeEnabled();
 
   // The clipboard must be a snapshot, not a live reference to the current recipe.

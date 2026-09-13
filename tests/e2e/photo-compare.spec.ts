@@ -20,7 +20,7 @@ async function openFixture(page: Page) {
   await page.getByRole('button', { name: 'Before/after' }).click();
 }
 
-test('split comparison has a draggable and keyboard-adjustable boundary', async ({ page }) => {
+test('split comparison has a draggable and keyboard-adjustable boundary', async ({ page }, testInfo) => {
   await openFixture(page);
 
   const splitMode = page.getByRole('button', { name: 'Split' });
@@ -37,10 +37,21 @@ test('split comparison has a draggable and keyboard-adjustable boundary', async 
 
   const box = await slider.boundingBox();
   if (!box) throw new Error('Comparison slider has no bounding box.');
-  await page.mouse.move(box.x + box.width * 0.51, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.75, box.y + box.height / 2, { steps: 5 });
-  await page.mouse.up();
+  const endX = box.x + box.width * 0.75;
+  const y = box.y + box.height / 2;
+  if (testInfo.project.use.hasTouch) {
+    // Playwright's mouse drag is not a trusted touch gesture in a hasTouch
+    // context. A locator tap still exercises the native range pointer path.
+    await slider.tap({ position: { x: box.width * 0.75, y: box.height / 2 } });
+  } else {
+    // Place the thumb through the native track first, then drag from its known
+    // position so platform-specific thumb hit-box sizing cannot miss the grab.
+    await slider.click({ position: { x: box.width * 0.25, y: box.height / 2 } });
+    await slider.hover({ position: { x: box.width * 0.25, y: box.height / 2 } });
+    await page.mouse.down();
+    await page.mouse.move(endX, y, { steps: 5 });
+    await page.mouse.up();
+  }
 
   const value = Number(await slider.inputValue());
   expect(value).toBeGreaterThanOrEqual(70);
