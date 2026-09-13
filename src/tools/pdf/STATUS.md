@@ -21,8 +21,8 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 - Branch: `feat/pdf-workstation`
 - Base at branch creation: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Current milestone: **A — deterministic document/export foundation**
-- Current gate: **attachments are verified; visible five-type AcroForm authoring is implemented and awaiting the fresh combined browser gate**
-- Current counts: **8 verified / 17 started / 121 planned / 0 blocked / 0 excluded capabilities**
+- Current gate: **attachments and visible five-type AcroForm authoring are verified; advancing to token overlays/Bates and remaining field/export properties**
+- Current counts: **13 verified / 12 started / 121 planned / 0 blocked / 0 excluded capabilities**
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Existing `pdf-sanitizer` route/deep link is preserved; the workstation evolves that surface rather than creating a duplicate tool.
 
@@ -46,16 +46,16 @@ Completed/proven portions:
 - attachment inventory recursively traverses valid embedded-file name trees with bounded parsing and extracts bytes only on demand;
 - source attachments are never silently inherited; explicit source inclusion and new local attachment authoring both reopen correctly in desktop/mobile browser tests;
 - attachment authoring supports filename, MIME type, description, creation date, and modification date with deterministic UTC handling and output inventory verification;
-- text, checkbox, dropdown, radio-group, and option-list form authoring contracts exist in the engine;
-- visible coordinate-first form authoring now stages all five field types, required/read-only state, text multiline/default value, checkbox state, dropdown options/selection, radio options/selection, and option-list multiselect/selection;
+- text, checkbox, dropdown, radio-group, and option-list authoring are implemented through typed engine contracts and visible coordinate-first controls;
+- required/read-only state, text multiline/initial value, checkbox state, dropdown options/selection, radio options/selection, and option-list multiselect/selection are live;
 - staged form fields are revalidated against current final output pages after page/MediaBox changes, and export is verified against the exact expected authored-field count;
-- visible metadata export, blank-page insertion, page-box edits, and attachments reopen correctly in browser tests across desktop/mobile Chromium;
+- source forms can be flattened while newly authored output fields remain editable and are verified after reopen;
+- visible metadata export, blank-page insertion, page-box edits, attachments, and all five editable field types reopen correctly in browser tests across desktop/mobile Chromium;
 - the responsive metadata/export foundation continues to pass the 320 CSS-pixel reflow assertion;
 - export status reports source-form flattening, authored editable fields, replacement metadata, blank-page insertion, page-box mutations, and attachment authoring.
 
 Still required for Milestone A exit:
 
-- fresh browser proof for the visible five-type AcroForm authoring surface;
 - remaining advanced field properties in capability 65 (font, alignment, and explicit default-value semantics beyond current initial values);
 - Bates/header/footer/watermark token overlays;
 - deterministic export-change summary broad enough to cover every Milestone A mutation;
@@ -122,6 +122,11 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **1** Local multi-PDF open with native file input — `verified`
 - **11** Insert blank pages using common/custom sizes — `verified`
 - **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `verified`
+- **60** Text-field authoring — `verified`
+- **61** Checkbox authoring — `verified`
+- **62** Radio-group authoring — `verified`
+- **63** Dropdown authoring — `verified`
+- **64** Multi-select option-list authoring — `verified`
 - **71** One-click form flattening with pre-export loss-of-editability warning and post-export verification — `verified`
 - **82** Attachment authoring with filename/MIME/description/dates — `verified`
 - **83** Attachment inventory/extraction — `verified`
@@ -136,11 +141,6 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **12** Duplicate pages — `started` (repeated page selections are preserved by the engine; dedicated user-flow proof remains)
 - **15** Rotate selected pages 90/180/270 degrees — `started` (engine/UI exist; focused rendered/reopened proof remains)
 - **58** Existing AcroForm field inventory — `started` (field count exists; page/name/type/state/flags inventory remains)
-- **60** Text-field authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
-- **61** Checkbox authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
-- **62** Radio-group authoring — `started` (engine and visible stacked-option authoring exist; fresh browser proof is pending)
-- **63** Dropdown authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
-- **64** Multi-select option-list authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
 - **65** Field properties — `started` (required/read-only/multiline/options/selections are live; font, alignment, and remaining default-property controls remain)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
@@ -184,6 +184,6 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — Merge-ref timing evidence, workflow run `34726080825`: all 688 unit tests again passed, but its checkout merged this PDF branch into `main@9d1e9e2ffe10df8b7ad6daaea36751519ab04741`; the web-layout syntax error therefore still blocked build before browser tests. The repaired `main@597e7b0c746545df0a90dc08440b3ad10c61b65c` landed seconds later.
 - 2026-09-12 — Clean merge-ref validation, workflow run `34726166983`: checkout was `Merge 73124e41… into 597e7b0c…`; all 688 unit tests and the production build passed. Six of eight focused desktop/mobile browser executions passed; the only failure was an older non-exact `Output pages` text locator made ambiguous by the new `Geometry output page` label. The new blank-page/date/page-box scenario passed on both browser projects.
 - 2026-09-12 — Final page/metadata slice GREEN, workflow run `34726249725`: after narrowing that stale locator to exact text, unit tests, production build, Chromium installation, and the full focused PDF browser suite all completed successfully. Capabilities 11, 19, and 96 were promoted to `verified`.
-- 2026-09-12 — Attachment foundation GREEN, workflow run `34726735769`: unit tests, production build, and focused desktop/mobile PDF browser tests passed. The visible browser case inventories a source attachment, extracts and verifies its bytes, authors a new attachment with description/dates, reopens it, and proves the source attachment was not silently carried forward. Capabilities 82 and 83 are promoted to `verified`.
+- 2026-09-12 — Attachment foundation GREEN, workflow run `34726735769`: unit tests, production build, and focused desktop/mobile PDF browser tests passed. The visible browser case inventories a source attachment, extracts and verifies its bytes, authors a new attachment with description/dates, reopens it, and proves the source attachment was not silently carried forward. Capabilities 82 and 83 were promoted to `verified`.
 - 2026-09-12 — Advanced-form TDD RED, workflow run `34729171676`: 700 pre-existing repository tests passed while both new radio/option-list tests failed on the intentionally missing engine handling (`client.priority` attempted the legacy top-level page path). This establishes the missing-behavior baseline before implementation.
-- 2026-09-12 — Advanced-form engine implementation added typed radio-group and option-list definitions, independent widget geometry validation, option/selection validation, multiselect handling, and real `pdf-lib` authoring calls. Typed tests no longer cast around the production contract; the visible five-type authoring/browser gate remains pending before capabilities 60–64 are promoted.
+- 2026-09-12 — Advanced-form GREEN, workflow run `34729484871`: unit tests, production build, and focused browser tests completed successfully after typed radio/option-list support and visible five-type form staging. Dedicated browser coverage creates and reopens text, checkbox, dropdown, radio-group, and multiselect option-list values and separately proves a source field can be flattened while a newly authored output field remains editable. Capabilities 60–64 are promoted to `verified`; capability 65 remains `started` for its unimplemented advanced properties.
