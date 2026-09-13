@@ -122,7 +122,11 @@ function DefinitionShape({ element, maskCutout = false }: { element: VectorEleme
     case 'path': return <path {...common} d={source.d}/>;
     case 'text': return <text {...common} x={source.x} y={source.y + source.fontSize} fontFamily={source.fontFamily} fontSize={source.fontSize} fontWeight={source.fontWeight} letterSpacing={source.letterSpacing} textAnchor={source.textAnchor}>{source.text}</text>;
     case 'image': return <image x={source.x} y={source.y} width={source.width} height={source.height} href={source.href} preserveAspectRatio={source.preserveAspectRatio} opacity={source.opacity} transform={common.transform}/>;
-    case 'group': return <g opacity={source.opacity} style={common.style} transform={common.transform}>{source.children.map((child) => <DefinitionShape key={child.id} element={child} maskCutout={maskCutout}/>)}</g>;
+    case 'group': {
+      const clipPath = source.composition?.mode === 'clip' ? `url(#${compositionId(source, 'clip')})` : undefined;
+      const mask = source.composition?.mode === 'difference' ? `url(#${compositionId(source, 'mask')})` : undefined;
+      return <g opacity={source.opacity} style={common.style} transform={common.transform} clipPath={clipPath} mask={mask}>{source.children.map((child) => <DefinitionShape key={child.id} element={child} maskCutout={maskCutout}/>)}</g>;
+    }
     case 'symbol-instance': return <use {...common} href={`#${source.symbolId}`} x={source.x} y={source.y} width={source.width} height={source.height}/>;
   }
 }
@@ -136,6 +140,7 @@ function CompositionDefinitions({ element }: { element: VectorElement }) {
       <DefinitionShape element={element.composition.shape} maskCutout/>
     </mask> : null}
     {element.children.map((child) => <CompositionDefinitions key={`composition-${child.id}`} element={child}/>)}
+    {element.composition ? <CompositionDefinitions element={element.composition.shape}/> : null}
   </>;
 }
 
