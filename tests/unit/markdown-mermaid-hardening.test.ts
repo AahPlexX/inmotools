@@ -21,8 +21,8 @@ describe('Mermaid source hardening', () => {
     expect(result).toEqual({ ok: true, source: 'flowchart LR\nA-->B' });
   });
 
-  it('rejects flowcharts with enough line tokens to trigger the residual quadratic Jison path', () => {
-    const source = `flowchart LR\nA-->B\n${' \n'.repeat(MAX_MERMAID_FLOWCHART_LINES)}`;
+  it('rejects flowcharts with enough interior line tokens to trigger the residual quadratic Jison path', () => {
+    const source = `flowchart LR\nA-->B\n${' \n'.repeat(MAX_MERMAID_FLOWCHART_LINES)}C-->D`;
     const result = prepareMermaidSource(source);
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('Expected token-heavy Mermaid flowchart source to be rejected.');
