@@ -2,7 +2,7 @@
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
-  - Current milestone: repair named-area editing and real viewport orientation. Baseline run `34729050953` failed orientation in both browser projects; the selector was wired to unused state. Recovery adds real iframe dimensions, applied area drafts, strict import validation and container-sized named-grid activation. Local unit gate: 10/10; TypeScript passes. Branch browser proof is required before main integration. Advanced features remain open.
+  - Current milestone: named-area editing and real viewport orientation repaired. Baseline run `34729050953` failed orientation in both browser projects; recovery run `34741482374` at `a51fec0` passes installation, 10 unit tests, production build and all 12 desktop/mobile browser cases. Integration uses the identical implementation; main checks and Pages are tracked by commit workflows. Next open work: WL-01 track authoring and WL-10 custom viewport sizes/actual-size mode. The full 60-feature scope remains active.
   - Completion: every ledger item implemented and verified through reachable UI, validated exports/persistence, script isolation, responsive keyboard access, exact-main checks and Pages deployment. Partial features remain open.
   - Scope: `src/tools/web-layout/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved.
 
