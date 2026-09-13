@@ -10,7 +10,7 @@ async function sourcePdf() {
 
 describe('PDF advanced form authoring', () => {
   it('authors radio groups and multiselect option lists with flags and selections', async () => {
-    const fields = [
+    const fields: PdfFormFieldDefinition[] = [
       {
         type: 'radio',
         name: 'client.priority',
@@ -34,7 +34,7 @@ describe('PDF advanced form authoring', () => {
         multiselect: true,
         readOnly: true,
       },
-    ] as unknown as PdfFormFieldDefinition[];
+    ];
 
     const output = await splicePdfs([{ bytes: await sourcePdf() }], { formFields: fields });
     const form = (await PDFDocument.load(output)).getForm();
@@ -58,7 +58,7 @@ describe('PDF advanced form authoring', () => {
           { value: 'Same', page: 1, x: 20, y: 320, width: 18, height: 18 },
           { value: 'Same', page: 1, x: 20, y: 290, width: 18, height: 18 },
         ],
-      }] as unknown as PdfFormFieldDefinition[],
+      }],
     })).rejects.toThrow(/radio.*duplicate/i);
 
     await expect(splicePdfs([{ bytes: source }], {
@@ -73,7 +73,7 @@ describe('PDF advanced form authoring', () => {
         options: ['A', 'B'],
         selected: ['A', 'C'],
         multiselect: true,
-      }] as unknown as PdfFormFieldDefinition[],
+      }],
     })).rejects.toThrow(/option list.*selected/i);
   });
 });
