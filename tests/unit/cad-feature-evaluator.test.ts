@@ -49,14 +49,19 @@ function fakeKernel() {
     cone: token('cone'),
     torus: token('torus'),
     cut: token('cut'),
+    cut2: token('cut2'),
   };
+  const cutCalls: unknown[][] = [];
   const kernel = {
     box: vi.fn(() => shapes.box),
     cylinder: vi.fn(() => shapes.cylinder),
     sphere: vi.fn(() => shapes.sphere),
     cone: vi.fn(() => shapes.cone),
     torus: vi.fn(() => shapes.torus),
-    cut: vi.fn(() => shapes.cut),
+    cut: vi.fn((...args: unknown[]) => {
+      cutCalls.push(args);
+      return cutCalls.length === 1 ? shapes.cut : shapes.cut2;
+    }),
     fuse: vi.fn(),
     common: vi.fn(),
     section: vi.fn(),
@@ -121,5 +126,25 @@ describe('CAD exact feature evaluator', () => {
     expect(thrown).toMatchObject({ featureId: 'bad-cylinder' });
     expect((thrown as Error).message).toMatch(/radius/i);
     expect(kernel.release).toHaveBeenCalledWith(shapes.box);
+  });
+
+  it('chains a Boolean result into a second Boolean operation as its own tool body', () => {
+    const { kernel, shapes } = fakeKernel();
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('tool-1', 'primitive', { kind: 'cylinder', radius: 2, height: 5 }),
+      feature('cut-1', 'boolean', { operation: 'cut' }, ['box-1', 'tool-1']),
+      feature('tool-2', 'primitive', { kind: 'cone', radius1: 1, radius2: 0, height: 3 }),
+      feature('cut-2', 'boolean', { operation: 'cut' }, ['cut-1', 'tool-2']),
+    ]), kernel);
+
+    expect(kernel.cut).toHaveBeenNthCalledWith(1, shapes.box, shapes.cylinder);
+    expect(kernel.cut).toHaveBeenNthCalledWith(2, shapes.cut, shapes.cone);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'cut-2', shape: shapes.cut2 }]);
+    expect(kernel.release).toHaveBeenCalledTimes(4);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.box);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.cylinder);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.cone);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.cut);
   });
 });
