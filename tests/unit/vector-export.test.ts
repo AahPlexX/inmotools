@@ -138,6 +138,22 @@ describe('Vector Studio export', () => {
     expect((maskMarkup.match(/fill="#000000"/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
+  test('preserves nested difference composition semantics when a composition becomes a cutter', () => {
+    const cutterA: VectorElement = { ...compositionShape, id: 'nested-a', x: 140, width: 110 };
+    const cutterB: VectorElement = { ...compositionShape, id: 'nested-b', x: 200, width: 110 };
+    let source = createVectorDocument();
+    source = addElement(source, { ...textElement, id: 'art' });
+    source = addElement(source, cutterA);
+    source = addElement(source, cutterB);
+
+    const inner = composeSelection(source, ['nested-a', 'nested-b'], 'difference');
+    const outer = composeSelection(inner.document, ['art', inner.selection[0]], 'difference');
+    const svg = serializeVectorSvg(outer.document);
+
+    expect((svg.match(/<mask\b/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(svg).toContain('mask="url(#cutout-mask-');
+  });
+
   test('omits hidden elements and preserves locked artwork as normal SVG content', () => {
     let document = createVectorDocument();
     document = addElement(document, { ...textElement, id: 'visible', locked: true });
