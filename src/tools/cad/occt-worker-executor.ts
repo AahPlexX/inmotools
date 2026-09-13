@@ -1,5 +1,6 @@
 import type {
   CadKernelBodyResult,
+  CadKernelOperation,
   CadKernelPayload,
   CadKernelQuality,
   CadKernelRequest,
@@ -17,6 +18,9 @@ interface WorkerBody {
   id: string;
   shape: CadKernelShape;
 }
+
+type ImportOperation = Extract<CadKernelOperation, { kind: 'import' }>;
+type ExportOperation = Extract<CadKernelOperation, { kind: 'export' }>;
 
 function tessellationOptions(quality: CadKernelQuality): CadKernelTessellationOptions {
   return quality === 'preview'
@@ -43,9 +47,9 @@ export class OcctKernelRequestExecutor {
 
     switch (request.operation.kind) {
       case 'import':
-        return this.#import(request);
+        return this.#import(request.operation, request.quality);
       case 'export':
-        return this.#export(request);
+        return this.#export(request.operation);
       case 'rebuild':
         throw new CadKernelRuntimeError(
           'evaluation-failed',
@@ -69,14 +73,14 @@ export class OcctKernelRequestExecutor {
     this.#kernel.dispose();
   }
 
-  #import(request: CadKernelRequest & { operation: Extract<CadKernelRequest['operation'], { kind: 'import' }> }): CadKernelPayload {
-    const bytes = new Uint8Array(request.operation.data);
-    const shapes = request.operation.format === 'step'
+  #import(operation: ImportOperation, quality: CadKernelQuality): CadKernelPayload {
+    const bytes = new Uint8Array(operation.data);
+    const shapes = operation.format === 'step'
       ? this.#kernel.importStep(bytes)
       : this.#kernel.importBrep(bytes);
 
     try {
-      const bodyResults = shapes.map((shape, index) => this.#bodyResult(`import-${index + 1}`, shape, request.quality));
+      const bodyResults = shapes.map((shape, index) => this.#bodyResult(`import-${index + 1}`, shape, quality));
       const nextBodies = shapes.map((shape, index) => ({ id: `import-${index + 1}`, shape }));
       const previousBodies = this.#bodies;
       this.#bodies = nextBodies;
@@ -88,14 +92,14 @@ export class OcctKernelRequestExecutor {
     }
   }
 
-  #export(request: CadKernelRequest & { operation: Extract<CadKernelRequest['operation'], { kind: 'export' }> }): CadKernelPayload {
+  #export(operation: ExportOperation): CadKernelPayload {
     if (this.#bodies.length === 0) {
       throw new CadKernelRuntimeError('export-failed', 'There are no exact worker-owned bodies to export.', true);
     }
 
     const shapes = this.#bodies.map((body) => body.shape);
     let data: string | Uint8Array;
-    switch (request.operation.format) {
+    switch (operation.format) {
       case 'step':
         data = this.#kernel.exportStep(shapes);
         break;
@@ -110,7 +114,7 @@ export class OcctKernelRequestExecutor {
             true,
           );
         }
-        const ascii = request.operation.options.ascii === true;
+        const ascii = operation.options.ascii === true;
         data = ascii
           ? this.#kernel.exportStl(shapes[0]!, true)
           : this.#kernel.exportStl(shapes[0]!, false);
@@ -121,7 +125,7 @@ export class OcctKernelRequestExecutor {
         break;
     }
 
-    return { kind: 'export', format: request.operation.format, data, warnings: [] };
+    return { kind: 'export', format: operation.format, data, warnings: [] };
   }
 
   #bodyResult(id: string, shape: CadKernelShape, quality: CadKernelQuality): CadKernelBodyResult {
