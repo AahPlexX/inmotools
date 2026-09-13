@@ -21,8 +21,8 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 - Branch: `feat/pdf-workstation`
 - Base at branch creation: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Current milestone: **A — deterministic document/export foundation**
-- Current gate: **attachments and visible five-type AcroForm authoring are verified; advancing to token overlays/Bates and remaining field/export properties**
-- Current counts: **13 verified / 12 started / 121 planned / 0 blocked / 0 excluded capabilities**
+- Current gate: **attachments, five-type AcroForm authoring, Bates numbering, token headers/footers, and text/image watermarks are verified; finishing field/export properties**
+- Current counts: **18 verified / 12 started / 116 planned / 0 blocked / 0 excluded capabilities**
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Existing `pdf-sanitizer` route/deep link is preserved; the workstation evolves that surface rather than creating a duplicate tool.
 
@@ -50,16 +50,19 @@ Completed/proven portions:
 - required/read-only state, text multiline/initial value, checkbox state, dropdown options/selection, radio options/selection, and option-list multiselect/selection are live;
 - staged form fields are revalidated against current final output pages after page/MediaBox changes, and export is verified against the exact expected authored-field count;
 - source forms can be flattened while newly authored output fields remain editable and are verified after reopen;
-- visible metadata export, blank-page insertion, page-box edits, attachments, and all five editable field types reopen correctly in browser tests across desktop/mobile Chromium;
+- deterministic export-time tokens support page, total pages, explicit date, final filename, and Bates sequence values;
+- Bates numbering supports start/padding/prefix/suffix and six header/footer placements;
+- header/footer overlays support left/center/right placement; text watermarks support opacity/rotation; PNG/JPEG watermarks support opacity/rotation/width and nine placements;
+- overlays are applied after the rebuilt document is created, then the final bytes are reinspected so authored forms/attachments remain protected by post-export verification;
+- visible metadata export, blank-page insertion, page-box edits, attachments, all five editable field types, and the overlay/Bates surface reopen correctly in browser tests;
 - the responsive metadata/export foundation continues to pass the 320 CSS-pixel reflow assertion;
-- export status reports source-form flattening, authored editable fields, replacement metadata, blank-page insertion, page-box mutations, and attachment authoring.
+- export status reports source-form flattening, authored editable fields, replacement metadata, overlays, blank-page insertion, page-box mutations, and attachment authoring.
 
 Still required for Milestone A exit:
 
 - remaining advanced field properties in capability 65 (font, alignment, and explicit default-value semantics beyond current initial values);
-- Bates/header/footer/watermark token overlays;
-- deterministic export-change summary broad enough to cover every Milestone A mutation;
-- focused browser evidence for all remaining behaviors.
+- wire and verify the new deterministic export-change summary broad enough to cover every Milestone A mutation;
+- focused browser evidence for those remaining behaviors.
 
 ### B — renderer and editor-layer foundation — PLANNED
 
@@ -108,7 +111,7 @@ Current review outcome:
 - Page-box editing uses independent UI and engine validation so invalid Crop/Bleed/Trim rectangles cannot bypass the UI to reach exported bytes.
 - Attachment parsing has explicit name-tree/attachment limits, avoids the unbounded date-decoding path for untrusted attachment metadata, validates output filenames, and proves source attachments are not silently copied.
 - Form authoring independently validates staged UI geometry and engine geometry/options; source-field flattening and newly authored fields use separate post-export expectations.
-- Browser expansion exposed one stale Playwright text locator, not an output defect; it was narrowed to exact metric text and the full focused browser suite subsequently passed.
+- Overlay input validation bounds opacity, rotation, image width, Bates sequence values, and margins; the explicit date token avoids nondeterministic clock reads.
 - Full final Gauntlet remains open because most workstation milestones are still planned.
 
 Exit: zero blocker/high findings without explicit acceptance, exact-main workflows green, Pages deployment green, counts reconcile to the design.
@@ -128,6 +131,11 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **63** Dropdown authoring — `verified`
 - **64** Multi-select option-list authoring — `verified`
 - **71** One-click form flattening with pre-export loss-of-editability warning and post-export verification — `verified`
+- **75** Bates numbering with prefix/suffix/start/padding/placement — `verified`
+- **76** Header token overlays — `verified`
+- **77** Footer token overlays — `verified`
+- **78** Text/image watermarks with opacity/rotation/placement — `verified`
+- **79** Page tokens for page/total/date/filename/Bates — `verified`
 - **82** Attachment authoring with filename/MIME/description/dates — `verified`
 - **83** Attachment inventory/extraction — `verified`
 - **96** Standard document metadata editor — `verified`
@@ -144,13 +152,13 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **65** Field properties — `started` (required/read-only/multiline/options/selections are live; font, alignment, and remaining default-property controls remain)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
-- **131** Export operation summary describing destructive/structural/reversible changes — `started` (status reports source-form flattening, authored fields, replacement metadata, blank insertions, page-box edits, and attachments; complete action classification/summary remains)
+- **131** Export operation summary describing destructive/structural/reversible changes — `started` (the deterministic impact-summary model/UI exist but are not yet wired into the live workspace)
 - **142** Responsive drawer/sheet layout for phone/tablet/split-screen/zoom/enlarged text — `started` (current foundation passes 320 CSS-pixel reflow; later workstation rails/drawers are not built)
 - **144** Drag-and-drop intake with native file-input fallback — `started` (native file fallback exists; drag/drop intake remains)
 
 ### Planned
 
-All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–57, 59, 66–70, 72–81, 84–95, 97–120, 122–128, 132–141, 143, 145–146**.
+All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–57, 59, 66–70, 72–74, 80–81, 84–95, 97–120, 122–128, 132–141, 143, 145–146**.
 
 No capability is currently `blocked` or `excluded`. The architectural exclusions in the design constrain claims and implementation approach; they are not numbered capabilities.
 
@@ -186,4 +194,6 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — Final page/metadata slice GREEN, workflow run `34726249725`: after narrowing that stale locator to exact text, unit tests, production build, Chromium installation, and the full focused PDF browser suite all completed successfully. Capabilities 11, 19, and 96 were promoted to `verified`.
 - 2026-09-12 — Attachment foundation GREEN, workflow run `34726735769`: unit tests, production build, and focused desktop/mobile PDF browser tests passed. The visible browser case inventories a source attachment, extracts and verifies its bytes, authors a new attachment with description/dates, reopens it, and proves the source attachment was not silently carried forward. Capabilities 82 and 83 were promoted to `verified`.
 - 2026-09-12 — Advanced-form TDD RED, workflow run `34729171676`: 700 pre-existing repository tests passed while both new radio/option-list tests failed on the intentionally missing engine handling (`client.priority` attempted the legacy top-level page path). This establishes the missing-behavior baseline before implementation.
-- 2026-09-12 — Advanced-form GREEN, workflow run `34729484871`: unit tests, production build, and focused browser tests completed successfully after typed radio/option-list support and visible five-type form staging. Dedicated browser coverage creates and reopens text, checkbox, dropdown, radio-group, and multiselect option-list values and separately proves a source field can be flattened while a newly authored output field remains editable. Capabilities 60–64 are promoted to `verified`; capability 65 remains `started` for its unimplemented advanced properties.
+- 2026-09-12 — Advanced-form GREEN, workflow run `34729484871`: unit tests, production build, and focused browser tests completed successfully after typed radio/option-list support and visible five-type form staging. Dedicated browser coverage creates and reopens text, checkbox, dropdown, radio-group, and multiselect option-list values and separately proves a source field can be flattened while a newly authored output field remains editable. Capabilities 60–64 were promoted to `verified`; capability 65 remains `started` for its unimplemented advanced properties.
+- 2026-09-12 — Overlay/Bates production validation, workflow run `34729732734`: unit tests, production build, and existing focused browser regression passed after integrating deterministic export-time overlays after the rebuilt document stage.
+- 2026-09-12 — Overlay/Bates focused GREEN, workflow run `34729800517`: unit tests, production build, and the dedicated visible overlay browser test passed. The browser flow stages explicit date/filename/page/total/Bates tokens, Bates start/padding/prefix/placement, text watermark, and a PNG watermark, then reopens the two-page output and verifies Font and XObject page resources. Capabilities 75–79 are promoted to `verified`.
