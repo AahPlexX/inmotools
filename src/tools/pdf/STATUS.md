@@ -21,8 +21,8 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 - Branch: `feat/pdf-workstation`
 - Base at branch creation: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Current milestone: **A — deterministic document/export foundation**
-- Current gate: **page/metadata structural slice is verified; advancing to attachment + form-authoring foundation**
-- Current counts: **6 verified / 14 started / 126 planned / 0 blocked / 0 excluded capabilities**
+- Current gate: **attachments are verified; visible five-type AcroForm authoring is implemented and awaiting the fresh combined browser gate**
+- Current counts: **8 verified / 17 started / 121 planned / 0 blocked / 0 excluded capabilities**
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Existing `pdf-sanitizer` route/deep link is preserved; the workstation evolves that surface rather than creating a duplicate tool.
 
@@ -43,15 +43,20 @@ Completed/proven portions:
 - blank-page insertion supports Letter, A4, Legal, Tabloid, and custom dimensions, preset orientation, quantity, and exact copied-page anchors;
 - final-output MediaBox/CropBox/BleedBox/TrimBox editing is live with independent UI and engine containment checks;
 - final output plan/preview includes staged blank pages and stable-key geometry edits;
-- text/checkbox/dropdown form authoring contracts exist in the engine;
-- visible metadata export, blank-page insertion, and page-box edits reopen correctly in browser tests across desktop/mobile Chromium;
+- attachment inventory recursively traverses valid embedded-file name trees with bounded parsing and extracts bytes only on demand;
+- source attachments are never silently inherited; explicit source inclusion and new local attachment authoring both reopen correctly in desktop/mobile browser tests;
+- attachment authoring supports filename, MIME type, description, creation date, and modification date with deterministic UTC handling and output inventory verification;
+- text, checkbox, dropdown, radio-group, and option-list form authoring contracts exist in the engine;
+- visible coordinate-first form authoring now stages all five field types, required/read-only state, text multiline/default value, checkbox state, dropdown options/selection, radio options/selection, and option-list multiselect/selection;
+- staged form fields are revalidated against current final output pages after page/MediaBox changes, and export is verified against the exact expected authored-field count;
+- visible metadata export, blank-page insertion, page-box edits, and attachments reopen correctly in browser tests across desktop/mobile Chromium;
 - the responsive metadata/export foundation continues to pass the 320 CSS-pixel reflow assertion;
-- export status reports form flattening, replacement metadata, blank-page insertion, and page-box structural mutations.
+- export status reports source-form flattening, authored editable fields, replacement metadata, blank-page insertion, page-box mutations, and attachment authoring.
 
 Still required for Milestone A exit:
 
-- attachment authoring/inventory;
-- visible AcroForm authoring UI including radio/option-list support;
+- fresh browser proof for the visible five-type AcroForm authoring surface;
+- remaining advanced field properties in capability 65 (font, alignment, and explicit default-value semantics beyond current initial values);
 - Bates/header/footer/watermark token overlays;
 - deterministic export-change summary broad enough to cover every Milestone A mutation;
 - focused browser evidence for all remaining behaviors.
@@ -99,8 +104,10 @@ Scope: fresh full-surface falsification, security/adversarial review, dependency
 Current review outcome:
 
 - Foundation Gauntlet found one privacy-robustness weakness: explicit metadata mode depended on the fresh output document having no incidental Info entries. The engine now clears the Info dictionary first and then writes only selected replacement values.
-- Tests were strengthened to use the real typed output-options contract instead of casting around TypeScript and to prove a partial metadata replacement cannot leak unspecified source Info fields.
+- Tests were strengthened to use real typed output-options contracts instead of casting around TypeScript and to prove a partial metadata replacement cannot leak unspecified source Info fields.
 - Page-box editing uses independent UI and engine validation so invalid Crop/Bleed/Trim rectangles cannot bypass the UI to reach exported bytes.
+- Attachment parsing has explicit name-tree/attachment limits, avoids the unbounded date-decoding path for untrusted attachment metadata, validates output filenames, and proves source attachments are not silently copied.
+- Form authoring independently validates staged UI geometry and engine geometry/options; source-field flattening and newly authored fields use separate post-export expectations.
 - Browser expansion exposed one stale Playwright text locator, not an output defect; it was narrowed to exact metric text and the full focused browser suite subsequently passed.
 - Full final Gauntlet remains open because most workstation milestones are still planned.
 
@@ -116,29 +123,34 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 - **11** Insert blank pages using common/custom sizes — `verified`
 - **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `verified`
 - **71** One-click form flattening with pre-export loss-of-editability warning and post-export verification — `verified`
+- **82** Attachment authoring with filename/MIME/description/dates — `verified`
+- **83** Attachment inventory/extraction — `verified`
 - **96** Standard document metadata editor — `verified`
 - **130** Per-export metadata/tags review before bytes are generated — `verified`
 
 ### Started
 
-- **3** Document diagnostics summary — `started` (page count/size/forms/common metadata/page geometry exist; attachments, active-content, encryption/security detail remain)
+- **3** Document diagnostics summary — `started` (page count/size/forms/common metadata/page geometry/attachments exist; active-content and richer encryption/security detail remain)
 - **5** Multi-document merge with explicit output order — `started` (queue/order behavior exists; final merged-byte order needs dedicated browser proof)
 - **9** Extract selected pages to a new PDF — `started` (range/order engine and UI exist; focused download/reopen proof remains)
 - **12** Duplicate pages — `started` (repeated page selections are preserved by the engine; dedicated user-flow proof remains)
 - **15** Rotate selected pages 90/180/270 degrees — `started` (engine/UI exist; focused rendered/reopened proof remains)
 - **58** Existing AcroForm field inventory — `started` (field count exists; page/name/type/state/flags inventory remains)
-- **60** Text-field authoring — `started` (engine contract proven; visual authoring UI remains)
-- **61** Checkbox authoring — `started` (engine contract proven; visual authoring UI remains)
-- **63** Dropdown authoring — `started` (engine contract proven; visual authoring UI remains)
+- **60** Text-field authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
+- **61** Checkbox authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
+- **62** Radio-group authoring — `started` (engine and visible stacked-option authoring exist; fresh browser proof is pending)
+- **63** Dropdown authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
+- **64** Multi-select option-list authoring — `started` (engine and visible coordinate-first authoring exist; fresh browser proof is pending)
+- **65** Field properties — `started` (required/read-only/multiline/options/selections are live; font, alignment, and remaining default-property controls remain)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
-- **131** Export operation summary describing destructive/structural/reversible changes — `started` (status reports forms, replacement metadata, blank insertions, and page-box edits; complete action classification/summary remains)
+- **131** Export operation summary describing destructive/structural/reversible changes — `started` (status reports source-form flattening, authored fields, replacement metadata, blank insertions, page-box edits, and attachments; complete action classification/summary remains)
 - **142** Responsive drawer/sheet layout for phone/tablet/split-screen/zoom/enlarged text — `started` (current foundation passes 320 CSS-pixel reflow; later workstation rails/drawers are not built)
 - **144** Drag-and-drop intake with native file-input fallback — `started` (native file fallback exists; drag/drop intake remains)
 
 ### Planned
 
-All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–57, 59, 62, 64–70, 72–95, 97–120, 122–128, 132–141, 143, 145–146**.
+All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–57, 59, 66–70, 72–81, 84–95, 97–120, 122–128, 132–141, 143, 145–146**.
 
 No capability is currently `blocked` or `excluded`. The architectural exclusions in the design constrain claims and implementation approach; they are not numbered capabilities.
 
@@ -171,4 +183,7 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — External base correction observed immediately afterward: `main` commit `e9557b99b5feb95218a72dad1581bdce627ce255` (`fix(web-layout): correct preview orientation state formatting`) corrected that parallel-tool syntax failure without PDF-scope edits.
 - 2026-09-12 — Merge-ref timing evidence, workflow run `34726080825`: all 688 unit tests again passed, but its checkout merged this PDF branch into `main@9d1e9e2ffe10df8b7ad6daaea36751519ab04741`; the web-layout syntax error therefore still blocked build before browser tests. The repaired `main@597e7b0c746545df0a90dc08440b3ad10c61b65c` landed seconds later.
 - 2026-09-12 — Clean merge-ref validation, workflow run `34726166983`: checkout was `Merge 73124e41… into 597e7b0c…`; all 688 unit tests and the production build passed. Six of eight focused desktop/mobile browser executions passed; the only failure was an older non-exact `Output pages` text locator made ambiguous by the new `Geometry output page` label. The new blank-page/date/page-box scenario passed on both browser projects.
-- 2026-09-12 — Final slice GREEN, workflow run `34726249725`: after narrowing that stale locator to exact text, unit tests, production build, Chromium installation, and the full focused PDF browser suite all completed successfully on the current PR merge ref. Capabilities 11, 19, and 96 are therefore promoted to `verified`.
+- 2026-09-12 — Final page/metadata slice GREEN, workflow run `34726249725`: after narrowing that stale locator to exact text, unit tests, production build, Chromium installation, and the full focused PDF browser suite all completed successfully. Capabilities 11, 19, and 96 were promoted to `verified`.
+- 2026-09-12 — Attachment foundation GREEN, workflow run `34726735769`: unit tests, production build, and focused desktop/mobile PDF browser tests passed. The visible browser case inventories a source attachment, extracts and verifies its bytes, authors a new attachment with description/dates, reopens it, and proves the source attachment was not silently carried forward. Capabilities 82 and 83 are promoted to `verified`.
+- 2026-09-12 — Advanced-form TDD RED, workflow run `34729171676`: 700 pre-existing repository tests passed while both new radio/option-list tests failed on the intentionally missing engine handling (`client.priority` attempted the legacy top-level page path). This establishes the missing-behavior baseline before implementation.
+- 2026-09-12 — Advanced-form engine implementation added typed radio-group and option-list definitions, independent widget geometry validation, option/selection validation, multiselect handling, and real `pdf-lib` authoring calls. Typed tests no longer cast around the production contract; the visible five-type authoring/browser gate remains pending before capabilities 60–64 are promoted.
