@@ -50,6 +50,8 @@ test('restores a local draft and rejects invalid import without replacing work',
   await expect(page.locator('.wl-studio > .status-line')).toContainText('Import failed:');
   await page.reload();
   await expect(page.getByLabel('Page heading', { exact: true })).toHaveValue('Keep this project');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.getByLabel('Autosave on this browser')).toBeChecked();
 });
 
 test('reflows editing controls in portrait and landscape without page overflow', async ({ page }) => {
@@ -93,4 +95,43 @@ test('applies area drafts, rejects invalid shapes and reflows named layouts', as
     const body = page.frameLocator(`iframe[title="Layout at ${width} pixels"]`).locator('body');
     expect(await body.evaluate(node => node.ownerDocument.documentElement.scrollWidth - node.ownerDocument.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   }
+});
+
+
+test('preserves area drafts, accepts fractional spacing and keeps backups available with invalid metadata', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  const areas = page.getByLabel('Named grid areas', { exact: true });
+  await areas.fill('a a b\na a c');
+  await page.getByLabel('Page heading', { exact: true }).fill('Preserved draft');
+  await expect(areas).toHaveValue('a a b\na a c');
+  await page.getByRole('button', { name: 'Theme', exact: true }).click();
+  await page.getByRole('button', { name: 'Build', exact: true }).click();
+  await expect(areas).toHaveValue('a a b\na a c');
+  await page.getByLabel('Gap (px)', { exact: true }).fill('24.5');
+  await page.getByLabel('Gap (px)', { exact: true }).press('Tab');
+  await expect(page.getByLabel('Gap (px)', { exact: true })).toHaveValue('24.5');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByLabel('Canonical URL', { exact: true }).fill('invalid');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download Project', exact: true }).click();
+  expect((await download).suggestedFilename()).toBe('web-layout.project.json');
+});
+
+test('retains preview interaction until manual refresh and offers actual-size custom viewports', async ({ page }) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByLabel('Refresh previews while editing', { exact: true }).uncheck();
+  const frame = page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  await frame.getByLabel('Email address', { exact: true }).fill('test@example.com');
+  await page.getByRole('button', { name: 'Build', exact: true }).click();
+  await page.getByLabel('Page heading', { exact: true }).fill('Refresh me');
+  await expect(frame.getByLabel('Email address', { exact: true })).toHaveValue('test@example.com');
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh previews', exact: true }).click();
+  await expect(frame.getByRole('heading', { name: 'Refresh me', exact: true })).toBeVisible();
+  await page.getByLabel('Custom viewport width (px)', { exact: true }).fill('1280');
+  await page.getByRole('button', { name: 'Add viewport', exact: true }).click();
+  await page.getByLabel('Actual-size view (scroll inside each frame)', { exact: true }).check();
+  await expect(page.locator('iframe[title="Layout at 1280 pixels"]')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });

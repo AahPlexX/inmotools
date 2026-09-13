@@ -75,3 +75,15 @@ describe('Web Layout Studio portable projects', () => {
     expect(html).toContain('property="og:title"');
   });
 });
+
+
+it('exports every navigation target, multiline content and a consistent print palette', () => {
+  const project = { ...INITIAL_PROJECT, theme: 'dark' as const, blocks: [{id: 'nav', kind: 'navigation' as const, title: 'Contents', text: ''}, ...Array.from({length: 8}, (_,i) => ({id: `item${i}`, kind: 'card' as const, title: `Item ${i}`, text: 'Line one\nLine two'}))] };
+  const html = buildHtml(project);
+  expect(html).toContain('href="#item7"');
+  expect(html).toContain('white-space:pre-wrap');
+  expect(html).toContain('@media print{:root{--surface:#fff;--ink:#000;--canvas:#fff;color-scheme:light}');
+  const tokens = JSON.parse(buildTokens(project));
+  expect(tokens.color.canvas.$value.hex).toBe('#111827');
+  expect(tokens.typography.headingMax.$value.value).toBe(project.fontMax);
+});
