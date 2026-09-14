@@ -1,4 +1,23 @@
-import { degrees, PDFDocument } from 'pdf-lib';
+import {
+  degrees,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  StandardFonts,
+  TextAlignment,
+  type PDFFont,
+} from 'pdf-lib';
+import {
+  attachPdfFiles,
+  extractPdfAttachments,
+  inspectDocumentAttachments,
+  type PdfAttachmentDefinition,
+  type PdfAttachmentInventory,
+} from './pdf-attachments';
+
+export { extractPdfAttachments } from './pdf-attachments';
+export type { PdfAttachmentDefinition, PdfAttachmentInventory, PdfExtractedAttachment } from './pdf-attachments';
 
 export interface PdfSelection {
   bytes: Uint8Array;
@@ -7,25 +26,480 @@ export interface PdfSelection {
   flatten?: boolean;
 }
 
+export interface PdfBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PdfPageInspection {
+  page: number;
+  width: number;
+  height: number;
+  rotation: number;
+  mediaBox: PdfBox;
+  cropBox: PdfBox;
+  bleedBox: PdfBox;
+  trimBox: PdfBox;
+}
+
 export interface PdfInspection {
   pageCount: number;
   formFieldCount: number;
   metadataFields: string[];
   encrypted: boolean;
+  pages: PdfPageInspection[];
+  attachments: PdfAttachmentInventory[];
+  attachmentWarnings: string[];
+}
+
+export interface PdfMetadataEdits {
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string[];
+  creator?: string;
+  producer?: string;
+  language?: string;
+  creationDate?: Date;
+  modificationDate?: Date;
+}
+
+export interface PdfBlankPageDefinition {
+  afterPage: number;
+  width: number;
+  height: number;
+  count?: number;
+}
+
+export interface PdfPageBoxEdit {
+  page: number;
+  mediaBox?: PdfBox;
+  cropBox?: PdfBox;
+  bleedBox?: PdfBox;
+  trimBox?: PdfBox;
+}
+
+export type PdfStandardFormFont = 'helvetica' | 'times-roman' | 'courier';
+export type PdfFormTextAlignment = 'left' | 'center' | 'right';
+
+interface PdfFormFieldFlags {
+  name: string;
+  required?: boolean;
+  readOnly?: boolean;
+}
+
+interface PdfPositionedFormFieldBase extends PdfFormFieldFlags {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface PdfFontFieldProperties {
+  font?: PdfStandardFormFont;
+  fontSize?: number;
+}
+
+export interface PdfTextFieldDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
+  type: 'text';
+  value?: string;
+  defaultValue?: string;
+  multiline?: boolean;
+  alignment?: PdfFormTextAlignment;
+}
+
+export interface PdfCheckBoxDefinition extends PdfPositionedFormFieldBase {
+  type: 'checkbox';
+  checked?: boolean;
+  defaultChecked?: boolean;
+}
+
+export interface PdfDropdownDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
+  type: 'dropdown';
+  options: string[];
+  selected?: string;
+  defaultSelected?: string;
+}
+
+export interface PdfRadioOptionDefinition {
+  value: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PdfRadioGroupDefinition extends PdfFormFieldFlags {
+  type: 'radio';
+  options: PdfRadioOptionDefinition[];
+  selected?: string;
+  defaultSelected?: string;
+}
+
+export interface PdfOptionListDefinition extends PdfPositionedFormFieldBase, PdfFontFieldProperties {
+  type: 'option-list';
+  options: string[];
+  selected?: string[];
+  defaultSelected?: string[];
+  multiselect?: boolean;
+}
+
+export type PdfFormFieldDefinition =
+  | PdfTextFieldDefinition
+  | PdfCheckBoxDefinition
+  | PdfDropdownDefinition
+  | PdfRadioGroupDefinition
+  | PdfOptionListDefinition;
+
+export interface PdfOutputOptions {
+  metadata?: PdfMetadataEdits;
+  formFields?: PdfFormFieldDefinition[];
+  blankPages?: PdfBlankPageDefinition[];
+  pageBoxEdits?: PdfPageBoxEdit[];
+  attachments?: PdfAttachmentDefinition[];
 }
 
 export type PageSelectionPreset = 'all' | 'odd' | 'even' | 'reverse';
 
-const METADATA_READERS = [
-  ['Title', (doc: PDFDocument) => doc.getTitle()],
-  ['Author', (doc: PDFDocument) => doc.getAuthor()],
-  ['Subject', (doc: PDFDocument) => doc.getSubject()],
-  ['Keywords', (doc: PDFDocument) => doc.getKeywords()],
-  ['Creator', (doc: PDFDocument) => doc.getCreator()],
-  ['Producer', (doc: PDFDocument) => doc.getProducer()],
-  ['Creation date', (doc: PDFDocument) => doc.getCreationDate()],
-  ['Modification date', (doc: PDFDocument) => doc.getModificationDate()],
+const METADATA_FIELDS = [
+  ['Title', 'Title'],
+  ['Author', 'Author'],
+  ['Subject', 'Subject'],
+  ['Keywords', 'Keywords'],
+  ['Creator', 'Creator'],
+  ['Producer', 'Producer'],
+  ['Creation date', 'CreationDate'],
+  ['Modification date', 'ModDate'],
 ] as const;
+
+const FORM_FONT_NAMES: Record<PdfStandardFormFont, StandardFonts> = {
+  helvetica: StandardFonts.Helvetica,
+  'times-roman': StandardFonts.TimesRoman,
+  courier: StandardFonts.Courier,
+};
+const FORM_TEXT_ALIGNMENTS: Record<PdfFormTextAlignment, TextAlignment> = {
+  left: TextAlignment.Left,
+  center: TextAlignment.Center,
+  right: TextAlignment.Right,
+};
+
+function infoDictionary(document: PDFDocument): PDFDict | undefined {
+  const info = document.context.trailerInfo.Info;
+  return info ? document.context.lookupMaybe(info, PDFDict) : undefined;
+}
+
+const cleanText = (value: string | undefined): string | undefined => {
+  const cleaned = value?.trim();
+  return cleaned ? cleaned : undefined;
+};
+
+const cleanKeywords = (values: string[] | undefined): string[] => (
+  values?.map((value) => value.trim()).filter(Boolean) ?? []
+);
+
+function applyMetadata(document: PDFDocument, metadata: PdfMetadataEdits | undefined): void {
+  document.context.trailerInfo.Info = undefined;
+  if (!metadata) return;
+
+  const title = cleanText(metadata.title);
+  const author = cleanText(metadata.author);
+  const subject = cleanText(metadata.subject);
+  const creator = cleanText(metadata.creator);
+  const producer = cleanText(metadata.producer);
+  const language = cleanText(metadata.language);
+  const keywords = cleanKeywords(metadata.keywords);
+
+  if (title) document.setTitle(title);
+  if (author) document.setAuthor(author);
+  if (subject) document.setSubject(subject);
+  if (keywords.length) document.setKeywords(keywords);
+  if (creator) document.setCreator(creator);
+  if (producer) document.setProducer(producer);
+  if (language) document.setLanguage(language);
+  if (metadata.creationDate) document.setCreationDate(metadata.creationDate);
+  if (metadata.modificationDate) document.setModificationDate(metadata.modificationDate);
+}
+
+function validateBox(box: PdfBox, label: string): void {
+  const values = [box.x, box.y, box.width, box.height];
+  if (!values.every(Number.isFinite) || box.width <= 0 || box.height <= 0) {
+    throw new Error(`${label} must use finite coordinates and positive width/height.`);
+  }
+}
+
+function boxInside(outer: PdfBox, inner: PdfBox): boolean {
+  const epsilon = 0.0001;
+  return inner.x >= outer.x - epsilon
+    && inner.y >= outer.y - epsilon
+    && inner.x + inner.width <= outer.x + outer.width + epsilon
+    && inner.y + inner.height <= outer.y + outer.height + epsilon;
+}
+
+function applyBlankPages(document: PDFDocument, definitions: PdfBlankPageDefinition[]): void {
+  if (!definitions.length) return;
+  const copiedPageCount = document.getPageCount();
+  const normalized = definitions.map((definition, index) => ({ ...definition, index, count: definition.count ?? 1 }));
+
+  for (const definition of normalized) {
+    if (!Number.isInteger(definition.afterPage) || definition.afterPage < 0 || definition.afterPage > copiedPageCount) {
+      throw new Error(`Blank-page anchor ${definition.afterPage} must be between 0 and ${copiedPageCount}.`);
+    }
+    if (![definition.width, definition.height].every(Number.isFinite) || definition.width <= 0 || definition.height <= 0) {
+      throw new Error('Blank-page width and height must be finite positive numbers.');
+    }
+    if (!Number.isInteger(definition.count) || definition.count < 1 || definition.count > 100) {
+      throw new Error('Blank-page count must be an integer between 1 and 100.');
+    }
+  }
+
+  normalized.sort((left, right) => left.afterPage - right.afterPage || left.index - right.index);
+  let inserted = 0;
+  for (const definition of normalized) {
+    let insertIndex = definition.afterPage + inserted;
+    for (let offset = 0; offset < definition.count; offset += 1) {
+      document.insertPage(insertIndex, [definition.width, definition.height]);
+      insertIndex += 1;
+      inserted += 1;
+    }
+  }
+}
+
+function applyPageBoxEdits(document: PDFDocument, edits: PdfPageBoxEdit[]): void {
+  const seen = new Set<number>();
+  for (const edit of edits) {
+    if (!Number.isInteger(edit.page) || edit.page < 1 || edit.page > document.getPageCount()) {
+      throw new Error(`Page-box edit targets page ${edit.page}, which is outside the output document.`);
+    }
+    if (seen.has(edit.page)) throw new Error(`Page-box edits for output page ${edit.page} must be combined into one definition.`);
+    seen.add(edit.page);
+
+    const page = document.getPage(edit.page - 1);
+    if (edit.mediaBox) {
+      validateBox(edit.mediaBox, 'MediaBox');
+      page.setMediaBox(edit.mediaBox.x, edit.mediaBox.y, edit.mediaBox.width, edit.mediaBox.height);
+    }
+    if (edit.cropBox) {
+      validateBox(edit.cropBox, 'CropBox');
+      page.setCropBox(edit.cropBox.x, edit.cropBox.y, edit.cropBox.width, edit.cropBox.height);
+    }
+    if (edit.bleedBox) {
+      validateBox(edit.bleedBox, 'BleedBox');
+      page.setBleedBox(edit.bleedBox.x, edit.bleedBox.y, edit.bleedBox.width, edit.bleedBox.height);
+    }
+    if (edit.trimBox) {
+      validateBox(edit.trimBox, 'TrimBox');
+      page.setTrimBox(edit.trimBox.x, edit.trimBox.y, edit.trimBox.width, edit.trimBox.height);
+    }
+
+    const mediaBox = page.getMediaBox();
+    const constrained = [
+      ['CropBox', page.getCropBox()],
+      ['BleedBox', page.getBleedBox()],
+      ['TrimBox', page.getTrimBox()],
+    ] as const;
+    for (const [label, box] of constrained) {
+      validateBox(box, label);
+      if (!boxInside(mediaBox, box)) throw new Error(`${label} on output page ${edit.page} must remain inside its MediaBox.`);
+    }
+  }
+}
+
+function validatePositionedGeometry(
+  document: PDFDocument,
+  label: string,
+  definition: Pick<PdfPositionedFormFieldBase, 'page' | 'x' | 'y' | 'width' | 'height'>,
+): void {
+  if (!Number.isInteger(definition.page) || definition.page < 1 || definition.page > document.getPageCount()) {
+    throw new Error(`${label} targets page ${definition.page}, which is outside the output document.`);
+  }
+  const values = [definition.x, definition.y, definition.width, definition.height];
+  if (!values.every(Number.isFinite) || definition.x < 0 || definition.y < 0 || definition.width <= 0 || definition.height <= 0) {
+    throw new Error(`${label} must use finite, positive page geometry.`);
+  }
+  const page = document.getPage(definition.page - 1);
+  if (definition.x + definition.width > page.getWidth() || definition.y + definition.height > page.getHeight()) {
+    throw new Error(`${label} extends outside output page ${definition.page}.`);
+  }
+}
+
+function cleanFieldOptions(values: string[], label: string): string[] {
+  if (!values.length) throw new Error(`${label} must contain at least one option.`);
+  const options = values.map((option) => option.trim());
+  if (options.some((option) => !option)) throw new Error(`${label} cannot contain blank options.`);
+  if (new Set(options).size !== options.length) throw new Error(`${label} cannot contain duplicate options.`);
+  return options;
+}
+
+function validateFontProperties(definition: PdfFontFieldProperties, label: string): void {
+  if (definition.fontSize !== undefined && (!Number.isFinite(definition.fontSize) || definition.fontSize <= 0)) {
+    throw new Error(`${label} font size must be a finite positive number.`);
+  }
+}
+
+function validateFieldDefinition(document: PDFDocument, definition: PdfFormFieldDefinition): void {
+  if (!definition.name.trim()) throw new Error('Form field names cannot be blank.');
+  if (definition.type === 'radio') {
+    const options = cleanFieldOptions(definition.options.map((option) => option.value), `Radio group ${definition.name}`);
+    definition.options.forEach((option, index) => validatePositionedGeometry(document, `Radio option ${options[index]} in ${definition.name}`, option));
+    if (definition.selected !== undefined && !options.includes(definition.selected)) {
+      throw new Error(`Radio group ${definition.name} selected value must match one of its options.`);
+    }
+    if (definition.defaultSelected !== undefined && !options.includes(definition.defaultSelected)) {
+      throw new Error(`Radio group ${definition.name} default value must match one of its options.`);
+    }
+    return;
+  }
+
+  validatePositionedGeometry(document, `Form field ${definition.name}`, definition);
+  if (definition.type === 'text') validateFontProperties(definition, `Text field ${definition.name}`);
+  if (definition.type === 'dropdown') {
+    validateFontProperties(definition, `Dropdown ${definition.name}`);
+    const options = cleanFieldOptions(definition.options, `Dropdown ${definition.name}`);
+    if (definition.selected !== undefined && !options.includes(definition.selected)) {
+      throw new Error(`Dropdown ${definition.name} selected value must match one of its options.`);
+    }
+    if (definition.defaultSelected !== undefined && !options.includes(definition.defaultSelected)) {
+      throw new Error(`Dropdown ${definition.name} default value must match one of its options.`);
+    }
+  }
+  if (definition.type === 'option-list') {
+    validateFontProperties(definition, `Option list ${definition.name}`);
+    const options = cleanFieldOptions(definition.options, `Option list ${definition.name}`);
+    const selected = definition.selected ?? [];
+    const defaultSelected = definition.defaultSelected ?? [];
+    if (!definition.multiselect && selected.length > 1) throw new Error(`Option list ${definition.name} must enable multiselect before selecting multiple values.`);
+    if (!definition.multiselect && defaultSelected.length > 1) throw new Error(`Option list ${definition.name} must enable multiselect before assigning multiple default values.`);
+    if (selected.some((value) => !options.includes(value))) {
+      throw new Error(`Option list ${definition.name} selected values must match its declared options.`);
+    }
+    if (defaultSelected.some((value) => !options.includes(value))) {
+      throw new Error(`Option list ${definition.name} default values must match its declared options.`);
+    }
+  }
+}
+
+function applyFieldFlags(field: { enableReadOnly(): void; enableRequired(): void }, definition: PdfFormFieldFlags): void {
+  if (definition.readOnly) field.enableReadOnly();
+  if (definition.required) field.enableRequired();
+}
+
+async function resolveFormFont(document: PDFDocument, definition: PdfFontFieldProperties, cache: Map<PdfStandardFormFont, PDFFont>): Promise<PDFFont | undefined> {
+  if (!definition.font && definition.fontSize === undefined) return undefined;
+  const fontKey = definition.font ?? 'helvetica';
+  const cached = cache.get(fontKey);
+  if (cached) return cached;
+  const font = await document.embedFont(FORM_FONT_NAMES[fontKey]);
+  cache.set(fontKey, font);
+  return font;
+}
+
+function setTextDefault(field: { acroField: { dict: PDFDict } }, value: string | undefined): void {
+  if (value !== undefined) field.acroField.dict.set(PDFName.of('DV'), PDFHexString.fromText(value));
+}
+
+function setChoiceDefault(field: { acroField: { dict: PDFDict } }, values: string[] | undefined): void {
+  if (!values?.length) return;
+  if (values.length === 1) field.acroField.dict.set(PDFName.of('DV'), PDFHexString.fromText(values[0]));
+  else field.acroField.dict.set(PDFName.of('DV'), field.acroField.dict.context.obj(values.map((value) => PDFHexString.fromText(value))));
+}
+
+async function applyFormFields(document: PDFDocument, definitions: PdfFormFieldDefinition[]): Promise<void> {
+  if (!definitions.length) return;
+  const form = document.getForm();
+  const seen = new Set<string>();
+  const fontCache = new Map<PdfStandardFormFont, PDFFont>();
+
+  for (const definition of definitions) {
+    validateFieldDefinition(document, definition);
+    const name = definition.name.trim();
+    if (seen.has(name) || form.getFieldMaybe(name)) throw new Error(`Form field name ${name} is duplicated.`);
+    seen.add(name);
+
+    if (definition.type === 'radio') {
+      const field = form.createRadioGroup(name);
+      applyFieldFlags(field, definition);
+      for (const option of definition.options) {
+        const page = document.getPage(option.page - 1);
+        field.addOptionToPage(option.value.trim(), page, {
+          x: option.x,
+          y: option.y,
+          width: option.width,
+          height: option.height,
+        });
+      }
+      if (definition.defaultSelected !== undefined) {
+        const index = definition.options.findIndex((option) => option.value.trim() === definition.defaultSelected);
+        const onValue = field.acroField.getOnValues()[index];
+        if (!onValue) throw new Error(`Radio group ${name} could not resolve its default appearance value.`);
+        field.acroField.dict.set(PDFName.of('DV'), onValue);
+      }
+      if (definition.selected !== undefined) field.select(definition.selected);
+      continue;
+    }
+
+    const page = document.getPage(definition.page - 1);
+    const rect = {
+      x: definition.x,
+      y: definition.y,
+      width: definition.width,
+      height: definition.height,
+    };
+
+    if (definition.type === 'text') {
+      const field = form.createTextField(name);
+      applyFieldFlags(field, definition);
+      if (definition.multiline) field.enableMultiline();
+      if (definition.value !== undefined) field.setText(definition.value);
+      const font = await resolveFormFont(document, definition, fontCache);
+      field.addToPage(page, { ...rect, font });
+      if (definition.alignment !== undefined) field.setAlignment(FORM_TEXT_ALIGNMENTS[definition.alignment]);
+      if (definition.fontSize !== undefined) field.setFontSize(definition.fontSize);
+      setTextDefault(field, definition.defaultValue);
+      if (font) field.updateAppearances(font);
+      continue;
+    }
+
+    if (definition.type === 'checkbox') {
+      const field = form.createCheckBox(name);
+      applyFieldFlags(field, definition);
+      field.addToPage(page, rect);
+      if (definition.defaultChecked !== undefined) {
+        const onValue = field.acroField.getOnValue() ?? PDFName.of('Yes');
+        field.acroField.dict.set(PDFName.of('DV'), definition.defaultChecked ? onValue : PDFName.of('Off'));
+      }
+      if (definition.checked) field.check();
+      continue;
+    }
+
+    if (definition.type === 'dropdown') {
+      const field = form.createDropdown(name);
+      applyFieldFlags(field, definition);
+      field.setOptions(definition.options.map((option) => option.trim()));
+      if (definition.selected !== undefined) field.select(definition.selected);
+      const font = await resolveFormFont(document, definition, fontCache);
+      field.addToPage(page, { ...rect, font });
+      if (definition.fontSize !== undefined) field.acroField.setFontSize(definition.fontSize);
+      setChoiceDefault(field, definition.defaultSelected === undefined ? undefined : [definition.defaultSelected]);
+      if (font) field.updateAppearances(font);
+      continue;
+    }
+
+    const field = form.createOptionList(name);
+    applyFieldFlags(field, definition);
+    field.setOptions(definition.options.map((option) => option.trim()));
+    if (definition.multiselect) field.enableMultiselect();
+    if (definition.selected?.length) field.select(definition.multiselect ? definition.selected : definition.selected[0]);
+    const font = await resolveFormFont(document, definition, fontCache);
+    field.addToPage(page, { ...rect, font });
+    if (definition.fontSize !== undefined) field.acroField.setFontSize(definition.fontSize);
+    setChoiceDefault(field, definition.defaultSelected);
+    if (font) field.updateAppearances(font);
+  }
+}
 
 export function parsePageSelection(value: string, max: number): number[] {
   if (!Number.isInteger(max) || max < 1) throw new Error('PDF must contain at least one page.');
@@ -53,11 +527,6 @@ export function parsePageSelection(value: string, max: number): number[] {
   return pages;
 }
 
-/**
- * Returns null when a preset has no pages. Empty string remains reserved for
- * the explicit “all pages” selection, so an empty even/odd result can never be
- * mistaken for all pages by parsePageSelection().
- */
 export function pageSelectionPreset(kind: PageSelectionPreset, max: number): string | null {
   if (!Number.isInteger(max) || max < 1) throw new Error('PDF must contain at least one page.');
   if (kind === 'all') return '';
@@ -72,11 +541,25 @@ export function pageSelectionPreset(kind: PageSelectionPreset, max: number): str
 export async function inspectPdf(bytes: Uint8Array): Promise<PdfInspection> {
   const document = await PDFDocument.load(bytes.slice(), { updateMetadata: false });
   const form = document.getForm();
+  const info = infoDictionary(document);
+  const attachmentScan = inspectDocumentAttachments(document);
   return {
     pageCount: document.getPageCount(),
     formFieldCount: form.getFields().length,
-    metadataFields: METADATA_READERS.filter(([, read]) => read(document) !== undefined).map(([label]) => label),
+    metadataFields: info ? METADATA_FIELDS.filter(([, key]) => info.has(PDFName.of(key))).map(([label]) => label) : [],
     encrypted: document.isEncrypted,
+    pages: document.getPages().map((page, index) => ({
+      page: index + 1,
+      width: page.getWidth(),
+      height: page.getHeight(),
+      rotation: page.getRotation().angle,
+      mediaBox: page.getMediaBox(),
+      cropBox: page.getCropBox(),
+      bleedBox: page.getBleedBox(),
+      trimBox: page.getTrimBox(),
+    })),
+    attachments: attachmentScan.attachments,
+    attachmentWarnings: attachmentScan.warnings,
   };
 }
 
@@ -88,7 +571,7 @@ export async function flattenAndSanitizePdf(bytes: Uint8Array): Promise<Uint8Arr
   return splicePdfs([{ bytes, flatten: true }]);
 }
 
-export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array> {
+export async function splicePdfs(selections: PdfSelection[], options: PdfOutputOptions = {}): Promise<Uint8Array> {
   if (!selections.length) throw new Error('Add at least one PDF.');
   const output = await PDFDocument.create({ updateMetadata: false });
   for (const selection of selections) {
@@ -112,6 +595,11 @@ export async function splicePdfs(selections: PdfSelection[]): Promise<Uint8Array
       output.addPage(page);
     });
   }
-  output.context.trailerInfo.Info = undefined;
-  return new Uint8Array(await output.save({ updateFieldAppearances: false }));
+
+  applyBlankPages(output, options.blankPages ?? []);
+  applyPageBoxEdits(output, options.pageBoxEdits ?? []);
+  await applyFormFields(output, options.formFields ?? []);
+  await attachPdfFiles(output, options.attachments ?? []);
+  applyMetadata(output, options.metadata);
+  return new Uint8Array(await output.save({ updateFieldAppearances: Boolean(options.formFields?.length) }));
 }
