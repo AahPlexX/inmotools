@@ -31,32 +31,6 @@ jobs:
           install: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: PDF Workstation unit acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
-        run: >-
-          pnpm exec vitest run
-          tests/unit/pdf.test.ts
-          tests/unit/pdf-attachments.test.ts
-          tests/unit/pdf-export-summary.test.ts
-          tests/unit/pdf-form-authoring.test.ts
-          tests/unit/pdf-form-inventory.test.ts
-          tests/unit/pdf-overlays.test.ts
-      - name: PDF Workstation production-build acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
-        run: pnpm build
-      - name: Install Playwright Chromium for PDF Workstation acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
-        run: pnpm exec playwright install --with-deps chromium
-      - name: PDF Workstation browser acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
-        run: >-
-          pnpm exec playwright test
-          tests/e2e/pdf.spec.ts
-          tests/e2e/pdf-export-summary.spec.ts
-          tests/e2e/pdf-form-authoring.spec.ts
-          tests/e2e/pdf-form-inventory.spec.ts
-          tests/e2e/pdf-overlays.spec.ts
-          tests/e2e/pdf-structural-actions.spec.ts
       - name: Unit tests
         run: pnpm test:unit
       - name: Build
