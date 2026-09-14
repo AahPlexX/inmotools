@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFDocument, PDFName } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { extractPdfAttachments, inspectPdf, splicePdfs } from '../../src/tools/pdf/pdf-engine';
 
@@ -29,6 +29,23 @@ async function pdfWithNestedAttachmentNameTree() {
   const childRef = loaded.context.register(child);
   embeddedFiles.delete(PDFName.of('Names'));
   embeddedFiles.set(PDFName.of('Kids'), loaded.context.obj([childRef]));
+  return new Uint8Array(await loaded.save({ updateFieldAppearances: false }));
+}
+
+async function pdfWithAmbiguousAttachmentDisplayNames() {
+  const doc = await PDFDocument.create();
+  doc.addPage([300, 200]);
+  await doc.attach(textBytes('first'), 'first-tree-name.txt', { mimeType: 'text/plain' });
+  await doc.attach(textBytes('second'), 'second-tree-name.txt', { mimeType: 'text/plain' });
+  const loaded = await PDFDocument.load(await doc.save(), { updateMetadata: false });
+  const names = loaded.catalog.lookup(PDFName.of('Names'), PDFDict);
+  const embeddedFiles = names.lookup(PDFName.of('EmbeddedFiles'), PDFDict);
+  const entries = embeddedFiles.lookup(PDFName.of('Names'), PDFArray);
+  for (let index = 1; index < entries.size(); index += 2) {
+    const fileSpec = entries.lookup(index, PDFDict);
+    fileSpec.set(PDFName.of('UF'), PDFHexString.fromText('same-display.txt'));
+    fileSpec.set(PDFName.of('F'), PDFHexString.fromText('same-display.txt'));
+  }
   return new Uint8Array(await loaded.save({ updateFieldAppearances: false }));
 }
 
@@ -74,6 +91,17 @@ describe('PDF embedded-file attachments', () => {
     const extracted = await extractPdfAttachments(bytes);
     expect(extracted.map((attachment) => attachment.name)).toEqual(['nested.txt']);
     expect(textOf(extracted[0].bytes)).toBe('nested evidence');
+  });
+
+  it('fails closed when two source entries resolve to the same actionable display filename', async () => {
+    const bytes = await pdfWithAmbiguousAttachmentDisplayNames();
+    const inspected = await inspectPdf(bytes);
+    expect(inspected.attachments).toEqual([]);
+    expect(inspected.attachmentWarnings.join(' ')).toMatch(/same-display\.txt.*ambiguous|ambiguous.*same-display\.txt/i);
+
+    const extracted = await extractPdfAttachments(bytes);
+    expect(extracted).toHaveLength(2);
+    expect(extracted.map((attachment) => attachment.name)).toEqual(['same-display.txt', 'same-display.txt']);
   });
 
   it('does not silently carry source attachments into rebuilt output', async () => {
