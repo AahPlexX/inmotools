@@ -7,11 +7,13 @@ import {
 } from './cell-engine';
 import {
   addCrystalSite,
+  constrainCell,
   deleteCrystalSite,
   duplicateCrystalSite,
   setCrystalCell,
   updateCrystalSite,
   wrapCrystalSites,
+  type CrystalSystemConstraint,
 } from './document-engine';
 import {
   commitCrystalHistory,
@@ -28,6 +30,8 @@ import type { CrystalSite, UnitCell, Vec3 } from './crystal-types';
 type CoordinateMode = 'fractional' | 'cartesian';
 type CellKey = keyof UnitCell;
 type RepeatTuple = readonly [number, number, number];
+type AdvancedNumericKey = 'isotope' | 'oxidationState' | 'uIso';
+type AdvancedTextKey = 'disorderAssembly' | 'disorderGroup' | 'notes';
 
 const CELL_FIELDS: readonly { key: CellKey; label: string; unit: string }[] = [
   { key: 'a', label: 'Cell a', unit: 'Å' },
@@ -38,6 +42,18 @@ const CELL_FIELDS: readonly { key: CellKey; label: string; unit: string }[] = [
   { key: 'gamma', label: 'Cell γ', unit: '°' },
 ];
 
+const CRYSTAL_SYSTEMS: readonly { value: CrystalSystemConstraint; label: string }[] = [
+  { value: 'none', label: 'Free cell' },
+  { value: 'cubic', label: 'Cubic' },
+  { value: 'tetragonal', label: 'Tetragonal' },
+  { value: 'orthorhombic', label: 'Orthorhombic' },
+  { value: 'hexagonal', label: 'Hexagonal' },
+  { value: 'trigonal', label: 'Trigonal — rhombohedral axes' },
+  { value: 'monoclinic', label: 'Monoclinic — unique b' },
+  { value: 'triclinic', label: 'Triclinic' },
+];
+
+const U_ANISO_LABELS = ['U11', 'U22', 'U33', 'U23', 'U13', 'U12'] as const;
 const MAX_PHASE_ONE_SITES = 50_000;
 
 export interface CrystalStructurePanelProps {
@@ -82,6 +98,14 @@ function parseRepeats(values: readonly string[]): RepeatTuple | null {
   return [parsed[0]!, parsed[1]!, parsed[2]!];
 }
 
+function optionalNumber(value: number | undefined): string {
+  return value === undefined ? '' : formatNumber(value);
+}
+
+function optionalText(value: string | undefined): string {
+  return value ?? '';
+}
+
 export default function CrystalStructurePanel({
   history,
   onHistoryChange,
@@ -90,6 +114,8 @@ export default function CrystalStructurePanel({
 }: CrystalStructurePanelProps) {
   const document = history.present;
   const [coordinateMode, setCoordinateMode] = useState<CoordinateMode>('fractional');
+  const [cellConstraint, setCellConstraint] = useState<CrystalSystemConstraint>('none');
+  const [expandedSiteIds, setExpandedSiteIds] = useState<ReadonlySet<string>>(() => new Set());
   const [cellDraft, setCellDraft] = useState<Record<CellKey, string>>(() => ({
     a: formatNumber(document.cell.a),
     b: formatNumber(document.cell.b),
@@ -120,6 +146,7 @@ export default function CrystalStructurePanel({
     const validIds = new Set(document.sites.map((site) => site.id));
     setMeasurementA((current) => validIds.has(current) ? current : document.sites[0]?.id ?? '');
     setMeasurementB((current) => validIds.has(current) ? current : document.sites[1]?.id ?? document.sites[0]?.id ?? '');
+    setExpandedSiteIds((current) => new Set([...current].filter((id) => validIds.has(id))));
   }, [document.sites]);
 
   const repeats = useMemo(() => parseRepeats(repeatDraft), [repeatDraft]);
@@ -137,7 +164,7 @@ export default function CrystalStructurePanel({
   const changeCellField = (key: CellKey, text: string) => {
     const nextDraft = { ...cellDraft, [key]: text };
     setCellDraft(nextDraft);
-    const nextCell: UnitCell = {
+    const proposedCell: UnitCell = {
       a: Number(nextDraft.a),
       b: Number(nextDraft.b),
       c: Number(nextDraft.c),
@@ -145,14 +172,19 @@ export default function CrystalStructurePanel({
       beta: Number(nextDraft.beta),
       gamma: Number(nextDraft.gamma),
     };
-    const validation = validateCell(nextCell);
+    const validation = validateCell(proposedCell);
     if (!validation.ok) {
       setCellError(validation.error);
       return;
     }
-    setCellError(null);
-    if (CELL_FIELDS.every((field) => nextCell[field.key] === document.cell[field.key])) return;
-    commitDocument(setCrystalCell(document, nextCell));
+    try {
+      const nextCell = constrainCell(proposedCell, cellConstraint, key);
+      setCellError(null);
+      if (CELL_FIELDS.every((field) => nextCell[field.key] === document.cell[field.key])) return;
+      commitDocument(setCrystalCell(document, nextCell));
+    } catch (error) {
+      setCellError(error instanceof Error ? error.message : 'Could not apply the unit-cell constraint.');
+    }
   };
 
   const commitSiteCoordinate = (site: CrystalSite, axis: 0 | 1 | 2, text: string) => {
@@ -200,6 +232,58 @@ export default function CrystalStructurePanel({
     } catch (error) {
       setSiteError(error instanceof Error ? error.message : 'Could not update occupancy.');
     }
+  };
+
+  const commitAdvancedNumber = (
+    site: CrystalSite,
+    key: AdvancedNumericKey,
+    text: string,
+    input: HTMLInputElement,
+  ) => {
+    const original = optionalNumber(site[key]);
+    try {
+      const patch = { [key]: text.trim() === '' ? undefined : Number(text) } as Partial<Omit<CrystalSite, 'id'>>;
+      if (text.trim() !== '' && !Number.isFinite(Number(text))) throw new RangeError(`${site.label} ${key} must be a finite number.`);
+      setSiteError(null);
+      commitDocument(updateCrystalSite(document, site.id, patch));
+    } catch (error) {
+      input.value = original;
+      setSiteError(error instanceof Error ? error.message : `Could not update ${site.label}.`);
+    }
+  };
+
+  const commitAdvancedText = (site: CrystalSite, key: AdvancedTextKey, text: string) => {
+    try {
+      setSiteError(null);
+      commitDocument(updateCrystalSite(document, site.id, { [key]: text.trim() === '' ? undefined : text }));
+    } catch (error) {
+      setSiteError(error instanceof Error ? error.message : `Could not update ${site.label}.`);
+    }
+  };
+
+  const commitAnisotropic = (site: CrystalSite, index: number, text: string, input: HTMLInputElement) => {
+    const current = site.uAniso ?? [0, 0, 0, 0, 0, 0] as const;
+    const original = site.uAniso === undefined ? '' : optionalNumber(site.uAniso[index]);
+    try {
+      const value = Number(text);
+      if (!Number.isFinite(value)) throw new RangeError('Anisotropic displacement values must be finite.');
+      const next = [...current] as [number, number, number, number, number, number];
+      next[index] = value;
+      setSiteError(null);
+      commitDocument(updateCrystalSite(document, site.id, { uAniso: next }));
+    } catch (error) {
+      input.value = original;
+      setSiteError(error instanceof Error ? error.message : `Could not update ${site.label} anisotropic displacement.`);
+    }
+  };
+
+  const toggleAdvanced = (siteId: string) => {
+    setExpandedSiteIds((current) => {
+      const next = new Set(current);
+      if (next.has(siteId)) next.delete(siteId);
+      else next.add(siteId);
+      return next;
+    });
   };
 
   const addSite = () => {
@@ -261,12 +345,19 @@ export default function CrystalStructurePanel({
       </div>
 
       <section className="crystal-editor-card" aria-labelledby="crystal-cell-heading">
-        <div className="crystal-editor-card__heading">
+        <div className="crystal-editor-card__heading crystal-editor-card__heading--wrap">
           <div>
             <h4 id="crystal-cell-heading">Unit cell</h4>
             <p data-testid="crystal-cell-volume">Volume: {cellVolume(document.cell).toFixed(3)} Å³</p>
           </div>
+          <label>
+            Crystal system constraint
+            <select value={cellConstraint} onChange={(event) => setCellConstraint(event.target.value as CrystalSystemConstraint)}>
+              {CRYSTAL_SYSTEMS.map((system) => <option key={system.value} value={system.value}>{system.label}</option>)}
+            </select>
+          </label>
         </div>
+        <p>Constraints apply to subsequent cell edits. Trigonal uses rhombohedral axes; monoclinic uses the conventional unique-b setting.</p>
         <div className="crystal-cell-grid">
           {CELL_FIELDS.map(({ key, label, unit }) => (
             <label key={key}>
@@ -319,6 +410,7 @@ export default function CrystalStructurePanel({
               {document.sites.map((site) => {
                 const vector = coordinateVector(site, document.cell, coordinateMode);
                 const modeLabel = coordinateMode === 'fractional' ? 'fractional' : 'Cartesian';
+                const advancedOpen = expandedSiteIds.has(site.id);
                 return (
                   <tr key={site.id} data-testid={`crystal-site-row-${site.id}`}>
                     <td data-label="Label">
@@ -376,6 +468,9 @@ export default function CrystalStructurePanel({
                     </td>
                     <td data-label="Actions">
                       <div className="crystal-site-row-actions">
+                        <button type="button" onClick={() => toggleAdvanced(site.id)} aria-expanded={advancedOpen}>
+                          Advanced properties for {site.label}
+                        </button>
                         <button type="button" onClick={() => commitDocument(duplicateCrystalSite(document, site.id))}>
                           Duplicate {site.label}
                         </button>
@@ -383,6 +478,85 @@ export default function CrystalStructurePanel({
                           Delete {site.label}
                         </button>
                       </div>
+                      {advancedOpen ? (
+                        <div className="crystal-cell-grid" data-testid={`crystal-advanced-${site.id}`}>
+                          <label>
+                            Isotope mass number
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              aria-label={`${site.label} isotope mass number`}
+                              key={`${site.id}-isotope-${site.isotope ?? 'empty'}`}
+                              defaultValue={optionalNumber(site.isotope)}
+                              onBlur={(event) => commitAdvancedNumber(site, 'isotope', event.currentTarget.value, event.currentTarget)}
+                            />
+                          </label>
+                          <label>
+                            Oxidation state
+                            <input
+                              type="number"
+                              step="any"
+                              aria-label={`${site.label} oxidation state`}
+                              key={`${site.id}-oxidation-${site.oxidationState ?? 'empty'}`}
+                              defaultValue={optionalNumber(site.oxidationState)}
+                              onBlur={(event) => commitAdvancedNumber(site, 'oxidationState', event.currentTarget.value, event.currentTarget)}
+                            />
+                          </label>
+                          <label>
+                            Disorder assembly
+                            <input
+                              aria-label={`${site.label} disorder assembly`}
+                              key={`${site.id}-assembly-${site.disorderAssembly ?? 'empty'}`}
+                              defaultValue={optionalText(site.disorderAssembly)}
+                              onBlur={(event) => commitAdvancedText(site, 'disorderAssembly', event.currentTarget.value)}
+                            />
+                          </label>
+                          <label>
+                            Disorder group
+                            <input
+                              aria-label={`${site.label} disorder group`}
+                              key={`${site.id}-group-${site.disorderGroup ?? 'empty'}`}
+                              defaultValue={optionalText(site.disorderGroup)}
+                              onBlur={(event) => commitAdvancedText(site, 'disorderGroup', event.currentTarget.value)}
+                            />
+                          </label>
+                          <label>
+                            Isotropic displacement
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              aria-label={`${site.label} isotropic displacement`}
+                              key={`${site.id}-uiso-${site.uIso ?? 'empty'}`}
+                              defaultValue={optionalNumber(site.uIso)}
+                              onBlur={(event) => commitAdvancedNumber(site, 'uIso', event.currentTarget.value, event.currentTarget)}
+                            />
+                          </label>
+                          {U_ANISO_LABELS.map((label, index) => (
+                            <label key={label}>
+                              Anisotropic {label}
+                              <input
+                                type="number"
+                                step="any"
+                                aria-label={`${site.label} anisotropic ${label}`}
+                                key={`${site.id}-${label}-${site.uAniso?.[index] ?? 'empty'}`}
+                                defaultValue={site.uAniso === undefined ? '' : optionalNumber(site.uAniso[index])}
+                                onBlur={(event) => commitAnisotropic(site, index, event.currentTarget.value, event.currentTarget)}
+                              />
+                            </label>
+                          ))}
+                          <label>
+                            Notes
+                            <textarea
+                              aria-label={`${site.label} notes`}
+                              key={`${site.id}-notes-${site.notes ?? 'empty'}`}
+                              defaultValue={optionalText(site.notes)}
+                              onBlur={(event) => commitAdvancedText(site, 'notes', event.currentTarget.value)}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );
