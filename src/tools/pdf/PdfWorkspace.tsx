@@ -17,6 +17,7 @@ import {
 } from './pdf-engine';
 import PdfAttachmentPanel, { type PdfStagedAttachment } from './PdfAttachmentPanel';
 import PdfFormAuthoringPanel from './PdfFormAuthoringPanel';
+import PdfSourceFormInventory from './PdfSourceFormInventory';
 import PdfOverlayPanel from './PdfOverlayPanel';
 import PdfExportSummaryPanel from './PdfExportSummaryPanel';
 import {
@@ -608,6 +609,7 @@ export default function PdfWorkspace() {
             <div className="button-row" style={{ marginTop: 0 }}><button className="action-button secondary" type="button" disabled={index === 0} onClick={() => move(index, -1)}>Move up</button><button className="action-button secondary" type="button" disabled={index === items.length - 1} onClick={() => move(index, 1)}>Move down</button><button className="action-button secondary" type="button" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item.file.name} from the queue`}>Remove</button></div>
           </div>
           <small>Choose an exact queue position or use Move up / Move down. These native controls work with touch, mouse, and keyboard without requiring a drag gesture.</small>
+          <PdfSourceFormInventory file={item.file} fieldCount={item.inspection.formFieldCount} />
         </div>;
       })}
 
