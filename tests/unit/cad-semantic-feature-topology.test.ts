@@ -59,6 +59,19 @@ const edgeCandidates: TopologyCandidate[] = [
   },
 ];
 
+function longEdgeRef(): CadFeature['topologyRefs'][number] {
+  return {
+    id: 'ref-edge-long',
+    producerFeatureId: 'base',
+    kind: 'edge',
+    role: 'outer-long-edge',
+    curveType: 'line',
+    centroid: [10, 5, 0],
+    length: 20,
+    bounds: { min: [10, 0, 0], max: [10, 20, 0] },
+  };
+}
+
 describe('CAD semantic topology feature resolution', () => {
   it('resolves a fillet edge from persisted fingerprints before invoking the exact kernel', () => {
     const base = token('base');
@@ -71,26 +84,38 @@ describe('CAD semantic topology feature resolution', () => {
       fillet,
       release: vi.fn(),
     } as unknown as CadFeatureKernel;
-    const edgeRef = {
-      id: 'ref-edge-long',
-      producerFeatureId: 'base',
-      kind: 'edge' as const,
-      role: 'outer-long-edge',
-      curveType: 'line',
-      centroid: [10, 5, 0] as const,
-      length: 20,
-      bounds: { min: [10, 0, 0] as const, max: [10, 20, 0] as const },
-    } as unknown as CadFeature['topologyRefs'][number];
 
     const result = evaluateCadFeatures(project([
       feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
-      feature('round', 'fillet', { radius: 2 }, ['base'], [edgeRef]),
+      feature('round', 'fillet', { radius: 2 }, ['base'], [longEdgeRef()]),
     ]), kernel);
 
     expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'edge');
     expect(fillet).toHaveBeenCalledWith(base, ['topo:edge:1'], 2);
     expect(kernel.release).toHaveBeenCalledWith(base);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'round', shape: filleted }]);
+  });
+
+  it('uses the same semantic edge resolver for chamfer rather than persisting edge ordinals', () => {
+    const base = token('base');
+    const chamfered = token('chamfered');
+    const topologyCandidates = vi.fn(() => edgeCandidates);
+    const chamfer = vi.fn(() => chamfered);
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates,
+      chamfer,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+
+    const result = evaluateCadFeatures(project([
+      feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('bevel', 'chamfer', { distance: 1.25 }, ['base'], [longEdgeRef()]),
+    ]), kernel);
+
+    expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'edge');
+    expect(chamfer).toHaveBeenCalledWith(base, ['topo:edge:1'], 1.25);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'bevel', shape: chamfered }]);
   });
 
   it('stops an ambiguous topology reference instead of guessing a raw subshape index', () => {
@@ -103,12 +128,12 @@ describe('CAD semantic topology feature resolution', () => {
       fillet,
       release: vi.fn(),
     } as unknown as CadFeatureKernel;
-    const ambiguousRef = {
+    const ambiguousRef: CadFeature['topologyRefs'][number] = {
       id: 'ref-ambiguous',
       producerFeatureId: 'base',
-      kind: 'edge' as const,
+      kind: 'edge',
       role: 'edge',
-    } as CadFeature['topologyRefs'][number];
+    };
 
     let thrown: unknown;
     try {
