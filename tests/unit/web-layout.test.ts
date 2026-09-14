@@ -144,3 +144,50 @@ it('validates appearance and exports motion, layers and a final print palette', 
   expect(()=>parseAppearance({...appearance,steps:[appearance.steps[0],appearance.steps[0]]})).toThrow();
   expect(()=>parseAppearance({...appearance,palettes:{...appearance.palettes,dark:{...appearance.palettes.dark,ink:'red;}body{display:none'}}})).toThrow();
 });
+
+it('resolves typed token aliases and JSON pointers without losing source references', async () => {
+  const {inspectTokens,tokenCss,setToken,removeToken,tokenVariable}=await import('../../src/tools/web-layout/token-engine');
+  const tokens={spacing:{$type:'dimension',base:{$value:{value:20,unit:'px'}},card:{$value:'{spacing.base}'}},scale:{$type:'number',$value:{$ref:'#/spacing/base/$value/value'}}};
+  const result=inspectTokens(tokens);
+  expect(result.document).toEqual(tokens);
+  expect(result.entries.find(e=>e.path==='spacing.card')?.css).toBe('20px');
+  expect(result.entries.find(e=>e.path==='scale')?.css).toBe('20');
+  const changed=setToken(tokens,'spacing.base','dimension',{value:2,unit:'rem'},'Base spacing');
+  expect(tokenCss(changed)).toContain('--token-spacing--card: 2rem');
+  expect(()=>removeToken(tokens,'spacing.base')).toThrow('Missing token alias');
+  expect(()=>inspectTokens({a:{$type:'number',$value:'{b}'},b:{$type:'number',$value:'{a}'}})).toThrow('Circular');
+  expect(()=>inspectTokens({a:{$type:'number',$value:{$ref:'#/a/$value'}}})).toThrow('Circular');
+  expect(()=>inspectTokens({a:{$type:'fontWeight',$value:400},b:{$type:'number',$value:'{a}'}})).toThrow('different type');
+  expect(()=>inspectTokens({a:{$type:'number',$value:{$ref:'#/constructor'}}})).toThrow('Missing');
+  expect(tokenVariable('a.b')).not.toBe(tokenVariable('a--b'));
+  const project={...INITIAL_PROJECT,tokens};
+  expect(parseProject(JSON.stringify(project)).tokens).toEqual(tokens);
+  expect(JSON.parse(buildTokens(project))).toEqual(tokens);
+  expect(buildCss(project)).toContain('--token-spacing--card: 20px');
+});
+
+it('exports correct token color units and escapes font names', async () => {
+  const {tokenValueCss,inspectTokens}=await import('../../src/tools/web-layout/token-engine');
+  expect(tokenValueCss('color',{colorSpace:'hsl',components:[330,100,50]})).toBe('hsl(330 100% 50% / 1)');
+  expect(tokenValueCss('color',{colorSpace:'oklch',components:[.6,.2,40],alpha:.5})).toBe('oklch(0.6 0.2 40 / 0.5)');
+  expect(()=>tokenValueCss('color',{colorSpace:'hsl',components:[360,100,50]})).toThrow();
+  expect(()=>tokenValueCss('color',{colorSpace:'srgb',components:[2,0,0]})).toThrow();
+  expect(tokenValueCss('fontFamily','</style><script>')).not.toContain('</style>');
+  expect(()=>inspectTokens({a:{$type:'dimension',$value:{value:1,unit:'px;display:none'}}})).toThrow();
+  expect(()=>inspectTokens({a:{$type:'number',$value:NaN}})).toThrow();
+  expect(()=>inspectTokens({a:{$type:'unknown',$value:{}}})).toThrow('Unsupported token type');
+});
+
+it('validates composite tokens, typed subvalue references and complete typography exports', async () => {
+  const {inspectTokens,tokenCss,tokenValueCss}=await import('../../src/tools/web-layout/token-engine');
+  const px=(value:number)=>({value,unit:'px'}),color={colorSpace:'srgb',components:[0,0,0]};
+  const tokens={weight:{$type:'fontWeight',$value:600},text:{$type:'typography',$value:{fontFamily:['system-ui','sans-serif'],fontSize:px(18),fontWeight:'{weight}',letterSpacing:px(.5),lineHeight:1.5}},border:{$type:'border',$value:{color,width:px(2),style:'solid'}},shadow:{$type:'shadow',$value:{color,offsetX:px(0),offsetY:px(4),blur:px(8),spread:px(0),inset:true}}};
+  expect(inspectTokens(tokens).document).toEqual(tokens);
+  expect(tokenCss(tokens)).toContain('--token-text-letter-spacing: 0.5px');
+  expect(tokenCss(tokens)).toContain('inset 0px 4px 8px 0px color(srgb 0 0 0 / 1)');
+  expect(()=>inspectTokens({...tokens,weight:{$type:'number',$value:600}})).toThrow('required fontWeight');
+  expect(tokenValueCss('gradient',[{color,position:-1},{color,position:2}])).toContain('0%, color(srgb 0 0 0 / 1) 100%');
+  expect(tokenValueCss('transition',{duration:{value:200,unit:'ms'},delay:{value:-.1,unit:'s'},timingFunction:[0,0,1,1]})).toBe('200ms cubic-bezier(0,0,1,1) -0.1s');
+  expect(()=>tokenValueCss('border',{color,width:px(1),style:'solid',bad:true})).toThrow();
+  expect(()=>tokenValueCss('shadow',{color,offsetX:px(0),offsetY:px(4),blur:px(-1),spread:px(0)})).toThrow();
+});

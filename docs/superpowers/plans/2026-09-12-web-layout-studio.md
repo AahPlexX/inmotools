@@ -17,8 +17,8 @@ Implemented means code is reachable; verified means its applicable focused and b
 | ID | Feature | Acceptance behavior | Current state |
 |---|---|---|---|
 | WL-01 | Visual Grid builder | Track sizing, fr/minmax/repeat, auto-fit/auto-fill, named areas and accessible track resizing. | partial — named-area editing and validation added; track manipulation remains |
-| WL-02 | Visual Flexbox builder | Direction, wrapping, distribution, alignment, gap and per-item sizing. | implemented — wrapping and per-item sizing; fresh browser gate pending |
-| WL-03 | Semantic DOM tree | Nested elements, tag selection, drag-and-drop and equivalent keyboard reordering with nesting validation. | implemented — validated five-level tree, parent/tag selection, drag and sibling buttons; fresh browser gate pending |
+| WL-02 | Visual Flexbox builder | Direction, wrapping, distribution, alignment, gap and per-item sizing. | verified — nested/appearance focused run 34780516533 |
+| WL-03 | Semantic DOM tree | Nested elements, tag selection, drag-and-drop and equivalent keyboard reordering with nesting validation. | verified — nested/appearance focused run 34780516533 |
 | WL-04 | Starter page patterns | Usable learning, portfolio, landing-page and dashboard starters. | verified — focused run 34779771042 |
 | WL-05 | Content and block editing | Add, edit, duplicate, remove and reorder blocks without changing reading order accidentally. | implemented |
 | WL-06 | Box-model workshop | Per-side margin, padding, borders, outlines, logical properties and px/rem readouts. | partial |
@@ -27,11 +27,11 @@ Implemented means code is reachable; verified means its applicable focused and b
 | WL-09 | Container-query lab | Resize a component parent independently and author named size queries. | planned |
 | WL-10 | Multi-viewport preview | 320–1920px presets, custom sizes, portrait/landscape, fitted and actual-size views. | verified — focused run 34779771042 |
 | WL-11 | Synchronized preview interaction | Opt-in scroll, click and form-state synchronization with event-loop prevention. | planned |
-| WL-12 | Theme manager | Light, dark and high-contrast token sets with explicit per-theme overrides. | implemented — explicit per-theme color expressions; fresh browser gate pending |
-| WL-13 | Typed design-token manager | DTCG 2025.10 types, groups, descriptions, aliases, cycle detection and import validation. | partial |
+| WL-12 | Theme manager | Light, dark and high-contrast token sets with explicit per-theme overrides. | verified — nested/appearance focused run 34780516533 |
+| WL-13 | Typed design-token manager | DTCG 2025.10 types, groups, descriptions, aliases, cycle detection and import validation. | partial — 13 value types, groups, descriptions, aliases, local JSON Pointers, cycle/type validation and import/export; group extensions and richer composite visual fields remain |
 | WL-14 | Modern color authoring | OKLCH, color-mix, relative colors, Display-P3 and gamut/fallback diagnostics. | partial — CSS expression authoring, browser-support feedback and base fallback; gamut diagnostics remain |
 | WL-15 | Gradient workshop | Linear, radial and conic gradients, stops, interpolation and layered compositions. | partial — layered linear/radial/conic gradients with editable stops; interpolation controls remain |
-| WL-16 | Elevation workshop | Multiple box/text shadows and editable blur, spread and offsets. | implemented — layered box/text shadow controls; fresh browser gate pending |
+| WL-16 | Elevation workshop | Multiple box/text shadows and editable blur, spread and offsets. | verified — nested/appearance focused run 34780516533 |
 | WL-17 | Backdrop workshop | Blur, saturation, brightness and transparent border styling with fallback preview. | partial — blur/saturation/brightness; transparent border and fallback comparison remain |
 | WL-18 | Motion timeline | Keyframes, transitions, cubic-bezier editing and reduced-motion alternatives. | partial — bounded keyframes, curve, delay/duration/iterations, reduced-motion/print behavior; transitions remain |
 | WL-19 | Form-control styling | Visible labels, inputs, checkboxes, radios, switches, ranges and local drop-zone patterns. | partial |
@@ -63,7 +63,7 @@ Implemented means code is reachable; verified means its applicable focused and b
 | WL-45 | Portable single HTML export | Inline all approved local assets and code, check external references and permit offline delivery. | partial |
 | WL-46 | Deterministic ZIP export | Stable file order/timestamps, HTML/CSS/JS/assets, local links and metadata integrity. | partial — reachable implementation; see code workflow evidence and remaining acceptance |
 | WL-47 | Code and component exports | HTML/CSS/JS files, selected snippets and portable component packages. | partial |
-| WL-48 | Token exports | DTCG JSON, CSS variables and optional Sass/Tailwind mappings with documented type handling. | partial |
+| WL-48 | Token exports | DTCG JSON, CSS variables and optional Sass/Tailwind mappings with documented type handling. | partial — preserved DTCG JSON, resolved CSS including typography subproperties and variable mapping; Sass/Tailwind exports remain |
 | WL-49 | Project backups | Versioned validated JSON import/export with lossless round trips and rejected malformed input. | implemented |
 | WL-50 | Local persistence | Opt-in local drafts, storage-error reporting, IndexedDB assets and recoverable snapshots. | partial |
 | WL-51 | Undo and redo | Bounded history for edits, imports, formatting and visual operations. | partial |
@@ -134,3 +134,9 @@ Nested layout and appearance cycle 2026-09-13: semantic parent/tag editing, five
 Validation: 15 focused units, TypeScript and production bundle pass locally. Added browser cases for nested removal/undo and appearance draft/apply/export/reduced-motion/print. Local direct browser inspection was blocked by ERR_BLOCKED_BY_CLIENT at the local preview URL; do not claim screenshot verification. Focused main run 34779771042 and companion 34779770939 succeeded for the previous code-workstation commit 369139584ed7a20c17dd6818963cbf30cc9fc2d3. That commit's Pages run 34779770970 remained in progress at last check. This candidate requires its own CI result. Full sixty-feature completion remains open.
 
 Research rechecked 2026-09-13: MDN @keyframes and backdrop-filter reference; W3C WCAG 2.2 Animation from Interactions. Avoid representing same-engine previews or automated checks as cross-browser or accessibility certification.
+
+Token integration cycle 2026-09-14: added a reachable Theme token library with simple primitive values, structured composite values, group paths, descriptions, search, draft/apply/discard, safe removal checks, JSON import, original-reference JSON export, resolved CSS and variable mapping. Supports all thirteen DTCG value types, inherited types, root tokens in groups, typed aliases, local JSON Pointer property references, cycle/type/missing-target detection and bounded document/reference work. Applied tokens persist in project backups and are emitted into both preview and HTML CSS. Existing layout controls are not silently rebound: users connect the explicitly listed variable in a theme expression or authored CSS. Composite CSS mapping is documented: custom stroke objects use a dashed border fallback and preserve separate SVG dash/cap variables; gradients use a 90-degree linear presentation; typography emits each subproperty, including letter spacing. Group extensions remain explicitly rejected; no silent flattening of nested composite arrays. Sass/Tailwind exports and richer composite visual authoring remain tracked. No dependencies added or pins changed.
+
+Validation for this candidate: 18 focused unit tests, TypeScript and production build passed. Added desktop/mobile browser case covers creating a base token and alias, rejecting dependent deletion, applying to preview CSS, and exporting the preserved alias. Exact-main browser result pending. Research checked 2026-09-14 against DTCG 2025.10 Format and Color modules, MDN custom property guidance, and official Tailwind theme documentation (future mapping work).
+
+Previous candidate 30dfca27a0a30a79b0ee5265959555cc556a23d1: Web Layout focused workflow 34780516533 succeeded. Pages run 34780516532 built and deployed successfully, but its repository-wide validate job reported 41 browser failures (including Photo Studio); the overall workflow is therefore not green. Do not modify unrelated tools or weaken their gates. The full 60-feature workstation remains in progress.

@@ -1,5 +1,31 @@
 import { expect, test } from '@playwright/test';
 
+test('authors a token alias, rejects broken references and exports applied variables', async ({page}) => {
+  await page.goto('./#/tools/web-layout-studio');
+  await page.getByRole('button',{name:'Theme',exact:true}).click();
+  await page.getByText('Design-token library',{exact:true}).click();
+  await page.getByLabel('Token path',{exact:true}).fill('spacing.base');
+  await page.getByLabel('Token value',{exact:true}).fill('20px');
+  await page.getByRole('button',{name:'Save token to draft',exact:true}).click();
+  await page.getByLabel('Token path',{exact:true}).fill('spacing.card');
+  await page.getByLabel('Token value mode',{exact:true}).selectOption('alias');
+  await page.getByLabel('Token value',{exact:true}).fill('spacing.base');
+  await page.getByRole('button',{name:'Save token to draft',exact:true}).click();
+  await page.getByRole('button',{name:'Remove spacing.base',exact:true}).click();
+  await expect(page.getByLabel('Token library status')).toContainText('Missing token alias');
+  await page.getByRole('button',{name:'Apply token library',exact:true}).click();
+  await expect(page.getByLabel('Token library status')).toContainText('Token library applied');
+  const frame=page.frameLocator('iframe[title="Layout at 375 pixels"]');
+  await expect.poll(()=>frame.locator('body').evaluate(e=>getComputedStyle(e).getPropertyValue('--token-spacing--card').trim())).toBe('20px');
+  await page.getByRole('button',{name:'Export',exact:true}).click();
+  const download=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Download Tokens',exact:true}).click();
+  const stream=await(await download).createReadStream();const chunks:Buffer[]=[];
+  for await(const chunk of stream!)chunks.push(chunk as Buffer);
+  const json=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  expect(json.spacing.card.$value).toBe('{spacing.base}');
+});
+
 test('applies appearance drafts to previews and exports, with print and reduced-motion recovery', async ({ page }) => {
   await page.goto('./#/tools/web-layout-studio');
   await page.getByRole('button', {name:'Theme',exact:true}).click();

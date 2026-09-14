@@ -1,3 +1,4 @@
+import { inspectTokens, tokenCss, type TokenDocument } from './token-engine';
 import { parseAppearance, appearanceCss, type Appearance } from './appearance';
 import { parseBlockStyle, validateTree, blockCss, type BlockStyle } from './block-tree';
 import { parseCode, escapeStyle, escapeScript, type CodeProject } from './code-tools';
@@ -8,6 +9,7 @@ export type LayoutProject = {
   options?: LayoutOptions;
   code?: CodeProject;
   appearance?: Appearance;
+  tokens?: TokenDocument;
   title: string;
   description: string;
   author: string;
@@ -96,6 +98,7 @@ export function parseProject(input: string): LayoutProject {
   validateTree(blocks);
   if (typeof p.reset !== 'boolean') throw new Error('Invalid reset setting.');
   const result: LayoutProject = {
+    ...(p.tokens === undefined ? {} : {tokens:inspectTokens(p.tokens).document}),
     ...(p.appearance === undefined ? {} : {appearance:parseAppearance(p.appearance)}),
     ...(p.code === undefined ? {} : { code: parseCode(p.code) }),
     ...(p.options === undefined ? {} : { options: parseOptions(p.options) }),
@@ -141,6 +144,7 @@ ${p.layout === 'grid' && p.gridAreas.length ? `@container(min-width:calc(${p.col
 .block-children{display:grid;gap:var(--space);min-width:0;margin-top:var(--space)}
 ${p.blocks.map(blockCss).join('\n')}
 ${appearanceCss(p.appearance,p.theme)}
+${p.tokens ? tokenCss(p.tokens) : ''}
 ${p.code?.enabled ? p.code.css : ''}
 `;
 }
@@ -182,6 +186,7 @@ export function projectWarnings(p: LayoutProject): string[] {
 
 export function buildTokens(p: LayoutProject): string {
   p = parseProject(JSON.stringify(p));
+  if(p.tokens)return JSON.stringify(p.tokens,null,2);
   const color = (hex: string) => ({ $type: 'color', $value: { colorSpace: 'srgb', components: [1,3,5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255), alpha: 1, hex } });
   const dimension = (value: number) => ({ $type: 'dimension', $value: { value, unit: 'px' } });
   return JSON.stringify({
