@@ -128,6 +128,25 @@ describe('CAD exact OCCT adapter', () => {
     expect(() => kernel.mirror(box, [0, 0, 0], [0, 0, 0])).toThrow(/non-zero/);
   });
 
+  it('thickens a planar exact face into a solid of the expected volume', () => {
+    const face = kernel.profileFace({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [0, 0, 0], end: [10, 0, 0] },
+        { kind: 'line', start: [10, 0, 0], end: [10, 10, 0] },
+        { kind: 'line', start: [10, 10, 0], end: [0, 10, 0] },
+        { kind: 'line', start: [0, 10, 0], end: [0, 0, 0] },
+      ],
+    });
+    const thickened = kernel.thicken(face, 2);
+    try {
+      expect(kernel.volume(thickened)).toBeCloseTo(200, 6);
+    } finally {
+      kernel.release(thickened);
+      kernel.release(face);
+    }
+  });
+
   it('performs a real OCCT cylindrical cut that reduces exact volume', () => {
     const tool = kernel.cylinder(2, 5);
     const cut = kernel.cut(box, tool);
