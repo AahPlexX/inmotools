@@ -1,9 +1,14 @@
-import { cellToMatrix, fractionalToCartesian, validateCell } from './cell-engine';
+import { cellToMatrix, fractionalToCartesian, reciprocalMatrix, validateCell } from './cell-engine';
 import { addCrystalSite, deleteCrystalSite, updateCrystalSite } from './document-engine';
+import { findPeriodicBondsWithDiagnostics } from './periodic-engine';
 import type { CrystalDocument, CrystalSite, Mat3, UnitCell, Vec3 } from './crystal-types';
 
 const EPSILON = 1e-10;
 const UNIMODULAR_TOLERANCE = 1e-8;
+const MAX_MODEL_SITES = 50_000;
+const MAX_SLAB_CANDIDATES = 2_000_000;
+
+type IntVec3 = readonly [number, number, number];
 
 function assertFiniteMatrix(matrix: Mat3, label: string): void {
   if (!matrix.every((row) => row.every(Number.isFinite))) {
@@ -62,6 +67,26 @@ function dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+function cross(a: Vec3, b: Vec3): Vec3 {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+
+function addVectors(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function subtractVectors(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scaleVector(vector: Vec3, scale: number): Vec3 {
+  return [vector[0] * scale, vector[1] * scale, vector[2] * scale];
+}
+
 function angleDegrees(a: Vec3, b: Vec3): number {
   const denominator = length(a) * length(b);
   if (!Number.isFinite(denominator) || denominator <= EPSILON) {
@@ -98,6 +123,58 @@ function wrapVec(vector: Vec3): Vec3 {
 
 function describeMatrix(matrix: Mat3): string {
   return matrix.map((row) => `[${row.map((value) => Number(value.toFixed(8))).join(', ')}]`).join(' ');
+}
+
+function gcdPair(a: number, b: number): number {
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y !== 0) {
+    const remainder = x % y;
+    x = y;
+    y = remainder;
+  }
+  return x;
+}
+
+function reduceIntegerVector(vector: IntVec3): IntVec3 {
+  const divisor = gcdPair(gcdPair(vector[0], vector[1]), vector[2]) || 1;
+  return [vector[0] / divisor, vector[1] / divisor, vector[2] / divisor];
+}
+
+function integerSurfaceBasis(hkl: IntVec3): readonly [IntVec3, IntVec3] {
+  const [h, k, l] = hkl;
+  let first: IntVec3;
+  if (h !== 0 || k !== 0) {
+    const divisor = gcdPair(h, k) || 1;
+    first = [k / divisor, -h / divisor, 0];
+  } else {
+    first = [1, 0, 0];
+  }
+  const second = reduceIntegerVector([
+    k * first[2] - l * first[1],
+    l * first[0] - h * first[2],
+    h * first[1] - k * first[0],
+  ]);
+  return [first, second];
+}
+
+function latticeCombination(coefficients: IntVec3, basis: Mat3): Vec3 {
+  return [
+    coefficients[0] * basis[0][0] + coefficients[1] * basis[1][0] + coefficients[2] * basis[2][0],
+    coefficients[0] * basis[0][1] + coefficients[1] * basis[1][1] + coefficients[2] * basis[2][1],
+    coefficients[0] * basis[0][2] + coefficients[1] * basis[1][2] + coefficients[2] * basis[2][2],
+  ];
+}
+
+function normalizeNearBoundary(value: number): number {
+  if (Math.abs(value) <= 1e-9) return 0;
+  if (Math.abs(value - 1) <= 1e-9) return 0;
+  return value;
+}
+
+function fractionalKey(siteId: string, fractional: Vec3): string {
+  const rounded = fractional.map((value) => Math.round(value * 1e9));
+  return `${siteId}|${rounded.join('|')}`;
 }
 
 export function transformBasis(document: CrystalDocument, matrix: Mat3, originShift: Vec3 = [0, 0, 0]): CrystalDocument {
@@ -275,5 +352,186 @@ export function compareMappedStructures(a: CrystalDocument, b: CrystalDocument):
       gamma: b.cell.gamma - a.cell.gamma,
     },
     siteDeltas,
+  };
+}
+
+export function reconstructPeriodicMolecule(
+  document: CrystalDocument,
+  seedSiteId: string,
+): readonly { siteId: string; image: IntVec3; fractional: Vec3 }[] {
+  const seed = document.sites.find((site) => site.id === seedSiteId);
+  if (!seed) throw new RangeError(`Site not found: ${seedSiteId}`);
+
+  const adjacency = new Map<string, { siteId: string; shift: IntVec3 }[]>();
+  for (const site of document.sites) adjacency.set(site.id, []);
+  for (const bond of findPeriodicBondsWithDiagnostics(document).bonds) {
+    adjacency.get(bond.aSiteId)?.push({ siteId: bond.bSiteId, shift: bond.imageShift });
+    adjacency.get(bond.bSiteId)?.push({
+      siteId: bond.aSiteId,
+      shift: [-bond.imageShift[0], -bond.imageShift[1], -bond.imageShift[2]],
+    });
+  }
+  const compareEdge = (a: { siteId: string; shift: IntVec3 }, b: { siteId: string; shift: IntVec3 }): number =>
+    a.siteId.localeCompare(b.siteId)
+      || a.shift[0] - b.shift[0]
+      || a.shift[1] - b.shift[1]
+      || a.shift[2] - b.shift[2];
+  for (const edges of adjacency.values()) edges.sort(compareEdge);
+
+  const siteById = new Map(document.sites.map((site) => [site.id, site]));
+  const assigned = new Map<string, IntVec3>([[seedSiteId, [0, 0, 0]]]);
+  const queue = [seedSiteId];
+  const output: { siteId: string; image: IntVec3; fractional: Vec3 }[] = [];
+
+  while (queue.length > 0) {
+    const siteId = queue.shift()!;
+    const site = siteById.get(siteId)!;
+    const image = assigned.get(siteId)!;
+    output.push({
+      siteId,
+      image,
+      fractional: [
+        site.fractional[0] + image[0],
+        site.fractional[1] + image[1],
+        site.fractional[2] + image[2],
+      ],
+    });
+    for (const edge of adjacency.get(siteId) ?? []) {
+      if (assigned.has(edge.siteId)) continue;
+      assigned.set(edge.siteId, [
+        image[0] + edge.shift[0],
+        image[1] + edge.shift[1],
+        image[2] + edge.shift[2],
+      ]);
+      queue.push(edge.siteId);
+    }
+  }
+  return output;
+}
+
+export function createDomainOverlay(
+  document: CrystalDocument,
+  transform: Mat3,
+): readonly { siteId: string; position: Vec3 }[] {
+  assertFiniteMatrix(transform, 'Domain transformation');
+  const det = determinant(transform);
+  if (!Number.isFinite(det) || Math.abs(det) <= EPSILON) {
+    throw new RangeError('Domain transformation matrix is singular.');
+  }
+  return document.sites.map((site) => ({
+    siteId: site.id,
+    position: columnTransform(transform, fractionalToCartesian(site.fractional, document.cell)),
+  }));
+}
+
+export function buildSlab(
+  document: CrystalDocument,
+  options: { hkl: IntVec3; thickness: number; vacuum: number; offset: number },
+): CrystalDocument {
+  const [h, k, l] = options.hkl;
+  if (![h, k, l].every(Number.isInteger) || (h === 0 && k === 0 && l === 0)) {
+    throw new RangeError('Slab Miller indices (h,k,l) must be integers and cannot all be zero.');
+  }
+  if (!Number.isFinite(options.thickness) || options.thickness <= 0) {
+    throw new RangeError('Slab thickness must be a positive finite distance in ångström.');
+  }
+  if (!Number.isFinite(options.vacuum) || options.vacuum < 0) {
+    throw new RangeError('Slab vacuum must be a non-negative finite distance in ångström.');
+  }
+  if (!Number.isFinite(options.offset)) throw new RangeError('Slab offset must be a finite number.');
+
+  const reciprocal = reciprocalMatrix(document.cell);
+  const planeNormal: Vec3 = [
+    h * reciprocal[0][0] + k * reciprocal[1][0] + l * reciprocal[2][0],
+    h * reciprocal[0][1] + k * reciprocal[1][1] + l * reciprocal[2][1],
+    h * reciprocal[0][2] + k * reciprocal[1][2] + l * reciprocal[2][2],
+  ];
+  const normalLength = length(planeNormal);
+  if (!Number.isFinite(normalLength) || normalLength <= EPSILON) {
+    throw new RangeError('Slab Miller indices do not define a valid reciprocal-plane normal.');
+  }
+  const normal = scaleVector(planeNormal, 1 / normalLength);
+  const planeSpacing = 1 / normalLength;
+  const totalNormalLength = options.thickness + options.vacuum;
+
+  const [surfaceFirst, surfaceSecond] = integerSurfaceBasis(options.hkl);
+  const directBasis = cellToMatrix(document.cell);
+  const aSurface = latticeCombination(surfaceFirst, directBasis);
+  let bSurface = latticeCombination(surfaceSecond, directBasis);
+  const cSurface = scaleVector(normal, totalNormalLength);
+  let slabBasis: Mat3 = [aSurface, bSurface, cSurface];
+  if (determinant(slabBasis) < 0) {
+    bSurface = scaleVector(bSurface, -1);
+    slabBasis = [aSurface, bSurface, cSurface];
+  }
+  const slabCell = matrixToCell(slabBasis);
+  const inverseSlab = inverse(slabBasis);
+  const origin = scaleVector(normal, options.offset * planeSpacing);
+
+  const minCellLength = Math.min(document.cell.a, document.cell.b, document.cell.c);
+  const maxSurfaceCoefficient = Math.max(
+    ...surfaceFirst.map(Math.abs),
+    ...surfaceSecond.map(Math.abs),
+  );
+  const searchBound = Math.max(2, Math.ceil(options.thickness / minCellLength) + maxSurfaceCoefficient + Math.ceil(Math.abs(options.offset)) + 3);
+  const side = searchBound * 2 + 1;
+  const candidateCount = document.sites.length * side * side * side;
+  if (!Number.isSafeInteger(candidateCount) || candidateCount > MAX_SLAB_CANDIDATES) {
+    throw new RangeError(`Slab request would inspect ${candidateCount.toLocaleString()} site images; reduce the thickness or Miller-index complexity.`);
+  }
+
+  const sites: CrystalSite[] = [];
+  const seen = new Set<string>();
+  const tolerance = 1e-9;
+  for (let i = -searchBound; i <= searchBound; i += 1) {
+    for (let j = -searchBound; j <= searchBound; j += 1) {
+      for (let q = -searchBound; q <= searchBound; q += 1) {
+        for (const site of document.sites) {
+          const imageFractional: Vec3 = [
+            site.fractional[0] + i,
+            site.fractional[1] + j,
+            site.fractional[2] + q,
+          ];
+          const cartesian = fractionalToCartesian(imageFractional, document.cell);
+          const slabFractionalRaw = rowVectorMultiply(subtractVectors(cartesian, origin), inverseSlab);
+          let x = normalizeNearBoundary(slabFractionalRaw[0]);
+          let y = normalizeNearBoundary(slabFractionalRaw[1]);
+          const z = slabFractionalRaw[2];
+          if (x < -tolerance || x >= 1 - tolerance || y < -tolerance || y >= 1 - tolerance) continue;
+          if (z < -tolerance || z * totalNormalLength >= options.thickness - tolerance) continue;
+          x = wrap(x);
+          y = wrap(y);
+          const fractional: Vec3 = [x, y, Math.max(0, z)];
+          const key = fractionalKey(site.id, fractional);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          if (sites.length >= MAX_MODEL_SITES) {
+            throw new RangeError(`Slab would exceed the ${MAX_MODEL_SITES.toLocaleString()}-site model limit.`);
+          }
+          sites.push({
+            ...site,
+            id: `${site.id}@slab-${sites.length + 1}`,
+            fractional,
+          });
+        }
+      }
+    }
+  }
+  if (sites.length === 0) throw new RangeError('The requested slab contains no sites; adjust the thickness or offset.');
+
+  return {
+    ...document,
+    id: `${document.id}-slab-${h}-${k}-${l}`,
+    name: `${document.name} — (${h} ${k} ${l}) slab`,
+    cell: slabCell,
+    sites,
+    provenance: [
+      ...document.provenance,
+      {
+        kind: 'slab',
+        label: `Built (${h} ${k} ${l}) slab`,
+        detail: `Material ${options.thickness} Å; vacuum ${options.vacuum} Å; offset ${options.offset} × d(hkl)`,
+      },
+    ],
   };
 }
