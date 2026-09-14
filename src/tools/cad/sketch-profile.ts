@@ -40,6 +40,11 @@ interface TraversableEntity {
 
 const TAU = Math.PI * 2;
 
+/** Negating an exact zero produces -0 in JS, which fails strict shape/equality checks downstream. */
+function negateComponent(value: number): number {
+  return value === 0 ? 0 : -value;
+}
+
 function originPlaneFrame(sketch: CadSketch): PlaneFrame {
   if (sketch.plane.kind === 'datum') {
     throw new Error(`Sketch '${sketch.label}' datum plane requires a resolved datum transform before exact profile construction.`);
@@ -58,8 +63,8 @@ function originPlaneFrame(sketch: CadSketch): PlaneFrame {
     case 'XZ':
       return {
         normal: [0, 1, 0],
-        point: (x, y) => [x, 0, -y],
-        vector: (x, y) => [x, 0, -y],
+        point: (x, y) => [x, 0, negateComponent(y)],
+        vector: (x, y) => [x, 0, negateComponent(y)],
       };
     case 'YZ':
       return {
@@ -213,7 +218,7 @@ function arcMidpoint(
 }
 
 function negate([x, y, z]: CadKernelVector3): CadKernelVector3 {
-  return [-x, -y, -z];
+  return [negateComponent(x), negateComponent(y), negateComponent(z)];
 }
 
 function curveEdge(
