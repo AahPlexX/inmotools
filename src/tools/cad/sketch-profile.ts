@@ -13,9 +13,12 @@ export type CadSketchProfileEdge3d =
       endTangent?: CadKernelVector3;
     };
 
-export interface CadSketchProfile3d {
-  normal: CadKernelVector3;
+export interface CadSketchWire3d {
   edges: CadSketchProfileEdge3d[];
+}
+
+export interface CadSketchProfile3d extends CadSketchWire3d {
+  normal: CadKernelVector3;
 }
 
 export interface CadSketchAxis3d {
@@ -103,14 +106,7 @@ function traversable(entity: SketchEntity): TraversableEntity | null {
   }
 }
 
-function orderedLoop(entities: readonly SketchEntity[]): Array<{ entity: TraversableEntity['entity']; reversed: boolean }> {
-  const traversables = entities.map(traversable);
-  if (traversables.some((entry) => entry === null)) {
-    throw new Error('Selected profile must be either one intrinsically closed curve or a connected closed profile loop.');
-  }
-  const edges = traversables as TraversableEntity[];
-  if (edges.length < 2) throw new Error('Selected sketch entities do not form a closed profile.');
-
+function adjacencyForEdges(edges: readonly TraversableEntity[]): Map<string, number[]> {
   const adjacency = new Map<string, number[]>();
   edges.forEach((edge, index) => {
     for (const pointId of [edge.startPointId, edge.endPointId]) {
@@ -119,35 +115,76 @@ function orderedLoop(entities: readonly SketchEntity[]): Array<{ entity: Travers
       adjacency.set(pointId, next);
     }
   });
-  if ([...adjacency.values()].some((indices) => indices.length !== 2)) {
-    throw new Error('Selected sketch entities do not form a closed profile.');
-  }
+  return adjacency;
+}
 
+function orderConnectedEdges(
+  edges: readonly TraversableEntity[],
+  startPointId: string,
+): Array<{ entity: TraversableEntity['entity']; reversed: boolean }> {
+  const adjacency = adjacencyForEdges(edges);
   const ordered: Array<{ entity: TraversableEntity['entity']; reversed: boolean }> = [];
   const used = new Set<number>();
-  let edgeIndex = 0;
-  let currentPointId = edges[0]!.startPointId;
+  let currentPointId = startPointId;
 
   while (ordered.length < edges.length) {
-    const edge = edges[edgeIndex]!;
-    if (used.has(edgeIndex)) throw new Error('Selected sketch entities do not form one closed profile loop.');
+    const nextIndex = (adjacency.get(currentPointId) ?? []).find((candidate) => !used.has(candidate));
+    if (nextIndex === undefined) break;
+    const edge = edges[nextIndex]!;
     const reversed = edge.endPointId === currentPointId;
     if (!reversed && edge.startPointId !== currentPointId) {
       throw new Error('Selected sketch entities are disconnected.');
     }
     ordered.push({ entity: edge.entity, reversed });
-    used.add(edgeIndex);
+    used.add(nextIndex);
     currentPointId = reversed ? edge.startPointId : edge.endPointId;
-    if (ordered.length === edges.length) break;
-    const nextIndex = (adjacency.get(currentPointId) ?? []).find((candidate) => !used.has(candidate));
-    if (nextIndex === undefined) throw new Error('Selected sketch entities do not form a closed profile.');
-    edgeIndex = nextIndex;
   }
 
-  const first = edges[0]!;
-  const initialPointId = ordered[0]!.reversed ? first.endPointId : first.startPointId;
-  if (currentPointId !== initialPointId) throw new Error('Selected sketch entities do not form a closed profile.');
+  if (used.size !== edges.length) throw new Error('Selected sketch entities must form one connected path.');
   return ordered;
+}
+
+function orderedLoop(entities: readonly SketchEntity[]): Array<{ entity: TraversableEntity['entity']; reversed: boolean }> {
+  const traversables = entities.map(traversable);
+  if (traversables.some((entry) => entry === null)) {
+    throw new Error('Selected profile must be either one intrinsically closed curve or a connected closed profile loop.');
+  }
+  const edges = traversables as TraversableEntity[];
+  if (edges.length < 2) throw new Error('Selected sketch entities do not form a closed profile.');
+
+  const adjacency = adjacencyForEdges(edges);
+  if ([...adjacency.values()].some((indices) => indices.length !== 2)) {
+    throw new Error('Selected sketch entities do not form a closed profile.');
+  }
+
+  const startPointId = edges[0]!.startPointId;
+  const ordered = orderConnectedEdges(edges, startPointId);
+  const final = ordered.at(-1);
+  if (!final) throw new Error('Selected sketch entities do not form a closed profile.');
+  const finalEntity = traversable(final.entity)!;
+  const finalPointId = final.reversed ? finalEntity.startPointId : finalEntity.endPointId;
+  if (finalPointId !== startPointId) throw new Error('Selected sketch entities do not form a closed profile.');
+  return ordered;
+}
+
+function orderedPath(entities: readonly SketchEntity[]): Array<{ entity: TraversableEntity['entity']; reversed: boolean }> {
+  const traversables = entities.map(traversable);
+  if (traversables.some((entry) => entry === null)) {
+    throw new Error('Selected path must contain connected line, arc, or open spline entities.');
+  }
+  const edges = traversables as TraversableEntity[];
+  if (edges.length === 0) throw new Error('A sketch path requires at least one selected curve.');
+
+  const adjacency = adjacencyForEdges(edges);
+  if ([...adjacency.values()].some((indices) => indices.length > 2)) {
+    throw new Error('Selected sketch path cannot branch.');
+  }
+  const endpoints = [...adjacency.entries()].filter(([, indices]) => indices.length === 1).map(([pointId]) => pointId);
+  if (endpoints.length !== 0 && endpoints.length !== 2) {
+    throw new Error('Selected sketch entities must form one connected path.');
+  }
+  if (endpoints.length === 0) return orderedLoop(entities);
+  return orderConnectedEdges(edges, endpoints[0]!);
 }
 
 function positiveAngle(value: number): number {
@@ -239,17 +276,21 @@ function intrinsicClosedEdge(
   return null;
 }
 
-export function buildSketchProfile3d(sketch: CadSketch, profileEntityIds: readonly string[]): CadSketchProfile3d {
-  if (profileEntityIds.length === 0) throw new Error('A sketch profile requires at least one selected entity.');
-  if (new Set(profileEntityIds).size !== profileEntityIds.length) throw new Error('Sketch profile entity ids must be unique.');
+function selectedCurves(sketch: CadSketch, entityIds: readonly string[], label: string): SketchEntity[] {
+  if (entityIds.length === 0) throw new Error(`A sketch ${label} requires at least one selected entity.`);
+  if (new Set(entityIds).size !== entityIds.length) throw new Error(`Sketch ${label} entity ids must be unique.`);
+  const requested = new Set(entityIds);
+  const selected = sketch.entities.filter((entity) => requested.has(entity.id));
+  if (selected.length !== requested.size) throw new Error(`Sketch ${label} contains an unknown entity id.`);
+  if (selected.some((entity) => entity.construction)) throw new Error(`Construction geometry cannot be used as ${label} geometry.`);
+  if (selected.some((entity) => entity.type === 'point')) throw new Error(`Point entities cannot be used as ${label} edges.`);
+  return selected;
+}
 
+export function buildSketchProfile3d(sketch: CadSketch, profileEntityIds: readonly string[]): CadSketchProfile3d {
   const frame = originPlaneFrame(sketch);
   const points = finitePointMap(sketch);
-  const requested = new Set(profileEntityIds);
-  const selected = sketch.entities.filter((entity) => requested.has(entity.id));
-  if (selected.length !== requested.size) throw new Error('Sketch profile contains an unknown entity id.');
-  if (selected.some((entity) => entity.construction)) throw new Error('Construction geometry cannot be used as profile geometry.');
-  if (selected.some((entity) => entity.type === 'point')) throw new Error('Point entities cannot be used as profile edges.');
+  const selected = selectedCurves(sketch, profileEntityIds, 'profile');
 
   if (selected.length === 1) {
     const edge = intrinsicClosedEdge(selected[0]!, points, frame);
@@ -259,6 +300,24 @@ export function buildSketchProfile3d(sketch: CadSketch, profileEntityIds: readon
 
   const edges = orderedLoop(selected).map(({ entity, reversed }) => curveEdge(entity, reversed, points, frame));
   return { normal: frame.normal, edges };
+}
+
+export function buildSketchPath3d(sketch: CadSketch, pathEntityIds: readonly string[]): CadSketchWire3d {
+  const frame = originPlaneFrame(sketch);
+  const points = finitePointMap(sketch);
+  const selected = selectedCurves(sketch, pathEntityIds, 'path');
+
+  if (selected.length === 1) {
+    const closed = intrinsicClosedEdge(selected[0]!, points, frame);
+    if (closed) return { edges: [closed] };
+    const single = traversable(selected[0]!);
+    if (!single) throw new Error('Selected sketch entity cannot form an exact path.');
+    return { edges: [curveEdge(single.entity, false, points, frame)] };
+  }
+
+  return {
+    edges: orderedPath(selected).map(({ entity, reversed }) => curveEdge(entity, reversed, points, frame)),
+  };
 }
 
 export function resolveSketchAxis3d(sketch: CadSketch, lineId: string): CadSketchAxis3d {
