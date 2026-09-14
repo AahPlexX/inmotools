@@ -16,7 +16,7 @@ test('updates destructive, structural, and reversible export impacts before byte
   const summary = page.getByTestId('pdf-export-impact-summary');
   await expect(summary).toContainText('Source Info metadata is stripped');
 
-  await page.getByLabel('Pages').fill('1');
+  await page.getByRole('textbox', { name: 'Pages', exact: true }).fill('1');
   await expect(summary).toContainText('Source pages omitted');
   await expect(summary).toContainText('Destructive in this output');
 
