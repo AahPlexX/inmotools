@@ -2,7 +2,7 @@ name: Validate and deploy Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/pdf-workstation]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,13 +15,11 @@ permissions:
 
 jobs:
   pdf-renderer-mount:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+    if: github.ref == 'refs/heads/feat/pdf-workstation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PDF branch head
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
       - name: Apply guarded renderer mount
         run: node scripts/pdf-renderer-mount.mjs
       - name: Commit renderer mount
