@@ -27,6 +27,11 @@ describe('PDF renderer foundation', () => {
     });
   });
 
+  it('rejects invalid viewport geometry instead of allocating a broken canvas', () => {
+    expect(() => canvasRenderPlan({ width: 0, height: 792 }, 2)).toThrow(/finite positive/i);
+    expect(() => canvasRenderPlan({ width: Number.POSITIVE_INFINITY, height: 792 }, 2)).toThrow(/finite positive/i);
+  });
+
   it('normalizes zoom to a finite usable range', () => {
     expect(normalizedPdfZoom(0)).toBe(0.25);
     expect(normalizedPdfZoom(Number.NaN)).toBe(1);
@@ -49,5 +54,9 @@ describe('PDF renderer foundation', () => {
     expect(events).toEqual(['cancel:one-a']);
     await coordinator.destroy();
     expect(events).toEqual(['cancel:one-a', 'cancel:one-b', 'cancel:two']);
+
+    const late = makeRender('late');
+    expect(() => coordinator.replace(1, late)).toThrow(/destroyed/i);
+    expect(events).toEqual(['cancel:one-a', 'cancel:one-b', 'cancel:two', 'cancel:late']);
   });
 });
