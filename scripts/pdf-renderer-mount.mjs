@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 
+// Temporary guarded branch migration; removed immediately after the renderer mount commit lands.
 const path = 'src/tools/pdf/PdfWorkspace.tsx';
 let source = fs.readFileSync(path, 'utf8');
 
