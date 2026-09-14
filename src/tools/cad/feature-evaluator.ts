@@ -4,6 +4,7 @@ import {
   buildSketchPath3d,
   buildSketchProfile3d,
   resolveSketchAxis3d,
+  resolveSketchPlane3d,
   type CadSketchProfile3d,
   type CadSketchWire3d,
 } from './sketch-profile';
@@ -273,6 +274,24 @@ function offsetFeature(
   return kernel.offset(singleDependencyShape(feature, featureShapes, 'offset'), distance);
 }
 
+function mirrorFeature(
+  feature: CadFeature,
+  project: CadProject,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const sketch = sketchForFeature(feature, project);
+  const shape = singleDependencyShape(feature, featureShapes, 'mirror');
+  let plane;
+  try {
+    plane = resolveSketchPlane3d(sketch);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} mirror plane is invalid: ${message}`, { cause: error });
+  }
+  return kernel.mirror(shape, plane.origin, plane.normal);
+}
+
 function projectSketch(feature: CadFeature, project: CadProject, sketchId: string, role: string) {
   const sketch = project.sketches.find((candidate) => candidate.id === sketchId);
   if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown ${role} sketch '${sketchId}'.`);
@@ -440,6 +459,8 @@ function createFeatureShape(
       return shellFeature(feature, kernel, featureShapes);
     case 'offset':
       return offsetFeature(feature, kernel, featureShapes);
+    case 'mirror':
+      return mirrorFeature(feature, project, kernel, featureShapes);
     default:
       if (isNonSolidPassThrough(feature)) return null;
       throw new CadFeatureEvaluationError(

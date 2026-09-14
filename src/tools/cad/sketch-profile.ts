@@ -26,6 +26,11 @@ export interface CadSketchAxis3d {
   direction: CadKernelVector3;
 }
 
+export interface CadSketchPlane3d {
+  origin: CadKernelVector3;
+  normal: CadKernelVector3;
+}
+
 interface PlaneFrame {
   normal: CadKernelVector3;
   point(x: number, y: number): CadKernelVector3;
@@ -323,6 +328,11 @@ export function buildSketchPath3d(sketch: CadSketch, pathEntityIds: readonly str
   return {
     edges: orderedPath(selected).map(({ entity, reversed }) => curveEdge(entity, reversed, points, frame)),
   };
+}
+
+export function resolveSketchPlane3d(sketch: CadSketch): CadSketchPlane3d {
+  const frame = originPlaneFrame(sketch);
+  return { origin: frame.point(0, 0), normal: frame.normal };
 }
 
 export function resolveSketchAxis3d(sketch: CadSketch, lineId: string): CadSketchAxis3d {

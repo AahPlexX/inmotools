@@ -343,6 +343,12 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return [this.#wrap(this.#kernel.split(this.#unwrap(shape), [this.#unwrap(tool)]))];
   }
 
+  mirror(shape: CadKernelShape, planeOrigin: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelShape {
+    const magnitude = vectorLength(planeNormal);
+    if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('Mirror plane normal must be a finite non-zero vector.');
+    return this.#wrap(this.#kernel.mirror(this.#unwrap(shape), asVec3(planeOrigin), asVec3(planeNormal)));
+  }
+
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh {
     const mesh = this.#kernel.tessellate(this.#unwrap(shape), options);
     return {
