@@ -1,7 +1,13 @@
 import type { CadFeature, CadProject } from './cad-types';
-import type { CadExactKernel, CadKernelShape } from './kernel-contract';
+import type { CadExactKernel, CadKernelShape, CadKernelVector3 } from './kernel-contract';
+import {
+  buildSketchProfile3d,
+  resolveSketchAxis3d,
+  type CadSketchProfile3d,
+} from './sketch-profile';
 
 export interface CadFeatureKernel extends CadExactKernel {
+  profileFace(profile: CadSketchProfile3d): CadKernelShape;
   release(shape: CadKernelShape): void;
 }
 
@@ -32,6 +38,22 @@ function parameterNumber(feature: CadFeature, key: string, options: { allowZero?
   if (typeof value !== 'number' || !Number.isFinite(value) || (allowZero ? value < 0 : value <= 0)) {
     const qualifier = allowZero ? 'a finite non-negative number' : 'a finite positive number';
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be ${qualifier}.`);
+  }
+  return value;
+}
+
+function parameterString(feature: CadFeature, key: string): string {
+  const value = feature.parameters[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a non-empty string.`);
+  }
+  return value;
+}
+
+function parameterStringArray(feature: CadFeature, key: string): string[] {
+  const value = feature.parameters[key];
+  if (!Array.isArray(value) || value.length === 0 || value.some((entry) => typeof entry !== 'string' || entry.length === 0)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a non-empty array of ids.`);
   }
   return value;
 }
@@ -102,18 +124,87 @@ function booleanFeature(
   }
 }
 
+function sketchForFeature(feature: CadFeature, project: CadProject) {
+  const sketchId = parameterString(feature, 'sketchId');
+  const sketch = project.sketches.find((candidate) => candidate.id === sketchId);
+  if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown sketch '${sketchId}'.`);
+  return sketch;
+}
+
+function withProfileFace(
+  feature: CadFeature,
+  project: CadProject,
+  kernel: CadFeatureKernel,
+  operation: (profile: CadKernelShape, profile3d: CadSketchProfile3d) => CadKernelShape,
+): CadKernelShape {
+  const sketch = sketchForFeature(feature, project);
+  const profileEntityIds = parameterStringArray(feature, 'profileEntityIds');
+  let profile3d: CadSketchProfile3d;
+  try {
+    profile3d = buildSketchProfile3d(sketch, profileEntityIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} profile is invalid: ${message}`, { cause: error });
+  }
+
+  const profile = kernel.profileFace(profile3d);
+  try {
+    return operation(profile, profile3d);
+  } finally {
+    kernel.release(profile);
+  }
+}
+
+function extrudeFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+  const distance = parameterNumber(feature, 'distance');
+  return withProfileFace(feature, project, kernel, (profile, profile3d) => {
+    const reversed = feature.parameters.reversed === true;
+    const direction: CadKernelVector3 = reversed
+      ? [-profile3d.normal[0], -profile3d.normal[1], -profile3d.normal[2]]
+      : profile3d.normal;
+    return kernel.extrude(profile, distance, direction);
+  });
+}
+
+function revolveFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+  const angle = parameterNumber(feature, 'angle');
+  if (angle > Math.PI * 2 + 1e-12) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} revolve angle must not exceed one full revolution.`);
+  }
+  const sketch = sketchForFeature(feature, project);
+  const axisLineId = parameterString(feature, 'axisLineId');
+  let axis;
+  try {
+    axis = resolveSketchAxis3d(sketch, axisLineId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} axis is invalid: ${message}`, { cause: error });
+  }
+  return withProfileFace(feature, project, kernel, (profile) => kernel.revolve(
+    profile,
+    axis.origin,
+    axis.direction,
+    feature.parameters.reversed === true ? -angle : angle,
+  ));
+}
+
 function isNonSolidPassThrough(feature: CadFeature): boolean {
   return feature.type === 'sketch' || feature.type === 'datum-plane' || feature.type === 'datum-axis';
 }
 
 function createFeatureShape(
   feature: CadFeature,
+  project: CadProject,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape | null {
   switch (feature.type) {
     case 'primitive':
       return primitive(feature, kernel);
+    case 'extrude':
+      return extrudeFeature(feature, project, kernel);
+    case 'revolve':
+      return revolveFeature(feature, project, kernel);
     case 'boolean':
       return booleanFeature(feature, kernel, featureShapes);
     default:
@@ -152,7 +243,7 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
       activeFeature = feature;
       if (feature.suppressed) continue;
 
-      const shape = createFeatureShape(feature, kernel, featureShapes);
+      const shape = createFeatureShape(feature, project, kernel, featureShapes);
       if (!shape) continue;
 
       if (!feature.bodyId) {
