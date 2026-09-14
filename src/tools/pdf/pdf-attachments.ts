@@ -200,14 +200,25 @@ function decodeAttachment(raw: RawAttachment, includeBytes: boolean): { inventor
   }
 }
 
+function removeAmbiguousActionableNames(attachments: PdfAttachmentInventory[], warnings: string[]): PdfAttachmentInventory[] {
+  const counts = new Map<string, number>();
+  for (const attachment of attachments) counts.set(attachment.name, (counts.get(attachment.name) ?? 0) + 1);
+  const ambiguous = new Set([...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name));
+  for (const name of ambiguous) {
+    warnings.push(`Embedded filename ${name} resolves from multiple source entries and is ambiguous; those entries were omitted from actionable inventory.`);
+  }
+  return ambiguous.size ? attachments.filter((attachment) => !ambiguous.has(attachment.name)) : attachments;
+}
+
 export function inspectDocumentAttachments(document: PDFDocument): PdfAttachmentScan {
   const raw = collectRawAttachments(document);
   const warnings = [...raw.warnings];
-  const attachments = raw.attachments.map((attachment) => {
+  const decodedAttachments = raw.attachments.map((attachment) => {
     const decoded = decodeAttachment(attachment, false);
     if (decoded.warning) warnings.push(decoded.warning);
     return decoded.inventory;
   });
+  const attachments = removeAmbiguousActionableNames(decodedAttachments, warnings);
   return { attachments, warnings };
 }
 
