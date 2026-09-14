@@ -20,6 +20,7 @@ import PdfFormAuthoringPanel from './PdfFormAuthoringPanel';
 import PdfSourceFormInventory from './PdfSourceFormInventory';
 import PdfOverlayPanel from './PdfOverlayPanel';
 import PdfExportSummaryPanel from './PdfExportSummaryPanel';
+import PdfCanvas from './PdfCanvas';
 import {
   attachmentDefinitionsFromStages,
   attachmentStageError,
@@ -229,6 +230,12 @@ export default function PdfWorkspace() {
   const [overlayDraft, setOverlayDraft] = useState<PdfOverlayDraft>(EMPTY_OVERLAY_DRAFT);
   const [status, setStatus] = useState('Choose PDFs to merge, extract, reorder, rotate, flatten, or prepare for export.');
   const [busy, setBusy] = useState(false);
+  const [viewerSourceId, setViewerSourceId] = useState('');
+  const [viewerPage, setViewerPage] = useState(1);
+  const [viewerZoomPercent, setViewerZoomPercent] = useState(100);
+  const viewerItem = items.find((item) => item.id === viewerSourceId) ?? items[0];
+  const viewerPageCount = viewerItem?.inspection.pageCount ?? 0;
+  const resolvedViewerPage = viewerPageCount ? Math.min(Math.max(viewerPage, 1), viewerPageCount) : 1;
 
   const pageStates = useMemo(() => items.map((item) => {
     try {
@@ -614,6 +621,21 @@ export default function PdfWorkspace() {
       })}
 
       {items.length ? <div className="metric-row" style={{ marginTop: 18 }}><div className="metric"><span>Documents</span><strong>{items.length}</strong></div><div className="metric"><span>Output pages</span><strong>{hasPageError ? '—' : outputPageCount}</strong></div><div className="metric"><span>Source size</span><strong>{bytesLabel(sourceBytes)}</strong></div></div> : null}
+
+      {viewerItem ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-viewer-title">
+        <h3 id="pdf-viewer-title" style={{ margin: 0 }}>Document viewer</h3>
+        <p className="help-text">PDF.js renders the active source page locally with a bundled worker. Canvas pixels are only the visual layer; document operations continue to use PDF coordinates and deterministic source bytes.</p>
+        <div className="workspace-grid three" style={{ marginTop: 14 }}>
+          <div className="field"><label htmlFor="pdf-viewer-source">Preview source</label><select id="pdf-viewer-source" value={viewerItem.id} onChange={(event) => { setViewerSourceId(event.target.value); setViewerPage(1); }}>{items.map((item) => <option key={item.id} value={item.id}>{item.file.name}</option>)}</select></div>
+          <div className="field"><label htmlFor="pdf-viewer-page">Preview page</label><input id="pdf-viewer-page" type="number" min="1" max={viewerPageCount} step="1" value={resolvedViewerPage} onChange={(event) => { const next = Number(event.target.value); setViewerPage(Number.isFinite(next) ? Math.min(Math.max(Math.trunc(next), 1), viewerPageCount) : 1); }} /></div>
+          <div className="field"><label htmlFor="pdf-viewer-zoom">Preview zoom</label><input id="pdf-viewer-zoom" type="number" min="25" max="500" step="25" value={viewerZoomPercent} onChange={(event) => { const next = Number(event.target.value); setViewerZoomPercent(Number.isFinite(next) ? Math.min(Math.max(next, 25), 500) : 100); }} /><small>25%–500%; canvas backing pixels are independently capped for display-memory safety.</small></div>
+        </div>
+        <div className="button-row">
+          <button className="action-button secondary" type="button" aria-label="Previous preview page" disabled={resolvedViewerPage <= 1} onClick={() => setViewerPage((page) => Math.max(1, page - 1))}>Previous page</button>
+          <button className="action-button secondary" type="button" aria-label="Next preview page" disabled={resolvedViewerPage >= viewerPageCount} onClick={() => setViewerPage((page) => Math.min(viewerPageCount, page + 1))}>Next page</button>
+        </div>
+        <PdfCanvas file={viewerItem.file} pageNumber={resolvedViewerPage} zoom={viewerZoomPercent / 100} />
+      </section> : null}
 
       {items.length ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-properties-title">
         <h3 id="pdf-properties-title" style={{ margin: 0 }}>Document properties &amp; export</h3>
