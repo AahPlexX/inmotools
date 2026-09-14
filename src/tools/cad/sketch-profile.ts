@@ -31,11 +31,16 @@ export interface CadSketchPlane3d {
   normal: CadKernelVector3;
 }
 
-interface PlaneFrame {
+export interface PlaneFrame {
   normal: CadKernelVector3;
   point(x: number, y: number): CadKernelVector3;
   vector(x: number, y: number): CadKernelVector3;
 }
+
+/** Resolved datum planes, keyed by the producing datum-plane feature's id. */
+export type CadDatumPlaneFrames = ReadonlyMap<string, PlaneFrame>;
+
+const EMPTY_DATUM_PLANES: CadDatumPlaneFrames = new Map();
 
 interface TraversableEntity {
   entity: SketchLineEntity | SketchArcEntity | SketchSplineEntity;
@@ -50,15 +55,8 @@ function negateComponent(value: number): number {
   return value === 0 ? 0 : -value;
 }
 
-function originPlaneFrame(sketch: CadSketch): PlaneFrame {
-  if (sketch.plane.kind === 'datum') {
-    throw new Error(`Sketch '${sketch.label}' datum plane requires a resolved datum transform before exact profile construction.`);
-  }
-  if (sketch.plane.kind === 'face') {
-    throw new Error(`Sketch '${sketch.label}' face plane requires a resolved semantic face transform before exact profile construction.`);
-  }
-
-  switch (sketch.plane.plane) {
+function namedOriginFrame(plane: 'XY' | 'XZ' | 'YZ'): PlaneFrame {
+  switch (plane) {
     case 'XY':
       return {
         normal: [0, 0, 1],
@@ -78,6 +76,42 @@ function originPlaneFrame(sketch: CadSketch): PlaneFrame {
         vector: (x, y) => [0, x, y],
       };
   }
+}
+
+/**
+ * Resolves an offset datum plane: parallel to `basePlane`, translated along
+ * its normal by `distance`. In-plane axis directions are inherited unchanged
+ * from the base plane, since a pure offset cannot rotate them - this is what
+ * keeps the "offset" variant unambiguous without picking an arbitrary
+ * in-plane rotation. Angle, mid-plane, three-point, tangent, and
+ * face-derived datum planes are not yet supported and are rejected rather
+ * than approximated.
+ */
+export function resolveDatumPlaneFrame(basePlane: 'XY' | 'XZ' | 'YZ', distance: number): PlaneFrame {
+  if (!Number.isFinite(distance)) throw new Error('Datum plane offset distance must be finite.');
+  const base = namedOriginFrame(basePlane);
+  const [nx, ny, nz] = base.normal;
+  const offset: CadKernelVector3 = [nx * distance, ny * distance, nz * distance];
+  return {
+    normal: base.normal,
+    point: (x, y) => {
+      const [px, py, pz] = base.point(x, y);
+      return [px + offset[0], py + offset[1], pz + offset[2]];
+    },
+    vector: base.vector,
+  };
+}
+
+function originPlaneFrame(sketch: CadSketch, datumPlanes: CadDatumPlaneFrames): PlaneFrame {
+  if (sketch.plane.kind === 'datum') {
+    const frame = datumPlanes.get(sketch.plane.datumId);
+    if (!frame) throw new Error(`Sketch '${sketch.label}' references unresolved datum plane '${sketch.plane.datumId}'.`);
+    return frame;
+  }
+  if (sketch.plane.kind === 'face') {
+    throw new Error(`Sketch '${sketch.label}' face plane requires a resolved semantic face transform before exact profile construction.`);
+  }
+  return namedOriginFrame(sketch.plane.plane);
 }
 
 function finitePointMap(sketch: CadSketch): Map<string, { x: number; y: number }> {
@@ -297,8 +331,12 @@ function selectedCurves(sketch: CadSketch, entityIds: readonly string[], label: 
   return selected;
 }
 
-export function buildSketchProfile3d(sketch: CadSketch, profileEntityIds: readonly string[]): CadSketchProfile3d {
-  const frame = originPlaneFrame(sketch);
+export function buildSketchProfile3d(
+  sketch: CadSketch,
+  profileEntityIds: readonly string[],
+  datumPlanes: CadDatumPlaneFrames = EMPTY_DATUM_PLANES,
+): CadSketchProfile3d {
+  const frame = originPlaneFrame(sketch, datumPlanes);
   const points = finitePointMap(sketch);
   const selected = selectedCurves(sketch, profileEntityIds, 'profile');
 
@@ -312,8 +350,12 @@ export function buildSketchProfile3d(sketch: CadSketch, profileEntityIds: readon
   return { normal: frame.normal, edges };
 }
 
-export function buildSketchPath3d(sketch: CadSketch, pathEntityIds: readonly string[]): CadSketchWire3d {
-  const frame = originPlaneFrame(sketch);
+export function buildSketchPath3d(
+  sketch: CadSketch,
+  pathEntityIds: readonly string[],
+  datumPlanes: CadDatumPlaneFrames = EMPTY_DATUM_PLANES,
+): CadSketchWire3d {
+  const frame = originPlaneFrame(sketch, datumPlanes);
   const points = finitePointMap(sketch);
   const selected = selectedCurves(sketch, pathEntityIds, 'path');
 
@@ -330,13 +372,17 @@ export function buildSketchPath3d(sketch: CadSketch, pathEntityIds: readonly str
   };
 }
 
-export function resolveSketchPlane3d(sketch: CadSketch): CadSketchPlane3d {
-  const frame = originPlaneFrame(sketch);
+export function resolveSketchPlane3d(sketch: CadSketch, datumPlanes: CadDatumPlaneFrames = EMPTY_DATUM_PLANES): CadSketchPlane3d {
+  const frame = originPlaneFrame(sketch, datumPlanes);
   return { origin: frame.point(0, 0), normal: frame.normal };
 }
 
-export function resolveSketchAxis3d(sketch: CadSketch, lineId: string): CadSketchAxis3d {
-  const frame = originPlaneFrame(sketch);
+export function resolveSketchAxis3d(
+  sketch: CadSketch,
+  lineId: string,
+  datumPlanes: CadDatumPlaneFrames = EMPTY_DATUM_PLANES,
+): CadSketchAxis3d {
+  const frame = originPlaneFrame(sketch, datumPlanes);
   const points = finitePointMap(sketch);
   const entity = sketch.entities.find((candidate) => candidate.id === lineId);
   if (!entity || entity.type !== 'line') throw new Error(`Revolve axis '${lineId}' must reference a sketch line.`);

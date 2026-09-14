@@ -3,10 +3,13 @@ import type { CadExactKernel, CadKernelShape, CadKernelVector3 } from './kernel-
 import {
   buildSketchPath3d,
   buildSketchProfile3d,
+  resolveDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
+  type CadDatumPlaneFrames,
   type CadSketchProfile3d,
   type CadSketchWire3d,
+  type PlaneFrame,
 } from './sketch-profile';
 import {
   resolveTopologyRef,
@@ -71,6 +74,40 @@ function parameterString(feature: CadFeature, key: string): string {
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a non-empty string.`);
   }
   return value;
+}
+
+function parameterOriginPlane(feature: CadFeature, key: string): 'XY' | 'XZ' | 'YZ' {
+  const value = parameterString(feature, key);
+  if (value !== 'XY' && value !== 'XZ' && value !== 'YZ') {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be one of 'XY', 'XZ', or 'YZ'.`);
+  }
+  return value;
+}
+
+/**
+ * Resolves every non-suppressed 'datum-plane' feature into a 3D plane frame
+ * before any sketch is placed. Only the offset-from-origin-plane variant is
+ * supported today (parameters: basePlane, distance); angle, mid-plane,
+ * three-point, tangent, and face-derived datum planes are rejected rather
+ * than approximated, since none of those has an unambiguous in-plane axis
+ * convention without a design decision this evaluator does not yet make.
+ */
+function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
+  const frames = new Map<string, PlaneFrame>();
+  for (const feature of project.features) {
+    if (feature.type !== 'datum-plane' || feature.suppressed) continue;
+    const kind = feature.parameters.kind;
+    if (kind !== undefined && kind !== 'offset') {
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset' is implemented.`,
+      );
+    }
+    const basePlane = parameterOriginPlane(feature, 'basePlane');
+    const distance = parameterNumber(feature, 'distance', { allowZero: true });
+    frames.set(feature.id, resolveDatumPlaneFrame(basePlane, distance));
+  }
+  return frames;
 }
 
 function parameterStringArray(feature: CadFeature, key: string): string[] {
@@ -286,6 +323,7 @@ function thickenFeature(
 function mirrorFeature(
   feature: CadFeature,
   project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape {
@@ -293,7 +331,7 @@ function mirrorFeature(
   const shape = singleDependencyShape(feature, featureShapes, 'mirror');
   let plane;
   try {
-    plane = resolveSketchPlane3d(sketch);
+    plane = resolveSketchPlane3d(sketch, datumPlanes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} mirror plane is invalid: ${message}`, { cause: error });
@@ -311,11 +349,11 @@ function sketchForFeature(feature: CadFeature, project: CadProject) {
   return projectSketch(feature, project, parameterString(feature, 'sketchId'), 'profile');
 }
 
-function profileForFeature3d(feature: CadFeature, project: CadProject): CadSketchProfile3d {
+function profileForFeature3d(feature: CadFeature, project: CadProject, datumPlanes: CadDatumPlaneFrames): CadSketchProfile3d {
   const sketch = sketchForFeature(feature, project);
   const profileEntityIds = parameterStringArray(feature, 'profileEntityIds');
   try {
-    return buildSketchProfile3d(sketch, profileEntityIds);
+    return buildSketchProfile3d(sketch, profileEntityIds, datumPlanes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} profile is invalid: ${message}`, { cause: error });
@@ -325,10 +363,11 @@ function profileForFeature3d(feature: CadFeature, project: CadProject): CadSketc
 function withProfileFace(
   feature: CadFeature,
   project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
   kernel: CadFeatureKernel,
   operation: (profile: CadKernelShape, profile3d: CadSketchProfile3d) => CadKernelShape,
 ): CadKernelShape {
-  const profile3d = profileForFeature3d(feature, project);
+  const profile3d = profileForFeature3d(feature, project, datumPlanes);
   const profile = kernel.profileFace(profile3d);
   try {
     return operation(profile, profile3d);
@@ -340,10 +379,11 @@ function withProfileFace(
 function withProfileWire(
   feature: CadFeature,
   project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
   kernel: CadFeatureKernel,
   operation: (profile: CadKernelShape, profile3d: CadSketchProfile3d) => CadKernelShape,
 ): CadKernelShape {
-  const profile3d = profileForFeature3d(feature, project);
+  const profile3d = profileForFeature3d(feature, project, datumPlanes);
   const profile = kernel.profileWire(profile3d);
   try {
     return operation(profile, profile3d);
@@ -352,9 +392,14 @@ function withProfileWire(
   }
 }
 
-function extrudeFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+function extrudeFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+): CadKernelShape {
   const distance = parameterNumber(feature, 'distance');
-  return withProfileFace(feature, project, kernel, (profile, profile3d) => {
+  return withProfileFace(feature, project, datumPlanes, kernel, (profile, profile3d) => {
     const reversed = feature.parameters.reversed === true;
     const direction: CadKernelVector3 = reversed
       ? [-profile3d.normal[0], -profile3d.normal[1], -profile3d.normal[2]]
@@ -363,7 +408,12 @@ function extrudeFeature(feature: CadFeature, project: CadProject, kernel: CadFea
   });
 }
 
-function revolveFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+function revolveFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+): CadKernelShape {
   const angle = parameterNumber(feature, 'angle');
   if (angle > Math.PI * 2 + 1e-12) {
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} revolve angle must not exceed one full revolution.`);
@@ -372,12 +422,12 @@ function revolveFeature(feature: CadFeature, project: CadProject, kernel: CadFea
   const axisLineId = parameterString(feature, 'axisLineId');
   let axis;
   try {
-    axis = resolveSketchAxis3d(sketch, axisLineId);
+    axis = resolveSketchAxis3d(sketch, axisLineId, datumPlanes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} axis is invalid: ${message}`, { cause: error });
   }
-  return withProfileFace(feature, project, kernel, (profile) => kernel.revolve(
+  return withProfileFace(feature, project, datumPlanes, kernel, (profile) => kernel.revolve(
     profile,
     axis.origin,
     axis.direction,
@@ -385,19 +435,24 @@ function revolveFeature(feature: CadFeature, project: CadProject, kernel: CadFea
   ));
 }
 
-function sweepFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+function sweepFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+): CadKernelShape {
   const pathSketchId = parameterString(feature, 'pathSketchId');
   const pathEntityIds = parameterStringArray(feature, 'pathEntityIds');
   const pathSketch = projectSketch(feature, project, pathSketchId, 'path');
   let path3d: CadSketchWire3d;
   try {
-    path3d = buildSketchPath3d(pathSketch, pathEntityIds);
+    path3d = buildSketchPath3d(pathSketch, pathEntityIds, datumPlanes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} path is invalid: ${message}`, { cause: error });
   }
 
-  return withProfileWire(feature, project, kernel, (profile) => {
+  return withProfileWire(feature, project, datumPlanes, kernel, (profile) => {
     const path = kernel.profileWire(path3d);
     try {
       return kernel.sweep(profile, path);
@@ -407,7 +462,12 @@ function sweepFeature(feature: CadFeature, project: CadProject, kernel: CadFeatu
   });
 }
 
-function loftFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+function loftFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+): CadKernelShape {
   const sections = parameterLoftSections(feature);
   const solidParameter = feature.parameters.solid;
   if (solidParameter !== undefined && typeof solidParameter !== 'boolean') {
@@ -420,7 +480,7 @@ function loftFeature(feature: CadFeature, project: CadProject, kernel: CadFeatur
       const sketch = projectSketch(feature, project, section.sketchId, `loft section ${index + 1}`);
       let profile3d: CadSketchProfile3d;
       try {
-        profile3d = buildSketchProfile3d(sketch, section.profileEntityIds);
+        profile3d = buildSketchProfile3d(sketch, section.profileEntityIds, datumPlanes);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new CadFeatureEvaluationError(
@@ -444,6 +504,7 @@ function isNonSolidPassThrough(feature: CadFeature): boolean {
 function createFeatureShape(
   feature: CadFeature,
   project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape | null {
@@ -451,13 +512,13 @@ function createFeatureShape(
     case 'primitive':
       return primitive(feature, kernel);
     case 'extrude':
-      return extrudeFeature(feature, project, kernel);
+      return extrudeFeature(feature, project, datumPlanes, kernel);
     case 'revolve':
-      return revolveFeature(feature, project, kernel);
+      return revolveFeature(feature, project, datumPlanes, kernel);
     case 'sweep':
-      return sweepFeature(feature, project, kernel);
+      return sweepFeature(feature, project, datumPlanes, kernel);
     case 'loft':
-      return loftFeature(feature, project, kernel);
+      return loftFeature(feature, project, datumPlanes, kernel);
     case 'boolean':
       return booleanFeature(feature, kernel, featureShapes);
     case 'fillet':
@@ -469,7 +530,7 @@ function createFeatureShape(
     case 'offset':
       return offsetFeature(feature, kernel, featureShapes);
     case 'mirror':
-      return mirrorFeature(feature, project, kernel, featureShapes);
+      return mirrorFeature(feature, project, datumPlanes, kernel, featureShapes);
     case 'thicken':
       return thickenFeature(feature, kernel, featureShapes);
     default:
@@ -504,11 +565,12 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
   let activeFeature: CadFeature | null = null;
 
   try {
+    const datumPlanes = resolveDatumPlanes(project);
     for (const feature of project.features) {
       activeFeature = feature;
       if (feature.suppressed) continue;
 
-      const shape = createFeatureShape(feature, project, kernel, featureShapes);
+      const shape = createFeatureShape(feature, project, datumPlanes, kernel, featureShapes);
       if (!shape) continue;
 
       if (!feature.bodyId) {
