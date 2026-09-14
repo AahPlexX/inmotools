@@ -1,6 +1,6 @@
 import { PDFDocument, PDFHexString, PDFName } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { inspectPdf } from '../../src/tools/pdf/pdf-engine';
+import { inspectPdfFormFields } from '../../src/tools/pdf/pdf-form-inventory';
 
 async function inventoryFixture() {
   const document = await PDFDocument.create();
@@ -46,11 +46,10 @@ describe('PDF AcroForm inventory', () => {
   it('reports field type, pages, flags, current state, and reset/default state without mutating the source', async () => {
     const bytes = await inventoryFixture();
     const before = bytes.slice();
-    const inspection = await inspectPdf(bytes);
+    const fields = await inspectPdfFormFields(bytes);
 
     expect(bytes).toEqual(before);
-    expect(inspection.formFieldCount).toBe(5);
-    expect(inspection.formFields).toEqual([
+    expect(fields).toEqual([
       {
         name: 'client.name',
         type: 'text',
