@@ -77,22 +77,31 @@ export function BlockTreeEditor({
   onChange,
 }: {
   blocks: LayoutProject["blocks"];
-  onChange: (blocks: Block[]) => void;
+  onChange: (blocks: Block[], group?: string) => void;
 }) {
   const [error, setError] = useState("");
   const dragging = useRef("");
   const host = useRef<HTMLOListElement>(null);
-  function update(action: () => Block[]) {
+  function update(action: () => Block[], group = "") {
     try {
-      onChange(action());
+      onChange(action(), group);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to change blocks.");
     }
   }
   function edit(id: string, patch: Partial<Block>) {
-    update(() => blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    const keys = Object.keys(patch);
+    const group =
+      keys.length === 1 && ["title", "text"].includes(keys[0])
+        ? `block:${id}:${keys[0]}`
+        : "";
+    update(
+      () => blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+      group,
+    );
   }
+
   return (
     <>
       <ol ref={host} className="wl-blocks">

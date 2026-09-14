@@ -191,3 +191,24 @@ it('validates composite tokens, typed subvalue references and complete typograph
   expect(()=>tokenValueCss('border',{color,width:px(1),style:'solid',bad:true})).toThrow();
   expect(()=>tokenValueCss('shadow',{color,offsetX:px(0),offsetY:px(4),blur:px(-1),spread:px(0)})).toThrow();
 });
+
+it('groups consecutive text edits without losing undo boundaries or redo branches', async () => {
+  const {createHistory,projectHistory}=await import('../../src/tools/web-layout/project-history');
+  let history=createHistory(INITIAL_PROJECT);
+  for(let n=1;n<=80;n++)history=projectHistory(history,{type:'commit',project:{...INITIAL_PROJECT,title:'a'.repeat(n)},group:'title',time:n*10});
+  expect(history.entries).toHaveLength(2);
+  history=projectHistory(history,{type:'undo'});
+  expect(history.entries[history.position].title).toBe(INITIAL_PROJECT.title);
+  history=projectHistory(history,{type:'redo'});
+  expect(history.entries[history.position].title).toHaveLength(80);
+  history=projectHistory(history,{type:'end-group'});
+  history=projectHistory(history,{type:'commit',project:{...INITIAL_PROJECT,title:'second'},group:'title',time:850});
+  expect(history.entries).toHaveLength(3);
+  history=projectHistory(history,{type:'undo'});
+  history=projectHistory(history,{type:'commit',project:{...INITIAL_PROJECT,title:'replacement'},group:'title',time:860});
+  expect(history.entries).toHaveLength(3);
+  expect(history.entries.some(p=>p.title==='second')).toBe(false);
+  for(let n=0;n<70;n++)history=projectHistory(history,{type:'commit',project:{...INITIAL_PROJECT,title:String(n)},time:1000+n});
+  expect(history.entries).toHaveLength(51);
+  expect(history.position).toBe(50);
+});

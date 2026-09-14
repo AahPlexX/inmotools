@@ -1,5 +1,21 @@
 import { expect, test } from '@playwright/test';
 
+test('undoes a typing session and supports project shortcuts outside text fields', async ({page}) => {
+  await page.goto('./#/tools/web-layout-studio');
+  const heading=page.getByLabel('Page heading',{exact:true});
+  await heading.fill('');
+  await heading.pressSequentially('A complete sentence');
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(heading).toHaveValue('A place for good ideas');
+  await page.getByRole('button',{name:'Redo',exact:true}).click();
+  await expect(heading).toHaveValue('A complete sentence');
+  await page.getByRole('button',{name:'Build',exact:true}).focus();
+  await page.keyboard.press('Control+z');
+  await expect(heading).toHaveValue('A place for good ideas');
+  await page.keyboard.press('Control+Shift+z');
+  await expect(heading).toHaveValue('A complete sentence');
+});
+
 test('authors a token alias, rejects broken references and exports applied variables', async ({page}) => {
   await page.goto('./#/tools/web-layout-studio');
   await page.getByRole('button',{name:'Theme',exact:true}).click();
