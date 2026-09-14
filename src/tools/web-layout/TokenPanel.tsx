@@ -172,14 +172,14 @@ export function TokenPanel({
         in previews and downloads. Use the listed variable in your code or theme
         expressions to connect it to a style.
       </p>
-      <p>
+      <details><summary>Token format and CSS mapping</summary><p>
         Supports all thirteen DTCG value types, group types and local JSON
         Pointer references. Group extensions are not supported yet; imports
         using them are rejected without replacing your draft. Custom stroke
         patterns export as dashed CSS borders, gradient tokens use a 90-degree
         linear presentation, and typography exports its letter spacing
         separately.
-      </p>
+      </p></details>
       <form
         onSubmit={(e) => {
           e.preventDefault();

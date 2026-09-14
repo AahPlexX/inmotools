@@ -20,6 +20,8 @@ test('authors a token alias, rejects broken references and exports applied varia
   await page.goto('./#/tools/web-layout-studio');
   await page.getByRole('button',{name:'Theme',exact:true}).click();
   await page.getByText('Design-token library',{exact:true}).click();
+  await expect(page.getByLabel('Token path',{exact:true})).toHaveCSS('border-top-width','1px');
+  await expect(page.getByRole('button',{name:'Save token to draft',exact:true})).toHaveCSS('border-top-width','1px');
   await page.getByLabel('Token path',{exact:true}).fill('spacing.base');
   await page.getByLabel('Token value',{exact:true}).fill('20px');
   await page.getByRole('button',{name:'Save token to draft',exact:true}).click();
@@ -40,6 +42,16 @@ test('authors a token alias, rejects broken references and exports applied varia
   for await(const chunk of stream!)chunks.push(chunk as Buffer);
   const json=JSON.parse(Buffer.concat(chunks).toString('utf8'));
   expect(json.spacing.card.$value).toBe('{spacing.base}');
+});
+
+test('gives tablet cards room for readable text without overflowing the viewport', async ({page}) => {
+  await page.goto('./#/tools/web-layout-studio');
+  const frame=page.frameLocator('iframe[title="Layout at 768 pixels"]');
+  await expect.poll(()=>frame.locator('#welcome').evaluate(el=>{
+    const css=getComputedStyle(el);
+    return el.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight);
+  })).toBeGreaterThan(220);
+  await expect.poll(()=>frame.locator('body').evaluate(el=>el.scrollWidth<=el.ownerDocument.documentElement.clientWidth)).toBe(true);
 });
 
 test('applies appearance drafts to previews and exports, with print and reduced-motion recovery', async ({ page }) => {

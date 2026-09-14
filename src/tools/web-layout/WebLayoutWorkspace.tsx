@@ -33,7 +33,7 @@ function AreaEditor({ project, onCommit }: { project: LayoutProject; onCommit: (
   const [error, setError] = useState('');
   const committedAreas = project.gridAreas.join('\n');
   useEffect(() => { setDraft(committedAreas); setError(''); }, [committedAreas, project.columns]);
-  return <div><label className="wl-field">Named grid areas<textarea aria-label="Named grid areas" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} /></label>
+  return <div className="wl-wide"><label className="wl-field">Named grid areas<textarea aria-label="Named grid areas" value={draft} aria-invalid={Boolean(error)} onChange={event => setDraft(event.target.value)} /></label>
     <p className="help-text">One row per line; separate names with spaces. Use dots for empty cells. Areas map to blocks in first-appearance order. Empty text restores automatic flow. Changing columns clears the area map.</p>
     <button type="button" onClick={() => {
       try {

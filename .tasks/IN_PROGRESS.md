@@ -2,7 +2,7 @@
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
-  - Current milestone: typed token integration passed focused browser run 34795779418 and Pages deployed 23364f7. Grouped undo/redo and project keyboard shortcuts implemented; 19 focused units, TypeScript and production build pass. New history browser case pending. Full 60-feature ledger remains active.
+  - Current milestone: token and grouped-history integrations passed focused browser validation and deployed. Live visual review led to scoped control-boundary and tablet card-readability fixes; current candidate awaits its focused browser gate. Full 60-feature ledger remains active with no scope reduction.
   - Completion: every ledger item implemented and verified through reachable UI, validated exports/persistence, script isolation, responsive keyboard access, exact-main checks and Pages deployment. Partial features remain open.
   - Scope: `src/tools/web-layout/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved.
 

@@ -32,7 +32,7 @@ describe('Web Layout Studio portable projects', () => {
   it('binds layout and breakpoint output to the same project as the preview', () => {
     const project = { ...INITIAL_PROJECT, columns: 5, breakpoint: 710, gap: 18 };
     const css = buildCss(project);
-    expect(css).toContain('repeat(auto-fit,minmax(min(100%,max(12rem,calc((100% - 4 * var(--space)) / 5))),1fr))');
+    expect(css).toContain('repeat(auto-fit,minmax(min(100%,max(16rem,calc((100% - 4 * var(--space)) / 5))),1fr))');
     expect(css).toContain('@media(max-width:710px)');
     expect(css).toContain('--space:18px');
     expect(buildHtml(project)).toContain(css);
@@ -53,7 +53,7 @@ describe('Web Layout Studio portable projects', () => {
     const mapped = { ...INITIAL_PROJECT, gridAreas: ['a a b', 'a a c'] };
     expect(parseProject(JSON.stringify(mapped)).gridAreas).toEqual(mapped.gridAreas);
     expect(() => parseProject(JSON.stringify({ ...mapped, columns: 4 }))).toThrow();
-    expect(buildCss(mapped)).toContain('@container(min-width:calc(36rem + 48px))');
+    expect(buildCss(mapped)).toContain('@container(min-width:calc(48rem + 48px))');
   });
   it('uses a restrictive preview policy without imposing it on portable exports', () => {
     const preview = buildPreview(INITIAL_PROJECT);
