@@ -8,6 +8,7 @@ import type {
   CadKernelVector3,
 } from './kernel-contract';
 import type { CadSketchProfile3d, CadSketchWire3d } from './sketch-profile';
+import type { TopologyCandidate, TopologyKind } from './topology-ref';
 
 export interface OcctCadKernelAdapterOptions {
   wasm?: InitOptions['wasm'];
@@ -21,6 +22,10 @@ function vectorLength([x, y, z]: CadKernelVector3): number {
 
 function asVec3([x, y, z]: CadKernelVector3): { x: number; y: number; z: number } {
   return { x, y, z };
+}
+
+function fromVec3(value: { x: number; y: number; z: number }): CadKernelVector3 {
+  return [value.x, value.y, value.z];
 }
 
 /**
@@ -108,6 +113,96 @@ export class OcctCadKernelAdapter implements CadExactKernel {
       return this.#kernel.makeWire(edgeHandles);
     } finally {
       for (const edge of edgeHandles) this.#kernel.release(edge);
+    }
+  }
+
+  #candidateBounds(handle: ShapeHandle): CadKernelShapeBounds {
+    const bounds = this.#kernel.getBoundingBox(handle, false);
+    return {
+      min: [bounds.xmin, bounds.ymin, bounds.zmin],
+      max: [bounds.xmax, bounds.ymax, bounds.zmax],
+    };
+  }
+
+  #topologyCandidate(
+    handle: ShapeHandle,
+    producerFeatureId: string,
+    kind: TopologyKind,
+    index: number,
+  ): TopologyCandidate {
+    const base = {
+      id: `topo:${kind}:${index}`,
+      producerFeatureId,
+      kind,
+      bounds: this.#candidateBounds(handle),
+    } as const;
+
+    if (kind === 'vertex') {
+      return {
+        ...base,
+        centroid: fromVec3(this.#kernel.vertexPosition(handle)),
+      };
+    }
+
+    if (kind === 'edge') {
+      const curveType = this.#kernel.curveType(handle);
+      const candidate: TopologyCandidate = {
+        ...base,
+        curveType,
+        centroid: fromVec3(this.#kernel.getLinearCenterOfMass(handle)),
+        length: this.#kernel.curveLength(handle),
+      };
+      if (curveType === 'line') {
+        const { first, last } = this.#kernel.curveParameters(handle);
+        candidate.axis = fromVec3(this.#kernel.curveTangent(handle, (first + last) / 2));
+      }
+      return candidate;
+    }
+
+    const surfaceType = this.#kernel.surfaceType(handle);
+    const candidate: TopologyCandidate = {
+      ...base,
+      surfaceType,
+      centroid: fromVec3(this.#kernel.getSurfaceCenterOfMass(handle)),
+      area: this.#kernel.getSurfaceArea(handle),
+    };
+    const uv = this.#kernel.uvBounds(handle);
+    if ([uv.uMin, uv.uMax, uv.vMin, uv.vMax].every(Number.isFinite)) {
+      candidate.normal = fromVec3(this.#kernel.surfaceNormal(
+        handle,
+        (uv.uMin + uv.uMax) / 2,
+        (uv.vMin + uv.vMax) / 2,
+      ));
+    }
+    return candidate;
+  }
+
+  #resolvedSubshapeIndex(id: string, kind: TopologyKind, count: number): number {
+    const match = /^topo:(vertex|edge|face):(\d+)$/.exec(id);
+    if (!match || match[1] !== kind) {
+      throw new Error(`Resolved topology id '${id}' is not an ephemeral ${kind} candidate id.`);
+    }
+    const index = Number(match[2]);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= count) {
+      throw new Error(`Resolved topology id '${id}' is outside the current ${kind} candidate range.`);
+    }
+    return index;
+  }
+
+  #withResolvedSubshapes<T>(
+    shape: CadKernelShape,
+    kind: TopologyKind,
+    ids: readonly string[],
+    operation: (handles: ShapeHandle[]) => T,
+  ): T {
+    if (ids.length === 0) throw new Error(`At least one resolved ${kind} candidate is required.`);
+    const subshapes = this.#kernel.getSubShapes(this.#unwrap(shape), kind);
+    try {
+      const indices = ids.map((id) => this.#resolvedSubshapeIndex(id, kind, subshapes.length));
+      if (new Set(indices).size !== indices.length) throw new Error(`Resolved ${kind} candidates must be unique.`);
+      return operation(indices.map((index) => subshapes[index]!));
+    } finally {
+      for (const subshape of subshapes) this.#kernel.release(subshape);
     }
   }
 
@@ -200,12 +295,27 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.loft(this.#unwrapMany(sections), solid, false));
   }
 
-  fillet(_shape: CadKernelShape, _edgeIds: readonly string[], _radius: number): CadKernelShape {
-    throw new Error('Fillet requires semantic topology IDs to be resolved to OCCT edge handles by the G6 feature evaluator.');
+  topologyCandidates(
+    shape: CadKernelShape,
+    producerFeatureId: string,
+    kind: TopologyKind,
+  ): TopologyCandidate[] {
+    const subshapes = this.#kernel.getSubShapes(this.#unwrap(shape), kind);
+    try {
+      return subshapes.map((subshape, index) => this.#topologyCandidate(subshape, producerFeatureId, kind, index));
+    } finally {
+      for (const subshape of subshapes) this.#kernel.release(subshape);
+    }
+  }
+
+  fillet(shape: CadKernelShape, edgeIds: readonly string[], radius: number): CadKernelShape {
+    return this.#withResolvedSubshapes(shape, 'edge', edgeIds, (edges) => (
+      this.#wrap(this.#kernel.fillet(this.#unwrap(shape), edges, radius))
+    ));
   }
 
   chamfer(_shape: CadKernelShape, _edgeIds: readonly string[], _distance: number): CadKernelShape {
-    throw new Error('Chamfer requires semantic topology IDs to be resolved to OCCT edge handles by the G6 feature evaluator.');
+    throw new Error('Chamfer semantic topology resolution is implemented after the fillet bridge is proven by G6 tests.');
   }
 
   shell(_shape: CadKernelShape, _faceIds: readonly string[], _thickness: number): CadKernelShape {
