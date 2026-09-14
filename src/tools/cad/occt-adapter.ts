@@ -7,7 +7,7 @@ import type {
   CadKernelTessellationOptions,
   CadKernelVector3,
 } from './kernel-contract';
-import type { CadSketchProfile3d } from './sketch-profile';
+import type { CadSketchProfile3d, CadSketchWire3d } from './sketch-profile';
 
 export interface OcctCadKernelAdapterOptions {
   wasm?: InitOptions['wasm'];
@@ -72,6 +72,45 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     }
   }
 
+  #makeWire(definition: CadSketchWire3d): ShapeHandle {
+    if (definition.edges.length === 0) throw new Error('Exact wire requires at least one edge.');
+    const edgeHandles: ShapeHandle[] = [];
+    try {
+      for (const edge of definition.edges) {
+        switch (edge.kind) {
+          case 'line':
+            edgeHandles.push(this.#kernel.makeLineEdge(asVec3(edge.start), asVec3(edge.end)));
+            break;
+          case 'arc':
+            edgeHandles.push(this.#kernel.makeArcEdge(asVec3(edge.start), asVec3(edge.mid), asVec3(edge.end)));
+            break;
+          case 'circle':
+            edgeHandles.push(this.#kernel.makeCircleEdge(asVec3(edge.center), asVec3(edge.normal), edge.radius));
+            break;
+          case 'spline': {
+            const points = edge.points.map(asVec3);
+            if ((edge.startTangent === undefined) !== (edge.endTangent === undefined)) {
+              throw new Error('Spline profile tangency requires both start and end tangents.');
+            }
+            if (edge.startTangent && edge.endTangent && !edge.periodic) {
+              edgeHandles.push(this.#kernel.interpolatePointsWithTangents(
+                points,
+                asVec3(edge.startTangent),
+                asVec3(edge.endTangent),
+              ));
+            } else {
+              edgeHandles.push(this.#kernel.interpolatePoints(points, edge.periodic));
+            }
+            break;
+          }
+        }
+      }
+      return this.#kernel.makeWire(edgeHandles);
+    } finally {
+      for (const edge of edgeHandles) this.#kernel.release(edge);
+    }
+  }
+
   box(width: number, depth: number, height: number): CadKernelShape {
     return this.#wrap(this.#kernel.makeBox(width, depth, height));
   }
@@ -108,50 +147,22 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.section(this.#unwrap(left), this.#unwrap(right)));
   }
 
+  /** Build an exact wire from already solved and 3D-mapped sketch curves. */
+  profileWire(definition: CadSketchWire3d): CadKernelShape {
+    return this.#wrap(this.#makeWire(definition));
+  }
+
   /**
    * Build a planar exact face from an already solved and 3D-mapped sketch
-   * profile. Edge/wire handles are temporary and are deterministically released
-   * after OCCT has copied them into the returned face.
+   * profile. The temporary wire is deterministically released after OCCT has
+   * copied it into the returned face.
    */
   profileFace(profile: CadSketchProfile3d): CadKernelShape {
-    if (profile.edges.length === 0) throw new Error('Exact profile requires at least one edge.');
-    const edgeHandles: ShapeHandle[] = [];
-    let wire: ShapeHandle | null = null;
+    const wire = this.#makeWire(profile);
     try {
-      for (const edge of profile.edges) {
-        switch (edge.kind) {
-          case 'line':
-            edgeHandles.push(this.#kernel.makeLineEdge(asVec3(edge.start), asVec3(edge.end)));
-            break;
-          case 'arc':
-            edgeHandles.push(this.#kernel.makeArcEdge(asVec3(edge.start), asVec3(edge.mid), asVec3(edge.end)));
-            break;
-          case 'circle':
-            edgeHandles.push(this.#kernel.makeCircleEdge(asVec3(edge.center), asVec3(edge.normal), edge.radius));
-            break;
-          case 'spline': {
-            const points = edge.points.map(asVec3);
-            if ((edge.startTangent === undefined) !== (edge.endTangent === undefined)) {
-              throw new Error('Spline profile tangency requires both start and end tangents.');
-            }
-            if (edge.startTangent && edge.endTangent && !edge.periodic) {
-              edgeHandles.push(this.#kernel.interpolatePointsWithTangents(
-                points,
-                asVec3(edge.startTangent),
-                asVec3(edge.endTangent),
-              ));
-            } else {
-              edgeHandles.push(this.#kernel.interpolatePoints(points, edge.periodic));
-            }
-            break;
-          }
-        }
-      }
-      wire = this.#kernel.makeWire(edgeHandles);
       return this.#wrap(this.#kernel.makeFace(wire));
     } finally {
-      if (wire !== null) this.#kernel.release(wire);
-      for (const edge of edgeHandles) this.#kernel.release(edge);
+      this.#kernel.release(wire);
     }
   }
 
