@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { downloadBlob } from '../../lib/download';
 import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
 import PhotoExportDialog from './PhotoExportDialog';
@@ -13,6 +21,14 @@ import {
 } from './photo-engine';
 import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
+import {
+  isPhotoImportFile,
+  normalizePhotoImport,
+  photoImportErrorMessage,
+  readPhotoClipboard,
+  type PhotoImportCandidate,
+  type PhotoImportSource,
+} from './photo-import';
 import {
   disposePhotoRenderer,
   isRenderResultCurrent,
@@ -118,6 +134,7 @@ function formatBytes(bytes: number): string {
 }
 
 function readNumber(value: string, fallback: number): number {
+  if (value.trim() === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -232,6 +249,7 @@ export default function PhotoWorkspace() {
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
   const [snapshotName, setSnapshotName] = useState('');
   const [editClipboard, setEditClipboard] = useState<PhotoRecipe | null>(null);
+  const [photoDragActive, setPhotoDragActive] = useState(false);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
@@ -240,6 +258,7 @@ export default function PhotoWorkspace() {
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
   const sourceUrlRef = useRef<string | null>(null);
+  const importRevisionRef = useRef(0);
 
   const recipe = history.present;
   const parsedCustomRatioWidth = Number(customRatioWidth);
@@ -248,6 +267,8 @@ export default function PhotoWorkspace() {
     && Number.isFinite(parsedCustomRatioHeight)
     && parsedCustomRatioWidth > 0
     && parsedCustomRatioHeight > 0;
+  const directClipboardAvailable = typeof navigator !== 'undefined'
+    && typeof navigator.clipboard?.read === 'function';
 
   const releasePreviewUrl = useCallback(() => {
     if (!previewUrlRef.current) return;
@@ -272,6 +293,7 @@ export default function PhotoWorkspace() {
   }, []);
 
   useEffect(() => () => {
+    importRevisionRef.current += 1;
     renderRevisionRef.current += 1;
     releasePreviewUrl();
     releaseSourceUrl();
@@ -281,10 +303,12 @@ export default function PhotoWorkspace() {
   useEffect(() => {
     if (!source) {
       setPreview(null);
+      setPreviewBusy(false);
       releasePreviewUrl();
       return;
     }
     const revision = ++renderRevisionRef.current;
+    const importRevisionAtStart = importRevisionRef.current;
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setPreviewBusy(true);
@@ -301,15 +325,19 @@ export default function PhotoWorkspace() {
         previewUrlRef.current = url;
         setPreview({ url, result });
         setPreviewBusy(false);
-        if (result.scaledForSafety) {
-          setStatus(`Preview rendered at ${result.width} × ${result.height} for responsive editing; full export remains available within device limits.`);
-        } else {
-          setStatus(`Preview updated · ${result.width} × ${result.height}`);
+        if (importRevisionAtStart === importRevisionRef.current) {
+          if (result.scaledForSafety) {
+            setStatus(`Preview rendered at ${result.width} × ${result.height} for responsive editing; full export remains available within device limits.`);
+          } else {
+            setStatus(`Preview updated · ${result.width} × ${result.height}`);
+          }
         }
       }).catch((error) => {
         if (cancelled || revision !== renderRevisionRef.current) return;
         setPreviewBusy(false);
-        setStatus(`Preview failed: ${error instanceof Error ? error.message : 'unknown rendering error'}`);
+        if (importRevisionAtStart === importRevisionRef.current) {
+          setStatus(`Preview failed: ${error instanceof Error ? error.message : 'unknown rendering error'}`);
+        }
       });
     }, 70);
     return () => {
@@ -338,6 +366,9 @@ export default function PhotoWorkspace() {
     const handler = (event: KeyboardEvent) => {
       const modifier = event.metaKey || event.ctrlKey;
       if (!modifier || event.key.toLowerCase() !== 'z') return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
       event.preventDefault();
       if (event.shiftKey) redo();
       else undo();
@@ -346,23 +377,27 @@ export default function PhotoWorkspace() {
     return () => window.removeEventListener('keydown', handler);
   }, [redo, undo]);
 
-  async function openPhoto(files: FileList | File[]) {
-    const file = Array.from(files)[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setStatus('That file is not a browser-decodable image. Choose a JPEG, PNG, WebP, or another still image your browser supports.');
-      return;
-    }
+  const openPhoto = useCallback(async (candidate: PhotoImportCandidate, importRevision: number) => {
+    const { file } = candidate;
+    if (importRevision !== importRevisionRef.current) return;
+    let nextSourceUrl: string | null = null;
     try {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       const width = bitmap.width;
       const height = bitmap.height;
       bitmap.close();
+      if (importRevision !== importRevisionRef.current) return;
+      nextSourceUrl = URL.createObjectURL(file);
+      if (importRevision !== importRevisionRef.current) {
+        URL.revokeObjectURL(nextSourceUrl);
+        return;
+      }
       releaseSourceUrl();
       releasePreviewUrl();
-      const originalUrl = URL.createObjectURL(file);
-      sourceUrlRef.current = originalUrl;
-      setSource({ file, name: file.name, originalUrl, width, height });
+      setPreview(null);
+      sourceUrlRef.current = nextSourceUrl;
+      setSource({ file, name: file.name, originalUrl: nextSourceUrl, width, height });
+      nextSourceUrl = null;
       setHistory(createHistory(DEFAULT_RECIPE));
       setSnapshots([]);
       setSnapshotName('');
@@ -371,8 +406,67 @@ export default function PhotoWorkspace() {
       setCanvasInteraction(null);
       setStatus(`${file.name} opened locally · ${width} × ${height} · ${formatBytes(file.size)}`);
     } catch (error) {
-      setStatus(`Could not decode ${file.name}: ${error instanceof Error ? error.message : 'unsupported image data'}`);
+      if (nextSourceUrl) URL.revokeObjectURL(nextSourceUrl);
+      if (importRevision === importRevisionRef.current) {
+        setStatus(`Could not decode ${file.name}: ${error instanceof Error ? error.message : 'unsupported image data'}`);
+      }
     }
+  }, [releasePreviewUrl, releaseSourceUrl]);
+
+  const importPhotoFiles = useCallback(async (
+    files: Iterable<File> | ArrayLike<File>,
+    source: PhotoImportSource,
+  ) => {
+    const importRevision = ++importRevisionRef.current;
+    try {
+      await openPhoto(normalizePhotoImport(files, source), importRevision);
+    } catch (error) {
+      if (importRevision === importRevisionRef.current) {
+        setStatus(photoImportErrorMessage(error));
+      }
+    }
+  }, [openPhoto]);
+
+  async function pastePhotoFromClipboard() {
+    const importRevision = ++importRevisionRef.current;
+    try {
+      const candidate = await readPhotoClipboard(navigator.clipboard);
+      if (importRevision !== importRevisionRef.current) return;
+      await openPhoto(candidate, importRevision);
+    } catch (error) {
+      if (importRevision === importRevisionRef.current) {
+        setStatus(photoImportErrorMessage(error));
+      }
+    }
+  }
+
+  useEffect(() => {
+    const handleWindowPaste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files ?? []).filter(isPhotoImportFile);
+      if (!files.length) return;
+      event.preventDefault();
+      void importPhotoFiles(files, 'clipboard');
+    };
+    window.addEventListener('paste', handleWindowPaste, true);
+    return () => window.removeEventListener('paste', handleWindowPaste, true);
+  }, [importPhotoFiles]);
+
+  function handlePhotoDrag(event: ReactDragEvent<HTMLDivElement>) {
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setPhotoDragActive(true);
+  }
+
+  function handlePhotoDragLeave(event: ReactDragEvent<HTMLDivElement>) {
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    setPhotoDragActive(false);
+  }
+
+  function handlePhotoDrop(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setPhotoDragActive(false);
+    void importPhotoFiles(event.dataTransfer.files, 'drop');
   }
 
   function resetAll() {
@@ -947,7 +1041,14 @@ export default function PhotoWorkspace() {
   const naturalDimensions = source ? photoNaturalDimensions(source.width, source.height, recipe) : null;
 
   return (
-    <div className="photo-studio">
+    <div
+      className={`photo-studio${photoDragActive ? ' is-photo-dragging' : ''}`}
+      data-testid="photo-drop-target"
+      onDragEnter={handlePhotoDrag}
+      onDragOver={handlePhotoDrag}
+      onDragLeave={handlePhotoDragLeave}
+      onDrop={handlePhotoDrop}
+    >
       <header className="photo-command-bar" aria-label="Photo Studio commands">
         <label className="photo-open-label">
           Open photo
@@ -956,9 +1057,31 @@ export default function PhotoWorkspace() {
             data-testid="photo-file-input"
             type="file"
             accept="image/jpeg,image/png,image/webp,image/*"
-            onChange={(event) => event.target.files && void openPhoto(event.target.files)}
+            onChange={(event) => {
+              if (event.target.files) void importPhotoFiles(event.target.files, 'file-input');
+              event.target.value = '';
+            }}
           />
         </label>
+        <label className="photo-open-label">
+          Use camera
+          <input
+            data-testid="photo-camera-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(event) => {
+              if (event.target.files) void importPhotoFiles(event.target.files, 'file-input');
+              event.target.value = '';
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void pastePhotoFromClipboard()}
+          disabled={!directClipboardAvailable}
+          aria-describedby="photo-import-hint"
+        >Paste image</button>
         <button type="button" onClick={undo} disabled={!history.past.length} aria-label="Undo">Undo</button>
         <button type="button" onClick={redo} disabled={!history.future.length} aria-label="Redo">Redo</button>
         <button type="button" onClick={copyEdits} disabled={!source}>Copy edits</button>
@@ -976,6 +1099,11 @@ export default function PhotoWorkspace() {
         <span className="photo-feature-count">60+ reversible image controls</span>
         <button type="button" onClick={() => setExportOpen(true)} disabled={!source} aria-label="Export">Export</button>
       </header>
+      <p className="photo-import-hint" id="photo-import-hint">
+        {directClipboardAvailable
+          ? 'Drop a photo anywhere in the studio, press Ctrl+V, or use Paste image.'
+          : 'Drop a photo anywhere in the studio or press Ctrl+V. Direct clipboard reading is unavailable in this browser.'}
+      </p>
 
       <div className="photo-workbench">
         <nav className="photo-tool-tabs" aria-label="Photo editing sections">
