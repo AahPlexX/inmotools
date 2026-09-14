@@ -1,0 +1,66 @@
+name: PDF Workstation validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/tools/pdf/**'
+      - 'tests/unit/pdf*.test.ts'
+      - 'tests/e2e/pdf*.spec.ts'
+      - 'docs/superpowers/specs/2026-09-12-pdf-workstation-design.md'
+      - 'docs/superpowers/plans/2026-09-12-pdf-workstation.md'
+      - '.github/workflows/pdf-workstation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pdf-workstation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: PDF unit tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/pdf.test.ts
+          tests/unit/pdf-attachments.test.ts
+          tests/unit/pdf-export-summary.test.ts
+          tests/unit/pdf-form-authoring.test.ts
+          tests/unit/pdf-form-inventory.test.ts
+          tests/unit/pdf-overlays.test.ts
+      - name: Production build
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: PDF browser tests
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/pdf.spec.ts
+          tests/e2e/pdf-export-summary.spec.ts
+          tests/e2e/pdf-form-authoring.spec.ts
+          tests/e2e/pdf-form-inventory.spec.ts
+          tests/e2e/pdf-overlays.spec.ts
+          tests/e2e/pdf-structural-actions.spec.ts
+      - name: Upload Playwright failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pdf-playwright-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
