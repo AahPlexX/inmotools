@@ -72,7 +72,7 @@ export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCur
         <path className="photo-tone-curve-path" d={curvePath(curve)} />
         {curve.map((point, index) => (
           <circle
-            key={`${index}-${point.x}-${point.y}`}
+            key={index}
             className="photo-tone-curve-point"
             cx={point.x * 100}
             cy={100 - point.y * 100}

@@ -20,17 +20,6 @@
 .photo-mini-histogram [data-histogram-channel='blue'] { stroke: #3b82f6; }
 .photo-mini-histogram [data-histogram-channel='luminance'] { stroke: currentColor; stroke-width: 1.8; }
 
-.photo-clipping-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  transform: scale(var(--photo-zoom, 1));
-  transform-origin: center center;
-  image-rendering: pixelated;
-}
-
 .photo-color-readout {
   display: flex;
   flex-wrap: wrap;

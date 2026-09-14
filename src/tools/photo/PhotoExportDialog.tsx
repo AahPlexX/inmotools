@@ -42,6 +42,7 @@ interface PhotoExportDialogProps {
 }
 
 function readNumber(value: string, fallback: number): number {
+  if (value.trim() === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -83,10 +84,13 @@ export default function PhotoExportDialog({
 
   useEffect(() => {
     if (!source) return;
+    // Intentionally re-run only when the photo changes, using whatever outputMime
+    // is current at that moment — not on every mime change.
     setRequestedName(safePhotoFilename(source.name, outputMime));
     setMetadata({ ppi: 300 });
     setBatchFiles([]);
     setBatchStatuses([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source?.file]);
 
   const encoderSupport = useMemo(() => ({
@@ -168,13 +172,17 @@ export default function PhotoExportDialog({
 
   function downloadXmp() {
     if (!source || metadataPolicy === 'strip') return;
-    const reviewed = photoMetadataForPolicy(metadata, metadataPolicy);
-    const xmp = serializePhotoXmp(reviewed);
-    downloadBlob(
-      new Blob([xmp], { type: 'application/rdf+xml' }),
-      sidecarFilename(requestedName, source.name, outputMime),
-    );
-    onStatus('XMP sidecar created from the reviewed export metadata.');
+    try {
+      const reviewed = photoMetadataForPolicy(metadata, metadataPolicy);
+      const xmp = serializePhotoXmp(reviewed);
+      downloadBlob(
+        new Blob([xmp], { type: 'application/rdf+xml' }),
+        sidecarFilename(requestedName, source.name, outputMime),
+      );
+      onStatus('XMP sidecar created from the reviewed export metadata.');
+    } catch (error) {
+      onStatus(`XMP sidecar creation failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
   }
 
   function chooseBatch(event: ChangeEvent<HTMLInputElement>) {

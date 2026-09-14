@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
 import type { LocalAdjustment, PhotoHistogram, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
+import './photo-observation.css';
 
 export interface PhotoCanvasInteraction {
   kind: 'local' | 'retouch';
@@ -136,6 +137,10 @@ export default function PhotoCanvas({
   }, [originalUrl]);
 
   useEffect(() => {
+    setSample(null);
+  }, [previewUrl]);
+
+  useEffect(() => {
     if (!clippingVisible || !previewUrl) return;
     const image = previewImageRef.current;
     const canvas = clippingCanvasRef.current;
@@ -149,7 +154,12 @@ export default function PhotoCanvas({
       if (!context) return;
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      let imageData: ImageData;
+      try {
+        imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      } catch {
+        return;
+      }
       const data = imageData.data;
       for (let offset = 0; offset < data.length; offset += 4) {
         const clipping = classifyPhotoClipping(data[offset], data[offset + 1], data[offset + 2]);
@@ -193,8 +203,12 @@ export default function PhotoCanvas({
     const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
     if (!context) return;
     context.drawImage(image, sx, sy, 1, 1, 0, 0, 1, 1);
-    const pixel = context.getImageData(0, 0, 1, 1).data;
-    setSample(photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]));
+    try {
+      const pixel = context.getImageData(0, 0, 1, 1).data;
+      setSample(photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]));
+    } catch {
+      // Ignore canvas security errors from unexpected non-local image sources.
+    }
   }
 
   function beginGesture(event: ReactPointerEvent<HTMLDivElement>) {

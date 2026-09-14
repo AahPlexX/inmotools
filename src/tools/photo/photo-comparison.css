@@ -84,6 +84,9 @@
   height: 100%;
   pointer-events: none;
   z-index: 2;
+  transform: scale(var(--photo-zoom, 1));
+  transform-origin: center center;
+  image-rendering: pixelated;
 }
 
 .photo-compare-side-by-side {
