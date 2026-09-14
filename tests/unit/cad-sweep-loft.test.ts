@@ -76,13 +76,13 @@ describe('CAD exact sweep and loft contracts', () => {
     });
   });
 
-  it('evaluates a sweep from a closed sketch profile and a separate open sketch path', () => {
-    const profileFace = token('profile-face');
+  it('evaluates a sweep from a closed sketch wire and a separate open sketch path', () => {
+    const profileWire = token('profile-wire');
     const pathWire = token('path-wire');
     const swept = token('swept');
+    const wireQueue = [profileWire, pathWire];
     const kernel = {
-      profileFace: vi.fn(() => profileFace),
-      profileWire: vi.fn(() => pathWire),
+      profileWire: vi.fn(() => wireQueue.shift()!),
       sweep: vi.fn(() => swept),
       release: vi.fn(),
     } as unknown as CadFeatureKernel;
@@ -97,16 +97,20 @@ describe('CAD exact sweep and loft contracts', () => {
 
     const result = evaluateCadFeatures(input, kernel);
 
-    expect(kernel.profileFace).toHaveBeenCalledTimes(1);
-    expect(kernel.profileWire).toHaveBeenCalledWith({
+    expect(kernel.profileWire).toHaveBeenCalledTimes(2);
+    expect(kernel.profileWire).toHaveBeenNthCalledWith(1, {
+      normal: [1, 0, 0],
+      edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],
+    });
+    expect(kernel.profileWire).toHaveBeenNthCalledWith(2, {
       edges: [
         { kind: 'line', start: [0, 0, 0], end: [10, 0, 0] },
         { kind: 'line', start: [10, 0, 0], end: [10, 5, 0] },
       ],
     });
-    expect(kernel.sweep).toHaveBeenCalledWith(profileFace, pathWire);
+    expect(kernel.sweep).toHaveBeenCalledWith(profileWire, pathWire);
     expect(kernel.release).toHaveBeenCalledWith(pathWire);
-    expect(kernel.release).toHaveBeenCalledWith(profileFace);
+    expect(kernel.release).toHaveBeenCalledWith(profileWire);
     expect(kernel.release).not.toHaveBeenCalledWith(swept);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'sweep-1', shape: swept }]);
   });
