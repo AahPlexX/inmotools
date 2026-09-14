@@ -1,3 +1,5 @@
+import type { CadSketch } from './sketch-types';
+
 export type CadFeatureType =
   | 'sketch'
   | 'primitive'
@@ -82,7 +84,7 @@ export interface CadProject {
     angle: 'rad';
   };
   parameters: Record<string, unknown>[];
-  sketches: Record<string, unknown>[];
+  sketches: CadSketch[];
   features: CadFeature[];
   bodies: CadBody[];
   materials: Record<string, unknown>[];
