@@ -1,12 +1,15 @@
 import type { CadFeature, CadProject } from './cad-types';
 import type { CadExactKernel, CadKernelShape, CadKernelVector3 } from './kernel-contract';
 import {
+  buildSketchPath3d,
   buildSketchProfile3d,
   resolveSketchAxis3d,
   type CadSketchProfile3d,
+  type CadSketchWire3d,
 } from './sketch-profile';
 
 export interface CadFeatureKernel extends CadExactKernel {
+  profileWire(definition: CadSketchWire3d): CadKernelShape;
   profileFace(profile: CadSketchProfile3d): CadKernelShape;
   release(shape: CadKernelShape): void;
 }
@@ -30,6 +33,11 @@ export class CadFeatureEvaluationError extends Error {
     this.name = 'CadFeatureEvaluationError';
     this.featureId = featureId;
   }
+}
+
+interface LoftSectionSpec {
+  sketchId: string;
+  profileEntityIds: string[];
 }
 
 function parameterNumber(feature: CadFeature, key: string, options: { allowZero?: boolean } = {}): number {
@@ -56,6 +64,34 @@ function parameterStringArray(feature: CadFeature, key: string): string[] {
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a non-empty array of ids.`);
   }
   return value;
+}
+
+function parameterLoftSections(feature: CadFeature): LoftSectionSpec[] {
+  const value = feature.parameters.sections;
+  if (!Array.isArray(value) || value.length < 2) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'sections' must contain at least two sketch sections.`);
+  }
+
+  return value.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} section ${index + 1} must be an object.`);
+    }
+    const record = entry as Record<string, unknown>;
+    if (typeof record.sketchId !== 'string' || record.sketchId.length === 0) {
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} section ${index + 1} requires a sketchId.`);
+    }
+    if (
+      !Array.isArray(record.profileEntityIds)
+      || record.profileEntityIds.length === 0
+      || record.profileEntityIds.some((id) => typeof id !== 'string' || id.length === 0)
+    ) {
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} section ${index + 1} requires profileEntityIds.`);
+    }
+    return {
+      sketchId: record.sketchId,
+      profileEntityIds: record.profileEntityIds as string[],
+    };
+  });
 }
 
 function primitive(feature: CadFeature, kernel: CadFeatureKernel): CadKernelShape {
@@ -124,11 +160,14 @@ function booleanFeature(
   }
 }
 
-function sketchForFeature(feature: CadFeature, project: CadProject) {
-  const sketchId = parameterString(feature, 'sketchId');
+function projectSketch(feature: CadFeature, project: CadProject, sketchId: string, role: string) {
   const sketch = project.sketches.find((candidate) => candidate.id === sketchId);
-  if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown sketch '${sketchId}'.`);
+  if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown ${role} sketch '${sketchId}'.`);
   return sketch;
+}
+
+function sketchForFeature(feature: CadFeature, project: CadProject) {
+  return projectSketch(feature, project, parameterString(feature, 'sketchId'), 'profile');
 }
 
 function withProfileFace(
@@ -188,6 +227,58 @@ function revolveFeature(feature: CadFeature, project: CadProject, kernel: CadFea
   ));
 }
 
+function sweepFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+  const pathSketchId = parameterString(feature, 'pathSketchId');
+  const pathEntityIds = parameterStringArray(feature, 'pathEntityIds');
+  const pathSketch = projectSketch(feature, project, pathSketchId, 'path');
+  let path3d: CadSketchWire3d;
+  try {
+    path3d = buildSketchPath3d(pathSketch, pathEntityIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} path is invalid: ${message}`, { cause: error });
+  }
+
+  return withProfileFace(feature, project, kernel, (profile) => {
+    const path = kernel.profileWire(path3d);
+    try {
+      return kernel.sweep(profile, path);
+    } finally {
+      kernel.release(path);
+    }
+  });
+}
+
+function loftFeature(feature: CadFeature, project: CadProject, kernel: CadFeatureKernel): CadKernelShape {
+  const sections = parameterLoftSections(feature);
+  const solidParameter = feature.parameters.solid;
+  if (solidParameter !== undefined && typeof solidParameter !== 'boolean') {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'solid' must be a boolean when provided.`);
+  }
+  const sectionWires: CadKernelShape[] = [];
+
+  try {
+    for (const [index, section] of sections.entries()) {
+      const sketch = projectSketch(feature, project, section.sketchId, `loft section ${index + 1}`);
+      let profile3d: CadSketchProfile3d;
+      try {
+        profile3d = buildSketchProfile3d(sketch, section.profileEntityIds);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new CadFeatureEvaluationError(
+          feature.id,
+          `${feature.label} loft section ${index + 1} is invalid: ${message}`,
+          { cause: error },
+        );
+      }
+      sectionWires.push(kernel.profileWire(profile3d));
+    }
+    return kernel.loft(sectionWires, solidParameter ?? true);
+  } finally {
+    for (const wire of sectionWires) kernel.release(wire);
+  }
+}
+
 function isNonSolidPassThrough(feature: CadFeature): boolean {
   return feature.type === 'sketch' || feature.type === 'datum-plane' || feature.type === 'datum-axis';
 }
@@ -205,6 +296,10 @@ function createFeatureShape(
       return extrudeFeature(feature, project, kernel);
     case 'revolve':
       return revolveFeature(feature, project, kernel);
+    case 'sweep':
+      return sweepFeature(feature, project, kernel);
+    case 'loft':
+      return loftFeature(feature, project, kernel);
     case 'boolean':
       return booleanFeature(feature, kernel, featureShapes);
     default:
