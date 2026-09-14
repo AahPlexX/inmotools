@@ -50,6 +50,14 @@ function parameterNumber(feature: CadFeature, key: string, options: { allowZero?
   return value;
 }
 
+function parameterNonZeroNumber(feature: CadFeature, key: string): number {
+  const value = feature.parameters[key];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a finite non-zero number.`);
+  }
+  return value;
+}
+
 function parameterString(feature: CadFeature, key: string): string {
   const value = feature.parameters[key];
   if (typeof value !== 'string' || value.length === 0) {
@@ -158,6 +166,30 @@ function booleanFeature(
         `${feature.label} has unsupported Boolean operation '${String(feature.parameters.operation)}'.`,
       );
   }
+}
+
+function singleDependencyShape(
+  feature: CadFeature,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+  role: string,
+): CadKernelShape {
+  if (feature.dependsOn.length !== 1) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} ${role} requires exactly one feature dependency.`);
+  }
+  const shape = featureShapes.get(feature.dependsOn[0]!);
+  if (!shape) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} ${role} dependency must resolve to an earlier exact-shape feature.`);
+  }
+  return shape;
+}
+
+function offsetFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const distance = parameterNonZeroNumber(feature, 'distance');
+  return kernel.offset(singleDependencyShape(feature, featureShapes, 'offset'), distance);
 }
 
 function projectSketch(feature: CadFeature, project: CadProject, sketchId: string, role: string) {
@@ -319,6 +351,8 @@ function createFeatureShape(
       return loftFeature(feature, project, kernel);
     case 'boolean':
       return booleanFeature(feature, kernel, featureShapes);
+    case 'offset':
+      return offsetFeature(feature, kernel, featureShapes);
     default:
       if (isNonSolidPassThrough(feature)) return null;
       throw new CadFeatureEvaluationError(
