@@ -320,8 +320,10 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     ));
   }
 
-  shell(_shape: CadKernelShape, _faceIds: readonly string[], _thickness: number): CadKernelShape {
-    throw new Error('Shell requires semantic topology IDs to be resolved to OCCT face handles by the G6 feature evaluator.');
+  shell(shape: CadKernelShape, faceIds: readonly string[], thickness: number): CadKernelShape {
+    return this.#withResolvedSubshapes(shape, 'face', faceIds, (faces) => (
+      this.#wrap(this.#kernel.shell(this.#unwrap(shape), faces, thickness, 1e-6))
+    ));
   }
 
   draft(
