@@ -20,21 +20,22 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 
 - Branch: `feat/pdf-workstation`
 - Base at branch creation: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
-- Current milestone: **A — deterministic document/export foundation**
-- Current gate: **export-impact review is verified; advanced field properties and rich AcroForm inventory are implemented and awaiting their remaining visible/browser acceptance gates while unrelated vector tests on moving `main` currently prevent PR browser execution**
-- Current counts: **19 verified / 11 started / 116 planned / 0 blocked / 0 excluded capabilities**
+- Current milestone: **B — renderer and editor-layer foundation**
+- Current gate: **Milestone A is PDF-scope verified; begin current-version PDF.js dependency/worker research and a production-base-path RED/GREEN renderer slice without weakening the still-red repository-wide integration gate**
+- Current counts: **25 verified / 5 started / 116 planned / 0 blocked / 0 excluded capabilities**
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Existing `pdf-sanitizer` route/deep link is preserved; the workstation evolves that surface rather than creating a duplicate tool.
 
 ## Milestones
 
-### A — document/export foundation — STARTED
+### A — document/export foundation — VERIFIED
 
 Scope: preserve existing splice/sanitizer behavior; richer inspection; metadata authoring; token overlays/Bates; page boxes; attachments; AcroForm authoring; deterministic export summary; first responsive workstation shell.
 
 Completed/proven portions:
 
 - local multi-file intake remains functional;
+- explicit multi-document queue order, selected-page extraction, intentional repeated-page duplication, and 90/180/270-degree rotation are verified by downloaded-byte reopen tests;
 - existing queue order/page selection/form-flatten safety remains intact;
 - complete standard metadata replacement UI covers title, author, subject, keywords/tags, creator, producer, language, creation date, and modification date;
 - metadata dates use explicit UTC interpretation for deterministic export and reopen exactly;
@@ -45,28 +46,24 @@ Completed/proven portions:
 - final output plan/preview includes staged blank pages and stable-key geometry edits;
 - attachment inventory recursively traverses valid embedded-file name trees with bounded parsing and extracts bytes only on demand;
 - source attachments are never silently inherited; explicit source inclusion and new local attachment authoring both reopen correctly in desktop/mobile browser tests;
+- ambiguous duplicate source attachment display names fail closed in actionable inventory instead of allowing a filename-based action to select an arbitrary embedded file;
 - attachment authoring supports filename, MIME type, description, creation date, and modification date with deterministic UTC handling and output inventory verification;
 - text, checkbox, dropdown, radio-group, and option-list authoring are implemented through typed engine contracts and visible coordinate-first controls;
 - required/read-only state, text multiline/current value, checkbox current state, dropdown options/selection, radio options/selection, and option-list multiselect/selection are live;
-- advanced field-property contracts now distinguish current values from real PDF reset/default `/DV` values and support Helvetica/Times Roman/Courier, optional font size, and text alignment; visible controls are implemented, with final browser acceptance pending;
+- advanced field-property contracts distinguish current `/V` values from reset/default `/DV` values and support Helvetica/Times Roman/Courier, optional font size, and text alignment; desktop/mobile browser reopen tests verify the persisted semantics;
 - staged form fields are revalidated against current final output pages after page/MediaBox changes, and export is verified against the exact expected authored-field count;
 - source forms can be flattened while newly authored output fields remain editable and are verified after reopen;
-- rich read-only AcroForm inventory now normalizes field name/type/page(s)/required/read-only/current state/reset-default state and follows the library's widget-page fallback without mutating input bytes; visible inventory integration remains pending;
+- rich read-only AcroForm inventory reports field name/type/page(s)/required/read-only/current/reset-default state, follows the library's widget-page fallback, does not mutate input bytes, and is verified through the on-demand desktop/mobile UI;
 - deterministic export-time tokens support page, total pages, explicit date, final filename, and Bates sequence values;
 - Bates numbering supports start/padding/prefix/suffix and six header/footer placements;
 - header/footer overlays support left/center/right placement; text watermarks support opacity/rotation; PNG/JPEG watermarks support opacity/rotation/width and nine placements;
 - overlays are applied after the rebuilt document is created, then the final bytes are reinspected so authored forms/attachments remain protected by post-export verification;
 - the live pre-export impact summary classifies destructive-output, structural-output, and reversible-before-export changes and updates from the current page/metadata/attachment/form/overlay/filename plan before bytes are generated;
-- visible metadata export, blank-page insertion, page-box edits, attachments, all five editable field types, and the overlay/Bates surface reopen correctly in browser tests;
-- the responsive metadata/export foundation continues to pass the 320 CSS-pixel reflow assertion;
+- visible metadata export, blank-page insertion, page-box edits, attachments, all five editable field types, overlay/Bates, advanced field properties, source-form inventory, and structural page operations pass focused desktop/mobile browser acceptance;
+- the responsive metadata/export foundation passes the 320 CSS-pixel reflow assertion;
 - export status reports source-form flattening, authored editable fields, replacement metadata, overlays, blank-page insertion, page-box mutations, and attachment authoring.
 
-Still required for Milestone A exit:
-
-- browser acceptance for visible advanced field properties after the selector correction;
-- visible rich existing-AcroForm inventory plus focused browser evidence;
-- focused browser evidence for the structural merge/extract/duplicate/rotate flows already implemented;
-- final Milestone A Gauntlet/reconciliation against a clean current-main merge ref.
+Milestone A exit evidence: workflow run `34853637913` executed on synthetic merge ref `ae73f8b99f867a431cc4e06cccbc70a482208b61` (`9430d7ad…` merged into `main@3ec9e435…`). Its PDF-first acceptance produced **26/26 focused PDF unit tests**, a successful production TypeScript/Vite build, and **30/30 focused PDF browser executions** across desktop and mobile Chromium. The unchanged repository-wide unit suite ran afterward and failed only in unrelated Crystal/Vector tests; exact-main integration therefore remains an open Milestone H gate rather than a Milestone A defect.
 
 ### B — renderer and editor-layer foundation — PLANNED
 
@@ -113,11 +110,12 @@ Current review outcome:
 - Foundation Gauntlet found one privacy-robustness weakness: explicit metadata mode depended on the fresh output document having no incidental Info entries. The engine now clears the Info dictionary first and then writes only selected replacement values.
 - Tests were strengthened to use real typed output-options contracts instead of casting around TypeScript and to prove a partial metadata replacement cannot leak unspecified source Info fields.
 - Page-box editing uses independent UI and engine validation so invalid Crop/Bleed/Trim rectangles cannot bypass the UI to reach exported bytes.
-- Attachment parsing has explicit name-tree/attachment limits, avoids the unbounded date-decoding path for untrusted attachment metadata, validates output filenames, and proves source attachments are not silently copied.
+- Attachment parsing has explicit name-tree/attachment limits, avoids the unbounded date-decoding path for untrusted attachment metadata, validates output filenames, proves source attachments are not silently copied, and now suppresses actionable inventory for duplicate display names that would make filename-based extraction ambiguous.
 - Form authoring independently validates staged UI geometry and engine geometry/options; source-field flattening and newly authored fields use separate post-export expectations.
-- Advanced reset/default form semantics write `/DV` independently from current `/V`; browser reopen coverage is committed and awaiting execution after the moving-base vector failures clear.
-- Rich form inventory mirrors `pdf-lib` widget-to-page resolution (`/P`, then annotation-ref fallback) and has a byte-for-byte non-mutation unit assertion.
+- Advanced reset/default form semantics write `/DV` independently from current `/V`; focused desktop/mobile reopen coverage verifies those values together with standard fonts, point sizes, and text alignment.
+- Rich form inventory mirrors `pdf-lib` widget-to-page resolution (`/P`, then annotation-ref fallback), has a byte-for-byte non-mutation unit assertion, and is browser-verified on demand.
 - Overlay input validation bounds opacity, rotation, image width, Bates sequence values, and margins; the explicit date token avoids nondeterministic clock reads.
+- A PDF-specific merge-ref acceptance gate was temporarily placed before the unchanged global unit suite to distinguish PDF defects from parallel-tool failures; it proved the PDF slice green without bypassing the global gate.
 - Full final Gauntlet remains open because most workstation milestones are still planned.
 
 Exit: zero blocker/high findings without explicit acceptance, exact-main workflows green, Pages deployment green, counts reconcile to the design.
@@ -129,13 +127,19 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 ### Verified
 
 - **1** Local multi-PDF open with native file input — `verified`
+- **5** Multi-document merge with explicit output order — `verified`
+- **9** Extract selected pages to a new PDF — `verified`
 - **11** Insert blank pages using common/custom sizes — `verified`
+- **12** Duplicate pages — `verified`
+- **15** Rotate selected pages 90/180/270 degrees — `verified`
 - **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `verified`
+- **58** Existing AcroForm field inventory — `verified`
 - **60** Text-field authoring — `verified`
 - **61** Checkbox authoring — `verified`
 - **62** Radio-group authoring — `verified`
 - **63** Dropdown authoring — `verified`
 - **64** Multi-select option-list authoring — `verified`
+- **65** Field properties — `verified`
 - **71** One-click form flattening with pre-export loss-of-editability warning and post-export verification — `verified`
 - **75** Bates numbering with prefix/suffix/start/padding/placement — `verified`
 - **76** Header token overlays — `verified`
@@ -151,12 +155,6 @@ Every ID below maps one-for-one to the numbered capability in the design documen
 ### Started
 
 - **3** Document diagnostics summary — `started` (page count/size/forms/common metadata/page geometry/attachments exist; active-content and richer encryption/security detail remain)
-- **5** Multi-document merge with explicit output order — `started` (visible queue/order implementation exists and focused byte-reopen browser coverage is committed; current moving-base vector failures prevent that browser spec from executing)
-- **9** Extract selected pages to a new PDF — `started` (range/order implementation exists and focused byte-reopen browser coverage is committed; current moving-base vector failures prevent that browser spec from executing)
-- **12** Duplicate pages — `started` (repeated selections are implemented and focused byte-reopen browser coverage is committed; current moving-base vector failures prevent that browser spec from executing)
-- **15** Rotate selected pages 90/180/270 degrees — `started` (engine/UI exist and focused byte-reopen browser coverage is committed; current moving-base vector failures prevent that browser spec from executing)
-- **58** Existing AcroForm field inventory — `started` (rich read-only name/type/page/state/default/required/read-only inventory engine is unit-proven; visible workstation presentation/browser proof remains)
-- **65** Field properties — `started` (standard font/font-size/text alignment and independent current/reset-default controls are implemented and unit/build-proven; selector-corrected visible browser reopen proof is committed but currently suppressed by unrelated moving-base vector failures)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
 - **142** Responsive drawer/sheet layout for phone/tablet/split-screen/zoom/enlarged text — `started` (current foundation passes 320 CSS-pixel reflow; later workstation rails/drawers are not built)
@@ -204,7 +202,9 @@ Every introduced package must remain exact-pinned and must pass the repository's
 - 2026-09-12 — Overlay/Bates production validation, workflow run `34729732734`: unit tests, production build, and existing focused browser regression passed after integrating deterministic export-time overlays after the rebuilt document stage.
 - 2026-09-12 — Overlay/Bates focused GREEN, workflow run `34729800517`: unit tests, production build, and the dedicated visible overlay browser test passed. The browser flow stages explicit date/filename/page/total/Bates tokens, Bates start/padding/prefix/placement, text watermark, and a PNG watermark, then reopens the two-page output and verifies Font and XObject page resources. Capabilities 75–79 were promoted to `verified`.
 - 2026-09-13 — Advanced field-property engine validation, workflow run `34730133278`: 708 repository unit tests and the production build passed, including real `/V` versus `/DV`, standard-font/font-size, and alignment contracts. Browser execution exposed only a stale export-summary `Pages` locator; that locator was narrowed subsequently.
-- 2026-09-13 — Combined visible properties/impact-summary run `34798238251`: 731 unit tests and the production build passed; 18 of 20 focused browser executions passed. The deterministic export-impact summary passed on both browser projects. The only two failures stopped at the same ambiguous `Field font` locator before output generation; that locator was subsequently narrowed to exact text. Capability 131 is promoted to `verified`; capability 65 remains `started` pending the selector-corrected rerun.
-- 2026-09-13 — Rich AcroForm inventory contract: a read-only helper now reports field name/type/widget page(s)/required/read-only/current/reset-default state and proves source bytes are unchanged. The page mapper mirrors `pdf-lib`'s `/P` lookup followed by annotation-reference fallback.
+- 2026-09-13 — Combined visible properties/impact-summary run `34798238251`: 731 unit tests and the production build passed; 18 of 20 focused browser executions passed. The deterministic export-impact summary passed on both browser projects. The only two failures stopped at the same ambiguous `Field font` locator before output generation; that locator was subsequently narrowed to exact text. Capability 131 was promoted to `verified`; capability 65 remained `started` pending the selector-corrected rerun.
+- 2026-09-13 — Rich AcroForm inventory contract: a read-only helper reports field name/type/widget page(s)/required/read-only/current/reset-default state and proves source bytes are unchanged. The page mapper mirrors `pdf-lib`'s `/P` lookup followed by annotation-reference fallback.
 - 2026-09-13 — Moving-base validation run `34798518917`: the new PDF form-inventory test passed, as did the advanced-form tests, but the repository-wide unit gate failed before build/browser because the merge base lacked a parallel Crystal module and had three Vector path-motion failures. No unrelated files were modified from the PDF branch.
-- 2026-09-13 — Moving-base validation run `34798685152`: the Crystal failure had been repaired and 740 repository tests passed, including all PDF inventory/property/summary tests. The only failures were three unrelated Vector path-motion assertions, so production build/browser steps were skipped. Focused browser contracts for merge/extract/duplicate/rotate are committed and await a clean base execution.
+- 2026-09-13 — Moving-base validation run `34798685152`: the Crystal failure had been repaired and 740 repository tests passed, including all PDF inventory/property/summary tests. The only failures were three unrelated Vector path-motion assertions, so production build/browser steps were skipped. Focused browser contracts for merge/extract/duplicate/rotate were committed and awaited clean execution.
+- 2026-09-14 — Attachment Gauntlet hardening: actionable source attachment inventory now fails closed when multiple embedded-file entries resolve to the same display filename; the low-level extraction API still exposes the raw entries for diagnostics. The new duplicate-name regression joined the focused attachment suite.
+- 2026-09-14 — Milestone A focused merge-ref acceptance, workflow run `34853637913`: checkout was synthetic merge `ae73f8b99f867a431cc4e06cccbc70a482208b61` (`9430d7ad…` into `main@3ec9e435…`). All 6 focused PDF unit files passed (**26/26 tests**), the production TypeScript/Vite build completed, Chromium installed, and all **30/30** focused PDF browser executions passed across desktop/mobile. This included advanced `/V` versus `/DV` field properties, rich source-form inventory, export impact review, overlays, attachments, metadata/page geometry/reflow, and byte-reopen proofs for merge/extract/duplicate/rotate. The unchanged global unit step then failed only on one missing Crystal symmetry module and three Vector path-motion assertions (**746 other tests passed**); those unrelated failures keep Milestone H exact-main integration open but do not invalidate the PDF-specific Milestone A evidence.
