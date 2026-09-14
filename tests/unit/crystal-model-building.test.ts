@@ -8,11 +8,14 @@ import {
 } from '../../src/tools/crystal/document-engine';
 import {
   applyStrain,
+  buildSlab,
   compareMappedStructures,
+  createDomainOverlay,
   createInterstitial,
   createSubstitution,
   createVacancy,
   defectConcentration,
+  reconstructPeriodicMolecule,
   transformBasis,
 } from '../../src/tools/crystal/model-building-engine';
 import type { Mat3 } from '../../src/tools/crystal/crystal-types';
@@ -109,5 +112,52 @@ describe('crystal model building engine', () => {
 
     expect(() => compareMappedStructures(source, createVacancy(source, source.sites[0]!.id)))
       .toThrow(/mapping|site ids/i);
+  });
+
+  it('reconstructs a periodic molecule split across the reference-cell boundary', () => {
+    let molecule = createEmptyCrystal('Periodic molecule');
+    molecule = setCrystalCell(molecule, { a: 5, b: 5, c: 5, alpha: 90, beta: 90, gamma: 90 });
+    molecule = addCrystalSite(molecule, { label: 'C1', element: 'C', fractional: [0.95, 0.5, 0.5], occupancy: 1 });
+    molecule = addCrystalSite(molecule, { label: 'C2', element: 'C', fractional: [0.05, 0.5, 0.5], occupancy: 1 });
+
+    const reconstructed = reconstructPeriodicMolecule(molecule, molecule.sites[0]!.id);
+    expect(reconstructed).toHaveLength(2);
+    expect(reconstructed[0]!.siteId).toBe(molecule.sites[0]!.id);
+    const second = reconstructed.find((item) => item.siteId === molecule.sites[1]!.id)!;
+    expect(second.image).toEqual([1, 0, 0]);
+    expect(second.fractional[0]).toBeCloseTo(1.05, 12);
+  });
+
+  it('builds a bounded cubic (100) slab with the requested material thickness and vacuum', () => {
+    const source = createStarterStructure('bcc');
+    const slab = buildSlab(source, { hkl: [1, 0, 0], thickness: 6, vacuum: 4, offset: 0 });
+
+    expect(slab.sites.length).toBeGreaterThan(0);
+    expect(slab.cell.c).toBeCloseTo(10, 10);
+    expect(slab.cell.alpha).toBeCloseTo(90, 10);
+    expect(slab.cell.beta).toBeCloseTo(90, 10);
+    expect(slab.sites.every((site) => site.fractional[2] >= -1e-10 && site.fractional[2] < 0.6 + 1e-10)).toBe(true);
+    expect(slab.provenance.at(-1)?.kind).toBe('slab');
+  });
+
+  it('creates deterministic identity and rotated domain overlays in Cartesian space', () => {
+    const source = createStarterStructure('bcc');
+    const identity = createDomainOverlay(source, IDENTITY);
+    expect(identity[1]!.position).toEqual(fractionalToCartesian(source.sites[1]!.fractional, source.cell));
+
+    const quarterTurn: Mat3 = [[0, -1, 0], [1, 0, 0], [0, 0, 1]];
+    const rotated = createDomainOverlay(source, quarterTurn);
+    const original = fractionalToCartesian(source.sites[1]!.fractional, source.cell);
+    expect(rotated[1]!.position[0]).toBeCloseTo(-original[1], 12);
+    expect(rotated[1]!.position[1]).toBeCloseTo(original[0], 12);
+    expect(rotated[1]!.position[2]).toBeCloseTo(original[2], 12);
+  });
+
+  it('rejects invalid slab and domain requests before producing partial output', () => {
+    const source = createStarterStructure('bcc');
+    expect(() => buildSlab(source, { hkl: [0, 0, 0], thickness: 5, vacuum: 3, offset: 0 })).toThrow(/miller|hkl/i);
+    expect(() => buildSlab(source, { hkl: [1, 0, 0], thickness: 0, vacuum: 3, offset: 0 })).toThrow(/thickness/i);
+    expect(() => buildSlab(source, { hkl: [1, 0, 0], thickness: 5, vacuum: -1, offset: 0 })).toThrow(/vacuum/i);
+    expect(() => createDomainOverlay(source, [[1, 0, 0], [0, 0, 0], [0, 0, 1]])).toThrow(/singular|determinant/i);
   });
 });
