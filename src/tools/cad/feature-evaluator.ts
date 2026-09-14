@@ -244,6 +244,16 @@ function filletFeature(
   return kernel.fillet(shape, resolvedTopologyIds(feature, kernel, shape, 'edge'), radius);
 }
 
+function chamferFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const distance = parameterNumber(feature, 'distance');
+  const shape = singleDependencyShape(feature, featureShapes, 'chamfer');
+  return kernel.chamfer(shape, resolvedTopologyIds(feature, kernel, shape, 'edge'), distance);
+}
+
 function offsetFeature(
   feature: CadFeature,
   kernel: CadFeatureKernel,
@@ -414,6 +424,8 @@ function createFeatureShape(
       return booleanFeature(feature, kernel, featureShapes);
     case 'fillet':
       return filletFeature(feature, kernel, featureShapes);
+    case 'chamfer':
+      return chamferFeature(feature, kernel, featureShapes);
     case 'offset':
       return offsetFeature(feature, kernel, featureShapes);
     default:
