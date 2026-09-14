@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CadSketch } from '../../src/tools/cad/sketch-types';
-import { buildSketchProfile3d, resolveSketchAxis3d } from '../../src/tools/cad/sketch-profile';
+import { buildSketchProfile3d, resolveDatumPlaneFrame, resolveSketchAxis3d, resolveSketchPlane3d } from '../../src/tools/cad/sketch-profile';
 
 function rectangleSketch(plane: CadSketch['plane'] = { kind: 'origin', plane: 'XY' }): CadSketch {
   return {
@@ -83,6 +83,35 @@ describe('CAD sketch profile bridge', () => {
     expect(() => buildSketchProfile3d(
       rectangleSketch({ kind: 'datum', datumId: 'datum-1' }),
       ['line-bottom', 'line-right', 'line-top', 'line-left'],
-    )).toThrow(/datum.*transform/i);
+    )).toThrow(/unresolved datum plane 'datum-1'/i);
+  });
+
+  it('resolves an offset datum plane parallel to its base origin plane', () => {
+    const frame = resolveDatumPlaneFrame('XY', 12);
+    expect(frame.normal).toEqual([0, 0, 1]);
+    expect(frame.point(3, 4)).toEqual([3, 4, 12]);
+    // In-plane axis directions are inherited unchanged from the base plane; only the origin moves.
+    expect(frame.vector(1, 0)).toEqual([1, 0, 0]);
+  });
+
+  it('rejects a non-finite datum plane offset', () => {
+    expect(() => resolveDatumPlaneFrame('XZ', Number.NaN)).toThrow(/finite/i);
+  });
+
+  it('places a profile on a resolved offset datum plane', () => {
+    const datumPlanes = new Map([['datum-1', resolveDatumPlaneFrame('XY', 12)]]);
+    const result = buildSketchProfile3d(
+      rectangleSketch({ kind: 'datum', datumId: 'datum-1' }),
+      ['line-bottom', 'line-right', 'line-top', 'line-left'],
+      datumPlanes,
+    );
+    expect(result.normal).toEqual([0, 0, 1]);
+    expect(result.edges[0]).toEqual({ kind: 'line', start: [0, 0, 12], end: [20, 0, 12] });
+  });
+
+  it('resolves a sketch plane through a datum plane for mirror and similar whole-plane consumers', () => {
+    const datumPlanes = new Map([['datum-1', resolveDatumPlaneFrame('YZ', -5)]]);
+    const plane = resolveSketchPlane3d(rectangleSketch({ kind: 'datum', datumId: 'datum-1' }), datumPlanes);
+    expect(plane).toEqual({ origin: [-5, 0, 0], normal: [1, 0, 0] });
   });
 });

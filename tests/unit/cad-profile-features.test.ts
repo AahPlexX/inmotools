@@ -59,6 +59,10 @@ function project(featureItem: CadFeature): CadProject {
   };
 }
 
+function datumPlaneFeature(id: string, basePlane: string, distance: number): CadFeature {
+  return feature(id, 'datum-plane', { basePlane, distance });
+}
+
 function kernelFixture() {
   const profile = token('profile');
   const result = token('result');
@@ -128,5 +132,74 @@ describe('CAD sketch-driven exact features', () => {
     expect(thrown).toMatchObject({ featureId: 'bad-extrude' });
     expect((thrown as Error).message).toMatch(/closed profile/i);
     expect(kernel.profileFace).not.toHaveBeenCalled();
+  });
+
+  it('extrudes a sketch placed on a resolved offset datum plane', () => {
+    const { kernel, profile, result } = kernelFixture();
+    const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-datum', plane: { kind: 'datum', datumId: 'datum-1' } };
+    const extrude = feature('extrude-1', 'extrude', { sketchId: 'sketch-datum', profileEntityIds, distance: 5 });
+    const input: CadProject = {
+      ...createCadProject('Datum plane fixture'),
+      sketches: [datumSketch],
+      features: [datumPlaneFeature('datum-1', 'XY', 12), extrude],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['datum-1', 'extrude-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.profileFace).toHaveBeenCalledWith({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [5, 0, 12], end: [15, 0, 12] },
+        { kind: 'line', start: [15, 0, 12], end: [15, 10, 12] },
+        { kind: 'line', start: [15, 10, 12], end: [5, 10, 12] },
+        { kind: 'line', start: [5, 10, 12], end: [5, 0, 12] },
+      ],
+    });
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'extrude-1', shape: result }]);
+  });
+
+  it('attributes an unresolved datum plane reference to the sketch-consuming feature', () => {
+    const { kernel } = kernelFixture();
+    const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-datum', plane: { kind: 'datum', datumId: 'missing-datum' } };
+    const extrude = feature('extrude-1', 'extrude', { sketchId: 'sketch-datum', profileEntityIds, distance: 5 });
+    const input: CadProject = {
+      ...createCadProject('Missing datum plane fixture'),
+      sketches: [datumSketch],
+      features: [extrude],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['extrude-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'extrude-1' });
+    expect((thrown as Error).message).toMatch(/unresolved datum plane 'missing-datum'/i);
+  });
+
+  it('rejects an unsupported datum plane kind instead of guessing an orientation', () => {
+    const { kernel } = kernelFixture();
+    const input: CadProject = {
+      ...createCadProject('Unsupported datum plane kind fixture'),
+      sketches: [],
+      features: [feature('datum-1', 'datum-plane', { kind: 'angle', basePlane: 'XY', distance: 0 })],
+      bodies: [],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'datum-1' });
+    expect((thrown as Error).message).toMatch(/only 'offset' is implemented/i);
   });
 });
