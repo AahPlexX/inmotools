@@ -1,4 +1,5 @@
 import type { CadSketch } from './sketch-types';
+import type { TopologyBounds, Vec3 } from './topology-ref';
 
 export type CadFeatureType =
   | 'sketch'
@@ -52,6 +53,16 @@ export interface CadTopologyRefRecord {
   producerFeatureId: string;
   kind: 'face' | 'edge' | 'vertex';
   role: string;
+  surfaceType?: string;
+  curveType?: string;
+  centroid?: Vec3;
+  normal?: Vec3;
+  axis?: Vec3;
+  area?: number;
+  length?: number;
+  bounds?: TopologyBounds;
+  adjacencyRoles?: string[];
+  pickPoint?: Vec3;
 }
 
 export interface CadFeature {
