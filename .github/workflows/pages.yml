@@ -9,11 +9,39 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 jobs:
+  pdf-lock-sync:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PDF branch head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Generate exact PDF.js dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node -e "const p=require('./package.json'); process.exit(p.dependencies?.['pdfjs-dist']==='6.3.289' ? 0 : 1)"; then
+            echo 'pdfjs-dist@6.3.289 is already pinned; no lock sync needed.'
+            exit 0
+          fi
+          pnpm add --save-exact --lockfile-only pdfjs-dist@6.3.289
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json pnpm-lock.yaml
+          git commit -m 'build(pdf): pin pdfjs-dist 6.3.289'
+          git push origin HEAD:feat/pdf-workstation
+
   validate:
     runs-on: ubuntu-latest
     steps:
