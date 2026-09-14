@@ -31,6 +31,45 @@ describe('CAD exact OCCT adapter', () => {
     expect(mesh.indices.length % 3).toBe(0);
   });
 
+  it('constructs an exact planar profile and extrudes it to the expected volume', () => {
+    const profile = kernel.profileFace({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [0, 0, 0], end: [20, 0, 0] },
+        { kind: 'line', start: [20, 0, 0], end: [20, 10, 0] },
+        { kind: 'line', start: [20, 10, 0], end: [0, 10, 0] },
+        { kind: 'line', start: [0, 10, 0], end: [0, 0, 0] },
+      ],
+    });
+    const extruded = kernel.extrude(profile, 5, [0, 0, 1]);
+    try {
+      expect(kernel.volume(extruded)).toBeCloseTo(1000, 8);
+      expect(kernel.bounds(extruded)).toEqual({ min: [0, 0, 0], max: [20, 10, 5] });
+    } finally {
+      kernel.release(extruded);
+      kernel.release(profile);
+    }
+  });
+
+  it('revolves an exact rectangular profile through one full turn', () => {
+    const profile = kernel.profileFace({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [5, 0, 0], end: [15, 0, 0] },
+        { kind: 'line', start: [15, 0, 0], end: [15, 10, 0] },
+        { kind: 'line', start: [15, 10, 0], end: [5, 10, 0] },
+        { kind: 'line', start: [5, 10, 0], end: [5, 0, 0] },
+      ],
+    });
+    const revolved = kernel.revolve(profile, [0, 0, 0], [0, 1, 0], Math.PI * 2);
+    try {
+      expect(kernel.volume(revolved)).toBeCloseTo(Math.PI * (15 ** 2 - 5 ** 2) * 10, 5);
+    } finally {
+      kernel.release(revolved);
+      kernel.release(profile);
+    }
+  });
+
   it('performs a real OCCT cylindrical cut that reduces exact volume', () => {
     const tool = kernel.cylinder(2, 5);
     const cut = kernel.cut(box, tool);
