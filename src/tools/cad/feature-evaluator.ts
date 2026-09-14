@@ -274,6 +274,15 @@ function offsetFeature(
   return kernel.offset(singleDependencyShape(feature, featureShapes, 'offset'), distance);
 }
 
+function thickenFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const thickness = parameterNonZeroNumber(feature, 'thickness');
+  return kernel.thicken(singleDependencyShape(feature, featureShapes, 'thicken'), thickness);
+}
+
 function mirrorFeature(
   feature: CadFeature,
   project: CadProject,
@@ -461,6 +470,8 @@ function createFeatureShape(
       return offsetFeature(feature, kernel, featureShapes);
     case 'mirror':
       return mirrorFeature(feature, project, kernel, featureShapes);
+    case 'thicken':
+      return thickenFeature(feature, kernel, featureShapes);
     default:
       if (isNonSolidPassThrough(feature)) return null;
       throw new CadFeatureEvaluationError(

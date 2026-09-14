@@ -349,6 +349,11 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.mirror(this.#unwrap(shape), asVec3(planeOrigin), asVec3(planeNormal)));
   }
 
+  thicken(shape: CadKernelShape, thickness: number): CadKernelShape {
+    if (!Number.isFinite(thickness) || thickness === 0) throw new Error('Thicken thickness must be a finite non-zero number.');
+    return this.#wrap(this.#kernel.thicken(this.#unwrap(shape), thickness, 1e-6));
+  }
+
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh {
     const mesh = this.#kernel.tessellate(this.#unwrap(shape), options);
     return {
