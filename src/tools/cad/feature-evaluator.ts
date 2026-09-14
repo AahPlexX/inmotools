@@ -7,10 +7,16 @@ import {
   type CadSketchProfile3d,
   type CadSketchWire3d,
 } from './sketch-profile';
+import {
+  resolveTopologyRef,
+  type TopologyCandidate,
+  type TopologyKind,
+} from './topology-ref';
 
 export interface CadFeatureKernel extends CadExactKernel {
   profileWire(definition: CadSketchWire3d): CadKernelShape;
   profileFace(profile: CadSketchProfile3d): CadKernelShape;
+  topologyCandidates(shape: CadKernelShape, producerFeatureId: string, kind: TopologyKind): TopologyCandidate[];
   release(shape: CadKernelShape): void;
 }
 
@@ -183,6 +189,61 @@ function singleDependencyShape(
   return shape;
 }
 
+function resolvedTopologyIds(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  shape: CadKernelShape,
+  kind: TopologyKind,
+): string[] {
+  const producerFeatureId = feature.dependsOn[0];
+  if (!producerFeatureId) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} topology operation requires one producer dependency.`);
+  }
+  const references = feature.topologyRefs.filter((reference) => reference.kind === kind);
+  if (references.length === 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} requires at least one persisted ${kind} reference.`);
+  }
+  if (references.some((reference) => reference.producerFeatureId !== producerFeatureId)) {
+    throw new CadFeatureEvaluationError(
+      feature.id,
+      `${feature.label} ${kind} references must target dependency '${producerFeatureId}'.`,
+    );
+  }
+
+  const candidates = kernel.topologyCandidates(shape, producerFeatureId, kind);
+  const resolved = references.map((reference) => {
+    const result = resolveTopologyRef(reference, candidates);
+    if (result.status === 'missing') {
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label} ${kind} reference '${reference.role}' could not be resolved on the current exact shape.`,
+      );
+    }
+    if (result.status === 'ambiguous') {
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label} ${kind} reference '${reference.role}' is ambiguous across ${result.candidates.length} current candidates.`,
+      );
+    }
+    return result.candidate.id;
+  });
+
+  if (new Set(resolved).size !== resolved.length) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} topology references must resolve to distinct ${kind} candidates.`);
+  }
+  return resolved;
+}
+
+function filletFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const radius = parameterNumber(feature, 'radius');
+  const shape = singleDependencyShape(feature, featureShapes, 'fillet');
+  return kernel.fillet(shape, resolvedTopologyIds(feature, kernel, shape, 'edge'), radius);
+}
+
 function offsetFeature(
   feature: CadFeature,
   kernel: CadFeatureKernel,
@@ -351,6 +412,8 @@ function createFeatureShape(
       return loftFeature(feature, project, kernel);
     case 'boolean':
       return booleanFeature(feature, kernel, featureShapes);
+    case 'fillet':
+      return filletFeature(feature, kernel, featureShapes);
     case 'offset':
       return offsetFeature(feature, kernel, featureShapes);
     default:
