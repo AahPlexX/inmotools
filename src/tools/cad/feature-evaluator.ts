@@ -170,23 +170,40 @@ function sketchForFeature(feature: CadFeature, project: CadProject) {
   return projectSketch(feature, project, parameterString(feature, 'sketchId'), 'profile');
 }
 
+function profileForFeature3d(feature: CadFeature, project: CadProject): CadSketchProfile3d {
+  const sketch = sketchForFeature(feature, project);
+  const profileEntityIds = parameterStringArray(feature, 'profileEntityIds');
+  try {
+    return buildSketchProfile3d(sketch, profileEntityIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} profile is invalid: ${message}`, { cause: error });
+  }
+}
+
 function withProfileFace(
   feature: CadFeature,
   project: CadProject,
   kernel: CadFeatureKernel,
   operation: (profile: CadKernelShape, profile3d: CadSketchProfile3d) => CadKernelShape,
 ): CadKernelShape {
-  const sketch = sketchForFeature(feature, project);
-  const profileEntityIds = parameterStringArray(feature, 'profileEntityIds');
-  let profile3d: CadSketchProfile3d;
-  try {
-    profile3d = buildSketchProfile3d(sketch, profileEntityIds);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new CadFeatureEvaluationError(feature.id, `${feature.label} profile is invalid: ${message}`, { cause: error });
-  }
-
+  const profile3d = profileForFeature3d(feature, project);
   const profile = kernel.profileFace(profile3d);
+  try {
+    return operation(profile, profile3d);
+  } finally {
+    kernel.release(profile);
+  }
+}
+
+function withProfileWire(
+  feature: CadFeature,
+  project: CadProject,
+  kernel: CadFeatureKernel,
+  operation: (profile: CadKernelShape, profile3d: CadSketchProfile3d) => CadKernelShape,
+): CadKernelShape {
+  const profile3d = profileForFeature3d(feature, project);
+  const profile = kernel.profileWire(profile3d);
   try {
     return operation(profile, profile3d);
   } finally {
@@ -239,7 +256,7 @@ function sweepFeature(feature: CadFeature, project: CadProject, kernel: CadFeatu
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} path is invalid: ${message}`, { cause: error });
   }
 
-  return withProfileFace(feature, project, kernel, (profile) => {
+  return withProfileWire(feature, project, kernel, (profile) => {
     const path = kernel.profileWire(path3d);
     try {
       return kernel.sweep(profile, path);
