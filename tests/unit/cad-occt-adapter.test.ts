@@ -114,6 +114,20 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('mirrors an exact box across a plane while preserving its volume', () => {
+    const mirrored = kernel.mirror(box, [0, 0, 0], [1, 0, 0]);
+    try {
+      expect(kernel.volume(mirrored)).toBeCloseTo(1000, 8);
+      expectBoundsClose(kernel.bounds(mirrored), { min: [-20, 0, 0], max: [0, 10, 5] });
+    } finally {
+      kernel.release(mirrored);
+    }
+  });
+
+  it('rejects a mirror plane with a zero-length normal', () => {
+    expect(() => kernel.mirror(box, [0, 0, 0], [0, 0, 0])).toThrow(/non-zero/);
+  });
+
   it('performs a real OCCT cylindrical cut that reduces exact volume', () => {
     const tool = kernel.cylinder(2, 5);
     const cut = kernel.cut(box, tool);

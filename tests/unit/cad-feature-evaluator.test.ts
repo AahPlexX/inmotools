@@ -65,6 +65,7 @@ function fakeKernel() {
     fuse: vi.fn(),
     common: vi.fn(),
     section: vi.fn(),
+    mirror: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, shapes };
@@ -126,6 +127,23 @@ describe('CAD exact feature evaluator', () => {
     expect(thrown).toMatchObject({ featureId: 'bad-cylinder' });
     expect((thrown as Error).message).toMatch(/radius/i);
     expect(kernel.release).toHaveBeenCalledWith(shapes.box);
+  });
+
+  it('mirrors a body across a sketch-referenced plane', () => {
+    const { kernel, shapes } = fakeKernel();
+    const mirrored = token('mirrored');
+    kernel.mirror = vi.fn(() => mirrored);
+
+    const input = project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('mirror-1', 'mirror', { sketchId: 'plane-sketch' }, ['box-1']),
+    ]);
+    input.sketches = [{ id: 'plane-sketch', label: 'YZ plane', plane: { kind: 'origin', plane: 'YZ' }, entities: [], constraints: [] }];
+
+    const result = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.mirror).toHaveBeenCalledWith(shapes.box, [0, 0, 0], [1, 0, 0]);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'mirror-1', shape: mirrored }]);
   });
 
   it('chains a Boolean result into a second Boolean operation as its own tool body', () => {
