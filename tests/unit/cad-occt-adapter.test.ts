@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { CadKernelShape } from '../../src/tools/cad/kernel-contract';
+import type { CadKernelShape, CadKernelShapeBounds } from '../../src/tools/cad/kernel-contract';
 import {
   createOcctCadKernelAdapter,
   type OcctCadKernelAdapter,
 } from '../../src/tools/cad/occt-adapter';
+
+/** Ruled-surface bounds (e.g. a loft) carry OCCT's own numerical tolerance and are not bit-exact. */
+function expectBoundsClose(actual: CadKernelShapeBounds, expected: CadKernelShapeBounds, precision = 5): void {
+  actual.min.forEach((value, index) => expect(value).toBeCloseTo(expected.min[index]!, precision));
+  actual.max.forEach((value, index) => expect(value).toBeCloseTo(expected.max[index]!, precision));
+}
 
 describe('CAD exact OCCT adapter', () => {
   let kernel: OcctCadKernelAdapter;
@@ -99,7 +105,8 @@ describe('CAD exact OCCT adapter', () => {
     try {
       const expectedVolume = Math.PI * 10 / 3 * (2 ** 2 + 2 * 4 + 4 ** 2);
       expect(kernel.volume(lofted)).toBeCloseTo(expectedVolume, 5);
-      expect(kernel.bounds(lofted)).toEqual({ min: [0, -2, -2], max: [10, 4, 4] });
+      // The frustum's overall bounding box spans the wider (radius-4) end in y/z, not the narrower end.
+      expectBoundsClose(kernel.bounds(lofted), { min: [0, -4, -4], max: [10, 4, 4] });
     } finally {
       kernel.release(lofted);
       kernel.release(sectionB);
