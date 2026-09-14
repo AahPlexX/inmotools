@@ -569,6 +569,36 @@ export function tokenMappings(input: unknown): string {
     2,
   );
 }
+
+// SCSS quoted strings also interpolate #{...}; JSON quoting alone is insufficient.
+function scssString(value: string): string {
+  return '"' + Array.from(value).map((character) => {
+    const code = character.codePointAt(0)!;
+    return character === '"' || character === '\\' || character === '#' || code < 32 || code === 127
+      ? `\\${code.toString(16)} `
+      : character;
+  }).join('') + '"';
+}
+
+export function tokenScss(input: unknown): string {
+  const entries = inspectTokens(input).entries;
+  const rows = entries.map((entry) => {
+    // Numeric primitives remain usable in Sass arithmetic; other values preserve
+    // their CSS representation without Sass evaluating modern CSS functions.
+    const numeric = ['number', 'dimension', 'duration'].includes(entry.type) ||
+      (entry.type === 'fontWeight' && typeof entry.value === 'number');
+    const value = numeric ? entry.css : `string.unquote(${scssString(entry.css)})`;
+    const declarations = Object.entries(tokenDeclarations(entry)).map(([name, css]) =>
+      `      ${scssString(name)}: string.unquote(${scssString(css)}),`).join('\n');
+    return `  ${scssString(entry.path)}: (\n    "type": ${scssString(entry.type)},\n    "value": ${value},\n    "css-variable": ${scssString(entry.variable)},\n    "declarations": (\n${declarations}\n    ),\n  ),`;
+  });
+  return '@use "sass:string";\n\n' +
+    '// Load with @use "web-layout.tokens" as tokens; and @use "sass:map";\n' +
+    '// Read a value with map.get(tokens.$tokens, "your.token.path", "value").\n' +
+    '// Numeric sizes, times and numbers support Sass arithmetic. Other values are CSS strings.\n' +
+    '// Aliases are resolved snapshots; declarations includes composite CSS subproperties.\n' +
+    '$tokens: (\n' + rows.join('\n') + '\n) !default;\n';
+}
 export function setToken(
   input: unknown,
   path: string,

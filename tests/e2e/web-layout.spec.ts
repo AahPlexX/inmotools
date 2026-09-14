@@ -35,6 +35,16 @@ test('authors a token alias, rejects broken references and exports applied varia
   await expect(page.getByLabel('Token library status')).toContainText('Token library applied');
   const frame=page.frameLocator('iframe[title="Layout at 375 pixels"]');
   await expect.poll(()=>frame.locator('body').evaluate(e=>getComputedStyle(e).getPropertyValue('--token-spacing--card').trim())).toBe('20px');
+  await page.getByText('Import, source and exports', {exact:true}).click();
+  const sassDownload = page.waitForEvent('download');
+  await page.getByRole('button', {name:'Export token Sass',exact:true}).click();
+  const sassFile = await sassDownload;
+  expect(sassFile.suggestedFilename()).toBe('web-layout.tokens.scss');
+  const sassChunks: Buffer[] = [];
+  for await (const chunk of (await sassFile.createReadStream())!) sassChunks.push(chunk as Buffer);
+  const scss = Buffer.concat(sassChunks).toString('utf8');
+  expect(scss).toContain('"spacing.card": (');
+  expect(scss).toContain('"value": 20px');
   await page.getByRole('button',{name:'Export',exact:true}).click();
   const download=page.waitForEvent('download');
   await page.getByRole('button',{name:'Download Tokens',exact:true}).click();

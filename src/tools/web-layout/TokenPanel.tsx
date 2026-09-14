@@ -7,6 +7,7 @@ import {
   setToken,
   tokenCss,
   tokenMappings,
+  tokenScss,
   TOKEN_TYPES,
   type TokenDocument,
   type TokenType,
@@ -423,8 +424,8 @@ export function TokenPanel({
           </button>
         </div>
         <p>
-          These exports use the library draft. JSON preserves references; CSS
-          and mapping exports contain resolved values. The variable mapping is
+          These exports use the library draft. JSON preserves references; CSS,
+          Sass and mapping exports contain resolved values. The variable mapping is
           framework-neutral.
         </p>
         <div className="button-row">
@@ -448,6 +449,9 @@ export function TokenPanel({
           >
             Export token CSS
           </button>
+          <button type="button" onClick={() => downloadText(tokenScss(draft), "web-layout.tokens.scss", "text/x-scss")}>
+            Export token Sass
+          </button>
           <button
             type="button"
             onClick={() =>
@@ -461,6 +465,7 @@ export function TokenPanel({
             Export variable mapping
           </button>
         </div>
+        <p>Sass exports a map keyed by the original token paths. Sizes, durations and numbers support arithmetic; other values preserve their CSS text. Each token includes its type and CSS declarations, including composite subproperties.</p>
       </details>
       <p role="status" aria-label="Token library status">
         {status}

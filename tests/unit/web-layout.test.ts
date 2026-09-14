@@ -2,6 +2,24 @@ import { DEFAULT_OPTIONS, parseOptions } from '../../src/tools/web-layout/layout
 import { describe, expect, it } from 'vitest';
 import { buildCss, buildHtml, buildPreview, buildTokens, INITIAL_PROJECT, parseProject } from '../../src/tools/web-layout/layout-engine';
 
+it('exports Sass maps with distinct paths, numeric aliases and inert interpolation', async () => {
+  const {tokenScss} = await import('../../src/tools/web-layout/token-engine');
+  const output = tokenScss({
+    'font-name': {$type:'fontFamily',$value:['A #{1 + 1}', 'B\\C']},
+    font_name: {$type:'number',$value:2},
+    space: {$type:'dimension',$value:{value:1.5,unit:'rem'}},
+    alias: {$type:'dimension',$value:'{space}'},
+  });
+  expect(output).toContain('"font-name": (');
+  expect(output).toContain('"font_name": (');
+  expect(output.match(/"value": 1.5rem/g)).toHaveLength(2);
+  expect(output).toContain('"value": 2');
+  expect(output).not.toContain('#{');
+  expect(output).toContain('\\5c 23');
+  expect(output).toContain('"declarations": (');
+  expect(() => tokenScss({x:{$type:'number',$value:'{missing}'}})).toThrow();
+});
+
 describe('Web Layout Studio portable projects', () => {
   it('round-trips the actual starter with all five component patterns', () => {
     const project = { ...INITIAL_PROJECT, blocks: [...INITIAL_PROJECT.blocks, { id: 'nav', kind: 'navigation' as const, title: 'Explore', text: 'Find your way' }, { id: 'note', kind: 'notice' as const, title: 'Remember', text: 'Bring your ideas' }] };
