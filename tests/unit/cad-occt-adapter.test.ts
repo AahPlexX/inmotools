@@ -70,6 +70,43 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('sweeps an exact circular wire along a straight exact spine', () => {
+    const profile = kernel.profileWire({
+      edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],
+    });
+    const path = kernel.profileWire({
+      edges: [{ kind: 'line', start: [0, 0, 0], end: [10, 0, 0] }],
+    });
+    const swept = kernel.sweep(profile, path);
+    try {
+      expect(kernel.volume(swept)).toBeCloseTo(Math.PI * 2 ** 2 * 10, 5);
+      expect(kernel.bounds(swept)).toEqual({ min: [0, -2, -2], max: [10, 2, 2] });
+    } finally {
+      kernel.release(swept);
+      kernel.release(path);
+      kernel.release(profile);
+    }
+  });
+
+  it('lofts two exact circular wires into a solid frustum', () => {
+    const sectionA = kernel.profileWire({
+      edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],
+    });
+    const sectionB = kernel.profileWire({
+      edges: [{ kind: 'circle', center: [10, 0, 0], normal: [1, 0, 0], radius: 4 }],
+    });
+    const lofted = kernel.loft([sectionA, sectionB], true);
+    try {
+      const expectedVolume = Math.PI * 10 / 3 * (2 ** 2 + 2 * 4 + 4 ** 2);
+      expect(kernel.volume(lofted)).toBeCloseTo(expectedVolume, 5);
+      expect(kernel.bounds(lofted)).toEqual({ min: [0, -2, -2], max: [10, 4, 4] });
+    } finally {
+      kernel.release(lofted);
+      kernel.release(sectionB);
+      kernel.release(sectionA);
+    }
+  });
+
   it('performs a real OCCT cylindrical cut that reduces exact volume', () => {
     const tool = kernel.cylinder(2, 5);
     const cut = kernel.cut(box, tool);
