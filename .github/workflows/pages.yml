@@ -2,7 +2,7 @@ name: Validate and deploy Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/pdf-workstation]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: PDF Workstation unit acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+        if: (github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation') || github.ref == 'refs/heads/feat/pdf-workstation'
         run: >-
           pnpm exec vitest run
           tests/unit/pdf.test.ts
@@ -43,13 +43,13 @@ jobs:
           tests/unit/pdf-overlays.test.ts
           tests/unit/pdf-renderer.test.ts
       - name: PDF Workstation production-build acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+        if: (github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation') || github.ref == 'refs/heads/feat/pdf-workstation'
         run: pnpm build
       - name: Install Playwright Chromium for PDF Workstation acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+        if: (github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation') || github.ref == 'refs/heads/feat/pdf-workstation'
         run: pnpm exec playwright install --with-deps chromium
       - name: PDF Workstation browser acceptance
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation'
+        if: (github.event_name == 'pull_request' && github.head_ref == 'feat/pdf-workstation') || github.ref == 'refs/heads/feat/pdf-workstation'
         run: >-
           pnpm exec playwright test
           tests/e2e/pdf.spec.ts
