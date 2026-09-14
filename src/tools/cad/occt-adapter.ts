@@ -7,6 +7,7 @@ import type {
   CadKernelTessellationOptions,
   CadKernelVector3,
 } from './kernel-contract';
+import type { CadSketchProfile3d } from './sketch-profile';
 
 export interface OcctCadKernelAdapterOptions {
   wasm?: InitOptions['wasm'];
@@ -105,6 +106,53 @@ export class OcctCadKernelAdapter implements CadExactKernel {
 
   section(left: CadKernelShape, right: CadKernelShape): CadKernelShape {
     return this.#wrap(this.#kernel.section(this.#unwrap(left), this.#unwrap(right)));
+  }
+
+  /**
+   * Build a planar exact face from an already solved and 3D-mapped sketch
+   * profile. Edge/wire handles are temporary and are deterministically released
+   * after OCCT has copied them into the returned face.
+   */
+  profileFace(profile: CadSketchProfile3d): CadKernelShape {
+    if (profile.edges.length === 0) throw new Error('Exact profile requires at least one edge.');
+    const edgeHandles: ShapeHandle[] = [];
+    let wire: ShapeHandle | null = null;
+    try {
+      for (const edge of profile.edges) {
+        switch (edge.kind) {
+          case 'line':
+            edgeHandles.push(this.#kernel.makeLineEdge(asVec3(edge.start), asVec3(edge.end)));
+            break;
+          case 'arc':
+            edgeHandles.push(this.#kernel.makeArcEdge(asVec3(edge.start), asVec3(edge.mid), asVec3(edge.end)));
+            break;
+          case 'circle':
+            edgeHandles.push(this.#kernel.makeCircleEdge(asVec3(edge.center), asVec3(edge.normal), edge.radius));
+            break;
+          case 'spline': {
+            const points = edge.points.map(asVec3);
+            if ((edge.startTangent === undefined) !== (edge.endTangent === undefined)) {
+              throw new Error('Spline profile tangency requires both start and end tangents.');
+            }
+            if (edge.startTangent && edge.endTangent && !edge.periodic) {
+              edgeHandles.push(this.#kernel.interpolatePointsWithTangents(
+                points,
+                asVec3(edge.startTangent),
+                asVec3(edge.endTangent),
+              ));
+            } else {
+              edgeHandles.push(this.#kernel.interpolatePoints(points, edge.periodic));
+            }
+            break;
+          }
+        }
+      }
+      wire = this.#kernel.makeWire(edgeHandles);
+      return this.#wrap(this.#kernel.makeFace(wire));
+    } finally {
+      if (wire !== null) this.#kernel.release(wire);
+      for (const edge of edgeHandles) this.#kernel.release(edge);
+    }
   }
 
   extrude(profile: CadKernelShape, distance: number, direction: CadKernelVector3): CadKernelShape {
