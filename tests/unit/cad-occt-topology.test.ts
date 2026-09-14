@@ -40,4 +40,24 @@ describe('CAD OCCT semantic topology bridge', () => {
       kernel.release(filleted);
     }
   });
+
+  it('enumerates serializable face fingerprints and feeds resolved ids into a real exact shell', () => {
+    const candidates = kernel.topologyCandidates(box, 'box-feature', 'face');
+
+    expect(candidates).toHaveLength(6);
+    expect(candidates.every((candidate) => candidate.kind === 'face')).toBe(true);
+
+    const top = [...candidates].sort((left, right) => right.centroid![2]! - left.centroid![2]!)[0]!;
+    const shelled = kernel.shell(box, [top.id], 1);
+
+    try {
+      const wallVolume = kernel.volume(shelled);
+      expect(wallVolume).toBeGreaterThan(0);
+      expect(wallVolume).toBeLessThan(1000);
+      // A 1mm-thick open-top shell of a 20x10x5 box: 1000 - (18*8*4) = 424 mm^3.
+      expect(wallVolume).toBeCloseTo(1000 - 18 * 8 * 4, 5);
+    } finally {
+      kernel.release(shelled);
+    }
+  });
 });

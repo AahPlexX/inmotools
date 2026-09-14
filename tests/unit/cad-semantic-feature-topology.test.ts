@@ -59,6 +59,34 @@ const edgeCandidates: TopologyCandidate[] = [
   },
 ];
 
+const faceCandidates: TopologyCandidate[] = [
+  {
+    id: 'topo:face:0',
+    producerFeatureId: 'base',
+    kind: 'face',
+    centroid: [10, 5, 5],
+    bounds: { min: [0, 0, 5], max: [20, 10, 5] },
+  },
+  {
+    id: 'topo:face:1',
+    producerFeatureId: 'base',
+    kind: 'face',
+    centroid: [10, 5, 0],
+    bounds: { min: [0, 0, 0], max: [20, 10, 0] },
+  },
+];
+
+function topFaceRef(): CadFeature['topologyRefs'][number] {
+  return {
+    id: 'ref-face-top',
+    producerFeatureId: 'base',
+    kind: 'face',
+    role: 'top-face',
+    centroid: [10, 5, 5],
+    bounds: { min: [0, 0, 5], max: [20, 10, 5] },
+  };
+}
+
 function longEdgeRef(): CadFeature['topologyRefs'][number] {
   return {
     id: 'ref-edge-long',
@@ -116,6 +144,29 @@ describe('CAD semantic topology feature resolution', () => {
     expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'edge');
     expect(chamfer).toHaveBeenCalledWith(base, ['topo:edge:1'], 1.25);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'bevel', shape: chamfered }]);
+  });
+
+  it('resolves a shell face from persisted fingerprints before invoking the exact kernel', () => {
+    const base = token('base');
+    const shelled = token('shelled');
+    const topologyCandidates = vi.fn(() => faceCandidates);
+    const shell = vi.fn(() => shelled);
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates,
+      shell,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+
+    const result = evaluateCadFeatures(project([
+      feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('hollow', 'shell', { thickness: 1 }, ['base'], [topFaceRef()]),
+    ]), kernel);
+
+    expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'face');
+    expect(shell).toHaveBeenCalledWith(base, ['topo:face:0'], 1);
+    expect(kernel.release).toHaveBeenCalledWith(base);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hollow', shape: shelled }]);
   });
 
   it('stops an ambiguous topology reference instead of guessing a raw subshape index', () => {
