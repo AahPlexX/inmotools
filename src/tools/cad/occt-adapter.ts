@@ -314,8 +314,10 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     ));
   }
 
-  chamfer(_shape: CadKernelShape, _edgeIds: readonly string[], _distance: number): CadKernelShape {
-    throw new Error('Chamfer semantic topology resolution is implemented after the fillet bridge is proven by G6 tests.');
+  chamfer(shape: CadKernelShape, edgeIds: readonly string[], distance: number): CadKernelShape {
+    return this.#withResolvedSubshapes(shape, 'edge', edgeIds, (edges) => (
+      this.#wrap(this.#kernel.chamfer(this.#unwrap(shape), edges, distance))
+    ));
   }
 
   shell(_shape: CadKernelShape, _faceIds: readonly string[], _thickness: number): CadKernelShape {
