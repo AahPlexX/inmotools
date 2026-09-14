@@ -2,46 +2,27 @@ name: Validate and deploy Pages
 
 on:
   push:
-    branches: [main, feat/pdf-workstation]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 jobs:
-  pdf-renderer-mount:
-    if: github.ref == 'refs/heads/feat/pdf-workstation'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PDF branch head
-        uses: actions/checkout@v7
-      - name: Apply guarded renderer mount
-        run: node scripts/pdf-renderer-mount.mjs
-      - name: Commit renderer mount
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- src/tools/pdf/PdfWorkspace.tsx; then
-            echo 'No renderer workspace change was produced.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/tools/pdf/PdfWorkspace.tsx
-          git commit -m 'feat(pdf): mount active-page renderer'
-          git push origin HEAD:feat/pdf-workstation
-
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # PR validation executes on GitHub's synthetic merge ref so tool tests
+          # see the latest base integration, but path selection below compares
+          # only the PR's own base/head SHAs to avoid unrelated main changes.
           fetch-depth: 0
       - name: Setup pnpm and Node
         uses: pnpm/setup@v2
@@ -77,6 +58,8 @@ jobs:
           else
             echo "Running focused browser specs:"
             printf '%s\n' "$E2E_SPECS"
+            # Spec paths are repository-controlled and contain no whitespace.
+            # shellcheck disable=SC2086
             pnpm exec playwright test $E2E_SPECS
           fi
       - name: Upload Playwright failure evidence
@@ -119,6 +102,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    # Every main commit gets its own deployment. Serialize production writes, but
+    # retain the pending queue instead of replacing older commits with newer ones.
     concurrency:
       group: pages
       queue: max
