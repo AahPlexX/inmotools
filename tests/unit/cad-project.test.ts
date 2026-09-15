@@ -7,6 +7,7 @@ import {
   markFeatureDirty,
   redoCadProject,
   reorderFeature,
+  setFeatureParameter,
   setFeatureSuppressed,
   undoCadProject,
 } from '../../src/tools/cad/project-engine';
@@ -74,6 +75,40 @@ describe('CAD parametric project engine', () => {
     const suppressed = setFeatureSuppressed(project, 'fillet', true);
     expect(suppressed.features.find((item) => item.id === 'fillet')?.status).toBe('suppressed');
     expect([...featureDependencyClosure(suppressed, ['extrude'])]).toEqual(['extrude', 'fillet']);
+  });
+
+  it('updates a feature parameter and marks it plus its dependency closure dirty', () => {
+    const project = withFeatures([
+      feature('sketch', 'sketch'),
+      feature('extrude', 'extrude', ['sketch']),
+      feature('fillet', 'fillet', ['extrude']),
+      feature('independent-box', 'primitive'),
+    ]);
+    const updated = setFeatureParameter(project, 'extrude', 'distance', 12);
+
+    const extrudeFeature = updated.features.find((item) => item.id === 'extrude');
+    expect(extrudeFeature?.parameters.distance).toBe(12);
+    expect(updated.features.map((item) => [item.id, item.status])).toEqual([
+      ['sketch', 'clean'],
+      ['extrude', 'dirty'],
+      ['fillet', 'dirty'],
+      ['independent-box', 'clean'],
+    ]);
+  });
+
+  it('clears a stale diagnostic on the feature whose parameter changed', () => {
+    const project: CadProject = {
+      ...withFeatures([feature('box', 'primitive')]),
+      features: [{ ...feature('box', 'primitive'), diagnostic: 'Previous rebuild failed.' }],
+    };
+    const updated = setFeatureParameter(project, 'box', 'width', 30);
+    expect(updated.features[0]?.diagnostic).toBeNull();
+  });
+
+  it('leaves the project unchanged when the feature does not exist', () => {
+    const project = withFeatures([feature('box', 'primitive')]);
+    const updated = setFeatureParameter(project, 'missing', 'width', 30);
+    expect(updated).toBe(project);
   });
 
   it('rejects a reorder that would move a feature before one of its dependencies', () => {
