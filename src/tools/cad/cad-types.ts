@@ -28,7 +28,9 @@ export type CadFeatureType =
   | 'datum-axis'
   | 'surface'
   | 'heal'
-  | 'defeature';
+  | 'defeature'
+  | 'sew'
+  | 'unify';
 
 export type CadFeatureStatus = 'clean' | 'dirty' | 'building' | 'failed' | 'blocked' | 'suppressed';
 

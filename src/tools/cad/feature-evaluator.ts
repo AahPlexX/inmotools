@@ -373,6 +373,29 @@ function healFeature(
   return kernel.heal(singleDependencyShape(feature, featureShapes, 'heal'));
 }
 
+function unifyFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  return kernel.unify(singleDependencyShape(feature, featureShapes, 'unify'));
+}
+
+function sewFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  if (feature.dependsOn.length < 2) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} sew feature requires at least two feature dependencies.`);
+  }
+  const shapes = feature.dependsOn.map((id) => featureShapes.get(id));
+  if (shapes.some((shape) => !shape)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} sew dependencies must resolve to earlier exact-shape features.`);
+  }
+  return kernel.sew(shapes as CadKernelShape[]);
+}
+
 /**
  * occt-wasm's raw draft() takes exactly one face handle, unlike
  * fillet/chamfer/shell which accept an array. Batch multi-face draft would
@@ -661,6 +684,10 @@ function createFeatureShape(
       return defeatureFeature(feature, kernel, featureShapes);
     case 'heal':
       return healFeature(feature, kernel, featureShapes);
+    case 'unify':
+      return unifyFeature(feature, kernel, featureShapes);
+    case 'sew':
+      return sewFeature(feature, kernel, featureShapes);
     case 'draft':
       return draftFeature(feature, kernel, featureShapes);
     case 'offset':

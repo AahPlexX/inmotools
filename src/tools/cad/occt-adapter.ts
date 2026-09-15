@@ -379,6 +379,23 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.healSolid(this.#unwrap(shape)));
   }
 
+  unify(shape: CadKernelShape): CadKernelShape {
+    return this.#wrap(this.#kernel.unifySameDomain(this.#unwrap(shape)));
+  }
+
+  sew(shapes: readonly CadKernelShape[]): CadKernelShape {
+    if (shapes.length < 2) throw new Error('Sew requires at least two shapes.');
+    const sewn = this.#kernel.sewAndSolidify(this.#unwrapMany(shapes), 1e-6);
+    // Solidifying an arbitrary set of input faces can yield an inside-out solid (negative volume)
+    // depending on their wire winding order; normalize orientation rather than leaking that detail.
+    if (this.#kernel.getVolume(sewn) < 0) {
+      const reversed = this.#kernel.reverseShape(sewn);
+      this.#kernel.release(sewn);
+      return this.#wrap(reversed);
+    }
+    return this.#wrap(sewn);
+  }
+
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh {
     const mesh = this.#kernel.tessellate(this.#unwrap(shape), options);
     return {

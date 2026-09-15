@@ -122,6 +122,8 @@ export interface CadExactKernel {
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
   defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;
   heal(shape: CadKernelShape): CadKernelShape;
+  unify(shape: CadKernelShape): CadKernelShape;
+  sew(shapes: readonly CadKernelShape[]): CadKernelShape;
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh;
   volume(shape: CadKernelShape): number;
   area(shape: CadKernelShape): number;
