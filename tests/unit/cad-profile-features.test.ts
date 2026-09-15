@@ -35,18 +35,36 @@ function rectangleSketch(): CadSketch {
   };
 }
 
-function feature(id: string, type: CadFeature['type'], parameters: Record<string, unknown>): CadFeature {
+function feature(
+  id: string,
+  type: CadFeature['type'],
+  parameters: Record<string, unknown>,
+  dependsOn: string[] = [],
+): CadFeature {
   return {
     id,
     label: id,
     type,
     bodyId: 'body-main',
-    dependsOn: [],
+    dependsOn,
     topologyRefs: [],
     parameters,
     suppressed: false,
     status: 'dirty',
     diagnostic: null,
+  };
+}
+
+function circleSketch(): CadSketch {
+  return {
+    id: 'sketch-circle',
+    label: 'Hole profile',
+    plane: { kind: 'origin', plane: 'XY' },
+    entities: [
+      { id: 'center', type: 'point', x: 10, y: 5, construction: false },
+      { id: 'circle', type: 'circle', centerPointId: 'center', radius: 2, construction: false },
+    ],
+    constraints: [],
   };
 }
 
@@ -70,6 +88,8 @@ function kernelFixture() {
     profileFace: vi.fn(() => profile),
     extrude: vi.fn(() => result),
     revolve: vi.fn(() => result),
+    cut: vi.fn(),
+    box: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, profile, result };
@@ -201,5 +221,53 @@ describe('CAD sketch-driven exact features', () => {
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'datum-1' });
     expect((thrown as Error).message).toMatch(/only 'offset' is implemented/i);
+  });
+
+  it('cuts a blind hole by extruding its circular profile opposite the sketch normal', () => {
+    const { kernel, profile } = kernelFixture();
+    const box = token('box');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    const tool = token('tool');
+    const cutResult = token('cut-result');
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValue(tool);
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(cutResult);
+
+    const input: CadProject = {
+      ...createCadProject('Hole fixture'),
+      sketches: [circleSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', { sketchId: 'sketch-circle', profileEntityIds: ['circle'], depth: 3 }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.extrude).toHaveBeenCalledWith(profile, 3, [0, 0, -1]);
+    expect(kernel.cut).toHaveBeenCalledWith(box, tool);
+    expect(kernel.release).toHaveBeenCalledWith(tool);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hole-1', shape: cutResult }]);
+  });
+
+  it('reverses a hole to bore along the sketch normal when requested', () => {
+    const { kernel, profile } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValue(token('tool'));
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(token('cut-result'));
+
+    const input: CadProject = {
+      ...createCadProject('Reversed hole fixture'),
+      sketches: [circleSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', { sketchId: 'sketch-circle', profileEntityIds: ['circle'], depth: 3, reversed: true }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    evaluateCadFeatures(input, kernel);
+
+    expect(kernel.extrude).toHaveBeenCalledWith(profile, 3, [0, 0, 1]);
   });
 });
