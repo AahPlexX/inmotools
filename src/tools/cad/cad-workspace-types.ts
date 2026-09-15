@@ -1,5 +1,6 @@
 import type { CadFeature, CadProject } from './cad-types';
 import type { CadKernelBodyResult } from './kernel-contract';
+import type { CadSketch } from './sketch-types';
 
 /**
  * Milestone A selection model: viewport and tree both operate on the same
@@ -38,4 +39,18 @@ export interface CadInspectorProps {
 export function selectedFeature(project: CadProject, selection: CadSelection | null): CadFeature | null {
   if (!selection || selection.kind !== 'feature') return null;
   return project.features.find((feature) => feature.id === selection.id) ?? null;
+}
+
+/**
+ * Standalone read-only sketch viewer contract. Deliberately not folded into
+ * `CadSelection`/`CadWorkspace` yet: this is Milestone B's first slice
+ * (visualize an already-solved sketch), the same way CadViewport started as
+ * render-only before selection/highlighting grew into the shared model.
+ * When/how CadWorkspace mounts this (a mode switch, a split pane, a panel
+ * under the inspector) is an explicit follow-up decision, not implied here.
+ */
+export interface CadSketchViewerProps {
+  sketch: CadSketch;
+  selectedEntityId: string | null;
+  onSelectEntity(entityId: string | null): void;
 }
