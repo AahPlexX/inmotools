@@ -121,9 +121,12 @@ through the workspace UI and produce a validated export.
 
 - **F34 Image metadata editor.** Inspect/edit/strip EXIF (piexifjs for JPEG, chunk-level
   strip for PNG, re-encode for WebP), including GPS and timestamps, applied at export.
+  JPEG exports additionally write Dublin Core XMP packets and IPTC-IIM APP13 blocks
+  (title/artist/copyright/description) via deterministic segment surgery; the
+  strip-existing option removes EXIF, XMP, and IPTC sidecars before re-writing.
 - **F35 Audio tag studio.** ID3v2.3 tags (title, artist, album, year, genre, track, embedded
-  album art) written to MP3 output at export (browser-id3-writer); tag inspection for
-  common audio containers.
+  album art) written to MP3 output at export (browser-id3-writer); descriptive tags are
+  written natively into WAV/OGG/FLAC/AAC containers through mediabunny's tags option.
 - **F36 Batch queue & ZIP imposition.** Multi-file queue with per-file target/options,
   concurrent processing, and one-click bundled ZIP download of all outputs.
 

@@ -28,8 +28,8 @@ before every ledger item is green or explicitly moved to `NEXT.md`/`BACKLOG.md` 
   (BMP/ICO/ICNS) and browser tests for canvas-based paths.
 - **M4 — Audio.** F20–F23, F35 (mediabunny + extensions, trim, resample, waveform/spectrogram,
   ID3 writer) with engine unit tests where feasible and browser tests for conversion.
-- **M5 — Fonts, geospatial, archives.** F24–F27, F31–F33, F28–F29, F34 (EXIF editor) with
-  unit tests for pure transforms.
+- **M5 — Fonts, geospatial, archives.** F24–F27, F31–F33, F28–F29, F34 (EXIF/XMP/IPTC
+  editor), F35 (audio tags) with unit tests for pure transforms.
 - **M6 — Batch, hardening, verification.** F36 batch queue + ZIP imposition, responsive and
   keyboard accessibility pass, capability messaging, unit + browser suites green, production
   build green, task-state reconciliation, then integration request.
@@ -44,7 +44,7 @@ before every ledger item is green or explicitly moved to `NEXT.md`/`BACKLOG.md` 
 | M3 | complete 2026-09-15 | F09–F14 implemented: raster transcode with quality control, BMP/ICO/ICNS binary writers, animated-WebP RIFF builder, GIF/APNG decode+encode, sprite sheets, frame ZIPs, multi-page TIFF, SVG rasterization, raster→SVG tracing, image→PDF; 13 binary-codec unit tests green |
 | M4 | complete 2026-09-15 | F20–F23 + F35 implemented: WAV/MP3/OGG(Opus)/FLAC/AAC transcode via mediabunny with WASM encoder fallbacks, resample/downmix/trim options, waveform SVG + FFT spectrogram PNG exporters, ID3v2 tagging at export (browser-id3-writer); audio-target registry tests green |
 | M5 | complete 2026-09-15 | F24–F35 implemented: WOFF1 pure-JS codec + WOFF2 wasm + SVG-font→TTF compiler + inline glyph subsetting (F24–F27); ZIP/TAR/TAR.GZ extract+build, bz2/7z/RAR via libarchive.js worker, Base64/hex/data-URI both directions (F28–F30); GeoJSON↔KML/KMZ/GPX/WKT/CSV/SVG-map (F31–F33); full image metadata editing at export — PNG tEXt, JPEG EXIF (piexifjs), pure-JS XMP packet surgery, and IPTC-IIM APP13 writer/reader (F34); audio tags written natively into WAV/OGG/FLAC/AAC plus ID3v2 for MP3 (F35). Edge-completeness guard proves every FORMAT_MATRIX edge is registered |
-| M6 | complete 2026-09-15 | tests/e2e/transcode.spec.ts: 6 scenarios (CSV→JSON download bytes, JSON→SQL options, WKT→GeoJSON, PNG→BMP, batch ZIP, Base64) × 2 projects = 12 Playwright tests; browser execution delegated to CI since the sandbox has no browser binaries |
+| M6 | complete 2026-09-15 | tests/e2e/transcode.spec.ts: 11 scenarios (CSV→JSON download bytes, JSON→SQL options, WKT→GeoJSON, PNG→BMP, batch ZIP, Base64, Markdown→HTML5, Markdown→PDF, GeoJSON→SVG map, ZIP→Binary unpacking with fflate fixture, PNG→JPEG quality) × 2 projects = 22 Playwright tests; browser execution delegated to CI since the sandbox has no browser binaries |
 
 ## Per-execution checklist
 
