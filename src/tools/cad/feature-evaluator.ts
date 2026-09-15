@@ -484,6 +484,19 @@ function mirrorFeature(
  * adding new kernel surface area. Counterbore/countersink presets,
  * through-all termination, and patterned placement are not yet supported.
  */
+/** A cut tool sized to a fixed depth is only guaranteed to reach through a body if it exceeds
+ * the body's bounding diagonal; the diagonal is a direction-agnostic safe over-estimate that
+ * avoids projecting onto the cut direction, and the boolean cut only removes what actually
+ * overlaps the body regardless of how far the tool extends beyond it. */
+const THROUGH_ALL_MARGIN = 1;
+
+function throughAllDepth(kernel: CadFeatureKernel, shape: CadKernelShape): number {
+  const bounds = kernel.bounds(shape);
+  const [minX, minY, minZ] = bounds.min;
+  const [maxX, maxY, maxZ] = bounds.max;
+  return Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) + THROUGH_ALL_MARGIN;
+}
+
 function holeFeature(
   feature: CadFeature,
   project: CadProject,
@@ -491,12 +504,16 @@ function holeFeature(
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape {
-  const depth = parameterNumber(feature, 'depth');
+  const throughAll = feature.parameters.throughAll === true;
+  if (!throughAll && feature.parameters.depth === undefined) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} requires either 'depth' or 'throughAll'.`);
+  }
+  const depth = throughAll ? undefined : parameterNumber(feature, 'depth');
   const shape = singleDependencyShape(feature, featureShapes, 'hole');
   return withProfileFace(feature, project, datumPlanes, kernel, (profile, profile3d) => {
     const reversed = feature.parameters.reversed === true;
     const direction: CadKernelVector3 = reversed ? profile3d.normal : negate(profile3d.normal);
-    const tool = kernel.extrude(profile, depth, direction);
+    const tool = kernel.extrude(profile, depth ?? throughAllDepth(kernel, shape), direction);
     try {
       return kernel.cut(shape, tool);
     } finally {
