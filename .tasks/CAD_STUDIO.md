@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `beaf10d3a213733a43637bc861aa0399a23ea44e`
+**Last tracked implementation commit:** `1a56582b9f4f196f8b284dab27d716bc875ae50f`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -100,6 +100,8 @@ A capability counts only when production behavior exists, relevant validation pa
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
 
 - `fast-check@4.10.0` added (exact pin, verified) for property-based tests on the pure-math layer — real-kernel tests stay example-based. Proof of concept at `beaf10d3a213733a43637bc861aa0399a23ea44e`: `negateComponent`/`negate` now property-tested against arbitrary finite floats. 861/862 (known flake), `tsc`/build clean.
+
+- `hole throughAll` implemented at `1a56582b9f4f196f8b284dab27d716bc875ae50f` (RED at `9050791`): tool sized from the body's bounding diagonal + margin; `depth`/`throughAll` now mutually required (no silent default). Verified against the real kernel: removes exactly `π·r²·height`, unaffected by tool oversize. Counterbore/countersink remain deferred (need a second concentric sketch circle + fuse composition — larger slice, not yet scoped).
 
 ## Freshness invariant
 
