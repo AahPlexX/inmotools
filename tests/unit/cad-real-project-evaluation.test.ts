@@ -131,4 +131,48 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('cuts a through-all hole exactly through the body regardless of the oversized cut tool', () => {
+    const holeSketch: CadSketch = {
+      id: 'hole-sketch',
+      label: 'Hole position',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'hole-center', type: 'point', x: 10, y: 5, construction: false },
+        { id: 'hole-circle', type: 'circle', centerPointId: 'hole-center', radius: 1, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const project: CadProject = {
+      ...createCadProject('Through-all hole fixture'),
+      sketches: [holeSketch],
+      features: [
+        feature({
+          id: 'box-1',
+          type: 'primitive',
+          parameters: { kind: 'box', width: 20, depth: 10, height: 5 },
+        }),
+        feature({
+          id: 'hole-1',
+          type: 'hole',
+          dependsOn: ['box-1'],
+          parameters: { sketchId: 'hole-sketch', profileEntityIds: ['hole-circle'], throughAll: true, reversed: true },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // The tool is sized well beyond the box's 5mm height, but the boolean cut only removes
+      // what overlaps the box, so exactly one full-height cylinder should be gone - no more, no less.
+      const expectedVolume = 20 * 10 * 5 - Math.PI * 1 ** 2 * 5;
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(expectedVolume, 4);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
 });

@@ -90,6 +90,7 @@ function kernelFixture() {
     revolve: vi.fn(() => result),
     cut: vi.fn(),
     box: vi.fn(),
+    bounds: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, profile, result };
@@ -269,5 +270,59 @@ describe('CAD sketch-driven exact features', () => {
     evaluateCadFeatures(input, kernel);
 
     expect(kernel.extrude).toHaveBeenCalledWith(profile, 3, [0, 0, 1]);
+  });
+
+  it('sizes a through-all hole from the dependency body bounds instead of a fixed depth', () => {
+    const { kernel } = kernelFixture();
+    const box = token('box');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    (kernel.bounds as ReturnType<typeof vi.fn>).mockReturnValue({ min: [0, 0, 0], max: [20, 10, 5] });
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValue(token('tool'));
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(token('cut-result'));
+
+    const input: CadProject = {
+      ...createCadProject('Through-all hole fixture'),
+      sketches: [circleSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', { sketchId: 'sketch-circle', profileEntityIds: ['circle'], throughAll: true }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    evaluateCadFeatures(input, kernel);
+
+    expect(kernel.bounds).toHaveBeenCalledWith(box);
+    // Diagonal of a 20x10x5 box is sqrt(20^2+10^2+5^2) ~= 22.913; through-all adds a safety margin on top.
+    const diagonal = Math.sqrt(20 ** 2 + 10 ** 2 + 5 ** 2);
+    const [, calledDepth] = (kernel.extrude as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(calledDepth).toBeGreaterThan(diagonal);
+    expect(calledDepth).toBeLessThan(diagonal * 1.5);
+  });
+
+  it('rejects a hole with neither depth nor throughAll specified', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Underspecified hole fixture'),
+      sketches: [circleSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', { sketchId: 'sketch-circle', profileEntityIds: ['circle'] }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/depth.*throughAll|throughAll.*depth/i);
   });
 });
