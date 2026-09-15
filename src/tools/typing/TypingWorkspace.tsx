@@ -14,6 +14,7 @@ import {
   generateWords,
   ghostSeries,
   initState,
+  isCleanlyCompleted,
   ngramLatencies,
   perKeyStats,
   pressKey,
@@ -333,6 +334,14 @@ export default function TypingWorkspace() {
       dispatch({ type: 'finish', reason: 'completed', t: engine.startedAt + totalDurationMs });
     }
   }, [running, now, engine.startedAt, totalDurationMs]);
+
+  // Finite non-timed modes finish as soon as the target is cleanly completed.
+  useEffect(() => {
+    if (!running || engine.finished || totalDurationMs !== 0 || config.durationMode === 'zen') return;
+    if (!isCleanlyCompleted(engine)) return;
+    const lastEvent = engine.events[engine.events.length - 1];
+    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });
+  }, [running, engine, totalDurationMs, config.durationMode]);
 
   // Watch for engine.finished transition.
   useEffect(() => {
@@ -1123,27 +1132,28 @@ function SaveTestModal({ onCancel, onSave, onExport, summary }: {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
   return (
-    <div className="tw-modal-backdrop" role="dialog" aria-modal="true">
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title">
       <div className="tw-modal">
-        <h3>Test result</h3>
+        <h3 id="tw-test-result-title">Test result</h3>
         <div className="tw-summary">
           <div><strong>{summary.netWpm}</strong><br /><small>Net WPM</small></div>
           <div><strong>{summary.accuracy}%</strong><br /><small>Accuracy</small></div>
           <div><strong>{summary.consistency}%</strong><br /><small>Consistency</small></div>
           <div><strong>{summary.incorrectChars}</strong><br /><small>Errors</small></div>
         </div>
-        <label>Typist name</label>
-        <input type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
-        <label>Organization / classroom</label>
-        <input type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
-        <label>Certified by (proctor)</label>
-        <input type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
-        <label>Tags (Enter to add)</label>
+        <label htmlFor="tw-result-typist">Typist name</label>
+        <input id="tw-result-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
+        <label htmlFor="tw-result-organization">Organization / classroom</label>
+        <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
+        <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
+        <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+        <label htmlFor="tw-result-tag">Tags (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
             <span key={t} className="tw-tag">{t} <button type="button" onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
           ))}
           <input
+            id="tw-result-tag"
             type="text"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
@@ -1158,8 +1168,8 @@ function SaveTestModal({ onCancel, onSave, onExport, summary }: {
             placeholder="add tag"
           />
         </div>
-        <label>Notes</label>
-        <textarea value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
+        <label htmlFor="tw-result-notes">Notes</label>
+        <textarea id="tw-result-notes" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
         <label>
           <input type="checkbox" checked={meta.includeKeystrokes} onChange={(e) => setMeta((m) => ({ ...m, includeKeystrokes: e.target.checked }))} /> Save raw keystroke log
         </label>
