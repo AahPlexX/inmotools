@@ -138,6 +138,56 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('unifies same-domain faces on a solid without changing its volume', () => {
+    const unified = kernel.unify(box);
+    try {
+      expect(kernel.volume(unified)).toBeCloseTo(1000, 6);
+    } finally {
+      kernel.release(unified);
+    }
+  });
+
+  it('sews six individually built exact faces into one closed 1000 mm^3 solid', () => {
+    // Corners of a 20x10x5 box: bottom (z=0) A-D, top (z=5) E-H.
+    const A: [number, number, number] = [0, 0, 0];
+    const B: [number, number, number] = [20, 0, 0];
+    const C: [number, number, number] = [20, 10, 0];
+    const D: [number, number, number] = [0, 10, 0];
+    const E: [number, number, number] = [0, 0, 5];
+    const F: [number, number, number] = [20, 0, 5];
+    const G: [number, number, number] = [20, 10, 5];
+    const H: [number, number, number] = [0, 10, 5];
+    const rectFace = (normal: [number, number, number], p1: typeof A, p2: typeof A, p3: typeof A, p4: typeof A) => kernel.profileFace({
+      normal,
+      edges: [
+        { kind: 'line', start: p1, end: p2 },
+        { kind: 'line', start: p2, end: p3 },
+        { kind: 'line', start: p3, end: p4 },
+        { kind: 'line', start: p4, end: p1 },
+      ],
+    });
+    const faces = [
+      rectFace([0, 0, -1], A, B, C, D),
+      rectFace([0, 0, 1], E, F, G, H),
+      rectFace([0, -1, 0], A, B, F, E),
+      rectFace([0, 1, 0], D, C, G, H),
+      rectFace([-1, 0, 0], A, E, H, D),
+      rectFace([1, 0, 0], B, C, G, F),
+    ];
+
+    const sewn = kernel.sew(faces);
+    try {
+      expect(kernel.volume(sewn)).toBeCloseTo(1000, 4);
+    } finally {
+      kernel.release(sewn);
+      for (const face of faces) kernel.release(face);
+    }
+  });
+
+  it('rejects a sew call given fewer than two shapes', () => {
+    expect(() => kernel.sew([box])).toThrow(/at least two/i);
+  });
+
   it('lofts two exact circular wires into a solid frustum', () => {
     const sectionA = kernel.profileWire({
       edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],

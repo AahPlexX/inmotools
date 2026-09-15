@@ -68,6 +68,8 @@ function fakeKernel() {
     mirror: vi.fn(),
     thicken: vi.fn(),
     heal: vi.fn(),
+    unify: vi.fn(),
+    sew: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, shapes };
@@ -174,6 +176,52 @@ describe('CAD exact feature evaluator', () => {
 
     expect(kernel.heal).toHaveBeenCalledWith(shapes.box);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'heal-1', shape: healed }]);
+  });
+
+  it('unifies same-domain faces on a dependency shape', () => {
+    const { kernel, shapes } = fakeKernel();
+    const unified = token('unified');
+    kernel.unify = vi.fn(() => unified);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('unify-1', 'unify', {}, ['box-1']),
+    ]), kernel);
+
+    expect(kernel.unify).toHaveBeenCalledWith(shapes.box);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'unify-1', shape: unified }]);
+  });
+
+  it('sews three or more dependency shapes into one solid', () => {
+    const { kernel, shapes } = fakeKernel();
+    const sewn = token('sewn');
+    kernel.sew = vi.fn(() => sewn);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('cyl-1', 'primitive', { kind: 'cylinder', radius: 2, height: 5 }),
+      feature('sphere-1', 'primitive', { kind: 'sphere', radius: 1 }),
+      feature('sew-1', 'sew', {}, ['box-1', 'cyl-1', 'sphere-1']),
+    ]), kernel);
+
+    expect(kernel.sew).toHaveBeenCalledWith([shapes.box, shapes.cylinder, shapes.sphere]);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'sew-1', shape: sewn }]);
+  });
+
+  it('rejects a sew feature with fewer than two dependencies', () => {
+    const { kernel } = fakeKernel();
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(project([
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('sew-1', 'sew', {}, ['box-1']),
+      ]), kernel);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'sew-1' });
+    expect((thrown as Error).message).toMatch(/at least two/i);
   });
 
   it('chains a Boolean result into a second Boolean operation as its own tool body', () => {
