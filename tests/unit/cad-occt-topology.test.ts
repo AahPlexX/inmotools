@@ -60,4 +60,25 @@ describe('CAD OCCT semantic topology bridge', () => {
       kernel.release(shelled);
     }
   });
+
+  it('feeds a resolved face id into a real exact draft and changes the solid volume', () => {
+    const candidates = kernel.topologyCandidates(box, 'box-feature', 'face');
+    const side = [...candidates].sort((left, right) => right.centroid![0]! - left.centroid![0]!)[0]!;
+    const drafted = kernel.draft(box, [side.id], 0.1, [0, 0, 1]);
+
+    try {
+      const draftedVolume = kernel.volume(drafted);
+      expect(Number.isFinite(draftedVolume)).toBe(true);
+      expect(draftedVolume).toBeGreaterThan(0);
+      expect(draftedVolume).not.toBeCloseTo(1000, 5);
+    } finally {
+      kernel.release(drafted);
+    }
+  });
+
+  it('rejects a draft call given more than one resolved face', () => {
+    const candidates = kernel.topologyCandidates(box, 'box-feature', 'face');
+    const [first, second] = candidates;
+    expect(() => kernel.draft(box, [first!.id, second!.id], 0.1, [0, 0, 1])).toThrow(/exactly one face/i);
+  });
 });

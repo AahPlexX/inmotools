@@ -169,6 +169,64 @@ describe('CAD semantic topology feature resolution', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hollow', shape: shelled }]);
   });
 
+  it('resolves a single draft face from persisted fingerprints before invoking the exact kernel', () => {
+    const base = token('base');
+    const drafted = token('drafted');
+    const topologyCandidates = vi.fn(() => faceCandidates);
+    const draft = vi.fn(() => drafted);
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates,
+      draft,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+
+    const result = evaluateCadFeatures(project([
+      feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('taper', 'draft', { angle: 0.1, direction: [0, 0, 1] }, ['base'], [topFaceRef()]),
+    ]), kernel);
+
+    expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'face');
+    expect(draft).toHaveBeenCalledWith(base, ['topo:face:0'], 0.1, [0, 0, 1]);
+    expect(kernel.release).toHaveBeenCalledWith(base);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'taper', shape: drafted }]);
+  });
+
+  it('rejects a multi-face draft instead of guessing a sequential application order', () => {
+    const base = token('base');
+    const topologyCandidates = vi.fn(() => faceCandidates);
+    const draft = vi.fn();
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates,
+      draft,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+    const secondFaceRef: CadFeature['topologyRefs'][number] = {
+      id: 'ref-face-bottom',
+      producerFeatureId: 'base',
+      kind: 'face',
+      role: 'bottom-face',
+      centroid: [10, 5, 0],
+      bounds: { min: [0, 0, 0], max: [20, 10, 0] },
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(project([
+        feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('taper', 'draft', { angle: 0.1, direction: [0, 0, 1] }, ['base'], [topFaceRef(), secondFaceRef]),
+      ]), kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'taper' });
+    expect((thrown as Error).message).toMatch(/exactly one face/i);
+    expect(draft).not.toHaveBeenCalled();
+  });
+
   it('stops an ambiguous topology reference instead of guessing a raw subshape index', () => {
     const base = token('base');
     const topologyCandidates = vi.fn(() => edgeCandidates);
