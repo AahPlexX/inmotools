@@ -634,7 +634,7 @@ export default function PdfWorkspace() {
           <button className="action-button secondary" type="button" aria-label="Previous preview page" disabled={resolvedViewerPage <= 1} onClick={() => setViewerPage((page) => Math.max(1, page - 1))}>Previous page</button>
           <button className="action-button secondary" type="button" aria-label="Next preview page" disabled={resolvedViewerPage >= viewerPageCount} onClick={() => setViewerPage((page) => Math.min(viewerPageCount, page + 1))}>Next page</button>
         </div>
-        <PdfCanvas file={viewerItem.file} pageNumber={resolvedViewerPage} zoom={viewerZoomPercent / 100} />
+        <PdfCanvas file={viewerItem.file} pageNumber={resolvedViewerPage} zoom={viewerZoomPercent / 100} onPageRequest={setViewerPage} />
       </section> : null}
 
       {items.length ? <section className="notice" style={{ marginTop: 18 }} aria-labelledby="pdf-properties-title">
