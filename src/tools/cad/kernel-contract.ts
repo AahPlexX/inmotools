@@ -117,7 +117,8 @@ export interface CadExactKernel {
   shell(shape: CadKernelShape, faceIds: readonly string[], thickness: number): CadKernelShape;
   draft(shape: CadKernelShape, faceIds: readonly string[], angle: number, direction: CadKernelVector3): CadKernelShape;
   offset(shape: CadKernelShape, distance: number): CadKernelShape;
-  split(shape: CadKernelShape, tool: CadKernelShape): CadKernelShape[];
+  /** Splits by one or more tool surfaces (BOPAlgo_Splitter). Returns one compound of the fragments, not separate shapes. */
+  split(shape: CadKernelShape, tools: readonly CadKernelShape[]): CadKernelShape;
   mirror(shape: CadKernelShape, planeOrigin: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelShape;
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
   defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;

@@ -396,6 +396,23 @@ function sewFeature(
   return kernel.sew(shapes as CadKernelShape[]);
 }
 
+function splitFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  if (feature.dependsOn.length < 2) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} split feature requires a shape dependency and at least one tool dependency.`);
+  }
+  const [shapeId, ...toolIds] = feature.dependsOn;
+  const shape = featureShapes.get(shapeId!);
+  const tools = toolIds.map((id) => featureShapes.get(id));
+  if (!shape || tools.some((tool) => !tool)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} split dependencies must resolve to earlier exact-shape features.`);
+  }
+  return kernel.split(shape, tools as CadKernelShape[]);
+}
+
 /**
  * occt-wasm's raw draft() takes exactly one face handle, unlike
  * fillet/chamfer/shell which accept an array. Batch multi-face draft would
@@ -688,6 +705,8 @@ function createFeatureShape(
       return unifyFeature(feature, kernel, featureShapes);
     case 'sew':
       return sewFeature(feature, kernel, featureShapes);
+    case 'split':
+      return splitFeature(feature, kernel, featureShapes);
     case 'draft':
       return draftFeature(feature, kernel, featureShapes);
     case 'offset':

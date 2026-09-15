@@ -354,8 +354,9 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.offset(this.#unwrap(shape), distance, 1e-6));
   }
 
-  split(shape: CadKernelShape, tool: CadKernelShape): CadKernelShape[] {
-    return [this.#wrap(this.#kernel.split(this.#unwrap(shape), [this.#unwrap(tool)]))];
+  split(shape: CadKernelShape, tools: readonly CadKernelShape[]): CadKernelShape {
+    if (tools.length === 0) throw new Error('Split requires at least one tool shape.');
+    return this.#wrap(this.#kernel.split(this.#unwrap(shape), this.#unwrapMany(tools)));
   }
 
   mirror(shape: CadKernelShape, planeOrigin: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelShape {
