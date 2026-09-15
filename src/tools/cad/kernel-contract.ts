@@ -79,6 +79,16 @@ export interface CadKernelShapeBounds {
   max: CadKernelVector3;
 }
 
+/** A helical wire: right-handed by default, winding counter-clockwise about `axis` as it climbs. */
+export interface CadHelixDefinition {
+  origin: CadKernelVector3;
+  axis: CadKernelVector3;
+  pitch: number;
+  height: number;
+  radius: number;
+  leftHanded?: boolean;
+}
+
 declare const cadKernelShapeBrand: unique symbol;
 
 /**

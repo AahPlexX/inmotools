@@ -1,5 +1,5 @@
 import type { CadFeature, CadProject } from './cad-types';
-import type { CadExactKernel, CadKernelShape, CadKernelVector3 } from './kernel-contract';
+import type { CadExactKernel, CadHelixDefinition, CadKernelShape, CadKernelVector3 } from './kernel-contract';
 import {
   buildSketchPath3d,
   buildSketchProfile3d,
@@ -21,6 +21,7 @@ import {
 export interface CadFeatureKernel extends CadExactKernel {
   profileWire(definition: CadSketchWire3d): CadKernelShape;
   profileFace(profile: CadSketchProfile3d): CadKernelShape;
+  helixWire(definition: CadHelixDefinition): CadKernelShape;
   topologyCandidates(shape: CadKernelShape, producerFeatureId: string, kind: TopologyKind): TopologyCandidate[];
   release(shape: CadKernelShape): void;
 }
@@ -117,6 +118,49 @@ function parameterStringArray(feature: CadFeature, key: string): string[] {
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a non-empty array of ids.`);
   }
   return value;
+}
+
+/**
+ * A sweep's path may come from an inline helix definition instead of a
+ * sketch, for springs and thread-like forms. Returns undefined when the
+ * feature has no 'helix' parameter at all, so the caller can fall back to
+ * the sketch-path convention rather than treating "no helix" as an error.
+ */
+function parameterHelixDefinition(feature: CadFeature): CadHelixDefinition | undefined {
+  const value = feature.parameters.helix;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'helix' must be an object when provided.`);
+  }
+  const helix = value as Record<string, unknown>;
+  const number = (key: string, positive: boolean): number => {
+    const entry = helix[key];
+    if (typeof entry !== 'number' || !Number.isFinite(entry) || (positive && entry <= 0)) {
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label} parameter 'helix.${key}' must be a finite${positive ? ' positive' : ''} number.`,
+      );
+    }
+    return entry;
+  };
+  const vector = (key: string): CadKernelVector3 => {
+    const entry = helix[key];
+    if (!Array.isArray(entry) || entry.length !== 3 || entry.some((component) => typeof component !== 'number' || !Number.isFinite(component))) {
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'helix.${key}' must be an array of three finite numbers.`);
+    }
+    return entry as CadKernelVector3;
+  };
+  if (helix.leftHanded !== undefined && typeof helix.leftHanded !== 'boolean') {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'helix.leftHanded' must be a boolean when provided.`);
+  }
+  return {
+    origin: vector('origin'),
+    axis: vector('axis'),
+    pitch: number('pitch', true),
+    height: number('height', true),
+    radius: number('radius', true),
+    leftHanded: helix.leftHanded as boolean | undefined,
+  };
 }
 
 function parameterVector3(feature: CadFeature, key: string): CadKernelVector3 {
@@ -497,12 +541,10 @@ function revolveFeature(
   ));
 }
 
-function sweepFeature(
-  feature: CadFeature,
-  project: CadProject,
-  datumPlanes: CadDatumPlaneFrames,
-  kernel: CadFeatureKernel,
-): CadKernelShape {
+function sweepPath(feature: CadFeature, project: CadProject, datumPlanes: CadDatumPlaneFrames, kernel: CadFeatureKernel): CadKernelShape {
+  const helix = parameterHelixDefinition(feature);
+  if (helix) return kernel.helixWire(helix);
+
   const pathSketchId = parameterString(feature, 'pathSketchId');
   const pathEntityIds = parameterStringArray(feature, 'pathEntityIds');
   const pathSketch = projectSketch(feature, project, pathSketchId, 'path');
@@ -513,9 +555,17 @@ function sweepFeature(
     const message = error instanceof Error ? error.message : String(error);
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} path is invalid: ${message}`, { cause: error });
   }
+  return kernel.profileWire(path3d);
+}
 
+function sweepFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+): CadKernelShape {
   return withProfileWire(feature, project, datumPlanes, kernel, (profile) => {
-    const path = kernel.profileWire(path3d);
+    const path = sweepPath(feature, project, datumPlanes, kernel);
     try {
       return kernel.sweep(profile, path);
     } finally {

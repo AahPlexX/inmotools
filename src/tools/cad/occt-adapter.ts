@@ -1,6 +1,7 @@
 import type { InitOptions, OcctKernel, ShapeHandle } from 'occt-wasm';
 import type {
   CadExactKernel,
+  CadHelixDefinition,
   CadKernelMesh,
   CadKernelShape,
   CadKernelShapeBounds,
@@ -245,6 +246,22 @@ export class OcctCadKernelAdapter implements CadExactKernel {
   /** Build an exact wire from already solved and 3D-mapped sketch curves. */
   profileWire(definition: CadSketchWire3d): CadKernelShape {
     return this.#wrap(this.#makeWire(definition));
+  }
+
+  helixWire(definition: CadHelixDefinition): CadKernelShape {
+    if (!Number.isFinite(definition.pitch) || definition.pitch <= 0) throw new Error('Helix pitch must be a finite positive number.');
+    if (!Number.isFinite(definition.height) || definition.height <= 0) throw new Error('Helix height must be a finite positive number.');
+    if (!Number.isFinite(definition.radius) || definition.radius <= 0) throw new Error('Helix radius must be a finite positive number.');
+    const magnitude = vectorLength(definition.axis);
+    if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('Helix axis must be a finite non-zero vector.');
+    return this.#wrap(this.#kernel.makeHelixWireHanded(
+      asVec3(definition.origin),
+      asVec3(definition.axis),
+      definition.pitch,
+      definition.height,
+      definition.radius,
+      definition.leftHanded ?? false,
+    ));
   }
 
   /**
