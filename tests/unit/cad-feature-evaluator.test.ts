@@ -70,6 +70,7 @@ function fakeKernel() {
     heal: vi.fn(),
     unify: vi.fn(),
     sew: vi.fn(),
+    split: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, shapes };
@@ -222,6 +223,37 @@ describe('CAD exact feature evaluator', () => {
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'sew-1' });
     expect((thrown as Error).message).toMatch(/at least two/i);
+  });
+
+  it('splits a shape by one or more tool dependencies into a single compound', () => {
+    const { kernel, shapes } = fakeKernel();
+    const fragments = token('fragments');
+    kernel.split = vi.fn(() => fragments);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('tool-1', 'primitive', { kind: 'cylinder', radius: 2, height: 5 }),
+      feature('split-1', 'split', {}, ['box-1', 'tool-1']),
+    ]), kernel);
+
+    expect(kernel.split).toHaveBeenCalledWith(shapes.box, [shapes.cylinder]);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'split-1', shape: fragments }]);
+  });
+
+  it('rejects a split feature with fewer than two dependencies', () => {
+    const { kernel } = fakeKernel();
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(project([
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('split-1', 'split', {}, ['box-1']),
+      ]), kernel);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'split-1' });
+    expect((thrown as Error).message).toMatch(/at least one tool/i);
   });
 
   it('chains a Boolean result into a second Boolean operation as its own tool body', () => {

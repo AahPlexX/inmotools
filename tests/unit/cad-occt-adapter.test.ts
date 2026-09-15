@@ -188,6 +188,31 @@ describe('CAD exact OCCT adapter', () => {
     expect(() => kernel.sew([box])).toThrow(/at least two/i);
   });
 
+  it('splits a solid into one compound of fragments that preserves total volume and bounds', () => {
+    // A planar tool face spanning well beyond the box's y/z extent, positioned at x=10 (through the middle).
+    const splittingPlane = kernel.profileFace({
+      normal: [1, 0, 0],
+      edges: [
+        { kind: 'line', start: [10, -5, -5], end: [10, 15, -5] },
+        { kind: 'line', start: [10, 15, -5], end: [10, 15, 10] },
+        { kind: 'line', start: [10, 15, 10], end: [10, -5, 10] },
+        { kind: 'line', start: [10, -5, 10], end: [10, -5, -5] },
+      ],
+    });
+    const fragments = kernel.split(box, [splittingPlane]);
+    try {
+      expect(kernel.volume(fragments)).toBeCloseTo(1000, 4);
+      expectBoundsClose(kernel.bounds(fragments), { min: [0, 0, 0], max: [20, 10, 5] });
+    } finally {
+      kernel.release(fragments);
+      kernel.release(splittingPlane);
+    }
+  });
+
+  it('rejects a split call given no tool shapes', () => {
+    expect(() => kernel.split(box, [])).toThrow(/at least one tool/i);
+  });
+
   it('lofts two exact circular wires into a solid frustum', () => {
     const sectionA = kernel.profileWire({
       edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],
