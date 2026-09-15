@@ -26,7 +26,7 @@ jobs:
           path = Path('src/tools/typing/TypingWorkspace.tsx')
           text = path.read_text()
 
-          replacements = [
+          unique_replacements = [
               (
                   "  initState,\n  ngramLatencies,",
                   "  initState,\n  isCleanlyCompleted,\n  ngramLatencies,",
@@ -47,22 +47,31 @@ jobs:
                   "        <label htmlFor=\"tw-result-typist\">Typist name</label>\n        <input id=\"tw-result-typist\" autoFocus type=\"text\" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />\n        <label htmlFor=\"tw-result-organization\">Organization / classroom</label>\n        <input id=\"tw-result-organization\" type=\"text\" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />\n        <label htmlFor=\"tw-result-certified-by\">Certified by (proctor)</label>\n        <input id=\"tw-result-certified-by\" type=\"text\" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />\n        <label htmlFor=\"tw-result-tag\">Tags (Enter to add)</label>",
                   'result text labels',
               ),
+          ]
+
+          for old, new, label in unique_replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one {label} target, found {count}')
+              text = text.replace(old, new, 1)
+
+          first_only_replacements = [
               (
                   "          <input\n            type=\"text\"\n            value={tagInput}",
                   "          <input\n            id=\"tw-result-tag\"\n            type=\"text\"\n            value={tagInput}",
-                  'result tag input label target',
+                  'tag input',
               ),
               (
                   "        <label>Notes</label>\n        <textarea value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />",
                   "        <label htmlFor=\"tw-result-notes\">Notes</label>\n        <textarea id=\"tw-result-notes\" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />",
-                  'result notes label',
+                  'notes field',
               ),
           ]
 
-          for old, new, label in replacements:
+          for old, new, label in first_only_replacements:
               count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'Expected exactly one {label} target, found {count}')
+              if count != 2:
+                  raise SystemExit(f'Expected exactly two {label} targets before scoped replacement, found {count}')
               text = text.replace(old, new, 1)
 
           path.write_text(text)
