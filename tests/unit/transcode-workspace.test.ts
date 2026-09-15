@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import TranscodeWorkspace from '../../src/tools/transcode/TranscodeWorkspace';
 import { availableTargets } from '../../src/tools/transcode/transcode-engine';
+import type { FormatId } from '../../src/tools/transcode/formats';
 import { registerTabularConverters } from '../../src/tools/transcode/tabular-converters';
 import { registerEncodingConverters } from '../../src/tools/transcode/encoding-converters';
 import { registerDocumentConverters } from '../../src/tools/transcode/documents-converters';
@@ -159,5 +160,16 @@ describe('TranscodeWorkspace shell', () => {
     for (const source of sources) {
       expect(Array.isArray(FORMAT_MATRIX[source as keyof typeof FORMAT_MATRIX])).toBe(true);
     }
+  });
+
+  it('registers a converter for every edge in the format matrix', () => {
+    const missing: string[] = [];
+    for (const [source, targets] of Object.entries(FORMAT_MATRIX)) {
+      for (const target of targets) {
+        const targetsForSource = availableTargets(source as FormatId).map((entry) => entry.target);
+        if (!targetsForSource.includes(target)) missing.push(`${source} -> ${target}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });

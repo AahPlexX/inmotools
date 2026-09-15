@@ -152,6 +152,27 @@ describe('registry wiring', () => {
     expect(collection.features).toHaveLength(2);
   });
 
+  it('runs kmz -> gpx and kmz -> csv through the registry', async () => {
+    const kmz = await geojsonToKmz(pointCollection);
+    const gpxArtifacts = await runConversion('kmz', 'gpx', {
+      sourceId: 'kmz',
+      fileName: 'sites.kmz',
+      bytes: kmz,
+      text: () => '',
+    }, {});
+    expect(gpxArtifacts[0].name).toBe('sites.gpx');
+    expect(new TextDecoder().decode(gpxArtifacts[0].bytes)).toContain('<wpt');
+
+    const csvArtifacts = await runConversion('kmz', 'csv', {
+      sourceId: 'kmz',
+      fileName: 'sites.kmz',
+      bytes: kmz,
+      text: () => '',
+    }, {});
+    expect(csvArtifacts[0].name).toBe('sites.csv');
+    expect(new TextDecoder().decode(csvArtifacts[0].bytes)).toContain('Covington');
+  });
+
   it('normalizes bare geometries into FeatureCollections', () => {
     const collection = normalizeFeatureCollection({ type: 'Point', coordinates: [1, 2] });
     expect(collection.features[0].geometry).toEqual({ type: 'Point', coordinates: [1, 2] });

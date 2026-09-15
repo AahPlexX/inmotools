@@ -4,7 +4,7 @@ import { zipSync } from 'fflate';
 import { FORMATS, type FormatId } from './formats';
 import {
   buildIcns, buildIco, decodeApngFrames, decodeGifFrames, decodeTiffPages, decodeToRgba, encodeApngAnimation,
-  encodeGifAnimation, encodeRgba, encodeSpriteSheet, encodeWebpAnimation, imageToPdf,
+  encodeGifAnimation, encodeRgba, encodeSpriteSheet, encodeTiff, encodeWebpAnimation, imageToPdf,
   rasterizeSvg, traceToSvg,
 } from './images-engine';
 import { bytesToBase64, toDataUri } from './text-codecs';
@@ -94,6 +94,23 @@ export function registerImageConverters(): void {
       return [bytesArtifact(swapExtension(input.fileName, 'pdf'), await imageToPdf(input.bytes, FORMATS[source].mime), 'application/pdf')];
     });
   }
+
+  // PNG -> multi-tag TIFF (F13 reverse).
+  registerConverter('png', 'tiff', 'Encode the image as a TIFF file', async (input) => {
+    const image = await decodeToRgba(input.bytes, 'image/png');
+    return [bytesArtifact(swapExtension(input.fileName, 'tiff'), await encodeTiff(image), 'image/tiff')];
+  });
+
+  // WebP -> GIF (palette-quantized still frame).
+  registerConverter('webp', 'gif', 'Convert WebP to a palette GIF', async (input) => {
+    const image = await decodeToRgba(input.bytes, 'image/webp');
+    const bytes = await encodeGifAnimation(
+      [{ image, delayMs: 0 }],
+      image.width,
+      image.height,
+    );
+    return [bytesArtifact(swapExtension(input.fileName, 'gif'), bytes, 'image/gif')];
+  });
 
   // --- PNG tracing (F11) -----------------------------------------------------
   registerConverter('png', 'svg', 'Trace the bitmap into SVG vector paths', async (input, options) => {

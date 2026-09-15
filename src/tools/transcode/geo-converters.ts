@@ -76,6 +76,16 @@ export function registerGeoConverters(): void {
     const collection = kmlToGeojson(kml);
     return [textArtifact(swapExtension(input.fileName, 'geojson'), `${JSON.stringify(collection, null, 2)}\n`, GEOJSON_MIME)];
   });
+  registerConverter('kmz', 'gpx', 'Unpack KMZ and convert to GPX', async (input) => {
+    const kml = await kmzToKml(input.bytes);
+    const collection = kmlToGeojson(kml);
+    return [textArtifact(swapExtension(input.fileName, 'gpx'), geojsonToGpx(collection), 'application/gpx+xml')];
+  });
+  registerConverter('kmz', 'csv', 'Unpack KMZ and flatten placemarks to CSV', async (input) => {
+    const kml = await kmzToKml(input.bytes);
+    const collection = kmlToGeojson(kml);
+    return [textArtifact(swapExtension(input.fileName, 'csv'), geojsonToCsv(collection), 'text/csv;charset=utf-8')];
+  });
 
   // --- GPX source (F32) ---------------------------------------------------------
   registerConverter('gpx', 'geojson', 'Convert GPX waypoints, tracks, and routes to GeoJSON', async (input) => {

@@ -278,6 +278,15 @@ export async function decodeTiffPages(bytes: Uint8Array): Promise<RgbaImage[]> {
   return pages;
 }
 
+export async function encodeTiff(image: RgbaImage): Promise<Uint8Array> {
+  const UTIF = (await import('utif2')).default as unknown as {
+    encodeImage: (rgba: Uint8Array | ArrayBuffer, width: number, height: number, metadata?: Record<string, unknown>) => ArrayBuffer;
+  };
+  const rgba = image.data.slice();
+  const buffer = UTIF.encodeImage(rgba, image.width, image.height);
+  return new Uint8Array(buffer);
+}
+
 // ---------------------------------------------------------------------------
 // SVG rasterization (F10)
 // ---------------------------------------------------------------------------

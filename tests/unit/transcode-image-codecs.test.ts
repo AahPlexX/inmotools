@@ -116,3 +116,19 @@ describe('scale helper', () => {
     expect(scaleToFit(solidImage(10, 10, [0, 0, 0, 255]), 256)).toEqual({ width: 256, height: 256 });
   });
 });
+
+describe('TIFF encoder', () => {
+  it('round-trips RGBA through utif2 encode/decode', async () => {
+    const { encodeTiff } = await import('../../src/tools/transcode/images-engine');
+    const { decodeTiffPages } = await import('../../src/tools/transcode/images-engine');
+    const image = solidImage(4, 3, [200, 60, 30, 255]);
+    const tiff = await encodeTiff(image);
+    // Valid TIFF magic: little-endian (II) or big-endian (MM).
+    expect([[0x49, 0x49], [0x4d, 0x4d]]).toContainEqual([tiff[0], tiff[1]]);
+    const pages = await decodeTiffPages(tiff);
+    expect(pages).toHaveLength(1);
+    expect(pages[0].width).toBe(4);
+    expect(pages[0].height).toBe(3);
+    expect(Array.from(pages[0].data.slice(0, 4))).toEqual([200, 60, 30, 255]);
+  });
+});
