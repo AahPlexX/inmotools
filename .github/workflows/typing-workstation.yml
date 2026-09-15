@@ -1,0 +1,47 @@
+name: Typing Workstation validation
+
+on:
+  push:
+    branches: [main, feature/typing-workstation]
+    paths:
+      - 'src/tools/typing/**'
+      - 'tests/unit/typing-*.test.ts'
+      - 'tests/e2e/typing.spec.ts'
+      - '.github/workflows/typing-workstation.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Focused typing unit tests
+        run: >-
+          pnpm exec vitest run
+          tests/unit/typing-engine.test.ts
+          tests/unit/typing-corpora.test.ts
+          tests/unit/typing-storage.test.ts
+          tests/unit/typing-export.test.ts
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Typing browser tests
+        run: pnpm exec playwright test tests/e2e/typing.spec.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: typing-workstation-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
