@@ -12,6 +12,7 @@
  */
 
 import type { SessionSummary } from './session-engine';
+import type { VocabularyEntry } from './vocabulary-engine';
 
 export const DATABASE_NAME = 'inmotools.sightline.v1';
 export const DATABASE_VERSION = 1;
@@ -224,6 +225,26 @@ export const readSession = async (database: IDBDatabase, id: string): Promise<Wa
 export const readDocument = async (database: IDBDatabase, id: string): Promise<WarehouseResult<StoredDocument | undefined>> =>
   transaction<StoredDocument | undefined>(database, DOCUMENT_STORE, 'readonly', (tx) => tx.objectStore(DOCUMENT_STORE).get(id) as IDBRequest<StoredDocument | undefined>);
 
+export const putVocabulary = async (database: IDBDatabase, entry: VocabularyEntry): Promise<WarehouseResult<IDBValidKey>> =>
+  transaction(database, VOCABULARY_STORE, 'readwrite', (tx) => tx.objectStore(VOCABULARY_STORE).put(entry));
+
+export const putVocabularyEntries = async (
+  database: IDBDatabase,
+  entries: readonly VocabularyEntry[],
+): Promise<WarehouseResult<number>> => {
+  for (const entry of entries) {
+    const result = await putVocabulary(database, entry);
+    if (!result.ok) return { ok: false, message: result.message };
+  }
+  return { ok: true, value: entries.length };
+};
+
+export const readAllVocabulary = async (database: IDBDatabase): Promise<WarehouseResult<VocabularyEntry[]>> =>
+  transaction<VocabularyEntry[]>(database, VOCABULARY_STORE, 'readonly', (tx) => tx.objectStore(VOCABULARY_STORE).getAll() as IDBRequest<VocabularyEntry[]>);
+
+export const deleteVocabularyWord = async (database: IDBDatabase, word: string): Promise<WarehouseResult<undefined>> =>
+  transaction<undefined>(database, VOCABULARY_STORE, 'readwrite', (tx) => tx.objectStore(VOCABULARY_STORE).delete(word) as IDBRequest<undefined>);
+
 export const readAllSessions = async (database: IDBDatabase): Promise<WarehouseResult<StoredSession[]>> =>
   transaction<StoredSession[]>(database, SESSION_STORE, 'readonly', (tx) => tx.objectStore(SESSION_STORE).getAll() as IDBRequest<StoredSession[]>);
 
@@ -234,9 +255,10 @@ export const deleteSession = async (database: IDBDatabase, id: string): Promise<
   transaction<undefined>(database, SESSION_STORE, 'readwrite', (tx) => tx.objectStore(SESSION_STORE).delete(id) as IDBRequest<undefined>);
 
 export const clearWarehouse = async (database: IDBDatabase): Promise<WarehouseResult<undefined>> =>
-  transaction<undefined>(database, [SESSION_STORE, DOCUMENT_STORE], 'readwrite', (tx) => {
+  transaction<undefined>(database, [SESSION_STORE, DOCUMENT_STORE, VOCABULARY_STORE], 'readwrite', (tx) => {
     tx.objectStore(SESSION_STORE).clear();
-    return tx.objectStore(DOCUMENT_STORE).clear() as IDBRequest<undefined>;
+    tx.objectStore(DOCUMENT_STORE).clear();
+    return tx.objectStore(VOCABULARY_STORE).clear() as IDBRequest<undefined>;
   });
 
 /** JSON payload for the analytics export. */

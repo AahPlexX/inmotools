@@ -26,6 +26,7 @@ const TOOL_SPECS = new Map([
   ['pdf', ['tests/e2e/pdf.spec.ts']],
   ['photo', ['tests/e2e/photo.spec.ts']],
   ['regex', ['tests/e2e/regex-matrix.spec.ts', 'tests/e2e/regex-matrix-audit.spec.ts']],
+  ['sightline', ['tests/e2e/sightline.spec.ts']],
   ['shader', ['tests/e2e/shader.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts']],
