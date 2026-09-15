@@ -32,6 +32,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'aethercast': () => import('./aethercast/AetherCastWorkspace'),
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
+  'transcode-workstation': () => import('./transcode/TranscodeWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

@@ -29,6 +29,7 @@ const TOOL_SPECS = new Map([
   ['shader', ['tests/e2e/shader.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts']],
+  ['transcode', ['tests/e2e/transcode.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],
   ['video', ['tests/e2e/video.spec.ts']],
 ]);

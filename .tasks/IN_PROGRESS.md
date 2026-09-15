@@ -1,5 +1,12 @@
 # In Progress
 
+- **Transcode Workstation** — universal local file-to-file transcoder, tabular data transformer, and multi-format media conversion workstation with 36 planned functional capabilities.
+  - Design: `docs/superpowers/specs/2026-09-15-transcode-workstation-design.md`.
+  - Plan and feature ledger: `docs/superpowers/plans/2026-09-15-transcode-workstation.md`.
+  - Current milestone: all six milestones (M0–M6) are complete as of 2026-09-15. F01–F36 are implemented: tabular, documents, images/icons/animation, audio, fonts, geospatial, archives, base64/hex/data-URI, metadata editing at export (EXIF + XMP + IPTC writers + strip), native audio container tags + ID3v2, and batch ZIP. 124 focused unit tests green (860/863 repo-wide; the 3 failures are the pre-existing vector-engine baseline, red on main); production build green. Draft PR #33 carries the branch for CI; browser e2e (11 scenarios × 2 projects) awaits the vector baseline fix that currently halts the pipeline at the unit-tests step.
+  - Completion gate: every ledger capability implemented and reachable through the workspace UI, validated exports, focused unit tests, responsive keyboard-accessible UI, green `pnpm test:unit` and `pnpm build`, and browser coverage for the tool before integration. No premature merge to `main`; work stays on the session working branch until all verification tasks finish.
+  - Scope: `src/tools/transcode/`, tool-specific tests, additive catalog/loader integration, additive dependency pins. Other workstreams and branches are preserved.
+
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
   - Current milestone: Sass token map export integrated at 3ec9e435; dedicated Web Layout run 34853354606 passed frozen install, 20 units, build and desktop/mobile browser tests. Pages deployed and the live export control was inspected. Shared Web Layout accessibility timeouts remain unresolved; current repository-wide gates fail in Crystal/Vector unit tests. Full 60-feature ledger remains active with no scope reduction.
