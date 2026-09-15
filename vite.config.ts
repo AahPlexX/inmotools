@@ -23,7 +23,7 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,wasm}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,wasm,woff2}'],
         // pyodide/** and duckdb-*.wasm avoid precaching the DuckDB/Pyodide-scale
         // WASM/runtime payload for every visitor (see .tasks/NEXT.md TASK-003).
         // MarkdownWorkspace itself stays precached so an already-open client can
@@ -42,6 +42,10 @@ export default defineConfig({
         //     bundled CSL style XML files, loaded dynamically per style.
         //   - KaTeX_*.{woff,woff2,ttf}: KaTeX's web fonts (all formats);
         //     only needed once a document actually contains math.
+        // `.mjs` and `.woff2` are precached on purpose: the Sightline reading
+        // tool ships its six reading typefaces as woff2, and its PDF decoder
+        // loads the pdf.js module worker, both of which must be available the
+        // first time the tool is used offline.
         globIgnores: [
           'pyodide/**',
           '**/duckdb-*.wasm',
