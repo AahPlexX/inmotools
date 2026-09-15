@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `c819d3ad32cb8f2ff6ab7970cae2ae6736434c16`
+**Last tracked implementation commit:** `beaf10d3a213733a43637bc861aa0399a23ea44e`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -98,6 +98,8 @@ A capability counts only when production behavior exists, relevant validation pa
 - glTF/XCAF assembly export remains part of the later professional export path.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
+
+- `fast-check@4.10.0` added (exact pin, verified) for property-based tests on the pure-math layer — real-kernel tests stay example-based. Proof of concept at `beaf10d3a213733a43637bc861aa0399a23ea44e`: `negateComponent`/`negate` now property-tested against arbitrary finite floats. 861/862 (known flake), `tsc`/build clean.
 
 ## Freshness invariant
 
