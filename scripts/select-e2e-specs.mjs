@@ -11,6 +11,7 @@ const TOOL_SPECS = new Map([
   ['dedupe', ['tests/e2e/dedupe.spec.ts']],
   ['duckdb', ['tests/e2e/duckdb.spec.ts']],
   ['exif', ['tests/e2e/exif.spec.ts']],
+  ['fiber-craft', ['tests/e2e/fiber-craft.spec.ts']],
   ['floorplan', ['tests/e2e/floorplan.spec.ts']],
   ['font', ['tests/e2e/font.spec.ts']],
   ['geo', ['tests/e2e/geo.spec.ts']],
