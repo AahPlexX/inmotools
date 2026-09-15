@@ -1,6 +1,6 @@
 # Fiber Craft Workstation
 
-**Status:** In progress (Slice 0 — foundation)
+**Status:** In progress (Slice 1 — shared shell; Slice 2 foundations started)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
 
@@ -30,13 +30,11 @@ any compatible application or machine.
 - **Rendering:** native Canvas 2D for grids/mandala/cable diagrams; no WebGL/3D dependency is
   required for this tool.
 - **Registration:** one `catalog.ts` entry, one lazy loader in `workspaces.tsx`, one hash-route
-  alias in `App.tsx` — added only once the workspace shell exists (a later slice), so no partially
-  wired route ships.
+  alias in `App.tsx` — added only once the workspace shell exists, so no partially wired route ships.
 - **Persistence:** browser-local structured storage (IndexedDB) for in-progress projects, plus a
   single-file `.craftproj` (JSON) bundle for portable import/export. Nothing is uploaded.
 
-## Tech Stack (exact pinned versions already in this repository; verified against `package.json`,
-`pnpm-lock.yaml`, and npmjs.com)
+## Tech Stack (exact pinned versions already in this repository)
 
 React `19.2.8`, TypeScript `7.0.2`, Vite `8.2.2`, Vitest `4.1.11`, Playwright `1.63.0`, pnpm
 `12.3.4`, Tailwind/project CSS, Canvas 2D, Web Workers, existing `pdf-lib` `1.17.1` (multi-page
@@ -53,16 +51,19 @@ unverified dependency, this workstation implements its own small, pure, unit-tes
 encoders for DST, EXP, JEF, and PES against their publicly documented, openly described binary
 layouts. This keeps every dependency in the lockfile exactly pinned and independently verifiable.
 
-## Delivery slices (tracked in this file; updated at the end of every session so the effort never
-goes stale)
+## Delivery slices
 
 - [x] **Slice 0 — Foundation.** This plan, the design spec, and the canonical
-      `FiberCraftDocument` / per-craft type model. *(this commit)*
+      `FiberCraftDocument` / per-craft type model.
 - [ ] **Slice 1 — Shared workspace shell.** Canvas host, tool/mode switcher, palette/inspector
-      panels, undo/redo history, autosave, catalog/route registration behind a working (even if
-      minimal) landing view so the route is never left half-wired.
+      panels, undo/redo history, autosave, catalog/route registration behind a working landing view.
+      **In progress:** the browser acceptance contract is defined; implementation is the current
+      milestone.
 - [ ] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator.
+      **Started:** shared grid/polar geometry, gauge math, the crochet symbol library, and focused
+      unit coverage are present. C2C/filet compilation, written instructions, and interactive
+      crochet editing remain open.
 - [ ] **Slice 3 — Cross-stitch & counted-thread engine.** Precision grid, raster quantization
       worker, DMC/Anchor/Madeira/Sullivan floss matcher (CIEDE2000 via `culori`), symbol/legend
       generator, skein/yardage calculator.

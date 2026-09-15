@@ -24,6 +24,14 @@
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
   - Current milestone: A — foundation and global editor
 
+- **Fiber Craft Workstation** — local-first fiber-pattern workstation; the active delivery path is crochet-first while preserving the approved multi-discipline design.
+  - Design: `docs/superpowers/specs/2026-09-15-fiber-craft-workstation-design.md`.
+  - Plan: `docs/superpowers/plans/2026-09-15-fiber-craft-workstation.md`.
+  - Dedicated branch: `feature/fiber-craft-workstation`; no second Fiber Craft branch is authorized for this workstream.
+  - Current milestone: Slice 1 — shared workspace shell and registration, with Slice 2 crochet foundations already started.
+  - Current state: canonical document types, grid/polar geometry, gauge math, crochet/knitting symbol data, and focused unit coverage exist on the dedicated branch. The shell, route/catalog registration, history, and IndexedDB restore flow are the active implementation target.
+  - Completion gate: all approved slices 0–8 are implemented and freshly verified, responsive/accessibility and persisted/exported behavior are validated, and intended completed work is integrated to `origin/main` before this entry can move to `DONE.md`.
+
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
