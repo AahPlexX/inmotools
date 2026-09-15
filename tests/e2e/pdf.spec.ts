@@ -40,8 +40,8 @@ test('keeps an empty Even preset distinct from All and reorders output without r
     { name: 'first.pdf', mimeType: 'application/pdf', buffer: await plainPdf(100) },
     { name: 'second.pdf', mimeType: 'application/pdf', buffer: await plainPdf(200) },
   ]);
-  await expect(page.getByText('first.pdf', { exact: true })).toBeVisible();
-  await expect(page.getByText('second.pdf', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('pdf-item').nth(0).getByText('first.pdf', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('pdf-item').nth(1).getByText('second.pdf', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Even', exact: true }).first()).toBeDisabled();
   await expect(page.getByTestId('pdf-output-preview').locator('li')).toHaveText(['first.pdf · page 1', 'second.pdf · page 1']);
 
