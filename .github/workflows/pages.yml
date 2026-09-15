@@ -2,7 +2,7 @@ name: Validate and deploy Pages
 
 on:
   push:
-    branches: [main, feat/pdf-workstation]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -14,57 +14,7 @@ permissions:
   id-token: write
 
 jobs:
-  pdf-branch-acceptance:
-    if: github.ref == 'refs/heads/feat/pdf-workstation'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup pnpm and Node
-        uses: pnpm/setup@v2
-        with:
-          runtime: node@24
-          install: false
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: PDF Workstation unit acceptance
-        run: >-
-          pnpm exec vitest run
-          tests/unit/pdf.test.ts
-          tests/unit/pdf-attachments.test.ts
-          tests/unit/pdf-export-summary.test.ts
-          tests/unit/pdf-form-authoring.test.ts
-          tests/unit/pdf-form-inventory.test.ts
-          tests/unit/pdf-overlays.test.ts
-          tests/unit/pdf-renderer.test.ts
-          tests/unit/pdf-text-search.test.ts
-      - name: PDF Workstation production build
-        run: pnpm build
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: PDF Workstation browser acceptance
-        run: >-
-          pnpm exec playwright test
-          tests/e2e/pdf.spec.ts
-          tests/e2e/pdf-export-summary.spec.ts
-          tests/e2e/pdf-form-authoring.spec.ts
-          tests/e2e/pdf-form-inventory.spec.ts
-          tests/e2e/pdf-overlays.spec.ts
-          tests/e2e/pdf-structural-actions.spec.ts
-          tests/e2e/pdf-renderer.spec.ts
-      - name: Upload Playwright failure evidence
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: pdf-text-layer-failure-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: warn
-          retention-days: 7
-
   validate:
-    if: github.ref != 'refs/heads/feat/pdf-workstation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
