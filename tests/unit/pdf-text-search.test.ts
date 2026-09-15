@@ -18,5 +18,6 @@ describe('PDF text search', () => {
 
   it('bounds results to protect the UI from pathological documents', () => {
     expect(findPdfTextMatches('x x x x x', 'x', { maxResults: 3 })).toHaveLength(3);
+    expect(findPdfTextMatches('x x x', 'x', { maxResults: 0 })).toHaveLength(1);
   });
 });
