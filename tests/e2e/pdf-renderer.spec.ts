@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./#/tools/pdf-sanitizer');
 });
 
-test('renders through a real worker with selectable text, page search, navigation, and zoom', async ({ page }) => {
+test('renders through a real worker with selectable text, document search navigation, and zoom', async ({ page }) => {
   await page.getByLabel('Add PDF files').setInputFiles({
     name: 'render-me.pdf',
     mimeType: 'application/pdf',
@@ -51,12 +51,13 @@ test('renders through a real worker with selectable text, page search, navigatio
   });
   expect(selectedText).toContain('Renderer page one');
 
-  await page.getByLabel('Search current page').fill('page one');
-  await page.getByRole('button', { name: 'Search page' }).click();
-  await expect(page.getByTestId('pdf-search-status')).toContainText('1 match on page 1');
-  await expect(page.getByTestId('pdf-search-results')).toContainText('Renderer page one');
+  await page.getByLabel('Search document').fill('page two');
+  await page.getByRole('button', { name: 'Search document', exact: true }).click();
+  await expect(page.getByTestId('pdf-search-status')).toContainText('1 match in this document');
+  await expect(page.getByTestId('pdf-search-results')).toContainText('Renderer page two');
+  await page.getByRole('button', { name: 'Go to page 2' }).click();
 
-  await page.getByRole('button', { name: 'Next preview page' }).click();
+  await expect(page.getByLabel('Preview page')).toHaveValue('2');
   await expect(canvas).toHaveAttribute('data-rendered-page', '2');
   await expect(textLayer).toContainText('Renderer page two');
   await expect(page.getByTestId('pdf-render-status')).toContainText('Rendered page 2');
