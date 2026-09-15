@@ -24,12 +24,12 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
     if (!isRecord(node)) return false;
     const round = Number(node.round);
     const angleIndex = Number(node.angleIndex);
-    const stitchCountInRound = Number(node.stitchCountInRound);
+    const stitchesInRound = Number(node.stitchesInRound);
     const symbolId = node.symbolId;
     const colorId = node.colorId;
     return Number.isInteger(round) && round >= 0 && round < rounds
-      && Number.isInteger(angleIndex) && angleIndex >= 0
-      && Number.isInteger(stitchCountInRound) && stitchCountInRound > 0
+      && Number.isInteger(angleIndex) && angleIndex >= 0 && angleIndex < stitchesInRound
+      && Number.isInteger(stitchesInRound) && stitchesInRound > 0
       && (symbolId === null || (typeof symbolId === 'string' && SYMBOL_IDS.has(symbolId)))
       && (colorId === null || (typeof colorId === 'string' && paletteIds.has(colorId)));
   });
