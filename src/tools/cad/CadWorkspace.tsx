@@ -3,7 +3,7 @@ import type { CadProjectHistory } from './cad-types';
 import type { CadKernelBodyResult, CadKernelResponse } from './kernel-contract';
 import { CadKernelWorkerClient, type CadKernelWorkerFactory } from './kernel-worker-client';
 import { createBrowserCadKernelWorkerFactory } from './cad-worker-factory';
-import { commitCadProject, createCadProject, redoCadProject, setFeatureSuppressed, undoCadProject } from './project-engine';
+import { commitCadProject, createCadProject, redoCadProject, setFeatureParameter, setFeatureSuppressed, undoCadProject } from './project-engine';
 import type { CadSelection } from './cad-workspace-types';
 import CadViewport from './CadViewport';
 import CadTree from './CadTree';
@@ -76,6 +76,14 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
     ));
   }
 
+  function changeParameter(featureId: string, key: string, value: unknown) {
+    setHistory((current) => commitCadProject(
+      current,
+      `Edit ${key}`,
+      (project) => setFeatureParameter(project, featureId, key, value),
+    ));
+  }
+
   function undo() {
     setHistory((current) => undoCadProject(current));
   }
@@ -99,7 +107,7 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
         {kernelError ? <div className="notice" role="alert">{kernelError}</div> : null}
       </div>
       <div className="cad-workspace-inspector">
-        <CadInspector project={history.present} selection={selection} onParameterChange={() => {}} />
+        <CadInspector project={history.present} selection={selection} onParameterChange={changeParameter} />
       </div>
       <div className="button-row" aria-label="History controls">
         <button className="action-button secondary" type="button" disabled={history.past.length === 0} onClick={undo}>Undo</button>

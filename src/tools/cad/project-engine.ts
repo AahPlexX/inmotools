@@ -119,6 +119,20 @@ export function markFeatureDirty(project: CadProject, featureId: string): CadPro
   return updateFeatureStatuses(project, featureDependencyClosure(project, [featureId]));
 }
 
+export function setFeatureParameter(project: CadProject, featureId: string, key: string, value: unknown): CadProject {
+  const featureExists = project.features.some((feature) => feature.id === featureId);
+  if (!featureExists) return project;
+  const withParameter: CadProject = {
+    ...project,
+    features: project.features.map((feature) => (
+      feature.id === featureId
+        ? { ...feature, parameters: { ...feature.parameters, [key]: value }, diagnostic: null }
+        : feature
+    )),
+  };
+  return markFeatureDirty(withParameter, featureId);
+}
+
 export function setFeatureSuppressed(project: CadProject, featureId: string, suppressed: boolean): CadProject {
   const featureExists = project.features.some((feature) => feature.id === featureId);
   if (!featureExists) return project;
