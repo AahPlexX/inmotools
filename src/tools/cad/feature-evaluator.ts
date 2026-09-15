@@ -119,6 +119,14 @@ function parameterStringArray(feature: CadFeature, key: string): string[] {
   return value;
 }
 
+function parameterVector3(feature: CadFeature, key: string): CadKernelVector3 {
+  const value = feature.parameters[key];
+  if (!Array.isArray(value) || value.length !== 3 || value.some((entry) => typeof entry !== 'number' || !Number.isFinite(entry))) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be an array of three finite numbers.`);
+  }
+  return value as CadKernelVector3;
+}
+
 function parameterLoftSections(feature: CadFeature): LoftSectionSpec[] {
   const value = feature.parameters.sections;
   if (!Array.isArray(value) || value.length < 2) {
@@ -301,6 +309,33 @@ function shellFeature(
   const thickness = parameterNumber(feature, 'thickness');
   const shape = singleDependencyShape(feature, featureShapes, 'shell');
   return kernel.shell(shape, resolvedTopologyIds(feature, kernel, shape, 'face'), thickness);
+}
+
+/**
+ * occt-wasm's raw draft() takes exactly one face handle, unlike
+ * fillet/chamfer/shell which accept an array. Batch multi-face draft would
+ * need each subsequent face re-resolved by semantic fingerprint against the
+ * shape produced by the previous face's draft (since the raw topology shifts
+ * after each edit), which is a real design decision nobody has validated
+ * yet. Rather than guess at that sequencing, this rejects more than one
+ * resolved face and leaves batch draft as an explicit follow-up.
+ */
+function draftFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const angle = parameterNumber(feature, 'angle');
+  const direction = parameterVector3(feature, 'direction');
+  const shape = singleDependencyShape(feature, featureShapes, 'draft');
+  const faceIds = resolvedTopologyIds(feature, kernel, shape, 'face');
+  if (faceIds.length !== 1) {
+    throw new CadFeatureEvaluationError(
+      feature.id,
+      `${feature.label} draft supports exactly one face per feature today; add another draft feature for additional faces.`,
+    );
+  }
+  return kernel.draft(shape, faceIds, angle, direction);
 }
 
 function offsetFeature(
@@ -554,6 +589,8 @@ function createFeatureShape(
       return chamferFeature(feature, kernel, featureShapes);
     case 'shell':
       return shellFeature(feature, kernel, featureShapes);
+    case 'draft':
+      return draftFeature(feature, kernel, featureShapes);
     case 'offset':
       return offsetFeature(feature, kernel, featureShapes);
     case 'mirror':

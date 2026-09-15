@@ -326,13 +326,11 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     ));
   }
 
-  draft(
-    _shape: CadKernelShape,
-    _faceIds: readonly string[],
-    _angle: number,
-    _direction: CadKernelVector3,
-  ): CadKernelShape {
-    throw new Error('Draft requires semantic topology IDs to be resolved to OCCT face handles by the G6 feature evaluator.');
+  draft(shape: CadKernelShape, faceIds: readonly string[], angle: number, direction: CadKernelVector3): CadKernelShape {
+    if (faceIds.length !== 1) throw new Error('Draft resolves exactly one face; occt-wasm\'s underlying draft() takes a single face handle.');
+    return this.#withResolvedSubshapes(shape, 'face', faceIds, (faces) => (
+      this.#wrap(this.#kernel.draft(this.#unwrap(shape), faces[0]!, angle, asVec3(direction)))
+    ));
   }
 
   offset(shape: CadKernelShape, distance: number): CadKernelShape {
