@@ -129,6 +129,15 @@ describe('CAD exact OCCT adapter', () => {
     expect(() => kernel.helixWire({ origin: [0, 0, 0], axis: [0, 0, 1], pitch: 2, height: 10, radius: 0 })).toThrow(/radius/i);
   });
 
+  it('heals an already-valid solid without changing its volume', () => {
+    const healed = kernel.heal(box);
+    try {
+      expect(kernel.volume(healed)).toBeCloseTo(1000, 6);
+    } finally {
+      kernel.release(healed);
+    }
+  });
+
   it('lofts two exact circular wires into a solid frustum', () => {
     const sectionA = kernel.profileWire({
       edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],

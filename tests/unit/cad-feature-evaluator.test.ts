@@ -67,6 +67,7 @@ function fakeKernel() {
     section: vi.fn(),
     mirror: vi.fn(),
     thicken: vi.fn(),
+    heal: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, shapes };
@@ -159,6 +160,20 @@ describe('CAD exact feature evaluator', () => {
 
     expect(kernel.thicken).toHaveBeenCalledWith(shapes.box, 2);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'thicken-1', shape: thickened }]);
+  });
+
+  it('heals a dependency shape with no additional parameters', () => {
+    const { kernel, shapes } = fakeKernel();
+    const healed = token('healed');
+    kernel.heal = vi.fn(() => healed);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('heal-1', 'heal', {}, ['box-1']),
+    ]), kernel);
+
+    expect(kernel.heal).toHaveBeenCalledWith(shapes.box);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'heal-1', shape: healed }]);
   });
 
   it('chains a Boolean result into a second Boolean operation as its own tool body', () => {
