@@ -81,4 +81,23 @@ describe('CAD OCCT semantic topology bridge', () => {
     const [first, second] = candidates;
     expect(() => kernel.draft(box, [first!.id, second!.id], 0.1, [0, 0, 1])).toThrow(/exactly one face/i);
   });
+
+  it('removes a real fillet feature and heals the surrounding faces back toward the plain box', () => {
+    const edgeCandidates = kernel.topologyCandidates(box, 'box-feature', 'edge');
+    const edge = edgeCandidates[0]!;
+    const filleted = kernel.fillet(box, [edge.id], 1);
+    try {
+      const faceCandidates = kernel.topologyCandidates(filleted, 'fillet-feature', 'face');
+      expect(faceCandidates).toHaveLength(7);
+      const filletFace = [...faceCandidates].sort((left, right) => left.area! - right.area!)[0]!;
+      const healed = kernel.defeature(filleted, [filletFace.id]);
+      try {
+        expect(kernel.volume(healed)).toBeCloseTo(1000, 3);
+      } finally {
+        kernel.release(healed);
+      }
+    } finally {
+      kernel.release(filleted);
+    }
+  });
 });

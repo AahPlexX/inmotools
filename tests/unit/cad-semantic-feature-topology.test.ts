@@ -169,6 +169,29 @@ describe('CAD semantic topology feature resolution', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hollow', shape: shelled }]);
   });
 
+  it('resolves defeature faces from persisted fingerprints before invoking the exact kernel', () => {
+    const base = token('base');
+    const defeatured = token('defeatured');
+    const topologyCandidates = vi.fn(() => faceCandidates);
+    const defeature = vi.fn(() => defeatured);
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates,
+      defeature,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+
+    const result = evaluateCadFeatures(project([
+      feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('clean', 'defeature', {}, ['base'], [topFaceRef()]),
+    ]), kernel);
+
+    expect(topologyCandidates).toHaveBeenCalledWith(base, 'base', 'face');
+    expect(defeature).toHaveBeenCalledWith(base, ['topo:face:0']);
+    expect(kernel.release).toHaveBeenCalledWith(base);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'clean', shape: defeatured }]);
+  });
+
   it('resolves a single draft face from persisted fingerprints before invoking the exact kernel', () => {
     const base = token('base');
     const drafted = token('drafted');
