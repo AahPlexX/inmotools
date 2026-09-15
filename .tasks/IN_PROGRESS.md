@@ -24,6 +24,15 @@
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
   - Current milestone: A — foundation and global editor
 
+- **Sightline Velocity Studio** — local-first universal document reader, paced speed-reading workstation, comprehension/retention toolkit, and export studio governed by the F1–F35 feature ledger.
+  - Design: `docs/superpowers/specs/2026-09-15-sightline-velocity-design.md`.
+  - Plan: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
+  - Branch: `feat/sightline-velocity` is the single active development branch for this workstream; no further Sightline writes belong on the prior arena branch.
+  - Current milestone: M5 — focused verification, task-state reconciliation, responsive/accessibility acceptance, and integration hand-off. M1–M4 implementation is present but is not accepted as complete until every deterministic completion gate in the plan has fresh evidence.
+  - Latest evidence: PR #34 run `35017105988` at `ec37bf3ff825bdbad5dd65d9e05f5d59f93d5ef8` passed the frozen install and all 407 Sightline unit assertions across 16 Sightline unit files, then stopped on the three pre-existing Vector path-motion failures before build/browser steps. Sightline now has a dedicated bounded validation lane at `.github/workflows/sightline.yml`; the repository-wide Pages gate remains mandatory before integration.
+  - Completion gate: all F1–F35 items reachable and functional; focused units, production build, Sightline browser spec, accessibility/keyboard, narrow/medium/wide reflow, export round trips, synchronized `.tasks`, integration to `origin/main`, and applicable Pages deployment all verified from fresh evidence.
+  - Scope: `src/tools/sightline/`, Sightline-specific unit/e2e tests, its design/plan, dedicated validation workflow, and additive catalog/loader/PWA integration. Unrelated workstreams remain untouched.
+
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.

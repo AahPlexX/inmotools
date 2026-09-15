@@ -6,7 +6,7 @@
 
 ## Status
 
-In progress. Milestone A complete when the ingestion engines, unit suites, and registration exist; the ledger in the design document stays authoritative and no item may be dropped without an explicit recorded rejection.
+In progress. Milestones M1–M4 are implemented on the dedicated `feat/sightline-velocity` branch; M5 verification is active. The ledger in the design document stays authoritative and no item may be dropped without an explicit recorded rejection. Implementation presence is not acceptance: the workstream remains open until the deterministic completion goal below has fresh evidence.
 
 ## Deterministic completion goal
 
@@ -46,7 +46,7 @@ Until item 1–7 hold, the workstream stays open in `IN_PROGRESS.md`.
 
 | Risk | Mitigation |
 | --- | --- |
-| PDF worker asset inflates the precache | Follow the repository's existing heavy-asset discipline: exclude the worker from precache and let the tool load it on demand; record the decision in `vite.config.ts` beside the other exclusions. |
+| PDF worker and bundled reading fonts increase the PWA precache | Keep the PDF runtime dynamically imported so it stays out of the main application bundle, but precache the emitted module worker and six local WOFF2 reading typefaces so F35 works on a first offline use after installation. Keep heavy unrelated runtimes under the repository's existing `globIgnores` policy and monitor the generated precache size during production builds. |
 | Word-boundary speech events are not universally implemented | Detect at runtime; fall back to estimated timing derived from utterance rate and word length; state which path is active in the interface. |
 | Large documents stall the main thread | Segmentation and model building are chunked with an explicit document size guard; the reader consumes the prepared model rather than re-segmenting per frame. |
 | Export libraries diverge from the reader's model | Every writer consumes the same prepared document model and the same metadata record; round-trip tests parse exported artifacts back. |
@@ -55,4 +55,6 @@ Until item 1–7 hold, the workstream stays open in `IN_PROGRESS.md`.
 ## Verification log
 
 - Pre-write baseline captured 2026-09-15: 97 unit files, 736 passing assertions, 3 pre-existing failures in `tests/unit/vector-engine-path-motion.test.ts`; production build green.
-- Subsequent entries are appended as each milestone closes, with the exact command and observed result.
+- Dependency verification 2026-09-15: `pdfjs-dist@6.3.289`, `rehype-parse@9.0.1`, `hast-util-to-text@4.0.2`, and all six `@fontsource/*@5.3.0` packages match the current latest registry releases; the dependency vulnerability scan reported no known vulnerabilities in the scanned package set.
+- PR #34 validation run `35017105988` at `ec37bf3ff825bdbad5dd65d9e05f5d59f93d5ef8`: frozen install passed and all 407 Sightline unit assertions across 16 Sightline unit files passed inside the repository-wide unit run. The job then stopped on the three pre-existing Vector path-motion failures, so production build and browser validation did not execute in that run.
+- M5 now uses `.github/workflows/sightline.yml` on the dedicated `feat/sightline-velocity` branch to run one bounded loop: frozen install, Sightline-only unit suites, production build, and the Sightline desktop/mobile browser spec. The repository-wide Pages gate remains unchanged and is still required before integration.
