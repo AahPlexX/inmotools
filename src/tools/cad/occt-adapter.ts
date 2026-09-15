@@ -375,6 +375,10 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     ));
   }
 
+  heal(shape: CadKernelShape): CadKernelShape {
+    return this.#wrap(this.#kernel.healSolid(this.#unwrap(shape)));
+  }
+
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh {
     const mesh = this.#kernel.tessellate(this.#unwrap(shape), options);
     return {
