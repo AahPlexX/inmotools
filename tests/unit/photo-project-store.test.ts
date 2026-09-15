@@ -4,20 +4,26 @@ import {
   PhotoProjectStoreError,
   createPhotoProjectStore,
   migratePhotoProjectRecord,
+  migratePhotoUserPresetRecord,
   type PhotoProjectBinaryAdapter,
   type PhotoProjectRecordAdapter,
   type PhotoProjectStoreCoordinator,
 } from '../../src/tools/photo/photo-project-store';
-import type { PhotoProjectRecord, PhotoProjectSaveInput } from '../../src/tools/photo/photo-project-types';
+import type { PhotoProjectRecord, PhotoProjectSaveInput, PhotoUserPresetRecord } from '../../src/tools/photo/photo-project-types';
 
 class MemoryRecords implements PhotoProjectRecordAdapter {
   projects = new Map<string, unknown>();
+  presets = new Map<string, unknown>();
   sources = new Map<string, Blob>();
 
   async listProjects() { return [...this.projects.values()]; }
   async getProject(id: string) { return this.projects.get(id); }
   async putProject(record: PhotoProjectRecord) { this.projects.set(record.id, structuredClone(record)); }
   async removeProject(id: string) { this.projects.delete(id); }
+  async listPresets() { return [...this.presets.values()]; }
+  async getPreset(id: string) { return this.presets.get(id); }
+  async putPreset(record: PhotoUserPresetRecord) { this.presets.set(record.id, structuredClone(record)); }
+  async removePreset(id: string) { this.presets.delete(id); }
   async getSource(key: string) { return this.sources.get(key); }
   async putSource(key: string, source: Blob) { this.sources.set(key, source); }
   async removeSource(key: string) { this.sources.delete(key); }
@@ -146,6 +152,64 @@ describe('Photo project store', () => {
     expect(updated.history.present.contrast).toBe(0.5);
   });
 
+  test('creates virtual copies with independent edits and snapshots while sharing the immutable source', async () => {
+    const records = new MemoryRecords();
+    const opfs = new MemoryBinaries();
+    const store = createPhotoProjectStore(records, opfs, () => 200);
+    const original = await store.save({
+      ...input(),
+      snapshots: [{ id: 'snapshot-1', name: 'Before', createdAt: '2026-01-01T00:00:00.000Z', recipe: DEFAULT_RECIPE }],
+    });
+
+    const copy = await store.createVirtualCopy(original.id, { id: 'project-2', name: 'Portrait alternate', createdAt: 150 });
+    expect(copy).toMatchObject({ id: 'project-2', name: 'Portrait alternate', createdAt: 150 });
+    expect(copy.source).toEqual(original.source);
+    expect(opfs.sources.size).toBe(1);
+
+    const editedCopy = await store.save({
+      ...input(copy.id),
+      name: copy.name,
+      createdAt: copy.createdAt,
+      sourceBlob: undefined,
+      history: { past: [], present: { ...DEFAULT_RECIPE, contrast: 0.75 }, future: [], limit: 80 },
+      snapshots: [],
+    });
+    expect(editedCopy.source.key).toBe(original.source.key);
+    expect((await store.load(original.id)).project).toMatchObject({
+      history: { present: { exposure: 1 } },
+      snapshots: [{ id: 'snapshot-1' }],
+    });
+    expect((await store.load(copy.id)).project).toMatchObject({
+      history: { present: { contrast: 0.75 } },
+      snapshots: [],
+    });
+  });
+
+  test('keeps a shared source readable when either virtual copy is deleted', async () => {
+    const records = new MemoryRecords();
+    const store = createPhotoProjectStore(records);
+    const original = await store.save(input());
+    const copy = await store.createVirtualCopy(original.id, { id: 'project-2', name: 'Portrait copy' });
+
+    await store.delete(original.id);
+    await expect(store.load(copy.id)).resolves.toMatchObject({ sourceFile: { name: 'portrait.png' } });
+    expect(records.sources.has(copy.source.key)).toBe(true);
+
+    await store.delete(copy.id);
+    expect(records.sources.has(copy.source.key)).toBe(false);
+  });
+
+  test('conservatively retains a source when another project record is corrupt during deletion', async () => {
+    const records = new MemoryRecords();
+    const store = createPhotoProjectStore(records);
+    const original = await store.save(input());
+    const copy = await store.createVirtualCopy(original.id, { id: 'project-2', name: 'Portrait copy' });
+    records.projects.set(copy.id, { ...copy, history: null });
+
+    await store.delete(original.id);
+    expect(records.sources.has(original.source.key)).toBe(true);
+  });
+
   test('migrates a legacy version-zero project into the current schema', () => {
     const migrated = migratePhotoProjectRecord({
       version: 0,
@@ -166,6 +230,61 @@ describe('Photo project store', () => {
     expect(migrated.schemaVersion).toBe(1);
     expect(migrated.source).toMatchObject({ key: 'legacy-source', storage: 'indexeddb', name: 'legacy.jpg' });
     expect(migrated.history.present.exposure).toBe(5);
+  });
+
+  test('normalizes and updates durable local user presets in place', async () => {
+    const records = new MemoryRecords();
+    let clock = 200;
+    const store = createPhotoProjectStore(records, undefined, () => clock);
+
+    const created = await store.savePreset({
+      id: 'preset-1',
+      name: '  Warm portrait  ',
+      createdAt: 100,
+      recipe: { ...DEFAULT_RECIPE, exposure: 99 },
+    });
+    expect(created).toMatchObject({ name: 'Warm portrait', createdAt: 100, updatedAt: 200 });
+    expect(created.recipe.exposure).toBe(5);
+
+    clock = 300;
+    const updated = await store.savePreset({
+      id: created.id,
+      name: 'Cool portrait',
+      createdAt: 1,
+      recipe: { ...DEFAULT_RECIPE, temperature: -99 },
+    });
+    expect(updated).toMatchObject({ name: 'Cool portrait', createdAt: 100, updatedAt: 300 });
+    expect(updated.recipe.temperature).toBe(-1);
+    expect(await store.listPresets()).toEqual([updated]);
+
+    await store.deletePreset(updated.id);
+    await expect(store.listPresets()).resolves.toEqual([]);
+  });
+
+  test('safely rejects corrupt current-schema user presets and excludes them from preset lists', async () => {
+    const records = new MemoryRecords();
+    const store = createPhotoProjectStore(records);
+    records.presets.set('bad', {
+      schemaVersion: 1,
+      id: 'bad',
+      name: 'Damaged',
+      createdAt: 1,
+      updatedAt: 2,
+      recipe: null,
+    });
+    records.presets.set('future', { schemaVersion: 2, id: 'future', name: 'Future', createdAt: 1, updatedAt: 2, recipe: DEFAULT_RECIPE });
+
+    expect(await store.listPresets()).toEqual([]);
+    await expect(store.savePreset({ id: 'bad', name: 'Recovered', recipe: DEFAULT_RECIPE }))
+      .rejects.toMatchObject<Partial<PhotoProjectStoreError>>({ code: 'corrupt-project' });
+    expect(() => migratePhotoUserPresetRecord({
+      schemaVersion: 1,
+      id: 'bad-time',
+      name: 'Damaged',
+      createdAt: Number.NaN,
+      updatedAt: 2,
+      recipe: DEFAULT_RECIPE,
+    })).toThrow(/invalid timestamps/i);
   });
 
   test('classifies quota failures and does not leave an orphaned source', async () => {

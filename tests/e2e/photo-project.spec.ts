@@ -80,3 +80,92 @@ test('saves, loads, and deletes a named local project while reporting storage ho
   await expect(project).toHaveCount(0);
   await expect(recoveredProjects).toContainText('No local Photo projects saved yet.');
 });
+
+test('virtual copies share a source while keeping independent editable histories', async ({ page }) => {
+  const studio = await openStudio(page);
+  await importPhoto(studio, 'shared-portrait.png');
+  await setExposure(studio, '0.8');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  const projects = studio.getByTestId('photo-project-panel');
+  await projects.getByRole('textbox', { name: 'Project name' }).fill('Original portrait');
+  await projects.getByRole('button', { name: 'Save project now' }).click();
+
+  const original = projects.getByTestId('photo-project-card').filter({
+    has: page.getByText('Original portrait', { exact: true }),
+  });
+  await original.getByRole('button', { name: 'Create virtual copy' }).click();
+  const copy = projects.getByTestId('photo-project-card').filter({
+    has: page.getByText('Original portrait copy', { exact: true }),
+  });
+  await expect(copy).toBeVisible();
+
+  await copy.getByRole('button', { name: 'Load project' }).click();
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(studio.getByLabel('Exposure value')).toHaveValue('0.8');
+  await setExposure(studio, '1.6');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await projects.getByRole('button', { name: 'Save project now' }).click();
+
+  await original.getByRole('button', { name: 'Load project' }).click();
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(studio.getByLabel('Exposure value')).toHaveValue('0.8');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await original.getByRole('button', { name: 'Delete local project' }).click();
+  await expect(original).toHaveCount(0);
+  await copy.getByRole('button', { name: 'Load project' }).click();
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(studio.getByLabel('Exposure value')).toHaveValue('1.6');
+});
+
+test('creates, edits, exports, imports, applies, and removes local user presets', async ({ page }) => {
+  const studio = await openStudio(page);
+  await importPhoto(studio, 'preset-source.png');
+  await setExposure(studio, '1.1');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  const presets = studio.getByTestId('photo-user-preset-panel');
+  const presetName = presets.getByRole('textbox', { name: 'User preset name' });
+  await presetName.fill('Bright portrait');
+  await presets.getByRole('button', { name: 'Save current as preset' }).click();
+
+  let card = presets.getByTestId('photo-user-preset-card').filter({ hasText: 'Bright portrait' });
+  await expect(card).toBeVisible();
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await setExposure(studio, '-0.4');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await card.getByRole('button', { name: 'Edit preset' }).click();
+  await presetName.fill('Bright portrait refined');
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(studio.getByLabel('Exposure value')).toHaveValue('1.1');
+  await setExposure(studio, '1.4');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await presets.getByRole('button', { name: 'Update preset' }).click();
+
+  card = presets.getByTestId('photo-user-preset-card').filter({ hasText: 'Bright portrait refined' });
+  const downloadPromise = page.waitForEvent('download');
+  await card.getByRole('button', { name: 'Export preset' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('bright-portrait-refined-photo-preset.json');
+
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await setExposure(studio, '-0.6');
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await card.getByRole('button', { name: 'Apply preset' }).click();
+  await studio.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(studio.getByLabel('Exposure value')).toHaveValue('1.4');
+
+  await studio.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await card.getByRole('button', { name: 'Delete preset' }).click();
+  await expect(card).toHaveCount(0);
+  await presets.getByTestId('photo-user-preset-input').setInputFiles({
+    name: 'imported.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      kind: 'inmotools-photo-preset',
+      version: 1,
+      name: 'Imported portrait',
+      recipe: { version: 1, exposure: 0.7 },
+    })),
+  });
+  card = presets.getByTestId('photo-user-preset-card').filter({ hasText: 'Imported portrait' });
+  await expect(card).toBeVisible();
+});

@@ -6,13 +6,17 @@ import {
   type PhotoProjectSaveInput,
   type PhotoProjectSourceDescriptor,
   type PhotoStorageStatus,
+  type PhotoProjectVirtualCopyInput,
+  type PhotoUserPresetRecord,
+  type PhotoUserPresetSaveInput,
 } from './photo-project-types';
 import type { PhotoHistory, PhotoRecipe, PhotoSnapshot } from './photo-types';
 
 const DB_NAME = 'inmotools.photo-studio';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PROJECT_STORE = 'projects';
 const SOURCE_STORE = 'sources';
+const PRESET_STORE = 'presets';
 const OPFS_DIRECTORY = 'inmotools-photo-studio';
 
 export type PhotoProjectStoreErrorCode =
@@ -37,6 +41,10 @@ export interface PhotoProjectRecordAdapter {
   getProject(id: string): Promise<unknown | undefined>;
   putProject(record: PhotoProjectRecord): Promise<void>;
   removeProject(id: string): Promise<void>;
+  listPresets(): Promise<unknown[]>;
+  getPreset(id: string): Promise<unknown | undefined>;
+  putPreset(record: PhotoUserPresetRecord): Promise<void>;
+  removePreset(id: string): Promise<void>;
   getSource(key: string): Promise<Blob | undefined>;
   putSource(key: string, source: Blob): Promise<void>;
   removeSource(key: string): Promise<void>;
@@ -56,7 +64,11 @@ export interface PhotoProjectStore {
   load(id: string): Promise<LoadedPhotoProject>;
   latest(): Promise<LoadedPhotoProject | null>;
   save(input: PhotoProjectSaveInput): Promise<PhotoProjectRecord>;
+  createVirtualCopy(sourceProjectId: string, input: PhotoProjectVirtualCopyInput): Promise<PhotoProjectRecord>;
   delete(id: string): Promise<void>;
+  listPresets(): Promise<PhotoUserPresetRecord[]>;
+  savePreset(input: PhotoUserPresetSaveInput): Promise<PhotoUserPresetRecord>;
+  deletePreset(id: string): Promise<void>;
   cleanup(): Promise<number>;
 }
 
@@ -180,6 +192,29 @@ export function migratePhotoProjectRecord(value: unknown): PhotoProjectRecord {
   };
 }
 
+export function migratePhotoUserPresetRecord(value: unknown): PhotoUserPresetRecord {
+  if (!isObject(value)) {
+    throw new PhotoProjectStoreError('corrupt-project', 'The saved user preset record is not readable.');
+  }
+  if (value.schemaVersion !== PHOTO_PROJECT_SCHEMA_VERSION) {
+    throw new PhotoProjectStoreError('corrupt-project', `Unsupported Photo preset schema version: ${String(value.schemaVersion)}.`);
+  }
+  if (!Number.isFinite(value.createdAt) || !Number.isFinite(value.updatedAt)) {
+    throw new PhotoProjectStoreError('corrupt-project', 'The saved user preset has invalid timestamps.');
+  }
+  if (!isObject(value.recipe)) {
+    throw new PhotoProjectStoreError('corrupt-project', 'The saved user preset is missing its edit recipe.');
+  }
+  return {
+    schemaVersion: PHOTO_PROJECT_SCHEMA_VERSION,
+    id: requiredString(value.id, 'preset id'),
+    name: requiredString(value.name, 'preset name').trim(),
+    createdAt: value.createdAt as number,
+    updatedAt: value.updatedAt as number,
+    recipe: normalizeRecipe(value.recipe as unknown as PhotoRecipe),
+  };
+}
+
 function sourceMatches(
   descriptor: PhotoProjectSourceDescriptor,
   input: PhotoProjectSaveInput['source'],
@@ -259,6 +294,21 @@ export function createPhotoProjectStore(
       }
     });
     return projects.sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  async function sourceIsStillReferenced(source: PhotoProjectSourceDescriptor): Promise<boolean> {
+    const rawProjects = await records.listProjects();
+    for (const rawProject of rawProjects) {
+      try {
+        const project = migratePhotoProjectRecord(rawProject);
+        if (project.source.storage === source.storage && project.source.key === source.key) return true;
+      } catch {
+        // An unreadable record could reference this source. Retaining an orphan is
+        // harmless; removing a live image is not.
+        return true;
+      }
+    }
+    return false;
   }
 
   async function loadProject(id: string): Promise<LoadedPhotoProject> {
@@ -366,13 +416,45 @@ export function createPhotoProjectStore(
           throw storageError(error, 'Could not save the Photo project metadata.');
         }
 
-        if (existing && wroteSource && existing.source.key !== wroteSource.key) {
+        if (existing && wroteSource && existing.source.key !== wroteSource.key
+          && !await sourceIsStillReferenced(existing.source)) {
           try {
             if (existing.source.storage === 'opfs') await opfs?.remove(existing.source.key);
             else await records.removeSource(existing.source.key);
           } catch { /* The new project is valid; cleanup() can remove the old orphan later. */ }
         }
         return project;
+      });
+    },
+
+    async createVirtualCopy(sourceProjectId, input) {
+      return enqueue(async () => {
+        try {
+          const original = await readRecord(sourceProjectId);
+          if (input.id === sourceProjectId) {
+            throw new PhotoProjectStoreError('corrupt-project', 'A virtual copy must use a new project id.');
+          }
+          if (await records.getProject(input.id) !== undefined) {
+            throw new PhotoProjectStoreError('corrupt-project', 'A local Photo project already uses that id.');
+          }
+          const createdAt = input.createdAt === undefined ? now() : finiteNumber(input.createdAt, now());
+          const copy: PhotoProjectRecord = {
+            schemaVersion: PHOTO_PROJECT_SCHEMA_VERSION,
+            id: requiredString(input.id, 'project id'),
+            name: input.name.trim() || `${original.name} copy`,
+            createdAt,
+            updatedAt: now(),
+            // Sources are immutable. Copies intentionally point at exactly the
+            // same persisted blob rather than duplicating image bytes.
+            source: { ...original.source },
+            history: normalizedHistory(original.history),
+            snapshots: normalizedSnapshots(original.snapshots),
+          };
+          await records.putProject(copy);
+          return copy;
+        } catch (error) {
+          throw storageError(error, 'Could not create a virtual Photo project copy.');
+        }
       });
     },
 
@@ -383,12 +465,68 @@ export function createPhotoProjectStore(
           const project = raw === undefined ? undefined : migratePhotoProjectRecord(raw);
           await records.removeProject(id);
           if (!project) return;
+          if (await sourceIsStillReferenced(project.source)) return;
           try {
             if (project.source.storage === 'opfs') await opfs?.remove(project.source.key);
             else await records.removeSource(project.source.key);
           } catch { /* Metadata deletion succeeded; cleanup() can remove the harmless orphan later. */ }
         } catch (error) {
           throw storageError(error, 'Could not delete that local Photo project.');
+        }
+      });
+    },
+
+    async listPresets() {
+      return enqueue(async () => {
+        try {
+          const presets = (await records.listPresets()).flatMap((entry) => {
+            try {
+              return [migratePhotoUserPresetRecord(entry)];
+            } catch {
+              return [];
+            }
+          });
+          return presets.sort((left, right) => right.updatedAt - left.updatedAt);
+        } catch (error) {
+          throw storageError(error, 'Could not list local Photo user presets.');
+        }
+      });
+    },
+
+    async savePreset(input) {
+      return enqueue(async () => {
+        try {
+          const id = requiredString(input.id, 'preset id');
+          const name = requiredString(input.name, 'preset name').trim();
+          if (!isObject(input.recipe)) {
+            throw new PhotoProjectStoreError('corrupt-project', 'A user preset must include an edit recipe.');
+          }
+          const rawExisting = await records.getPreset(id);
+          const existing = rawExisting === undefined ? undefined : migratePhotoUserPresetRecord(rawExisting);
+          const createdAt = existing?.createdAt
+            ?? (input.createdAt === undefined ? now() : finiteNumber(input.createdAt, now()));
+          const preset: PhotoUserPresetRecord = {
+            schemaVersion: PHOTO_PROJECT_SCHEMA_VERSION,
+            id,
+            name,
+            createdAt,
+            updatedAt: now(),
+            recipe: normalizeRecipe(input.recipe),
+          };
+          await records.putPreset(preset);
+          return preset;
+        } catch (error) {
+          throw storageError(error, 'Could not save the local Photo user preset.');
+        }
+      });
+    },
+
+    async deletePreset(id) {
+      return enqueue(async () => {
+        try {
+          await records.removePreset(id);
+        } catch (error) {
+          throw storageError(error, 'Could not delete the local Photo user preset.');
         }
       });
     },
@@ -439,6 +577,9 @@ function openPhotoDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(SOURCE_STORE)) {
         db.createObjectStore(SOURCE_STORE);
       }
+      if (!db.objectStoreNames.contains(PRESET_STORE)) {
+        db.createObjectStore(PRESET_STORE, { keyPath: 'id' });
+      }
     };
     request.onsuccess = () => {
       request.result.onversionchange = () => request.result.close();
@@ -485,6 +626,10 @@ export function createIndexedDbPhotoProjectAdapter(): PhotoProjectRecordAdapter 
     getProject: (id) => requestResult(PROJECT_STORE, (store) => store.get(id)),
     putProject: (record) => mutateStore(PROJECT_STORE, (store) => { store.put(record); }),
     removeProject: (id) => mutateStore(PROJECT_STORE, (store) => { store.delete(id); }),
+    listPresets: () => requestResult(PRESET_STORE, (store) => store.getAll()),
+    getPreset: (id) => requestResult(PRESET_STORE, (store) => store.get(id)),
+    putPreset: (record) => mutateStore(PRESET_STORE, (store) => { store.put(record); }),
+    removePreset: (id) => mutateStore(PRESET_STORE, (store) => { store.delete(id); }),
     getSource: (key) => requestResult(SOURCE_STORE, (store) => store.get(key)),
     putSource: (key, source) => mutateStore(SOURCE_STORE, (store) => { store.put(source, key); }),
     removeSource: (key) => mutateStore(SOURCE_STORE, (store) => { store.delete(key); }),

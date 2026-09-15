@@ -1,4 +1,4 @@
-import type { PhotoHistory, PhotoSnapshot } from './photo-types';
+import type { PhotoHistory, PhotoRecipe, PhotoSnapshot } from './photo-types';
 
 export const PHOTO_PROJECT_SCHEMA_VERSION = 1 as const;
 
@@ -43,6 +43,31 @@ export interface PhotoProjectSaveInput {
   sourceBlob?: Blob;
   history: PhotoHistory;
   snapshots: PhotoSnapshot[];
+}
+
+/** A durable, user-editable recipe which can be applied to any source image. */
+export interface PhotoUserPresetRecord {
+  schemaVersion: typeof PHOTO_PROJECT_SCHEMA_VERSION;
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  recipe: PhotoRecipe;
+}
+
+export interface PhotoUserPresetSaveInput {
+  id: string;
+  name: string;
+  /** Used only when creating a preset; edits retain the original creation time. */
+  createdAt?: number;
+  recipe: PhotoRecipe;
+}
+
+export interface PhotoProjectVirtualCopyInput {
+  id: string;
+  name: string;
+  /** Defaults to the store clock when omitted. */
+  createdAt?: number;
 }
 
 export interface LoadedPhotoProject {

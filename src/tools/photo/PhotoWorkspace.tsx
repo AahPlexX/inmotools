@@ -36,10 +36,16 @@ import {
   requestPhotoStoragePersistence,
   type PhotoProjectStore,
 } from './photo-project-store';
+import {
+  parsePhotoPreset,
+  serializePhotoPreset,
+  suggestPhotoPresetFilename,
+} from './photo-preset-transfer';
 import type {
   LoadedPhotoProject,
   PhotoProjectRecord,
   PhotoStorageStatus,
+  PhotoUserPresetRecord,
 } from './photo-project-types';
 import {
   disposePhotoRenderer,
@@ -271,6 +277,11 @@ export default function PhotoWorkspace() {
   const [projectName, setProjectName] = useState('');
   const [projectCreatedAt, setProjectCreatedAt] = useState(0);
   const [localProjects, setLocalProjects] = useState<PhotoProjectRecord[]>([]);
+  const [userPresets, setUserPresets] = useState<PhotoUserPresetRecord[]>([]);
+  const [userPresetName, setUserPresetName] = useState('');
+  const [editingUserPresetId, setEditingUserPresetId] = useState<string | null>(null);
+  const [userPresetBusy, setUserPresetBusy] = useState(false);
+  const [projectBeingDeletedId, setProjectBeingDeletedId] = useState<string | null>(null);
   const [recoveryProject, setRecoveryProject] = useState<PhotoProjectRecord | null>(null);
   const [projectSaveState, setProjectSaveState] = useState<'checking' | 'unavailable' | 'unsaved' | 'saving' | 'saved' | 'error'>('checking');
   const [lastProjectSavedAt, setLastProjectSavedAt] = useState<number | null>(null);
@@ -279,6 +290,7 @@ export default function PhotoWorkspace() {
   const [storageStatus, setStorageStatus] = useState<PhotoStorageStatus | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
+  const userPresetInputRef = useRef<HTMLInputElement | null>(null);
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
   const sourceUrlRef = useRef<string | null>(null);
@@ -287,6 +299,8 @@ export default function PhotoWorkspace() {
   const projectStoreRef = useRef<PhotoProjectStore | null>(null);
   const projectSaveRevisionRef = useRef(0);
   const projectSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const projectBeingDeletedRef = useRef<string | null>(null);
+  const userPresetMutationRef = useRef(false);
 
   const recipe = history.present;
   const parsedCustomRatioWidth = Number(customRatioWidth);
@@ -301,6 +315,11 @@ export default function PhotoWorkspace() {
   const refreshLocalProjects = useCallback(async (store = projectStoreRef.current) => {
     if (!store) return;
     setLocalProjects(await store.list());
+  }, []);
+
+  const refreshUserPresets = useCallback(async (store = projectStoreRef.current) => {
+    if (!store) return;
+    setUserPresets(await store.listPresets());
   }, []);
 
   const refreshStorageStatus = useCallback(() => {
@@ -339,9 +358,10 @@ export default function PhotoWorkspace() {
     void createBrowserPhotoProjectStore().then(async (store) => {
       if (!active) return;
       projectStoreRef.current = store;
-      const projects = await store.list();
+      const [projects, presets] = await Promise.all([store.list(), store.listPresets()]);
       if (!active) return;
       setLocalProjects(projects);
+      setUserPresets(presets);
       setStorageStatus({ ...(await inspectPhotoStorage()), opfsAvailable: store.opfsAvailable });
       if (!active) return;
       setProjectStoreReady(true);
@@ -499,7 +519,9 @@ export default function PhotoWorkspace() {
 
   async function deleteLocalProject(project: PhotoProjectRecord) {
     const store = projectStoreRef.current;
-    if (!store) return;
+    if (!store || projectBeingDeletedRef.current) return;
+    projectBeingDeletedRef.current = project.id;
+    setProjectBeingDeletedId(project.id);
     const deletionRevision = ++importRevisionRef.current;
     const deletingCurrentProject = projectId === project.id;
     if (deletingCurrentProject) {
@@ -535,6 +557,26 @@ export default function PhotoWorkspace() {
         }
         setStatus(photoProjectErrorMessage(error));
       }
+    } finally {
+      projectBeingDeletedRef.current = null;
+      setProjectBeingDeletedId(null);
+    }
+  }
+
+  async function createVirtualCopy(project: PhotoProjectRecord) {
+    const store = projectStoreRef.current;
+    if (!store) return;
+    const createdAt = Date.now();
+    try {
+      const copy = await store.createVirtualCopy(project.id, {
+        id: crypto.randomUUID?.() ?? `photo-project-copy-${createdAt}`,
+        name: `${project.name} copy`,
+        createdAt,
+      });
+      await refreshLocalProjects(store);
+      setStatus(`${copy.name} created without duplicating the source image.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
     }
   }
 
@@ -597,6 +639,7 @@ export default function PhotoWorkspace() {
   const persistCurrentProject = useCallback((reason: 'auto' | 'manual' = 'auto') => {
     const store = projectStoreRef.current;
     if (!store || !source || !projectId || (reason === 'auto' && !autosaveEnabled)) return Promise.resolve();
+    if (projectBeingDeletedRef.current === projectId) return Promise.resolve();
     if (reason === 'manual') setAutosaveEnabled(true);
     const revision = ++projectSaveRevisionRef.current;
     const input = {
@@ -875,6 +918,97 @@ export default function PhotoWorkspace() {
     commitRecipe(recipeWithPatch(recipe, patch));
   }
 
+  async function saveUserPreset() {
+    const store = projectStoreRef.current;
+    const name = userPresetName.trim();
+    if (!store || !source || !name || userPresetMutationRef.current) return;
+    userPresetMutationRef.current = true;
+    setUserPresetBusy(true);
+    const wasEditing = editingUserPresetId !== null;
+    const id = editingUserPresetId
+      ?? crypto.randomUUID?.()
+      ?? `photo-preset-${Date.now()}`;
+    try {
+      const saved = await store.savePreset({ id, name, recipe });
+      await refreshUserPresets(store);
+      setEditingUserPresetId(null);
+      setUserPresetName('');
+      setStatus(`${saved.name} ${wasEditing ? 'updated' : 'saved'} as a local user preset.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
+    } finally {
+      userPresetMutationRef.current = false;
+      setUserPresetBusy(false);
+    }
+  }
+
+  function editUserPreset(preset: PhotoUserPresetRecord) {
+    if (userPresetMutationRef.current) return;
+    setEditingUserPresetId(preset.id);
+    setUserPresetName(preset.name);
+    commitRecipe(preset.recipe);
+    setCanvasInteraction(null);
+    setStatus(`${preset.name} loaded for editing. Adjust the photo, then update the preset.`);
+  }
+
+  function applyUserPreset(preset: PhotoUserPresetRecord) {
+    if (!source) return;
+    commitRecipe(preset.recipe);
+    setCanvasInteraction(null);
+    setStatus(`${preset.name} applied as one undo step.`);
+  }
+
+  function exportUserPreset(preset: PhotoUserPresetRecord) {
+    const blob = new Blob([serializePhotoPreset(preset.name, preset.recipe)], { type: 'application/json' });
+    downloadBlob(blob, suggestPhotoPresetFilename(preset.name));
+    setStatus(`${preset.name} exported.`);
+  }
+
+  async function deleteUserPreset(preset: PhotoUserPresetRecord) {
+    const store = projectStoreRef.current;
+    if (!store || userPresetMutationRef.current) return;
+    userPresetMutationRef.current = true;
+    setUserPresetBusy(true);
+    try {
+      await store.deletePreset(preset.id);
+      await refreshUserPresets(store);
+      if (editingUserPresetId === preset.id) {
+        setEditingUserPresetId(null);
+        setUserPresetName('');
+      }
+      setStatus(`${preset.name} deleted from local user presets.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
+    } finally {
+      userPresetMutationRef.current = false;
+      setUserPresetBusy(false);
+    }
+  }
+
+  async function importUserPreset(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const store = projectStoreRef.current;
+    if (!file || !store || userPresetMutationRef.current) return;
+    userPresetMutationRef.current = true;
+    setUserPresetBusy(true);
+    try {
+      const imported = parsePhotoPreset(await file.text());
+      const saved = await store.savePreset({
+        id: crypto.randomUUID?.() ?? `photo-preset-${Date.now()}`,
+        name: imported.name,
+        recipe: imported.recipe,
+      });
+      await refreshUserPresets(store);
+      setStatus(`${saved.name} imported as a local user preset.`);
+    } catch (error) {
+      setStatus(`Preset import failed: ${error instanceof Error ? error.message : 'invalid JSON'}`);
+    } finally {
+      userPresetMutationRef.current = false;
+      setUserPresetBusy(false);
+    }
+  }
+
   function saveSnapshot() {
     if (!source) return;
     const requestedName = snapshotName.trim();
@@ -897,6 +1031,10 @@ export default function PhotoWorkspace() {
 
   function copyEdits() {
     if (!source) return;
+    // Copy is a newer user-visible action than any preview already in flight.
+    // Advancing the operation revision keeps an older preview completion from
+    // immediately replacing the confirmation message under a busy renderer.
+    importRevisionRef.current += 1;
     setEditClipboard(normalizeRecipe(recipe));
     setCanvasInteraction(null);
     setStatus('Edits copied. Open another photo or paste them here.');
@@ -1244,7 +1382,7 @@ export default function PhotoWorkspace() {
             <button
               type="button"
               onClick={() => void persistCurrentProject('manual')}
-              disabled={!source || projectSaveState === 'checking' || projectSaveState === 'unavailable' || projectSaveState === 'saving'}
+              disabled={!source || projectBeingDeletedId === projectId || projectSaveState === 'checking' || projectSaveState === 'unavailable' || projectSaveState === 'saving'}
             >Save project now</button>
             {storageStatus?.persisted === false ? (
               <button type="button" onClick={() => void requestDurableStorage()}>Request durable storage</button>
@@ -1261,8 +1399,9 @@ export default function PhotoWorkspace() {
                 <strong>{project.name}</strong>
                 <span>{project.source.name} · edited {new Date(project.updatedAt).toLocaleString()}</span>
                 <div className="photo-inline-actions">
-                  <button type="button" onClick={() => void loadLocalProject(project.id)}>Load project</button>
-                  <button type="button" onClick={() => void deleteLocalProject(project)}>Delete local project</button>
+                  <button type="button" aria-label={`Load project ${project.name}`} onClick={() => void loadLocalProject(project.id)} disabled={projectBeingDeletedId === project.id}>Load project</button>
+                  <button type="button" aria-label={`Create virtual copy of ${project.name}`} onClick={() => void createVirtualCopy(project)} disabled={projectBeingDeletedId === project.id}>Create virtual copy</button>
+                  <button type="button" aria-label={`Delete local project ${project.name}`} onClick={() => void deleteLocalProject(project)} disabled={projectBeingDeletedId !== null}>Delete local project</button>
                 </div>
               </article>
             ))}
@@ -1273,6 +1412,69 @@ export default function PhotoWorkspace() {
           <summary>Editable starting presets</summary>
           <div className="photo-inline-actions">
             {PRESETS.map((preset) => <button type="button" key={preset.name} onClick={() => applyPreset(preset.patch)} disabled={!source}>{preset.name}</button>)}
+          </div>
+        </details>
+        <details className="photo-section" open data-testid="photo-user-preset-panel" aria-busy={userPresetBusy}>
+          <summary>User presets ({userPresets.length})</summary>
+          <p className="photo-export-note">
+            Save the complete current recipe as an editable local preset, or move presets between browsers with versioned JSON files.
+          </p>
+          <div className="photo-metadata-grid">
+            <label>
+              User preset name
+              <input
+                type="text"
+                value={userPresetName}
+                maxLength={80}
+                placeholder="My preset"
+                disabled={userPresetBusy}
+                onChange={(event) => setUserPresetName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void saveUserPreset();
+                }}
+              />
+            </label>
+          </div>
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              onClick={() => void saveUserPreset()}
+              disabled={!source || !projectStoreReady || userPresetBusy || !userPresetName.trim()}
+            >{editingUserPresetId ? 'Update preset' : 'Save current as preset'}</button>
+            {editingUserPresetId ? (
+              <button
+                type="button"
+                disabled={userPresetBusy}
+                onClick={() => {
+                  setEditingUserPresetId(null);
+                  setUserPresetName('');
+                }}
+              >Cancel preset edit</button>
+            ) : null}
+            <button type="button" onClick={() => userPresetInputRef.current?.click()} disabled={!projectStoreReady || userPresetBusy}>Import preset</button>
+            <input
+              ref={userPresetInputRef}
+              data-testid="photo-user-preset-input"
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(event) => void importUserPreset(event)}
+            />
+          </div>
+          <div className="photo-project-list">
+            {userPresets.map((preset) => (
+              <article className="photo-local-card" key={preset.id} data-testid="photo-user-preset-card">
+                <strong>{preset.name}</strong>
+                <span>Updated {new Date(preset.updatedAt).toLocaleString()}</span>
+                <div className="photo-inline-actions">
+                  <button type="button" aria-label={`Apply preset ${preset.name}`} onClick={() => applyUserPreset(preset)} disabled={!source}>Apply preset</button>
+                  <button type="button" aria-label={`Edit preset ${preset.name}`} onClick={() => editUserPreset(preset)} disabled={userPresetBusy || !source}>Edit preset</button>
+                  <button type="button" aria-label={`Export preset ${preset.name}`} onClick={() => exportUserPreset(preset)}>Export preset</button>
+                  <button type="button" aria-label={`Delete preset ${preset.name}`} onClick={() => void deleteUserPreset(preset)} disabled={userPresetBusy}>Delete preset</button>
+                </div>
+              </article>
+            ))}
+            {!userPresets.length ? <p className="photo-export-note">No local user presets saved yet.</p> : null}
           </div>
         </details>
         <details className="photo-section" open>
