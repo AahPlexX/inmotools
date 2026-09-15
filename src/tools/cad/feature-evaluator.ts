@@ -481,9 +481,34 @@ function mirrorFeature(
  * Simple blind hole: extrudes the sketch's circular profile into a cutting
  * tool and subtracts it from the dependency body. Composes entirely from
  * already-verified primitives (profile placement, extrude, cut) instead of
- * adding new kernel surface area. Counterbore/countersink presets,
- * through-all termination, and patterned placement are not yet supported.
+ * adding new kernel surface area. An optional counterbore fuses a second,
+ * wider tool built from a concentric sketch circle into the bore before
+ * cutting. Countersink presets and patterned placement are not yet supported.
  */
+interface CounterboreSpec {
+  profileEntityIds: string[];
+  depth: number;
+}
+
+function parameterCounterbore(feature: CadFeature): CounterboreSpec | null {
+  const value = feature.parameters.counterbore;
+  if (value === undefined) return null;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'counterbore' must be an object when provided.`);
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    !Array.isArray(record.profileEntityIds)
+    || record.profileEntityIds.length === 0
+    || record.profileEntityIds.some((id) => typeof id !== 'string' || id.length === 0)
+  ) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore requires profileEntityIds.`);
+  }
+  if (typeof record.depth !== 'number' || !Number.isFinite(record.depth) || record.depth <= 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore requires a positive finite depth.`);
+  }
+  return { profileEntityIds: record.profileEntityIds as string[], depth: record.depth };
+}
 /** A cut tool sized to a fixed depth is only guaranteed to reach through a body if it exceeds
  * the body's bounding diagonal; the diagonal is a direction-agnostic safe over-estimate that
  * avoids projecting onto the cut direction, and the boolean cut only removes what actually
@@ -509,15 +534,48 @@ function holeFeature(
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} requires either 'depth' or 'throughAll'.`);
   }
   const depth = throughAll ? undefined : parameterNumber(feature, 'depth');
+  const counterbore = parameterCounterbore(feature);
+  if (counterbore && depth !== undefined && counterbore.depth >= depth) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore depth must be less than the hole depth.`);
+  }
   const shape = singleDependencyShape(feature, featureShapes, 'hole');
   return withProfileFace(feature, project, datumPlanes, kernel, (profile, profile3d) => {
     const reversed = feature.parameters.reversed === true;
     const direction: CadKernelVector3 = reversed ? profile3d.normal : negate(profile3d.normal);
     const tool = kernel.extrude(profile, depth ?? throughAllDepth(kernel, shape), direction);
+    if (!counterbore) {
+      try {
+        return kernel.cut(shape, tool);
+      } finally {
+        kernel.release(tool);
+      }
+    }
+    const sketch = sketchForFeature(feature, project);
+    let counterboreProfile3d: CadSketchProfile3d;
     try {
-      return kernel.cut(shape, tool);
+      counterboreProfile3d = buildSketchProfile3d(sketch, counterbore.profileEntityIds, datumPlanes);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore profile is invalid: ${message}`, { cause: error });
+    }
+    const counterboreFace = kernel.profileFace(counterboreProfile3d);
+    let counterboreTool: CadKernelShape;
+    try {
+      counterboreTool = kernel.extrude(counterboreFace, counterbore.depth, direction);
+    } finally {
+      kernel.release(counterboreFace);
+    }
+    let fusedTool: CadKernelShape;
+    try {
+      fusedTool = kernel.fuse(tool, counterboreTool);
     } finally {
       kernel.release(tool);
+      kernel.release(counterboreTool);
+    }
+    try {
+      return kernel.cut(shape, fusedTool);
+    } finally {
+      kernel.release(fusedTool);
     }
   });
 }
