@@ -42,6 +42,14 @@ function formatGps(value: number | undefined): string | undefined {
   return value.toFixed(7);
 }
 
+function safeFilenameStem(value: string): string {
+  return value
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '');
+}
+
 export function serializePhotoXmp(metadata: PhotoExportMetadata): string {
   const fields = [
     altElement('dc:title', metadata.title),
@@ -78,12 +86,15 @@ export function serializePhotoXmp(metadata: PhotoExportMetadata): string {
 export function safePhotoFilename(sourceName: string, mime: PhotoOutputMime): string {
   const extension = MIME_EXTENSIONS[mime];
   const withoutExtension = sourceName.replace(/\.[^./\\]+$/, '') || 'photo';
-  const safeStem = withoutExtension
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[. ]+$/g, '') || 'photo';
+  const safeStem = safeFilenameStem(withoutExtension) || 'photo';
   return `${safeStem}-edited.${extension}`;
+}
+
+export function safeRequestedPhotoFilename(requestedName: string, sourceName: string, mime: PhotoOutputMime): string {
+  const requestedStem = requestedName.replace(/\.[^./\\]+$/, '');
+  const safeStem = safeFilenameStem(requestedStem);
+  if (!safeStem) return safePhotoFilename(sourceName, mime);
+  return `${safeStem}.${MIME_EXTENSIONS[mime]}`;
 }
 
 export function metadataHasLocation(metadata: PhotoExportMetadata): boolean {

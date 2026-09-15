@@ -1,4 +1,6 @@
 import { applyPixelAdjustments, normalizeRecipe, sampleHistogram } from './photo-engine';
+import { warpPhotoGeometryPixels } from './photo-geometry';
+import { preparePhotoRaster } from './photo-import';
 import type {
   PhotoCapabilities,
   PhotoHistogram,
@@ -53,6 +55,10 @@ interface PendingWorkerRequest {
 
 let worker: Worker | null = null;
 let workerBroken = false;
+let nextWorkerRequestId = 0;
+// Keyed by an internally generated id (not the caller-supplied revision), since
+// multiple callers (preview + export) each keep their own independent revision
+// counters and could otherwise collide on the same key.
 const pendingWorkerRequests = new Map<number, PendingWorkerRequest>();
 
 export function normalizeQuarterTurns(value: number): number {
@@ -108,11 +114,11 @@ async function canvasToBlob(
   mime: PhotoOutputMime,
   quality: number,
 ): Promise<Blob> {
-  if (canvas instanceof OffscreenCanvas) {
+  if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
     return canvas.convertToBlob({ type: mime, quality: mime === 'image/png' ? undefined : quality });
   }
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
+    (canvas as HTMLCanvasElement).toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error('The browser could not encode this image.')),
       mime,
       mime === 'image/png' ? undefined : quality,
@@ -189,6 +195,8 @@ function ensureWorker(): Worker | null {
       pending.resolve(new Uint8ClampedArray(message.buffer));
     });
     worker.addEventListener('error', () => {
+      // Intentionally permanent: once broken, fall back to main-thread processing
+      // for the rest of the session rather than risking a crash-loop retry.
       workerBroken = true;
       for (const pending of pendingWorkerRequests.values()) pending.reject(new Error('Photo render worker failed.'));
       pendingWorkerRequests.clear();
@@ -207,7 +215,6 @@ async function processPixels(
   width: number,
   height: number,
   recipe: PhotoRecipe,
-  revision: number,
 ): Promise<Uint8ClampedArray> {
   const activeWorker = ensureWorker();
   if (!activeWorker) {
@@ -215,13 +222,14 @@ async function processPixels(
     return pixels;
   }
 
+  const requestId = nextWorkerRequestId++;
   const transferable = new Uint8ClampedArray(pixels);
   try {
     const result = await new Promise<Uint8ClampedArray>((resolve, reject) => {
-      pendingWorkerRequests.set(revision, { resolve, reject });
+      pendingWorkerRequests.set(requestId, { resolve, reject });
       activeWorker.postMessage({
         type: 'process',
-        revision,
+        revision: requestId,
         width,
         height,
         buffer: transferable.buffer,
@@ -230,7 +238,7 @@ async function processPixels(
     });
     return result;
   } catch {
-    pendingWorkerRequests.delete(revision);
+    pendingWorkerRequests.delete(requestId);
     applyPixelAdjustments(pixels, width, height, recipe);
     return pixels;
   }
@@ -329,7 +337,8 @@ function fillJpegBackground(
 export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult> {
   if (typeof createImageBitmap !== 'function') throw new Error('This browser cannot decode images for Photo Studio.');
   const recipe = normalizeRecipe(request.recipe);
-  const bitmap = await createImageBitmap(request.file, { imageOrientation: 'from-image' });
+  const raster = await preparePhotoRaster(request.file);
+  const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
   try {
     const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);
     const desired = requestedDimensions(natural.width, natural.height, request);
@@ -345,7 +354,15 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const canvas = drawGeometry(bitmap, recipe, target.width, target.height);
     const context = getContext2d(canvas);
     const imageData = context.getImageData(0, 0, target.width, target.height);
-    const processed = await processPixels(imageData.data, target.width, target.height, recipe, request.revision);
+    const geometryPixels = warpPhotoGeometryPixels(
+      imageData.data,
+      target.width,
+      target.height,
+      recipe.lensDistortion,
+      recipe.perspectiveHorizontal,
+      recipe.perspectiveVertical,
+    );
+    const processed = await processPixels(geometryPixels, target.width, target.height, recipe);
     const ownedPixels = new Uint8ClampedArray(processed.length);
     ownedPixels.set(processed);
     const processedImage = new ImageData(ownedPixels, target.width, target.height);
