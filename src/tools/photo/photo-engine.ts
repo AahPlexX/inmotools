@@ -9,6 +9,7 @@ import type {
   RetouchOperation,
   TonePoint,
 } from './photo-types';
+import { normalizeRawSettings } from './photo-raw-settings';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -21,6 +22,7 @@ function clamp(value: number, min: number, max: number): number {
 function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
   return {
     ...recipe,
+    raw: recipe.raw ? { ...recipe.raw } : undefined,
     crop: { ...recipe.crop },
     toneCurve: recipe.toneCurve.map((point) => ({ ...point })),
     hsl: recipe.hsl.map((entry) => ({ ...entry })),
@@ -49,6 +51,7 @@ const neutralGrade = (): ColorGrade => ({ hue: 0, saturation: 0, luminance: 0 })
 
 export const DEFAULT_RECIPE: PhotoRecipe = {
   version: 1,
+  raw: normalizeRawSettings(undefined),
   crop: { x: 0, y: 0, width: 1, height: 1 },
   straighten: 0,
   rotateQuarterTurns: 0,
@@ -231,6 +234,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
   return {
     ...source,
     version: 1,
+    raw: normalizeRawSettings(source.raw),
     crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
     straighten: clamp(source.straighten, -45, 45),
     rotateQuarterTurns: Math.round(source.rotateQuarterTurns ?? 0) % 4,

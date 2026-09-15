@@ -1,4 +1,6 @@
 import { detectRawSource, RAW_EXTENSION } from './codecs/raw-decoder';
+import { normalizeRawSettings } from './photo-raw-settings';
+import type { PhotoRawSettings, PhotoRawSource } from './photo-types';
 
 export const PHOTO_FILE_ACCEPT = 'image/*,.tif,.tiff,.dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.pef,.srw';
 
@@ -18,22 +20,25 @@ export interface PhotoImportCandidate {
 export interface PhotoImportRaster {
   blob: Blob;
   notice?: string;
+  rawSource?: PhotoRawSource;
 }
 
-const rasterCache = new WeakMap<Blob, Promise<PhotoImportRaster>>();
+const rasterCache = new WeakMap<Blob, { key: string; task: Promise<PhotoImportRaster> }>();
 
 export function releasePhotoRaster(file: Blob): void {
   rasterCache.delete(file);
 }
 
 /** Preserve the source; all consumers share one lazy codec raster. */
-export function preparePhotoRaster(file: Blob): Promise<PhotoImportRaster> {
+export function preparePhotoRaster(file: Blob, raw?: PhotoRawSettings): Promise<PhotoImportRaster> {
+  const settings = normalizeRawSettings(raw);
+  const key = JSON.stringify(settings);
   const existing = rasterCache.get(file);
-  if (existing) return existing;
+  if (existing?.key === key) return existing.task;
   const task = (async () => {
     if (await detectRawSource(file)) {
       const { prepareRawSource } = await import('./codecs/raw-source');
-      return prepareRawSource(file);
+      return prepareRawSource(file, settings);
     }
     const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     const hasTiffSignature = signature.length === 4 && (
@@ -49,8 +54,9 @@ export function preparePhotoRaster(file: Blob): Promise<PhotoImportRaster> {
     }
     return { blob: file };
   })();
-  rasterCache.set(file, task);
-  void task.catch(() => rasterCache.delete(file));
+  // Retain only the latest variant, not a full-resolution raster per edit.
+  rasterCache.set(file, { key, task });
+  void task.catch(() => { if (rasterCache.get(file)?.task === task) rasterCache.delete(file); });
   return task;
 }
 

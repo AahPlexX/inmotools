@@ -337,7 +337,7 @@ function fillJpegBackground(
 export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult> {
   if (typeof createImageBitmap !== 'function') throw new Error('This browser cannot decode images for Photo Studio.');
   const recipe = normalizeRecipe(request.recipe);
-  const raster = await preparePhotoRaster(request.file);
+  const raster = await preparePhotoRaster(request.file, recipe.raw);
   const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
   try {
     const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);

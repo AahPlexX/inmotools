@@ -1,3 +1,6 @@
+import { normalizeRawSettings } from '../photo-raw-settings';
+import type { PhotoRawSettings, PhotoRawSource } from '../photo-types';
+
 export const RAW_EXTENSION = /\.(?:dng|cr2|cr3|nef|arw|raf|orf|rw2|pef|srw)$/i;
 
 /** Read only a bounded first TIFF directory; never traverse metadata pointers. */
@@ -35,7 +38,7 @@ function checkGeometry(width: number, height: number): void {
   }
 }
 
-export async function decodeRawPixels(buffer: ArrayBuffer): Promise<{ width: number; height: number; samples: Uint16Array; rgba: Uint8ClampedArray<ArrayBuffer>; notice: string }> {
+export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: PhotoRawSettings): Promise<{ width: number; height: number; samples: Uint16Array; rgba: Uint8ClampedArray<ArrayBuffer>; notice: string; rawSource: PhotoRawSource }> {
   if (!buffer.byteLength || buffer.byteLength > 64 * 1024 * 1024) throw new Error('RAW input must be nonempty and no larger than 64 MiB.');
   const { LibRaw } = await import('@colorhythm/libraw-wasm');
   await LibRaw.initialize();
@@ -51,11 +54,37 @@ export async function decodeRawPixels(buffer: ArrayBuffer): Promise<{ width: num
       Math.ceil(decoder.getActiveWidth() * Math.max(1, aspect)),
       Math.ceil(decoder.getActiveHeight() / Math.min(1, aspect)),
     );
+    const camera = decoder.getIParams();
+    const cleanText = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 64);
+    const channels = Array.from({ length: 4 }, (_, index) => String.fromCharCode(decoder.getCdesc(index))).join('');
+    const colors = decoder.getColors();
+    // The C unsigned CFA bitmask crosses the WASM i32 binding as signed.
+    const filters = decoder.getFilters() >>> 0;
+    const rgb = colors === 3 && channels.startsWith('RGB') && !decoder.getIsFoveon();
+    const bayer = rgb && filters >= 1000;
+    const rawSource: PhotoRawSource = {
+      make: cleanText(camera.normalized_make || camera.make),
+      model: cleanText(camera.normalized_model || camera.model),
+      rawWidth: decoder.getRawWidth(), rawHeight: decoder.getRawHeight(),
+      activeWidth: decoder.getActiveWidth(), activeHeight: decoder.getActiveHeight(),
+      layout: bayer ? 'Bayer CFA' : rgb && filters === 9 ? 'X-Trans CFA' : rgb && filters === 0 ? 'Linear RGB' : 'Other',
+      cameraWhiteBalance: rgb && [0, 1, 2].every((index) => Number.isFinite(decoder.getCamMul(index)) && decoder.getCamMul(index) > 0),
+      colorControls: rgb,
+      demosaicControl: bayer,
+    };
+    const settings = normalizeRawSettings(inputSettings);
     decoder.setOutputColor(1);
     decoder.setOutputBps(16);
     decoder.setGamma(0, 1 / 2.4);
     decoder.setGamma(1, 12.92);
-    decoder.setUseCameraWb(1);
+    decoder.setUseCameraWb(settings.whiteBalance === 'camera' || !rgb ? 1 : 0);
+    if (rgb) {
+      if (settings.whiteBalance === 'custom') {
+        [settings.redMultiplier, 1, settings.blueMultiplier, 1].forEach((value, index) => decoder.setUserMul(index, value));
+      }
+      decoder.setHighlight({ clip: 0, unclip: 1, blend: 2 }[settings.highlight]);
+    }
+    if (bayer) decoder.setDemosaic({ bilinear: 0, vng: 1, ppg: 2, ahd: 3 }[settings.demosaic]);
     decoder.setNoAutoBright(1);
     decoder.unpack();
     decoder.dcrawProcess();
@@ -77,8 +106,8 @@ export async function decodeRawPixels(buffer: ArrayBuffer): Promise<{ width: num
       rgba[pixel * 4 + 3] = 255;
     }
     return {
-      width: image.width, height: image.height, samples, rgba,
-      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate with camera white balance when available. Editing and export use an 8-bit raster. Sensor-level RAW controls and embedded-preview extraction are not yet available.',
+      width: image.width, height: image.height, samples, rgba, rawSource,
+      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. RAW exposure baseline and embedded-preview extraction are not yet available.',
     };
   } catch (error) {
     throw new Error(`RAW decoding failed: ${error instanceof Error ? error.message : 'unsupported or damaged source'}. Convert the source to TIFF or PNG if this camera/variant is unsupported.`);

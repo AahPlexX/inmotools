@@ -85,6 +85,103 @@ test('RAW DNG imports through the actual worker and retains its original source 
   expect(output).toEqual({ width: 32, height: 32, pixel: [188, 188, 188, 255] });
 });
 
+test('RAW development controls are source-gated and survive undo, recovery and pixel export', async ({ page }) => {
+  await openStudio(page); await openNamedFixture(page, 'native-controls.png');
+  await expect(page.getByTestId('photo-raw-controls')).toHaveCount(0);
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'development.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.from(makePhotoDng()) });
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  const raw = page.getByTestId('photo-raw-controls');
+  await expect(raw).toBeVisible();
+  await raw.getByLabel('RAW white balance', { exact: true }).selectOption('custom');
+  await raw.getByLabel('RAW red multiplier', { exact: true }).fill('2');
+  await raw.getByLabel('RAW red multiplier', { exact: true }).press('Enter');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(raw.getByLabel('RAW red multiplier', { exact: true })).toHaveValue('1');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(raw.getByLabel('RAW red multiplier', { exact: true })).toHaveValue('2');
+  await raw.getByLabel('RAW highlight handling', { exact: true }).selectOption('blend');
+  await raw.getByLabel('RAW demosaic', { exact: true }).selectOption('bilinear');
+  await expect(page.getByTestId('photo-project-save-state')).toContainText('Saved locally');
+  await page.reload(); await page.getByRole('button', { name: 'Recover project', exact: true }).click();
+  await expect(raw.getByLabel('RAW white balance', { exact: true })).toHaveValue('custom');
+  await expect(raw.getByLabel('RAW red multiplier', { exact: true })).toHaveValue('2');
+  await expect(raw.getByLabel('RAW highlight handling', { exact: true })).toHaveValue('blend');
+  await expect(raw.getByLabel('RAW demosaic', { exact: true })).toHaveValue('bilinear');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.locator('.photo-render-badge')).toHaveCount(0);
+  const previewPixel = await page.getByTestId('photo-preview').evaluate((image) => {
+    const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+    const context = canvas.getContext('2d')!; context.drawImage(image as HTMLImageElement, 0, 0);
+    return [...context.getImageData(16, 16, 1, 1).data];
+  });
+  expect(previewPixel[0]).toBeGreaterThan(previewPixel[1]);
+  await page.getByRole('button', { name: 'Before/after', exact: true }).click();
+  const original = page.getByTestId('photo-before-overlay').locator('img'); await expect(original).toBeVisible();
+  expect(await original.evaluate((image) => {
+    const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+    const context = canvas.getContext('2d')!; context.drawImage(image as HTMLImageElement, 0, 0);
+    return [...context.getImageData(16, 16, 1, 1).data];
+  })).toEqual([137, 137, 137, 255]);
+  await page.getByRole('button', { name: 'Inspect & workflow', exact: true }).click();
+  await expect(page.getByTestId('photo-raw-source')).toContainText('InMo Synthetic Bayer');
+  await expect(page.getByTestId('photo-raw-source')).toContainText('Bayer CFA');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = page.getByRole('dialog'); await dialog.getByLabel('File format', { exact: true }).selectOption('image/png');
+  const downloaded = page.waitForEvent('download'); await dialog.getByRole('button', { name: 'Download photo', exact: true }).click();
+  const bytes = await readFile((await (await downloaded).path())!);
+  expect(await page.evaluate(async (bytes) => {
+    const bitmap = await createImageBitmap(new Blob([Uint8Array.from(bytes)], { type: 'image/png' }));
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+      const context = canvas.getContext('2d')!; context.drawImage(bitmap, 0, 0);
+      return [...context.getImageData(16, 16, 1, 1).data];
+    } finally { bitmap.close(); }
+  }, [...bytes])).toEqual(previewPixel);
+  await dialog.getByText('Batch export current recipe', { exact: true }).click();
+  await dialog.getByLabel('Choose batch photos').setInputFiles([
+    { name: 'broken-batch.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.alloc(12) },
+    { name: 'same-development.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.from(makePhotoDng()) },
+  ]);
+  const batchDownload = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Export 2 photos', exact: true }).click();
+  const batchResult = await batchDownload;
+  expect(batchResult.suggestedFilename()).toBe('same-development.png');
+  await expect(page.locator('.photo-status-message')).toContainText('1 completed · 1 failed');
+  const batchBytes = await readFile((await batchResult.path())!);
+  expect(await page.evaluate(async (bytes) => {
+    const bitmap = await createImageBitmap(new Blob([Uint8Array.from(bytes)], { type: 'image/png' }));
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+      const context = canvas.getContext('2d')!; context.drawImage(bitmap, 0, 0);
+      return [...context.getImageData(16, 16, 1, 1).data];
+    } finally { bitmap.close(); }
+  }, [...batchBytes])).toEqual(previewPixel);
+  await dialog.getByRole('button', { name: 'Close export dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await raw.getByRole('button', { name: 'Reset RAW red multiplier', exact: true }).click();
+  await expect(raw.getByLabel('RAW red multiplier', { exact: true })).toHaveValue('1');
+  await expect(raw.getByLabel('RAW highlight handling', { exact: true })).toHaveValue('blend');
+  await expect(raw.getByLabel('RAW demosaic', { exact: true })).toHaveValue('bilinear');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(raw.getByLabel('RAW red multiplier', { exact: true })).toHaveValue('2');
+  await raw.getByRole('button', { name: 'Reset RAW development', exact: true }).click();
+  await expect(raw.getByLabel('RAW white balance', { exact: true })).toHaveValue('camera');
+  await expect(raw.getByLabel('RAW highlight handling', { exact: true })).toHaveValue('clip');
+  await expect(raw.getByLabel('RAW demosaic', { exact: true })).toHaveValue('ahd');
+  await raw.getByLabel('RAW white balance', { exact: true }).selectOption('custom');
+  const gain = raw.getByLabel('RAW blue multiplier', { exact: true });
+  await gain.fill(''); await gain.pressSequentially('2.25'); await gain.press('Enter');
+  await expect(gain).toHaveValue('2.25');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(gain).toHaveValue('1');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(gain).toHaveValue('2.25');
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await openNamedFixture(page, 'native-after-development.png');
+  await expect(page.getByTestId('photo-raw-source')).toHaveCount(0);
+});
+
 test('malformed RAW leaves the active photo intact and a subsequent DNG import succeeds', async ({ page }) => {
   await openStudio(page); await openNamedFixture(page, 'preserve-native.png');
   await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'damaged.cr3', mimeType: 'application/octet-stream', buffer: Buffer.alloc(12) });

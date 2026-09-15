@@ -53,6 +53,8 @@ export type RetouchOperation =
 
 export interface PhotoRecipe {
   version: 1;
+  /** Optional on older version-1 recipes; normalized before decoding. */
+  raw?: PhotoRawSettings;
   crop: NormalizedCrop;
   straighten: number;
   rotateQuarterTurns: number;
@@ -108,6 +110,27 @@ export interface PhotoHistogram {
   green: number[];
   blue: number[];
   luminance: number[];
+}
+
+export interface PhotoRawSettings {
+  whiteBalance: 'camera' | 'daylight' | 'custom';
+  redMultiplier: number;
+  blueMultiplier: number;
+  highlight: 'clip' | 'unclip' | 'blend';
+  demosaic: 'ahd' | 'bilinear' | 'vng' | 'ppg';
+}
+
+export interface PhotoRawSource {
+  make: string;
+  model: string;
+  rawWidth: number;
+  rawHeight: number;
+  activeWidth: number;
+  activeHeight: number;
+  layout: 'Bayer CFA' | 'X-Trans CFA' | 'Linear RGB' | 'Other';
+  cameraWhiteBalance: boolean;
+  colorControls: boolean;
+  demosaicControl: boolean;
 }
 
 export interface PhotoHistory {

@@ -209,7 +209,7 @@ export default function PhotoExportDialog({
         items,
         async (item) => {
           try {
-            const raster = await preparePhotoRaster(item.file);
+            const raster = await preparePhotoRaster(item.file, recipe.raw);
             const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
             const width = bitmap.width;
             const height = bitmap.height;

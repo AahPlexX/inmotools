@@ -11,6 +11,7 @@ import { downloadBlob } from '../../lib/download';
 import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
 import PhotoExportDialog from './PhotoExportDialog';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
+import PhotoRawControls from './PhotoRawControls';
 import {
   DEFAULT_RECIPE,
   commitHistory,
@@ -61,6 +62,7 @@ import type {
   PhotoCapabilities,
   PhotoHistory,
   PhotoRecipe,
+  PhotoRawSource,
   PhotoSnapshot,
   RetouchOperation,
 } from './photo-types';
@@ -75,6 +77,7 @@ interface SourcePhoto {
   width: number;
   height: number;
   codecNotice?: string;
+  rawSource?: PhotoRawSource;
 }
 
 interface PreviewState {
@@ -480,7 +483,7 @@ export default function PhotoWorkspace() {
       releasePreviewUrl();
       setPreview(null);
       sourceUrlRef.current = nextSourceUrl;
-      const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice };
+      const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice, rawSource: raster.rawSource };
       sourceRef.current = recoveredSource;
       setSource(recoveredSource);
       nextSourceUrl = null;
@@ -614,7 +617,7 @@ export default function PhotoWorkspace() {
       releasePreviewUrl();
       setPreview(null);
       sourceUrlRef.current = nextSourceUrl;
-      const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice };
+      const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice, rawSource: raster.rawSource };
       sourceRef.current = importedSource;
       setSource(importedSource);
       nextSourceUrl = null;
@@ -1081,6 +1084,7 @@ export default function PhotoWorkspace() {
           <h2>Photo Studio</h2>
           <p>Shape light and color with reversible controls. Nothing touches the original file.</p>
         </div>
+        {source?.rawSource ? <PhotoRawControls value={recipe.raw} source={source.rawSource} onChange={(raw) => patchRecipe({ raw })} /> : null}
         <details className="photo-section" open>
           <summary>Light & tone</summary>
           <div className="photo-control-list">
@@ -1364,6 +1368,12 @@ export default function PhotoWorkspace() {
             <strong>{source.name}</strong>
             <span>{source.width} × {source.height}</span>
             <span>{formatBytes(source.file.size)} · {source.file.type || 'unknown image type'}</span>
+            {source.rawSource ? <div data-testid="photo-raw-source">
+              <p>{[source.rawSource.make, source.rawSource.model].filter(Boolean).join(' ') || 'Camera not reported'}</p>
+              <p>{source.rawSource.layout} · Stored {source.rawSource.rawWidth} × {source.rawSource.rawHeight} · Active {source.rawSource.activeWidth} × {source.rawSource.activeHeight}</p>
+              <p>Camera white balance: {source.rawSource.cameraWhiteBalance ? 'reported' : 'not reported; decoder fallback'}</p>
+              <p>Read-only source facts; not automatically copied into export metadata.</p>
+            </div> : null}
           </div>
         ) : null}
         <details className="photo-section" open data-testid="photo-project-panel">

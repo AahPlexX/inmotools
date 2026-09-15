@@ -9,6 +9,7 @@ import {
   preparePhotoRaster,
   releasePhotoRaster,
 } from '../../src/tools/photo/photo-import';
+import { normalizeRawSettings } from '../../src/tools/photo/photo-raw-settings';
 
 function file(name: string, type: string, contents = 'pixels') {
   return new File([contents], name, { type });
@@ -17,6 +18,42 @@ function file(name: string, type: string, contents = 'pixels') {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Photo Studio import contract', () => {
+  test('RAW variants use normalized cache keys and an old failure cannot evict a newer queued variant', async () => {
+    const workers: VariantWorker[] = [];
+    const bytes = makePhotoDng();
+    class VariantWorker {
+      onmessage: ((event: { data: { blob?: Blob; error?: string } }) => void) | null = null;
+      started = false;
+      constructor() { workers.push(this); }
+      postMessage(message: ArrayBuffer | { buffer: ArrayBuffer; settings: unknown }, transfer: Transferable[]) {
+        const buffer = message instanceof ArrayBuffer ? message : message.buffer;
+        expect(transfer).toEqual([buffer]); expect(new Uint8Array(buffer)).toEqual(bytes);
+        if (!(message instanceof ArrayBuffer)) expect(message.settings).toEqual({ whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd' });
+        this.started = true;
+      }
+      terminate() {}
+    }
+    vi.stubGlobal('Worker', VariantWorker); vi.stubGlobal('OffscreenCanvas', class {});
+    const input = new File([bytes], 'variants.dng', { type: 'image/x-adobe-dng' });
+    const prepare = preparePhotoRaster as (file: Blob, settings?: unknown) => ReturnType<typeof preparePhotoRaster>;
+    const first = prepare(input);
+    const settings = normalizeRawSettings({ whiteBalance: 'custom', redMultiplier: 20 });
+    const second = prepare(input, settings);
+    const distinct = second !== first;
+    void second.catch(() => undefined);
+    expect(prepare(input, { ...settings, redMultiplier: 20 })).toBe(second);
+    const firstRejection = expect(first).rejects.toThrow('old variant failed');
+    await vi.waitFor(() => expect(workers[0]?.started).toBe(true));
+    workers[0].onmessage?.({ data: { error: 'old variant failed' } }); await firstRejection;
+    expect(distinct).toBe(true);
+    expect(prepare(input, settings)).toBe(second);
+    await vi.waitFor(() => expect(workers[1]?.started).toBe(true));
+    expect(workers).toHaveLength(2);
+    const png = new Blob(['custom'], { type: 'image/png' });
+    workers[1].onmessage?.({ data: { blob: png } });
+    await expect(second).resolves.toMatchObject({ blob: png });
+    releasePhotoRaster(input);
+  });
   test.each([
     { extension: 'tif', bytes: makePhotoTiff(), type: 'image/tiff', seconds: 20 },
     { extension: 'dng', bytes: makePhotoDng(), type: 'image/x-adobe-dng', seconds: 30 },

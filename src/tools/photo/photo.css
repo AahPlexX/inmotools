@@ -299,6 +299,9 @@
 .photo-section:first-of-type { border-top: 0; }
 .photo-section > summary { cursor: pointer; font-weight: 700; margin-bottom: 0.55rem; }
 .photo-control-list { display: grid; gap: 0.62rem; }
+.photo-control.photo-raw-control { grid-template-columns: minmax(0, 1fr); }
+.photo-control.photo-raw-control > input,
+.photo-control.photo-raw-control > select { grid-column: 1; }
 
 .photo-control {
   display: grid;

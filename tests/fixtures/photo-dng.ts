@@ -1,5 +1,5 @@
 /** Original 32x32 uncompressed Bayer DNG; contains no third-party camera data. */
-export function makePhotoDng(options: { width?: number; height?: number; sample?: number; orientation?: number; pixelAspect?: number } = {}): Uint8Array<ArrayBuffer> {
+export function makePhotoDng(options: { width?: number; height?: number; sample?: number; orientation?: number; pixelAspect?: number; patterned?: boolean } = {}): Uint8Array<ArrayBuffer> {
   const width = options.width ?? 32;
   const height = options.height ?? 32;
   const text = [...new TextEncoder().encode('InMo Synthetic Bayer'), 0];
@@ -44,6 +44,9 @@ export function makePhotoDng(options: { width?: number; height?: number; sample?
       else view.setUint32(offset, value, true);
     });
   });
-  for (let index = 0; index < 1024; index++) view.setUint16(pixelOffset + index * 2, options.sample ?? 1024, true);
+  for (let index = 0; index < 1024; index++) {
+    const sample = options.patterned ? 512 + ((index % 32) % 4 + Math.floor(index / 32) % 4) * 512 : options.sample ?? 1024;
+    view.setUint16(pixelOffset + index * 2, sample, true);
+  }
   return bytes;
 }
