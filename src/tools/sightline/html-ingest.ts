@@ -48,6 +48,10 @@ const classAndId = (element: Element): string => {
 };
 
 const isBoilerplate = (element: Element): boolean => {
+  // An explicit marker wins over every heuristic: an exporter that knows a
+  // block is document chrome can say so, and the reader will skip it.
+  const chrome = element.properties?.['dataSightlineChrome'];
+  if (chrome === 'true' || chrome === true) return true;
   const tag = element.tagName.toLowerCase();
   if (tag === 'nav' || tag === 'footer' || tag === 'aside' || tag === 'form' || tag === 'script' || tag === 'style') return true;
   if (tag === 'header') return true;
@@ -143,13 +147,33 @@ const collectParagraphs = (root: Element): RawParagraph[] => {
   return paragraphs;
 };
 
+/** Block-level tags that hold text rather than other blocks. */
+const LEAF_BLOCK_TAGS = new Set([
+  'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre',
+  'figcaption', 'caption', 'dd', 'dt', 'summary', 'td', 'th',
+]);
+
+/**
+ * A container must be able to hold blocks. Without this test a paragraph whose
+ * class happens to match a content hint scores higher than the article around
+ * it, and the collector then finds nothing inside a leaf element.
+ */
+const isContainerCandidate = (element: Element): boolean => {
+  if (LEAF_BLOCK_TAGS.has(element.tagName.toLowerCase())) return false;
+  return element.children.some((child) => {
+    if (child.type !== 'element' || isBoilerplate(child)) return false;
+    const tag = child.tagName.toLowerCase();
+    return BLOCK_TAGS.has(tag) || !LEAF_BLOCK_TAGS.has(tag);
+  });
+};
+
 const findArticleContainer = (root: Root): { element: Element | null; score: number; considered: number } => {
   let best: Element | null = null;
   let bestScore = 0;
   let considered = 0;
   const visit = (node: RootContent) => {
     if (node.type !== 'element') return;
-    if (!isBoilerplate(node)) {
+    if (!isBoilerplate(node) && isContainerCandidate(node)) {
       const score = scoreContainer(node);
       if (score >= 0) {
         considered += 1;

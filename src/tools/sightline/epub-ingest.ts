@@ -133,8 +133,13 @@ const parseCoreMetadata = (metadataNode: XmlRecord | undefined): Partial<Documen
 
 const readNavDocument = (html: string, basePath: string): RawChapter[] => {
   const chapters: RawChapter[] = [];
+  // Only the table-of-contents navigation lists the chapters. The landmarks
+  // navigation holds pointers such as "Start of content" that are not chapters,
+  // and a hidden navigation must not be read as one.
+  const tocMatch = /<nav\b[^>]*epub:type\s*=\s*["']toc["'][^>]*>([\s\S]*?)<\/nav>/i.exec(html);
+  const source = tocMatch?.[1] ?? html;
   const linkPattern = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match = linkPattern.exec(html);
+  let match = linkPattern.exec(source);
   while (match) {
     const href = match[1] ?? '';
     const title = normalizeParagraphText(match[2]!.replace(/<[^>]*>/g, ' '));
@@ -146,7 +151,7 @@ const readNavDocument = (html: string, basePath: string): RawChapter[] => {
         href: resolveEpubPath(basePath, href),
       });
     }
-    match = linkPattern.exec(html);
+    match = linkPattern.exec(source);
   }
   return chapters;
 };
