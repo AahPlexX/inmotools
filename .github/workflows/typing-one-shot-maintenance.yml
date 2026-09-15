@@ -1,6 +1,10 @@
 name: Typing Workstation one-shot maintenance
 
 on:
+  push:
+    branches: [feature/typing-workstation]
+    paths:
+      - '.github/workflows/typing-one-shot-maintenance.yml'
   workflow_dispatch:
 
 permissions:
