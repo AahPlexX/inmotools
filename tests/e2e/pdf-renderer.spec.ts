@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
       },
     });
   });
-  await page.goto('/tools/pdf-sanitizer');
+  await page.goto('./#/tools/pdf-sanitizer');
 });
 
 test('renders a queued PDF through a bundled real worker and supports page/zoom controls', async ({ page }) => {
