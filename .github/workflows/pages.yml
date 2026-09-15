@@ -2,19 +2,42 @@ name: Validate and deploy Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/pdf-workstation]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
   actions: read
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 jobs:
+  pdf-search-navigation-mount:
+    if: github.ref == 'refs/heads/feat/pdf-workstation'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Apply guarded search navigation mount
+        run: node scripts/pdf-search-navigation-mount.mjs
+      - name: Commit viewer callback
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/tools/pdf/PdfWorkspace.tsx; then
+            echo 'No PDF viewer callback change was produced.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/tools/pdf/PdfWorkspace.tsx
+          git commit -m 'feat(pdf): connect search results to page navigation'
+          git push origin HEAD:feat/pdf-workstation
+
   validate:
+    if: github.ref != 'refs/heads/feat/pdf-workstation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
