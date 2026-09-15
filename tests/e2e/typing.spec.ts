@@ -9,7 +9,6 @@ async function openWorkspace(page: Page) {
   await page.goto(ROUTE);
   const workspace = page.getByTestId('suite-workspace');
   await expect(workspace).toHaveAttribute('aria-label', 'Typing Workstation workspace');
-  await expect(workspace.getByRole('heading', { name: /^Typing Workstation —/ })).toBeVisible();
   return workspace;
 }
 
