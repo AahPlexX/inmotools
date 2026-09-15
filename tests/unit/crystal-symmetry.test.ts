@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createStarterStructure, updateCrystalSite } from '../../src/tools/crystal/document-engine';
-import { analyzeCrystalSymmetry, crystalToMoyoCell } from '../../src/tools/crystal/symmetry-engine';
+import {
+  analyzeCrystalSymmetry,
+  applySymmetryOperation,
+  crystalToMoyoCell,
+  generateEquivalentSites,
+  reflectionAllowed,
+  standardizeCrystal,
+  validateSourceSymmetry,
+} from '../../src/tools/crystal/symmetry-engine';
+import type { CrystalSymmetryOperation } from '../../src/tools/crystal/symmetry-types';
 
 describe('crystal symmetry adapter', () => {
   it('maps the canonical lattice row-major without mutating fractional positions', () => {
@@ -53,5 +62,67 @@ describe('crystal symmetry adapter', () => {
   it('rejects invalid tolerances before invoking the symmetry kernel', async () => {
     await expect(analyzeCrystalSymmetry(createStarterStructure('bcc'), 0)).rejects.toThrow(/tolerance/i);
     await expect(analyzeCrystalSymmetry(createStarterStructure('bcc'), Number.NaN)).rejects.toThrow(/tolerance/i);
+  });
+});
+
+describe('crystal symmetry operations', () => {
+  const identity: CrystalSymmetryOperation = {
+    rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    translation: [0, 0, 0],
+  };
+  const inversion: CrystalSymmetryOperation = {
+    rotation: [-1, 0, 0, 0, -1, 0, 0, 0, -1],
+    translation: [0, 0, 0],
+  };
+
+  it('applies operations in wrapped fractional coordinates', () => {
+    expect(applySymmetryOperation([0.1, 0.2, 0.3], identity)).toEqual([0.1, 0.2, 0.3]);
+    const inverted = applySymmetryOperation([0.1, 0.2, 0.3], inversion);
+    expect(inverted[0]).toBeCloseTo(0.9, 12);
+    expect(inverted[1]).toBeCloseTo(0.8, 12);
+    expect(inverted[2]).toBeCloseTo(0.7, 12);
+  });
+
+  it('generates deduplicated equivalent sites without mutating the source', async () => {
+    const bcc = createStarterStructure('bcc');
+    const before = bcc.sites.map((site) => [...site.fractional]);
+    const result = await analyzeCrystalSymmetry(bcc, 1e-4);
+    const generated = generateEquivalentSites(bcc, result);
+
+    expect(generated.sites).toHaveLength(2);
+    expect(generated.sites.every((site) => site.fractional.every((value) => value >= 0 && value < 1))).toBe(true);
+    expect(generated.provenance.at(-1)?.kind).toBe('symmetry-equivalent-sites');
+    expect(bcc.sites.map((site) => [...site.fractional])).toEqual(before);
+  });
+
+  it('standardizes to conventional and primitive cells with provenance', async () => {
+    const bcc = createStarterStructure('bcc');
+    const result = await analyzeCrystalSymmetry(bcc, 1e-4);
+
+    expect(standardizeCrystal(bcc, result, 'conventional').sites).toHaveLength(2);
+    expect(standardizeCrystal(bcc, result, 'primitive').sites).toHaveLength(1);
+    expect(standardizeCrystal(bcc, result, 'primitive').provenance.at(-1)?.kind).toBe('symmetry-standardize');
+  });
+
+  it('reports BCC h+k+l extinction conditions from the operation set', async () => {
+    const result = await analyzeCrystalSymmetry(createStarterStructure('bcc'), 1e-4);
+    expect(reflectionAllowed([1, 0, 0], result.operations)).toBe(false);
+    expect(reflectionAllowed([0, 1, 0], result.operations)).toBe(false);
+    expect(reflectionAllowed([1, 1, 0], result.operations)).toBe(true);
+    expect(reflectionAllowed([2, 0, 0], result.operations)).toBe(true);
+    expect(() => reflectionAllowed([0.5, 0, 0], result.operations)).toThrow(/integer/i);
+    expect(() => reflectionAllowed([1, 0, 0], result.operations, 0)).toThrow(/tolerance/i);
+  });
+
+  it('flags operations that no longer map an edited structure onto itself', async () => {
+    const bcc = createStarterStructure('bcc');
+    const result = await analyzeCrystalSymmetry(bcc, 1e-4);
+    expect(validateSourceSymmetry(bcc, result, 1e-4)).toEqual([]);
+
+    const moved = updateCrystalSite(bcc, bcc.sites[1]!.id, { fractional: [0.13, 0.5, 0.5] });
+    const findings = validateSourceSymmetry(moved, result, 1e-4);
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0]!.severity).toBe('warning');
+    expect(findings[0]!.siteIds.length).toBeGreaterThan(0);
   });
 });

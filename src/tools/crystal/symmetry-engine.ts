@@ -1,11 +1,14 @@
 import { cellToMatrix, validateCell } from './cell-engine';
 import { ELEMENTS } from './element-data';
+import { periodicDistance } from './periodic-engine';
 import type { CrystalDocument, CrystalSite, Mat3, UnitCell, Vec3 } from './crystal-types';
 import type { CrystalSymmetryOperation, CrystalSymmetryResult, SymmetryAdapterCell } from './symmetry-types';
+import type { StructureHealthFinding } from './structure-health-engine';
 
 const DEFAULT_TOLERANCE = 1e-4;
 const VECTOR_EPSILON = 1e-10;
 const LATTICE_NOISE_EPSILON = 1e-9;
+const MAX_EQUIVALENT_SITES = 50_000;
 const MOYO_SETTING = 'Standard';
 const MOYO_WASM_FILE = '@spglib/moyo-wasm/moyo_wasm_bg.wasm';
 
@@ -219,4 +222,126 @@ export async function analyzeCrystalSymmetry(
     primitive: documentFromSymmetryCell(document, dataset.prim_std_cell, 'primitive', tolerance),
     tolerance,
   };
+}
+
+const wrapFractional = (value: number): number => {
+  const wrapped = value - Math.floor(value);
+  return Object.is(wrapped, -0) ? 0 : wrapped;
+};
+
+export function applySymmetryOperation(fractional: Vec3, operation: CrystalSymmetryOperation): Vec3 {
+  const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = operation.rotation;
+  const [t0, t1, t2] = operation.translation;
+  return [
+    wrapFractional(r0 * fractional[0] + r1 * fractional[1] + r2 * fractional[2] + t0),
+    wrapFractional(r3 * fractional[0] + r4 * fractional[1] + r5 * fractional[2] + t1),
+    wrapFractional(r6 * fractional[0] + r7 * fractional[1] + r8 * fractional[2] + t2),
+  ];
+}
+
+export function generateEquivalentSites(document: CrystalDocument, result: CrystalSymmetryResult): CrystalDocument {
+  const sites: CrystalSite[] = [];
+  const seen = new Set<string>();
+  for (const site of document.sites) {
+    for (const operation of result.operations) {
+      const fractional = applySymmetryOperation(site.fractional, operation);
+      const key = `${site.element}|${fractional.map((value) => Math.round(value / result.tolerance)).join('|')}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (sites.length >= MAX_EQUIVALENT_SITES) {
+        throw new RangeError(
+          `Equivalent-site generation would exceed the ${MAX_EQUIVALENT_SITES.toLocaleString()}-site limit.`,
+        );
+      }
+      sites.push({ ...site, id: `${site.id}@sym-${sites.length + 1}`, fractional });
+    }
+  }
+  return {
+    ...document,
+    id: `${document.id}-equivalent-sites`,
+    name: `${document.name} — symmetry-equivalent sites`,
+    sites,
+    provenance: [
+      ...document.provenance,
+      {
+        kind: 'symmetry-equivalent-sites',
+        label: `Generated ${sites.length} symmetry-equivalent sites`,
+        detail: `${result.hmSymbol} at tolerance ${result.tolerance} Å`,
+      },
+    ],
+  };
+}
+
+export function standardizeCrystal(
+  document: CrystalDocument,
+  result: CrystalSymmetryResult,
+  mode: 'conventional' | 'primitive',
+): CrystalDocument {
+  const source = mode === 'primitive' ? result.primitive : result.standardized;
+  return {
+    ...source,
+    provenance: [
+      ...document.provenance,
+      {
+        kind: 'symmetry-standardize',
+        label: `Standardized to the ${mode} cell`,
+        detail: `${result.hmSymbol} (#${result.number}) at tolerance ${result.tolerance} Å`,
+      },
+    ],
+  };
+}
+
+export function validateSourceSymmetry(
+  document: CrystalDocument,
+  result: CrystalSymmetryResult,
+  tolerance: number,
+): readonly StructureHealthFinding[] {
+  const findings: StructureHealthFinding[] = [];
+  result.operations.forEach((operation, index) => {
+    const siteIds = document.sites
+      .filter((site) => {
+        const mapped = applySymmetryOperation(site.fractional, operation);
+        return !document.sites.some(
+          (candidate) =>
+            candidate.element === site.element &&
+            periodicDistance(mapped, candidate.fractional, document.cell) <= tolerance,
+        );
+      })
+      .map((site) => site.id);
+    if (siteIds.length > 0) {
+      findings.push({
+        id: `symmetry-operation-${index + 1}`,
+        severity: 'warning',
+        message: `Symmetry operation ${index + 1} of ${result.hmSymbol} does not map every site onto an equivalent site within ${tolerance} Å.`,
+        siteIds,
+      });
+    }
+  });
+  return findings;
+}
+
+export function reflectionAllowed(
+  hkl: readonly [number, number, number],
+  operations: readonly CrystalSymmetryOperation[],
+  tolerance: number = DEFAULT_TOLERANCE,
+): boolean {
+  if (!hkl.every(Number.isInteger)) throw new RangeError('Reflection indices must be integers.');
+  if (!Number.isFinite(tolerance) || tolerance <= 0) {
+    throw new RangeError('Reflection tolerance must be a positive finite number.');
+  }
+  for (const operation of operations) {
+    const [r0, r1, r2, r3, r4, r5, r6, r7, r8] = operation.rotation;
+    const image = [
+      hkl[0] * r0 + hkl[1] * r3 + hkl[2] * r6,
+      hkl[0] * r1 + hkl[1] * r4 + hkl[2] * r7,
+      hkl[0] * r2 + hkl[1] * r5 + hkl[2] * r8,
+    ];
+    if (image[0] !== hkl[0] || image[1] !== hkl[1] || image[2] !== hkl[2]) continue;
+    const phase =
+      hkl[0] * operation.translation[0] +
+      hkl[1] * operation.translation[1] +
+      hkl[2] * operation.translation[2];
+    if (Math.abs(phase - Math.round(phase)) > tolerance) return false;
+  }
+  return true;
 }
