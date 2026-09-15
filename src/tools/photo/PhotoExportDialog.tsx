@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { downloadBlob } from '../../lib/download';
 import { processPhotoBatch, type PhotoBatchItemStatus } from './photo-batch';
+import { isPhotoImportFile, preparePhotoRaster, releasePhotoRaster } from './photo-import';
 import {
   createPhotoExport,
   photoMetadataForPolicy,
@@ -186,7 +187,7 @@ export default function PhotoExportDialog({
   }
 
   function chooseBatch(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith('image/'));
+    const files = Array.from(event.target.files ?? []).filter(isPhotoImportFile);
     event.target.value = '';
     setBatchFiles(files);
     setBatchStatuses([]);
@@ -207,26 +208,31 @@ export default function PhotoExportDialog({
       const summary = await processPhotoBatch(
         items,
         async (item) => {
-          const bitmap = await createImageBitmap(item.file, { imageOrientation: 'from-image' });
-          const width = bitmap.width;
-          const height = bitmap.height;
-          bitmap.close();
-          const dimensions = requestedPhotoDimensions(width, height, recipe, resizeMode, resizeValue);
-          const exported = await createPhotoExport({
-            file: item.file,
-            sourceName: item.name,
-            requestedName: item.name,
-            recipe,
-            outputMime,
-            quality,
-            metadataPolicy,
-            metadata,
-            outputSharpening,
-            revision: ++revisionRef.current,
-            jpegBackground,
-            ...dimensions,
-          });
-          return { blob: exported.blob, width: exported.width, height: exported.height };
+          try {
+            const raster = await preparePhotoRaster(item.file);
+            const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
+            const width = bitmap.width;
+            const height = bitmap.height;
+            bitmap.close();
+            const dimensions = requestedPhotoDimensions(width, height, recipe, resizeMode, resizeValue);
+            const exported = await createPhotoExport({
+              file: item.file,
+              sourceName: item.name,
+              requestedName: item.name,
+              recipe,
+              outputMime,
+              quality,
+              metadataPolicy,
+              metadata,
+              outputSharpening,
+              revision: ++revisionRef.current,
+              jpegBackground,
+              ...dimensions,
+            });
+            return { blob: exported.blob, width: exported.width, height: exported.height };
+          } finally {
+            releasePhotoRaster(item.file);
+          }
         },
         (item, result) => {
           downloadBlob(result.blob, safeRequestedPhotoFilename(item.name, item.name, outputMime));
@@ -367,7 +373,7 @@ export default function PhotoExportDialog({
           <p className="photo-export-note">Files are rendered one at a time with the same format, resize, sharpening, and metadata policy. Each file is independently constrained to verified-safe local canvas limits, a failure is isolated to that file, and full-resolution output blobs are released after each download.</p>
           <label className="photo-open-label photo-batch-picker">
             Choose batch photos
-            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/*" onChange={chooseBatch} />
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff,image/*" onChange={chooseBatch} />
           </label>
           <div className="photo-inline-actions">
             <span>{batchFiles.length} queued</span>

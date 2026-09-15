@@ -24,6 +24,7 @@ import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
 import {
   isPhotoImportFile,
   normalizePhotoImport,
+  preparePhotoRaster,
   photoImportErrorMessage,
   readPhotoClipboard,
   type PhotoImportCandidate,
@@ -72,6 +73,7 @@ interface SourcePhoto {
   originalUrl: string;
   width: number;
   height: number;
+  codecNotice?: string;
 }
 
 interface PreviewState {
@@ -466,17 +468,18 @@ export default function PhotoWorkspace() {
   const openStoredProject = useCallback(async (loaded: LoadedPhotoProject, importRevision: number) => {
     let nextSourceUrl: string | null = null;
     try {
-      const bitmap = await createImageBitmap(loaded.sourceFile, { imageOrientation: 'from-image' });
+      const raster = await preparePhotoRaster(loaded.sourceFile);
+      const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
       const width = bitmap.width;
       const height = bitmap.height;
       bitmap.close();
       if (importRevision !== importRevisionRef.current) return false;
-      nextSourceUrl = URL.createObjectURL(loaded.sourceFile);
+      nextSourceUrl = URL.createObjectURL(raster.blob);
       releaseSourceUrl();
       releasePreviewUrl();
       setPreview(null);
       sourceUrlRef.current = nextSourceUrl;
-      const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height };
+      const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice };
       sourceRef.current = recoveredSource;
       setSource(recoveredSource);
       nextSourceUrl = null;
@@ -595,12 +598,13 @@ export default function PhotoWorkspace() {
     if (importRevision !== importRevisionRef.current) return;
     let nextSourceUrl: string | null = null;
     try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const raster = await preparePhotoRaster(file);
+      const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
       const width = bitmap.width;
       const height = bitmap.height;
       bitmap.close();
       if (importRevision !== importRevisionRef.current) return;
-      nextSourceUrl = URL.createObjectURL(file);
+      nextSourceUrl = URL.createObjectURL(raster.blob);
       if (importRevision !== importRevisionRef.current) {
         URL.revokeObjectURL(nextSourceUrl);
         return;
@@ -609,7 +613,7 @@ export default function PhotoWorkspace() {
       releasePreviewUrl();
       setPreview(null);
       sourceUrlRef.current = nextSourceUrl;
-      const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height };
+      const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice };
       sourceRef.current = importedSource;
       setSource(importedSource);
       nextSourceUrl = null;
@@ -1553,7 +1557,7 @@ export default function PhotoWorkspace() {
             ref={fileInputRef}
             data-testid="photo-file-input"
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/*"
+            accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff,image/*"
             onChange={(event) => {
               if (event.target.files) void importPhotoFiles(event.target.files, 'file-input');
               event.target.value = '';
@@ -1601,6 +1605,8 @@ export default function PhotoWorkspace() {
           ? 'Drop a photo anywhere in the studio, press Ctrl+V, or use Paste image.'
           : 'Drop a photo anywhere in the studio or press Ctrl+V. Direct clipboard reading is unavailable in this browser.'}
       </p>
+
+      {source?.codecNotice ? <p className="photo-import-hint" data-testid="photo-codec-notice">{source.codecNotice}</p> : null}
 
       {recoveryProject ? (
         <section className="photo-recovery-banner" aria-labelledby="photo-recovery-title" data-testid="photo-recovery-prompt">

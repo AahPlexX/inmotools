@@ -11,6 +11,41 @@ export interface PhotoImportCandidate {
   source: PhotoImportSource;
 }
 
+export interface PhotoImportRaster {
+  blob: Blob;
+  notice?: string;
+}
+
+const rasterCache = new WeakMap<Blob, Promise<PhotoImportRaster>>();
+
+export function releasePhotoRaster(file: Blob): void {
+  rasterCache.delete(file);
+}
+
+/** Preserve the source; all consumers share one bounded, lazy TIFF raster. */
+export function preparePhotoRaster(file: Blob): Promise<PhotoImportRaster> {
+  const existing = rasterCache.get(file);
+  if (existing) return existing;
+  const task = (async () => {
+    const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    const hasTiffSignature = signature.length === 4 && (
+      (signature[0] === 73 && signature[1] === 73 && [42, 43].includes(signature[2]) && signature[3] === 0)
+      || (signature[0] === 77 && signature[1] === 77 && signature[2] === 0 && [42, 43].includes(signature[3]))
+    );
+    const name = 'name' in file ? String(file.name) : '';
+    const type = file.type.trim().toLowerCase();
+    if (hasTiffSignature || /^image\/(?:x-)?tiff$/i.test(type)
+      || ((!type || type === 'application/octet-stream') && /\.tiff?$/i.test(name))) {
+      const { prepareTiffSource } = await import('./codecs/tiff-source');
+      return prepareTiffSource(file);
+    }
+    return { blob: file };
+  })();
+  rasterCache.set(file, task);
+  void task.catch(() => rasterCache.delete(file));
+  return task;
+}
+
 export interface PhotoClipboardItemLike {
   readonly types: readonly string[];
   getType(type: string): Promise<Blob>;
@@ -37,7 +72,7 @@ const IMAGE_EXTENSION = /\.(?:avif|bmp|gif|heic|heif|jpe?g|jfif|png|tiff?|webp)$
 export function isPhotoImportFile(file: Pick<File, 'name' | 'type'>): boolean {
   const explicitType = file.type.trim().toLowerCase();
   return explicitType
-    ? explicitType.startsWith('image/')
+    ? explicitType.startsWith('image/') || (explicitType === 'application/octet-stream' && /\.tiff?$/i.test(file.name))
     : IMAGE_EXTENSION.test(file.name);
 }
 

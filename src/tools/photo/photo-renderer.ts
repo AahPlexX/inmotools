@@ -1,5 +1,6 @@
 import { applyPixelAdjustments, normalizeRecipe, sampleHistogram } from './photo-engine';
 import { warpPhotoGeometryPixels } from './photo-geometry';
+import { preparePhotoRaster } from './photo-import';
 import type {
   PhotoCapabilities,
   PhotoHistogram,
@@ -336,7 +337,8 @@ function fillJpegBackground(
 export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult> {
   if (typeof createImageBitmap !== 'function') throw new Error('This browser cannot decode images for Photo Studio.');
   const recipe = normalizeRecipe(request.recipe);
-  const bitmap = await createImageBitmap(request.file, { imageOrientation: 'from-image' });
+  const raster = await preparePhotoRaster(request.file);
+  const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
   try {
     const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);
     const desired = requestedDimensions(natural.width, natural.height, request);

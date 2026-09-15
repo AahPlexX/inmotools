@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { makePhotoTiff } from '../fixtures/photo-tiff';
+import { readFile } from 'node:fs/promises';
 
 const FIXTURE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAUAAAADwCAIAAAD+Tyo8AAACqElEQVR42u3VQQ0AMQwDwbVU/pj7OBQ9zTyWQeJVqzVVfa6nBTzqtO+CVfW9WmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpgsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGCywqlpgwAKrqgUGC6yqFhiwwKoW2AKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwwWWFUtMGCBVdUCgwVWVQsMWGBVtcBggVXVAgMWWNUCAxZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGBVtcCABVZVCwwWWFUtMGCBVS0wYIFV1QIDFljVAgMWWFUtMGCBVS0wYIFV1QKDBVZVCwxYYFW1wGCBVdUCAxZYVS0wWGBVtcCABVa1wIAFVlULDFhgVQsMWGBVtcCABVa1wIAFVlULDBZYVS0wYIFV1QKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwxYYFULDFhgVbXAYIFV1QIDFlhVLTBYYFW1wIAFVlULDBZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGALrGqBAQusqhYYLLCqWmDAAquqBQYLrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoHBAquqBQYssKpaYLDAqmqBAQusqhYYLLCqWmDAAqtaYMACq6oFBiywqgUGLLCqWmCwwD6ZqgUGLLCqWmCwwKpqgQELrKoWGCywqlpgwAKrWmDAAquqBQYssKoFBiywqlpgwAKrWmDAAquqBQYLrKoWGLDAqmqBwQKrqgUGLLCqWmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpg+I0LLVVQ6zZs79UAAAAASUVORK5CYII=',
@@ -19,6 +21,127 @@ async function openNamedFixture(page: Page, name: string) {
   await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
   await expect(page.getByTestId('photo-preview')).toBeVisible();
 }
+
+test('TIFF shares preview, comparison, export and durable recovery while preserving original source bytes', async ({ page }) => {
+  await openStudio(page);
+  const bytes = makePhotoTiff({ bits: 16, samples: [32768, 0, 0, 0, 65535, 0] });
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'precision-proof.tiff', mimeType: 'image/tiff', buffer: Buffer.from(bytes) });
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('2 × 1');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-codec-notice')).toContainText(/16-bit.*8-bit/);
+  await page.getByLabel('Exposure value').fill('1');
+  await page.getByLabel('Exposure value').press('Enter');
+  await expect(page.getByTestId('photo-project-save-state')).toContainText('Saved locally');
+  const persisted = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('inmotools.photo-studio');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const read = <T,>(store: string, action: (objectStore: IDBObjectStore) => IDBRequest<T>) => new Promise<T>((resolve, reject) => {
+      const request = action(db.transaction(store, 'readonly').objectStore(store));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const projects = await read('projects', (store) => store.getAll());
+      const project = projects.find((entry) => entry.source.name === 'precision-proof.tiff');
+      let source: Blob;
+      if (project.source.storage === 'opfs') {
+        const root = await navigator.storage.getDirectory();
+        const directory = await root.getDirectoryHandle('inmotools-photo-studio');
+        source = await (await directory.getFileHandle(project.source.key)).getFile();
+      } else source = await read('sources', (store) => store.get(project.source.key));
+      return Array.from(new Uint8Array(await source.arrayBuffer()));
+    } finally { db.close(); }
+  });
+  expect(persisted).toEqual([...bytes]);
+  await page.reload();
+  await page.getByTestId('photo-recovery-prompt').getByRole('button', { name: 'Recover project' }).click();
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('2 × 1');
+  await expect(page.getByLabel('Exposure value')).toHaveValue('1');
+  await expect(page.getByTestId('photo-codec-notice')).toContainText(/16-bit.*8-bit/);
+  const original = page.getByTestId('photo-before-overlay').locator('img');
+  await page.getByRole('button', { name: 'Before/after', exact: true }).click();
+  await expect(original).toBeVisible();
+  expect(await original.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBe(2);
+  const beforePixels = await original.evaluate((image) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2; canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image as HTMLImageElement, 0, 0);
+    return [...context.getImageData(0, 0, 2, 1).data];
+  });
+  expect(beforePixels).toEqual([128, 0, 0, 255, 0, 255, 0, 255]);
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('File format', { exact: true }).selectOption('image/png');
+  const download = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download photo', exact: true }).click();
+  const result = await download;
+  expect(result.suggestedFilename()).toMatch(/\.png$/);
+  const exportedBytes = await readFile((await result.path())!);
+  const exported = await page.evaluate(async (pixels) => {
+    const bitmap = await createImageBitmap(new Blob([Uint8Array.from(pixels)], { type: 'image/png' }));
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(bitmap, 0, 0);
+      return { width: bitmap.width, height: bitmap.height, pixels: [...context.getImageData(0, 0, 2, 1).data] };
+    } finally { bitmap.close(); }
+  }, [...exportedBytes]);
+  expect(exported).toEqual({ width: 2, height: 1, pixels: [176, 0, 0, 255, 0, 255, 0, 255] });
+});
+
+test('Deflate TIFF decodes through the browser worker', async ({ page }) => {
+  await openStudio(page);
+  await page.setInputFiles('[data-testid="photo-file-input"]', {
+    name: 'deflate-proof.tif', mimeType: 'application/octet-stream',
+    buffer: Buffer.from(makePhotoTiff({ compression: 8, encoded: [120, 156, 251, 207, 192, 192, 240, 159, 1, 0, 7, 254, 1, 255] })),
+  });
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('2 × 1');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-codec-notice')).toContainText('8-bit TIFF source preserved');
+});
+
+test('unsupported TIFF preserves the current document and gives variant-specific guidance', async ({ page }) => {
+  await openStudio(page);
+  await openNamedFixture(page, 'keep-me.png');
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'rotated.tif', mimeType: 'image/tiff', buffer: Buffer.from(makePhotoTiff({ orientation: 6 })) });
+  await expect(page.locator('.photo-status-message')).toContainText(/TIFF.*orientation/i);
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
+  await expect(page.locator('.photo-status-strip')).toContainText('keep-me.png');
+});
+
+test('a delayed TIFF decoder cannot replace a newer native import', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const state = window as unknown as { releaseTiff?: () => void; tiffCompleted?: boolean };
+    window.Worker = class extends NativeWorker {
+      private readonly isTiff: boolean;
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.isTiff = String(url).includes('tiff.worker-');
+        if (this.isTiff) this.addEventListener('message', () => { state.tiffCompleted = true; });
+      }
+      postMessage(message: unknown, transfer: Transferable[]): void {
+        if (this.isTiff) state.releaseTiff = () => super.postMessage(message, transfer);
+        else super.postMessage(message, transfer);
+      }
+    };
+  });
+  await openStudio(page);
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'delayed.tif', mimeType: 'image/tiff', buffer: Buffer.from(makePhotoTiff()) });
+  await expect.poll(() => page.evaluate(() => typeof (window as unknown as { releaseTiff?: () => void }).releaseTiff)).toBe('function');
+  await openNamedFixture(page, 'newer-photo.png');
+  await page.evaluate(() => (window as unknown as { releaseTiff: () => void }).releaseTiff());
+  await expect.poll(() => page.evaluate(() => (window as unknown as { tiffCompleted?: boolean }).tiffCompleted)).toBe(true);
+  await expect(page.locator('.photo-status-strip')).toContainText('newer-photo.png');
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
+  await expect(page.getByTestId('photo-codec-notice')).toHaveCount(0);
+});
 
 test('opens a dropped image through the shared import target', async ({ page }) => {
   await openStudio(page);
