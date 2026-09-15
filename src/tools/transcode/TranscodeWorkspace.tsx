@@ -142,7 +142,8 @@ const TARGET_OPTIONS: Record<string, OptionField[]> = {
     { kind: 'text', key: 'title', label: 'EXIF title', placeholder: 'Optional' },
     { kind: 'text', key: 'artist', label: 'EXIF artist', placeholder: 'Optional' },
     { kind: 'text', key: 'copyright', label: 'EXIF copyright', placeholder: 'Optional' },
-    { kind: 'checkbox', key: 'stripMeta', label: 'Strip existing metadata first' },
+    { kind: 'checkbox', key: 'xmp', label: 'Also write an XMP packet (title/artist/copyright/description)' },
+    { kind: 'checkbox', key: 'stripMeta', label: 'Strip existing metadata (EXIF/XMP/IPTC) first' },
   ],
   png: [
     { kind: 'text', key: 'title', label: 'PNG title (tEXt)', placeholder: 'Optional' },

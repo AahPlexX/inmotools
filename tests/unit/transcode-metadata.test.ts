@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { monoFromDecoded, waveformToSvg, writeId3Tags, hasTagOptions } from '../../src/tools/transcode/audio-engine';
 import {
-  hasImageMetadata, readPngTextChunks, stripPngTextChunks, writeJpegMetadata, writePngMetadata,
+  buildXmpPacket, hasImageMetadata, insertJpegXmp, readJpegXmp, readPngTextChunks, stripJpegSidecarSegments,
+  stripPngTextChunks, writeJpegMetadata, writePngMetadata,
 } from '../../src/tools/transcode/metadata-engine';
 
 // Minimal valid 1x1 PNG.
@@ -85,6 +86,95 @@ describe('JPEG EXIF editor (F34)', () => {
     expect(result.length).toBe(original.length);
   });
 });
+
+describe('JPEG XMP packet editor (F34)', () => {
+  const sosIndexOf = (jpeg: Uint8Array): number => {
+    for (let i = 2; i + 3 < jpeg.length; i += 1) {
+      if (jpeg[i] === 0xff && jpeg[i + 1] === 0xda) return i;
+    }
+    return -1;
+  };
+
+  it('inserts a readable XMP packet without disturbing scan data', () => {
+    const original = jpegBytes();
+    const tagged = insertJpegXmp(original, { title: 'Bayou Dawn', artist: 'Field Team', copyright: 'CC-BY' });
+    expect(tagged[0]).toBe(0xff);
+    expect(tagged[1]).toBe(0xd8);
+
+    const packet = readJpegXmp(tagged);
+    expect(packet).toContain('<dc:title>');
+    expect(packet).toContain('Bayou Dawn');
+    expect(packet).toContain('<dc:creator>');
+    expect(packet).toContain('Field Team');
+    expect(packet).toContain('<?xpacket end="w"?>');
+
+    // Entropy-coded data from SOS onward is byte-identical.
+    const originalSos = sosIndexOf(original);
+    const taggedSos = sosIndexOf(tagged);
+    expect(taggedSos).toBeGreaterThan(2);
+    expect(Array.from(tagged.subarray(taggedSos))).toEqual(Array.from(original.subarray(originalSos)));
+    // File still ends with EOI.
+    expect(tagged[tagged.length - 2]).toBe(0xff);
+    expect(tagged[tagged.length - 1]).toBe(0xd9);
+  });
+
+  it('replaces an existing packet instead of stacking packets', () => {
+    const first = insertJpegXmp(jpegBytes(), { title: 'First' });
+    const second = insertJpegXmp(first, { title: 'Second' });
+    const packet = readJpegXmp(second);
+    expect(packet).toContain('Second');
+    expect(packet).not.toContain('First');
+    const markerCount = countXmpApp1(second);
+    expect(markerCount).toBe(1);
+  });
+
+  it('strips XMP and IPTC segments on demand', () => {
+    const tagged = insertJpegXmp(jpegBytes(), { title: 'Gone' });
+    const stripped = stripJpegSidecarSegments(tagged, { xmp: true, iptc: true });
+    expect(readJpegXmp(stripped)).toBeNull();
+    // Strip on a clean JPEG is a no-op.
+    const clean = jpegBytes();
+    expect(Array.from(stripJpegSidecarSegments(clean, { xmp: true }))).toEqual(Array.from(clean));
+  });
+
+  it('escapes XML entities in packet fields', () => {
+    const packet = buildXmpPacket({ title: 'A & B <C> "D"' });
+    expect(packet).toContain('A &amp; B &lt;C&gt; &quot;D&quot;');
+    expect(packet).not.toContain('<C>');
+  });
+
+  it('writes EXIF and XMP together deterministically', async () => {
+    const meta = { title: 'Dual', artist: 'Crew', xmp: true };
+    const once = await writeJpegMetadata(jpegBytes(), meta);
+    const twice = await writeJpegMetadata(jpegBytes(), meta);
+    expect(Array.from(twice)).toEqual(Array.from(once));
+    expect(readJpegXmp(once)).toContain('Dual');
+
+    const piexif = (await import('piexifjs')).default;
+    let binary = '';
+    for (let i = 0; i < once.length; i += 0x8000) {
+      binary += String.fromCharCode(...once.subarray(i, Math.min(once.length, i + 0x8000)));
+    }
+    const exif = piexif.load(binary);
+    expect(exif['0th'][piexif.ImageIFD.Artist]).toBe('Crew');
+  });
+});
+
+function countXmpApp1(jpeg: Uint8Array): number {
+  const ns = 'http://ns.adobe.com/xap/1.0/';
+  let count = 0;
+  for (let i = 2; i + 4 < jpeg.length; i += 1) {
+    if (jpeg[i] !== 0xff || jpeg[i + 1] !== 0xe1) continue;
+    const length = (jpeg[i + 2] << 8) | jpeg[i + 3];
+    const payload = jpeg.subarray(i + 4, i + 2 + length);
+    let match = payload.length >= ns.length;
+    for (let k = 0; match && k < ns.length; k += 1) {
+      if (payload[k] !== ns.charCodeAt(k)) match = false;
+    }
+    if (match) count += 1;
+  }
+  return count;
+}
 
 describe('ID3 tag studio helpers (F35)', () => {
   it('detects tag option presence', () => {

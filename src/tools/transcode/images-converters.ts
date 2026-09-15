@@ -19,6 +19,7 @@ function imageMetadataFrom(options: ConversionOptions): ImageMetadata {
     copyright: typeof options.copyright === 'string' ? options.copyright : undefined,
     software: typeof options.software === 'string' ? options.software : undefined,
     creationTime: typeof options.creationTime === 'string' ? options.creationTime : undefined,
+    xmp: options.xmp === true || options.xmp === 'true',
     stripExisting: options.stripMeta === true || options.stripMeta === 'true',
   };
 }

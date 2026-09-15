@@ -9,12 +9,14 @@ export interface ImageMetadata {
   copyright?: string;
   software?: string;
   creationTime?: string;
+  /** Replace (or create) the XMP packet with these Dublin Core fields. */
+  xmp?: boolean;
   stripExisting?: boolean;
 }
 
 export function hasImageMetadata(meta: ImageMetadata | undefined): boolean {
   if (!meta) return false;
-  return Boolean(meta.title || meta.artist || meta.description || meta.copyright || meta.software || meta.creationTime || meta.stripExisting);
+  return Boolean(meta.title || meta.artist || meta.description || meta.copyright || meta.software || meta.creationTime || meta.xmp || meta.stripExisting);
 }
 
 const crcTable = (() => {
@@ -148,13 +150,165 @@ export function readPngTextChunks(png: Uint8Array): Record<string, string> {
 }
 
 // ---------------------------------------------------------------------------
-// JPEG: EXIF via piexifjs, XMP via packet replacement
+// JPEG segment surgery (XMP APP1 packets, IPTC APP13 stripping) — pure JS
+// ---------------------------------------------------------------------------
+
+const XMP_NAMESPACE = 'http://ns.adobe.com/xap/1.0/';
+
+interface JpegSegment {
+  marker: number;
+  payload: Uint8Array;
+}
+
+function splitJpegSegments(jpeg: Uint8Array): { segments: JpegSegment[]; tailStart: number } {
+  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error('Input is not a JPEG.');
+  const segments: JpegSegment[] = [];
+  let position = 2;
+  while (position + 4 <= jpeg.length) {
+    if (jpeg[position] !== 0xff) break;
+    const marker = jpeg[position + 1];
+    // Standalone markers (RSTn, SOI, EOI, TEM) carry no payload.
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+      position += 2;
+      continue;
+    }
+    // SOS starts the entropy-coded scan data; keep it and everything after
+    // it (including the trailing EOI) as an opaque tail.
+    if (marker === 0xda) break;
+    const length = (jpeg[position + 2] << 8) | jpeg[position + 3];
+    if (position + 2 + length > jpeg.length) break;
+    segments.push({ marker, payload: jpeg.subarray(position + 4, position + 2 + length) });
+    position += 2 + length;
+  }
+  return { segments, tailStart: position };
+}
+
+const startsWithAscii = (bytes: Uint8Array, text: string): boolean => {
+  if (bytes.length < text.length) return false;
+  for (let i = 0; i < text.length; i += 1) {
+    if (bytes[i] !== text.charCodeAt(i)) return false;
+  }
+  return true;
+};
+
+const isXmpSegment = (segment: JpegSegment): boolean =>
+  segment.marker === 0xe1 && startsWithAscii(segment.payload, XMP_NAMESPACE);
+
+const isIptcSegment = (segment: JpegSegment): boolean =>
+  segment.marker === 0xed;
+
+/** Remove XMP APP1 packets (and optionally IPTC APP13 records) from a JPEG. */
+export function stripJpegSidecarSegments(jpeg: Uint8Array, options: { xmp?: boolean; iptc?: boolean }): Uint8Array {
+  const { segments, tailStart } = splitJpegSegments(jpeg);
+  const parts: Uint8Array[] = [jpeg.subarray(0, 2)];
+  for (const segment of segments) {
+    const drop = (options.xmp && isXmpSegment(segment)) || (options.iptc && isIptcSegment(segment));
+    if (drop) continue;
+    const chunk = new Uint8Array(4 + segment.payload.length);
+    chunk[0] = 0xff;
+    chunk[1] = segment.marker;
+    chunk[2] = (segment.payload.length + 2) >> 8;
+    chunk[3] = (segment.payload.length + 2) & 0xff;
+    chunk.set(segment.payload, 4);
+    parts.push(chunk);
+  }
+  parts.push(jpeg.subarray(tailStart));
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let cursor = 0;
+  for (const part of parts) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
+}
+
+const xmlEscapeValue = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Build a Dublin-Core XMP packet from the supplied metadata fields. */
+export function buildXmpPacket(meta: ImageMetadata): string {
+  const parts: string[] = [];
+  if (meta.title) parts.push(`<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmlEscapeValue(meta.title)}</rdf:li></rdf:Alt></dc:title>`);
+  if (meta.artist) parts.push(`<dc:creator><rdf:Seq><rdf:li>${xmlEscapeValue(meta.artist)}</rdf:li></rdf:Seq></dc:creator>`);
+  if (meta.copyright) parts.push(`<dc:rights><rdf:Alt><rdf:li xml:lang="x-default">${xmlEscapeValue(meta.copyright)}</rdf:li></rdf:Alt></dc:rights>`);
+  if (meta.description) parts.push(`<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${xmlEscapeValue(meta.description)}</rdf:li></rdf:Alt></dc:description>`);
+  return [
+    '<?xpacket begin="\u{feff}" id="W5M0MpCehiHzreSzNTczkc9d"?>',
+    '<x:xmpmeta xmlns:x="adobe:ns:meta/">',
+    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">',
+    '<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"',
+    '  xmlns:xmp="http://ns.adobe.com/xap/1.0/">',
+    parts.join('\n'),
+    meta.software ? `<xmp:CreatorTool>${xmlEscapeValue(meta.software)}</xmp:CreatorTool>` : '',
+    '</rdf:Description>',
+    '</rdf:RDF>',
+    '</x:xmpmeta>',
+    '<?xpacket end="w"?>',
+  ].filter(Boolean).join('\n');
+}
+
+/** Insert (or replace) the XMP APP1 packet immediately after SOI. */
+export function insertJpegXmp(jpeg: Uint8Array, meta: ImageMetadata): Uint8Array {
+  const stripped = stripJpegSidecarSegments(jpeg, { xmp: true });
+  const namespaceBytes = new TextEncoder().encode(`${XMP_NAMESPACE}\0`);
+  const packetBytes = new TextEncoder().encode(buildXmpPacket(meta));
+  const payloadLength = namespaceBytes.length + packetBytes.length;
+  if (payloadLength + 2 > 0xffff) throw new Error('XMP packet is too large for a JPEG APP1 segment.');
+  const { segments, tailStart } = splitJpegSegments(stripped);
+
+  let total = 2 + 4 + payloadLength;
+  const kept: JpegSegment[] = [];
+  for (const segment of segments) {
+    kept.push(segment);
+    total += 4 + segment.payload.length;
+  }
+  total += stripped.length - tailStart;
+
+  const out = new Uint8Array(total);
+  out[0] = 0xff;
+  out[1] = 0xd8;
+  out[2] = 0xff;
+  out[3] = 0xe1;
+  out[4] = (payloadLength + 2) >> 8;
+  out[5] = (payloadLength + 2) & 0xff;
+  out.set(namespaceBytes, 6);
+  out.set(packetBytes, 6 + namespaceBytes.length);
+  let cursor = 6 + payloadLength;
+  for (const segment of kept) {
+    out[cursor] = 0xff;
+    out[cursor + 1] = segment.marker;
+    out[cursor + 2] = (segment.payload.length + 2) >> 8;
+    out[cursor + 3] = (segment.payload.length + 2) & 0xff;
+    out.set(segment.payload, cursor + 4);
+    cursor += 4 + segment.payload.length;
+  }
+  out.set(stripped.subarray(tailStart), cursor);
+  return out;
+}
+
+/** Extract the XMP packet text from a JPEG, if present. */
+export function readJpegXmp(jpeg: Uint8Array): string | null {
+  const { segments } = splitJpegSegments(jpeg);
+  for (const segment of segments) {
+    if (isXmpSegment(segment)) {
+      return new TextDecoder().decode(segment.payload.subarray(XMP_NAMESPACE.length + 1));
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// JPEG: EXIF via piexifjs
 // ---------------------------------------------------------------------------
 
 export async function writeJpegMetadata(jpeg: Uint8Array, meta: ImageMetadata): Promise<Uint8Array> {
   const piexif = (await import('piexifjs')).default;
-  // piexifjs operates on latin-1 binary strings (or data URIs).
-  let binary = binaryToString(jpeg);
+  // piexifjs operates on latin-1 binary strings (or data URIs). XMP and IPTC
+  // live in sidecar APP1/APP13 segments handled by the segment surgery above.
+  let stripped = jpeg;
+  if (meta.stripExisting) stripped = stripJpegSidecarSegments(jpeg, { xmp: true, iptc: true });
+  let binary = binaryToString(stripped);
   if (meta.stripExisting) binary = piexif.remove(binary);
 
   type ExifDict = Parameters<typeof piexif.dump>[0];
@@ -176,7 +330,9 @@ export async function writeJpegMetadata(jpeg: Uint8Array, meta: ImageMetadata): 
     const exifBytes = piexif.dump(exif);
     binary = piexif.insert(exifBytes, binary);
   }
-  return stringToBinary(binary);
+  let result = stringToBinary(binary);
+  if (meta.xmp) result = insertJpegXmp(result, meta);
+  return result;
 }
 
 export async function stripJpegMetadata(jpeg: Uint8Array): Promise<Uint8Array> {
