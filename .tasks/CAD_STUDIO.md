@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `9de39833aeeef1c1bb64d1bb0a2abc82902c80e3`
+**Last tracked implementation commit:** `259c38e9d055a8feb49cd72a4a5d45260d8ac9d0`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -107,7 +107,9 @@ A capability counts only when production behavior exists, relevant validation pa
 - `CadWorkspace`'s `onParameterChange` was a no-op since G7 scaffolding landed — parameter edits did nothing. Fixed at `ef799e3180ace74108c29559e19f2681dc6771e8` (RED at `1e63918`): new `setFeatureParameter()` in `project-engine.ts` mirrors `setFeatureSuppressed`, wired through history (undo/redo covers it free).
 - Sketches were invisible and unselectable anywhere in the UI — `CadSketchViewer` existed but nothing mounted it. Fixed at `cf832f09e4355229cfdd5f7f56834d38adf5c616` (RED at `4f872796`): `CadSelectionKind` gains `'sketch'`, `selectedSketch()` added alongside `selectedFeature()`, `CadTree` lists `project.sketches` as a selectable section, and `CadWorkspace` swaps `CadSketchViewer` in for `CadViewport` when a sketch is selected. All five G7 pieces (`CadWorkspace`/`CadTree`/`CadInspector`/`CadViewport`/`CadSketchViewer`) are now reachable together; catalog/route registration remains the deliberately deferred last step.
 
-- Counterbore hole termination implemented at `9de39833aeeef1c1bb64d1bb0a2abc82902c80e3` (RED at `635539c`): a second concentric sketch circle extrudes to its own depth and fuses with the full-depth bore tool before one cut, rejecting a counterbore at least as deep as the hole (degenerate) or missing `profileEntityIds`. Verified against the real kernel: fused-tool removed volume matches the hand-computed bore-plus-annular-extra expectation exactly. Countersink stays deferred (needs conical, angle-driven geometry — a separate design decision, not a variant of this slice).
+- Counterbore hole termination implemented at `9de39833aeeef1c1bb64d1bb0a2abc82902c80e3` (RED at `635539c`): a second concentric sketch circle extrudes to its own depth and fuses with the full-depth bore tool before one cut, rejecting a counterbore at least as deep as the hole (degenerate) or missing `profileEntityIds`. Verified against the real kernel: fused-tool removed volume matches the hand-computed bore-plus-annular-extra expectation exactly.
+
+- Countersink hole termination implemented at `259c38e9d055a8feb49cd72a4a5d45260d8ac9d0` (RED at `addb655`), resolving the deferred conical-geometry question: `CadExactKernel` gains `placeAlongAxis(shape, origin, direction)`, positioning a canonical +Z-axis primitive at an arbitrary 3D placement via `occt-wasm`'s raw `rotate`/`translate`, using a new pure `alignmentRotation()` in `sketch-profile.ts` (property-tested against an independently-implemented Rodrigues rotation, including the ambiguous-axis antiparallel case). Countersink itself fuses a `kernel.cone()` frustum (sized from a concentric sketch circle and an included angle, narrow end matching the bore radius) with the full-depth bore before one cut — mutually exclusive with counterbore, rejects an out-of-range angle, an undersized diameter, a non-circle profile, or missing parameters. Verified against the real kernel two ways: total removed volume matches a hand-computed frustum-plus-remaining-bore expectation, and — since that volume is orientation-invariant by construction — a probe-cylinder check independently proves the wide end lands at the surface rather than buried mid-depth.
 
 ## Freshness invariant
 
