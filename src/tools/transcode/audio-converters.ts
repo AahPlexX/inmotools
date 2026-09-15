@@ -44,6 +44,10 @@ export function registerAudioConverters(): void {
         });
         if (target.id === 'mp3') {
           const tags = audioTagsFrom(options);
+          const coverFile = typeof File !== 'undefined' && options.coverArt instanceof File ? options.coverArt : undefined;
+          if (coverFile) {
+            tags.coverArt = { bytes: new Uint8Array(await coverFile.arrayBuffer()), mime: coverFile.type || 'image/jpeg' };
+          }
           if (hasTagOptions(tags)) bytes = await writeId3Tags(bytes, tags);
         }
         return [bytesArtifact(swapExtension(input.fileName, target.extension), bytes, target.mime)];

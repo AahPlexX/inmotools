@@ -53,6 +53,7 @@ type OptionField =
   | { kind: 'text'; key: string; label: string; placeholder?: string }
   | { kind: 'number'; key: string; label: string; min?: number; max?: number; step?: number }
   | { kind: 'checkbox'; key: string; label: string }
+  | { kind: 'file'; key: string; label: string; accept?: string }
   | { kind: 'select'; key: string; label: string; options: Array<{ value: string; label: string }> };
 
 const AUDIO_TRANSCODE_OPTIONS: OptionField[] = [
@@ -175,6 +176,7 @@ const TARGET_OPTIONS: Record<string, OptionField[]> = {
     { kind: 'text', key: 'tagAlbum', label: 'ID3 album', placeholder: 'Optional' },
     { kind: 'text', key: 'tagYear', label: 'ID3 year', placeholder: 'Optional' },
     { kind: 'text', key: 'tagGenre', label: 'ID3 genre', placeholder: 'Optional' },
+    { kind: 'file', key: 'coverArt', label: 'Embedded album art (JPEG/PNG)', accept: 'image/jpeg,image/png' },
   ],
   ogg: AUDIO_TRANSCODE_OPTIONS,
   flac: AUDIO_TRANSCODE_OPTIONS,
@@ -562,6 +564,20 @@ function renderField(field: OptionField, options: ConversionOptions, apply: (key
           onChange={(event) => apply(field.key, event.target.checked)}
         />
         {field.label}
+      </label>
+    );
+  }
+  if (field.kind === 'file') {
+    const chosen = value instanceof File ? value.name : '';
+    return (
+      <label key={field.key}>
+        {field.label}
+        <input
+          type="file"
+          accept={field.accept}
+          onChange={(event) => apply(field.key, event.target.files?.[0] ?? undefined)}
+        />
+        {chosen ? <span className="tc-option-note">{chosen}</span> : null}
       </label>
     );
   }

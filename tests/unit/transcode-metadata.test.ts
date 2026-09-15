@@ -226,6 +226,26 @@ describe('ID3 tag studio helpers (F35)', () => {
     expect(String.fromCharCode(tagged[0], tagged[1], tagged[2])).toBe('ID3');
     expect(tagged.length).toBeGreaterThan(mp3.length);
   });
+
+  it('embeds album art as an APIC frame', async () => {
+    const frame = new Uint8Array(417).fill(0);
+    frame[0] = 0xff;
+    frame[1] = 0xfb;
+    frame[2] = 0x90;
+    frame[3] = 0x00;
+    const mp3 = new Uint8Array(417 * 2);
+    mp3.set(frame, 0);
+    mp3.set(frame, 417);
+
+    // Tiny synthetic PNG payload (magic + IHDR marker only; content is opaque to ID3).
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
+    const tagged = await writeId3Tags(mp3, { title: 'With Art', coverArt: { bytes: png, mime: 'image/png' } });
+
+    const text = Buffer.from(tagged).toString('latin1');
+    expect(text).toContain('APIC');
+    const artOffset = text.indexOf(Buffer.from(png).toString('latin1'));
+    expect(artOffset).toBeGreaterThan(10);
+  });
 });
 
 describe('waveform exporter (F23)', () => {
