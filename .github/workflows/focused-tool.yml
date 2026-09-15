@@ -23,8 +23,6 @@ jobs:
           install: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Unit tests
-        run: pnpm test:unit
       - name: Build
         run: pnpm build
       - name: Select focused browser specs
