@@ -163,6 +163,9 @@ importers:
       '@replit/codemirror-vim':
         specifier: 6.4.0
         version: 6.4.0(@codemirror/commands@6.11.0)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
+      '@spglib/moyo-wasm':
+        specifier: 0.16.0
+        version: 0.16.0
       '@tonejs/midi':
         specifier: 2.0.28
         version: 2.0.28
@@ -1504,6 +1507,9 @@ packages:
     resolution: {integrity: sha512-at8QVep6S3h5Y6gSbdGU06bRY5WJkf6WUduM9YtvYMbYhB1MOFfUgc6kehitQXzOtMSaT70q7f9ydPhpqu821w==}
     cpu: [x64]
     os: [win32]
+
+  '@spglib/moyo-wasm@0.16.0':
+    resolution: {integrity: sha512-QT0vF5OS/DkdQoEvT8NJSMG/ImPh3If9I2JzvUMHuIblK3uHP6PlmRVLeZhdG/pNHX1C7/9XoPzOvo0dzg7d9g==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -5423,6 +5429,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.63.1':
     optional: true
+
+  '@spglib/moyo-wasm@0.16.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 
