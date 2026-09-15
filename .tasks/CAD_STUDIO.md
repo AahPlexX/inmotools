@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `ef799e3180ace74108c29559e19f2681dc6771e8`
+**Last tracked implementation commit:** `b55cdfcd1d2a79ace77647acc67ffd426ebdd68b`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -103,7 +103,7 @@ A capability counts only when production behavior exists, relevant validation pa
 
 - `hole throughAll` implemented at `1a56582b9f4f196f8b284dab27d716bc875ae50f` (RED at `9050791`): tool sized from the body's bounding diagonal + margin; `depth`/`throughAll` now mutually required (no silent default). Verified against the real kernel: removes exactly `π·r²·height`, unaffected by tool oversize. Counterbore/countersink remain deferred (need a second concentric sketch circle + fuse composition — larger slice, not yet scoped).
 
-- `CadSketchViewerProps` contract defined at `cfceaba` — standalone, not yet mounted in `CadWorkspace`. Dispatched a subagent (isolated worktree, own branch `feat/cad-studio-sketch-viewer`) to build the real SVG implementation against it; pending review/merge.
+- `CadSketchViewerProps` contract defined at `cfceaba` — standalone, not yet mounted in `CadWorkspace`. `CadSketchViewer.tsx` (real SVG rendering, all 7 entity kinds, arc/elliptical-arc sweep flags, construction styling, click/keyboard selection) reviewed and merged at `b55cdfcd1d2a79ace77647acc67ffd426ebdd68b`. The arc-sweep sign convention is independently proven, not just asserted: a property test reconstructs the rendered SVG arc's center via the W3C endpoint-to-center formula (implemented from scratch, not reused from the code under test) across randomized cases and checks it matches. Splines render as a disclosed fit-point polyline, not an evaluated NURBS curve. 38 new unit tests, `tsc` clean, 284/285 CAD tests (expected stale-ledger guard, now corrected).
 - `CadWorkspace`'s `onParameterChange` was a no-op since G7 scaffolding landed — parameter edits did nothing. Fixed at `ef799e3180ace74108c29559e19f2681dc6771e8` (RED at `1e63918`): new `setFeatureParameter()` in `project-engine.ts` mirrors `setFeatureSuppressed`, wired through history (undo/redo covers it free).
 
 ## Freshness invariant
