@@ -22,8 +22,8 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 - Branch creation base: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Current milestone: **B — renderer and editor-layer foundation — STARTED**
-- Current gate: **high-DPI PDF.js rendering is verified; numeric zoom is live but fit-width/fit-page/actual-size modes remain; next smallest renderer slice is reusable PDF.js text extraction/search/select rather than a second parser/loader**
-- Current counts: **26 verified / 6 started / 114 planned / 0 blocked / 0 excluded capabilities**
+- Current gate: **high-DPI rendering and selectable/copyable PDF.js text are verified; current-page search is live but whole-document result navigation remains; numeric zoom still needs fit-width/fit-page/actual-size modes**
+- Current counts: **27 verified / 7 started / 112 planned / 0 blocked / 0 excluded capabilities**
 - Current integration state: branch remains intentionally isolated and has diverged substantially from current `main`; PR #31 is not presently mergeable. Reconciliation is a separate conflict-safe Milestone H task, not a reason to rewrite the branch while parallel agents are active.
 - Existing `pdf-sanitizer` route/deep link remains the workstation route.
 
@@ -53,18 +53,20 @@ Implemented/proven:
 
 - exact `pdfjs-dist@6.3.289` runtime dependency with frozen-lock/supply-chain validation;
 - worker imported through Vite `?url`, producing a real fingerprinted `pdf.worker.min-*.mjs` asset under the `/inmotools/` production base;
-- one reusable `PdfJsDocumentSession` owns `PDFDocumentLoadingTask`, page rendering, cancellation, cleanup, and worker destruction;
+- one reusable `PdfJsDocumentSession` owns `PDFDocumentLoadingTask`, page rendering, text extraction, cancellation, cleanup, and worker destruction;
 - active source/page preview with previous/next controls;
 - bounded high-DPI canvas backing store separated from CSS size, capped at 3× device pixel ratio for display-memory safety;
-- numeric zoom from 25%–500%; stale renders are cancelled rather than layered;
-- renderer lifecycle/math contracts are unit tested and the production build is verified;
-- focused desktop/mobile browser acceptance is green after correcting two stale test-harness locators/routes introduced by the new viewer surface.
+- numeric zoom from 25%–500%; stale canvas/text renders are cancelled rather than layered;
+- selectable/copyable DOM text layer built with the public PDF.js `TextLayer` API and scoped workstation CSS;
+- bounded explicit current-page text search with stale-request guards and capped result counts;
+- renderer/text lifecycle contracts are unit tested and production builds are verified;
+- focused desktop/mobile browser acceptance proves real-worker rendering, native text selection, current-page search, page navigation, zoom rerendering, and all earlier PDF flows together.
 
 Still required for Milestone B exit:
 
 - thumbnails;
 - full zoom modes (fit width, fit page, actual size) and explicit pan behavior;
-- text extraction/search plus selectable/copyable PDF.js text layer;
+- whole-document text search with result-to-page navigation;
 - editor object model for text/image/vector placement;
 - transforms, alignment/distribution/snap, layers, undo/redo history;
 - mobile/keyboard alternatives and final renderer cancellation/memory/reflow Gauntlet.
@@ -100,6 +102,7 @@ Already hardened:
 - reset/default form semantics persist independently from current values;
 - rich form inventory mirrors PDF widget-page fallback and proves input bytes are not mutated;
 - overlay inputs bound opacity/rotation/image width/Bates sequence/margins and use explicit deterministic date tokens;
+- PDF.js render and text-layer work share one session/worker lifecycle; result counts and device-pixel backing scale are explicitly bounded;
 - focused PDF gates have been run before unchanged global gates when moving-main failures otherwise obscured PDF evidence.
 
 Still required: reconcile with current `main` without discarding parallel work, fresh full-surface/adversarial/security review, exact-main workflows green, and Pages deployment green.
@@ -116,6 +119,7 @@ Still required: reconcile with current `main` without discarding parallel work, 
 - **15** Rotate selected pages 90/180/270 degrees — `verified`
 - **19** MediaBox/CropBox/BleedBox/TrimBox inspection/editing — `verified`
 - **24** High-DPI PDF.js page rendering with bounded backing pixels and real bundled worker — `verified`
+- **28** Select/copy PDF text through a selectable PDF.js DOM text layer — `verified`
 - **58** Existing AcroForm field inventory — `verified`
 - **60** Text-field authoring — `verified`
 - **61** Checkbox authoring — `verified`
@@ -139,6 +143,7 @@ Still required: reconcile with current `main` without discarding parallel work, 
 
 - **3** Document diagnostics summary — `started` (page count/size/forms/common metadata/page geometry/attachments exist; active-content and richer encryption/security detail remain)
 - **25** Zoom modes — `started` (25%–500% numeric zoom is browser-verified; fit width, fit page, and actual-size modes remain)
+- **27** Text search — `started` (bounded current-page search is desktop/mobile browser-verified; whole-document result navigation remains)
 - **121** Save edited full PDF — `started` (current supported edits export; the complete editor model is not yet present)
 - **129** Per-export filename editor and deterministic batch-renaming pattern — `started` (filename editor is live; batch pattern remains)
 - **142** Responsive drawer/sheet layout for phone/tablet/split-screen/zoom/enlarged text — `started` (foundation passes 320 CSS-pixel reflow; later workstation rails/drawers remain)
@@ -146,7 +151,7 @@ Still required: reconcile with current `main` without discarding parallel work, 
 
 ### Planned
 
-All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–23, 26–57, 59, 66–70, 72–74, 80–81, 84–95, 97–120, 122–128, 132–141, 143, 145–146**.
+All capability IDs not listed above remain `planned`: **2, 4, 6–8, 10, 13–14, 16–18, 20–23, 26, 29–57, 59, 66–70, 72–74, 80–81, 84–95, 97–120, 122–128, 132–141, 143, 145–146**.
 
 No capability is currently `blocked` or `excluded`. Architectural exclusions in the design constrain claims and implementation approach; they are not numbered capabilities.
 
@@ -155,7 +160,7 @@ No capability is currently `blocked` or `excluded`. Architectural exclusions in 
 Active exact PDF runtime dependencies:
 
 - `pdf-lib@1.17.1` — deterministic high-level PDF writer/editor foundation;
-- `pdfjs-dist@6.3.289` — renderer/text-display foundation; frozen-lock install, production worker asset, unit lifecycle checks, and focused browser execution are proven.
+- `pdfjs-dist@6.3.289` — renderer/text-display foundation; frozen-lock install, production worker asset, unit lifecycle checks, selectable text, and focused browser execution are proven.
 
 Milestone-gated dependencies not yet added:
 
@@ -174,4 +179,5 @@ Every introduced package remains exact-pinned and must pass frozen-lock and supp
 - 2026-09-13 — Advanced form properties/export-impact/inventory were hardened through `34730133278`, `34798238251`, `34798518917`, and `34798685152`.
 - 2026-09-14 — Milestone A focused merge-ref acceptance `34853637913`: **26/26 PDF unit**, production build, and **30/30 PDF browser** executions green; Milestone A promoted to verified.
 - 2026-09-14 — Renderer pre-final run `34855762778`: **30/30 PDF unit tests** and production build green; Vite emitted the real `pdf.worker.min-*.mjs` asset. Browser failures were isolated to a base-path route in the new renderer spec and two filename locators made ambiguous by the new preview-source option, not to renderer engine assertions.
-- 2026-09-15 — Renderer confirmation run `35019607950`: after the two minimal test-harness corrections, PDF unit acceptance, production build, and the complete focused PDF browser acceptance all passed. The unchanged repository unit suite and production build also passed afterward; the full repository browser suite continued as the remaining branch-wide check.
+- 2026-09-15 — Renderer confirmation run `35019607950`: after the two minimal test-harness corrections, PDF unit acceptance, production build, and the complete focused PDF browser acceptance all passed. The unchanged repository unit suite and production build also passed afterward.
+- 2026-09-15 — Selectable-text/search run `35020470889`: **33/33 focused PDF unit tests**, production build, and **32/32 focused desktop/mobile PDF browser executions** passed. The renderer test proves a real worker, native DOM text selection/copy, bounded current-page search, page navigation, zoom rerendering, and HiDPI output together. Capability 28 was promoted to `verified`; capability 27 remains `started` until search spans the document and navigates results.
