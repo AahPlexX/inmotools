@@ -22,6 +22,7 @@ import {
 import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
 import {
+  PHOTO_FILE_ACCEPT,
   isPhotoImportFile,
   normalizePhotoImport,
   preparePhotoRaster,
@@ -1557,7 +1558,7 @@ export default function PhotoWorkspace() {
             ref={fileInputRef}
             data-testid="photo-file-input"
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff,image/*"
+            accept={PHOTO_FILE_ACCEPT}
             onChange={(event) => {
               if (event.target.files) void importPhotoFiles(event.target.files, 'file-input');
               event.target.value = '';

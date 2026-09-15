@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makePhotoTiff } from '../fixtures/photo-tiff';
+import { makePhotoDng } from '../fixtures/photo-dng';
 import {
   PhotoImportError,
   normalizePhotoImport,
@@ -16,7 +17,10 @@ function file(name: string, type: string, contents = 'pixels') {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Photo Studio import contract', () => {
-  test('terminates a stalled TIFF worker at the deadline rather than blocking the decoder queue forever', async () => {
+  test.each([
+    { extension: 'tif', bytes: makePhotoTiff(), type: 'image/tiff', seconds: 20 },
+    { extension: 'dng', bytes: makePhotoDng(), type: 'image/x-adobe-dng', seconds: 30 },
+  ])('terminates a stalled .$extension worker at its deadline rather than blocking the decoder queue forever', async ({ extension, bytes, type, seconds }) => {
     vi.useFakeTimers();
     let started = false;
     let terminated = false;
@@ -25,10 +29,10 @@ describe('Photo Studio import contract', () => {
       terminate() { terminated = true; }
     });
     vi.stubGlobal('OffscreenCanvas', class {});
-    const input = new File([makePhotoTiff()], 'deadline.tif', { type: 'image/tiff' });
-    const rejection = expect(preparePhotoRaster(input)).rejects.toThrow(/20-second time limit/);
+    const input = new File([bytes], `deadline.${extension}`, { type });
+    const rejection = expect(preparePhotoRaster(input)).rejects.toThrow(new RegExp(`${seconds}-second time limit`));
     await vi.waitFor(() => expect(started).toBe(true));
-    await vi.advanceTimersByTimeAsync(20_000);
+    await vi.advanceTimersByTimeAsync(seconds * 1000);
     await rejection;
     expect(terminated).toBe(true);
   });
@@ -43,7 +47,10 @@ describe('Photo Studio import contract', () => {
     expect(normalizePhotoImport([file('notes.tif', 'text/plain'), tiff], 'drop').file).toBe(tiff);
   });
 
-  test('signature detection shares one lazy TIFF task and serializes distinct sources', async () => {
+  test.each([
+    { extension: 'tif', bytes: makePhotoTiff(), type: 'image/tiff', worker: 'tiff.worker' },
+    { extension: 'dng', bytes: makePhotoDng(), type: 'image/jpeg', worker: 'raw.worker' },
+  ])('signature detection shares one lazy .$extension task and serializes distinct sources', async ({ extension, bytes, type, worker }) => {
     const workers: FakeTiffWorker[] = [];
     class FakeTiffWorker {
       onmessage: ((event: { data: { blob?: Blob; notice?: string; error?: string } }) => void) | null = null;
@@ -51,14 +58,20 @@ describe('Photo Studio import contract', () => {
       onmessageerror: (() => void) | null = null;
       buffer: ArrayBuffer | null = null;
       terminated = false;
-      constructor() { workers.push(this); }
-      postMessage(buffer: ArrayBuffer) { this.buffer = buffer; }
+      constructor(url: URL, options: WorkerOptions) {
+        expect(String(url)).toContain(worker); expect(options.type).toBe('module');
+        workers.push(this);
+      }
+      postMessage(buffer: ArrayBuffer, transfer: Transferable[]) {
+        expect(transfer).toEqual([buffer]); expect(new Uint8Array(buffer)).toEqual(bytes);
+        this.buffer = buffer;
+      }
       terminate() { this.terminated = true; }
     }
     vi.stubGlobal('Worker', FakeTiffWorker);
     vi.stubGlobal('OffscreenCanvas', class {});
-    const first = new File([makePhotoTiff()], 'signature.jpg', { type: 'image/jpeg' });
-    const second = new File([makePhotoTiff()], 'next.tif', { type: 'image/tiff' });
+    const first = new File([bytes], 'signature.jpg', { type: 'image/jpeg' });
+    const second = new File([bytes], `next.${extension}`, { type });
     const task = preparePhotoRaster(first);
     expect(preparePhotoRaster(first)).toBe(task);
     const next = preparePhotoRaster(second);

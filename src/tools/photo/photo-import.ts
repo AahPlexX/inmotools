@@ -1,3 +1,7 @@
+import { detectRawSource, RAW_EXTENSION } from './codecs/raw-decoder';
+
+export const PHOTO_FILE_ACCEPT = 'image/*,.tif,.tiff,.dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.pef,.srw';
+
 export type PhotoImportSource = 'file-input' | 'drop' | 'clipboard';
 
 export type PhotoImportErrorCode =
@@ -22,11 +26,15 @@ export function releasePhotoRaster(file: Blob): void {
   rasterCache.delete(file);
 }
 
-/** Preserve the source; all consumers share one bounded, lazy TIFF raster. */
+/** Preserve the source; all consumers share one lazy codec raster. */
 export function preparePhotoRaster(file: Blob): Promise<PhotoImportRaster> {
   const existing = rasterCache.get(file);
   if (existing) return existing;
   const task = (async () => {
+    if (await detectRawSource(file)) {
+      const { prepareRawSource } = await import('./codecs/raw-source');
+      return prepareRawSource(file);
+    }
     const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     const hasTiffSignature = signature.length === 4 && (
       (signature[0] === 73 && signature[1] === 73 && [42, 43].includes(signature[2]) && signature[3] === 0)
@@ -72,8 +80,8 @@ const IMAGE_EXTENSION = /\.(?:avif|bmp|gif|heic|heif|jpe?g|jfif|png|tiff?|webp)$
 export function isPhotoImportFile(file: Pick<File, 'name' | 'type'>): boolean {
   const explicitType = file.type.trim().toLowerCase();
   return explicitType
-    ? explicitType.startsWith('image/') || (explicitType === 'application/octet-stream' && /\.tiff?$/i.test(file.name))
-    : IMAGE_EXTENSION.test(file.name);
+    ? explicitType.startsWith('image/') || (explicitType === 'application/octet-stream' && (/\.tiff?$/i.test(file.name) || RAW_EXTENSION.test(file.name)))
+    : IMAGE_EXTENSION.test(file.name) || RAW_EXTENSION.test(file.name);
 }
 
 function noImageError(source: PhotoImportSource): PhotoImportError {

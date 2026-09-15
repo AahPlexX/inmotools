@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { makePhotoTiff } from '../fixtures/photo-tiff';
+import { makePhotoDng } from '../fixtures/photo-dng';
 import { readFile } from 'node:fs/promises';
 
 const FIXTURE_PNG = Buffer.from(
@@ -21,6 +22,102 @@ async function openNamedFixture(page: Page, name: string) {
   await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
   await expect(page.getByTestId('photo-preview')).toBeVisible();
 }
+
+test('RAW DNG imports through the actual worker and retains its original source through recovery and export', async ({ page }) => {
+  await openStudio(page);
+  await page.setInputFiles('[data-testid="photo-file-input"]', {
+    name: 'synthetic-sensor.dng', mimeType: 'application/octet-stream', buffer: Buffer.from(makePhotoDng()),
+  });
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('32 × 32');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-codec-notice')).toContainText(/RAW source preserved.*16-bit.*8-bit/);
+  await page.getByLabel('Exposure value').fill('1');
+  await page.getByLabel('Exposure value').press('Enter');
+  await expect(page.getByTestId('photo-project-save-state')).toContainText('Saved locally');
+  const persisted = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('inmotools.photo-studio');
+      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+    });
+    const read = <T,>(store: string, action: (objectStore: IDBObjectStore) => IDBRequest<T>) => new Promise<T>((resolve, reject) => {
+      const request = action(db.transaction(store, 'readonly').objectStore(store));
+      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+    });
+    try {
+      const projects = await read('projects', (store) => store.getAll());
+      const project = projects.find((entry) => entry.source.name === 'synthetic-sensor.dng');
+      let source: Blob;
+      if (project.source.storage === 'opfs') {
+        const directory = await (await navigator.storage.getDirectory()).getDirectoryHandle('inmotools-photo-studio');
+        source = await (await directory.getFileHandle(project.source.key)).getFile();
+      } else source = await read('sources', (store) => store.get(project.source.key));
+      return [...new Uint8Array(await source.arrayBuffer())];
+    } finally { db.close(); }
+  });
+  expect(persisted).toEqual([...makePhotoDng()]);
+  await page.reload();
+  await page.getByTestId('photo-recovery-prompt').getByRole('button', { name: 'Recover project' }).click();
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByLabel('Exposure value')).toHaveValue('1');
+  await expect(page.getByTestId('photo-codec-notice')).toContainText('RAW source preserved');
+  await page.getByRole('button', { name: 'Before/after', exact: true }).click();
+  const original = page.getByTestId('photo-before-overlay').locator('img');
+  await expect(original).toBeVisible();
+  expect(await original.evaluate((image) => {
+    const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+    const context = canvas.getContext('2d')!; context.drawImage(image as HTMLImageElement, 0, 0);
+    return [...context.getImageData(16, 16, 1, 1).data];
+  })).toEqual([137, 137, 137, 255]);
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('File format', { exact: true }).selectOption('image/png');
+  const downloaded = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download photo', exact: true }).click();
+  const bytes = await readFile((await (await downloaded).path())!);
+  const output = await page.evaluate(async (bytes) => {
+    const bitmap = await createImageBitmap(new Blob([Uint8Array.from(bytes)], { type: 'image/png' }));
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const context = canvas.getContext('2d')!; context.drawImage(bitmap, 0, 0);
+      return { width: bitmap.width, height: bitmap.height, pixel: [...context.getImageData(16, 16, 1, 1).data] };
+    } finally { bitmap.close(); }
+  }, [...bytes]);
+  expect(output).toEqual({ width: 32, height: 32, pixel: [188, 188, 188, 255] });
+});
+
+test('malformed RAW leaves the active photo intact and a subsequent DNG import succeeds', async ({ page }) => {
+  await openStudio(page); await openNamedFixture(page, 'preserve-native.png');
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'damaged.cr3', mimeType: 'application/octet-stream', buffer: Buffer.alloc(12) });
+  await expect(page.locator('.photo-status-message')).toContainText(/RAW.*failed/i);
+  await expect(page.locator('.photo-status-strip')).toContainText('preserve-native.png');
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'after-failure.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.from(makePhotoDng()) });
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('32 × 32');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+});
+
+test('RAW decoding is on-demand and a cached decoder can recover a project offline', async ({ page, context }) => {
+  await openStudio(page);
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await page.reload();
+  await openNamedFixture(page, 'native-before-raw.png');
+  expect(await page.evaluate(async () => {
+    const cache = await caches.open('photo-raw-codecs'); return (await cache.keys()).length;
+  })).toBe(0);
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'offline-sensor.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.from(makePhotoDng()) });
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('32 × 32');
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-project-save-state')).toContainText('Saved locally');
+  await expect.poll(() => page.evaluate(async () => {
+    const cache = await caches.open('photo-raw-codecs'); return (await cache.keys()).length;
+  })).toBe(2);
+  await context.setOffline(true);
+  await page.reload();
+  await page.getByTestId('photo-recovery-prompt').getByRole('button', { name: 'Recover project' }).click();
+  await expect(page.getByTestId('photo-preview')).toBeVisible();
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('32 × 32');
+  await expect(page.getByTestId('photo-codec-notice')).toContainText('RAW source preserved');
+});
 
 test('TIFF shares preview, comparison, export and durable recovery while preserving original source bytes', async ({ page }) => {
   await openStudio(page);
@@ -115,15 +212,18 @@ test('unsupported TIFF preserves the current document and gives variant-specific
   await expect(page.locator('.photo-status-strip')).toContainText('keep-me.png');
 });
 
-test('a delayed TIFF decoder cannot replace a newer native import', async ({ page }) => {
-  await page.addInitScript(() => {
+for (const codec of [
+  { format: 'TIFF', worker: 'tiff.worker-', name: 'delayed.tif', mime: 'image/tiff', bytes: makePhotoTiff() },
+  { format: 'RAW', worker: 'raw.worker-', name: 'delayed.dng', mime: 'image/x-adobe-dng', bytes: makePhotoDng() },
+]) test(`a delayed ${codec.format} decoder cannot replace a newer native import`, async ({ page }) => {
+  await page.addInitScript((worker) => {
     const NativeWorker = window.Worker;
     const state = window as unknown as { releaseTiff?: () => void; tiffCompleted?: boolean };
     window.Worker = class extends NativeWorker {
       private readonly isTiff: boolean;
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
-        this.isTiff = String(url).includes('tiff.worker-');
+        this.isTiff = String(url).includes(worker);
         if (this.isTiff) this.addEventListener('message', () => { state.tiffCompleted = true; });
       }
       postMessage(message: unknown, transfer: Transferable[]): void {
@@ -131,9 +231,9 @@ test('a delayed TIFF decoder cannot replace a newer native import', async ({ pag
         else super.postMessage(message, transfer);
       }
     };
-  });
+  }, codec.worker);
   await openStudio(page);
-  await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'delayed.tif', mimeType: 'image/tiff', buffer: Buffer.from(makePhotoTiff()) });
+  await page.setInputFiles('[data-testid="photo-file-input"]', { name: codec.name, mimeType: codec.mime, buffer: Buffer.from(codec.bytes) });
   await expect.poll(() => page.evaluate(() => typeof (window as unknown as { releaseTiff?: () => void }).releaseTiff)).toBe('function');
   await openNamedFixture(page, 'newer-photo.png');
   await page.evaluate(() => (window as unknown as { releaseTiff: () => void }).releaseTiff());

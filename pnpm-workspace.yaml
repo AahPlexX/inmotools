@@ -1,2 +1,4 @@
 allowBuilds:
   exifreader@4.44.0: true
+overrides:
+  '@colorhythm/libraw-wasm>typed-cstruct': 0.11.0

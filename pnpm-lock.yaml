@@ -105,6 +105,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@colorhythm/libraw-wasm>typed-cstruct': 0.11.0
+
 importers:
 
   .:
@@ -142,6 +145,9 @@ importers:
       '@codemirror/view':
         specifier: 6.43.9
         version: 6.43.9
+      '@colorhythm/libraw-wasm':
+        specifier: 1.1.1
+        version: 1.1.1
       '@duckdb/duckdb-wasm':
         specifier: 1.32.0
         version: 1.32.0
@@ -909,6 +915,9 @@ packages:
 
   '@codemirror/view@6.43.9':
     resolution: {integrity: sha512-sTuUzTpPMFebRhg6dawChoKKgndIwfjmJgKVxBefPElcU2NwQ6AFroupk0SFqEerQyZOGRfDNnSN8Dw/lMAsXw==}
+
+  '@colorhythm/libraw-wasm@1.1.1':
+    resolution: {integrity: sha512-OxqXLhDurX/sM4KL/rR71zjuH0VHBUWCOJ71tLiIxy3ATbIS2KM/8RixT0Gc3RygcsS1T8SXnzdipPqWYSjt9A==}
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
@@ -3846,6 +3855,9 @@ packages:
     resolution: {integrity: sha512-phPGCwqr2+Qo0fwniCE8e4pKnGu/yFb5nD5Y8bf0EEeiI5GklnACYA9GFy/DrAeRrKHXvHn+1SUsOWgJp6RO+g==}
     engines: {node: '>= 0.4'}
 
+  typed-cstruct@0.11.0:
+    resolution: {integrity: sha512-uA/0LwbdAttaUzEzpMNvUaEw9YHoGOe6/yzq3LonnHjVL8pHQvb706T1GhJafB8fpUIeXI3akFheiDeO37z1qA==}
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -4966,6 +4978,10 @@ snapshots:
       crelt: 1.0.7
       style-mod: 4.1.3
       w3c-keyname: 2.2.8
+
+  '@colorhythm/libraw-wasm@1.1.1':
+    dependencies:
+      typed-cstruct: 0.11.0
 
   '@dimforge/rapier3d-compat@0.12.0': {}
 
@@ -8104,6 +8120,8 @@ snapshots:
       is-typed-array: 1.1.15
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
+
+  typed-cstruct@0.11.0: {}
 
   typescript@7.0.2:
     optionalDependencies:

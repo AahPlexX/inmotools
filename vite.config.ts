@@ -45,6 +45,9 @@ export default defineConfig({
         globIgnores: [
           'pyodide/**',
           '**/duckdb-*.wasm',
+          // Camera RAW decoding is optional; do not download its WASM for every visitor.
+          'assets/libraw-*.wasm',
+          'assets/raw.worker-*.js',
           'assets/diagram.worker-*.js',
           'assets/mermaid-parser.core-*.js',
           'assets/cytoscape.esm-*.js',
@@ -60,6 +63,15 @@ export default defineConfig({
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(?:libraw-[^/]+\.wasm|raw\.worker-[^/]+\.js)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'photo-raw-codecs',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 4, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
           {
             urlPattern: /\/duckdb-.*\.wasm$/,
             handler: 'CacheFirst',

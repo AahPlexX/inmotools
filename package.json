@@ -15,6 +15,7 @@
     "prepare:pyodide": "node scripts/copy-pyodide.mjs"
   },
   "dependencies": {
+    "@colorhythm/libraw-wasm": "1.1.1",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.0",
     "@codemirror/lang-json": "6.0.2",

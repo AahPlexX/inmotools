@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { downloadBlob } from '../../lib/download';
 import { processPhotoBatch, type PhotoBatchItemStatus } from './photo-batch';
-import { isPhotoImportFile, preparePhotoRaster, releasePhotoRaster } from './photo-import';
+import { PHOTO_FILE_ACCEPT, isPhotoImportFile, preparePhotoRaster, releasePhotoRaster } from './photo-import';
 import {
   createPhotoExport,
   photoMetadataForPolicy,
@@ -373,7 +373,7 @@ export default function PhotoExportDialog({
           <p className="photo-export-note">Files are rendered one at a time with the same format, resize, sharpening, and metadata policy. Each file is independently constrained to verified-safe local canvas limits, a failure is isolated to that file, and full-resolution output blobs are released after each download.</p>
           <label className="photo-open-label photo-batch-picker">
             Choose batch photos
-            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/tiff,.tif,.tiff,image/*" onChange={chooseBatch} />
+            <input type="file" multiple accept={PHOTO_FILE_ACCEPT} onChange={chooseBatch} />
           </label>
           <div className="photo-inline-actions">
             <span>{batchFiles.length} queued</span>
