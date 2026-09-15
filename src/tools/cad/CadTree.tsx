@@ -1,12 +1,28 @@
 import type { CadTreeProps } from './cad-workspace-types';
 
-export default function CadTree({ project, selection, onSelectFeature, onToggleSuppressed }: CadTreeProps) {
-  if (project.features.length === 0) {
+export default function CadTree({ project, selection, onSelectFeature, onToggleSuppressed, onSelectSketch }: CadTreeProps) {
+  if (project.features.length === 0 && project.sketches.length === 0) {
     return <p className="cad-tree-empty">No features yet. Create a sketch or primitive to begin.</p>;
   }
 
   return (
     <ul className="cad-tree" role="tree" aria-label="Feature tree">
+      {project.sketches.map((sketch) => {
+        const isSelected = selection?.kind === 'sketch' && selection.id === sketch.id;
+        return (
+          <li key={sketch.id} role="treeitem" aria-selected={isSelected}>
+            <button
+              type="button"
+              className={`cad-tree-item${isSelected ? ' cad-tree-item-selected' : ''}`}
+              onClick={() => onSelectSketch(isSelected ? null : sketch.id)}
+              aria-current={isSelected ? 'true' : undefined}
+            >
+              <span className="cad-tree-item-label">{sketch.label}</span>
+              <span className="cad-tree-item-type">sketch</span>
+            </button>
+          </li>
+        );
+      })}
       {project.features.map((feature) => {
         const isSelected = selection?.kind === 'feature' && selection.id === feature.id;
         return (

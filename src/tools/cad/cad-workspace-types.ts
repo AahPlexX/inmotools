@@ -7,7 +7,7 @@ import type { CadSketch } from './sketch-types';
  * selection, addressed by kind + id rather than duplicating per-surface
  * state. Face/edge/vertex sub-shape selection is a later milestone.
  */
-export type CadSelectionKind = 'feature' | 'body';
+export type CadSelectionKind = 'feature' | 'body' | 'sketch';
 
 export interface CadSelection {
   kind: CadSelectionKind;
@@ -28,6 +28,7 @@ export interface CadTreeProps {
   selection: CadSelection | null;
   onSelectFeature(featureId: string | null): void;
   onToggleSuppressed(featureId: string, suppressed: boolean): void;
+  onSelectSketch(sketchId: string | null): void;
 }
 
 export interface CadInspectorProps {
@@ -41,14 +42,11 @@ export function selectedFeature(project: CadProject, selection: CadSelection | n
   return project.features.find((feature) => feature.id === selection.id) ?? null;
 }
 
-/**
- * Standalone read-only sketch viewer contract. Deliberately not folded into
- * `CadSelection`/`CadWorkspace` yet: this is Milestone B's first slice
- * (visualize an already-solved sketch), the same way CadViewport started as
- * render-only before selection/highlighting grew into the shared model.
- * When/how CadWorkspace mounts this (a mode switch, a split pane, a panel
- * under the inspector) is an explicit follow-up decision, not implied here.
- */
+export function selectedSketch(project: CadProject, selection: CadSelection | null): CadSketch | null {
+  if (!selection || selection.kind !== 'sketch') return null;
+  return project.sketches.find((sketch) => sketch.id === selection.id) ?? null;
+}
+
 export interface CadSketchViewerProps {
   sketch: CadSketch;
   selectedEntityId: string | null;

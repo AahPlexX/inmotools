@@ -4,10 +4,11 @@ import type { CadKernelBodyResult, CadKernelResponse } from './kernel-contract';
 import { CadKernelWorkerClient, type CadKernelWorkerFactory } from './kernel-worker-client';
 import { createBrowserCadKernelWorkerFactory } from './cad-worker-factory';
 import { commitCadProject, createCadProject, redoCadProject, setFeatureParameter, setFeatureSuppressed, undoCadProject } from './project-engine';
-import type { CadSelection } from './cad-workspace-types';
+import { selectedSketch, type CadSelection } from './cad-workspace-types';
 import CadViewport from './CadViewport';
 import CadTree from './CadTree';
 import CadInspector from './CadInspector';
+import CadSketchViewer from './CadSketchViewer';
 
 const HISTORY_LIMIT = 100;
 
@@ -24,6 +25,7 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
   const [history, setHistory] = useState<CadProjectHistory>(initialHistory);
   const [bodies, setBodies] = useState<readonly CadKernelBodyResult[]>([]);
   const [selection, setSelection] = useState<CadSelection | null>(null);
+  const [sketchEntitySelection, setSketchEntitySelection] = useState<string | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
   const [kernelError, setKernelError] = useState<string | null>(null);
   const clientRef = useRef<CadKernelWorkerClient | null>(null);
@@ -68,6 +70,11 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
     setSelection(bodyId ? { kind: 'body', id: bodyId } : null);
   }
 
+  function selectSketch(sketchId: string | null) {
+    setSelection(sketchId ? { kind: 'sketch', id: sketchId } : null);
+    setSketchEntitySelection(null);
+  }
+
   function toggleSuppressed(featureId: string, suppressed: boolean) {
     setHistory((current) => commitCadProject(
       current,
@@ -92,6 +99,8 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
     setHistory((current) => redoCadProject(current));
   }
 
+  const activeSketch = selectedSketch(history.present, selection);
+
   return (
     <div className="cad-workspace" data-testid="cad-workspace">
       <div className="cad-workspace-tree">
@@ -100,10 +109,19 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
           selection={selection}
           onSelectFeature={selectFeature}
           onToggleSuppressed={toggleSuppressed}
+          onSelectSketch={selectSketch}
         />
       </div>
       <div className="cad-workspace-viewport">
-        <CadViewport bodies={bodies} selection={selection} onSelectBody={selectBody} rebuilding={rebuilding} />
+        {activeSketch ? (
+          <CadSketchViewer
+            sketch={activeSketch}
+            selectedEntityId={sketchEntitySelection}
+            onSelectEntity={setSketchEntitySelection}
+          />
+        ) : (
+          <CadViewport bodies={bodies} selection={selection} onSelectBody={selectBody} rebuilding={rebuilding} />
+        )}
         {kernelError ? <div className="notice" role="alert">{kernelError}</div> : null}
       </div>
       <div className="cad-workspace-inspector">
