@@ -2,30 +2,32 @@ import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const ROUTE = '/inmotools/#/tools/typing-workstation';
+const APP_ROOT = '/inmotools/';
 const DB_NAME = 'inmotools-typing-workstation';
 
 async function openWorkspace(page: Page) {
   await page.goto(ROUTE);
   const workspace = page.getByTestId('suite-workspace');
-  await expect(workspace.getByRole('heading', { name: 'Typing Workstation', exact: true })).toBeVisible();
+  await expect(workspace).toHaveAttribute('aria-label', 'Typing Workstation workspace');
+  await expect(workspace.getByRole('heading', { name: /^Typing Workstation —/ })).toBeVisible();
   return workspace;
 }
 
 async function clearTypingDatabase(page: Page) {
+  await page.goto(APP_ROOT);
   await page.evaluate(async (dbName) => {
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(dbName);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error ?? new Error('IndexedDB delete failed'));
-      request.onblocked = () => resolve();
+      request.onblocked = () => reject(new Error('IndexedDB delete was blocked'));
     });
   }, DB_NAME);
-  await page.reload();
 }
 
 test('completes a non-timed custom target, persists it, and exports the JSON envelope', async ({ page }) => {
-  const workspace = await openWorkspace(page);
   await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
 
   await workspace.getByLabel('Mode').selectOption('custom');
   await workspace.getByLabel('Duration').selectOption('words');
