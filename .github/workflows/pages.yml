@@ -9,32 +9,59 @@ on:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 jobs:
-  pdf-search-navigation-mount:
+  pdf-branch-acceptance:
     if: github.ref == 'refs/heads/feat/pdf-workstation'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Apply guarded search navigation mount
-        run: node scripts/pdf-search-navigation-mount.mjs
-      - name: Commit viewer callback
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- src/tools/pdf/PdfWorkspace.tsx; then
-            echo 'No PDF viewer callback change was produced.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/tools/pdf/PdfWorkspace.tsx
-          git commit -m 'feat(pdf): connect search results to page navigation'
-          git push origin HEAD:feat/pdf-workstation
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: PDF Workstation unit acceptance
+        run: >-
+          pnpm exec vitest run
+          tests/unit/pdf.test.ts
+          tests/unit/pdf-attachments.test.ts
+          tests/unit/pdf-export-summary.test.ts
+          tests/unit/pdf-form-authoring.test.ts
+          tests/unit/pdf-form-inventory.test.ts
+          tests/unit/pdf-overlays.test.ts
+          tests/unit/pdf-renderer.test.ts
+          tests/unit/pdf-text-search.test.ts
+      - name: PDF Workstation production build
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: PDF Workstation browser acceptance
+        run: >-
+          pnpm exec playwright test
+          tests/e2e/pdf.spec.ts
+          tests/e2e/pdf-export-summary.spec.ts
+          tests/e2e/pdf-form-authoring.spec.ts
+          tests/e2e/pdf-form-inventory.spec.ts
+          tests/e2e/pdf-overlays.spec.ts
+          tests/e2e/pdf-structural-actions.spec.ts
+          tests/e2e/pdf-renderer.spec.ts
+      - name: Upload Playwright failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pdf-document-search-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
 
   validate:
     if: github.ref != 'refs/heads/feat/pdf-workstation'
