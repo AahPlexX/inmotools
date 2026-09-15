@@ -3,6 +3,7 @@ import type { CadExactKernel, CadKernelShape, CadKernelVector3 } from './kernel-
 import {
   buildSketchPath3d,
   buildSketchProfile3d,
+  negate,
   resolveDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
@@ -339,6 +340,34 @@ function mirrorFeature(
   return kernel.mirror(shape, plane.origin, plane.normal);
 }
 
+/**
+ * Simple blind hole: extrudes the sketch's circular profile into a cutting
+ * tool and subtracts it from the dependency body. Composes entirely from
+ * already-verified primitives (profile placement, extrude, cut) instead of
+ * adding new kernel surface area. Counterbore/countersink presets,
+ * through-all termination, and patterned placement are not yet supported.
+ */
+function holeFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const depth = parameterNumber(feature, 'depth');
+  const shape = singleDependencyShape(feature, featureShapes, 'hole');
+  return withProfileFace(feature, project, datumPlanes, kernel, (profile, profile3d) => {
+    const reversed = feature.parameters.reversed === true;
+    const direction: CadKernelVector3 = reversed ? profile3d.normal : negate(profile3d.normal);
+    const tool = kernel.extrude(profile, depth, direction);
+    try {
+      return kernel.cut(shape, tool);
+    } finally {
+      kernel.release(tool);
+    }
+  });
+}
+
 function projectSketch(feature: CadFeature, project: CadProject, sketchId: string, role: string) {
   const sketch = project.sketches.find((candidate) => candidate.id === sketchId);
   if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown ${role} sketch '${sketchId}'.`);
@@ -401,9 +430,7 @@ function extrudeFeature(
   const distance = parameterNumber(feature, 'distance');
   return withProfileFace(feature, project, datumPlanes, kernel, (profile, profile3d) => {
     const reversed = feature.parameters.reversed === true;
-    const direction: CadKernelVector3 = reversed
-      ? [-profile3d.normal[0], -profile3d.normal[1], -profile3d.normal[2]]
-      : profile3d.normal;
+    const direction: CadKernelVector3 = reversed ? negate(profile3d.normal) : profile3d.normal;
     return kernel.extrude(profile, distance, direction);
   });
 }
@@ -533,6 +560,8 @@ function createFeatureShape(
       return mirrorFeature(feature, project, datumPlanes, kernel, featureShapes);
     case 'thicken':
       return thickenFeature(feature, kernel, featureShapes);
+    case 'hole':
+      return holeFeature(feature, project, datumPlanes, kernel, featureShapes);
     default:
       if (isNonSolidPassThrough(feature)) return null;
       throw new CadFeatureEvaluationError(

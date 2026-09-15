@@ -256,7 +256,7 @@ function arcMidpoint(
   return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
 }
 
-function negate([x, y, z]: CadKernelVector3): CadKernelVector3 {
+export function negate([x, y, z]: CadKernelVector3): CadKernelVector3 {
   return [negateComponent(x), negateComponent(y), negateComponent(z)];
 }
 
