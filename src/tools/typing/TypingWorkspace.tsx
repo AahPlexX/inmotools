@@ -1232,11 +1232,12 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
 function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
   const [text, setText] = useState(value);
   return (
-    <div className="tw-modal-backdrop" role="dialog" aria-modal="true">
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-custom-text-title">
       <div className="tw-modal">
-        <h3>Paste or edit custom text</h3>
+        <h3 id="tw-custom-text-title">Paste or edit custom text</h3>
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything is kept locally. Longer prose becomes book-length practice.</p>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
+        <label htmlFor="tw-custom-text-input">Custom text</label>
+        <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
         <div className="row">
           <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
           <button type="button" onClick={() => onApply(text)}>Use this text</button>
