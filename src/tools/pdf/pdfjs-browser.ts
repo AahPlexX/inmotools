@@ -113,7 +113,6 @@ export class PdfJsDocumentSession {
       textLayerContainer.style.setProperty('--total-scale-factor', String(viewport.scale));
       textLayer = new TextLayer({
         textContentSource: page.streamTextContent({ includeMarkedContent: true, disableNormalization: true }),
-        images: null,
         container: textLayerContainer,
         viewport,
       });
