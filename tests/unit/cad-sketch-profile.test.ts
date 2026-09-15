@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import fc from 'fast-check';
 import type { CadSketch } from '../../src/tools/cad/sketch-types';
-import { buildSketchProfile3d, resolveDatumPlaneFrame, resolveSketchAxis3d, resolveSketchPlane3d } from '../../src/tools/cad/sketch-profile';
+import {
+  buildSketchProfile3d,
+  negate,
+  negateComponent,
+  resolveDatumPlaneFrame,
+  resolveSketchAxis3d,
+  resolveSketchPlane3d,
+} from '../../src/tools/cad/sketch-profile';
 
 function rectangleSketch(plane: CadSketch['plane'] = { kind: 'origin', plane: 'XY' }): CadSketch {
   return {
@@ -113,5 +121,53 @@ describe('CAD sketch profile bridge', () => {
     const datumPlanes = new Map([['datum-1', resolveDatumPlaneFrame('YZ', -5)]]);
     const plane = resolveSketchPlane3d(rectangleSketch({ kind: 'datum', datumId: 'datum-1' }), datumPlanes);
     expect(plane).toEqual({ origin: [-5, 0, 0], normal: [1, 0, 0] });
+  });
+});
+
+// Property-based coverage for the exact bug class that shipped twice this session
+// (an inline `-x` producing -0 for an exact-zero component, which fails strict
+// downstream equality even though it's numerically identical to 0). Hand-picked
+// examples only prove the cases someone thought to pick; these hold for every
+// finite number, including values nobody would have thought to hand-write.
+describe('negateComponent / negate (property-based)', () => {
+  it('never returns -0, for any finite input including exact zero', () => {
+    fc.assert(
+      fc.property(fc.float({ noNaN: true, noDefaultInfinity: true }), (value) => {
+        const result = negateComponent(value);
+        expect(Object.is(result, -0)).toBe(false);
+      }),
+    );
+  });
+
+  it('is its own inverse for any finite input (negating twice returns the original)', () => {
+    fc.assert(
+      fc.property(fc.float({ noNaN: true, noDefaultInfinity: true }), (value) => {
+        expect(negateComponent(negateComponent(value))).toBe(value === 0 ? 0 : value);
+      }),
+    );
+  });
+
+  it('preserves magnitude for any finite input', () => {
+    fc.assert(
+      fc.property(fc.float({ noNaN: true, noDefaultInfinity: true }), (value) => {
+        expect(Math.abs(negateComponent(value))).toBeCloseTo(Math.abs(value), 10);
+      }),
+    );
+  });
+
+  it('negates a full vector component-wise with no -0 leaking through any axis', () => {
+    fc.assert(
+      fc.property(
+        fc.tuple(
+          fc.float({ noNaN: true, noDefaultInfinity: true }),
+          fc.float({ noNaN: true, noDefaultInfinity: true }),
+          fc.float({ noNaN: true, noDefaultInfinity: true }),
+        ),
+        ([x, y, z]) => {
+          const [nx, ny, nz] = negate([x, y, z]);
+          expect([Object.is(nx, -0), Object.is(ny, -0), Object.is(nz, -0)]).toEqual([false, false, false]);
+        },
+      ),
+    );
   });
 });

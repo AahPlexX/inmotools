@@ -51,7 +51,7 @@ interface TraversableEntity {
 const TAU = Math.PI * 2;
 
 /** Negating an exact zero produces -0 in JS, which fails strict shape/equality checks downstream. */
-function negateComponent(value: number): number {
+export function negateComponent(value: number): number {
   return value === 0 ? 0 : -value;
 }
 
