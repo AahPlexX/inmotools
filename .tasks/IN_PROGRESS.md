@@ -29,7 +29,7 @@
   - Plan: `docs/superpowers/plans/2026-09-15-fiber-craft-workstation.md`.
   - Dedicated branch: `feature/fiber-craft-workstation`; no second Fiber Craft branch is authorized for this workstream.
   - Current milestone: Slice 1 — shared workspace shell and registration, with Slice 2 crochet foundations already started.
-  - Current state: the crochet-first shell, reversible history, IndexedDB draft validation/restore, responsive Canvas2D preview, symbol/palette inspector, focused unit coverage, catalog entry, lazy loader, canonical alias, and focused E2E selector are implemented on the dedicated branch. Verification is pending because the shared CI unit gate currently stops on unrelated Vector path-motion tests before build/browser stages.
+  - Current state: the crochet-first shell, reversible history, IndexedDB draft validation/restore, responsive Canvas2D preview, symbol/palette inspector, focused unit coverage, catalog entry, lazy loader, canonical alias, and focused E2E selector are implemented on the dedicated branch. At code head `88b386ec`, CI run `35020871841` passed all 30 Fiber Craft unit checks (25 geometry + 5 state/persistence) and the focused E2E-selector unit check. The shared unit gate remains red only on three unrelated Vector path-motion tests, so build and browser stages are skipped and remain unverified for Fiber Craft.
   - Completion gate: all approved slices 0–8 are implemented and freshly verified, responsive/accessibility and persisted/exported behavior are validated, and intended completed work is integrated to `origin/main` before this entry can move to `DONE.md`.
 
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.

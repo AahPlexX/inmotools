@@ -59,9 +59,11 @@ layouts. This keeps every dependency in the lockfile exactly pinned and independ
       panels, undo/redo history, autosave, catalog/route registration behind a working landing view.
       **In progress:** the crochet-first Canvas2D shell, palette/inspector, reversible history,
       IndexedDB draft restore, catalog entry, lazy loader, canonical alias, and focused browser
-      acceptance spec are implemented. Cross-discipline mode switching and fresh browser/build
-      verification remain open; the shared CI currently stops first on unrelated Vector path-motion
-      unit failures.
+      acceptance spec are implemented. At code head `88b386ec`, CI run `35020871841` passed all
+      30 Fiber Craft unit checks (25 geometry + 5 state/persistence) and the focused E2E-selector
+      unit check. Cross-discipline mode switching and browser/build verification remain open; the
+      shared CI currently stops first on three unrelated Vector path-motion unit failures, so build
+      and Playwright stages are skipped rather than treated as verified.
 - [ ] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator.
       **Started:** shared grid/polar geometry, gauge math, the crochet symbol library, and focused
