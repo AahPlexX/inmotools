@@ -1,10 +1,10 @@
 # In Progress
 
-- **Typing Workstation** — local speed-typing calculator, ergonomic touch-typing testing and adaptive motor-skill training tool with a 30-feature ledger.
+- **Typing Workstation** — local speed-typing calculator, ergonomic touch-typing testing and adaptive motor-skill training tool with a 38-feature ledger.
   - Contract and full feature ledger: `docs/superpowers/plans/2026-09-15-typing-workstation.md`.
-  - Current milestone: Milestone A — engine, corpora, storage, audio, exports, workspace UI and catalog wiring implemented on `feature/typing-workstation`; awaiting focused unit tests, browser spec, `pnpm test:unit`/`pnpm build`, and Pages deployment on the exact integrated `origin/main` revision.
+  - Current milestone: Milestones A-C are complete on `feature/typing-workstation`. Source acceptance revision `11d99cf1a9060a8cbd89a48867507e404fb828ff` passed dedicated workflow run `35020326518`: frozen install, 34 focused unit tests, production build, and 6/6 desktop/mobile Chromium checks covering non-timed completion, JSON export metadata/envelope, IndexedDB reload persistence, serious/critical automated accessibility scanning, and 320 CSS-pixel reflow. Milestone D (exact-main integration + Pages deployment) remains pending and must not be claimed from the dedicated feature branch.
   - Completion: every ledger item implemented and verified through reachable UI, validated exports (CSV/JSON/PDF/keystrokes/Markdown) with editable tags at export, IndexedDB persistence proven, responsive keyboard access, exact-main integration, and Pages deployment. Deferred items must land in `NEXT.md` with rationale rather than being silently dropped.
-  - Scope: `src/tools/typing/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved; this workstream must not merge to `main` before its own completion gates pass.
+  - Scope: `src/tools/typing/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved; this workstream must not merge to `main` before its own completion gates pass and explicit integration is appropriate.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
