@@ -105,6 +105,19 @@
   font-size: 0.82rem;
 }
 
+.photo-recovery-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--accent, #4f46e5) 62%, var(--photo-border));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--accent, #4f46e5) 13%, var(--photo-panel));
+}
+.photo-recovery-banner > div:first-child { display: grid; gap: 0.2rem; }
+.photo-recovery-banner span { color: var(--photo-muted); font-size: 0.86rem; }
+
 .photo-workbench {
   display: grid;
   grid-template-columns: minmax(9.5rem, 0.22fr) minmax(0, 1fr) minmax(16rem, 0.36fr);
@@ -379,6 +392,9 @@
 .photo-local-card header,
 .photo-snapshot-card { font-size: 0.88rem; }
 
+.photo-project-list { display: grid; gap: 0.5rem; margin-top: 0.55rem; }
+.photo-project-storage { margin: 0.55rem 0 0; color: var(--photo-muted); font-size: 0.8rem; }
+
 .photo-feature-count { font-size: 0.78rem; color: var(--photo-muted); }
 
 @media (max-width: 980px) {
@@ -414,6 +430,7 @@
   .photo-metadata-grid .photo-wide { grid-column: auto; }
   .photo-dialog-backdrop { padding: 0.35rem; align-items: end; }
   .photo-dialog { border-radius: 1rem 1rem 0 0; max-height: 94vh; padding: 0.8rem; }
+  .photo-recovery-banner { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -30,6 +30,18 @@ import {
   type PhotoImportSource,
 } from './photo-import';
 import {
+  createBrowserPhotoProjectStore,
+  inspectPhotoStorage,
+  photoProjectErrorMessage,
+  requestPhotoStoragePersistence,
+  type PhotoProjectStore,
+} from './photo-project-store';
+import type {
+  LoadedPhotoProject,
+  PhotoProjectRecord,
+  PhotoStorageStatus,
+} from './photo-project-types';
+import {
   disposePhotoRenderer,
   isRenderResultCurrent,
   probePhotoCapabilities,
@@ -126,6 +138,8 @@ const PRESETS: Array<{ name: string; patch: Partial<PhotoRecipe> }> = [
   { name: 'Landscape depth', patch: { contrast: 0.14, dehaze: 0.18, vibrance: 0.18, highlights: -0.2, shadows: 0.08 } },
   { name: 'Monochrome', patch: { blackAndWhite: true, contrast: 0.12, highlights: -0.08, shadows: 0.08 } },
 ];
+
+const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -253,12 +267,26 @@ export default function PhotoWorkspace() {
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState('');
+  const [projectCreatedAt, setProjectCreatedAt] = useState(0);
+  const [localProjects, setLocalProjects] = useState<PhotoProjectRecord[]>([]);
+  const [recoveryProject, setRecoveryProject] = useState<PhotoProjectRecord | null>(null);
+  const [projectSaveState, setProjectSaveState] = useState<'checking' | 'unavailable' | 'unsaved' | 'saving' | 'saved' | 'error'>('checking');
+  const [lastProjectSavedAt, setLastProjectSavedAt] = useState<number | null>(null);
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+  const [projectStoreReady, setProjectStoreReady] = useState(false);
+  const [storageStatus, setStorageStatus] = useState<PhotoStorageStatus | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
   const sourceUrlRef = useRef<string | null>(null);
+  const sourceRef = useRef<SourcePhoto | null>(null);
   const importRevisionRef = useRef(0);
+  const projectStoreRef = useRef<PhotoProjectStore | null>(null);
+  const projectSaveRevisionRef = useRef(0);
+  const projectSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const recipe = history.present;
   const parsedCustomRatioWidth = Number(customRatioWidth);
@@ -269,6 +297,20 @@ export default function PhotoWorkspace() {
     && parsedCustomRatioHeight > 0;
   const directClipboardAvailable = typeof navigator !== 'undefined'
     && typeof navigator.clipboard?.read === 'function';
+
+  const refreshLocalProjects = useCallback(async (store = projectStoreRef.current) => {
+    if (!store) return;
+    setLocalProjects(await store.list());
+  }, []);
+
+  const refreshStorageStatus = useCallback(() => {
+    void inspectPhotoStorage().then((value) => {
+      setStorageStatus({
+        ...value,
+        opfsAvailable: projectStoreRef.current?.opfsAvailable ?? false,
+      });
+    }).catch(() => undefined);
+  }, []);
 
   const releasePreviewUrl = useCallback(() => {
     if (!previewUrlRef.current) return;
@@ -291,6 +333,30 @@ export default function PhotoWorkspace() {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void createBrowserPhotoProjectStore().then(async (store) => {
+      if (!active) return;
+      projectStoreRef.current = store;
+      const projects = await store.list();
+      if (!active) return;
+      setLocalProjects(projects);
+      setStorageStatus({ ...(await inspectPhotoStorage()), opfsAvailable: store.opfsAvailable });
+      if (!active) return;
+      setProjectStoreReady(true);
+      if (projects[0] && !sourceRef.current) setRecoveryProject(projects[0]);
+      void store.cleanup().then(refreshStorageStatus).catch(() => undefined);
+    }).catch((error) => {
+      if (!active) return;
+      projectStoreRef.current = null;
+      setProjectStoreReady(false);
+      setProjectSaveState('unavailable');
+      setStatus(photoProjectErrorMessage(error));
+      refreshStorageStatus();
+    });
+    return () => { active = false; };
+  }, [refreshStorageStatus]);
 
   useEffect(() => () => {
     importRevisionRef.current += 1;
@@ -377,6 +443,111 @@ export default function PhotoWorkspace() {
     return () => window.removeEventListener('keydown', handler);
   }, [redo, undo]);
 
+  const openStoredProject = useCallback(async (loaded: LoadedPhotoProject, importRevision: number) => {
+    let nextSourceUrl: string | null = null;
+    try {
+      const bitmap = await createImageBitmap(loaded.sourceFile, { imageOrientation: 'from-image' });
+      const width = bitmap.width;
+      const height = bitmap.height;
+      bitmap.close();
+      if (importRevision !== importRevisionRef.current) return false;
+      nextSourceUrl = URL.createObjectURL(loaded.sourceFile);
+      releaseSourceUrl();
+      releasePreviewUrl();
+      setPreview(null);
+      sourceUrlRef.current = nextSourceUrl;
+      const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height };
+      sourceRef.current = recoveredSource;
+      setSource(recoveredSource);
+      nextSourceUrl = null;
+      setHistory(loaded.project.history);
+      setSnapshots(loaded.project.snapshots);
+      setSnapshotName('');
+      setProjectId(loaded.project.id);
+      setProjectName(loaded.project.name);
+      setProjectCreatedAt(loaded.project.createdAt);
+      setLastProjectSavedAt(loaded.project.updatedAt);
+      setAutosaveEnabled(true);
+      setProjectSaveState('saved');
+      setRecoveryProject(null);
+      setCompare(false);
+      setCanvasInteraction(null);
+      setStatus(`${loaded.project.name} recovered locally.`);
+      return true;
+    } catch (error) {
+      if (nextSourceUrl) URL.revokeObjectURL(nextSourceUrl);
+      if (importRevision === importRevisionRef.current) {
+        setStatus(`Could not recover that project: ${error instanceof Error ? error.message : 'unsupported image data'}`);
+      }
+      return false;
+    }
+  }, [releasePreviewUrl, releaseSourceUrl]);
+
+  async function loadLocalProject(id: string, nextPanel: InspectorPanel = 'inspect') {
+    const store = projectStoreRef.current;
+    if (!store) return;
+    const importRevision = ++importRevisionRef.current;
+    try {
+      const loaded = await store.load(id);
+      if (importRevision !== importRevisionRef.current) return;
+      const opened = await openStoredProject(loaded, importRevision);
+      if (opened && importRevision === importRevisionRef.current) setPanel(nextPanel);
+    } catch (error) {
+      if (importRevision === importRevisionRef.current) setStatus(photoProjectErrorMessage(error));
+    }
+  }
+
+  async function deleteLocalProject(project: PhotoProjectRecord) {
+    const store = projectStoreRef.current;
+    if (!store) return;
+    const deletionRevision = ++importRevisionRef.current;
+    const deletingCurrentProject = projectId === project.id;
+    if (deletingCurrentProject) {
+      setAutosaveEnabled(false);
+      projectSaveRevisionRef.current += 1;
+    }
+    try {
+      const deletion = projectSaveQueueRef.current
+        .catch(() => undefined)
+        .then(() => store.delete(project.id));
+      projectSaveQueueRef.current = deletion.catch(() => undefined);
+      await deletion;
+      if (deletionRevision === importRevisionRef.current) {
+        if (recoveryProject?.id === project.id) setRecoveryProject(null);
+        if (deletingCurrentProject) {
+          const createdAt = Date.now();
+          setProjectId(crypto.randomUUID?.() ?? `photo-project-${createdAt}`);
+          setProjectCreatedAt(createdAt);
+          setLastProjectSavedAt(null);
+          setProjectSaveState('unsaved');
+        }
+      }
+      await refreshLocalProjects(store);
+      refreshStorageStatus();
+      if (deletionRevision === importRevisionRef.current) {
+        setStatus(`${project.name} deleted from local browser storage.`);
+      }
+    } catch (error) {
+      if (deletionRevision === importRevisionRef.current) {
+        if (deletingCurrentProject) {
+          setAutosaveEnabled(true);
+          setProjectSaveState('error');
+        }
+        setStatus(photoProjectErrorMessage(error));
+      }
+    }
+  }
+
+  async function requestDurableStorage() {
+    const result = await requestPhotoStoragePersistence();
+    refreshStorageStatus();
+    setStatus(result === true
+      ? 'Durable browser storage granted for local projects.'
+      : result === false
+        ? 'Durable storage was not granted; projects remain best-effort browser storage.'
+        : 'This browser does not expose a durable-storage request. Local projects remain best-effort.');
+  }
+
   const openPhoto = useCallback(async (candidate: PhotoImportCandidate, importRevision: number) => {
     const { file } = candidate;
     if (importRevision !== importRevisionRef.current) return;
@@ -396,8 +567,18 @@ export default function PhotoWorkspace() {
       releasePreviewUrl();
       setPreview(null);
       sourceUrlRef.current = nextSourceUrl;
-      setSource({ file, name: file.name, originalUrl: nextSourceUrl, width, height });
+      const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height };
+      sourceRef.current = importedSource;
+      setSource(importedSource);
       nextSourceUrl = null;
+      const createdAt = Date.now();
+      setProjectId(crypto.randomUUID?.() ?? `photo-project-${createdAt}`);
+      setProjectName(file.name.replace(/\.[^.]+$/, '') || file.name);
+      setProjectCreatedAt(createdAt);
+      setLastProjectSavedAt(null);
+      setAutosaveEnabled(true);
+      setProjectSaveState(projectStoreRef.current ? 'unsaved' : 'checking');
+      setRecoveryProject(null);
       setHistory(createHistory(DEFAULT_RECIPE));
       setSnapshots([]);
       setSnapshotName('');
@@ -412,6 +593,61 @@ export default function PhotoWorkspace() {
       }
     }
   }, [releasePreviewUrl, releaseSourceUrl]);
+
+  const persistCurrentProject = useCallback((reason: 'auto' | 'manual' = 'auto') => {
+    const store = projectStoreRef.current;
+    if (!store || !source || !projectId || (reason === 'auto' && !autosaveEnabled)) return Promise.resolve();
+    if (reason === 'manual') setAutosaveEnabled(true);
+    const revision = ++projectSaveRevisionRef.current;
+    const input = {
+      id: projectId,
+      name: projectName || source.name.replace(/\.[^.]+$/, '') || source.name,
+      createdAt: projectCreatedAt || Date.now(),
+      source: {
+        name: source.file.name,
+        type: source.file.type,
+        size: source.file.size,
+        lastModified: source.file.lastModified,
+        width: source.width,
+        height: source.height,
+      },
+      sourceBlob: source.file,
+      history,
+      snapshots,
+    };
+    setProjectSaveState('saving');
+    const save = projectSaveQueueRef.current
+      .catch(() => undefined)
+      .then(() => store.save(input))
+      .then(async (saved) => {
+        if (revision !== projectSaveRevisionRef.current) return;
+        setLastProjectSavedAt(saved.updatedAt);
+        setProjectSaveState('saved');
+        if (reason === 'manual') setStatus(`${saved.name} saved locally.`);
+        await refreshLocalProjects(store);
+        refreshStorageStatus();
+      })
+      .catch((error) => {
+        if (revision !== projectSaveRevisionRef.current) return;
+        setProjectSaveState('error');
+        setStatus(photoProjectErrorMessage(error));
+      });
+    projectSaveQueueRef.current = save;
+    return save;
+  }, [autosaveEnabled, history, projectCreatedAt, projectId, projectName, refreshLocalProjects, refreshStorageStatus, snapshots, source]);
+
+  useEffect(() => {
+    if (!projectStoreReady) return;
+    if (!source || !projectId || !projectStoreRef.current) {
+      setProjectSaveState('saved');
+      return;
+    }
+    if (!autosaveEnabled || recoveryProject) return;
+    projectSaveRevisionRef.current += 1;
+    setProjectSaveState('unsaved');
+    const timer = window.setTimeout(() => { void persistCurrentProject(); }, PROJECT_AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [autosaveEnabled, persistCurrentProject, projectId, projectStoreReady, recoveryProject, source]);
 
   const importPhotoFiles = useCallback(async (
     files: Iterable<File> | ArrayLike<File>,
@@ -987,6 +1223,52 @@ export default function PhotoWorkspace() {
             <span>{formatBytes(source.file.size)} · {source.file.type || 'unknown image type'}</span>
           </div>
         ) : null}
+        <details className="photo-section" open data-testid="photo-project-panel">
+          <summary>Local projects ({localProjects.length})</summary>
+          <p className="photo-export-note">
+            Project recipes and history snapshots stay in IndexedDB. The immutable source uses OPFS when this browser permits it, with an IndexedDB fallback.
+          </p>
+          <div className="photo-metadata-grid">
+            <label>
+              Project name
+              <input
+                type="text"
+                value={projectName}
+                maxLength={80}
+                disabled={!source}
+                onChange={(event) => setProjectName(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              onClick={() => void persistCurrentProject('manual')}
+              disabled={!source || projectSaveState === 'checking' || projectSaveState === 'unavailable' || projectSaveState === 'saving'}
+            >Save project now</button>
+            {storageStatus?.persisted === false ? (
+              <button type="button" onClick={() => void requestDurableStorage()}>Request durable storage</button>
+            ) : null}
+          </div>
+          <p className="photo-project-storage" data-testid="photo-storage-status">
+            {storageStatus
+              ? `${storageStatus.opfsAvailable ? 'OPFS source storage available' : 'Using IndexedDB source fallback'} · ${storageStatus.persisted === true ? 'durable storage granted' : storageStatus.persisted === false ? 'best-effort storage' : 'durability status unavailable'}${storageStatus.usageBytes !== null && storageStatus.quotaBytes !== null ? ` · approximately ${formatBytes(storageStatus.usageBytes)} of ${formatBytes(storageStatus.quotaBytes)} used by this site` : ''}`
+              : 'Checking browser storage capabilities…'}
+          </p>
+          <div className="photo-project-list">
+            {localProjects.map((project) => (
+              <article className="photo-local-card" key={project.id} data-testid="photo-project-card">
+                <strong>{project.name}</strong>
+                <span>{project.source.name} · edited {new Date(project.updatedAt).toLocaleString()}</span>
+                <div className="photo-inline-actions">
+                  <button type="button" onClick={() => void loadLocalProject(project.id)}>Load project</button>
+                  <button type="button" onClick={() => void deleteLocalProject(project)}>Delete local project</button>
+                </div>
+              </article>
+            ))}
+            {!localProjects.length ? <p className="photo-export-note">No local Photo projects saved yet.</p> : null}
+          </div>
+        </details>
         <details className="photo-section" open>
           <summary>Editable starting presets</summary>
           <div className="photo-inline-actions">
@@ -1039,6 +1321,19 @@ export default function PhotoWorkspace() {
   }
 
   const naturalDimensions = source ? photoNaturalDimensions(source.width, source.height, recipe) : null;
+  const projectSaveLabel = projectSaveState === 'checking'
+    ? 'Checking local project storage…'
+    : projectSaveState === 'unavailable'
+      ? 'Local project storage unavailable'
+      : projectSaveState === 'saving'
+        ? 'Saving project locally…'
+        : projectSaveState === 'unsaved'
+          ? autosaveEnabled ? 'Unsaved changes' : 'Local copy deleted · autosave paused'
+          : projectSaveState === 'error'
+            ? 'Local save failed'
+            : lastProjectSavedAt
+              ? `Saved locally ${new Date(lastProjectSavedAt).toLocaleTimeString()}`
+              : 'Local projects ready';
 
   return (
     <div
@@ -1105,6 +1400,22 @@ export default function PhotoWorkspace() {
           : 'Drop a photo anywhere in the studio or press Ctrl+V. Direct clipboard reading is unavailable in this browser.'}
       </p>
 
+      {recoveryProject ? (
+        <section className="photo-recovery-banner" aria-labelledby="photo-recovery-title" data-testid="photo-recovery-prompt">
+          <div>
+            <strong id="photo-recovery-title">Recover {recoveryProject.name}?</strong>
+            <span>
+              Last saved {new Date(recoveryProject.updatedAt).toLocaleString()} · {recoveryProject.source.name}
+            </span>
+          </div>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => void loadLocalProject(recoveryProject.id, 'edit')}>Recover project</button>
+            <button type="button" onClick={() => setRecoveryProject(null)}>Not now</button>
+            <button type="button" onClick={() => void deleteLocalProject(recoveryProject)}>Delete local recovery</button>
+          </div>
+        </section>
+      ) : null}
+
       <div className="photo-workbench">
         <nav className="photo-tool-tabs" aria-label="Photo editing sections">
           {([
@@ -1143,6 +1454,7 @@ export default function PhotoWorkspace() {
         {source ? <span data-testid="photo-source-dimensions">{source.width} × {source.height}</span> : null}
         {naturalDimensions ? <span>Edited frame {naturalDimensions.width} × {naturalDimensions.height}</span> : null}
         <span>Zoom {Math.round(zoom * 100)}%</span>
+        <span data-testid="photo-project-save-state">{projectSaveLabel}</span>
         <span className="photo-status-message" role="status">{status}</span>
       </footer>
 
