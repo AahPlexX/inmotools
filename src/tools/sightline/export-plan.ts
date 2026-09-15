@@ -9,6 +9,7 @@
 
 import { unparse } from 'papaparse';
 import { analyticsPayload, sessionRows, type StoredDocument, type StoredSession } from './analytics-engine';
+import { buildDocxBytes, DEFAULT_DOCX_EXPORT, type DocxExportOptions } from './export-docx';
 import { buildEpubArchive, DEFAULT_EPUB_EXPORT, type EpubExportOptions } from './export-epub';
 import { buildExportHtml, buildExportMarkdown, buildExportText, DEFAULT_HTML_EXPORT, type HtmlExportOptions } from './export-html';
 import { buildPdfBytes, DEFAULT_PDF_EXPORT, estimatePageCount, type PdfExportOptions } from './export-pdf';
@@ -21,6 +22,7 @@ export type ExportId =
   | 'weighted-pdf'
   | 'weighted-epub'
   | 'weighted-html'
+  | 'weighted-docx'
   | 'gradient-html'
   | 'gradient-pdf'
   | 'gradient-epub'
@@ -46,6 +48,7 @@ export const EXPORT_DEFINITIONS: readonly ExportDefinition[] = [
   { id: 'weighted-pdf', label: 'Weighted PDF', detail: 'Fixation-weighted type in a paginated PDF with document metadata.', mediaType: 'application/pdf', extension: 'pdf', needsDocument: true },
   { id: 'weighted-epub', label: 'Weighted EPUB', detail: 'Fixation-weighted XHTML in an EPUB package with a contents document.', mediaType: 'application/epub+zip', extension: 'epub', needsDocument: true },
   { id: 'weighted-html', label: 'Weighted HTML', detail: 'One self-contained HTML file with the weighting baked in.', mediaType: 'text/html', extension: 'html', needsDocument: true },
+  { id: 'weighted-docx', label: 'Weighted Word document', detail: 'A .docx with the weighting as real bold runs, ready for comments and track changes.', mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', extension: 'docx', needsDocument: true },
   { id: 'gradient-html', label: 'Gradient HTML', detail: 'One self-contained HTML file with a trail gradient on every line.', mediaType: 'text/html', extension: 'html', needsDocument: true },
   { id: 'gradient-pdf', label: 'Gradient PDF', detail: 'A paginated PDF where each word carries its palette colour.', mediaType: 'application/pdf', extension: 'pdf', needsDocument: true },
   { id: 'gradient-epub', label: 'Gradient EPUB', detail: 'An EPUB package with palette-coloured words.', mediaType: 'application/epub+zip', extension: 'epub', needsDocument: true },
@@ -67,6 +70,7 @@ export interface ExportInputs {
   readonly html: HtmlExportOptions;
   readonly pdf: PdfExportOptions;
   readonly epub: EpubExportOptions;
+  readonly docx: DocxExportOptions;
   readonly sessions: readonly StoredSession[];
   readonly documents: readonly StoredDocument[];
   readonly vocabulary: readonly VocabularyEntry[];
@@ -95,7 +99,7 @@ export const planExport = async (id: ExportId, inputs: ExportInputs): Promise<Pl
   const definition = exportById(id);
   const suffix = (): string => {
     switch (id) {
-      case 'weighted-pdf': case 'weighted-html': case 'weighted-epub': return 'weighted';
+      case 'weighted-pdf': case 'weighted-html': case 'weighted-epub': case 'weighted-docx': return 'weighted';
       case 'gradient-pdf': case 'gradient-html': case 'gradient-epub': return 'gradient';
       case 'markdown': return 'document';
       case 'text': return 'text';
@@ -134,6 +138,10 @@ export const planExport = async (id: ExportId, inputs: ExportInputs): Promise<Pl
     case 'gradient-epub': {
       const result = await buildEpubArchive(model!, inputs.draft, { ...(inputs.epub ?? DEFAULT_EPUB_EXPORT), treatment: 'gradient' });
       return { definition, fileName: exportFileName(inputs.draft, 'gradient', 'epub'), mediaType: definition.mediaType, bytes: result.bytes, rendered: true };
+    }
+    case 'weighted-docx': {
+      const result = await buildDocxBytes(model!, inputs.draft, { ...(inputs.docx ?? DEFAULT_DOCX_EXPORT), treatment: 'emphasis' });
+      return { definition, fileName: result.fileName, mediaType: definition.mediaType, bytes: result.bytes, rendered: true };
     }
     case 'weighted-html':
     case 'gradient-html': {
@@ -193,6 +201,13 @@ export const describeExports = (model: DocumentModel | undefined, inputs: Export
     if (definition.id === 'weighted-pdf' || definition.id === 'gradient-pdf') {
       return { ...definition, available: true, note: `About ${estimatePageCount(model!, inputs.pdf)} pages at the current settings.` };
     }
+    if (definition.id === 'weighted-docx') {
+      return {
+        ...definition,
+        available: true,
+        note: `A Word document with ${model!.metrics.words.toLocaleString('en-US')} words weighted for fixation.`,
+      };
+    }
     if (definition.id === 'weighted-epub' || definition.id === 'gradient-epub') {
       const chapters = Math.max(1, model!.chapters.length);
       return { ...definition, available: true, note: `${chapters} chapter document${chapters === 1 ? '' : 's'} in the package.` };
@@ -201,4 +216,4 @@ export const describeExports = (model: DocumentModel | undefined, inputs: Export
     return { ...definition, available: true, note: `${words} words and ${model!.metrics.sentences.toLocaleString('en-US')} sentences.` };
   });
 
-export { DEFAULT_HTML_EXPORT, DEFAULT_PDF_EXPORT, DEFAULT_EPUB_EXPORT };
+export { DEFAULT_HTML_EXPORT, DEFAULT_PDF_EXPORT, DEFAULT_EPUB_EXPORT, DEFAULT_DOCX_EXPORT };

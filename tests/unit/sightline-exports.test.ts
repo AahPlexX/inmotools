@@ -28,6 +28,7 @@ import {
 import { createDefaultState } from '../../src/tools/sightline/sightline-store';
 import { DEFAULT_HTML_EXPORT } from '../../src/tools/sightline/export-html';
 import { DEFAULT_PDF_EXPORT } from '../../src/tools/sightline/export-pdf';
+import { DEFAULT_DOCX_EXPORT } from '../../src/tools/sightline/export-docx';
 import { DEFAULT_EPUB_EXPORT } from '../../src/tools/sightline/export-epub';
 import { buildDocumentModel } from '../../src/tools/sightline/segmentation-engine';
 import { ingestHtml } from '../../src/tools/sightline/html-ingest';
@@ -72,6 +73,7 @@ const inputs = (model?: ReturnType<typeof buildModel>): ExportInputs => {
     html: DEFAULT_HTML_EXPORT,
     pdf: DEFAULT_PDF_EXPORT,
     epub: DEFAULT_EPUB_EXPORT,
+    docx: DEFAULT_DOCX_EXPORT,
     sessions: [],
     documents: [],
     vocabulary: [],
@@ -426,7 +428,7 @@ describe('export planning', () => {
   it('renders each document export to real bytes', async () => {
     const model = buildModel();
     const plan = inputs(model);
-    for (const id of ['weighted-pdf', 'weighted-epub', 'weighted-html', 'gradient-html', 'gradient-pdf', 'gradient-epub', 'markdown', 'text'] as const) {
+    for (const id of ['weighted-pdf', 'weighted-epub', 'weighted-html', 'weighted-docx', 'gradient-html', 'gradient-pdf', 'gradient-epub', 'markdown', 'text'] as const) {
       const planned = await planExport(id, plan);
       expect(planned.bytes.byteLength, id).toBeGreaterThan(100);
       expect(planned.fileName.endsWith(`.${planned.definition.extension}`)).toBe(true);
