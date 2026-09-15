@@ -13,7 +13,7 @@ test('converts CSV to JSON entirely in the browser', async ({ page }) => {
   await page.getByLabel('Choose files to convert').setInputFiles({ name: 'people.csv', mimeType: 'text/csv', buffer: csvBuffer });
   await expect(page.locator('.tc-file-name', { hasText: 'people.csv' })).toBeVisible();
 
-  await page.locator('.tc-target-chip', { hasText: 'JSON' }).first().click();
+  await page.locator('.tc-target-chip[data-format="json"]').click();
   await page.getByRole('button', { name: /Convert 1 file → JSON/ }).click();
   await expect(page.getByRole('heading', { name: 'people.csv → JSON' })).toBeVisible();
 
@@ -28,7 +28,7 @@ test('converts CSV to JSON entirely in the browser', async ({ page }) => {
 test('converts JSON to SQL with dialect options', async ({ page }) => {
   await page.goto('./#/tools/transcode-workstation');
   await page.getByLabel('Choose files to convert').setInputFiles({ name: 'rows.json', mimeType: 'application/json', buffer: jsonBuffer });
-  await page.locator('.tc-target-chip', { hasText: 'SQL' }).first().click();
+  await page.locator('.tc-target-chip[data-format="sql"]').click();
   await page.getByLabel('Table name').fill('notes');
   await page.getByRole('button', { name: /Convert 1 file → SQL/ }).click();
 
@@ -41,7 +41,7 @@ test('converts JSON to SQL with dialect options', async ({ page }) => {
 test('parses WKT geometry text into GeoJSON', async ({ page }) => {
   await page.goto('./#/tools/transcode-workstation');
   await page.getByLabel('Choose files to convert').setInputFiles({ name: 'shapes.wkt', mimeType: 'text/plain', buffer: wktBuffer });
-  await page.locator('.tc-target-chip', { hasText: 'GeoJSON' }).first().click();
+  await page.locator('.tc-target-chip[data-format="geojson"]').click();
   await page.getByRole('button', { name: /Convert 1 file → GeoJSON/ }).click();
   await expect(page.getByRole('heading', { name: 'shapes.wkt → GeoJSON' })).toBeVisible();
   await page.getByText('Preview').click();
@@ -52,7 +52,7 @@ test('parses WKT geometry text into GeoJSON', async ({ page }) => {
 test('transcodes PNG to BMP and writes metadata-free deterministic output', async ({ page }) => {
   await page.goto('./#/tools/transcode-workstation');
   await page.getByLabel('Choose files to convert').setInputFiles({ name: 'dot.png', mimeType: 'image/png', buffer: onePixelPng });
-  await page.locator('.tc-target-chip', { hasText: 'BMP' }).first().click();
+  await page.locator('.tc-target-chip[data-format="bmp"]').click();
   await page.getByRole('button', { name: /Convert 1 file → BMP/ }).click();
   await expect(page.getByRole('heading', { name: 'dot.png → BMP' })).toBeVisible();
 
@@ -70,7 +70,7 @@ test('batches multiple files and downloads a ZIP', async ({ page }) => {
     { name: 'alpha.csv', mimeType: 'text/csv', buffer: csvBuffer },
     { name: 'beta.csv', mimeType: 'text/csv', buffer: csvBuffer },
   ]);
-  await page.locator('.tc-target-chip', { hasText: 'JSON' }).first().click();
+  await page.locator('.tc-target-chip[data-format="json"]').click();
   await page.getByRole('button', { name: /Convert 2 files → JSON/ }).click();
   await expect(page.getByRole('heading', { name: 'alpha.csv → JSON' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'beta.csv → JSON' })).toBeVisible();
@@ -78,7 +78,7 @@ test('batches multiple files and downloads a ZIP', async ({ page }) => {
   const zipPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download all as ZIP' }).click();
   const zip = await zipPromise;
-  expect(zip.suggestedFilename()).toMatch(/\.zip$/);
+  expect(zip.suggestedFilename()).toBe('transcode-results.zip');
   const bytes = await (await zip.createReadStream()).read();
   expect(bytes.subarray(0, 2).toString()).toBe('PK');
 });
@@ -86,7 +86,7 @@ test('batches multiple files and downloads a ZIP', async ({ page }) => {
 test('encodes an image to Base64 text', async ({ page }) => {
   await page.goto('./#/tools/transcode-workstation');
   await page.getByLabel('Choose files to convert').setInputFiles({ name: 'dot.png', mimeType: 'image/png', buffer: onePixelPng });
-  await page.locator('.tc-target-chip', { hasText: 'Base64' }).first().click();
+  await page.locator('.tc-target-chip[data-format="base64"]').click();
   await page.getByRole('button', { name: /Convert 1 file → Base64/ }).click();
   await expect(page.getByRole('heading', { name: 'dot.png → Base64' })).toBeVisible();
   await page.getByText('Preview').click();

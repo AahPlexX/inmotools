@@ -461,6 +461,7 @@ export default function TranscodeWorkspace() {
                         key={String(item.id)}
                         type="button"
                         className="tc-target-chip"
+                        data-format={String(item.id)}
                         aria-pressed={target === item.id}
                         title={item.description}
                         onClick={() => setTarget(item.id)}
