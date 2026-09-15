@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { monoFromDecoded, waveformToSvg, writeId3Tags, hasTagOptions } from '../../src/tools/transcode/audio-engine';
 import {
-  buildXmpPacket, hasImageMetadata, insertJpegXmp, readJpegXmp, readPngTextChunks, stripJpegSidecarSegments,
-  stripPngTextChunks, writeJpegMetadata, writePngMetadata,
+  buildXmpPacket, hasImageMetadata, insertJpegIptc, insertJpegXmp, readJpegIptc, readJpegXmp,
+  readPngTextChunks, stripJpegSidecarSegments, stripPngTextChunks, writeJpegMetadata, writePngMetadata,
 } from '../../src/tools/transcode/metadata-engine';
 
 // Minimal valid 1x1 PNG.
@@ -175,6 +175,34 @@ function countXmpApp1(jpeg: Uint8Array): number {
   }
   return count;
 }
+
+describe('JPEG IPTC-IIM editor (F34)', () => {
+  it('writes and reads IPTC datasets through an APP13 IRB', () => {
+    const tagged = insertJpegIptc(jpegBytes(), { title: 'Delta Sunset', artist: 'Bayou Unit', copyright: 'PD', description: 'Golden hour' });
+    const iptc = readJpegIptc(tagged);
+    expect(iptc[5]).toBe('Delta Sunset');
+    expect(iptc[80]).toBe('Bayou Unit');
+    expect(iptc[116]).toBe('PD');
+    expect(iptc[120]).toBe('Golden hour');
+    expect(tagged[0]).toBe(0xff);
+    expect(tagged[tagged.length - 1]).toBe(0xd9);
+  });
+
+  it('replaces prior IPTC blocks and handles odd-length payloads', () => {
+    const first = insertJpegIptc(jpegBytes(), { title: 'AAA' });
+    const second = insertJpegIptc(first, { title: 'B' }); // odd-length value exercises padding
+    const iptc = readJpegIptc(second);
+    expect(iptc[5]).toBe('B');
+    expect(Object.keys(iptc)).not.toContain('80');
+  });
+
+  it('coexists with XMP in the same file', () => {
+    const withXmp = insertJpegXmp(jpegBytes(), { title: 'XMP Title' });
+    const withBoth = insertJpegIptc(withXmp, { title: 'IPTC Title' });
+    expect(readJpegXmp(withBoth)).toContain('XMP Title');
+    expect(readJpegIptc(withBoth)[5]).toBe('IPTC Title');
+  });
+});
 
 describe('ID3 tag studio helpers (F35)', () => {
   it('detects tag option presence', () => {

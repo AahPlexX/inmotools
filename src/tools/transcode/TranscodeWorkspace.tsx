@@ -61,6 +61,11 @@ const AUDIO_TRANSCODE_OPTIONS: OptionField[] = [
   { kind: 'number', key: 'channels', label: 'Channels (1 mono, 2 stereo)', min: 1, max: 8, step: 1 },
   { kind: 'number', key: 'trimStart', label: 'Trim start (s)', min: 0, step: 0.1 },
   { kind: 'number', key: 'trimEnd', label: 'Trim end (s)', min: 0, step: 0.1 },
+  { kind: 'text', key: 'tagTitle', label: 'Tag: title', placeholder: 'Optional' },
+  { kind: 'text', key: 'tagArtist', label: 'Tag: artist', placeholder: 'Optional' },
+  { kind: 'text', key: 'tagAlbum', label: 'Tag: album', placeholder: 'Optional' },
+  { kind: 'text', key: 'tagYear', label: 'Tag: year', placeholder: 'Optional' },
+  { kind: 'text', key: 'tagGenre', label: 'Tag: genre', placeholder: 'Optional' },
 ];
 
 const DELIMITER_OPTIONS = [
@@ -143,6 +148,7 @@ const TARGET_OPTIONS: Record<string, OptionField[]> = {
     { kind: 'text', key: 'artist', label: 'EXIF artist', placeholder: 'Optional' },
     { kind: 'text', key: 'copyright', label: 'EXIF copyright', placeholder: 'Optional' },
     { kind: 'checkbox', key: 'xmp', label: 'Also write an XMP packet (title/artist/copyright/description)' },
+    { kind: 'checkbox', key: 'iptc', label: 'Also write IPTC-IIM fields (title/byline/copyright/caption)' },
     { kind: 'checkbox', key: 'stripMeta', label: 'Strip existing metadata (EXIF/XMP/IPTC) first' },
   ],
   png: [

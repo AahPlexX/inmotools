@@ -11,12 +11,14 @@ export interface ImageMetadata {
   creationTime?: string;
   /** Replace (or create) the XMP packet with these Dublin Core fields. */
   xmp?: boolean;
+  /** Replace (or create) the IPTC-IIM APP13 block with these fields. */
+  iptc?: boolean;
   stripExisting?: boolean;
 }
 
 export function hasImageMetadata(meta: ImageMetadata | undefined): boolean {
   if (!meta) return false;
-  return Boolean(meta.title || meta.artist || meta.description || meta.copyright || meta.software || meta.creationTime || meta.xmp || meta.stripExisting);
+  return Boolean(meta.title || meta.artist || meta.description || meta.copyright || meta.software || meta.creationTime || meta.xmp || meta.iptc || meta.stripExisting);
 }
 
 const crcTable = (() => {
@@ -299,6 +301,130 @@ export function readJpegXmp(jpeg: Uint8Array): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// IPTC-IIM writer (APP13 Photoshop IRB)
+// ---------------------------------------------------------------------------
+
+function buildIptcDatasets(meta: ImageMetadata): Uint8Array {
+  const parts: Uint8Array[] = [];
+  const dataset = (record: number, number: number, data: Uint8Array) => {
+    const header = new Uint8Array(5);
+    header[0] = 0x1c;
+    header[1] = record;
+    header[2] = number;
+    header[3] = data.length >> 8;
+    header[4] = data.length & 0xff;
+    parts.push(header, data);
+  };
+  // UTF-8 coded character set declaration (required for non-ASCII text).
+  dataset(1, 90, Uint8Array.from([0x1b, 0x25, 0x47]));
+  const encoder = new TextEncoder();
+  if (meta.title) dataset(2, 5, encoder.encode(meta.title));
+  if (meta.artist) dataset(2, 80, encoder.encode(meta.artist));
+  if (meta.copyright) dataset(2, 116, encoder.encode(meta.copyright));
+  if (meta.description) dataset(2, 120, encoder.encode(meta.description));
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let cursor = 0;
+  for (const part of parts) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
+}
+
+/** Insert (or replace) an IPTC-IIM APP13 segment immediately after SOI. */
+export function insertJpegIptc(jpeg: Uint8Array, meta: ImageMetadata): Uint8Array {
+  const stripped = stripJpegSidecarSegments(jpeg, { iptc: true });
+  const iptc = buildIptcDatasets(meta);
+  // 8BIM resource: ID 0x0404 (IPTC-NAA), empty Pascal name, u32 size, data.
+  const resourceName = Uint8Array.from([0x00, 0x00]); // length 0 + padding byte
+  // '8BIM'(4) + resource ID(2) + Pascal name block(2) + size(4) + data.
+  const resourceSize = 4 + 2 + resourceName.length + 4 + iptc.length + (iptc.length % 2);
+  const payload = new Uint8Array('Photoshop 3.0'.length + 1 + resourceSize);
+  const encoder = new TextEncoder();
+  payload.set(encoder.encode('Photoshop 3.0'), 0);
+  payload[13] = 0;
+  let cursor = 14;
+  payload.set(encoder.encode('8BIM'), cursor);
+  cursor += 4;
+  payload[cursor] = 0x04;
+  payload[cursor + 1] = 0x04;
+  cursor += 2;
+  payload.set(resourceName, cursor);
+  cursor += resourceName.length;
+  payload[cursor] = (iptc.length >>> 24) & 0xff;
+  payload[cursor + 1] = (iptc.length >>> 16) & 0xff;
+  payload[cursor + 2] = (iptc.length >>> 8) & 0xff;
+  payload[cursor + 3] = iptc.length & 0xff;
+  cursor += 4;
+  payload.set(iptc, cursor);
+  cursor += iptc.length;
+  if (iptc.length % 2 === 1) cursor += 1; // already zero-filled
+
+  const { segments, tailStart } = splitJpegSegments(stripped);
+  let total = 2 + 4 + payload.length;
+  for (const segment of segments) total += 4 + segment.payload.length;
+  total += stripped.length - tailStart;
+
+  const out = new Uint8Array(total);
+  out[0] = 0xff;
+  out[1] = 0xd8;
+  out[2] = 0xff;
+  out[3] = 0xed;
+  out[4] = (payload.length + 2) >> 8;
+  out[5] = (payload.length + 2) & 0xff;
+  out.set(payload, 6);
+  let position = 6 + payload.length;
+  for (const segment of segments) {
+    out[position] = 0xff;
+    out[position + 1] = segment.marker;
+    out[position + 2] = (segment.payload.length + 2) >> 8;
+    out[position + 3] = (segment.payload.length + 2) & 0xff;
+    out.set(segment.payload, position + 4);
+    position += 4 + segment.payload.length;
+  }
+  out.set(stripped.subarray(tailStart), position);
+  return out;
+}
+
+/** Read IPTC-IIM datasets back out of a JPEG (dataset number -> value). */
+export function readJpegIptc(jpeg: Uint8Array): Record<number, string> {
+  const { segments } = splitJpegSegments(jpeg);
+  const decoder = new TextDecoder('utf-8');
+  const result: Record<number, string> = {};
+  for (const segment of segments) {
+    if (!isIptcSegment(segment)) continue;
+    const payload = segment.payload;
+    // Skip "Photoshop 3.0\0", then walk 8BIM resources to find 0x0404.
+    let cursor = 14;
+    while (cursor + 10 <= payload.length) {
+      if (String.fromCharCode(payload[cursor], payload[cursor + 1], payload[cursor + 2], payload[cursor + 3]) !== '8BIM') break;
+      const resourceId = (payload[cursor + 4] << 8) | payload[cursor + 5];
+      const nameLength = payload[cursor + 6];
+      // Pascal string: length byte + name, padded to an even total.
+      const nameBlock = 1 + nameLength + ((1 + nameLength) % 2);
+      const sizeOffset = cursor + 6 + nameBlock;
+      if (sizeOffset + 4 > payload.length) break;
+      const size = ((payload[sizeOffset] << 24) | (payload[sizeOffset + 1] << 16) | (payload[sizeOffset + 2] << 8) | payload[sizeOffset + 3]) >>> 0;
+      const dataStart = sizeOffset + 4;
+      if (resourceId === 0x0404) {
+        let i = dataStart;
+        while (i + 5 <= dataStart + size) {
+          if (payload[i] !== 0x1c) break;
+          const datasetNumber = payload[i + 2];
+          const datasetSize = (payload[i + 3] << 8) | payload[i + 4];
+          result[datasetNumber] = decoder.decode(payload.subarray(i + 5, i + 5 + datasetSize));
+          i += 5 + datasetSize;
+        }
+        return result;
+      }
+      cursor = dataStart + size + (size % 2);
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // JPEG: EXIF via piexifjs
 // ---------------------------------------------------------------------------
 
@@ -332,6 +458,7 @@ export async function writeJpegMetadata(jpeg: Uint8Array, meta: ImageMetadata): 
   }
   let result = stringToBinary(binary);
   if (meta.xmp) result = insertJpegXmp(result, meta);
+  if (meta.iptc) result = insertJpegIptc(result, meta);
   return result;
 }
 

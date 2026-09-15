@@ -40,6 +40,7 @@ export function registerAudioConverters(): void {
           channels: Number(options.channels) > 0 ? Number(options.channels) : undefined,
           trimStart: Number(options.trimStart) > 0 ? Number(options.trimStart) : undefined,
           trimEnd: Number(options.trimEnd) > 0 ? Number(options.trimEnd) : undefined,
+          tags: audioTagsFrom(options),
         });
         if (target.id === 'mp3') {
           const tags = audioTagsFrom(options);

@@ -20,6 +20,7 @@ function imageMetadataFrom(options: ConversionOptions): ImageMetadata {
     software: typeof options.software === 'string' ? options.software : undefined,
     creationTime: typeof options.creationTime === 'string' ? options.creationTime : undefined,
     xmp: options.xmp === true || options.xmp === 'true',
+    iptc: options.iptc === true || options.iptc === 'true',
     stripExisting: options.stripMeta === true || options.stripMeta === 'true',
   };
 }

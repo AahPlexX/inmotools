@@ -11,6 +11,9 @@ export interface AudioConvertOptions {
   channels?: number;
   trimStart?: number;
   trimEnd?: number;
+  /** Descriptive tags written natively into the container (not used for MP3,
+   *  which receives a full ID3v2 rewrite instead). */
+  tags?: AudioTagOptions;
 }
 
 export interface AudioTagOptions {
@@ -96,6 +99,18 @@ export async function transcodeAudio(
   }
   if (options.sampleRate && options.sampleRate > 0) audioOptions.sampleRate = options.sampleRate;
   if (options.channels && options.channels > 0) audioOptions.numberOfChannels = options.channels;
+  if (target !== 'mp3' && hasTagOptions(options.tags)) {
+    const tags = options.tags as AudioTagOptions;
+    audioOptions.tags = {
+      ...(tags.title ? { title: tags.title } : {}),
+      ...(tags.artist ? { artist: tags.artist } : {}),
+      ...(tags.album ? { album: tags.album } : {}),
+      ...(tags.genre ? { genre: tags.genre } : {}),
+      ...(tags.comment ? { comment: tags.comment } : {}),
+      ...(tags.year ? { date: tags.year } : {}),
+      ...(tags.trackNumber ? { trackNumber: tags.trackNumber } : {}),
+    };
+  }
 
   const trim = options.trimStart !== undefined || options.trimEnd !== undefined
     ? { start: Math.max(0, options.trimStart ?? 0), end: options.trimEnd }
