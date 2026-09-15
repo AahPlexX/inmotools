@@ -115,6 +115,34 @@ describe('CAD exact sweep and loft contracts', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'sweep-1', shape: swept }]);
   });
 
+  it('sweeps along an inline helix path instead of a sketch when a helix parameter is given', () => {
+    const profileWire = token('profile-wire');
+    const helixWire = token('helix-wire');
+    const swept = token('swept');
+    const kernel = {
+      profileWire: vi.fn(() => profileWire),
+      helixWire: vi.fn(() => helixWire),
+      sweep: vi.fn(() => swept),
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+    const helixDefinition = { origin: [0, 0, 0], axis: [0, 0, 1], pitch: 2, height: 10, radius: 5 };
+    const input = project([circleSketch('profile')], [
+      feature('coil-1', 'sweep', {
+        sketchId: 'profile',
+        profileEntityIds: ['profile-circle'],
+        helix: helixDefinition,
+      }),
+    ]);
+
+    const result = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.helixWire).toHaveBeenCalledWith(helixDefinition);
+    expect(kernel.profileWire).toHaveBeenCalledTimes(1);
+    expect(kernel.sweep).toHaveBeenCalledWith(profileWire, helixWire);
+    expect(kernel.release).toHaveBeenCalledWith(helixWire);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'coil-1', shape: swept }]);
+  });
+
   it('builds loft sections as exact wires and releases every temporary section', () => {
     const sectionA = token('section-a');
     const sectionB = token('section-b');

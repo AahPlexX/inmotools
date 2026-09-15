@@ -94,6 +94,41 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('builds a real exact helix wire spanning exactly its declared radius and height', () => {
+    // 5 complete turns (height/pitch = 10/2), so the x/y projection covers the full circle.
+    const helix = kernel.helixWire({ origin: [0, 0, 0], axis: [0, 0, 1], pitch: 2, height: 10, radius: 5 });
+    try {
+      expectBoundsClose(kernel.bounds(helix), { min: [-5, -5, 0], max: [5, 5, 10] });
+    } finally {
+      kernel.release(helix);
+    }
+  });
+
+  it('sweeps a small circle along a real exact helix into a coil solid', () => {
+    const profile = kernel.profileWire({
+      edges: [{ kind: 'circle', center: [5, 0, 0], normal: [0, 1, 0], radius: 0.5 }],
+    });
+    const helix = kernel.helixWire({ origin: [0, 0, 0], axis: [0, 0, 1], pitch: 2, height: 10, radius: 5 });
+    const coil = kernel.sweep(profile, helix);
+    try {
+      const volume = kernel.volume(coil);
+      expect(Number.isFinite(volume)).toBe(true);
+      expect(volume).toBeGreaterThan(0);
+      // A generalized-cylinder sanity bound: swept volume can't exceed cross-section area times path arc length.
+      const turns = 10 / 2;
+      const archLength = turns * Math.hypot(2 * Math.PI * 5, 2);
+      expect(volume).toBeLessThan(Math.PI * 0.5 ** 2 * archLength * 1.05);
+    } finally {
+      kernel.release(coil);
+      kernel.release(helix);
+      kernel.release(profile);
+    }
+  });
+
+  it('rejects a helix with a non-positive radius', () => {
+    expect(() => kernel.helixWire({ origin: [0, 0, 0], axis: [0, 0, 1], pitch: 2, height: 10, radius: 0 })).toThrow(/radius/i);
+  });
+
   it('lofts two exact circular wires into a solid frustum', () => {
     const sectionA = kernel.profileWire({
       edges: [{ kind: 'circle', center: [0, 0, 0], normal: [1, 0, 0], radius: 2 }],
