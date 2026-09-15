@@ -108,6 +108,21 @@ These remain release blockers because they are promised by the design specificat
 4. Reconcile `feat/photo-studio` with the latest moving `main` only when the planned integration gate is reached; do not rewrite parallel-agent branches.
 5. Review the exact changed-file set, run exact merge-state validation, verify the Pages deployment, and close shared task records only after every completion gate is evidenced.
 
+## Risk-based verification cadence
+
+Effective 2026-09-15, development feedback is batched by risk; the feature inventory and final completion gates above are unchanged.
+
+- Use one primary implementer by default. Delegate only a substantial independent task with clear file ownership and an expected payoff greater than coordination/review cost; do not create parallel implementer/reviewer loops for small changes.
+- For new behavior or bug fixes, add a meaningful failing contract test before implementation. Related contracts may share one RED run; every changed behavior still needs appropriate coverage, not an arbitrary test quota per capability.
+- For at most two related low-risk edits within an already-tested contract, run the affected checks after the pair, or sooner at the subsystem boundary. A single remaining edit must be checked before handoff. This defers a repeated run, not coverage of either edit.
+- Check high-risk changes immediately: codecs/untrusted imports, source retention/deletion, persistence/migrations, history isolation, async revision/cancellation, shared preview/export rendering, output limits, or metadata packaging. Uncertain impact, cross-module effects, failures, or flaky results escalate to broader checks; never sample past ambiguity.
+- Run development check commands sequentially, without overlapping build/unit/browser jobs. Browser spot checks use explicit affected specs/tests with `--workers=1`; exercise desktop first unless the change is touch/mobile-specific, then check the affected mobile contract. Keep production build freshness explicit because Playwright serves `dist`.
+- Prefer shared literal input/expected-output tables with Vitest `test.each` and uniquely named Playwright parameterized cases for genuinely equivalent behavior. Keep unique pixel effects, data-loss paths, ordering/races, and accessibility interactions independently asserted; do not derive expected results from the implementation being tested.
+- Read executed counts, failures, skips, and exit status from runner output/reporters. Test totals are evidence, not capability-completion counts; sampled results must be labeled with their exact scope.
+- Before closing a material implementation batch, perform one consolidated changed-file review, run all Photo unit/selector tests, rebuild production/PWA, and run every selected Photo browser spec across both configured projects. Rerun affected checks after review fixes; repeat the broader gate whenever the fix can invalidate it. Exact merge-state repository validation and deployment proof remain mandatory at release.
+- For documentation-only cadence changes, validate the diff and referenced entrypoints; do not rerun the full browser matrix or imply fresh feature/build verification. The existing preset-transfer table was checked sequentially on 2026-09-15: 12 tests passed in one file; no new runtime, test configuration, dependency, or CI changes accompany this policy.
+- Reassess cadence using completed capabilities, affected-run/full-gate duration, escaped defects, and coordination cost. If batching weakens failure attribution or defect detection, return the affected subsystem to immediate checks rather than weakening assertions or completion criteria.
+
 ## Anti-staleness rule
 
 - This tracker must be reviewed before and after each material Photo Studio implementation batch.

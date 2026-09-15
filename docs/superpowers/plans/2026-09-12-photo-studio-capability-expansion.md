@@ -2,6 +2,8 @@
 
 > **Execution rule:** Implement in small Photo-only batches using RED → GREEN → focused refactor. Do not advance a blocker in the authoritative tracker until the exact material implementation head has appropriate evidence. Reconcile with moving `main` non-destructively; never modify an unrelated tool to make Photo Studio green.
 
+> **Verification cadence:** Follow the risk-based verification cadence in `.tasks/PHOTO_STUDIO.md`: batch repeated low-risk development checks, verify high-risk changes immediately, and retain the consolidated material-batch and exact merge-state gates. Sampling never replaces coverage or final verification.
+
 **Goal:** Expand Photo Studio from the approved base editor into the broadest realistically deliverable local-first browser photo workstation supported by the existing repository and GitHub Pages, while retaining deterministic completion, non-destructive state, accessibility, and safe memory behavior.
 
 **Architecture:** Keep the existing `PhotoRecipe`/history/worker renderer as the stable base. Add large codecs and advanced processors behind lazy adapters, keep source data immutable, route all preview/export semantics through shared operations, and persist projects locally through capability-detected browser storage. Heavy multi-image operations use dedicated workers and bounded queues. New UI is grouped into the existing workspace rather than spawning disconnected mini-tools.
