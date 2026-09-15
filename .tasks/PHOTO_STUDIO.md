@@ -26,9 +26,9 @@ If any box above is unchecked, Photo Studio is not complete.
 - Status: **IN PROGRESS**
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
-- Current material Photo head before this tracker-only commit: `77d00cf5ea7b78a397fbe24c94453137456e8678`
-- Current phase: **Capability expansion Phase 1 / Task 1.2 — durable local projects and recovery**
-- Current verification state: exact local Photo head `77d00cf5ea7b78a397fbe24c94453137456e8678` passes all 64 Photo unit/selector tests, the production build, and all 62 focused Photo browser cases across desktop/mobile Chromium. Independent read-only change review reports no remaining P0/P1/P2 findings. PR run `34881169420` at tracker head `cf4a07b23f9caeeffd49def2a3235e7a007c419f` passed every Photo unit file, then stopped in the repository unit step on unrelated Crystal/Vector branch gaps before build/browser execution.
+- Current material Photo head before this tracker-only commit: `448f46e695cef35abfeb46ab6a4c5095d6c1be6e`
+- Current phase: **Capability expansion Phase 1 / Task 1.3 — virtual copies and user presets**
+- Current verification state: exact local Photo head `448f46e695cef35abfeb46ab6a4c5095d6c1be6e` passes all 76 Photo unit/selector tests, the production/PWA build, and all 66 focused Photo browser cases across desktop/mobile Chromium. Astral-routed fresh review found concurrency and data-safety defects during development; every P1 was repaired with deterministic regression coverage, and the final closure review reports no remaining P0/P1 findings. PR run `34881169420` at tracker head `cf4a07b23f9caeeffd49def2a3235e7a007c419f` remains the latest remote workflow context and predates this implementation.
 - Latest PR workflow context: run `34881169420` recorded 771 passing repository tests, including every Photo unit test, but failed because `tests/unit/crystal-symmetry.test.ts` imports a missing parallel-branch `symmetry-engine` module and three `vector-engine-path-motion` assertions lack their parallel-branch path-translation implementation. Those failures are outside Photo Studio scope; build and browser steps were skipped.
 - Prior PR workflow context: run `34726437963` passed all 722 repository unit tests and the production build at earlier Photo head `93a3535252c843cc27146030373e377b9e35f12a`, then failed the expanded 502-case repository browser suite. Its two Photo-specific failures were test-contract defects (an unscoped page-level status locator and mouse-only range dragging under touch emulation), both corrected at `5612412d8e0416f62f14bd82d351d4c76ac77966`; unrelated tool failures remain outside Photo Studio scope.
 - Current verified merge-state evidence: PR workflow run `34706122558` completed successfully for earlier Photo head `5394c88b560af6ab5933968771334502da9c207e`; the repository unit suite, production build, and the complete focused Photo Studio browser matrix all passed on that PR merge state.
@@ -59,7 +59,7 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] The export dialog exposes planned dimensions before render and blocks known-oversized single exports until the user explicitly selects the offered verified-safe dimensions.
 - [x] Safe export planning honors both edge and area ceilings and preserves aspect ratio.
 - [x] Before/after comparison now supports an explicit split mode with a pointer-draggable, keyboard-operable split slider plus a side-by-side mode; both surfaces share synchronized zoom and preserve image-space registration for overlays and direct editing.
-- [x] Photo source changes select the full focused Photo browser matrix (`photo.spec.ts`, `photo-controls.spec.ts`, `photo-compare.spec.ts`, `photo-copy-paste.spec.ts`, and `photo-import.spec.ts`) rather than silently omitting specialized Photo specs.
+- [x] Photo source changes select the full focused Photo browser matrix (`photo.spec.ts`, `photo-controls.spec.ts`, `photo-compare.spec.ts`, `photo-copy-paste.spec.ts`, `photo-import.spec.ts`, and `photo-project.spec.ts`) rather than silently omitting specialized Photo specs.
 - [x] Browser coverage verifies tone-curve undo semantics, direct mask/retouch placement, reviewed XMP sidecar, actual embedded XMP in PNG, safe custom filename, output sharpening, production batch queue completion, RGB histogram, clipping overlay, color sampler, individual resets, named snapshots, exact custom crop ratio, long-/short-edge sizing, explicit safe-size selection, keyboard history, synchronized split/side-by-side comparison, and 320 CSS px editor/export-dialog reflow.
 - [x] Exact Photo head `5394c88b560af6ab5933968771334502da9c207e` passed repository unit tests, production build, and the full focused Photo browser matrix through PR validation run `34706122558`.
 - [x] In-session copy/paste implementation exists at `93a3535252c843cc27146030373e377b9e35f12a`: Copy stores an independent normalized recipe snapshot, source changes preserve the in-session clipboard, and Paste routes through one normal history commit. Its focused desktop/mobile browser contract is GREEN at `5612412d8e0416f62f14bd82d351d4c76ac77966`.
@@ -68,6 +68,7 @@ If any box above is unchecked, Photo Studio is not complete.
 - [x] Drag/drop, direct clipboard read, body-level image paste, mobile camera capture, and ordinary file input route through one local import contract at `77d00cf5ea7b78a397fbe24c94453137456e8678`; unsupported/denied clipboard paths remain truthful and preserve the active document.
 - [x] Import operations are revision-gated from operation start, source URL replacement is transactional, stale clipboard work cannot decode over a newer source, older preview success/failure cannot replace newer import guidance, and source swaps clear prior preview observation state before the new render is ready.
 - [x] Concurrent preview/export worker requests use internal unique correlation IDs independent of caller revision counters, with deterministic reverse-order fake-worker proof at `f057e8e`.
+- [x] Durable local projects and recovery are implemented at `448f46e695cef35abfeb46ab6a4c5095d6c1be6e`: versioned/migrated IndexedDB metadata, OPFS source storage with IndexedDB fallback, 800 ms autosave, explicit save/load/delete, startup recovery, quota/capability/durability reporting, conservative orphan cleanup, unique replacement keys, browser-wide mutation coordination, and stale-action/save-state guards. Final evidence is 76 Photo unit/selector tests, the production/PWA build, and 66 desktop/mobile browser cases.
 
 ## Original spec inventory blockers discovered during audit
 
@@ -93,13 +94,14 @@ These remain release blockers because they are promised by the design specificat
 - [x] Phase 0 / Task 0.4 — in-session copy/paste edits; implementation committed at `93a3535252c843cc27146030373e377b9e35f12a`, with all 42 focused Photo browser cases GREEN at `5612412d8e0416f62f14bd82d351d4c76ac77966`.
 - [x] Phase 0 / Task 0.5 — final base-contract evidence and explicit unsupported-encoder/stale-render accounting recorded from deterministic runtime and unit evidence at `5612412d8e0416f62f14bd82d351d4c76ac77966`.
 - [x] Phase 1 / Task 1.1 — failure-safe drag/drop, clipboard, camera, and native raster acquisition, implemented at `77d00cf5ea7b78a397fbe24c94453137456e8678` with 20 desktop/mobile import browser cases plus focused unit coverage.
-- [ ] Phase 1 / Tasks 1.2–1.5 — durable projects/recovery, virtual copies/user presets, and capability-gated TIFF/RAW adapters.
+- [x] Phase 1 / Task 1.2 — durable projects/recovery, implemented at `448f46e695cef35abfeb46ab6a4c5095d6c1be6e` with final unit/build/browser evidence and clean Astral closure review.
+- [ ] Phase 1 / Tasks 1.3–1.5 — virtual copies/user presets and capability-gated TIFF/RAW adapters.
 - [ ] Phases 2–7 — composition/scopes/tone/color; selection/masking/brushes; layers/compositing/detail; multi-image processing; workflow/export depth; final capability ledger, integration, and deployment.
 
 ## Remaining release work
 
-1. Implement Phase 1 / Task 1.2: versioned IndexedDB project state, capability-gated OPFS source/cache storage, autosave debounce, quota/error handling, recovery prompt, explicit delete, and cleanup.
-2. Continue the remaining Phase 1 tasks: virtual copies/user presets and capability-gated TIFF/RAW adapters; reverify and exactly pin any dependency immediately before installation.
+1. Implement Phase 1 / Task 1.3: virtual copies that share one immutable source while retaining independent recipes/snapshots, plus local named user presets with edit/import/export/delete workflows.
+2. Continue Tasks 1.4–1.5 with capability-gated TIFF/RAW adapters; reverify official documentation and npm, then exactly pin any dependency immediately before installation.
 3. Continue Phases 2–7 in the ordered, Photo-only batches defined by `docs/superpowers/plans/2026-09-12-photo-studio-capability-expansion.md`; maintain the 164-item capability ledger without silent omissions.
 4. Reconcile `feat/photo-studio` with the latest moving `main` only when the planned integration gate is reached; do not rewrite parallel-agent branches.
 5. Review the exact changed-file set, run exact merge-state validation, verify the Pages deployment, and close shared task records only after every completion gate is evidenced.
