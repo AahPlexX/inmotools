@@ -1,59 +1,71 @@
 /**
  * Sightline Velocity Studio — reading workspace.
  *
- * The workspace owns three things and nothing else: the reader state that is
- * persisted locally, the document model that came out of ingestion, and the
- * clock that decides which word is on screen. Every calculation behind those
- * — pacing, chunking, weighting, gradients, drills, warehouses, exports — lives
- * in the engines under this directory, so the surface cannot drift away from
- * what the exporters write.
+ * One screen covers the whole path from a local file to a finished export:
+ * ingestion with a per-format report, a chapter navigator and page map, five
+ * presentation engines, pacing and drill controls, a word bank, the local
+ * reading history, bookmarks, highlights, margin notes, and the metadata-led
+ * export studio.
  *
- * Playback runs on `requestAnimationFrame` and the schedule is looked up by
- * elapsed time rather than counted frame by frame, which keeps the rate honest
- * when the browser throttles the tab and keeps the pause multipliers exact.
+ * Everything runs in this browser tab. Documents are decoded here, sessions are
+ * measured here, and every file is written here; the workspace never sends the
+ * text, the timings, or the exports anywhere.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { downloadBytes, downloadText } from '../../lib/download';
-import { ingestDocument, ingestPastedText, describeModel, extensionOf } from './ingest-router';
 import {
-  RAMP_PRESETS,
-  WPM_STEPS,
+  describeModel,
+  extensionOf,
+  ingestDocument,
+  ingestPastedText,
+  type IngestDependencies,
+} from './ingest-router';
+import {
   buildSchedule,
   clampWpm,
   frameAt,
-  frameForToken,
   rateNote,
+  remainingMs,
+  RAMP_PRESETS,
+  scheduleWpm,
+  WPM_STEPS,
+  type RampConfig,
   type Schedule,
 } from './pacing-engine';
-import { buildChunkSchedule } from './chunk-engine';
+import { buildChunkSchedule, chunkStreamWpm, suggestedChunkWidth } from './chunk-engine';
+import { FOCAL_ANCHOR_FRACTION, computeOrp, splitOrp } from './orp-engine';
 import { splitEmphasis } from './typography-engine';
-import { checkGradientContrast, paletteById, samplePalette } from './gradient-engine';
+import { paletteById, samplePalette } from './gradient-engine';
+import { ANCHOR_ACCENTS, applyDyslexiaSpacing, fontById, fontSizePx, themeById, themeVariables } from './palette-engine';
+import { anchorScrollTop, pacerBoxes, pacerPosition, pageDurationMs, type PacerBox, type WordBox } from './pacer-engine';
 import {
-  ANCHOR_ACCENTS,
-  backgroundOf,
-  fontSizePx,
-  fontById,
-  themeById,
-  themeContrast,
-  themeVariables,
-} from './palette-engine';
-import { buildDrillPlan, flashEquivalentWpm, scoreRecall, type DrillFlash } from './drill-engine';
-import { anchorScrollTop } from './pacer-engine';
-import { buildColumnLayout, buildPeripheralSlides, columnEccentricityDegrees } from './peripheral-engine';
-import { beatAt, clickSchedule } from './metronome-engine';
-import { buildSpeechPlan, detectSpeechSupport, tokenForCharOffset } from './speech-engine';
+  buildColumnLayout,
+  buildPeripheralSlides,
+  columnEccentricityDegrees,
+  columnFontSize,
+  peripheralAdvice,
+} from './peripheral-engine';
+import { buildDrillPlan, flashEquivalentWpm, scoreRecall, type DrillPlan } from './drill-engine';
+import { beatsInRange } from './metronome-engine';
+import {
+  buildSpeechPlan,
+  chooseVoice,
+  chunkStartTimes,
+  detectSpeechSupport,
+  tokenForCharOffset,
+  type SpeechPlan,
+} from './speech-engine';
 import {
   advanceSession,
   createSession,
-  formatDuration,
-  formatEta,
   pauseSession,
-  readingStreak,
   resumeSession,
   sessionTick,
   summariseSession,
+  suggestNextWpm,
   type SessionState,
+  type SessionSummary,
   type SessionTick,
 } from './session-engine';
 import {
@@ -67,16 +79,18 @@ import {
   readAllDocuments,
   readAllSessions,
   readAllVocabulary,
+  readDocument,
   summariseWarehouse,
   velocityByDay,
   type StoredDocument,
   type StoredSession,
-  type WarehouseSummary,
 } from './analytics-engine';
 import {
   applyReview,
   buildClozeSet,
   collectVocabulary,
+  DEFAULT_COLLECT,
+  retentionRate,
   type ClozeItem,
   type TimedToken,
   type VocabularyEntry,
@@ -87,9 +101,7 @@ import {
   createDefaultState,
   documentId,
   exportState,
-  highlightFor,
   importState,
-  notesFor,
   progressFor,
   readState,
   removeBookmark,
@@ -99,719 +111,860 @@ import {
   updateSettings,
   upsertNote,
   writeState,
+  type DocumentProgress,
+  type EngineId,
   type HighlightColor,
   type ReaderSettings,
   type SightlineState,
 } from './sightline-store';
-import {
-  draftFromModel,
-  draftToMetadata,
-  emptyDraft,
-  exportFileName,
-  parseTags,
-  readingLevelOf,
-  reconcileReadingLevel,
-  socialTags,
-  structuredData,
-  suggestTags,
-  validateDraft,
-  type MetadataDraft,
-} from './metadata-studio';
-import {
-  DEFAULT_DOCX_EXPORT,
-  DEFAULT_EPUB_EXPORT,
-  DEFAULT_HTML_EXPORT,
-  DEFAULT_PDF_EXPORT,
-  describeExports,
-  planExport,
-  type ExportId,
-  type ExportInputs,
-} from './export-plan';
-import {
-  BankPanel,
-  DataPanel,
-  DrillPanel,
-  ExportPanel,
-  LookPanel,
-  PacePanel,
-} from './SightlinePanels';
-import { chapterForToken } from './segmentation-engine';
-import type { DocumentModel, IngestDiagnostic, ProseMetrics, SourceFormat } from './sightline-types';
+import { emptyDraft, draftFromModel, exportFileName, reconcileReadingLevel, suggestTags, type MetadataDraft } from './metadata-studio';
+import { DEFAULT_DOCX_EXPORT } from './export-docx';
+import { DEFAULT_EPUB_EXPORT } from './export-epub';
+import { DEFAULT_HTML_EXPORT } from './export-html';
+import { DEFAULT_PDF_EXPORT } from './export-pdf';
+import { describeExports, planExport, type ExportId, type ExportInputs } from './export-plan';
+import { BankPanel, DataPanel, DrillPanel, ExportPanel, LibraryPanel, LookPanel, PacePanel } from './SightlinePanels';
+import type { DocumentModel, IngestDiagnostic, IngestResult, SourceFormat, TokenRecord } from './sightline-types';
+import './sightline-fonts.css';
 import './sightline-workspace.css';
 
-type StatusPhase = 'idle' | 'working' | 'ready' | 'error';
-
-interface Status {
-  readonly phase: StatusPhase;
-  readonly message: string;
-  readonly diagnostics: readonly IngestDiagnostic[];
-}
-
-type PanelId = 'pace' | 'look' | 'drill' | 'bank' | 'data' | 'export';
-
-const ENGINE_TABS: readonly { readonly id: ReaderSettings['engine']; readonly label: string; readonly hint: string }[] = [
-  { id: 'rsvp', label: 'Anchor RSVP', hint: 'One word at a time, aligned on a fixed anchor letter.' },
-  { id: 'chunk', label: 'Chunked stream', hint: 'One to five words at a time, broken at phrase boundaries.' },
-  { id: 'page', label: 'Full page with pacer', hint: 'The whole text, with a pacer bar that glides word to word.' },
-  { id: 'peripheral', label: 'Peripheral columns', hint: 'Several short columns at once, training the wider visual field.' },
-  { id: 'drill', label: 'Flash drill', hint: 'Very short exposures of single words or short phrases.' },
+const ENGINES: readonly { readonly id: EngineId; readonly label: string; readonly hint: string }[] = [
+  { id: 'rsvp', label: 'Anchor RSVP', hint: 'One word at a time with its recognition point held on a fixed anchor.' },
+  { id: 'chunk', label: 'Chunked stream', hint: 'One to five words per frame, kept together by phrase.' },
+  { id: 'page', label: 'Full page', hint: 'The whole document with a pacer and an optional reading treatment.' },
+  { id: 'peripheral', label: 'Peripheral columns', hint: 'Several columns at once; the eye takes in more per fixation.' },
+  { id: 'drill', label: 'Flash drill', hint: 'Timed flashes that train recognition speed.' },
 ];
 
-const PANEL_TABS: readonly { readonly id: PanelId; readonly label: string }[] = [
+const PANELS: readonly { readonly id: string; readonly label: string }[] = [
   { id: 'pace', label: 'Pace' },
   { id: 'look', label: 'Look' },
   { id: 'drill', label: 'Drill' },
-  { id: 'bank', label: 'Word bank' },
-  { id: 'data', label: 'Data' },
+  { id: 'bank', label: 'Words' },
+  { id: 'marks', label: 'Marks' },
+  { id: 'data', label: 'History' },
   { id: 'export', label: 'Export' },
 ];
 
-const HIGHLIGHT_COLORS: readonly HighlightColor[] = ['amber', 'mint', 'sky', 'rose', 'violet'];
+const PASTE_FORMATS: readonly { readonly id: SourceFormat; readonly label: string }[] = [
+  { id: 'markdown', label: 'Markdown' },
+  { id: 'html', label: 'HTML' },
+  { id: 'rtf', label: 'RTF' },
+  { id: 'text', label: 'Plain text' },
+];
 
-const SAMPLE_DOCUMENT = `# Reading pace, measured honestly
+const SAMPLE_DOCUMENT = `# Reading with a moving anchor
 
-Speed reading is a skill with a speed limit. The evidence is consistent: comprehension survives a faster rate only while the wording stays simple and the material is familiar, and it falls away quickly beyond about four hundred words per minute on unfamiliar text.
+Speed reading is a skill with a speed limit. The eyes do less work than most
+people assume: a trained reader makes four or five fixations a second, and each
+fixation takes in a handful of letters either side of the point the eye lands
+on. The tools here do not change the eye; they change what the page asks of it.
+
+## What the anchor does
+
+An anchored presentation holds one word — or one short phrase — still while the
+rest of the document waits. Nothing moves except the words themselves, so the eye
+stops sweeping across a line and stops returning to the start of the next.
 
 ## What the research shows
 
-Readers recognise a word in roughly a quarter of a second when it is already in front of them. Remove the ability to look back, and the reader has to hold the sentence in memory instead of re-reading it. That is why the pause at the end of a sentence matters: the pause is not a courtesy to the reader, it is where the meaning is assembled.
+Comprehension is the price of speed once the material stops being familiar.
+Published work on one-word presentation finds that readers keep up with ordinary
+reading when the total time is the same, and that recall falls when the rate is
+pushed past roughly four hundred words per minute on new material. Treat this as
+a tool for reading more of what you already understand, and slow down when the
+argument matters.
+`;
 
-## What this workstation does with that
-
-This tool keeps the rewind controls in reach and slows down at punctuation by default. Rate is yours to choose, and the estimate shown here is measured from the words you actually saw rather than from a promise.
-
-## Practice
-
-Read the next passage at your normal pace, then again slightly faster. Compare the two sessions in the Data panel. The useful signal is not a single fast run; it is a rate you can hold with the comprehension you want.`;
-
-const ZERO_METRICS: ProseMetrics = {
-  words: 0,
-  sentences: 0,
-  syllables: 0,
-  complexWords: 0,
-  characters: 0,
-  charactersNoSpaces: 0,
-  paragraphs: 0,
-  readingMinutes: 0,
-  speakingMinutes: 0,
-  fleschReadingEase: 0,
-  fleschKincaidGrade: 0,
-  gunningFog: 0,
-  averageSentenceWords: 0,
-  longestSentenceWords: 0,
-};
-
-const formatClock = (ms: number): string => {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-};
-
-const isTypingTarget = (target: EventTarget | null): boolean => {
-  const element = target as HTMLElement | null;
-  return Boolean(element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT' || element.isContentEditable));
-};
+interface Status {
+  readonly phase: 'idle' | 'working' | 'ready' | 'error';
+  readonly message: string;
+}
 
 export default function SightlineWorkspace() {
-  /* -------------------------------------------------------- reader state -- */
-
-  const [state, setState] = useState<SightlineState>(() => (typeof localStorage === 'undefined'
-    ? createDefaultState()
-    : readState(localStorage)));
-  useEffect(() => {
+  const [state, setState] = useState<SightlineState>(() => {
+    if (typeof localStorage === 'undefined') return createDefaultState();
     try {
-      writeState(localStorage, state);
+      return readState(localStorage);
     } catch {
-      // A browser with storage disabled still reads; only the memory of the
-      // settings is lost, which is reported in the Data panel.
+      return createDefaultState();
     }
-  }, [state]);
+  });
   const settings = state.settings;
-  const patch = useCallback((values: Partial<ReaderSettings>) => setState((current) => updateSettings(current, values)), []);
 
-  /* ------------------------------------------------------------ document -- */
-
-  const [model, setModel] = useState<DocumentModel | null>(null);
-  const [status, setStatus] = useState<Status>({ phase: 'idle', message: 'Open a document, paste text, or load the sample.', diagnostics: [] });
-  const [dragging, setDragging] = useState(false);
+  const [model, setModel] = useState<DocumentModel | undefined>(undefined);
+  const [status, setStatus] = useState<Status>({ phase: 'idle', message: 'Choose a document, paste text, or load the sample.' });
+  const [diagnostics, setDiagnostics] = useState<readonly IngestDiagnostic[]>([]);
+  const [resume, setResume] = useState<DocumentProgress | undefined>(undefined);
   const [pasteText, setPasteText] = useState('');
-  const [pasteFormat, setPasteFormat] = useState<SourceFormat>('text');
-  const docId = useMemo(() => (model ? documentId(model) : ''), [model]);
+  const [pasteFormat, setPasteFormat] = useState<SourceFormat>('markdown');
+  const [dragging, setDragging] = useState(false);
+  const [panel, setPanel] = useState('pace');
+  const [engine, setEngine] = useState<EngineId>(settings.engine);
+  const [highlightColor, setHighlightColor] = useState<HighlightColor>('amber');
+  const [noteText, setNoteText] = useState('');
+  const [bankMessage, setBankMessage] = useState('');
+  const [copied] = useState(false);
 
-  /* ------------------------------------------------------------ playback -- */
-
-  const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+  const [position, setPosition] = useState(0);
+  const [clock, setClock] = useState(0);
   const [tick, setTick] = useState<SessionTick | null>(null);
-  const [panel, setPanel] = useState<PanelId>('pace');
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [drillPlan, setDrillPlan] = useState<DrillPlan | null>(null);
+  const [drillIndex, setDrillIndex] = useState(-1);
   const [drillRunning, setDrillRunning] = useState(false);
-  const [drillIndex, setDrillIndex] = useState(0);
-  const [recognised, setRecognised] = useState<ReadonlySet<number>>(new Set());
-  const [drillResult, setDrillResult] = useState<{ correct: number; total: number; accuracy: number; firstTryAccuracy: number; equivalentWpm: number } | null>(null);
-  const [bank, setBank] = useState<readonly VocabularyEntry[]>([]);
-  const [cloze, setCloze] = useState<readonly ClozeItem[]>([]);
+  const [recognised, setRecognised] = useState<ReadonlySet<number>>(() => new Set());
+  const [stageWidth, setStageWidth] = useState(960);
+  const [pacer, setPacer] = useState<{ current: PacerBox; glide: number } | null>(null);
+  const [beatFlash, setBeatFlash] = useState(false);
+
   const [sessions, setSessions] = useState<readonly StoredSession[]>([]);
   const [documents, setDocuments] = useState<readonly StoredDocument[]>([]);
-  const [storageNote, setStorageNote] = useState('Reading history is kept in this browser only.');
-  const [bankMessage, setBankMessage] = useState('');
+  const [bank, setBank] = useState<readonly VocabularyEntry[]>([]);
+  const [cloze, setCloze] = useState<readonly ClozeItem[]>([]);
+  const [warehouseNote, setWarehouseNote] = useState('Reading history is kept in this browser only.');
   const [exportMessage, setExportMessage] = useState('');
-  const [busyExport, setBusyExport] = useState<ExportId | ''>('');
-  const [draft, setDraft] = useState<MetadataDraft>(emptyDraft());
-  const [now, setNow] = useState(() => Date.now());
-  const [stageWidth, setStageWidth] = useState(1200);
+  const [busyExport, setBusyExport] = useState<ExportId | null>(null);
+  const [draft, setDraft] = useState<MetadataDraft>(emptyDraft);
+  const [speech, setSpeech] = useState({ supported: false, boundaryEvents: false, reason: 'Checking whether this browser can speak…' });
+  const [voices, setVoices] = useState<readonly string[]>([]);
 
-  const databaseRef = useRef<IDBDatabase | null>(null);
-  const sessionRef = useRef<SessionState | null>(null);
-  const timedRef = useRef<TimedToken[]>([]);
-  const startedAtRef = useRef<number | null>(null);
-  const lastTokenRef = useRef<{ index: number; at: number } | null>(null);
-  const elapsedRef = useRef(0);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const pageRef = useRef<HTMLDivElement | null>(null);
+  const positionRef = useRef(0);
+  const elapsedRef = useRef(0);
+  const sessionRef = useRef<SessionState | null>(null);
+  const seriesRef = useRef<number[]>([]);
+  const timingsRef = useRef<TimedToken[]>([]);
+  const lastWordRef = useRef<{ index: number; at: number } | null>(null);
+  const markedRef = useRef<string[]>([]);
+  const startedAtRef = useRef(0);
+  const dbRef = useRef<IDBDatabase | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
-  const tokens = model?.tokens ?? [];
-  const totalTokens = tokens.length;
-  const speechSupport = useMemo(
-    () => detectSpeechSupport({ speechSynthesis: typeof window === 'undefined' ? undefined : window.speechSynthesis, SpeechSynthesisUtterance: typeof window === 'undefined' ? undefined : window.SpeechSynthesisUtterance }),
-    [],
-  );
-  const metronomeSupported = useMemo(
-    () => typeof window !== 'undefined' && typeof window.AudioContext === 'function',
-    [],
-  );
-  const speechDriven = settings.speechEnabled && speechSupport.supported;
-
-  /* ------------------------------------------------------------ schedule -- */
-
-  const chunkSet = useMemo(
-    () => (model && settings.engine === 'chunk' ? buildChunkSchedule(model.tokens, settings.chunk, settings.pacing) : null),
-    [model, settings.engine, settings.chunk, settings.pacing],
-  );
-
-  const schedule: Schedule | null = useMemo(() => {
-    if (!model) return null;
-    if (settings.engine === 'chunk') return chunkSet?.schedule ?? null;
-    return buildSchedule(model.tokens, settings.pacing);
-  }, [model, settings.engine, chunkSet, settings.pacing]);
-
-  const drillPlan = useMemo(() => {
-    if (!model || settings.engine !== 'drill') return null;
-    const weak = new Set(bank.filter((entry) => entry.weight >= 2).map((entry) => entry.word));
-    return buildDrillPlan(model.tokens, settings.drill, { weakWords: weak });
-  }, [model, settings.engine, settings.drill, bank]);
-
-  /* --------------------------------------------------------- persistence -- */
-
-  const openDatabase = useCallback(async (): Promise<IDBDatabase | null> => {
-    if (databaseRef.current) return databaseRef.current;
-    const result = await openWarehouse(typeof indexedDB === 'undefined' ? {} : { indexedDB });
-    if (!result.ok || !result.value) {
-      setStorageNote(result.message ?? 'The local database could not be opened.');
-      return null;
-    }
-    databaseRef.current = result.value;
-    setStorageNote('Reading history, document rollups, and the word bank are stored in this browser.');
-    return result.value;
-  }, []);
-
-  const refreshWarehouse = useCallback(async () => {
-    const database = await openDatabase();
-    if (!database) return;
-    const [sessionResult, documentResult, vocabularyResult] = await Promise.all([
-      readAllSessions(database),
-      readAllDocuments(database),
-      readAllVocabulary(database),
-    ]);
-    if (sessionResult.ok && sessionResult.value) setSessions(sessionResult.value);
-    if (documentResult.ok && documentResult.value) setDocuments(documentResult.value);
-    if (vocabularyResult.ok && vocabularyResult.value) setBank(vocabularyResult.value);
-  }, [openDatabase]);
-
-  useEffect(() => { void refreshWarehouse(); }, [refreshWarehouse]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  // The reading surface is measured rather than guessed, so the peripheral
-  // layout and the pacer respond to the real viewport instead of a constant.
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage || typeof ResizeObserver === 'undefined') {
-      if (stage) setStageWidth(stage.clientWidth);
-      return;
-    }
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? stage.clientWidth;
-      if (width > 0) setStageWidth(width);
-    });
-    observer.observe(stage);
-    setStageWidth(stage.clientWidth);
-    return () => observer.disconnect();
-  }, [model, settings.engine]);
-
-  /* ----------------------------------------------------------- ingestion -- */
-
-  const applyResult = useCallback((result: Awaited<ReturnType<typeof ingestDocument>>) => {
-    if (!result.ok) {
-      setStatus({ phase: 'error', message: result.message, diagnostics: result.diagnostics });
-      return;
-    }
-    setModel(result.model);
-    setDraft(draftFromModel(result.model));
-    setPosition(0);
-    setElapsed(0);
-    elapsedRef.current = 0;
-    setPlaying(false);
-    setTick(null);
-    timedRef.current = [];
-    setStatus({
-      phase: 'ready',
-      message: `${result.model.fileName} · ${describeModel(result.model)}`,
-      diagnostics: result.diagnostics,
-    });
-    setCloze([]);
-    setDrillResult(null);
-    setRecognised(new Set());
-  }, []);
-
-  const openFile = useCallback(async (file: File) => {
-    setStatus({ phase: 'working', message: `Reading ${file.name}…`, diagnostics: [] });
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const result = await ingestDocument(bytes, file.name, {
-        proseOnly: settings.proseOnly,
-        includeNotes: settings.includeNotes,
-      }, { onProgress: (message) => setStatus({ phase: 'working', message, diagnostics: [] }) });
-      applyResult(result);
-    } catch (error) {
-      setStatus({
-        phase: 'error',
-        message: error instanceof Error ? error.message : 'That file could not be read.',
-        diagnostics: [],
-      });
-    }
-  }, [applyResult, settings.includeNotes, settings.proseOnly]);
-
-  const onFileInput = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) void openFile(file);
-  }, [openFile]);
-
-  const onDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) {
-      void openFile(file);
-      return;
-    }
-    const text = event.dataTransfer.getData('text/plain');
-    if (text.trim().length > 0) void ingestPastedText(text, { label: 'Dropped text', format: pasteFormat, proseOnly: settings.proseOnly, includeNotes: settings.includeNotes }).then(applyResult);
-  }, [applyResult, openFile, pasteFormat, settings.includeNotes, settings.proseOnly]);
-
-  const ingestPaste = useCallback(async () => {
-    setStatus({ phase: 'working', message: 'Reading the pasted text…', diagnostics: [] });
-    const result = await ingestPastedText(pasteText, {
-      label: `Pasted ${pasteFormat}`,
-      format: pasteFormat,
-      proseOnly: settings.proseOnly,
-      includeNotes: settings.includeNotes,
-    });
-    applyResult(result);
-  }, [applyResult, pasteFormat, pasteText, settings.includeNotes, settings.proseOnly]);
-
-  const loadSample = useCallback(async () => {
-    const result = await ingestPastedText(SAMPLE_DOCUMENT, { label: 'Reading pace notes', format: 'markdown' });
-    applyResult(result);
-  }, [applyResult]);
-
-  /* ------------------------------------------------------------- session -- */
-
-  const persistSession = useCallback(async () => {
-    const session = sessionRef.current;
-    if (!session || !model || session.tokensRead === 0) return;
-    const summary = summariseSession(session);
-    // The velocity series is sampled once a second from the realised rate, so a
-    // session that slowed down in the middle reads as one in the chart too.
-    const samples = Math.max(1, Math.round(summary.elapsedMs / 1000));
-    const sampled: number[] = [];
-    for (let index = 0; index < samples; index += 1) {
-      const drift = (index - (samples - 1) / 2) / Math.max(1, samples);
-      sampled.push(Math.max(40, Math.round(summary.averageWpm * (1 - drift * 0.06))));
-    }
-    const slowWords = [...bank]
-      .sort((left, right) => right.weight - left.weight)
-      .slice(0, 20)
-      .map((entry) => ({ word: entry.word, averageMs: entry.averageMs }));
-    const stored: StoredSession = { ...summary, series: sampled, slowWords };
-    const database = await openDatabase();
-    if (database) {
-      await putSession(database, stored);
-      const existing = documents.find((entry) => entry.id === docId);
-      await putDocument(database, mergeDocumentRollup(existing, stored));
-    }
-    setSessions((current) => [...current, stored]);
-    setDocuments((current) => {
-      const next = mergeDocumentRollup(current.find((entry) => entry.id === docId), stored);
-      return [...current.filter((entry) => entry.id !== next.id), next];
-    });
-    setState((current) => saveProgress(current, {
-      documentId: docId,
-      title: model.metadata.title || model.fileName,
-      format: model.format,
-      tokenIndex: session.position,
-      tokenCount: model.tokens.length,
-      chapterIndex: chapterForToken(model, session.position)?.index ?? 0,
-      wpm: settings.pacing.wpm,
-    }));
-  }, [bank, docId, documents, model, openDatabase, settings.pacing.wpm]);
-
-  const collectFromSession = useCallback(async () => {
-    const timed = timedRef.current;
-    if (timed.length === 0) {
-      setBankMessage('Read a passage first: weak words are collected from the words you actually saw.');
-      return;
-    }
-    const collected = collectVocabulary(timed, { slowRatio: 1.6, minLetters: 4 });
-    if (collected.length === 0) {
-      setBankMessage('No word was slow enough to collect. That usually means the rate was comfortable.');
-      return;
-    }
-    const merged = new Map(bank.map((entry) => [entry.word.toLowerCase(), entry]));
-    for (const entry of collected) {
-      const existing = merged.get(entry.word.toLowerCase());
-      merged.set(entry.word.toLowerCase(), existing
-        ? { ...existing, seen: existing.seen + entry.seen, weight: existing.weight + entry.weight, lastSeenAt: entry.lastSeenAt, averageMs: Math.round((existing.averageMs + entry.averageMs) / 2) }
-        : entry);
-    }
-    const next = [...merged.values()];
-    setBank(next);
-    const database = await openDatabase();
-    if (database) {
-      const result = await putVocabularyEntries(database, next);
-      setBankMessage(result.ok
-        ? `${collected.length} word${collected.length === 1 ? '' : 's'} added to the bank.`
-        : `${collected.length} word(s) added for this session, but the browser refused to save the bank: ${result.message ?? 'unknown reason'}`);
-      return;
-    }
-    setBankMessage(`${collected.length} word${collected.length === 1 ? '' : 's'} added for this session.`);
-  }, [bank, openDatabase]);
-
-  const reviewWord = useCallback(async (word: string, correct: boolean) => {
-    setBank((current) => current.map((entry) => (entry.word === word ? applyReview({ entry, correct, now: Date.now() }) : entry)));
-    const database = await openDatabase();
-    const entry = bank.find((candidate) => candidate.word === word);
-    if (database && entry) await putVocabularyEntries(database, [applyReview({ entry, correct, now: Date.now() })]);
-  }, [bank, openDatabase]);
-
-  const removeWord = useCallback(async (word: string) => {
-    setBank((current) => current.filter((entry) => entry.word !== word));
-    const database = await openDatabase();
-    if (database) await deleteVocabularyWord(database, word);
-  }, [openDatabase]);
-
-  const markCurrentWord = useCallback(() => {
-    const token = tokens[position];
-    if (!token) return;
-    const word = token.text.replace(/[^A-Za-z\u00c0-\u024f]/g, '');
-    if (word.length === 0) return;
-    setBank((current) => {
-      const existing = current.find((entry) => entry.word.toLowerCase() === word.toLowerCase());
-      if (existing) {
-        return current.map((entry) => (entry === existing ? { ...entry, weight: entry.weight + 1, seen: entry.seen + 1, lastSeenAt: Date.now() } : entry));
-      }
-      const now = Date.now();
-      return [...current, { word, seen: 1, correct: 0, averageMs: 0, weight: 3, addedAt: now, lastSeenAt: now, dueAt: now, intervalDays: 0 }];
-    });
-    setBankMessage(`Marked “${word}” as unknown.`);
-  }, [position, tokens]);
-
-  /* -------------------------------------------------------------- clock --- */
-
-  const finishReading = useCallback((atEnd: boolean) => {
-    setPlaying(false);
-    if (atEnd) setPosition(totalTokens);
-    void persistSession();
-    const session = sessionRef.current;
-    if (session && session.tokensRead > 4 && model) {
-      const next = clampWpm(settings.pacing.wpm + (atEnd ? 25 : -25));
-      setStatus({
-        phase: 'ready',
-        message: `${describeModel(model)} · ${next === settings.pacing.wpm
-          ? 'Hold this rate for another session before changing it.'
-          : `The smallest useful change for the next session is about ${next} words per minute.`}`,
-        diagnostics: model.diagnostics,
-      });
-    }
-  }, [model, persistSession, settings.pacing.wpm, totalTokens]);
-
-  useEffect(() => {
-    if (!playing || !schedule || !model || speechDriven) return;
-    let raf = 0;
-    const base = elapsedRef.current;
-    const origin = performance.now();
-    const step = (time: number) => {
-      const next = base + (time - origin);
-      elapsedRef.current = next;
-      const frame = frameAt(schedule, next);
-      if (!frame) {
-        setElapsed(schedule.totalMs);
-        finishReading(true);
-        return;
-      }
-      setElapsed(next);
-      const currentToken = model.tokens[frame.tokenIndex];
-      if (currentToken) {
-        const at = Date.now();
-        const previous = lastTokenRef.current;
-        if (!previous || previous.index !== frame.tokenIndex) {
-          if (previous) {
-            const previousToken = model.tokens[previous.index];
-            if (previousToken) timedRef.current.push({ token: previousToken, durationMs: Math.max(1, at - previous.at) });
-          }
-          lastTokenRef.current = { index: frame.tokenIndex, at };
-          if (sessionRef.current) sessionRef.current = advanceSession(sessionRef.current, model.tokens.length, { tokenIndex: frame.tokenIndex, at, wpm: frame.wpm });
-        }
-        setPosition(frame.tokenIndex);
-        if (sessionRef.current) setTick(sessionTick(sessionRef.current, model.tokens.length, at));
-      }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [playing, schedule, model, speechDriven, finishReading, settings.engine]);
-
-  // Progress is written periodically, so an unexpected close still leaves a
-  // usable resume point.
-  useEffect(() => {
-    if (!playing || !model || !docId) return;
-    const timer = window.setInterval(() => {
-      setState((current) => saveProgress(current, {
-        documentId: docId,
-        title: model.metadata.title || model.fileName,
-        format: model.format,
-        tokenIndex: position,
-        tokenCount: model.tokens.length,
-        chapterIndex: chapterForToken(model, position)?.index ?? 0,
-        wpm: settings.pacing.wpm,
-      }));
-    }, 4_000);
-    return () => window.clearInterval(timer);
-  }, [playing, model, docId, position, settings.pacing.wpm]);
-
-  const play = useCallback(() => {
-    if (!model) return;
-    if (!sessionRef.current) {
-      const session = createSession(model);
-      sessionRef.current = session;
-      timedRef.current = [];
-      lastTokenRef.current = null;
-      startedAtRef.current = session.startedAt;
-    } else {
-      sessionRef.current = resumeSession(sessionRef.current);
-    }
-    setPlaying(true);
-  }, [model]);
-
-  const pause = useCallback(() => {
-    setPlaying(false);
-    if (sessionRef.current) sessionRef.current = pauseSession(sessionRef.current);
-    void persistSession();
-  }, [persistSession]);
-
-  const seek = useCallback((tokenIndex: number) => {
-    if (!model) return;
-    const clamped = Math.max(0, Math.min(model.tokens.length - 1, tokenIndex));
-    setPosition(clamped);
-    const frame = schedule ? frameForToken(schedule, clamped) : undefined;
-    const nextElapsed = frame ? frame.startMs : 0;
-    elapsedRef.current = nextElapsed;
-    setElapsed(nextElapsed);
-    timedRef.current = [];
-    lastTokenRef.current = null;
-    if (sessionRef.current) sessionRef.current = { ...sessionRef.current, position: clamped };
-  }, [model, schedule]);
-
-  const step = useCallback((delta: number) => {
-    seek(position + delta);
-  }, [position, seek]);
-
-  /* ------------------------------------------------------- speech channel - */
-
-  useEffect(() => {
-    if (!speechDriven || !playing || !model) return;
-    const synthesis = window.speechSynthesis;
-    const plan = buildSpeechPlan(model.tokens, { wpm: settings.pacing.wpm, fromToken: position, neutralWpm: 175 });
-    if (plan.chunks.length === 0) return;
-    let cancelled = false;
-    let index = 0;
-    const speakNext = () => {
-      if (cancelled) return;
-      const chunk = plan.chunks[index];
-      if (!chunk) {
-        finishReading(true);
-        return;
-      }
-      const utterance = new SpeechSynthesisUtterance(chunk.text);
-      utterance.rate = plan.rate;
-      utterance.lang = draftToMetadata(draft).language || 'en';
-      utterance.onboundary = (event) => {
-        const offset = event.charIndex ?? 0;
-        const tokenIndex = tokenForCharOffset(chunk, offset);
-        if (tokenIndex >= 0) {
-          setPosition(tokenIndex);
-          if (sessionRef.current) {
-            sessionRef.current = advanceSession(sessionRef.current, model.tokens.length, { tokenIndex, at: Date.now(), wpm: settings.pacing.wpm });
-            setTick(sessionTick(sessionRef.current, model.tokens.length));
-          }
-        }
-      };
-      utterance.onend = () => {
-        index += 1;
-        speakNext();
-      };
-      utteranceRef.current = utterance;
-      synthesis.speak(utterance);
-    };
-    speakNext();
-    return () => {
-      cancelled = true;
-      synthesis.cancel();
-    };
-    // The position is intentionally not a dependency: speech runs a chunk at a
-    // time from the position captured when it started.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speechDriven, playing, model, settings.pacing.wpm]);
-
-  /* -------------------------------------------------------- metronome ----- */
-
-  const [beat, setBeat] = useState({ position: 0, accent: false });
-  useEffect(() => {
-    if (!settings.metronomeEnabled || !playing) return;
-    const config = settings.metronome;
-    const startedAt = performance.now();
-    let windowIndex = 0;
-    const timer = window.setInterval(() => {
-      const context = audioRef.current;
-      const samples = clickSchedule(config, 400, windowIndex * 400);
-      windowIndex += 1;
-      if (context && config.channel !== 'visual') {
-        for (const sample of samples) {
-          const oscillator = context.createOscillator();
-          const gain = context.createGain();
-          oscillator.frequency.value = sample.frequencyHz;
-          oscillator.type = 'square';
-          gain.gain.value = sample.gain;
-          oscillator.connect(gain).connect(context.destination);
-          const at = context.currentTime + sample.atMs / 1000;
-          oscillator.start(at);
-          oscillator.stop(at + sample.durationMs / 1000);
-        }
-      }
-      setBeat(beatAt(config, performance.now() - startedAt));
-    }, 200);
-    return () => window.clearInterval(timer);
-  }, [settings.metronomeEnabled, settings.metronome, playing]);
-
-  useEffect(() => {
-    if (!metronomeSupported || typeof window === 'undefined') return;
-    if (!settings.metronomeEnabled) return;
-    if (audioRef.current) return;
-    const Ctor = window.AudioContext;
-    if (typeof Ctor !== 'function') return;
-    try {
-      audioRef.current = new Ctor();
-    } catch {
-      // A browser that refuses an audio context falls back to the visual beat.
-    }
-  }, [metronomeSupported, settings.metronomeEnabled]);
-
-  /* -------------------------------------------------------- drill clock --- */
-
-  const [inGap, setInGap] = useState(false);
-
-  useEffect(() => {
-    if (!drillRunning || !drillPlan) return;
-    const flash = drillPlan.flashes[drillIndex];
-    if (!flash) {
-      setDrillRunning(false);
-      const scored = scoreRecall(drillPlan.flashes, recognised);
-      setDrillResult({ ...scored, equivalentWpm: flashEquivalentWpm(drillPlan.flashMs, settings.drill.wordsPerFlash) });
-      return;
-    }
-    setInGap(false);
-    const shown = window.setTimeout(() => setInGap(true), flash.durationMs);
-    const next = window.setTimeout(() => setDrillIndex((index) => index + 1), flash.durationMs + flash.gapMs);
-    return () => {
-      window.clearTimeout(shown);
-      window.clearTimeout(next);
-    };
-  }, [drillRunning, drillPlan, drillIndex, recognised, settings.drill.wordsPerFlash]);
-
-  const currentFlash: DrillFlash | undefined = drillPlan?.flashes[drillIndex];
-
-  /* ------------------------------------------------------------- derived -- */
+  const speechRef = useRef<SpeechPlan | null>(null);
 
   const theme = themeById(settings.appearance.theme);
   const font = fontById(settings.appearance.font);
-  const contrast = themeContrast(theme);
-  const palette = paletteById(settings.gradientPalette);
-  const gradientContrast = checkGradientContrast(palette, backgroundOf(settings.appearance));
-  const visualVariables = themeVariables(settings.appearance);
+  const appearance = applyDyslexiaSpacing(settings.appearance);
+  const accent = ANCHOR_ACCENTS.find((entry) => entry.id === appearance.anchorAccent) ?? ANCHOR_ACCENTS[0]!;
+  const tokens: readonly TokenRecord[] = model?.tokens ?? [];
+  const documentKey = model ? documentId(model) : '';
 
-  const currentToken = tokens[Math.min(position, Math.max(0, totalTokens - 1))];
-  const chapter = model ? chapterForToken(model, position) : undefined;
-  const sentence = model && currentToken ? model.sentences[currentToken.sentenceIndex] : undefined;
-  const progress = progressFor(state, docId);
-  const bookmarks = state.bookmarks;
-  const notesByToken = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const note of state.notes) {
-      const existing = map.get(note.tokenIndex);
-      map.set(note.tokenIndex, existing ? `${existing} · ${note.text}` : note.text);
+  /* ---------------------------------------------------------- persistence */
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      writeState(localStorage, state);
+    } catch {
+      // A full or blocked store must not stop the reader from reading.
+    }
+  }, [state]);
+
+  const patch = useCallback((values: Partial<ReaderSettings>) => {
+    setState((current) => updateSettings(current, values));
+  }, []);
+
+  useEffect(() => {
+    setState((current) => (current.settings.engine === engine ? current : updateSettings(current, { engine })));
+  }, [engine]);
+
+  /* ------------------------------------------------------------ ingestion */
+
+  const applyResult = useCallback(
+    (result: IngestResult) => {
+      if (!result.ok) {
+        setStatus({ phase: 'error', message: result.message });
+        setDiagnostics(result.diagnostics);
+        return;
+      }
+      const loaded = result.model;
+      setModel(loaded);
+      setDiagnostics(result.diagnostics);
+      setStatus({ phase: 'ready', message: `${loaded.fileName}: ${describeModel(loaded)}` });
+      setDraft(draftFromModel(loaded));
+      setCloze([]);
+      setSummary(null);
+      setTick(null);
+      setPlaying(false);
+      setDrillRunning(false);
+      setDrillPlan(null);
+      positionRef.current = 0;
+      elapsedRef.current = 0;
+      sessionRef.current = null;
+      setPosition(0);
+      setClock(0);
+      const key = documentId(loaded);
+      const saved = state.progress.find((entry) => entry.documentId === key);
+      setResume(saved && saved.tokenIndex > 0 && saved.tokenIndex < loaded.tokens.length ? saved : undefined);
+    },
+    [state.progress],
+  );
+
+  const ingestFiles = useCallback(
+    async (files: FileList | readonly File[]) => {
+      const file = files[0];
+      if (!file) return;
+      setStatus({ phase: 'working', message: `Reading ${file.name}…` });
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const isPdf = extensionOf(file.name) === 'pdf';
+        // The PDF runtime and its worker are fetched only when a PDF is
+        // opened, so the rest of the studio stays small and offline-first.
+        const pdfModule = isPdf ? await import('./pdfjs-extractor') : null;
+        if (pdfModule && !pdfModule.canDecodePdf()) {
+          setStatus({
+            phase: 'error',
+            message: `${file.name}: this browser cannot run the local PDF decoder. Convert the document to Markdown, HTML, or plain text and open that instead.`,
+          });
+          return;
+        }
+        const dependencies: IngestDependencies = {
+          onProgress: (message) => setStatus({ phase: 'working', message }),
+          ...(pdfModule ? { pdf: pdfModule.createPdfJsExtractor() } : {}),
+        };
+        applyResult(await ingestDocument(
+          bytes,
+          file.name,
+          { proseOnly: settings.proseOnly, includeNotes: settings.includeNotes },
+          dependencies,
+        ));
+      } catch (error) {
+        setStatus({
+          phase: 'error',
+          message: error instanceof Error ? error.message : 'That file could not be read in this browser.',
+        });
+      }
+    },
+    [applyResult, settings.includeNotes, settings.proseOnly],
+  );
+
+  const pasteIngest = useCallback(async () => {
+    applyResult(await ingestPastedText(pasteText, {
+      format: pasteFormat,
+      label: `Pasted ${pasteFormat} text`,
+      proseOnly: settings.proseOnly,
+      includeNotes: settings.includeNotes,
+      title: pasteText.trimStart().replace(/^#+\s*/, '').split('\n')[0]?.slice(0, 80),
+    }));
+  }, [applyResult, pasteFormat, pasteText, settings.includeNotes, settings.proseOnly]);
+
+  const readClipboard = useCallback(async () => {
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+    if (!clipboard || typeof clipboard.readText !== 'function') {
+      setStatus({ phase: 'error', message: 'This browser does not let a page read the clipboard. Paste into the box instead.' });
+      return;
+    }
+    try {
+      const text = await clipboard.readText();
+      if (text.trim().length === 0) {
+        setStatus({ phase: 'error', message: 'The clipboard held no text.' });
+        return;
+      }
+      setPasteText(text);
+      applyResult(await ingestPastedText(text, { format: pasteFormat, label: 'Clipboard text' }));
+    } catch {
+      setStatus({ phase: 'error', message: 'The browser blocked the clipboard read. Paste into the box instead.' });
+    }
+  }, [applyResult, pasteFormat]);
+
+  const loadSample = useCallback(async () => {
+    applyResult(await ingestPastedText(SAMPLE_DOCUMENT, { format: 'markdown', label: 'Reading pace notes' }));
+  }, [applyResult]);
+
+  const onPickFile = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (files && files.length > 0) void ingestFiles(files);
+      event.target.value = '';
+    },
+    [ingestFiles],
+  );
+
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(false);
+      if (event.dataTransfer.files.length > 0) {
+        void ingestFiles(event.dataTransfer.files);
+        return;
+      }
+      const text = event.dataTransfer.getData('text/plain');
+      if (text.trim().length > 0) {
+        setPasteText(text);
+        setStatus({ phase: 'ready', message: 'Dropped text captured. Press “Read the pasted text” to open it.' });
+      }
+    },
+    [ingestFiles],
+  );
+
+  /* ------------------------------------------------------- reading engines */
+
+  const tokenSchedule: Schedule = useMemo(() => buildSchedule(tokens, settings.pacing), [tokens, settings.pacing]);
+  const chunked = useMemo(
+    () => (engine === 'chunk' && tokens.length > 0 ? buildChunkSchedule(tokens, settings.chunk, settings.pacing) : null),
+    [engine, settings.chunk, settings.pacing, tokens],
+  );
+  const activeSchedule = chunked ? chunked.schedule : tokenSchedule;
+  const streamLength = chunked ? chunked.chunks.length : tokens.length;
+  const tokenIndexForStream = useCallback(
+    (index: number): number => (chunked ? (chunked.chunks[index]?.startToken ?? 0) : Math.min(index, Math.max(0, tokens.length - 1))),
+    [chunked, tokens.length],
+  );
+  const streamIndexForToken = useCallback(
+    (tokenIndex: number): number => {
+      if (!chunked) return Math.min(Math.max(0, tokenIndex), Math.max(0, tokens.length - 1));
+      const found = chunked.chunks.findIndex((chunk) => tokenIndex >= chunk.startToken && tokenIndex < chunk.endToken);
+      return found >= 0 ? found : Math.max(0, chunked.chunks.length - 1);
+    },
+    [chunked, tokens.length],
+  );
+  const streamText = useCallback(
+    (index: number): string => (chunked ? (chunked.chunks[index]?.text ?? '') : (tokens[index]?.text ?? '')),
+    [chunked, tokens],
+  );
+
+  const currentStreamIndex = Math.min(Math.max(0, position), Math.max(0, streamLength - 1));
+  const currentTokenIndex = tokenIndexForStream(currentStreamIndex);
+  const currentToken = tokens[currentTokenIndex];
+  const currentWord = streamText(currentStreamIndex);
+
+  const chapter = useMemo(() => {
+    if (!model || model.chapters.length === 0) return undefined;
+    const paragraphIndex = currentToken?.paragraphIndex ?? 0;
+    return [...model.chapters].reverse().find((entry) => entry.paragraphStart <= paragraphIndex) ?? model.chapters[0];
+  }, [currentToken, model]);
+
+  const sentenceRange = useMemo(() => {
+    if (!model || !currentToken) return null;
+    const node = model.sentences[currentToken.sentenceIndex];
+    if (!node) return null;
+    return { start: node.tokenStart, end: Math.max(node.tokenStart, node.tokenEnd - 1) };
+  }, [currentToken, model]);
+
+  const highlightedTokens = useMemo(() => {
+    const map = new Map<number, HighlightColor>();
+    for (const highlight of state.highlights) {
+      for (let index = highlight.startToken; index <= highlight.endToken; index += 1) map.set(index, highlight.color);
     }
     return map;
-  }, [state.notes]);
-  const currentHighlight = highlightFor(state, position);
-  const currentNotes = notesFor(state, position);
-  const [noteText, setNoteText] = useState('');
-  const [highlightColor, setHighlightColor] = useState<HighlightColor>('amber');
+  }, [state.highlights]);
 
-  const summary: WarehouseSummary | null = useMemo(
-    () => (sessions.length === 0 && documents.length === 0
-      ? null
-      : summariseWarehouse(sessions, documents, bank.length)),
-    [sessions, documents, bank.length],
+  /* ------------------------------------------------------------ playback */
+
+  const currentTokenIndexRef = useRef(currentTokenIndex);
+  currentTokenIndexRef.current = currentTokenIndex;
+  const chapterIndexRef = useRef(chapter?.index ?? 0);
+  chapterIndexRef.current = chapter?.index ?? 0;
+  const activeScheduleRef = useRef(activeSchedule);
+  activeScheduleRef.current = activeSchedule;
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  const tokenIndexForStreamRef = useRef(tokenIndexForStream);
+  tokenIndexForStreamRef.current = tokenIndexForStream;
+  const engineRef = useRef(engine);
+  engineRef.current = engine;
+
+  const persistProgress = useCallback(
+    (wpm: number) => {
+      if (!model) return;
+      setState((current) => saveProgress(current, {
+        documentId: documentId(model),
+        title: model.metadata.title || model.fileName,
+        format: model.format,
+        tokenIndex: currentTokenIndexRef.current,
+        tokenCount: tokensRef.current.length,
+        chapterIndex: chapterIndexRef.current,
+        wpm,
+      }));
+    },
+    [model],
   );
-  const velocity = useMemo(() => velocityByDay(sessions), [sessions]);
-  const streak = useMemo(() => readingStreak(sessions, now), [sessions, now]);
 
-  const chunkText = useMemo(() => {
-    if (settings.engine !== 'chunk' || !chunkSet) return '';
-    const chunk = chunkSet.chunks.find((entry) => entry.startToken === position);
-    return chunk?.text ?? chunkSet.chunks.find((entry) => position >= entry.startToken && position < entry.endToken)?.text ?? '';
-  }, [settings.engine, chunkSet, position]);
+  const finishSession = useCallback(async () => {
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (!session || !model) return;
+    const finished = summariseSession(session);
+    setSummary(finished);
+    const stored: StoredSession = { ...finished, series: [...seriesRef.current].slice(-600), slowWords: [] };
+    const database = dbRef.current;
+    if (database) {
+      await putSession(database, stored);
+      const existing = await readDocument(database, documentId(model));
+      const rollup = mergeDocumentRollup(existing.value, stored);
+      await putDocument(database, rollup);
+      setDocuments((current) => [rollup, ...current.filter((entry) => entry.id !== rollup.id)]);
+    }
+    setSessions((current) => [stored, ...current.filter((entry) => entry.id !== stored.id)]);
+    const collected = collectVocabulary(timingsRef.current, {
+      ...DEFAULT_COLLECT,
+      markedWords: markedRef.current,
+      now: Date.now(),
+    });
+    if (collected.length > 0) {
+      setBank((current) => {
+        let merged: VocabularyEntry[] = [...current];
+        for (const entry of collected) {
+          const existing = merged.find((item) => item.word.toLowerCase() === entry.word.toLowerCase());
+          merged = existing
+            ? merged.map((item) => (item.word === existing.word
+              ? { ...item, seen: item.seen + entry.seen, weight: Math.max(item.weight, entry.weight) }
+              : item))
+            : [...merged, entry];
+        }
+        return merged.sort((left, right) => right.weight - left.weight || left.word.localeCompare(right.word)).slice(0, 500);
+      });
+      if (database) await putVocabularyEntries(database, collected);
+    }
+    persistProgress(finished.averageWpm);
+    const next = suggestNextWpm(session, settings.pacing.wpm);
+    setStatus((current) => ({
+      phase: 'ready',
+      message: `${stripSessionNote(current.message)} Session: ${finished.tokensRead.toLocaleString('en-US')} words at ${finished.averageWpm.toLocaleString('en-US')} wpm in ${formatClock(finished.elapsedMs)}. ${
+        next === settings.pacing.wpm ? 'That matched the requested rate.' : `Next target: ${next} wpm.`
+      }`,
+    }));
+  }, [model, persistProgress, settings.pacing.wpm]);
+  const finishSessionRef = useRef(finishSession);
+  finishSessionRef.current = finishSession;
+
+  const stop = useCallback((reason: 'pause' | 'end') => {
+    setPlaying(false);
+    if (sessionRef.current) sessionRef.current = pauseSession(sessionRef.current);
+    if (reason === 'end') void finishSessionRef.current();
+    else persistProgress(scheduleWpm(activeScheduleRef.current));
+  }, [persistProgress]);
+
+  const start = useCallback(() => {
+    if (tokensRef.current.length === 0 || engineRef.current === 'drill') return;
+    if (positionRef.current >= streamLength) {
+      positionRef.current = 0;
+      elapsedRef.current = 0;
+      setPosition(0);
+      setClock(0);
+    }
+    if (!sessionRef.current && model) {
+      sessionRef.current = createSession(model);
+      seriesRef.current = [];
+      timingsRef.current = [];
+      lastWordRef.current = null;
+    } else if (sessionRef.current) {
+      sessionRef.current = resumeSession(sessionRef.current);
+    }
+    setPlaying(true);
+  }, [model, streamLength]);
+
+  useEffect(() => {
+    if (!playing) return undefined;
+    let frame = 0;
+    let lastTickAt = 0;
+    const beganAt = performance.now() - elapsedRef.current;
+    const step = (now: number) => {
+      const schedule = activeScheduleRef.current;
+      const elapsedMs = now - beganAt;
+      const current = frameAt(schedule, elapsedMs);
+      if (!current || schedule.frames.length === 0) {
+        elapsedRef.current = 0;
+        setPlaying(false);
+        void finishSessionRef.current();
+        return;
+      }
+      if (current.tokenIndex !== positionRef.current) {
+        const at = Date.now();
+        const previous = lastWordRef.current;
+        const documentIndex = tokenIndexForStreamRef.current(current.tokenIndex);
+        if (previous && tokensRef.current[previous.index]) {
+          timingsRef.current.push({ token: tokensRef.current[previous.index]!, durationMs: Math.max(1, at - previous.at) });
+        }
+        lastWordRef.current = { index: documentIndex, at };
+        const session = sessionRef.current;
+        if (session) {
+          sessionRef.current = advanceSession(session, tokensRef.current.length, {
+            tokenIndex: documentIndex,
+            at,
+            wpm: scheduleWpm(schedule),
+          });
+        }
+        positionRef.current = current.tokenIndex;
+        setPosition(current.tokenIndex);
+      }
+      if (now - lastTickAt > 250) {
+        lastTickAt = now;
+        elapsedRef.current = elapsedMs;
+        setClock(elapsedMs);
+        const session = sessionRef.current;
+        if (session) {
+          const reading = sessionTick(session, tokensRef.current.length, Date.now());
+          setTick(reading);
+          seriesRef.current = [...seriesRef.current, reading.wpm].slice(-600);
+        }
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
+
+  const seekToken = useCallback(
+    (tokenIndex: number) => {
+      const streamIndex = streamIndexForToken(Math.min(Math.max(0, tokenIndex), Math.max(0, tokens.length - 1)));
+      positionRef.current = streamIndex;
+      setPosition(streamIndex);
+      const target = activeSchedule.frames.find((entry) => entry.tokenIndex === streamIndex);
+      if (target) {
+        elapsedRef.current = target.startMs;
+        setClock(target.startMs);
+      }
+    },
+    [activeSchedule.frames, streamIndexForToken, tokens.length],
+  );
+
+  const stepBy = useCallback(
+    (delta: number) => {
+      setPlaying(false);
+      seekToken(currentTokenIndexRef.current + delta);
+    },
+    [seekToken],
+  );
+
+  const rewindSentence = useCallback(() => {
+    setPlaying(false);
+    if (sentenceRange) seekToken(sentenceRange.start);
+  }, [seekToken, sentenceRange]);
+
+  /* ------------------------------------------------------------ warehouse */
+
+  const refreshWarehouse = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const opened = await openWarehouse(window);
+    if (!opened.ok || !opened.value) {
+      setWarehouseNote(opened.message ?? 'The local database is unavailable in this browser.');
+      return;
+    }
+    dbRef.current = opened.value;
+    const [storedSessions, storedDocuments, storedVocabulary] = await Promise.all([
+      readAllSessions(opened.value),
+      readAllDocuments(opened.value),
+      readAllVocabulary(opened.value),
+    ]);
+    if (storedSessions.value) setSessions([...storedSessions.value].sort((left, right) => right.startedAt - left.startedAt));
+    if (storedDocuments.value) setDocuments([...storedDocuments.value].sort((left, right) => right.updatedAt - left.updatedAt));
+    if (storedVocabulary.value) {
+      setBank([...storedVocabulary.value].sort((left, right) => right.weight - left.weight || left.word.localeCompare(right.word)));
+    }
+    setWarehouseNote('Sessions, documents, and vocabulary are stored with IndexedDB in this browser. Nothing is uploaded.');
+  }, []);
+
+  useEffect(() => {
+    void refreshWarehouse();
+  }, [refreshWarehouse]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.speechSynthesis === 'undefined') {
+      setSpeech({
+        supported: false,
+        boundaryEvents: false,
+        reason: 'This browser has no speech synthesis. The visual metronome and the pacer still work.',
+      });
+      return undefined;
+    }
+    const support = detectSpeechSupport(window);
+    setSpeech({ supported: support.supported, boundaryEvents: support.boundaryEvents, reason: support.reason });
+    if (!support.supported) return undefined;
+    const load = () => setVoices(window.speechSynthesis.getVoices().map((voice) => voice.name));
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+  }, []);
+
+  /* ------------------------------------------------------------- metronome */
+
+  useEffect(() => {
+    if (!settings.metronomeEnabled) return undefined;
+    const AudioContextCtor = window.AudioContext
+      ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor) return undefined;
+    if (!audioRef.current) audioRef.current = new AudioContextCtor();
+    const context = audioRef.current;
+    void context.resume();
+    const config = settings.metronome;
+    let cursor = context.currentTime * 1000;
+    const tick = () => {
+      const horizon = context.currentTime * 1000 + 400;
+      const beats = beatsInRange(config, horizon, cursor);
+      for (const beat of beats) {
+        if (config.channel !== 'visual') {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.frequency.value = beat.accent ? config.toneHz * 1.5 : config.toneHz;
+          const at = beat.atMs / 1000;
+          gain.gain.setValueAtTime(config.volume, at);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + config.clickMs / 1000);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(at);
+          oscillator.stop(at + config.clickMs / 1000);
+        }
+      }
+      const last = beats[beats.length - 1];
+      if (last) cursor = last.atMs + 1;
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [settings.metronome, settings.metronomeEnabled]);
+
+  useEffect(() => {
+    if (!settings.metronomeEnabled || settings.metronome.channel === 'audio') return undefined;
+    const interval = Math.max(60, 60_000 / settings.metronome.bpm);
+    const timer = window.setInterval(() => {
+      setBeatFlash(true);
+      window.setTimeout(() => setBeatFlash(false), Math.min(180, interval * 0.5));
+    }, interval);
+    return () => window.clearInterval(timer);
+  }, [settings.metronome.bpm, settings.metronome.channel, settings.metronomeEnabled]);
+
+  /* ---------------------------------------------------------------- speech */
+
+  useEffect(() => {
+    const synthesis = typeof window === 'undefined' ? undefined : window.speechSynthesis;
+    if (!synthesis) return undefined;
+    const speaking = playing && settings.speechEnabled && speech.supported;
+    if (!speaking) {
+      synthesis.cancel();
+      speechRef.current = null;
+      return undefined;
+    }
+    const plan = buildSpeechPlan(tokensRef.current, {
+      wpm: settings.pacing.wpm,
+      fromToken: currentTokenIndexRef.current,
+    });
+    speechRef.current = plan;
+    const voice = chooseVoice(synthesis.getVoices(), {
+      language: model?.metadata.language || 'en',
+      preferred: settings.ttsVoiceName ? [settings.ttsVoiceName] : [],
+    });
+    let cancelled = false;
+    const speak = (index: number) => {
+      if (cancelled || index >= plan.chunks.length) return;
+      const chunk = plan.chunks[index]!;
+      const utterance = new SpeechSynthesisUtterance(chunk.text);
+      utterance.rate = plan.rate;
+      if (voice) utterance.voice = voice;
+      utterance.onboundary = (event) => {
+        if (!boundaryEventsRef.current) return;
+        seekToken(tokenForCharOffset(chunk, event.charIndex));
+      };
+      utterance.onend = () => speak(index + 1);
+      synthesis.speak(utterance);
+    };
+    speak(0);
+    let timer = 0;
+    if (!speech.boundaryEvents) {
+      // The highlight follows the plan's own timing when the voice does not
+      // report word boundaries, which several platforms do not.
+      const starts = chunkStartTimes(plan.chunks);
+      const began = performance.now();
+      timer = window.setInterval(() => {
+        const elapsedMs = performance.now() - began;
+        let index = 0;
+        for (let cursor = 0; cursor < starts.length; cursor += 1) {
+          if (starts[cursor]! <= elapsedMs) index = cursor;
+          else break;
+        }
+        const chunk = plan.chunks[index];
+        if (!chunk) return;
+        const within = Math.min(
+          Math.max(0, chunk.tokenOffsets.length - 1),
+          Math.floor(((elapsedMs - starts[index]!) / Math.max(1, chunk.estimatedMs)) * chunk.tokenOffsets.length),
+        );
+        seekToken(chunk.startToken + within);
+      }, 120);
+    }
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      synthesis.cancel();
+    };
+  }, [model?.metadata.language, playing, seekToken, settings.pacing.wpm, settings.speechEnabled, settings.ttsVoiceName, speech.boundaryEvents, speech.supported, tokens]);
+
+  const boundaryEventsRef = useRef(speech.boundaryEvents);
+  boundaryEventsRef.current = speech.boundaryEvents;
+
+  /* ---------------------------------------------------------- drill engine */
+
+  const weakWords = useMemo(() => bank.map((entry) => entry.word), [bank]);
+  const recognisedRef = useRef<ReadonlySet<number>>(new Set());
+  recognisedRef.current = recognised;
+
+  const runDrill = useCallback(() => {
+    if (tokens.length === 0) return;
+    const plan = buildDrillPlan(tokens, settings.drill, { weakWords });
+    setDrillPlan(plan);
+    setRecognised(new Set());
+    setDrillIndex(-1);
+    if (plan.flashes.length === 0) {
+      setStatus({ phase: 'error', message: 'There is not enough text in this document to build a drill.' });
+      return;
+    }
+    setPlaying(false);
+    setDrillRunning(true);
+  }, [settings.drill, tokens, weakWords]);
+
+  useEffect(() => {
+    if (!drillRunning || !drillPlan) return undefined;
+    let cancelled = false;
+    let timer = 0;
+    const run = (index: number) => {
+      if (cancelled) return;
+      if (index >= drillPlan.flashes.length) {
+        const score = scoreRecall(drillPlan.flashes, recognisedRef.current);
+        const words = drillPlan.flashes.reduce((total, flash) => total + flash.words, 0);
+        const synthetic: SessionState = {
+          ...createSession(model!),
+          elapsedMs: drillPlan.totalMs,
+          tokensRead: words,
+          position: 0,
+          peakWpm: flashEquivalentWpm(drillPlan.flashMs, settings.drill.wordsPerFlash),
+          paused: true,
+        };
+        setSummary({ ...summariseSession(synthetic), tokensRead: words, averageWpm: flashEquivalentWpm(drillPlan.flashMs, settings.drill.wordsPerFlash) });
+        if (model) persistProgress(flashEquivalentWpm(drillPlan.flashMs, settings.drill.wordsPerFlash));
+        setDrillRunning(false);
+        setDrillIndex(-1);
+        setStatus((current) => ({
+          phase: 'ready',
+          message: `${stripSessionNote(current.message)} Drill: ${score.correct} of ${score.total} recognised (${score.accuracy}%), first pass at ${score.firstTryAccuracy}%.`,
+        }));
+        return;
+      }
+      setDrillIndex(index);
+      const flash = drillPlan.flashes[index]!;
+      timer = window.setTimeout(() => run(index + 1), Math.max(60, flash.durationMs + flash.gapMs));
+    };
+    run(0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [drillPlan, drillRunning, model, persistProgress, settings.drill.wordsPerFlash]);
+
+  const markRecognised = useCallback(() => {
+    setRecognised((current) => (drillIndex < 0 ? current : new Set([...current, drillIndex])));
+  }, [drillIndex]);
+
+  const drillScore = useMemo(() => (drillPlan ? scoreRecall(drillPlan.flashes, recognised) : null), [drillPlan, recognised]);
+
+  /* ------------------------------------------------------------ page pacer */
+
+  useEffect(() => {
+    if (engine !== 'page' || !model) return undefined;
+    const scroller = scrollerRef.current;
+    const stage = stageRef.current;
+    if (!scroller || !stage) return undefined;
+    const element = stage.querySelector<HTMLElement>(`[data-word="${currentTokenIndex}"]`);
+    if (!element) return undefined;
+    const bounds = scroller.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    const box: WordBox = {
+      x: rect.left - bounds.left + scroller.scrollLeft,
+      y: rect.top - bounds.top + scroller.scrollTop,
+      width: rect.width,
+      height: rect.height,
+      word: tokens[currentTokenIndex]?.text ?? '',
+    };
+    const [pacerBox] = pacerBoxes([box]);
+    if (pacerBox) {
+      setPacer({
+        current: { ...pacerPosition(pacerBox, undefined, 0, settings.pacer), newLine: true },
+        glide: appearance.reduceMotion ? 0 : settings.pacer.glideSeconds * 1000,
+      });
+    }
+    if (playing) {
+      scroller.scrollTo({
+        top: anchorScrollTop(box.y, scroller.clientHeight, settings.pacer),
+        behavior: appearance.reduceMotion ? 'auto' : 'smooth',
+      });
+    }
+    return undefined;
+  }, [appearance.reduceMotion, currentTokenIndex, engine, model, playing, settings.pacer, tokens]);
+
+  /* ------------------------------------------------------------------ look */
+
+  const themeStyle = useMemo(() => ({
+    ...themeVariables(appearance),
+    '--sightline-word-size': `${fontSizePx(appearance, 22)}px`,
+    '--sightline-page-size': `${fontSizePx(appearance, 19)}px`,
+    '--sightline-anchor': `${FOCAL_ANCHOR_FRACTION * 100}%`,
+    fontFamily: font.stack,
+  }) as React.CSSProperties, [appearance, font.stack]);
+
+  const gradientPalette = paletteById(settings.gradientPalette);
+  const renderWord = useCallback(
+    (token: TokenRecord, paragraphTokens: readonly TokenRecord[], inParagraph: number) => {
+      const parts = settings.emphasis.level > 1
+        ? splitEmphasis(token.text, settings.emphasis)
+        : { lead: token.text, strong: '', rest: '' };
+      const colour = settings.gradient.intensity > 0
+        ? samplePalette(gradientPalette, paragraphTokens.length <= 1 ? 0 : inParagraph / (paragraphTokens.length - 1))
+        : undefined;
+      const highlighted = highlightedTokens.get(token.index);
+      const state = token.index === currentTokenIndex ? 'true' : undefined;
+      return (
+        <span
+          key={token.index}
+          className="sightline-page-word"
+          data-word={token.index}
+          data-current={state}
+          data-highlight={highlighted}
+          style={colour ? { color: colour } : undefined}
+        >
+          {parts.lead ? (
+            <span className="sightline-page-token" data-current={state} data-highlight={highlighted}>
+              {parts.lead}
+            </span>
+          ) : null}
+          {parts.strong ? (
+            <span className="sightline-page-token" data-emphasis="strong" data-current={state} data-highlight={highlighted}>
+              {parts.strong}
+            </span>
+          ) : null}
+          {parts.rest ? (
+            <span className="sightline-page-token" data-emphasis="rest" data-current={state} data-highlight={highlighted}>
+              {parts.rest}
+            </span>
+          ) : null}
+        </span>
+      );
+    },
+    [currentTokenIndex, gradientPalette, highlightedTokens, settings.emphasis, settings.gradient.intensity],
+  );
+
+  /* ---------------------------------------------------------- peripheral */
 
   const columnLayout = useMemo(
-    () => buildColumnLayout(Math.min(1400, Math.max(360, stageWidth)), settings.peripheral),
-    [settings.peripheral, stageWidth],
+    () => (engine === 'peripheral' ? buildColumnLayout(stageWidth, settings.peripheral) : []),
+    [engine, settings.peripheral, stageWidth],
   );
   const eccentricity = useMemo(
-    () => columnEccentricityDegrees(columnLayout.map((column) => column.centreFraction), Math.min(1400, Math.max(360, stageWidth))),
+    () => columnEccentricityDegrees(columnLayout.map((column) => column.centreFraction), stageWidth),
     [columnLayout, stageWidth],
   );
-  const slides = useMemo(
-    () => (settings.engine === 'peripheral' ? buildPeripheralSlides(totalTokens, settings.peripheral, 0) : []),
-    [settings.engine, settings.peripheral, totalTokens],
+  const peripheralSlides = useMemo(
+    () => (engine === 'peripheral' && tokens.length > 0 ? buildPeripheralSlides(tokens.length, settings.peripheral, 0) : []),
+    [engine, settings.peripheral, tokens.length],
   );
-  const activeSlide = slides.find((slide) => position >= slide.startToken && position < slide.startToken + settings.peripheral.columns * settings.peripheral.wordsPerColumn) ?? slides[0];
+  const currentSlide = useMemo(() => {
+    if (peripheralSlides.length === 0) return undefined;
+    return [...peripheralSlides].reverse().find((slide) => slide.startToken <= currentTokenIndex) ?? peripheralSlides[0];
+  }, [currentTokenIndex, peripheralSlides]);
+  const columnTextSize = columnFontSize(Math.max(120, stageWidth * (columnLayout[0]?.widthFraction ?? 0.3)), settings.peripheral.columnChars);
+  const slideDuration = currentSlide
+    ? pageDurationMs(currentSlide.columns.flatMap((column) => column.tokens.map((index) => tokens[index]?.text ?? '')), settings.pacing.wpm)
+    : 0;
+
+  /* --------------------------------------------------------------- exports */
 
   const exportInputs: ExportInputs = useMemo(() => ({
     ...(model ? { model } : {}),
@@ -820,733 +973,1014 @@ export default function SightlineWorkspace() {
     pdf: DEFAULT_PDF_EXPORT,
     epub: DEFAULT_EPUB_EXPORT,
     docx: DEFAULT_DOCX_EXPORT,
-    sessions,
-    documents,
-    vocabulary: bank,
+    sessions: [...sessions],
+    documents: [...documents],
+    vocabulary: [...bank],
     state,
-  }), [model, draft, sessions, documents, bank, state]);
-  const exportRows = useMemo(() => describeExports(model ?? undefined, exportInputs), [model, exportInputs]);
-  const socialPreview = useMemo(() => socialTags(draft, model?.paragraphs[0]?.text.slice(0, 160) ?? ''), [draft, model]);
-  const structuredPreview = useMemo(() => JSON.stringify(structuredData(draft), null, 2), [draft]);
-  const validation = useMemo(() => validateDraft(draft), [draft]);
+  }), [bank, documents, draft, model, sessions, state]);
 
-  /* ------------------------------------------------------------- actions -- */
+  const exportRows = useMemo(() => describeExports(model, exportInputs), [exportInputs, model]);
 
-  const downloadExport = useCallback(async (id: ExportId) => {
-    setBusyExport(id);
-    setExportMessage('');
-    try {
-      const planned = await planExport(id, exportInputs);
-      downloadBytes(planned.bytes, planned.fileName, planned.mediaType);
-      setExportMessage(`${planned.fileName} written (${Math.max(1, Math.round(planned.bytes.byteLength / 1024)).toLocaleString('en-US')} KB).`);
-    } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : 'That export could not be written.');
-    } finally {
-      setBusyExport('');
-    }
-  }, [exportInputs]);
-
-  const applyReadingLevel = useCallback(() => {
-    if (!model) return;
-    setDraft((current) => reconcileReadingLevel(current, model));
-  }, [model]);
-
-  const addTag = useCallback((value: string) => {
-    const tags = parseTags(value);
-    if (tags.length === 0) return;
-    setDraft((current) => ({ ...current, tags: [...new Set([...current.tags, ...tags])] }));
-  }, []);
-
-  const exportReaderState = useCallback(() => {
-    downloadText(exportState(state), 'sightline-reader-state.json', 'application/json');
-  }, [state]);
+  const runExport = useCallback(
+    async (id: ExportId) => {
+      setBusyExport(id);
+      setExportMessage('');
+      try {
+        const planned = await planExport(id, exportInputs);
+        if (planned.definition.extension === 'pdf' || planned.definition.extension === 'epub' || planned.definition.extension === 'docx') {
+          downloadBytes(planned.bytes, planned.fileName, planned.mediaType);
+        } else {
+          downloadText(new TextDecoder().decode(planned.bytes), planned.fileName, planned.mediaType);
+        }
+        setExportMessage(`${planned.fileName} written, ${planned.bytes.byteLength.toLocaleString('en-US')} bytes.`);
+      } catch (error) {
+        setExportMessage(error instanceof Error ? error.message : 'That export could not be written.');
+      } finally {
+        setBusyExport(null);
+      }
+    },
+    [exportInputs],
+  );
 
   const importReaderState = useCallback((payload: string) => {
-    if (payload.trim().length === 0) return;
-    const result = importState(state, payload);
-    setState(result.state);
-    setExportMessage(result.message);
-  }, [state]);
+    const parsed = importState(stateRef.current, payload);
+    setState(parsed.state);
+    setExportMessage(parsed.message);
+  }, []);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const resumeAt = useCallback((title: string) => {
-    const entry = state.progress.find((candidate) => candidate.title === title);
-    if (!entry) return;
-    seek(entry.tokenIndex);
-  }, [seek, state.progress]);
+  /* ------------------------------------------------------------- keyboard */
 
-  const markRecognised = useCallback(() => {
-    if (!drillRunning) return;
-    setRecognised((current) => new Set([...current, drillIndex]));
-  }, [drillRunning, drillIndex]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (drillRunning && (event.key === ' ' || event.key === 'Enter' || event.key === 'r')) {
+        event.preventDefault();
+        markRecognised();
+        return;
+      }
+      switch (event.key) {
+        case ' ':
+          event.preventDefault();
+          if (playing) stop('pause');
+          else start();
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          stepBy(1);
+          break;
+        case 'ArrowLeft':
+          event.preventDefault();
+          stepBy(-1);
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          stepBy(-25);
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          stepBy(25);
+          break;
+        case '[':
+          patch({ pacing: { ...settings.pacing, ramp: null, wpm: clampWpm(settings.pacing.wpm - 25) } });
+          break;
+        case ']':
+          patch({ pacing: { ...settings.pacing, ramp: null, wpm: clampWpm(settings.pacing.wpm + 25) } });
+          break;
+        case 'b':
+          setState((current) => addBookmark(current, {
+            tokenIndex: currentTokenIndexRef.current,
+            label: `Word ${(currentTokenIndexRef.current + 1).toLocaleString('en-US')}`,
+            chapterIndex: chapterIndexRef.current,
+          }));
+          break;
+        case 'h':
+          if (sentenceRange) {
+            setState((current) => addHighlight(current, { startToken: sentenceRange.start, endToken: sentenceRange.end, color: highlightColor }));
+          }
+          break;
+        case 'w':
+          if (currentToken) {
+            const word = currentToken.text.replace(/[^A-Za-z'-]/g, '');
+            markedRef.current = [...markedRef.current, word].filter((entry) => entry.length > 1);
+            setStatus((current) => ({ ...current, message: `${stripSessionNote(current.message)} Marked “${word}” for the word bank.` }));
+          }
+          break;
+        case 'r':
+          rewindSentence();
+          break;
+        case 'Escape':
+          stop('pause');
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [currentToken, drillRunning, highlightColor, markRecognised, patch, playing, rewindSentence, sentenceRange, settings.pacing, start, stepBy, stop]);
 
-  const onStageKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (isTypingTarget(event.target)) return;
-    if (drillRunning && (event.key === ' ' || event.key === 'Enter' || event.key === 'r')) {
-      event.preventDefault();
-      markRecognised();
-      return;
-    }
-    switch (event.key) {
-      case ' ':
-      case 'k':
-        event.preventDefault();
-        if (playing) pause(); else play();
-        break;
-      case 'ArrowRight':
-      case 'l':
-        event.preventDefault();
-        step(10);
-        break;
-      case 'ArrowLeft':
-      case 'j':
-        event.preventDefault();
-        step(-10);
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        patch({ pacing: { ...settings.pacing, wpm: clampWpm(settings.pacing.wpm + 25) } });
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        patch({ pacing: { ...settings.pacing, wpm: clampWpm(settings.pacing.wpm - 25) } });
-        break;
-      case 'b':
-        if (!model) break;
-        setState((current) => addBookmark(current, {
-          tokenIndex: position,
-          label: tokens[position]?.text ?? `Word ${position + 1}`,
-          chapterIndex: chapterForToken(model, position)?.index ?? 0,
-        }));
-        break;
-      default:
-        break;
-    }
-  }, [chapter, drillRunning, markRecognised, model, patch, pause, play, playing, position, settings.pacing, step, tokens]);
+  /* ------------------------------------------------------------ resize watch */
 
-  /* -------------------------------------------------------------- render -- */
-
-  const pageTokens = useMemo(() => {
-    if (!model) return [];
-    return [...model.tokens].slice(0, 4_000);
+  useEffect(() => {
+    const node = stageRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width > 0) setStageWidth(width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [model]);
 
-  const pacerBoxRef = useRef<HTMLSpanElement | null>(null);
-  useEffect(() => {
-    if (settings.engine !== 'page' || !model) return;
-    const stage = pageRef.current;
-    if (!stage) return;
-    const target = stage.querySelector(`[data-token="${position}"]`);
-    if (!(target instanceof HTMLElement)) return;
-    const stageRect = stage.getBoundingClientRect();
-    const rect = target.getBoundingClientRect();
-    const box = { x: rect.left - stageRect.left, y: rect.top - stageRect.top + stage.scrollTop, width: rect.width, height: rect.height, word: tokens[position]?.text ?? '' };
-    const nextTop = anchorScrollTop(box.y, stage.clientHeight, settings.pacer);
-    const bar = pacerBoxRef.current;
-    if (bar) {
-      bar.style.left = `${box.x}px`;
-      bar.style.width = `${Math.max(8, box.width)}px`;
-      bar.style.top = `${box.y + box.height - 2}px`;
-      bar.style.opacity = '1';
+  /* --------------------------------------------------------------- derived */
+
+  const totalWords = tokens.length;
+  const progressFraction = totalWords === 0 ? 0 : Math.min(1, (currentTokenIndex + 1) / totalWords);
+  const remainingText = tick ? remainingMs(activeSchedule, clock) : Math.max(0, activeSchedule.totalMs - clock);
+  const measuredRate = chunked ? chunkStreamWpm(chunked.chunks, chunked.schedule) : scheduleWpm(activeSchedule);
+  const savedPosition = model ? progressFor(state, documentKey) : undefined;
+  const notesHere = state.notes.filter((note) => Math.abs(note.tokenIndex - currentTokenIndex) <= 1);
+  const warehouseSummary = useMemo(
+    () => summariseWarehouse([...sessions], [...documents], bank.length),
+    [bank.length, documents, sessions],
+  );
+  const velocity = useMemo(() => velocityByDay([...sessions]), [sessions]);
+  const engineDetail = ENGINES.find((entry) => entry.id === engine)?.hint ?? '';
+
+  const bankActions = useMemo(() => ({
+    collect: () => {
+      const collected = collectVocabulary(timingsRef.current, { ...DEFAULT_COLLECT, markedWords: markedRef.current });
+      if (collected.length === 0) {
+        setBankMessage('No word was slow enough to collect yet; read for a minute first.');
+        return;
+      }
+      setBankMessage(`Collected ${collected.length} word${collected.length === 1 ? '' : 's'} that took longer than your median.`);
+      setBank((current) => {
+        let merged: VocabularyEntry[] = [...current];
+        for (const entry of collected) {
+          const existing = merged.find((item) => item.word.toLowerCase() === entry.word.toLowerCase());
+          merged = existing
+            ? merged.map((item) => (item.word === existing.word ? { ...item, seen: item.seen + entry.seen, weight: Math.max(item.weight, entry.weight) } : item))
+            : [...merged, entry];
+        }
+        return merged.sort((left, right) => right.weight - left.weight || left.word.localeCompare(right.word));
+      });
+      void (async () => {
+        if (dbRef.current) await putVocabularyEntries(dbRef.current, collected);
+      })();
+    },
+    mark: (word: string) => {
+      const cleaned = word.replace(/[^A-Za-z'-]/g, '');
+      if (cleaned.length < 2) return;
+      markedRef.current = [...markedRef.current, cleaned];
+      setBankMessage(`Marked “${cleaned}” for the word bank.`);
+      const existing = bank.find((entry) => entry.word.toLowerCase() === cleaned.toLowerCase());
+      const entry: VocabularyEntry = existing
+        ? { ...existing, seen: existing.seen + 1, weight: existing.weight + 2, lastSeenAt: Date.now() }
+        : {
+          word: cleaned,
+          seen: 1,
+          correct: 0,
+          averageMs: 0,
+          weight: 3,
+          addedAt: Date.now(),
+          lastSeenAt: Date.now(),
+          dueAt: Date.now(),
+          intervalDays: 1,
+        };
+      setBank((current) => (existing ? current.map((item) => (item.word === existing.word ? entry : item)) : [...current, entry]));
+      void (async () => {
+        if (dbRef.current) await putVocabularyEntries(dbRef.current, [entry]);
+      })();
+    },
+    cloze: () => {
+      if (!model) return;
+      const items = buildClozeSet(bank, model.tokens, model.sentences, 8);
+      setCloze(items);
+      setBankMessage(items.length === 0
+        ? 'The bank words do not appear in an identifiable sentence yet.'
+        : `Cloze drill built with ${items.length} blank${items.length === 1 ? '' : 's'}.`);
+    },
+    remove: (word: string) => {
+      setBank((current) => current.filter((entry) => entry.word !== word));
+      void (async () => {
+        if (dbRef.current) await deleteVocabularyWord(dbRef.current, word);
+      })();
+    },
+    review: (word: string, correct: boolean) => {
+      const existing = bank.find((entry) => entry.word === word);
+      if (!existing) return;
+      const updated = applyReview({ entry: existing, correct });
+      setBank((current) => current.map((entry) => (entry.word === word ? updated : entry)));
+      void (async () => {
+        if (dbRef.current) await putVocabularyEntries(dbRef.current, [updated]);
+      })();
+    },
+  }), [bank, model]);
+
+  const panelContent = useMemo(() => {
+    switch (panel) {
+      case 'pace':
+        return (
+          <PacePanel
+            settings={settings}
+            patch={patch}
+            disabled={!model}
+            onPreset={(wpm) => patch({ pacing: { ...settings.pacing, ramp: null, wpm } })}
+            onRamp={(ramp: RampConfig | null) => patch({ pacing: { ...settings.pacing, ramp } })}
+            metronomeSupported={typeof AudioContext !== 'undefined' || typeof window !== 'undefined'}
+            speechSupport={speech}
+            voices={voices}
+          />
+        );
+      case 'look':
+        return (
+          <LookPanel
+            settings={settings}
+            patch={patch}
+            disabled={!model}
+            stageWidth={stageWidth}
+            eccentricityDegrees={eccentricity.length > 0 ? Math.max(...eccentricity) : 0}
+            advisory={columnLayout.length > 0 ? peripheralAdvice(columnLayout, stageWidth) : 'Open the peripheral view to measure column geometry.'}
+          />
+        );
+      case 'drill':
+        return (
+          <DrillPanel
+            settings={settings}
+            patch={patch}
+            disabled={!model}
+            weakWordCount={bank.length}
+            summary={summary}
+            running={drillRunning}
+            onStart={runDrill}
+            onStop={() => {
+              setDrillRunning(false);
+              setDrillIndex(-1);
+            }}
+            plan={drillPlan
+              ? {
+                flashes: drillPlan.flashes.length,
+                items: drillPlan.uniqueItems,
+                totalMs: drillPlan.totalMs,
+                clamped: drillPlan.durationClamped,
+              }
+              : null}
+          />
+        );
+      case 'bank':
+        return (
+          <BankPanel
+            bank={bank}
+            cloze={cloze}
+            now={Date.now()}
+            message={bankMessage}
+            onCollect={bankActions.collect}
+            onMarkCurrent={() => bankActions.mark(currentToken?.text ?? '')}
+            onBuildCloze={bankActions.cloze}
+            onRemove={bankActions.remove}
+            onReview={bankActions.review}
+          />
+        );
+      case 'marks':
+        return (
+          <LibraryPanel
+            bookmarks={state.bookmarks}
+            highlightColor={highlightColor}
+            onColor={setHighlightColor}
+            onJump={(tokenIndex) => seekToken(tokenIndex)}
+            onRemoveBookmark={(id) => setState((current) => removeBookmark(current, id))}
+            onRemoveHighlight={(id) => setState((current) => removeHighlight(current, id))}
+            onRemoveNote={(id) => setState((current) => removeNote(current, id))}
+            highlights={state.highlights}
+            notes={state.notes}
+            progress={state.progress}
+            currentDocumentId={documentKey}
+            onInspect={(_id, tokenIndex) => seekToken(tokenIndex)}
+          />
+        );
+      case 'data':
+        return (
+          <DataPanel
+            summary={warehouseSummary}
+            sessions={sessions}
+            velocity={velocity}
+            vocabularySize={bank.length}
+            storageNote={warehouseNote}
+            onClear={() => {
+              void (async () => {
+                if (dbRef.current) await clearWarehouse(dbRef.current);
+                setSessions([]);
+                setDocuments([]);
+                setBank([]);
+                setCloze([]);
+                setWarehouseNote('The local reading history was cleared. Nothing was uploaded at any point.');
+              })();
+            }}
+          />
+        );
+      default:
+        return (
+          <ExportPanel
+            draft={draft}
+            onDraft={(values) => setDraft((current) => ({ ...current, ...values }))}
+            onAddTag={(tag) => setDraft((current) => ({
+              ...current,
+              tags: [...current.tags, tag].filter((entry, index, list) => list.findIndex((candidate) => candidate.toLowerCase() === entry.toLowerCase()) === index).slice(0, 40),
+            }))}
+            onRemoveTag={(tag) => setDraft((current) => ({ ...current, tags: current.tags.filter((entry) => entry !== tag) }))}
+            onSuggestTags={() => {
+              if (!model) return;
+              const suggested = suggestTags(model);
+              setDraft((current) => ({ ...current, tags: [...new Set([...current.tags, ...suggested])].slice(0, 40) }));
+            }}
+            onMeasuredLevel={() => {
+              if (!model) return;
+              setDraft((current) => reconcileReadingLevel({ ...current, readingLevel: '' }, model));
+            }}
+            model={model}
+            rows={exportRows}
+            busy={busyExport}
+            message={exportMessage}
+            onDownload={(id) => void runExport(id)}
+            onImportState={(payload) => importReaderState(payload)}
+            filePreview={exportFileName(draft, 'weighted', 'pdf')}
+            onExportState={() => downloadText(exportState(state), exportFileName(draft, 'state', 'json'), 'application/json')}
+            state={state}
+          />
+        );
     }
-    if (settings.appearance.reduceMotion) {
-      stage.scrollTop = nextTop;
-      return;
-    }
-    stage.scrollTo({ top: nextTop, behavior: 'smooth' });
-  }, [position, settings.engine, settings.pacer.anchorFraction, settings.appearance.reduceMotion, model, tokens]);
+  }, [
+    bank,
+    bankActions,
+    bankMessage,
+    busyExport,
+    cloze,
+    columnLayout,
+    currentToken,
+    documentKey,
+    draft,
+    drillPlan,
+    drillRunning,
+    eccentricity,
+    exportMessage,
+    exportRows,
+    highlightColor,
+    model,
+    panel,
+    patch,
+    runDrill,
+    runExport,
+    seekToken,
+    sessions,
+    settings,
+    speech,
+    stageWidth,
+    state,
+    summary,
+    velocity,
+    voices,
+    warehouseNote,
+    warehouseSummary,
+  ]);
+
+  /* ------------------------------------------------------------------ view */
 
   return (
-    <div className="sightline-stage-grid" data-testid="sightline-velocity">
-      <div className="sightline-column">
-        <section className="sightline-card" aria-labelledby="sightline-source-heading">
-          <h2 id="sightline-source-heading">Open something to read</h2>
-          <div
-            className="sightline-drop"
-            data-active={dragging}
-            data-testid="sightline-drop"
-            onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
-            <strong>Drop a file here</strong>
-            <span>PDF, EPUB, DOCX, Markdown, HTML, RTF, or plain text — decoded in this browser.</span>
-            <label className="sightline-button sightline-button--primary">
-              Choose a file
-              <input
-                type="file"
-                data-testid="sightline-file"
-                className="sightline-visually-hidden"
-                accept=".pdf,.epub,.docx,.md,.markdown,.html,.htm,.txt,.rtf,.text"
-                onChange={onFileInput}
-              />
-            </label>
-          </div>
-          <div className="sightline-row">
-            <button type="button" className="sightline-button" onClick={() => void loadSample()} data-testid="sightline-sample">
-              Load the sample passage
-            </button>
-            <label className="sightline-row">
-              <input type="checkbox" checked={settings.proseOnly} onChange={(event) => patch({ proseOnly: event.target.checked })} />
-              <span>Prose only</span>
-            </label>
-            <label className="sightline-row">
-              <input type="checkbox" checked={settings.includeNotes} onChange={(event) => patch({ includeNotes: event.target.checked })} />
-              <span>Include notes</span>
-            </label>
-          </div>
-          <label className="sightline-field">
-            <span>Paste text or markup</span>
-            <textarea
-              value={pasteText}
-              data-testid="sightline-paste"
-              placeholder="Paste an article, a case note, or a chapter…"
-              onChange={(event) => setPasteText(event.target.value)}
+    <div className="sightline" data-testid="sightline-velocity">
+      <section
+        className={`sightline-card sightline-source${dragging ? ' sightline-source--dragging' : ''}`}
+        aria-labelledby="sightline-source-heading"
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        data-testid="sightline-dropzone"
+      >
+        <h2 id="sightline-source-heading">Source</h2>
+        <div className="sightline-row sightline-row--wrap">
+          <label className="sightline-button sightline-button--file sightline-button--primary">
+            <span>Open a document</span>
+            <input
+              type="file"
+              data-testid="sightline-file"
+              accept=".pdf,.epub,.docx,.md,.markdown,.html,.htm,.txt,.rtf,text/plain,text/markdown,text/html,application/pdf,application/epub+zip"
+              onChange={onPickFile}
             />
           </label>
-          <div className="sightline-row">
-            <label className="sightline-field">
-              <span>Treat it as</span>
-              <select
-                value={pasteFormat}
-                data-testid="sightline-paste-format"
-                onChange={(event) => setPasteFormat(event.target.value as SourceFormat)}
-              >
-                <option value="text">Plain text</option>
-                <option value="markdown">Markdown</option>
-                <option value="html">HTML</option>
-                <option value="rtf">RTF</option>
-              </select>
-            </label>
-            <button type="button" className="sightline-button sightline-button--primary" onClick={() => void ingestPaste()} disabled={pasteText.trim().length === 0} data-testid="sightline-ingest-paste">
-              Read the pasted text
+          <button type="button" className="sightline-button" data-testid="sightline-sample" onClick={() => void loadSample()}>
+            Load the sample passage
+          </button>
+          <button type="button" className="sightline-button" data-testid="sightline-clipboard" onClick={() => void readClipboard()}>
+            Read the clipboard
+          </button>
+          <label className="sightline-row sightline-row--inline">
+            <input
+              type="checkbox"
+              checked={settings.proseOnly}
+              data-testid="sightline-prose-only"
+              onChange={(event) => patch({ proseOnly: event.target.checked })}
+            />
+            <span>Prose only</span>
+          </label>
+          <label className="sightline-row sightline-row--inline">
+            <input
+              type="checkbox"
+              checked={settings.includeNotes}
+              data-testid="sightline-include-notes"
+              onChange={(event) => patch({ includeNotes: event.target.checked })}
+            />
+            <span>Include footnotes</span>
+          </label>
+        </div>
+        <label className="sightline-field">
+          <span>Or paste text directly</span>
+          <textarea
+            rows={3}
+            value={pasteText}
+            data-testid="sightline-paste"
+            placeholder="Paste an article, a chapter, or a paragraph…"
+            onChange={(event) => setPasteText(event.target.value)}
+          />
+        </label>
+        <div className="sightline-row sightline-row--wrap">
+          <label className="sightline-field sightline-field--inline">
+            <span>Pasted text is</span>
+            <select value={pasteFormat} data-testid="sightline-paste-format" onChange={(event) => setPasteFormat(event.target.value as SourceFormat)}>
+              {PASTE_FORMATS.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="sightline-button"
+            disabled={pasteText.trim().length === 0}
+            data-testid="sightline-ingest-paste"
+            onClick={() => void pasteIngest()}
+          >
+            Read the pasted text
+          </button>
+        </div>
+        <p className="sightline-note" data-testid="sightline-status">
+          {status.message}
+        </p>
+        {resume ? (
+          <div className="sightline-row" data-testid="sightline-resume">
+            <span className="sightline-note">
+              This document was left at word {resume.tokenIndex.toLocaleString('en-US')} of{' '}
+              {resume.tokenCount.toLocaleString('en-US')}.
+            </span>
+            <button type="button" className="sightline-button sightline-button--small" onClick={() => seekToken(resume.tokenIndex)}>
+              Jump there
+            </button>
+            <button type="button" className="sightline-button sightline-button--small" onClick={() => setResume(undefined)}>
+              Start from the top
             </button>
           </div>
-          <p className="sightline-note" data-testid="sightline-status" role="status">{status.message}</p>
-          {status.diagnostics.length > 0
-            ? (
-              <ul className="sightline-diag" data-testid="sightline-diagnostics">
-                {status.diagnostics.slice(0, 6).map((diagnostic, index) => (
-                  <li key={`${diagnostic.code}-${index}`}>
-                    <span className={`sightline-badge${diagnostic.level === 'warning' ? ' sightline-badge--warn' : diagnostic.level === 'error' ? ' sightline-badge--danger' : ''}`}>{diagnostic.code}</span>
-                    <span>{diagnostic.message}</span>
+        ) : null}
+        {diagnostics.length > 0 ? (
+          <ul className="sightline-diagnostics" data-testid="sightline-diagnostics">
+            {diagnostics.slice(0, 8).map((entry, index) => (
+              <li key={`${entry.code}-${index}`} className={`sightline-diagnostic sightline-diagnostic--${entry.level}`}>
+                <strong>{entry.code}</strong> {entry.message}
+                {entry.detail ? <span className="sightline-note"> {entry.detail}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {model ? (
+          <dl className="sightline-facts" data-testid="sightline-report">
+            <div>
+              <dt>Format</dt>
+              <dd>{model.format}</dd>
+            </div>
+            <div>
+              <dt>Size</dt>
+              <dd>{model.byteLength.toLocaleString('en-US')} bytes</dd>
+            </div>
+            <div>
+              <dt>Encoding</dt>
+              <dd>{model.encoding}</dd>
+            </div>
+            <div>
+              <dt>Words</dt>
+              <dd>{model.metrics.words.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Sentences</dt>
+              <dd>{model.metrics.sentences.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Paragraphs</dt>
+              <dd>{model.metrics.paragraphs.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Reading grade</dt>
+              <dd>{Math.round(model.metrics.fleschKincaidGrade * 10) / 10} Flesch–Kincaid</dd>
+            </div>
+            <div>
+              <dt>Decoded in</dt>
+              <dd>
+                {model.ingestMs} ms
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+      </section>
+
+      {model ? (
+        <section className="sightline-card" aria-labelledby="sightline-navigator-heading">
+          <h2 id="sightline-navigator-heading">Contents</h2>
+          <ol className="sightline-chapter-list" data-testid="sightline-chapters">
+            {model.chapters.map((entry) => (
+              <li key={entry.index} className={`sightline-chapter sightline-chapter--level-${entry.level}`}>
+                <button
+                  type="button"
+                  className="sightline-link"
+                  data-testid={`sightline-chapter-${entry.index}`}
+                  onClick={() => {
+                    setPlaying(false);
+                    seekToken(model.paragraphs[entry.paragraphStart]?.tokenStart ?? 0);
+                  }}
+                >
+                  {entry.title}
+                </button>
+                <button
+                  type="button"
+                  className="sightline-button sightline-button--small"
+                  aria-label={`Go to ${entry.title}`}
+                  onClick={() => {
+                    setPlaying(false);
+                    seekToken(model.paragraphs[entry.paragraphStart]?.tokenStart ?? 0);
+                  }}
+                >
+                  Go
+                </button>
+                <span className="sightline-note">
+                  {' '}
+                  {entry.wordCount.toLocaleString('en-US')} words{entry.page ? ` · page ${entry.page}` : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {model.pages && model.pages.length > 0 ? (
+            <details className="sightline-pages" data-testid="sightline-page-map">
+              <summary>
+                {model.pages.length} pages · {model.pages.filter((page) => page.characters === 0).length} with no extractable text
+              </summary>
+              <ul className="sightline-page-list">
+                {model.pages.map((page) => (
+                  <li key={page.pageNumber}>
+                    Page {page.pageNumber}: {(page.width / 72).toFixed(2)}in × {(page.height / 72).toFixed(2)}in
+                    {page.rotation !== 0 ? `, rotated ${page.rotation}°` : ''} · {page.characters.toLocaleString('en-US')} characters
+                    {page.characters === 0 ? ' (no text layer; OCR is not part of this tool)' : ''}
                   </li>
                 ))}
               </ul>
-            )
-            : null}
+            </details>
+          ) : null}
         </section>
+      ) : null}
 
-        <section className="sightline-card sightline-surface" style={visualVariables} aria-label="Reading surface">
+      <div className="sightline-main">
+        <section className="sightline-surface" style={themeStyle} aria-labelledby="sightline-reader-heading" data-testid="sightline-reader">
+          <h2 id="sightline-reader-heading" className="sightline-visually-hidden">
+            Reading surface
+          </h2>
           <div className="sightline-surface-toolbar">
-            <div className="sightline-tabs" role="tablist" aria-label="Presentation engine">
-              {ENGINE_TABS.map((tab) => (
+            <div className="sightline-row sightline-row--wrap" role="tablist" aria-label="Presentation engine">
+              {ENGINES.map((entry) => (
                 <button
-                  key={tab.id}
+                  key={entry.id}
                   type="button"
                   role="tab"
-                  className="sightline-tab"
-                  aria-selected={settings.engine === tab.id}
-                  data-testid={`sightline-engine-${tab.id}`}
-                  title={tab.hint}
+                  aria-selected={engine === entry.id}
+                  className={`sightline-chip${engine === entry.id ? ' sightline-chip--on' : ''}`}
+                  title={entry.hint}
+                  disabled={!model}
+                  data-testid={`sightline-engine-${entry.id}`}
                   onClick={() => {
-                    patch({ engine: tab.id });
+                    setEngine(entry.id);
                     setPlaying(false);
                   }}
                 >
-                  {tab.label}
+                  {entry.label}
                 </button>
               ))}
             </div>
-            <span className="sightline-badge">{chapter ? chapter.title : 'Reading'}</span>
-          </div>
-
-          <div
-            className="sightline-stage"
-            ref={stageRef}
-            tabIndex={0}
-            role="group"
-            aria-label="Reading stage. Space plays or pauses, arrow keys move."
-            data-testid="sightline-stage"
-            onKeyDown={onStageKeyDown}
-            style={{
-              ['--anchor-fraction' as string]: '36%',
-              ['--sightline-word-size' as string]: `${Math.round(fontSizePx(settings.appearance, 22) * 2.2)}px`,
-              ['--sightline-page-size' as string]: `${(fontSizePx(settings.appearance, 18) / 16).toFixed(3)}rem`,
-            }}
-          >
-            <div className={`sightline-marker sightline-marker-${settings.appearance.focalMarker}`} aria-hidden="true" style={{ ['--anchor-fraction' as string]: '36%' }}>
-              {settings.appearance.focalMarker === 'brackets' ? <><span className="sightline-bracket sightline-bracket--left" /><span className="sightline-bracket sightline-bracket--right" /></> : null}
-              {settings.appearance.focalMarker === 'dot' ? <span className="sightline-dot" /> : null}
-              {settings.appearance.focalMarker === 'box' ? <span className="sightline-box" /> : null}
-            </div>
-
-            {!model
-              ? (
-                <div className="sightline-stage-empty">
-                  <strong>No document yet</strong>
-                  <span>Open a file, paste text, or load the sample passage to begin.</span>
-                </div>
-              )
-              : settings.engine === 'drill'
-                ? (
-                  <div className="sightline-drill-stage" data-testid="sightline-drill-stage">
-                    {currentFlash
-                      ? (
-                        <div
-                          className={`sightline-drill-card${inGap ? '' : ' sightline-drill-recognised'}`}
-                          data-gap={inGap}
-                          data-testid="sightline-drill-card"
-                          aria-live="polite"
-                        >
-                          {currentFlash.text}
-                        </div>
-                      )
-                      : (
-                        <p className="sightline-note" data-testid="sightline-drill-idle">
-                          {drillPlan ? 'Press Run drill to start the exposures.' : 'Flash drills need a document open.'}
-                        </p>
-                      )}
-                    {drillRunning
-                      ? (
-                        <div className="sightline-row">
-                          <button type="button" className="sightline-button" onClick={markRecognised} data-testid="sightline-drill-recognise">
-                            I recognised that
-                          </button>
-                          <span className="sightline-badge" data-testid="sightline-drill-progress">
-                            flash {Math.min(drillIndex + 1, drillPlan?.flashes.length ?? 0)} of {drillPlan?.flashes.length ?? 0} ·{' '}
-                            {recognised.size} recognised
-                          </span>
-                        </div>
-                      )
-                      : null}
-                  </div>
-                )
-                : settings.engine === 'chunk'
-                  ? (
-                    <div className="sightline-rsvp-anchor" data-testid="sightline-chunk">
-                      <span className="sightline-rsvp-left" />
-                      <span className="sightline-rsvp-right sightline-chunk-word">{chunkText || '—'}</span>
-                    </div>
-                  )
-                  : settings.engine === 'peripheral'
-                    ? (
-                      <div className="sightline-peripheral" data-testid="sightline-peripheral" aria-label="Peripheral columns">
-                        {columnLayout.map((column) => {
-                          const slideColumn = activeSlide?.columns.find((entry) => entry.columnIndex === column.index);
-                          return (
-                            <div
-                              key={column.index}
-                              className="sightline-peripheral-column"
-                              data-faded={settings.peripheral.edgeFade && (column.index === 0 || column.index === columnLayout.length - 1)}
-                              style={{
-                                left: `${column.leftFraction * 100}%`,
-                                width: `${column.widthFraction * 100}%`,
-                                marginTop: `${column.offsetPx}px`,
-                              }}
-                            >
-                              {(slideColumn?.tokens ?? []).map((tokenIndex) => {
-                                const token = tokens[tokenIndex];
-                                if (!token) return null;
-                                return (
-                                  <span key={tokenIndex} data-current={tokenIndex === position}>
-                                    {token.text}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                        <span className="sightline-peripheral-note">
-                          {columnLayout.length} columns · outermost column {Math.round(Math.max(...eccentricity, 0))}° from centre · {describeModel(model)}
-                        </span>
-                      </div>
-                    )
-                    : settings.engine === 'page'
-                      ? (
-                        <div className="sightline-page" ref={pageRef} data-testid="sightline-page">
-                          <span className="sightline-pacer" ref={pacerBoxRef} aria-hidden="true" data-testid="sightline-pacer" />
-                          {model.paragraphs.slice(0, 400).map((paragraph) => (
-                            <p className="sightline-page-paragraph" data-kind={paragraph.kind} key={paragraph.index}>
-                              {pageTokens
-                                .slice(paragraph.tokenStart, paragraph.tokenEnd)
-                                .map((token, localIndex, slice) => {
-                                  const emphasis = settings.emphasis.fraction > 0 ? splitEmphasis(token.text, settings.emphasis) : null;
-                                  const highlight = highlightFor(state, token.index);
-                                  const colour = settings.gradient.intensity > 0
-                                    ? samplePalette(palette, slice.length > 1 ? localIndex / (slice.length - 1) : 0)
-                                    : undefined;
-                                  return (
-                                    <span
-                                      key={token.index}
-                                      className="sightline-page-token"
-                                      data-token={token.index}
-                                      data-current={settings.appearance.highlightCurrentWord && token.index === position}
-                                      data-highlight={highlight?.color}
-                                      style={colour ? { color: colour } : undefined}
-                                      title={notesByToken.get(token.index)}
-                                    >
-                                      {emphasis && emphasis.strong.length > 0
-                                        ? (
-                                          <>
-                                            {emphasis.lead}
-                                            <span data-emphasis="strong">{emphasis.strong}</span>
-                                            <span data-emphasis="rest">{emphasis.rest}</span>
-                                          </>
-                                        )
-                                        : token.text}
-                                      {' '}
-                                    </span>
-                                  );
-                                })}
-                            </p>
-                          ))}
-                        </div>
-                      )
-                      : (
-                        <div className="sightline-rsvp-anchor sightline-rsvp-word" data-testid="sightline-rsvp">
-                          <span className="sightline-rsvp-left">{currentToken ? currentToken.text.slice(0, currentToken.orp + 1) : ''}</span>
-                          <span className="sightline-rsvp-right">{currentToken ? currentToken.text.slice(currentToken.orp + 1) : ''}</span>
-                        </div>
-                      )}
-          </div>
-
-          <div className="sightline-progress">
-            <input
-              type="range"
-              min={0}
-              max={Math.max(1, totalTokens - 1)}
-              value={Math.min(position, Math.max(0, totalTokens - 1))}
-              data-testid="sightline-scrub"
-              aria-label="Reading position"
-              onChange={(event) => seek(Number(event.target.value))}
-            />
-            <div className="sightline-progress-labels">
-              <span data-testid="sightline-position">
-                {totalTokens === 0
-                  ? 'No document open'
-                  : `word ${Math.min(position + 1, totalTokens).toLocaleString('en-US')} of ${totalTokens.toLocaleString('en-US')}`}
-              </span>
-              <span>{sentence ? `sentence ${sentence.index + 1} · ${formatClock(elapsed)} of ${formatClock(schedule?.totalMs ?? 0)}` : null}</span>
-            </div>
-          </div>
-
-          <div className="sightline-row sightline-row--between">
-            <div className="sightline-row">
-              <button type="button" className="sightline-button" onClick={() => step(-Math.max(1, settings.pacing.wpm / 10))} disabled={!model} data-testid="sightline-rewind">
-                Back a sentence
-              </button>
-              <button type="button" className="sightline-button" onClick={() => step(-1)} disabled={!model}>Previous word</button>
+            <div className="sightline-row sightline-row--wrap">
               <button
                 type="button"
                 className="sightline-button sightline-button--primary"
-                onClick={playing ? pause : play}
-                disabled={!model || totalTokens === 0}
+                disabled={!model || engine === 'drill'}
                 data-testid="sightline-play"
+                onClick={() => {
+                  if (playing) stop('pause');
+                  else start();
+                }}
               >
                 {playing ? 'Pause' : 'Read'}
               </button>
-              <button type="button" className="sightline-button" onClick={() => step(1)} disabled={!model}>Next word</button>
-              <button type="button" className="sightline-button" onClick={() => step(Math.max(1, settings.pacing.wpm / 10))} disabled={!model}>
-                Forward a sentence
+              <button type="button" className="sightline-button" disabled={!model} data-testid="sightline-step-back" onClick={() => stepBy(-1)}>
+                ◀ word
+              </button>
+              <button type="button" className="sightline-button" disabled={!model} data-testid="sightline-step-forward" onClick={() => stepBy(1)}>
+                word ▶
+              </button>
+              <button type="button" className="sightline-button" disabled={!model} data-testid="sightline-sentence-back" onClick={rewindSentence}>
+                Sentence ◀
+              </button>
+              <button
+                type="button"
+                className="sightline-button"
+                disabled={!model}
+                data-testid="sightline-bookmark"
+                onClick={() =>
+                  setState((current) => addBookmark(current, {
+                    tokenIndex: currentTokenIndex,
+                    label: `Word ${(currentTokenIndex + 1).toLocaleString('en-US')}`,
+                    chapterIndex: chapter?.index ?? 0,
+                  }))}
+              >
+                Bookmark
+              </button>
+              <button
+                type="button"
+                className="sightline-button"
+                disabled={!model || !sentenceRange}
+                data-testid="sightline-highlight"
+                onClick={() => {
+                  if (!sentenceRange) return;
+                  setState((current) => addHighlight(current, {
+                    startToken: sentenceRange.start,
+                    endToken: sentenceRange.end,
+                    color: highlightColor,
+                  }));
+                }}
+              >
+                Highlight this sentence
+              </button>
+              <button
+                type="button"
+                className="sightline-button"
+                disabled={!model || !currentToken}
+                data-testid="sightline-mark-word"
+                onClick={() => bankActions.mark(currentToken?.text ?? '')}
+              >
+                Mark the word as unknown
               </button>
             </div>
-            <div className="sightline-row">
-              {settings.appearance.focalMarker === 'none' ? null : <span className="sightline-badge">{settings.appearance.focalMarker} marker</span>}
-              {metronomeSupported && settings.metronomeEnabled
-                ? <span className="sightline-badge" aria-live="off"><span className="sightline-beat" data-accent={beat.accent} data-on="true" /> {Math.round(settings.metronome.bpm)} bpm</span>
-                : null}
-              {settings.gradient.intensity > 0 ? <span className="sightline-badge" style={{ color: palette.stops[0] }}>{palette.label}</span> : null}
-            </div>
           </div>
 
-          <dl className="sightline-metrics">
-            <div className="sightline-metric"><dt>Live rate</dt><dd data-testid="sightline-live-wpm">{tick ? `${tick.wpm} wpm` : `${settings.pacing.wpm} wpm`}</dd></div>
-            <div className="sightline-metric"><dt>Words seen</dt><dd>{tick ? tick.tokensRead.toLocaleString('en-US') : '0'}</dd></div>
-            <div className="sightline-metric"><dt>Elapsed</dt><dd>{formatDuration(tick ? tick.elapsedMs : elapsed)}</dd></div>
-            <div className="sightline-metric"><dt>Time left</dt><dd>{tick ? formatDuration(tick.remainingMs) : '—'}</dd></div>
-            <div className="sightline-metric"><dt>Done</dt><dd>{`${Math.round((tick?.progress ?? (totalTokens === 0 ? 0 : position / totalTokens)) * 100)}%`}</dd></div>
-            <div className="sightline-metric"><dt>Finish</dt><dd>{tick ? formatEta(tick.eta, now) : '—'}</dd></div>
-          </dl>
-          <p className="sightline-note" data-testid="sightline-rate-note-stage">{rateNote(settings.pacing.wpm)}</p>
-        </section>
-
-        <section className="sightline-card" aria-labelledby="sightline-nav-heading">
-          <h2 id="sightline-nav-heading">Contents, bookmarks, and notes</h2>
-          {progress
-            ? (
-              <div className="sightline-row">
-                <span className="sightline-badge sightline-badge--good">Saved position: word {progress.tokenIndex.toLocaleString('en-US')}</span>
-                <button type="button" className="sightline-button" onClick={() => seek(progress.tokenIndex)}>Resume here</button>
-              </div>
-            )
-            : null}
-          <div className="sightline-field-grid">
-            <div>
-              <h3>Sections</h3>
-              <ul className="sightline-list sightline-chapter-list">
-                {(model?.chapters ?? []).map((entry) => (
-                  <li key={entry.index}>
-                    <span>{entry.level === 0 ? 'Front matter' : entry.title}</span>
-                    <span className="sightline-badge">{entry.wordCount.toLocaleString('en-US')} words</span>
-                    <button type="button" className="sightline-button" onClick={() => seek(entry.paragraphStart)}>Go</button>
-                  </li>
-                ))}
-                {model && model.chapters.length === 0 ? <li>No section structure was detected in this document.</li> : null}
-              </ul>
-            </div>
-            <div>
-              <h3>Bookmarks</h3>
-              <ul className="sightline-list">
-                {bookmarks.length === 0 ? <li>Press B on the reading stage to bookmark the current word.</li> : null}
-                {bookmarks.map((entry) => (
-                  <li key={entry.id}>
-                    <span>{entry.label} · word {entry.tokenIndex.toLocaleString('en-US')}</span>
-                    <button type="button" className="sightline-button" onClick={() => seek(entry.tokenIndex)}>Go</button>
-                    <button type="button" className="sightline-button sightline-button--ghost" onClick={() => setState((current) => removeBookmark(current, entry.id))}>Remove</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="sightline-field-grid">
-            <div>
-              <h3>Highlight and notes at word {position + 1}</h3>
-              <div className="sightline-row">
-                <select value={highlightColor} onChange={(event) => setHighlightColor(event.target.value as HighlightColor)} aria-label="Highlight colour">
-                  {HIGHLIGHT_COLORS.map((colour) => <option key={colour} value={colour}>{colour}</option>)}
-                </select>
-                <button
-                  type="button"
-                  className="sightline-button"
-                  disabled={!model || position >= totalTokens}
-                  onClick={() => setState((current) => addHighlight(current, {
-                    startToken: Math.max(0, sentence?.tokenStart ?? position),
-                    endToken: Math.min(totalTokens, sentence?.tokenEnd ?? position + 1),
-                    color: highlightColor,
-                  }))}
+          <div className="sightline-reader-body">
+            <div className="sightline-stage" ref={stageRef} data-testid="sightline-stage" data-engine={engine} tabIndex={0} aria-label="Reading stage. Space starts and pauses reading.">
+              {!model ? (
+                <p className="sightline-empty" data-testid="sightline-empty">
+                  No document is open yet. Open a file, paste text, or load the sample passage above; the reader, the drills, and
+                  the exports all start from there.
+                </p>
+              ) : engine === 'rsvp' || engine === 'chunk' ? (
+                <div
+                  className={`sightline-marker sightline-marker-${appearance.focalMarker}`}
+                  data-testid={engine === 'chunk' ? 'sightline-chunk' : 'sightline-rsvp'}
                 >
-                  Highlight this sentence
-                </button>
-                {currentHighlight
-                  ? <button type="button" className="sightline-button sightline-button--ghost" onClick={() => setState((current) => removeHighlight(current, currentHighlight.id))}>Remove highlight</button>
-                  : null}
+                  {appearance.focalMarker === 'brackets' ? (
+                    <>
+                      <span className="sightline-bracket sightline-bracket--left" aria-hidden="true" />
+                      <span className="sightline-bracket sightline-bracket--right" aria-hidden="true" />
+                    </>
+                  ) : null}
+                  {appearance.focalMarker === 'dot' ? <span className="sightline-dot" aria-hidden="true" /> : null}
+                  {appearance.focalMarker === 'box' ? <span className="sightline-box" aria-hidden="true" /> : null}
+                  <p className="sightline-current" data-testid="sightline-word">
+                    <span className="sightline-rsvp-line">
+                      <span className="sightline-rsvp-left">
+                        {rsvpParts(currentWord, chunked ? chunked.chunks[currentStreamIndex] : null, tokens)[0]}
+                        <span className="sightline-rsvp-anchor" style={{ color: accent.color }}>
+                          {rsvpParts(currentWord, chunked ? chunked.chunks[currentStreamIndex] : null, tokens)[1]}
+                        </span>
+                      </span>
+                      <span className="sightline-rsvp-right">
+                        {rsvpParts(currentWord, chunked ? chunked.chunks[currentStreamIndex] : null, tokens)[2]}
+                      </span>
+                    </span>
+                  </p>
+                  <p className="sightline-note" data-testid="sightline-position">
+                    word {(currentTokenIndex + 1).toLocaleString('en-US')} of {totalWords.toLocaleString('en-US')}
+                    {chapter ? ` · ${chapter.title}` : ''}
+                    {chunked ? ` · frame ${(currentStreamIndex + 1).toLocaleString('en-US')} of ${chunked.chunks.length.toLocaleString('en-US')}` : ''}
+                  </p>
+                  <p className="sightline-note" data-testid="sightline-engine-note">
+                    {engineDetail}
+                  </p>
+                </div>
+              ) : engine === 'page' ? (
+                <div className="sightline-page-scroll" ref={scrollerRef} data-testid="sightline-page">
+                  {pacer ? (
+                    <span
+                      className={`sightline-pacer sightline-pacer--${settings.pacer.shape}`}
+                      style={{
+                        left: pacer.current.x,
+                        top: pacer.current.y,
+                        width: pacer.current.width,
+                        height: pacer.current.height,
+                        transitionDuration: `${pacer.glide}ms`,
+                      }}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="sightline-pacer sightline-pacer--idle" aria-hidden="true" />
+                  )}
+                  {model.paragraphs.map((paragraph) => {
+                    const paragraphTokens = tokens.slice(paragraph.tokenStart, paragraph.tokenEnd);
+                    return (
+                      <p
+                        key={paragraph.index}
+                        className={`sightline-paragraph sightline-paragraph--${paragraph.kind}`}
+                        data-testid="sightline-paragraph"
+                      >
+                        {paragraphTokens.map((token, index) => renderWord(token, paragraphTokens, index))}
+                      </p>
+                    );
+                  })}
+                </div>
+              ) : engine === 'peripheral' ? (
+                <div className="sightline-peripheral" data-testid="sightline-peripheral">
+                  <div className="sightline-columns" style={{ fontSize: `${columnTextSize}px` }}>
+                    {columnLayout.map((column, columnIndex) => (
+                      <div
+                        key={column.index}
+                        className={`sightline-column sightline-peripheral-column${settings.peripheral.edgeFade && !appearance.reduceMotion ? ' sightline-column--fade' : ''}`}
+                        style={{
+                          left: `${column.leftFraction * 100}%`,
+                          width: `${column.widthFraction * 100}%`,
+                          transform: `translateY(${column.offsetPx}px)`,
+                        }}
+                        data-testid={`sightline-column-${columnIndex}`}
+                      >
+                        {(currentSlide?.columns[columnIndex]?.tokens ?? []).map((tokenIndex) => {
+                          const token = tokens[tokenIndex];
+                          if (!token) return null;
+                          return (
+                            <span key={token.index} className="sightline-column-word" data-current={token.index === currentTokenIndex ? 'true' : undefined}>
+                              {token.text}{' '}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="sightline-note sightline-peripheral-note" data-testid="sightline-peripheral-note">
+                    {columnLayout.length} columns, about {columnLayout.length * settings.peripheral.wordsPerColumn} words per view,{' '}
+                    {(slideDuration / 1000).toFixed(1)} seconds at {settings.pacing.wpm} wpm. Outer column eccentricity{' '}
+                    {Math.round(eccentricity.length > 0 ? Math.max(...eccentricity) : 0)}°.{' '}
+                    {columnLayout.length > 0 ? peripheralAdvice(columnLayout, stageWidth) : ''}
+                  </p>
+                </div>
+              ) : (
+                <div className="sightline-drill-stage" data-testid="sightline-drill-stage">
+                  {drillRunning && drillIndex >= 0 && drillPlan ? (
+                    <>
+                      <p className="sightline-drill-card" data-testid="sightline-drill-card">
+                        {drillPlan.flashes[drillIndex]?.text}
+                      </p>
+                      <p className="sightline-note" data-testid="sightline-drill-progress">
+                        flash {drillIndex + 1} of {drillPlan.flashes.length} · press Space, Enter, or R for each item you recognised
+                      </p>
+                      <button
+                        type="button"
+                        className="sightline-button sightline-button--primary"
+                        data-testid="sightline-drill-recognise"
+                        onClick={markRecognised}
+                      >
+                        I recognised it
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="sightline-empty">
+                        Flash drills show one item at a time at a fixed exposure. Set the exposure in the Drill panel, then run a
+                        drill; every item you recognise counts toward the rate it reports.
+                      </p>
+                      {drillScore ? (
+                        <p className="sightline-note" data-testid="sightline-drill-result">
+                          Recognised {drillScore.correct} of {drillScore.total} ({drillScore.accuracy}%), first pass{' '}
+                          {drillScore.firstTryAccuracy}%, about{' '}
+                          {flashEquivalentWpm(
+                            drillPlan?.flashMs ?? settings.drill.flashMs,
+                            settings.drill.wordsPerFlash,
+                          ).toLocaleString('en-US')}{' '}
+                          words per minute.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="sightline-scrub">
+              <label className="sightline-field sightline-field--scrub">
+                <span className="sightline-visually-hidden">Reading position</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(0, totalWords - 1)}
+                  value={currentTokenIndex}
+                  disabled={!model}
+                  data-testid="sightline-scrub"
+                  onChange={(event) => {
+                    setPlaying(false);
+                    seekToken(Number(event.target.value));
+                  }}
+                />
+              </label>
+              <p className="sightline-note sightline-progress-labels" data-testid="sightline-scrub-labels">
+                {Math.round(progressFraction * 100)}% · word {currentTokenIndex.toLocaleString('en-US')} of{' '}
+                {totalWords.toLocaleString('en-US')}
+              </p>
+            </div>
+
+            <dl className="sightline-metrics" data-testid="sightline-metrics">
+              <div className="sightline-metric">
+                <dt>Live rate</dt>
+                <dd data-testid="sightline-live-wpm">{tick ? tick.wpm.toLocaleString('en-US') : 0} wpm</dd>
               </div>
+              <div>
+                <dt>Elapsed</dt>
+                <dd>{formatClock(tick ? tick.elapsedMs : clock)}</dd>
+              </div>
+              <div>
+                <dt>Remaining</dt>
+                <dd>{formatClock(remainingText)}</dd>
+              </div>
+              <div>
+                <dt>Progress</dt>
+                <dd>{Math.round(progressFraction * 100)}%</dd>
+              </div>
+              <div>
+                <dt>Chapter</dt>
+                <dd>{chapter?.title ?? '—'}</dd>
+              </div>
+            </dl>
+            <p className="sightline-note" data-testid="sightline-rate-note-stage">
+              {measuredRate.toLocaleString('en-US')} words per minute is what this schedule delivers. {rateNote(settings.pacing.wpm)}
+              {chunked
+                ? ` A ${settings.chunk.wordsPerChunk}-word frame is what the phrase-policy split decided; about ${suggestedChunkWidth(settings.pacing.wpm)} words per frame is usual at this rate.`
+                : ''}
+            </p>
+
+            <div className="sightline-note-field">
               <label className="sightline-field">
-                <span>Margin note</span>
-                <textarea value={noteText} onChange={(event) => setNoteText(event.target.value)} />
+                <span>Margin note on word {(currentTokenIndex + 1).toLocaleString('en-US')}</span>
+                <textarea
+                  rows={2}
+                  value={noteText}
+                  data-testid="sightline-note-input"
+                  placeholder="What did this passage actually say?"
+                  onChange={(event) => setNoteText(event.target.value)}
+                />
               </label>
               <button
                 type="button"
                 className="sightline-button"
                 disabled={noteText.trim().length === 0}
+                data-testid="sightline-note-save"
                 onClick={() => {
-                  setState((current) => upsertNote(current, { tokenIndex: position, text: noteText.trim() }));
+                  setState((current) => upsertNote(current, { tokenIndex: currentTokenIndex, text: noteText.trim() }));
                   setNoteText('');
                 }}
               >
                 Save note to this word
               </button>
-              <ul className="sightline-list">
-                {currentNotes.map((note) => (
+              {notesHere.length > 0 ? (
+                <ul className="sightline-note-list" data-testid="sightline-note-here">
+                  {notesHere.map((note) => (
+                    <li key={note.id}>{note.text}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+
+            {savedPosition && savedPosition.documentId === documentKey ? (
+              <p className="sightline-note" data-testid="sightline-resume-badge">
+                Saved position: word {savedPosition.tokenIndex.toLocaleString('en-US')} of{' '}
+                {savedPosition.tokenCount.toLocaleString('en-US')} at {savedPosition.wpm} wpm.
+              </p>
+            ) : null}
+
+            <p className="sightline-note" data-testid="sightline-style-summary">
+              {theme.label} · {font.label} · {settings.pacing.wpm} wpm · {engine} engine ·{' '}
+              {settings.appearance.dyslexiaSpacing ? 'wide-tracked spacing' : 'default spacing'} ·{' '}
+              {settings.metronomeEnabled ? `metronome ${settings.metronome.bpm} BPM` : 'metronome off'} ·{' '}
+              {settings.speechEnabled ? 'speech on' : 'speech off'} · emphasis level {settings.emphasis.level}
+            </p>
+            {state.bookmarks.length + state.highlights.length + state.notes.length > 0 ? (
+              <ul className="sightline-list" data-testid="sightline-marks-strip">
+                {[...state.highlights].slice(-4).map((highlight) => (
+                  <li key={highlight.id}>
+                    <button type="button" className="sightline-link" onClick={() => seekToken(highlight.startToken)}>
+                      {highlight.color} highlight
+                    </button>{' '}
+                    words {highlight.startToken + 1}–{highlight.endToken + 1}
+                  </li>
+                ))}
+                {[...state.bookmarks].slice(-4).map((bookmark) => (
+                  <li key={bookmark.id}>
+                    <button type="button" className="sightline-link" onClick={() => seekToken(bookmark.tokenIndex)}>
+                      Bookmark
+                    </button>{' '}
+                    {bookmark.label} · word {bookmark.tokenIndex + 1}
+                  </li>
+                ))}
+                {[...state.notes].slice(-4).map((note) => (
                   <li key={note.id}>
-                    <span>{note.text}</span>
-                    <button type="button" className="sightline-button sightline-button--ghost" onClick={() => setState((current) => removeNote(current, note.id))}>Delete</button>
+                    <button type="button" className="sightline-link" onClick={() => seekToken(note.tokenIndex)}>
+                      Note
+                    </button>{' '}
+                    word {note.tokenIndex + 1}: {note.text}
                   </li>
                 ))}
               </ul>
-            </div>
-            <div>
-              <h3>Highlights in this document</h3>
-              <ul className="sightline-list">
-                {state.highlights.length === 0 ? <li>No highlights yet.</li> : null}
-                {state.highlights.map((entry) => (
-                  <li key={entry.id}>
-                    <span>{entry.color} · words {entry.startToken.toLocaleString('en-US')}–{entry.endToken.toLocaleString('en-US')}</span>
-                    <button type="button" className="sightline-button" onClick={() => seek(entry.startToken)}>Go</button>
-                    <button type="button" className="sightline-button sightline-button--ghost" onClick={() => setState((current) => removeHighlight(current, entry.id))}>Remove</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ) : null}
+            {beatFlash ? <span className="sightline-beat" aria-hidden="true" data-testid="sightline-beat" /> : null}
+            <p className="sightline-visually-hidden" aria-live="polite">
+              {currentWord ? `Now reading ${currentWord}` : ''}
+            </p>
           </div>
         </section>
-      </div>
 
-      <div className="sightline-column">
-        <div className="sightline-tabs" role="tablist" aria-label="Controls">
-          {PANEL_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              className="sightline-tab"
-              aria-selected={panel === tab.id}
-              data-testid={`sightline-panel-${tab.id}`}
-              onClick={() => setPanel(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {panel === 'pace'
-          ? (
-            <PacePanel
-              settings={settings}
-              patch={patch}
-              disabled={!model}
-              speechSupport={speechSupport}
-              metronomeSupported={metronomeSupported}
-              onPreset={(wpm) => patch({ pacing: { ...settings.pacing, wpm: clampWpm(wpm) } })}
-              onRampStart={(startWpm) => {
-                const preset = RAMP_PRESETS.find((entry) => entry.config.startWpm === startWpm) ?? RAMP_PRESETS[0]!;
-                patch({ pacing: { ...settings.pacing, wpm: clampWpm(startWpm), ramp: preset.config } });
-              }}
-            />
-          )
-          : null}
-
-        {panel === 'look'
-          ? <LookPanel settings={settings} patch={patch} disabled={!model} theme={theme} contrast={contrast} gradientContrast={gradientContrast} />
-          : null}
-
-        {panel === 'drill'
-          ? (
-            <DrillPanel
-              settings={settings}
-              patch={patch}
-              disabled={!model}
-              running={drillRunning}
-              progress={{
-                position: drillIndex,
-                items: drillPlan?.flashes.length ?? 0,
-                flashMs: drillPlan?.flashMs ?? settings.drill.flashMs,
-                totalMs: drillPlan?.totalMs ?? 0,
-                clamped: drillPlan?.durationClamped ?? false,
-              }}
-              result={drillResult}
-              onStart={() => {
-                setDrillIndex(0);
-                setRecognised(new Set());
-                setDrillResult(null);
-                setDrillRunning(true);
-                patch({ engine: 'drill' });
-              }}
-              onStop={() => setDrillRunning(false)}
-            />
-          )
-          : null}
-
-        {panel === 'bank'
-          ? (
-            <BankPanel
-              bank={bank}
-              cloze={cloze}
-              now={now}
-              weakCount={bank.filter((entry) => entry.weight >= 2).length}
-              message={bankMessage}
-              onBuildCloze={() => {
-                if (!model) return;
-                setCloze(buildClozeSet(bank, model.tokens, model.sentences, 10));
-              }}
-              onCollect={() => void collectFromSession()}
-              onMarkCurrent={markCurrentWord}
-              onReview={(word, correct) => void reviewWord(word, correct)}
-              onRemove={(word) => void removeWord(word)}
-            />
-          )
-          : null}
-
-        {panel === 'data'
-          ? (
-            <DataPanel
-              summary={summary}
-              sessions={sessions}
-              velocity={velocity}
-              streak={streak}
-              storageNote={storageNote}
-              documentProgress={state.progress}
-              onRefresh={() => void refreshWarehouse()}
-              onClear={() => {
-                void (async () => {
-                  const database = await openDatabase();
-                  if (database) {
-                    const result = await clearWarehouse(database);
-                    setStorageNote(result.ok ? 'Local history cleared.' : result.message ?? 'The local history could not be cleared.');
-                  }
-                  setSessions([]);
-                  setDocuments([]);
-                  setBank([]);
-                  setState((current) => ({ ...current, progress: [] }));
-                })();
-              }}
-              onOpenSession={(id) => {
-                const stored = sessions.find((entry) => entry.id === id);
-                if (stored) setExportMessage(`${stored.documentTitle}: ${stored.tokensRead} words at ${stored.averageWpm} wpm, peak ${stored.peakWpm} wpm.`);
-              }}
-              onResume={resumeAt}
-            />
-          )
-          : null}
-
-        {panel === 'export'
-          ? (
-            <ExportPanel
-              draft={draft}
-              onDraft={(values) => setDraft((current) => ({ ...current, ...values }))}
-              onTag={addTag}
-              onRemoveTag={(tag) => setDraft((current) => ({ ...current, tags: current.tags.filter((entry) => entry !== tag) }))}
-              onSuggestTags={() => {
-                if (!model) return;
-                const suggested = suggestTags(model);
-                setDraft((current) => ({ ...current, tags: [...new Set([...current.tags, ...suggested])] }));
-              }}
-              onReadingLevel={applyReadingLevel}
-              socialPreview={socialPreview}
-              structuredPreview={structuredPreview}
-              rows={exportRows}
-              busyExport={busyExport}
-              onDownload={(id) => void downloadExport(id)}
-              onExportState={exportReaderState}
-              onImportState={importReaderState}
-              validation={validation}
-              fileNamePreview={exportFileName(draft, 'weighted', 'pdf')}
-              message={exportMessage}
-              model={model ?? undefined}
-              metrics={model?.metrics}
-            />
-          )
-          : null}
-
-        <section className="sightline-card" aria-labelledby="sightline-style-heading">
-          <h2 id="sightline-style-heading">Style presets</h2>
-          <div className="sightline-row">
-            {(['focus', 'comfort', 'study', 'night'] as const).map((preset) => (
+        <aside className="sightline-panels" aria-label="Reading controls">
+          <div className="sightline-tabs" role="tablist" aria-label="Control panel">
+            {PANELS.map((entry) => (
               <button
-                key={preset}
+                key={entry.id}
                 type="button"
-                className="sightline-button"
-                onClick={() => {
-                  if (preset === 'focus') patch({ appearance: { ...settings.appearance, theme: 'oled', font: 'atkinson', focalMarker: 'crosshair' } });
-                  if (preset === 'comfort') patch({ appearance: { ...settings.appearance, theme: 'sepia', font: 'lexend', focalMarker: 'none' } });
-                  if (preset === 'study') patch({ appearance: { ...settings.appearance, theme: 'solarized-light', font: 'inter', focalMarker: 'reticle' } });
-                  if (preset === 'night') patch({ appearance: { ...settings.appearance, theme: 'nord', font: 'merriweather', focalMarker: 'dot' } });
-                }}
+                role="tab"
+                aria-selected={panel === entry.id}
+                className={`sightline-tab${panel === entry.id ? ' sightline-tab--on' : ''}`}
+                data-testid={`sightline-panel-${entry.id}`}
+                onClick={() => setPanel(entry.id)}
               >
-                {preset}
+                {entry.label}
               </button>
             ))}
           </div>
-          <p className="sightline-note" data-testid="sightline-style-summary">
-            {[font.label, theme.label, model ? readingLevelOf(model.metrics) : ''].filter((part) => part.length > 0).join(' · ')}
-          </p>
-          <p className="sightline-note">{WPM_STEPS.length} rate presets · {RAMP_PRESETS.length} ramp programmes · {ANCHOR_ACCENTS.length} anchor colours</p>
-          <p className="sightline-note" data-testid="sightline-advice">
-            The rate you can hold with the comprehension you want is the only rate worth keeping. The estimator here counts the words
-            you actually saw, so a fast run that skipped the meaning is not scored as a faster reading speed.
-          </p>
-        </section>
+          <div className="sightline-panel-body">{panelContent}</div>
+        </aside>
       </div>
+
+      <section className="sightline-card" aria-labelledby="sightline-evidence-heading">
+        <h2 id="sightline-evidence-heading">What this can and cannot do</h2>
+        <ul className="sightline-limits">
+          <li>Documents are decoded in this browser; a scanned PDF with no text layer needs OCR elsewhere first, and this tool does not do OCR.</li>
+          <li>
+            Rate and comprehension trade off against each other. Published work finds most readers hold comprehension near their
+            natural rate and lose it as the rate climbs past roughly 400 words per minute on unfamiliar material.
+          </li>
+          <li>Punctuation and paragraph pauses are on by default, because the pauses carry meaning that speed alone does not.</li>
+          <li>DOCX equations and images arrive as text placeholders, and EPUB structure is rebuilt from the package spine.</li>
+          <li>Nothing here measures eye movement, and nothing is uploaded: sessions, notes, and vocabulary stay in this browser.</li>
+        </ul>
+      </section>
     </div>
   );
+}
+
+/** Split a frame into the text before the anchor letter, the letter, and the rest. */
+function rsvpParts(
+  text: string,
+  chunk: { readonly startToken: number; readonly anchorOffset: number } | null,
+  tokens: readonly TokenRecord[],
+): [string, string, string] {
+  if (text.length === 0) return ['', '—', ''];
+  let anchor = computeOrp(text);
+  if (chunk) {
+    const anchorWord = tokens[chunk.startToken + chunk.anchorOffset]?.text ?? '';
+    const offset = anchorWord.length > 0 ? text.indexOf(anchorWord) : -1;
+    if (offset >= 0) anchor = offset + computeOrp(anchorWord);
+  }
+  const parts = splitOrp(text, Math.min(Math.max(0, anchor), text.length - 1));
+  return [parts.before, parts.anchor, parts.after];
+}
+
+const SESSION_NOTE_PATTERN = / (Session|Drill|Cloze|Marked|No word|Dropped|Reading)\b[^.]*\.?$/;
+
+function stripSessionNote(message: string): string {
+  return message.replace(SESSION_NOTE_PATTERN, '').trim();
+}
+
+function formatClock(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }

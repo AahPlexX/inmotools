@@ -1,43 +1,44 @@
 /**
- * Control panels for Sightline Velocity Studio.
+ * Control panels for the reading workspace.
  *
- * These components are presentational: every value is computed by the engines
- * under `src/tools/sightline/` and every change is reported back to the
- * workspace, which owns the reader state. Keeping the panels free of engine
- * calls means the reading surface and the panels cannot disagree about the
- * current settings.
+ * Each panel is a plain function of the settings object plus one callback, so
+ * the reader, the exports, and the tests all read the same values. Nothing here
+ * keeps its own copy of a setting: a control writes through `patch`, the
+ * workspace persists the result, and the engine that consumes the field reads
+ * it back from the same place.
  */
 
-import type {
-  ClozeItem,
-  VocabularyEntry,
-} from './vocabulary-engine';
-import { BLANK, dueEntries, retentionRate } from './vocabulary-engine';
 import {
   ANCHOR_ACCENTS,
-  FONT_CHOICES,
   FOCAL_MARKERS,
+  FONT_CHOICES,
   READER_THEMES,
-  type ReaderTheme,
+  accessibleThemes,
+  themeById,
+  themeContrast,
+  type AnchorAccent,
+  type ReaderAppearance,
 } from './palette-engine';
-import { emphasisForLevel } from './typography-engine';
-import { GRADIENT_PALETTES } from './gradient-engine';
-import { METRONOME_PRESETS, tempoName } from './metronome-engine';
-import { RAMP_PRESETS, WPM_STEPS, rateNote } from './pacing-engine';
-import { DRILL_PRESETS } from './drill-engine';
-import { SPEECH_RATE_PRESETS } from './speech-engine';
+import { GRADIENT_PALETTES, checkGradientContrast, paletteById, palettesForBackground } from './gradient-engine';
+import { EMPHASIS_LEVELS, emphasisForLevel, type EmphasisLevel } from './typography-engine';
+import { RAMP_PRESETS, WPM_STEPS, rateNote, type RampConfig } from './pacing-engine';
+import { MAX_BPM, METRONOME_PRESETS, MIN_BPM } from './metronome-engine';
+import { DRILL_PRESETS, MIN_FLASH_MS, flashEquivalentWpm } from './drill-engine';
+import { SPEECH_RATE_PRESETS, type SpeechSupport } from './speech-engine';
+import { PACER_SHAPES } from './pacer-engine';
+import { dueEntries, retentionRate, type ClozeItem, type VocabularyEntry } from './vocabulary-engine';
+import type { SessionSummary } from './session-engine';
 import type { StoredSession, VelocityPoint, WarehouseSummary } from './analytics-engine';
-import type { ExportDefinition } from './export-plan';
-import type {
-  DocumentModel,
-  ProseMetrics,
-} from './sightline-types';
-import type {
-  HighlightColor,
-  MarginNote,
-  ReaderSettings,
-} from './sightline-store';
-import type { MetadataDraft } from './metadata-studio';
+import type { ExportDefinition, ExportId } from './export-plan';
+import { useState } from 'react';
+import type { DocumentModel } from './sightline-types';
+import {
+  socialTags,
+  structuredDataScript,
+  validateDraft,
+  type MetadataDraft,
+} from './metadata-studio';
+import type { Bookmark, DocumentProgress, HighlightColor, ReaderSettings, SightlineState } from './sightline-store';
 
 export interface PanelSharedProps {
   readonly settings: ReaderSettings;
@@ -45,534 +46,755 @@ export interface PanelSharedProps {
   readonly disabled: boolean;
 }
 
-const formatMs = (ms: number): string => `${Math.round(ms).toLocaleString('en-US')} ms`;
+const percent = (value: number) => `${Math.round(value * 100)}%`;
+const ms = (value: number) => `${value.toFixed(0)} ms`;
 
-const formatRatio = (value: number): string => `${value.toFixed(1)}×`;
-
-/* ---------------------------------------------------------------- pace ---- */
+/* ------------------------------------------------------------------ pace -- */
 
 export interface PacePanelProps extends PanelSharedProps {
   readonly onPreset: (wpm: number) => void;
-  readonly onRampStart: (startWpm: number) => void;
-  readonly speechSupport: { readonly supported: boolean; readonly boundaryEvents: boolean; readonly reason: string };
+  readonly onRamp: (ramp: RampConfig | null) => void;
   readonly metronomeSupported: boolean;
+  readonly speechSupport: SpeechSupport;
+  readonly voices: readonly string[];
 }
 
-export function PacePanel({ settings, patch, disabled, onPreset, onRampStart, speechSupport, metronomeSupported }: PacePanelProps) {
+export function PacePanel({ settings, patch, disabled, onPreset, onRamp, metronomeSupported, speechSupport, voices }: PacePanelProps) {
   const pacing = settings.pacing;
+  const ramp = pacing.ramp;
   return (
     <>
-      <section className="sightline-card" aria-labelledby="sightline-pace-heading">
-        <h2 id="sightline-pace-heading">Pacing</h2>
+      <section className="sightline-card" aria-labelledby="sightline-rate-heading">
+        <h2 id="sightline-rate-heading">Reading rate</h2>
         <label className="sightline-field">
-          <span>Reading rate — {pacing.wpm} words per minute</span>
+          <span>
+            Rate — {pacing.wpm} words per minute
+          </span>
           <input
             type="range"
             min={40}
             max={1600}
             step={5}
             value={pacing.wpm}
+            disabled={disabled}
             data-testid="sightline-wpm-range"
-            onChange={(event) => patch({ pacing: { ...pacing, wpm: Number(event.target.value) } })}
+            onChange={(event) => patch({ pacing: { ...pacing, ramp: null, wpm: Number(event.target.value) } })}
           />
         </label>
-        <div className="sightline-row">
+        <div className="sightline-row sightline-row--wrap">
           {WPM_STEPS.map((step) => (
             <button
               key={step}
               type="button"
-              className="sightline-button"
-              aria-pressed={pacing.wpm === step}
-              onClick={() => onPreset(step)}
+              className={`sightline-chip${pacing.wpm === step ? ' sightline-chip--on' : ''}`}
               disabled={disabled}
+              title={`${step} words per minute`}
+              data-testid={`sightline-wpm-${step}`}
+              onClick={() => onPreset(step)}
             >
               {step}
             </button>
           ))}
         </div>
-        <p className="sightline-note" data-testid="sightline-rate-note">{rateNote(pacing.wpm)}</p>
+        <p className="sightline-note" data-testid="sightline-rate-note">
+          {rateNote(pacing.wpm)}
+        </p>
+      </section>
 
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Word length compensation</span>
-            <select
-              value={pacing.compensator}
-              onChange={(event) => patch({ pacing: { ...pacing, compensator: event.target.value as typeof pacing.compensator } })}
-            >
-              <option value="syllable">Syllables</option>
-              <option value="length">Letters</option>
-              <option value="none">None (steady metronome)</option>
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Chunk size — {settings.chunk.wordsPerChunk} word{settings.chunk.wordsPerChunk === 1 ? '' : 's'}</span>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              step={1}
-              value={settings.chunk.wordsPerChunk}
-              onChange={(event) => patch({ chunk: { ...settings.chunk, wordsPerChunk: Number(event.target.value) } })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Chunk breaking</span>
-            <select
-              value={settings.chunk.splitPolicy}
-              onChange={(event) => patch({ chunk: { ...settings.chunk, splitPolicy: event.target.value as typeof settings.chunk.splitPolicy } })}
-            >
-              <option value="punctuation">Keep phrases together</option>
-              <option value="balanced">Even chunks per sentence</option>
-            </select>
-          </label>
-        </div>
-
+      <section className="sightline-card" aria-labelledby="sightline-breaks-heading">
+        <h2 id="sightline-breaks-heading">Boundary pauses</h2>
         <label className="sightline-row">
           <input
             type="checkbox"
             checked={pacing.respectBreaks}
+            disabled={disabled}
+            data-testid="sightline-respect-breaks"
             onChange={(event) => patch({ pacing: { ...pacing, respectBreaks: event.target.checked } })}
           />
-          <span>Pause at punctuation and sentence ends</span>
+          <span>Hold at punctuation and paragraph ends</span>
         </label>
-        <div className="sightline-field-grid">
-          {([
-            ['periodMultiplier', 'After a full stop'],
-            ['clauseMultiplier', 'After a comma'],
-            ['paragraphMultiplier', 'After a paragraph'],
-            ['chapterMultiplier', 'After a section'],
-          ] as const).map(([key, label]) => (
-            <label className="sightline-field" key={key}>
-              <span>{label} — {formatRatio(pacing[key])}</span>
-              <input
-                type="range"
-                min={1}
-                max={4}
-                step={0.1}
-                disabled={!pacing.respectBreaks}
-                value={pacing[key]}
-                onChange={(event) => patch({ pacing: { ...pacing, [key]: Number(event.target.value) } })}
-              />
-            </label>
-          ))}
-        </div>
+        {([
+          ['periodMultiplier', 'After a full stop', 1, 5],
+          ['clauseMultiplier', 'After a comma, semicolon, or dash', 1, 4],
+          ['paragraphMultiplier', 'At the end of a paragraph', 1, 5],
+          ['chapterMultiplier', 'At the end of a chapter', 1, 6],
+        ] as const).map(([field, label, min, max]) => (
+          <label key={field} className="sightline-field">
+            <span>
+              {label} — {pacing[field].toFixed(1)}x
+            </span>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={0.1}
+              value={pacing[field]}
+              disabled={disabled || !pacing.respectBreaks}
+              data-testid={`sightline-${field}`}
+              onChange={(event) => patch({ pacing: { ...pacing, [field]: Number(event.target.value) } })}
+            />
+          </label>
+        ))}
+        <label className="sightline-field">
+          <span>Time given to each word</span>
+          <select
+            value={pacing.compensator}
+            disabled={disabled}
+            data-testid="sightline-compensator"
+            onChange={(event) => patch({ pacing: { ...pacing, compensator: event.target.value as typeof pacing.compensator } })}
+          >
+            <option value="none">Same time for every word</option>
+            <option value="length">Longer words take longer</option>
+            <option value="syllable">Longer words and more syllables take longer</option>
+          </select>
+        </label>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-ramp-heading">
         <h2 id="sightline-ramp-heading">Velocity ramp trainer</h2>
         <p className="sightline-note">
-          The ramp starts below your chosen rate and adds a step every few words, so the passage accelerates while you keep the same
-          comprehension target.
+          A ramp starts below your chosen rate and lifts it in steps, so the reading stays fluent while the pace climbs.
         </p>
-        <div className="sightline-row">
+        <div className="sightline-row sightline-row--wrap">
           {RAMP_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="sightline-button"
+              className={`sightline-chip${ramp?.startWpm === preset.config.startWpm && ramp?.ceilingWpm === preset.config.ceilingWpm ? ' sightline-chip--on' : ''}`}
               disabled={disabled}
-              onClick={() => onRampStart(preset.config.startWpm)}
               title={preset.detail}
+              data-testid={`sightline-ramp-${preset.id}`}
+              onClick={() => onRamp(preset.config)}
             >
               {preset.label}
             </button>
           ))}
           <button
             type="button"
-            className="sightline-button sightline-button--ghost"
-            onClick={() => patch({ pacing: { ...pacing, ramp: null } })}
+            className={`sightline-chip${ramp ? '' : ' sightline-chip--on'}`}
+            data-testid="sightline-ramp-off"
+            onClick={() => onRamp(null)}
           >
-            Ramp off
+            Steady rate
           </button>
         </div>
-        {pacing.ramp
-          ? <p className="sightline-note">Ramp active: {pacing.ramp.startWpm} → {pacing.ramp.ceilingWpm} words per minute, +{pacing.ramp.stepWpm} every {pacing.ramp.everyTokens} words.</p>
-          : null}
+        <p className="sightline-note" data-testid="sightline-ramp-status">
+          {ramp
+            ? `Ramping ${ramp.startWpm} → ${ramp.ceilingWpm} wpm, adding ${ramp.stepWpm} wpm every ${ramp.everyTokens} words.`
+            : 'No ramp is running; every word is shown at the chosen rate.'}
+        </p>
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-chunk-heading">
+        <h2 id="sightline-chunk-heading">Chunked stream</h2>
+        <label className="sightline-field">
+          <span>Words per frame — {settings.chunk.wordsPerChunk}</span>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            step={1}
+            value={settings.chunk.wordsPerChunk}
+            disabled={disabled}
+            data-testid="sightline-words-per-chunk"
+            onChange={(event) => patch({ chunk: { ...settings.chunk, wordsPerChunk: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Where a frame may break</span>
+          <select
+            value={settings.chunk.splitPolicy}
+            disabled={disabled}
+            data-testid="sightline-split-policy"
+            onChange={(event) => patch({ chunk: { ...settings.chunk, splitPolicy: event.target.value as typeof settings.chunk.splitPolicy } })}
+          >
+            <option value="punctuation">At punctuation first, then at width</option>
+            <option value="balanced">Evenly, keeping phrases together</option>
+            <option value="fixed">Strictly every N words</option>
+          </select>
+        </label>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-metronome-heading">
         <h2 id="sightline-metronome-heading">Subvocalization metronome</h2>
         <p className="sightline-note">
-          A steady click gives the inner voice a rhythm to follow instead of finishing each word. Range 40–400 beats per minute.
+          A steady click gives the inner voice something to follow. It discourages silent pronunciation rather than measuring it.
+        </p>
+        <button
+          type="button"
+          className={`sightline-chip${settings.metronomeEnabled ? ' sightline-chip--on' : ''}`}
+          disabled={disabled || !metronomeSupported}
+          aria-pressed={settings.metronomeEnabled}
+          data-testid="sightline-metronome-enable"
+          onClick={() => patch({ metronomeEnabled: !settings.metronomeEnabled })}
+        >
+          Subvocalization metronome {settings.metronomeEnabled ? 'on' : 'off'}
+        </button>
+        <p className="sightline-note">
+          {metronomeSupported
+            ? 'The click runs while you read; the beat marker shows the same pulse without sound.'
+            : 'This browser did not allow an audio context, so the click cannot run here. The beat marker still can.'}
         </p>
         <label className="sightline-field">
-          <span>Beats per minute — {settings.metronome.bpm} ({tempoName(settings.metronome.bpm)})</span>
+          <span>Tempo — {settings.metronome.bpm} BPM, {MIN_BPM}–{MAX_BPM} available</span>
           <input
             type="range"
-            min={40}
-            max={400}
-            step={5}
+            min={MIN_BPM}
+            max={MAX_BPM}
+            step={2}
             value={settings.metronome.bpm}
+            disabled={disabled}
+            data-testid="sightline-metronome-bpm"
             onChange={(event) => patch({ metronome: { ...settings.metronome, bpm: Number(event.target.value) } })}
           />
         </label>
-        <div className="sightline-row">
+        <div className="sightline-row sightline-row--wrap">
           {METRONOME_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="sightline-button"
-              aria-pressed={settings.metronome.bpm === preset.bpm}
+              className={`sightline-chip${settings.metronome.bpm === preset.bpm ? ' sightline-chip--on' : ''}`}
+              disabled={disabled || !metronomeSupported}
               title={preset.detail}
+              data-testid={`sightline-metronome-${preset.id}`}
               onClick={() => patch({ metronome: { ...settings.metronome, bpm: preset.bpm } })}
             >
               {preset.label}
             </button>
           ))}
         </div>
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Channel</span>
-            <select
-              value={settings.metronome.channel}
-              onChange={(event) => patch({ metronome: { ...settings.metronome, channel: event.target.value as typeof settings.metronome.channel } })}
-            >
-              <option value="audio">Click</option>
-              <option value="visual">Visual beat</option>
-              <option value="both">Click and visual</option>
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Accent every {settings.metronome.accentEvery} beat(s)</span>
-            <input
-              type="range"
-              min={1}
-              max={8}
-              step={1}
-              value={settings.metronome.accentEvery}
-              onChange={(event) => patch({ metronome: { ...settings.metronome, accentEvery: Number(event.target.value) } })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Tone — {Math.round(settings.metronome.toneHz)} Hz</span>
-            <input
-              type="range"
-              min={400}
-              max={2000}
-              step={20}
-              value={settings.metronome.toneHz}
-              onChange={(event) => patch({ metronome: { ...settings.metronome, toneHz: Number(event.target.value) } })}
-            />
-          </label>
-        </div>
-        <label className="sightline-row">
-          <input
-            type="checkbox"
-            checked={settings.metronomeEnabled}
-            onChange={(event) => patch({ metronomeEnabled: event.target.checked })}
-          />
-          <span>Run the metronome while reading</span>
+        <label className="sightline-field">
+          <span>Signal</span>
+          <select
+            value={settings.metronome.channel}
+            disabled={disabled || !metronomeSupported}
+            data-testid="sightline-metronome-channel"
+            onChange={(event) =>
+              patch({ metronome: { ...settings.metronome, channel: event.target.value as typeof settings.metronome.channel } })
+            }
+          >
+            <option value="audio">Click only</option>
+            <option value="visual">Beat marker only</option>
+            <option value="both">Click and beat marker</option>
+          </select>
         </label>
-        {settings.metronomeEnabled && !metronomeSupported
-          ? <p className="sightline-badge sightline-badge--warn">This browser has no audio output available, so the visual beat is used on its own.</p>
-          : null}
+        <label className="sightline-field">
+          <span>Accent every {settings.metronome.accentEvery} beats</span>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={1}
+            value={settings.metronome.accentEvery}
+            disabled={disabled}
+            onChange={(event) => patch({ metronome: { ...settings.metronome, accentEvery: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Volume — {percent(settings.metronome.volume)}</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={settings.metronome.volume}
+            disabled={disabled}
+            onChange={(event) => patch({ metronome: { ...settings.metronome, volume: Number(event.target.value) } })}
+          />
+        </label>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-speech-heading">
-        <h2 id="sightline-speech-heading">Spoken pacing</h2>
-        <p className="sightline-note">
-          Reads the passage aloud with the browser voice while the highlight follows. Word-level timing comes from the speech engine when
-          the browser reports it, and from estimated timings when it does not.
+        <h2 id="sightline-speech-heading">Synchronized speech</h2>
+        <p className="sightline-note" data-testid="sightline-speech-status">
+          {speechSupport.reason}
         </p>
         <label className="sightline-row">
           <input
             type="checkbox"
             checked={settings.speechEnabled}
-            disabled={!speechSupport.supported}
+            disabled={disabled || !speechSupport.supported}
+            data-testid="sightline-speech-enable"
             onChange={(event) => patch({ speechEnabled: event.target.checked })}
           />
-          <span>Speak the passage while reading</span>
+          <span>Let the system voice drive the highlight</span>
         </label>
-        <p className="sightline-note" data-testid="sightline-speech-status">{speechSupport.reason}</p>
-        <div className="sightline-row">
+        <div className="sightline-row sightline-row--wrap">
           {SPEECH_RATE_PRESETS.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="sightline-button"
-              aria-pressed={Math.abs(settings.pacing.wpm - preset.wpm) < 5}
-              onClick={() => onPreset(preset.wpm)}
-              disabled={!speechSupport.supported}
+              className={`sightline-chip${pacing.wpm === preset.wpm ? ' sightline-chip--on' : ''}`}
+              disabled={disabled || !speechSupport.supported}
+              data-testid={`sightline-speech-${preset.id}`}
+              onClick={() => patch({ pacing: { ...pacing, wpm: preset.wpm } })}
             >
-              {preset.label}
+              {preset.label}, {preset.wpm} words per minute
             </button>
           ))}
         </div>
+        {settings.speechEnabled ? (
+          <label className="sightline-field">
+            <span>{voices.length === 0 ? 'Voice — the browser exposed no voice list, so the default is used' : 'Voice'}</span>
+            <select
+              value={settings.ttsVoiceName}
+              disabled={voices.length === 0}
+              data-testid="sightline-voice"
+              onChange={(event) => patch({ ttsVoiceName: event.target.value })}
+            >
+              <option value="">System default</option>
+              {voices.map((voice) => (
+                <option key={voice} value={voice}>
+                  {voice}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-pacer-heading">
+        <h2 id="sightline-pacer-heading">Page pacer</h2>
+        <p className="sightline-note">
+          The pacer glides between words and keeps the paced line at a fixed height on the page, so the eye is not chasing
+          text that scrolls past it.
+        </p>
+        <label className="sightline-field">
+          <span>Pacer shape</span>
+          <select
+            value={settings.pacer.shape}
+            disabled={disabled}
+            data-testid="sightline-pacer-shape"
+            onChange={(event) => patch({ pacer: { ...settings.pacer, shape: event.target.value as typeof settings.pacer.shape } })}
+          >
+            {PACER_SHAPES.map((shape) => (
+              <option key={shape.id} value={shape.id}>
+                {shape.label} — {shape.detail}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="sightline-field">
+          <span>Hold the paced line {percent(settings.pacer.anchorFraction)} down the viewport</span>
+          <input
+            type="range"
+            min={0.2}
+            max={0.8}
+            step={0.01}
+            value={settings.pacer.anchorFraction}
+            disabled={disabled}
+            data-testid="sightline-pacer-anchor"
+            onChange={(event) => patch({ pacer: { ...settings.pacer, anchorFraction: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Glide between words — {(settings.pacer.glideSeconds * 1000).toFixed(0)} ms</span>
+          <input
+            type="range"
+            min={0}
+            max={0.3}
+            step={0.01}
+            value={settings.pacer.glideSeconds}
+            disabled={disabled || settings.appearance.reduceMotion}
+            data-testid="sightline-pacer-glide"
+            onChange={(event) => patch({ pacer: { ...settings.pacer, glideSeconds: Number(event.target.value) } })}
+          />
+        </label>
       </section>
     </>
   );
 }
 
-/* ---------------------------------------------------------------- look ---- */
+/* ------------------------------------------------------------------ look -- */
 
 export interface LookPanelProps extends PanelSharedProps {
-  readonly theme: ReaderTheme;
-  readonly contrast: { readonly ratio: number; readonly level: string; readonly passes: boolean };
-  readonly gradientContrast: { readonly ratio: number; readonly passes: boolean; readonly worstStop: string } | null;
+  readonly stageWidth: number;
+  readonly eccentricityDegrees: number;
+  readonly advisory: string;
 }
 
-export function LookPanel({ settings, patch, theme, contrast, gradientContrast }: LookPanelProps) {
+export function LookPanel({ settings, patch, disabled, stageWidth, eccentricityDegrees, advisory }: LookPanelProps) {
   const appearance = settings.appearance;
+  const theme = themeById(appearance.theme);
+  const verdict = themeContrast(theme);
+  const gradient = checkGradientContrast(paletteById(settings.gradientPalette), theme.background);
+  const clearPalettes = palettesForBackground(theme.background);
+  const accent = ANCHOR_ACCENTS.find((entry) => entry.id === appearance.anchorAccent) ?? ANCHOR_ACCENTS[0]!;
   return (
     <>
       <section className="sightline-card" aria-labelledby="sightline-theme-heading">
-        <h2 id="sightline-theme-heading">Theme — {theme.label}</h2>
-        <p className="sightline-note">{theme.detail} Body contrast {contrast.ratio.toFixed(1)}:1 ({contrast.level}).</p>
-        <div className="sightline-swatch-grid">
-          {READER_THEMES.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="sightline-swatch"
-              aria-pressed={entry.id === appearance.theme}
-              data-testid={`sightline-theme-${entry.id}`}
-              style={{ background: entry.background, color: entry.text, borderColor: entry.accent }}
-              onClick={() => patch({ appearance: { ...appearance, theme: entry.id } })}
-            >
-              <strong>{entry.label}</strong>
-              <small>{entry.dark ? 'low light' : entry.paper ? 'paper tone' : 'bright'}</small>
-            </button>
-          ))}
+        <h2 id="sightline-theme-heading">Theme</h2>
+        <p className="sightline-note" data-testid="sightline-theme-contrast">
+          {theme.label}: body text at {verdict.ratio}:1, judged {verdict.level}. {accessibleThemes().length} of{' '}
+          {READER_THEMES.length} themes clear 4.5:1 for body text; each swatch carries its own measured ratio.
+        </p>
+        <div className="sightline-swatches" role="group" aria-label="Reading theme">
+          {READER_THEMES.map((candidate) => {
+            const candidateVerdict = themeContrast(candidate);
+            return (
+              <button
+                key={candidate.id}
+                type="button"
+                aria-pressed={candidate.id === appearance.theme}
+                className={`sightline-swatch${candidate.id === appearance.theme ? ' sightline-swatch--on' : ''}`}
+                style={{ background: candidate.background, color: candidate.text, borderColor: candidate.accent }}
+                title={`${candidate.label}. ${candidate.detail} Measured contrast ${candidateVerdict.ratio}:1 (${candidateVerdict.level}).`}
+                disabled={disabled}
+                data-testid={`sightline-theme-${candidate.id}`}
+                onClick={() => patch({ appearance: { ...appearance, theme: candidate.id } })}
+              >
+                <span aria-hidden="true">Aa</span>
+                <small>{candidate.label}</small>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      <section className="sightline-card" aria-labelledby="sightline-type-heading">
-        <h2 id="sightline-type-heading">Type and spacing</h2>
+      <section className="sightline-card" aria-labelledby="sightline-font-heading">
+        <h2 id="sightline-font-heading">Typeface</h2>
         <label className="sightline-field">
-          <span>Reading font</span>
+          <span>Family</span>
           <select
             value={appearance.font}
+            disabled={disabled}
             data-testid="sightline-font"
             onChange={(event) => patch({ appearance: { ...appearance, font: event.target.value } })}
           >
             {FONT_CHOICES.map((font) => (
-              <option key={font.id} value={font.id}>{font.label}{font.accessibility ? ' — accessibility designed' : ''}</option>
+              <option key={font.id} value={font.id}>
+                {font.label}
+                {font.accessibility ? ' — legibility-first' : ''}
+              </option>
             ))}
           </select>
         </label>
-        <p className="sightline-note">
-          Every face is served from this site, so the reader works offline and no font request leaves the device.
-        </p>
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Size — {Math.round(appearance.fontScale * 100)}%</span>
-            <input
-              type="range"
-              min={0.7}
-              max={3}
-              step={0.05}
-              value={appearance.fontScale}
-              onChange={(event) => patch({ appearance: { ...appearance, fontScale: Number(event.target.value) } })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Line height — {appearance.lineHeight.toFixed(2)}</span>
-            <input
-              type="range"
-              min={1.2}
-              max={2.4}
-              step={0.05}
-              value={appearance.lineHeight}
-              onChange={(event) => patch({ appearance: { ...appearance, lineHeight: Number(event.target.value) } })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Letter spacing — {appearance.letterSpacing.toFixed(3)}em</span>
-            <input
-              type="range"
-              min={0}
-              max={0.2}
-              step={0.005}
-              value={appearance.letterSpacing}
-              onChange={(event) => patch({ appearance: { ...appearance, letterSpacing: Number(event.target.value) } })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Word spacing — {appearance.wordSpacing.toFixed(3)}em</span>
-            <input
-              type="range"
-              min={0}
-              max={0.6}
-              step={0.01}
-              value={appearance.wordSpacing}
-              onChange={(event) => patch({ appearance: { ...appearance, wordSpacing: Number(event.target.value) } })}
-            />
-          </label>
-        </div>
+        <p className="sightline-note">{FONT_CHOICES.find((font) => font.id === appearance.font)?.detail}</p>
+        <label className="sightline-field">
+          <span>Size — {percent(appearance.fontScale)} of the base size</span>
+          <input
+            type="range"
+            min={0.8}
+            max={2.4}
+            step={0.05}
+            value={appearance.fontScale}
+            disabled={disabled}
+            data-testid="sightline-font-scale"
+            onChange={(event) => patch({ appearance: { ...appearance, fontScale: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Line height — {appearance.lineHeight.toFixed(2)}</span>
+          <input
+            type="range"
+            min={1.2}
+            max={2.4}
+            step={0.05}
+            value={appearance.lineHeight}
+            disabled={disabled}
+            data-testid="sightline-line-height"
+            onChange={(event) => patch({ appearance: { ...appearance, lineHeight: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Letter spacing — {appearance.letterSpacing.toFixed(3)} em</span>
+          <input
+            type="range"
+            min={0}
+            max={0.12}
+            step={0.005}
+            value={appearance.letterSpacing}
+            disabled={disabled}
+            data-testid="sightline-letter-spacing"
+            onChange={(event) => patch({ appearance: { ...appearance, letterSpacing: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Word spacing — {appearance.wordSpacing.toFixed(3)} em</span>
+          <input
+            type="range"
+            min={0}
+            max={0.4}
+            step={0.01}
+            value={appearance.wordSpacing}
+            disabled={disabled}
+            data-testid="sightline-word-spacing"
+            onChange={(event) => patch({ appearance: { ...appearance, wordSpacing: Number(event.target.value) } })}
+          />
+        </label>
         <label className="sightline-row">
           <input
             type="checkbox"
             checked={appearance.dyslexiaSpacing}
+            disabled={disabled}
+            data-testid="sightline-dyslexia-spacing"
             onChange={(event) => patch({ appearance: { ...appearance, dyslexiaSpacing: event.target.checked } })}
           />
-          <span>Apply the wide spacing preset used for dyslexic readers</span>
-        </label>
-        <label className="sightline-row">
-          <input
-            type="checkbox"
-            checked={appearance.highlightCurrentWord}
-            onChange={(event) => patch({ appearance: { ...appearance, highlightCurrentWord: event.target.checked } })}
-          />
-          <span>Highlight the current word in page mode</span>
+          <span>Use the wide-tracked spacing recommended for dyslexic readers</span>
         </label>
         <label className="sightline-row">
           <input
             type="checkbox"
             checked={appearance.reduceMotion}
+            data-testid="sightline-reduce-motion"
             onChange={(event) => patch({ appearance: { ...appearance, reduceMotion: event.target.checked } })}
           />
-          <span>Reduce motion in the pacer and page scroll</span>
+          <span>Reduce motion: no gliding pacer and no fading edges</span>
         </label>
       </section>
 
-      <section className="sightline-card" aria-labelledby="sightline-focal-heading">
-        <h2 id="sightline-focal-heading">Focal anchor</h2>
-        <p className="sightline-note">
-          The anchor is where every word is aligned, so the eye does not travel. The horizontal position is a focus point, not eye
-          tracking: it stays where you put it.
+      <section className="sightline-card" aria-labelledby="sightline-anchor-heading">
+        <h2 id="sightline-anchor-heading">Focal anchor</h2>
+        <label className="sightline-field">
+          <span>Marker</span>
+          <select
+            value={appearance.focalMarker}
+            disabled={disabled}
+            data-testid="sightline-marker"
+            onChange={(event) =>
+              patch({ appearance: { ...appearance, focalMarker: event.target.value as ReaderAppearance['focalMarker'] } })
+            }
+          >
+            {FOCAL_MARKERS.map((marker) => (
+              <option key={marker.id} value={marker.id}>
+                {marker.label} — {marker.detail}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="sightline-field">
+          <span>Anchor colour — {accent.label}</span>
+          <select
+            value={appearance.anchorAccent}
+            disabled={disabled}
+            data-testid="sightline-accent"
+            onChange={(event) => patch({ appearance: { ...appearance, anchorAccent: event.target.value as AnchorAccent } })}
+          >
+            {ANCHOR_ACCENTS.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="sightline-row">
+          <input
+            type="checkbox"
+            checked={appearance.highlightCurrentWord}
+            disabled={disabled}
+            data-testid="sightline-current-word"
+            onChange={(event) => patch({ appearance: { ...appearance, highlightCurrentWord: event.target.checked } })}
+          />
+          <span>Mark the word being read in page mode</span>
+        </label>
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-layout-heading">
+        <h2 id="sightline-layout-heading">Viewport bounding</h2>
+        <p className="sightline-note" data-testid="sightline-eccentricity">
+          The reading stage measures {Math.round(stageWidth)} pixels wide on this screen. The outermost column of the peripheral
+          view sits about {Math.round(eccentricityDegrees)} degrees from the centre of gaze. {advisory}
         </p>
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Marker</span>
-            <select
-              value={appearance.focalMarker}
-              data-testid="sightline-marker"
-              onChange={(event) => patch({ appearance: { ...appearance, focalMarker: event.target.value as typeof appearance.focalMarker } })}
-            >
-              {FOCAL_MARKERS.map((marker) => <option key={marker.id} value={marker.id}>{marker.label}</option>)}
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Anchor colour</span>
-            <select
-              value={appearance.anchorAccent}
-              onChange={(event) => patch({ appearance: { ...appearance, anchorAccent: event.target.value as typeof appearance.anchorAccent } })}
-            >
-              {ANCHOR_ACCENTS.map((accent) => <option key={accent.id} value={accent.id}>{accent.label}</option>)}
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Anchor position</span>
-            <select
-              value={Math.round(settings.pacer.anchorFraction * 100)}
-              onChange={(event) => patch({ pacer: { ...settings.pacer, anchorFraction: Number(event.target.value) / 100 } })}
-            >
-              {[40, 45, 50, 55].map((value) => <option key={value} value={value}>{value}% down the reading area</option>)}
-            </select>
-          </label>
-        </div>
+        <label className="sightline-field">
+          <span>Columns — {settings.peripheral.columns}</span>
+          <input
+            type="range"
+            min={2}
+            max={5}
+            step={1}
+            value={settings.peripheral.columns}
+            disabled={disabled}
+            data-testid="sightline-columns"
+            onChange={(event) => patch({ peripheral: { ...settings.peripheral, columns: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Measure — {settings.peripheral.columnChars} characters</span>
+          <input
+            type="range"
+            min={12}
+            max={42}
+            step={1}
+            value={settings.peripheral.columnChars}
+            disabled={disabled}
+            data-testid="sightline-column-chars"
+            onChange={(event) => patch({ peripheral: { ...settings.peripheral, columnChars: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Words per column — {settings.peripheral.wordsPerColumn}</span>
+          <input
+            type="range"
+            min={4}
+            max={40}
+            step={1}
+            value={settings.peripheral.wordsPerColumn}
+            disabled={disabled}
+            data-testid="sightline-column-words"
+            onChange={(event) => patch({ peripheral: { ...settings.peripheral, wordsPerColumn: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-field">
+          <span>Field spread — {percent(settings.peripheral.spread)}</span>
+          <input
+            type="range"
+            min={0.4}
+            max={1}
+            step={0.05}
+            value={settings.peripheral.spread}
+            disabled={disabled}
+            data-testid="sightline-column-spread"
+            onChange={(event) => patch({ peripheral: { ...settings.peripheral, spread: Number(event.target.value) } })}
+          />
+        </label>
+        <label className="sightline-row">
+          <input
+            type="checkbox"
+            checked={settings.peripheral.edgeFade}
+            disabled={disabled}
+            onChange={(event) => patch({ peripheral: { ...settings.peripheral, edgeFade: event.target.checked } })}
+          />
+          <span>Fade the outer columns so the eye is not pulled to the edges</span>
+        </label>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-treatment-heading">
-        <h2 id="sightline-treatment-heading">Export treatments</h2>
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Anchor weighting — level {settings.emphasis.level}</span>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              step={1}
-              value={settings.emphasis.level}
-              data-testid="sightline-emphasis"
-              onChange={(event) => patch({ emphasis: emphasisForLevel(Number(event.target.value) as typeof settings.emphasis.level) })}
-            />
-          </label>
-          <label className="sightline-field">
-            <span>Trail palette</span>
-            <select
-              value={settings.gradientPalette}
-              data-testid="sightline-palette"
-              onChange={(event) => patch({ gradientPalette: event.target.value })}
-            >
-              {GRADIENT_PALETTES.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Trail direction</span>
-            <select
-              value={settings.gradient.direction}
-              onChange={(event) => patch({ gradient: { ...settings.gradient, direction: event.target.value as typeof settings.gradient.direction } })}
-            >
-              <option value="horizontal">Across the line</option>
-              <option value="vertical">Down the page</option>
-              <option value="word">Inside each word</option>
-            </select>
-          </label>
-          <label className="sightline-field">
-            <span>Trail strength — {Math.round(settings.gradient.intensity * 100)}%</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={settings.gradient.intensity}
-              onChange={(event) => patch({ gradient: { ...settings.gradient, intensity: Number(event.target.value) } })}
-            />
-          </label>
-        </div>
+        <h2 id="sightline-treatment-heading">Emphasis typography</h2>
+        <label className="sightline-field">
+          <span>Emphasis level — {settings.emphasis.level} of 5</span>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            step={1}
+            value={settings.emphasis.level}
+            disabled={disabled}
+            data-testid="sightline-emphasis"
+            onChange={(event) =>
+              patch({
+                emphasis: emphasisForLevel(Number(event.target.value) as EmphasisLevel),
+              })
+            }
+          />
+        </label>
+        <p className="sightline-note">
+          {EMPHASIS_LEVELS.find((entry) => entry.level === settings.emphasis.level)?.detail} Heavier levels bold more letters,
+          keep at most {settings.emphasis.maxLetters} of them, and lighten the rest of the word.
+        </p>
+        <label className="sightline-field">
+          <span>Trail gradient palette</span>
+          <select
+            value={settings.gradientPalette}
+            disabled={disabled}
+            data-testid="sightline-palette"
+            onChange={(event) => patch({ gradientPalette: event.target.value })}
+          >
+            {GRADIENT_PALETTES.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p
+          className={`sightline-note${gradient.passes ? '' : ' sightline-note--warning'}`}
+          data-testid="sightline-gradient-contrast"
+        >
+          {paletteById(settings.gradientPalette).label} on {theme.label}: weakest stop {gradient.ratio.toFixed(2)}:1 at{' '}
+          {gradient.worstStop}
+          {gradient.passes ? ' — keeps the 4.5:1 floor.' : ' — below the 4.5:1 floor.'} {clearPalettes.length} of{' '}
+          {GRADIENT_PALETTES.length} palettes clear that floor on this background.
+        </p>
+        <label className="sightline-field">
+          <span>Gradient direction</span>
+          <select
+            value={settings.gradient.direction}
+            disabled={disabled}
+            data-testid="sightline-gradient-direction"
+            onChange={(event) =>
+              patch({ gradient: { ...settings.gradient, direction: event.target.value as typeof settings.gradient.direction } })
+            }
+          >
+            <option value="horizontal">Left to right across each line</option>
+            <option value="vertical">Top to bottom down the page</option>
+            <option value="word">Within each word</option>
+          </select>
+        </label>
+        <label className="sightline-field">
+          <span>Gradient strength — {settings.gradient.intensity.toFixed(2)}</span>
+          <input
+            type="range"
+            min={0.2}
+            max={1}
+            step={0.05}
+            value={settings.gradient.intensity}
+            disabled={disabled}
+            data-testid="sightline-gradient-intensity"
+            onChange={(event) => patch({ gradient: { ...settings.gradient, intensity: Number(event.target.value) } })}
+          />
+        </label>
         <label className="sightline-row">
           <input
             type="checkbox"
             checked={settings.gradient.wash}
+            disabled={disabled}
             onChange={(event) => patch({ gradient: { ...settings.gradient, wash: event.target.checked } })}
           />
-          <span>Soften the trail with a light wash behind the text</span>
+          <span>Wash each paragraph with a pale version of its palette</span>
         </label>
-        {gradientContrast && !gradientContrast.passes
-          ? (
-            <p className="sightline-badge sightline-badge--warn" data-testid="sightline-gradient-warning">
-              The weakest stop of this palette reaches only {gradientContrast.ratio.toFixed(1)}:1 against the reading background
-              ({gradientContrast.worstStop}). Choose a darker palette or a lighter theme before exporting.
-            </p>
-          )
-          : null}
       </section>
     </>
   );
 }
 
-/* --------------------------------------------------------------- drill ---- */
+/* ----------------------------------------------------------------- drill -- */
 
 export interface DrillPanelProps extends PanelSharedProps {
-  readonly running: boolean;
-  readonly progress: { readonly position: number; readonly items: number; readonly flashMs: number; readonly totalMs: number; readonly clamped: boolean };
-  readonly result: { readonly correct: number; readonly total: number; readonly accuracy: number; readonly firstTryAccuracy: number; readonly equivalentWpm: number } | null;
+  readonly weakWordCount: number;
+  readonly summary: SessionSummary | null;
   readonly onStart: () => void;
   readonly onStop: () => void;
+  readonly running: boolean;
+  readonly plan: { readonly flashes: number; readonly items: number; readonly totalMs: number; readonly clamped: boolean } | null;
 }
 
-export function DrillPanel({ settings, patch, running, progress, result, onStart, onStop }: DrillPanelProps) {
+export function DrillPanel({ settings, patch, disabled, weakWordCount, summary, onStart, onStop, running, plan }: DrillPanelProps) {
   const drill = settings.drill;
   return (
-    <section className="sightline-card" aria-labelledby="sightline-drill-heading">
-      <h2 id="sightline-drill-heading">Flash drill</h2>
-      <p className="sightline-note">
-        Words appear for a fraction of a second and disappear. The shortest flash this screen can draw is one animation frame, so
-        anything faster than {progress.flashMs} ms is shown at the frame rate instead of being faked.
-      </p>
-      <div className="sightline-row">
-        {DRILL_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className="sightline-button"
-            title={preset.detail}
-            onClick={() => patch({ drill: { ...drill, ...preset.config } })}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-      <div className="sightline-field-grid">
+    <>
+      <section className="sightline-card" aria-labelledby="sightline-drill-heading">
+        <h2 id="sightline-drill-heading">Tachistoscopic drills</h2>
+        <p className="sightline-note">
+          Each flash is shown for a fixed time, then the reader marks whether they recognised it. A drill reports the rate its
+          exposure time is equivalent to rather than a comprehension score.
+        </p>
+        <div className="sightline-row sightline-row--wrap">
+          {DRILL_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="sightline-chip"
+              disabled={disabled}
+              title={preset.detail}
+              data-testid={`sightline-drill-preset-${preset.id}`}
+              onClick={() => patch({ drill: { ...drill, ...preset.config } })}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <label className="sightline-field">
-          <span>Flash time — {drill.flashMs} ms</span>
+          <span>
+            Exposure — {ms(drill.flashMs)} ({flashEquivalentWpm(drill.flashMs, drill.wordsPerFlash).toLocaleString('en-US')} wpm
+            equivalent)
+          </span>
           <input
             type="range"
-            min={17}
+            min={MIN_FLASH_MS}
             max={600}
             step={1}
             value={drill.flashMs}
+            disabled={disabled}
             data-testid="sightline-flash-range"
             onChange={(event) => patch({ drill: { ...drill, flashMs: Number(event.target.value) } })}
           />
@@ -585,448 +807,745 @@ export function DrillPanel({ settings, patch, running, progress, result, onStart
             max={5}
             step={1}
             value={drill.wordsPerFlash}
+            disabled={disabled}
+            data-testid="sightline-words-per-flash"
             onChange={(event) => patch({ drill: { ...drill, wordsPerFlash: Number(event.target.value) } })}
           />
         </label>
         <label className="sightline-field">
-          <span>Gap — {formatMs(drill.gapMs)}</span>
+          <span>Gap between flashes — {ms(drill.gapMs)}</span>
           <input
             type="range"
-            min={100}
-            max={3000}
+            min={0}
+            max={4000}
             step={50}
             value={drill.gapMs}
+            disabled={disabled}
             data-testid="sightline-drill-gap"
             onChange={(event) => patch({ drill: { ...drill, gapMs: Number(event.target.value) } })}
           />
         </label>
         <label className="sightline-field">
-          <span>Flashes — {drill.flashCount}</span>
+          <span>Flashes in this run — {drill.flashCount}</span>
           <input
             type="range"
             min={5}
-            max={80}
-            step={1}
+            max={60}
+            step={5}
             value={drill.flashCount}
+            disabled={disabled}
             data-testid="sightline-flash-count"
             onChange={(event) => patch({ drill: { ...drill, flashCount: Number(event.target.value) } })}
           />
         </label>
         <label className="sightline-field">
-          <span>Repeat after {drill.repeatAfter} item(s)</span>
+          <span>Repeat an item after {drill.repeatAfter === 0 ? 'no other flashes' : `${drill.repeatAfter} others`}</span>
           <input
             type="range"
             min={0}
-            max={20}
+            max={12}
             step={1}
             value={drill.repeatAfter}
+            disabled={disabled}
+            data-testid="sightline-flash-repeat"
             onChange={(event) => patch({ drill: { ...drill, repeatAfter: Number(event.target.value) } })}
           />
         </label>
-        <label className="sightline-field">
-          <span>Order seed</span>
+        <label className="sightline-row">
           <input
-            type="number"
-            value={drill.seed}
-            onChange={(event) => patch({ drill: { ...drill, seed: Number(event.target.value) } })}
+            type="checkbox"
+            checked={drill.preferWeakWords}
+            disabled={disabled}
+            data-testid="sightline-flash-weak"
+            onChange={(event) => patch({ drill: { ...drill, preferWeakWords: event.target.checked } })}
           />
+          <span>Draw from the word bank first ({weakWordCount} words collected)</span>
         </label>
-      </div>
-      <label className="sightline-row">
-        <input
-          type="checkbox"
-          checked={drill.preferWeakWords}
-          onChange={(event) => patch({ drill: { ...drill, preferWeakWords: event.target.checked } })}
-        />
-        <span>Draw flashcards from the weakest words in the bank</span>
-      </label>
-      <div className="sightline-row">
-        <button type="button" className="sightline-button sightline-button--primary" onClick={running ? onStop : onStart} data-testid="sightline-drill-run">
-          {running ? 'Stop drill' : 'Run drill'}
-        </button>
-        <span className="sightline-badge" data-testid="sightline-drill-plan">
-          {progress.items} flashes · {Math.round(progress.totalMs / 1000)} s
-          {progress.clamped ? ' · slowed to the shortest drawable flash' : ''}
-        </span>
-      </div>
-      {result
-        ? (
-          <p className="sightline-note" data-testid="sightline-drill-result">
-            Recognised {result.correct} of {result.total} ({Math.round(result.accuracy * 100)}%), first-try accuracy{' '}
-            {Math.round(result.firstTryAccuracy * 100)}%. That is the equivalent of reading at {result.equivalentWpm} words per minute.
+        <div className="sightline-row">
+          <button
+            type="button"
+            className="sightline-button sightline-button--primary"
+            disabled={disabled || running}
+            data-testid="sightline-drill-run"
+            onClick={onStart}
+          >
+            Run the drill
+          </button>
+          <button type="button" className="sightline-button" disabled={!running} data-testid="sightline-drill-stop" onClick={onStop}>
+            Stop
+          </button>
+        </div>
+        {plan ? (
+          <p className="sightline-note" data-testid="sightline-drill-plan">
+            {plan.items} distinct items in {plan.flashes} flashes, about {(plan.totalMs / 1000).toFixed(1)} seconds
+            {plan.clamped ? ', with the exposure raised to the shortest interval this browser can show' : ''}.
           </p>
-        )
-        : null}
-    </section>
+        ) : null}
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-drill-result-heading">
+        <h2 id="sightline-drill-result-heading">Last drill</h2>
+        {summary ? (
+          <dl className="sightline-facts" data-testid="sightline-drill-result">
+            <div>
+              <dt>Words flashed</dt>
+              <dd>{summary.tokensRead.toLocaleString('en-US')}</dd>
+            </div>
+            <div>
+              <dt>Rate equivalent</dt>
+              <dd>{summary.averageWpm.toLocaleString('en-US')} words per minute</dd>
+            </div>
+            <div>
+              <dt>Time in the drill</dt>
+              <dd>{(summary.elapsedMs / 1000).toFixed(1)} s</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="sightline-note">No drill has been scored in this browser session yet.</p>
+        )}
+      </section>
+    </>
   );
 }
 
-/* ---------------------------------------------------------------- bank ---- */
+/* ------------------------------------------------------------------ bank -- */
 
 export interface BankPanelProps {
   readonly bank: readonly VocabularyEntry[];
   readonly cloze: readonly ClozeItem[];
   readonly now: number;
-  readonly weakCount: number;
-  readonly onBuildCloze: () => void;
-  readonly onReview: (word: string, correct: boolean) => void;
-  readonly onRemove: (word: string) => void;
+  /** Short line shown above the table, such as the last word that was marked. */
+  readonly message: string;
   readonly onCollect: () => void;
   readonly onMarkCurrent: () => void;
-  readonly message: string;
+  readonly onBuildCloze: () => void;
+  readonly onRemove: (word: string) => void;
+  readonly onReview: (word: string, correct: boolean) => void;
 }
 
-export function BankPanel({ bank, cloze, now, weakCount, onBuildCloze, onReview, onRemove, onCollect, onMarkCurrent, message }: BankPanelProps) {
+const reviewLabel = (entry: VocabularyEntry, now: number): string => {
+  const days = Math.round((entry.dueAt - now) / 86_400_000);
+  if (days <= 0) return 'due now';
+  return `in ${days} day${days === 1 ? '' : 's'}`;
+};
+
+export function BankPanel({ bank, cloze, now, message, onCollect, onMarkCurrent, onBuildCloze, onRemove, onReview }: BankPanelProps) {
   const due = dueEntries(bank, now);
-  const retention = retentionRate(bank);
   return (
     <>
       <section className="sightline-card" aria-labelledby="sightline-bank-heading">
-        <h2 id="sightline-bank-heading">Word bank — {bank.length} word{bank.length === 1 ? '' : 's'}</h2>
+        <h2 id="sightline-bank-heading">Word bank</h2>
         <p className="sightline-note" data-testid="sightline-bank-summary">
-          {bank.length === 0
-            ? 'Retention — · nothing in the bank yet.'
-            : `Retention ${Math.round(retention * 100)}% · ${due.length} due now · ${weakCount} weak word${weakCount === 1 ? '' : 's'} kept in the vault.`}
+          {bank.length} words · {due.length} due now · Retention {retentionRate(bank)}% over{' '}
+          {bank.reduce((total, entry) => total + entry.seen, 0)} encounters.
         </p>
-        <div className="sightline-row">
-          <button type="button" className="sightline-button" onClick={onCollect}>Collect weak words from this session</button>
-          <button type="button" className="sightline-button" onClick={onMarkCurrent}>Mark the current word as unknown</button>
-          <button type="button" className="sightline-button" onClick={onBuildCloze}>Build a cloze drill</button>
+        <p className="sightline-note" data-testid="sightline-bank-message">
+          {message || 'Words are collected from your own reading; none are predefined.'}
+        </p>
+        <div className="sightline-row sightline-row--wrap">
+          <button type="button" className="sightline-button" data-testid="sightline-bank-collect" onClick={onCollect}>
+            Collect the slow words from this session
+          </button>
+          <button type="button" className="sightline-button" data-testid="sightline-bank-mark" onClick={onMarkCurrent}>
+            Mark the current word as unknown
+          </button>
+          <button type="button" className="sightline-button" data-testid="sightline-bank-cloze" onClick={onBuildCloze}>
+            Build a cloze drill
+          </button>
         </div>
-        {message ? <p className="sightline-note" data-testid="sightline-bank-message">{message}</p> : null}
-        <div className="sightline-scroll-x">
-          <table className="sightline-table">
-            <caption className="sightline-visually-hidden">Vocabulary bank</caption>
-            <thead>
-              <tr><th scope="col">Word</th><th scope="col">Seen</th><th scope="col">Correct</th><th scope="col">Weight</th><th scope="col">Review</th><th scope="col" /></tr>
-            </thead>
-            <tbody>
-              {bank.length === 0
-                ? <tr><td colSpan={6}>The bank is empty. Read for a moment, then collect the words that slowed you down.</td></tr>
-                : [...bank]
-                  .sort((left, right) => right.weight - left.weight || left.word.localeCompare(right.word))
-                  .map((entry) => (
-                    <tr key={entry.word} data-testid={`sightline-word-${entry.word}`}>
-                      <td>{entry.word}</td>
-                      <td>{entry.seen}</td>
-                      <td>{entry.correct}</td>
-                      <td>{entry.weight}</td>
-                      <td>{entry.dueAt <= now ? 'due' : new Date(entry.dueAt).toLocaleDateString()}</td>
-                      <td>
-                        <button type="button" className="sightline-button" onClick={() => onReview(entry.word, true)}>Knew it</button>{' '}
-                        <button type="button" className="sightline-button" onClick={() => onReview(entry.word, false)}>Missed</button>{' '}
-                        <button type="button" className="sightline-button sightline-button--ghost" onClick={() => onRemove(entry.word)}>Remove</button>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-        </div>
+        {bank.length === 0 ? (
+          <p className="sightline-note">
+            Nothing collected yet. The bank fills from words that took you longer than your own median, and any word can be added
+            by hand.
+          </p>
+        ) : (
+          <div className="sightline-scroll-x">
+            <table className="sightline-table" data-testid="sightline-bank-table">
+              <caption className="sightline-visually-hidden">Words collected from reading sessions</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Word</th>
+                  <th scope="col">Seen</th>
+                  <th scope="col">Mean time</th>
+                  <th scope="col">Weight</th>
+                  <th scope="col">Next review</th>
+                  <th scope="col">Review</th>
+                  <th scope="col">Remove</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bank.map((entry) => (
+                  <tr key={entry.word}>
+                    <th scope="row">{entry.word}</th>
+                    <td>{entry.seen}</td>
+                    <td>{ms(entry.averageMs)}</td>
+                    <td>{entry.weight}</td>
+                    <td>{reviewLabel(entry, now)}</td>
+                    <td>
+                      <button type="button" className="sightline-button sightline-button--small" onClick={() => onReview(entry.word, false)}>
+                        Again
+                      </button>{' '}
+                      <button type="button" className="sightline-button sightline-button--small" onClick={() => onReview(entry.word, true)}>
+                        Knew it
+                      </button>
+                    </td>
+                    <td>
+                      <button type="button" className="sightline-button sightline-button--small" onClick={() => onRemove(entry.word)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
-      <section className="sightline-card" aria-labelledby="sightline-cloze-heading">
-        <h2 id="sightline-cloze-heading">Cloze and vocabulary drill</h2>
-        {cloze.length === 0
-          ? <p className="sightline-note">Build a cloze drill to test the words in the bank inside their original sentences.</p>
-          : (
-            <ol className="sightline-list sightline-list--cloze" style={{ counterReset: 'none' }}>
-              {cloze.map((item) => (
-                <li key={`${item.tokenIndex}-${item.answer}`} data-testid="sightline-cloze-item">
-                  <span>{item.text.replace(BLANK, '______')}</span>
-                  <span className="sightline-badge">{item.options.length > 0 ? item.options.join(' / ') : 'open answer'}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-      </section>
+      {cloze.length > 0 ? (
+        <section className="sightline-card" aria-labelledby="sightline-cloze-heading">
+          <h2 id="sightline-cloze-heading">Cloze passage</h2>
+          <p className="sightline-note">
+            Each blank is a bank word inside the sentence where you met it, with three plausible alternatives from the same
+            document.
+          </p>
+          <ol className="sightline-cloze-list" data-testid="sightline-cloze-list">
+            {cloze.map((item, index) => (
+              <li key={`${item.answer}-${item.tokenIndex}-${index}`} data-testid="sightline-cloze-item">
+                <p>{item.text}</p>
+                <p className="sightline-note">
+                  Choices: {item.options.join(' · ')} (answer recorded at position {item.answerIndex + 1})
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
     </>
   );
 }
 
-/* ---------------------------------------------------------------- data ---- */
+/* ------------------------------------------------------------------ data -- */
 
 export interface DataPanelProps {
-  readonly summary: WarehouseSummary | null;
+  readonly summary: WarehouseSummary;
   readonly sessions: readonly StoredSession[];
   readonly velocity: readonly VelocityPoint[];
-  readonly streak: number;
+  readonly vocabularySize: number;
   readonly storageNote: string;
-  readonly documentProgress: readonly { readonly title: string; readonly tokenIndex: number; readonly tokenCount: number; readonly updatedAt: number }[];
-  readonly onRefresh: () => void;
   readonly onClear: () => void;
-  readonly onOpenSession: (id: string) => void;
-  readonly onResume: (title: string) => void;
 }
 
-export function DataPanel({ summary, sessions, velocity, streak, storageNote, documentProgress, onRefresh, onClear, onOpenSession, onResume }: DataPanelProps) {
+export function DataPanel({ summary, sessions, velocity, vocabularySize, storageNote, onClear }: DataPanelProps) {
   return (
     <>
       <section className="sightline-card" aria-labelledby="sightline-warehouse-heading">
-        <h2 id="sightline-warehouse-heading">Reading warehouse</h2>
-        <p className="sightline-note" data-testid="sightline-storage-note">{storageNote}</p>
-        <dl className="sightline-metrics">
-          <div className="sightline-metric"><dt>Sessions</dt><dd>{summary?.sessions ?? sessions.length}</dd></div>
-          <div className="sightline-metric"><dt>Words</dt><dd>{(summary?.totalWords ?? 0).toLocaleString('en-US')}</dd></div>
-          <div className="sightline-metric"><dt>Average</dt><dd>{summary ? `${summary.averageWpm} wpm` : '—'}</dd></div>
-          <div className="sightline-metric"><dt>Best</dt><dd>{summary ? `${summary.bestWpm} wpm` : '—'}</dd></div>
-          <div className="sightline-metric"><dt>Median</dt><dd>{summary ? `${summary.medianWpm} wpm` : '—'}</dd></div>
-          <div className="sightline-metric"><dt>Streak</dt><dd>{streak} day{streak === 1 ? '' : 's'}</dd></div>
+        <h2 id="sightline-warehouse-heading">Local reading history</h2>
+        <p className="sightline-note" data-testid="sightline-storage-note">
+          {storageNote}
+        </p>
+        <dl className="sightline-facts" data-testid="sightline-warehouse-summary">
+          <div>
+            <dt>Sessions</dt>
+            <dd>{summary.sessions}</dd>
+          </div>
+          <div>
+            <dt>Words read</dt>
+            <dd>{summary.totalWords.toLocaleString('en-US')}</dd>
+          </div>
+          <div>
+            <dt>Time reading</dt>
+            <dd>{Math.round(summary.totalMs / 60_000)} min</dd>
+          </div>
+          <div>
+            <dt>Mean rate</dt>
+            <dd>{summary.averageWpm} wpm</dd>
+          </div>
+          <div>
+            <dt>Best rate</dt>
+            <dd>{summary.bestWpm} wpm</dd>
+          </div>
+          <div>
+            <dt>Median rate</dt>
+            <dd>{summary.medianWpm} wpm</dd>
+          </div>
+          <div>
+            <dt>Documents</dt>
+            <dd>{summary.documents}</dd>
+          </div>
+          <div>
+            <dt>Days with sessions</dt>
+            <dd>{summary.streakDays}</dd>
+          </div>
+          <div>
+            <dt>Word bank</dt>
+            <dd>{vocabularySize}</dd>
+          </div>
         </dl>
         <div className="sightline-row">
-          <button type="button" className="sightline-button" onClick={onRefresh}>Refresh</button>
-          <button type="button" className="sightline-button sightline-button--ghost" onClick={onClear}>Clear local history</button>
+          <button type="button" className="sightline-button" data-testid="sightline-warehouse-clear" onClick={onClear}>
+            Clear the local reading history
+          </button>
         </div>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-velocity-heading">
         <h2 id="sightline-velocity-heading">Velocity by day</h2>
-        {velocity.length === 0
-          ? <p className="sightline-note">Finish a reading session and the daily velocity series appears here.</p>
-          : (
-            <table className="sightline-table">
-              <thead><tr><th scope="col">Day</th><th scope="col">Average</th><th scope="col">Sessions</th></tr></thead>
+        {velocity.length === 0 ? (
+          <p className="sightline-note">No sessions recorded yet, so there is no velocity series to show.</p>
+        ) : (
+          <ul className="sightline-velocity-list" data-testid="sightline-velocity-list">
+            {velocity.map((point) => (
+              <li key={point.at}>
+                <span>{new Date(point.at).toISOString().slice(0, 10)}</span>
+                <span className="sightline-velocity-bar" style={{ width: `${Math.min(100, point.wpm / 6)}%` }} />
+                <span>
+                  {point.wpm} wpm over {point.sessions} session{point.sessions === 1 ? '' : 's'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-sessions-heading">
+        <h2 id="sightline-sessions-heading">Sessions</h2>
+        {sessions.length === 0 ? (
+          <p className="sightline-note">Read for a minute and the first session appears here.</p>
+        ) : (
+          <div className="sightline-scroll-x">
+            <table className="sightline-table" data-testid="sightline-session-table">
+              <caption className="sightline-visually-hidden">Reading sessions recorded in this browser</caption>
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Document</th>
+                  <th scope="col">Words</th>
+                  <th scope="col">Rate</th>
+                  <th scope="col">Peak</th>
+                </tr>
+              </thead>
               <tbody>
-                {velocity.slice(-10).map((point) => (
-                  <tr key={point.at}>
-                    <td>{new Date(point.at).toLocaleDateString()}</td>
-                    <td>{point.wpm} wpm</td>
-                    <td>{point.sessions}</td>
+                {sessions.slice(0, 20).map((session) => (
+                  <tr key={session.id}>
+                    <th scope="row">{new Date(session.startedAt).toLocaleString()}</th>
+                    <td>{session.documentTitle}</td>
+                    <td>{session.tokensRead.toLocaleString('en-US')}</td>
+                    <td>{session.averageWpm} wpm</td>
+                    <td>{session.peakWpm} wpm</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-      </section>
-
-      <section className="sightline-card" aria-labelledby="sightline-sessions-heading">
-        <h2 id="sightline-sessions-heading">Session history</h2>
-        <div className="sightline-scroll-x">
-          <table className="sightline-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Words</th><th scope="col">Average</th><th scope="col">Peak</th><th scope="col">When</th></tr></thead>
-            <tbody>
-              {sessions.length === 0
-                ? <tr><td colSpan={5}>No sessions recorded yet.</td></tr>
-                : [...sessions].reverse().slice(0, 12).map((session) => (
-                  <tr key={session.id} data-testid={`sightline-session-${session.id}`}>
-                    <td><button type="button" className="sightline-button sightline-button--ghost" onClick={() => onOpenSession(session.id)}>{session.documentTitle}</button></td>
-                    <td>{session.tokensRead}</td>
-                    <td>{session.averageWpm}</td>
-                    <td>{session.peakWpm}</td>
-                    <td>{new Date(session.startedAt).toLocaleString()}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="sightline-card" aria-labelledby="sightline-resume-heading">
-        <h2 id="sightline-resume-heading">Resume points</h2>
-        {documentProgress.length === 0
-          ? <p className="sightline-note">Reading positions are saved here as you go, so you can pick a document up at the exact word.</p>
-          : (
-            <ul className="sightline-list">
-              {[...documentProgress].sort((left, right) => right.updatedAt - left.updatedAt).map((entry) => (
-                <li key={`${entry.title}-${entry.updatedAt}`}>
-                  <span>{entry.title}</span>
-                  <span className="sightline-badge">
-                    word {entry.tokenIndex.toLocaleString('en-US')} of {entry.tokenCount.toLocaleString('en-US')}
-                  </span>
-                  <button type="button" className="sightline-button" onClick={() => onResume(entry.title)}>Resume</button>
-                </li>
-              ))}
-            </ul>
-          )}
+          </div>
+        )}
       </section>
     </>
   );
 }
 
-/* -------------------------------------------------------------- export ---- */
+/* --------------------------------------------------------------- library -- */
+
+export interface LibraryPanelProps {
+  readonly bookmarks: readonly Bookmark[];
+  readonly highlightColor: HighlightColor;
+  readonly onColor: (color: HighlightColor) => void;
+  readonly onJump: (tokenIndex: number) => void;
+  readonly onRemoveBookmark: (id: string) => void;
+  readonly onRemoveHighlight: (id: string) => void;
+  readonly onRemoveNote: (id: string) => void;
+  readonly highlights: readonly { id: string; startToken: number; endToken: number; color: HighlightColor }[];
+  readonly notes: readonly { id: string; tokenIndex: number; text: string }[];
+  readonly progress: readonly DocumentProgress[];
+  readonly currentDocumentId: string;
+  readonly onInspect: (documentId: string, tokenIndex: number) => void;
+}
+
+export function LibraryPanel({
+  bookmarks,
+  highlightColor,
+  onColor,
+  onJump,
+  onRemoveBookmark,
+  onRemoveHighlight,
+  onRemoveNote,
+  highlights,
+  notes,
+  progress,
+  currentDocumentId,
+  onInspect,
+}: LibraryPanelProps) {
+  return (
+    <>
+      <section className="sightline-card" aria-labelledby="sightline-marks-heading">
+        <h2 id="sightline-marks-heading">Marks in this document</h2>
+        <p className="sightline-note" data-testid="sightline-marks-summary">
+          {bookmarks.length} bookmark{bookmarks.length === 1 ? '' : 's'} · {highlights.length} highlight
+          {highlights.length === 1 ? '' : 's'} · {notes.length} note{notes.length === 1 ? '' : 's'} kept beside the text. Nothing
+          here changes the document itself.
+        </p>
+        <label className="sightline-field">
+          <span>Highlight colour for new marks</span>
+          <select value={highlightColor} data-testid="sightline-highlight-color" onChange={(event) => onColor(event.target.value as HighlightColor)}>
+            <option value="amber">Amber</option>
+            <option value="mint">Mint</option>
+            <option value="sky">Sky</option>
+            <option value="rose">Rose</option>
+            <option value="violet">Violet</option>
+          </select>
+        </label>
+        {bookmarks.length === 0 ? (
+          <p className="sightline-note">Press B while reading, or use the bookmark button, to mark a place.</p>
+        ) : (
+          <ul className="sightline-bookmark-list" data-testid="sightline-bookmark-list">
+            {bookmarks.map((bookmark) => (
+              <li key={bookmark.id}>
+                <button type="button" className="sightline-link" onClick={() => onJump(bookmark.tokenIndex)}>
+                  {bookmark.label}
+                </button>
+                <span className="sightline-note"> word {bookmark.tokenIndex.toLocaleString('en-US')}</span>
+                <button type="button" className="sightline-button sightline-button--small" onClick={() => onRemoveBookmark(bookmark.id)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {highlights.length > 0 ? (
+          <ul className="sightline-bookmark-list" data-testid="sightline-highlight-list">
+            {highlights.map((highlight) => (
+              <li key={highlight.id}>
+                <button type="button" className="sightline-link" onClick={() => onJump(highlight.startToken)}>
+                  {highlight.color} highlight
+                </button>
+                <span className="sightline-note">
+                  {' '}
+                  words {highlight.startToken.toLocaleString('en-US')}–{highlight.endToken.toLocaleString('en-US')}
+                </span>
+                <button type="button" className="sightline-button sightline-button--small" onClick={() => onRemoveHighlight(highlight.id)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {notes.length > 0 ? (
+          <ul className="sightline-bookmark-list" data-testid="sightline-note-list">
+            {notes.map((note) => (
+              <li key={note.id}>
+                <button type="button" className="sightline-link" onClick={() => onJump(note.tokenIndex)}>
+                  Note
+                </button>
+                <span className="sightline-note"> {note.text}</span>
+                <button type="button" className="sightline-button sightline-button--small" onClick={() => onRemoveNote(note.id)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <section className="sightline-card" aria-labelledby="sightline-progress-heading">
+        <h2 id="sightline-progress-heading">Saved positions</h2>
+        {progress.length === 0 ? (
+          <p className="sightline-note">Positions are saved as you read, so a document can be resumed later.</p>
+        ) : (
+          <ul className="sightline-progress-list" data-testid="sightline-progress-list">
+            {progress.map((entry) => (
+              <li key={entry.documentId}>
+                <span>{entry.title}</span>
+                <span className="sightline-note">
+                  word {entry.tokenIndex.toLocaleString('en-US')} of {entry.tokenCount.toLocaleString('en-US')}, saved{' '}
+                  {new Date(entry.updatedAt).toLocaleString()}
+                </span>
+                {entry.documentId === currentDocumentId ? (
+                  <span className="sightline-note">open now</span>
+                ) : (
+                  <button type="button" className="sightline-button sightline-button--small" onClick={() => onInspect(entry.documentId, entry.tokenIndex)}>
+                    Show this position
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  );
+}
+
+/* ---------------------------------------------------------------- export -- */
 
 export interface ExportPanelProps {
   readonly draft: MetadataDraft;
   readonly onDraft: (patch: Partial<MetadataDraft>) => void;
-  readonly onTag: (tag: string) => void;
+  readonly onAddTag: (tag: string) => void;
   readonly onRemoveTag: (tag: string) => void;
   readonly onSuggestTags: () => void;
-  readonly onReadingLevel: () => void;
-  readonly socialPreview: readonly { readonly property: string; readonly content: string }[];
-  readonly structuredPreview: string;
+  readonly onMeasuredLevel: () => void;
+  readonly model: DocumentModel | undefined;
   readonly rows: readonly (ExportDefinition & { readonly available: boolean; readonly note: string })[];
-  readonly busyExport: string;
-  readonly onDownload: (id: ExportDefinition['id']) => void;
+  readonly busy: ExportId | null;
+  readonly message: string;
+  readonly filePreview: string;
+  readonly onDownload: (id: ExportId) => void;
   readonly onImportState: (payload: string) => void;
   readonly onExportState: () => void;
-  readonly validation: readonly { readonly field: keyof MetadataDraft; readonly message: string }[];
-  readonly fileNamePreview: string;
-  readonly message: string;
-  readonly model: DocumentModel | undefined;
-  readonly metrics: ProseMetrics | undefined;
+  readonly state: SightlineState;
 }
 
+const FIELD_LABELS: readonly { readonly field: keyof MetadataDraft; readonly label: string; readonly hint: string }[] = [
+  { field: 'title', label: 'Title', hint: 'Used for the file name, the page title, and the document metadata.' },
+  { field: 'author', label: 'Author', hint: 'The person or organisation credited in the exported document.' },
+  { field: 'description', label: 'Description', hint: 'The abstract or summary shown in catalogues and social previews.' },
+  { field: 'subject', label: 'Subject', hint: 'A short classification, such as the course or practice area.' },
+  { field: 'language', label: 'Language', hint: 'A BCP-47 tag such as en, en-GB, or fr-CA.' },
+  { field: 'publisher', label: 'Publisher', hint: 'Whoever is publishing the exported document.' },
+  { field: 'identifier', label: 'Identifier', hint: 'A DOI, ISBN, docket number, or other stable reference.' },
+  { field: 'rights', label: 'Rights', hint: 'A licence or copyright statement.' },
+  { field: 'url', label: 'Canonical URL', hint: 'Used for the Open Graph and schema.org output.' },
+  { field: 'readingLevel', label: 'Reading level', hint: 'Computed from the prose; edit it if you have a house standard.' },
+];
+
 export function ExportPanel({
-  draft, onDraft, onTag, onRemoveTag, onSuggestTags, onReadingLevel, socialPreview, structuredPreview,
-  rows, busyExport, onDownload, onImportState, onExportState, validation, fileNamePreview, message, metrics,
+  draft,
+  onDraft,
+  onAddTag,
+  onRemoveTag,
+  onSuggestTags,
+  onMeasuredLevel,
+  model,
+  rows,
+  busy,
+  message,
+  filePreview,
+  onDownload,
+  onImportState,
+  onExportState,
+  state,
 }: ExportPanelProps) {
+  const [tagText, setTagText] = useState('');
+  const [stateText, setStateText] = useState('');
+  const problems = validateDraft(draft);
+  const social = socialTags(draft, model?.paragraphs[0] ? model.paragraphs[0].text.slice(0, 200) : '');
+  const commitTag = () => {
+    const cleaned = tagText.trim();
+    if (cleaned.length === 0) return;
+    cleaned
+      .split(/[,;\n]+/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+      .forEach(onAddTag);
+    setTagText('');
+  };
   return (
     <>
       <section className="sightline-card" aria-labelledby="sightline-metadata-heading">
-        <h2 id="sightline-metadata-heading">Document studio</h2>
+        <h2 id="sightline-metadata-heading">Metadata studio</h2>
         <p className="sightline-note">
-          These fields are written into every export that can carry them — the EPUB package, the PDF information dictionary, the Word
-          core properties, and the HTML head with its social tags. File name preview: <strong data-testid="sightline-file-preview">{fileNamePreview}</strong>
+          Every field here is written into every export, and into the social and schema.org tags. Tags are added one at a time
+          with Enter and removed from the chip beside the field.
         </p>
-        <div className="sightline-field-grid">
-          <label className="sightline-field">
-            <span>Title</span>
-            <input type="text" value={draft.title} data-testid="sightline-meta-title" onChange={(event) => onDraft({ title: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Author</span>
-            <input type="text" value={draft.author} data-testid="sightline-meta-author" onChange={(event) => onDraft({ author: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Publisher</span>
-            <input type="text" value={draft.publisher} onChange={(event) => onDraft({ publisher: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Language</span>
-            <input type="text" value={draft.language} onChange={(event) => onDraft({ language: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Identifier</span>
-            <input type="text" value={draft.identifier} placeholder="urn:uuid:…" onChange={(event) => onDraft({ identifier: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Rights</span>
-            <input type="text" value={draft.rights} onChange={(event) => onDraft({ rights: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Created</span>
-            <input type="text" value={draft.created} onChange={(event) => onDraft({ created: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Modified</span>
-            <input type="text" value={draft.modified} onChange={(event) => onDraft({ modified: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Reading level</span>
-            <input type="text" value={draft.readingLevel} onChange={(event) => onDraft({ readingLevel: event.target.value })} />
-          </label>
-          <label className="sightline-field">
-            <span>Canonical URL</span>
-            <input type="url" value={draft.url} placeholder="https://example.org/notes" onChange={(event) => onDraft({ url: event.target.value })} />
-          </label>
-        </div>
-        <label className="sightline-field">
-          <span>Description</span>
-          <textarea value={draft.description} data-testid="sightline-meta-description" onChange={(event) => onDraft({ description: event.target.value })} />
-        </label>
         <div className="sightline-row">
-          <button type="button" className="sightline-button" onClick={onReadingLevel} disabled={!metrics}>
+          <label className="sightline-field">
+            <span>Add a tag</span>
+            <input
+              type="text"
+              value={tagText}
+              data-testid="sightline-tag-input"
+              placeholder="reading, methodology…"
+              onChange={(event) => setTagText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitTag();
+                }
+              }}
+            />
+          </label>
+          <button type="button" className="sightline-button" data-testid="sightline-tag-add" onClick={commitTag}>
+            Add the tag
+          </button>
+        </div>
+        <div className="sightline-row sightline-row--wrap" data-testid="sightline-tag-list">
+          {draft.tags.length === 0 ? (
+            <span className="sightline-note">No tags yet. Suggested tags come from the document itself.</span>
+          ) : (
+            draft.tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="sightline-chip sightline-chip--on"
+                onClick={() => onRemoveTag(tag)}
+              >
+                {tag} ×
+              </button>
+            ))
+          )}
+        </div>
+        <div className="sightline-row">
+          <button type="button" className="sightline-button" data-testid="sightline-meta-suggest" disabled={!model} onClick={onSuggestTags}>
+            Suggest tags from the document
+          </button>
+          <button type="button" className="sightline-button" data-testid="sightline-measured-level" disabled={!model} onClick={onMeasuredLevel}>
             Use measured reading level
           </button>
-          <span className="sightline-badge">
-            {metrics ? `${metrics.words.toLocaleString('en-US')} words · ${metrics.sentences} sentences` : 'no document'}
-          </span>
         </div>
-        {validation.length > 0
-          ? (
-            <ul className="sightline-diag">
-              {validation.map((problem) => <li key={problem.field}>{problem.field}: {problem.message}</li>)}
-            </ul>
-          )
-          : null}
-      </section>
-
-      <section className="sightline-card" aria-labelledby="sightline-tags-heading">
-        <h2 id="sightline-tags-heading">Tags</h2>
-        <div className="sightline-row">
-          {draft.tags.length === 0 ? <span className="sightline-note">No tags yet.</span> : null}
-          {draft.tags.map((tag) => (
-            <button key={tag} type="button" className="sightline-badge" onClick={() => onRemoveTag(tag)} title={`Remove ${tag}`}>
-              {tag} ×
-            </button>
-          ))}
-        </div>
-        <label className="sightline-field">
-          <span>Add tags — comma separated</span>
-          <input
-            type="text"
-            data-testid="sightline-tag-input"
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return;
-              event.preventDefault();
-              onTag((event.target as HTMLInputElement).value);
-              (event.target as HTMLInputElement).value = '';
-            }}
-            onBlur={(event) => {
-              if (event.target.value.trim().length === 0) return;
-              onTag(event.target.value);
-              event.target.value = '';
-            }}
-          />
-        </label>
-        <button type="button" className="sightline-button" onClick={onSuggestTags} disabled={!metrics}>Suggest tags from the prose</button>
-        {message ? <p className="sightline-note" data-testid="sightline-export-message">{message}</p> : null}
+        {FIELD_LABELS.map(({ field, label, hint }) => (
+          <label key={field} className="sightline-field">
+            <span title={hint}>{label}</span>
+            {field === 'description' ? (
+              <textarea
+                rows={3}
+                value={draft[field] as string}
+                data-testid={`sightline-meta-${field}`}
+                onChange={(event) => onDraft({ [field]: event.target.value } as Partial<MetadataDraft>)}
+              />
+            ) : (
+              <input
+                type="text"
+                value={draft[field] as string}
+                data-testid={`sightline-meta-${field}`}
+                onChange={(event) => onDraft({ [field]: event.target.value } as Partial<MetadataDraft>)}
+              />
+            )}
+          </label>
+        ))}
+        {problems.length > 0 ? (
+          <ul className="sightline-note sightline-note--warning" data-testid="sightline-meta-problems">
+            {problems.map((problem) => (
+              <li key={`${problem.field}-${problem.message}`}>{problem.message}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="sightline-note" data-testid="sightline-meta-problems">
+            The metadata passes every check applied here.
+          </p>
+        )}
+        <p className="sightline-note">
+          The weighted PDF will be written as <code data-testid="sightline-file-preview">{filePreview}</code>.
+        </p>
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-social-heading">
-        <h2 id="sightline-social-heading">Social tags and structured data</h2>
-        <table className="sightline-table">
-          <thead><tr><th scope="col">Tag</th><th scope="col">Value</th></tr></thead>
-          <tbody>
-            {socialPreview.map((tag) => (
-              <tr key={tag.property}><td>{tag.property}</td><td>{tag.content}</td></tr>
-            ))}
-          </tbody>
-        </table>
+        <h2 id="sightline-social-heading">Social and structured data</h2>
+        <div className="sightline-scroll-x">
+          <table className="sightline-table" data-testid="sightline-social-table">
+            <caption className="sightline-visually-hidden">Open Graph and social card tags written into the HTML export</caption>
+            <thead>
+              <tr>
+                <th scope="col">Tag</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {social.map((tag) => (
+                <tr key={tag.property}>
+                  <th scope="row">{tag.property}</th>
+                  <td>{tag.content}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <details>
-          <summary>Structured data preview</summary>
-          <pre className="sightline-note" style={{ whiteSpace: 'pre-wrap' }}>{structuredPreview}</pre>
+          <summary>Schema.org data written into the exports</summary>
+          <pre className="sightline-brief" data-testid="sightline-structured-data">
+            {structuredDataScript(draft)}
+          </pre>
         </details>
       </section>
 
-      <section className="sightline-card" aria-labelledby="sightline-export-rows">
-        <h2 id="sightline-export-rows">Exports</h2>
-        {rows.map((row) => (
-          <div className="sightline-export-row" key={row.id}>
-            <strong>{row.label}</strong>
-            <small>{row.detail}</small>
-            <small data-testid={`sightline-note-${row.id}`}>{row.note}</small>
-            <div className="sightline-row">
+      <section className="sightline-card" aria-labelledby="sightline-exports-heading">
+        <h2 id="sightline-exports-heading">Exports</h2>
+        <p className="sightline-note">
+          Document exports carry the reading treatment you chose and the metadata above. Every file is written in this browser.
+        </p>
+        <ul className="sightline-export-list">
+          {rows.map((row) => (
+            <li key={row.id} data-testid={`sightline-export-row-${row.id}`}>
+              <div>
+                <strong>{row.label}</strong>
+                <p className="sightline-note">{row.detail}</p>
+                <p className="sightline-note">{row.note}</p>
+              </div>
               <button
                 type="button"
-                className="sightline-button sightline-button--primary"
+                className="sightline-button"
+                disabled={!row.available || busy !== null}
                 data-testid={`sightline-export-${row.id}`}
-                disabled={!row.available || busyExport === row.id}
                 onClick={() => onDownload(row.id)}
               >
-                {busyExport === row.id ? 'Writing…' : `Download ${row.extension.toUpperCase()}`}
+                {busy === row.id ? 'Writing…' : `Download .${row.extension}`}
               </button>
-              <span className="sightline-badge">{row.mediaType}</span>
-            </div>
-          </div>
-        ))}
+            </li>
+          ))}
+        </ul>
+        {message ? (
+          <p className="sightline-note" data-testid="sightline-export-message">
+            {message}
+          </p>
+        ) : null}
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-state-heading">
-        <h2 id="sightline-state-heading">Reader state backup</h2>
+        <h2 id="sightline-state-heading">Reader state</h2>
         <p className="sightline-note">
-          Settings, bookmarks, highlights, notes, and positions are stored in this browser. Export them to move to another device, or
-          paste a backup to restore.
+          Settings, bookmarks, highlights, notes, and saved positions live in this browser. The state document moves them to
+          another machine; importing replaces what is stored here.
         </p>
+        <dl className="sightline-facts">
+          <div>
+            <dt>Bookmarks</dt>
+            <dd>{state.bookmarks.length}</dd>
+          </div>
+          <div>
+            <dt>Highlights</dt>
+            <dd>{state.highlights.length}</dd>
+          </div>
+          <div>
+            <dt>Notes</dt>
+            <dd>{state.notes.length}</dd>
+          </div>
+          <div>
+            <dt>Saved positions</dt>
+            <dd>{state.progress.length}</dd>
+          </div>
+        </dl>
         <div className="sightline-row">
-          <button type="button" className="sightline-button" onClick={onExportState} data-testid="sightline-state-export">Download reader state</button>
+          <button type="button" className="sightline-button" data-testid="sightline-state-export" onClick={onExportState}>
+            Download the reader state
+          </button>
+          <label className="sightline-button sightline-button--file">
+            <span>Import a state file</span>
+            <input
+              type="file"
+              accept="application/json,.json"
+              data-testid="sightline-state-file"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void file.text().then(onImportState);
+              }}
+            />
+          </label>
         </div>
         <label className="sightline-field">
-          <span>Restore from a backup</span>
-          <textarea data-testid="sightline-state-import" placeholder='{"version":1,…}' onBlur={(event) => onImportState(event.target.value)} />
+          <span>Or paste a state document here and leave the field to import it</span>
+          <textarea
+            rows={3}
+            value={stateText}
+            data-testid="sightline-state-import"
+            onChange={(event) => setStateText(event.target.value)}
+            onBlur={() => {
+              if (stateText.trim().length > 0) {
+                onImportState(stateText);
+                setStateText('');
+              }
+            }}
+          />
         </label>
       </section>
     </>
   );
 }
-
-export type { HighlightColor, MarginNote };

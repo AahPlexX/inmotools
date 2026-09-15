@@ -1,5 +1,5 @@
 /**
- * Render smoke tests for the reading workspace and its panels.
+ * Render smoke tests for the reading workspace and its control panels.
  *
  * The browser spec in `tests/e2e/sightline.spec.ts` is the real interface test,
  * but it needs a browser. These tests render the workspace and each panel to
@@ -19,6 +19,7 @@ import {
   DataPanel,
   DrillPanel,
   ExportPanel,
+  LibraryPanel,
   LookPanel,
   PacePanel,
 } from '../../src/tools/sightline/SightlinePanels';
@@ -28,12 +29,18 @@ import { DEFAULT_EPUB_EXPORT } from '../../src/tools/sightline/export-epub';
 import { DEFAULT_HTML_EXPORT } from '../../src/tools/sightline/export-html';
 import { DEFAULT_PDF_EXPORT } from '../../src/tools/sightline/export-pdf';
 import { DEFAULT_SETTINGS, createDefaultState } from '../../src/tools/sightline/sightline-store';
-import { draftFromModel, socialTags } from '../../src/tools/sightline/metadata-studio';
+import { draftFromModel } from '../../src/tools/sightline/metadata-studio';
 import { buildDocumentModel } from '../../src/tools/sightline/segmentation-engine';
 import { buildColumnLayout, DEFAULT_PERIPHERAL } from '../../src/tools/sightline/peripheral-engine';
+import {
+  GRADIENT_PALETTES,
+  checkGradientContrast,
+  paletteById,
+} from '../../src/tools/sightline/gradient-engine';
 import { themeById, themeContrast, themeVariables } from '../../src/tools/sightline/palette-engine';
 import { emphasisForLevel } from '../../src/tools/sightline/typography-engine';
-import { DEFAULT_GRADIENT } from '../../src/tools/sightline/gradient-engine';
+import { summariseWarehouse } from '../../src/tools/sightline/analytics-engine';
+import { DEFAULT_COLLECT, retentionRate } from '../../src/tools/sightline/vocabulary-engine';
 import type { ReaderSettings } from '../../src/tools/sightline/sightline-store';
 
 const workspaceHtml = renderToStaticMarkup(<SightlineWorkspace />);
@@ -75,27 +82,34 @@ describe('workspace first render', () => {
     expect(workspaceHtml).toContain('data-testid="sightline-stage"');
     expect(workspaceHtml).toContain('data-testid="sightline-play"');
     expect(workspaceHtml).toContain('data-testid="sightline-scrub"');
+    expect(workspaceHtml).toContain('class="sightline-surface"');
     for (const engine of ['rsvp', 'chunk', 'page', 'peripheral', 'drill']) {
       expect(workspaceHtml).toContain(`data-testid="sightline-engine-${engine}"`);
     }
-    for (const panel of ['pace', 'look', 'drill', 'bank', 'data', 'export']) {
+    for (const panel of ['pace', 'look', 'drill', 'bank', 'marks', 'data', 'export']) {
       expect(workspaceHtml).toContain(`data-testid="sightline-panel-${panel}"`);
     }
   });
 
   it('shows the empty state and holds the document controls disabled', () => {
-    expect(workspaceHtml).toContain('No document yet');
+    expect(workspaceHtml).toContain('No document is open yet');
     expect(workspaceHtml).toContain('Load the sample passage');
-    expect(workspaceHtml).toContain('No document open');
+    expect(workspaceHtml).toContain('Read the clipboard');
+    expect(workspaceHtml).toContain('data-testid="sightline-clipboard"');
+    expect(workspaceHtml).toContain('data-testid="sightline-dropzone"');
     const disabledButton = (testId: string) => new RegExp(`<button(?=[^>]*data-testid="${testId}")(?=[^>]*disabled)[^>]*>`);
     expect(workspaceHtml).toMatch(disabledButton('sightline-play'));
     expect(workspaceHtml).toMatch(disabledButton('sightline-ingest-paste'));
   });
 
   it('states the limits instead of promising a multiplier', () => {
-    expect(workspaceHtml).toContain('data-testid="sightline-advice"');
-    expect(workspaceHtml).toMatch(/comprehension you want/i);
-    expect(workspaceHtml.toLowerCase()).not.toContain('bionic');
+    const lower = workspaceHtml.toLowerCase();
+    expect(lower).toContain('does not do ocr');
+    expect(lower).toContain('400 words per minute');
+    expect(lower).toContain('stay in this browser');
+    expect(lower).not.toContain('bionic');
+    expect(lower).not.toContain('spritz');
+    expect(lower).not.toContain('beeline');
   });
 
   it('uses the theme variables the theme engine writes', () => {
@@ -111,6 +125,24 @@ describe('workspace first render', () => {
       expect(written.has(name), `${name} is read by the stylesheet but never written`).toBe(true);
     }
   });
+
+  it('styles every class the workspace applies', () => {
+    const css = readFileSync('src/tools/sightline/sightline-workspace.css', 'utf8');
+    const defined = new Set([...css.matchAll(/\.([a-z][a-z0-9_-]*)/g)].map((match) => match[1]!));
+    const missing: string[] = [];
+    for (const file of ['SightlineWorkspace.tsx', 'SightlinePanels.tsx']) {
+      const source = readFileSync(`src/tools/sightline/${file}`, 'utf8');
+      for (const match of source.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        const text = (match[1] ?? match[2] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+        for (const name of text.split(/\s+/)) {
+          if (!name.startsWith('sightline-')) continue;
+          if (defined.has(name) || name.endsWith('-')) continue;
+          missing.push(`${file}: ${name}`);
+        }
+      }
+    }
+    expect([...new Set(missing)]).toEqual([]);
+  });
 });
 
 describe('control panels render with real data', () => {
@@ -122,9 +154,10 @@ describe('control panels render with real data', () => {
       <PacePanel
         {...shared}
         onPreset={noop}
-        onRampStart={noop}
-        speechSupport={{ supported: true, boundaryEvents: true, reason: 'Speech synthesis is available.' }}
+        onRamp={noop}
         metronomeSupported
+        speechSupport={{ supported: true, boundaryEvents: true, reason: 'Speech synthesis is available.' }}
+        voices={['Google US English']}
       />,
     );
     expect(html).toContain('data-testid="sightline-wpm-range"');
@@ -132,48 +165,73 @@ describe('control panels render with real data', () => {
     expect(html).toContain('Subvocalization metronome');
     expect(html).toContain('Velocity ramp trainer');
     expect(html).toContain('data-testid="sightline-speech-status"');
+    // The speed presets are bare numbers, so the accessible name stays short.
+    expect(html).toMatch(/>450</);
   });
 
   it('renders the look panel with themes, fonts, markers, and palettes', () => {
-    const theme = themeById(settings.appearance.theme);
     const html = renderToStaticMarkup(
-      <LookPanel {...shared} theme={theme} contrast={themeContrast(theme)} gradientContrast={null} />,
+      <LookPanel {...shared} stageWidth={1024} eccentricityDegrees={11} advisory="Two columns fit." />,
     );
     expect(html).toContain('data-testid="sightline-theme-oled"');
     expect(html).toContain('data-testid="sightline-font"');
     expect(html).toContain('data-testid="sightline-marker"');
     expect(html).toContain('data-testid="sightline-palette"');
     expect(html).toContain('data-testid="sightline-emphasis"');
+    expect(html).toContain('aria-pressed="true"');
+    // The viewport bounding calibrator reports the measured stage and the
+    // eccentricity of the outermost column.
+    expect(html).toContain('data-testid="sightline-columns"');
+    expect(html).toContain('data-testid="sightline-eccentricity"');
+    expect(html).toContain('1024 pixels wide');
+    expect(html).toContain('11 degrees');
+    expect(html).toContain('Two columns fit.');
   });
 
   it('warns when a palette cannot hold contrast on the chosen theme', () => {
     const theme = themeById('oled');
+    const failing = GRADIENT_PALETTES.find((palette) => !checkGradientContrast(palette, theme.background).passes);
+    expect(failing, 'a palette must fail on true black for this test to mean anything').toBeTruthy();
+    const darkSettings: ReaderSettings = {
+      ...settings,
+      gradientPalette: failing!.id,
+      appearance: { ...settings.appearance, theme: 'oled' },
+    };
     const html = renderToStaticMarkup(
       <LookPanel
-        {...shared}
-        theme={theme}
-        contrast={themeContrast(theme)}
-        gradientContrast={{ ratio: 1.4, passes: false, background: theme.background, worstStop: '#111111' }}
+        settings={darkSettings}
+        patch={noop}
+        disabled={false}
+        stageWidth={1024}
+        eccentricityDegrees={11}
+        advisory=""
       />,
     );
-    expect(html).toContain('data-testid="sightline-gradient-warning"');
+    expect(html).toContain('data-testid="sightline-gradient-contrast"');
+    expect(html).toContain('below the 4.5:1 floor');
+    expect(html).toContain('sightline-note--warning');
+    expect(paletteById(failing!.id).label).toBe(failing!.label);
   });
 
-  it('renders the drill panel with a plan summary and a result', () => {
+  it('renders the drill panel with a plan summary and an exposure control', () => {
     const html = renderToStaticMarkup(
       <DrillPanel
         {...shared}
+        weakWordCount={4}
+        summary={null}
         running={false}
-        progress={{ position: 0, items: 20, flashMs: 120, totalMs: 20_400, clamped: false }}
-        result={{ correct: 18, total: 20, accuracy: 0.9, firstTryAccuracy: 0.85, equivalentWpm: 500 }}
+        plan={{ flashes: 20, items: 20, totalMs: 20_400, clamped: false }}
         onStart={noop}
         onStop={noop}
       />,
     );
     expect(html).toContain('data-testid="sightline-drill-plan"');
     expect(html).toContain('data-testid="sightline-flash-range"');
-    expect(html).toContain('data-testid="sightline-drill-result"');
-    expect(html).toContain('500 words per minute');
+    expect(html).toContain('data-testid="sightline-drill-gap"');
+    expect(html).toContain('data-testid="sightline-flash-count"');
+    expect(html).toContain('data-testid="sightline-drill-run"');
+    expect(html).toContain('20 flashes');
+    expect(html).toContain('Draw from the word bank first (4 words collected)');
   });
 
   it('renders the word bank with an empty-state explanation', () => {
@@ -182,7 +240,6 @@ describe('control panels render with real data', () => {
         bank={[]}
         cloze={[]}
         now={Date.now()}
-        weakCount={0}
         message=""
         onBuildCloze={noop}
         onCollect={noop}
@@ -192,28 +249,83 @@ describe('control panels render with real data', () => {
       />,
     );
     expect(html).toContain('data-testid="sightline-bank-summary"');
-    expect(html).toContain('The bank is empty');
-    expect(html).toContain('Retention —');
+    expect(html).toContain('data-testid="sightline-bank-message"');
+    expect(html).toContain('Nothing collected yet');
+    expect(html).toContain('Mark the current word as unknown');
+    expect(html).toContain('Build a cloze drill');
+    expect(html).toContain('Retention 0%');
+  });
+
+  it('renders the cloze passage once blanks exist', () => {
+    const html = renderToStaticMarkup(
+      <BankPanel
+        bank={[]}
+        cloze={[
+          {
+            answer: 'pacing',
+            tokenIndex: 3,
+            text: 'The ___ changes the task.',
+            options: ['pacing', 'pacing', 'paces', 'packing'],
+            answerIndex: 0,
+          },
+        ]}
+        now={Date.now()}
+        message="Marked “pacing” for the word bank."
+        onBuildCloze={noop}
+        onCollect={noop}
+        onMarkCurrent={noop}
+        onRemove={noop}
+        onReview={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="sightline-cloze-item"');
+    expect(html).toContain('The ___ changes the task.');
+    expect(html).toContain('Marked “pacing” for the word bank.');
   });
 
   it('renders the warehouse panel with no history recorded yet', () => {
     const html = renderToStaticMarkup(
       <DataPanel
-        summary={null}
+        summary={summariseWarehouse([], [], 0)}
         sessions={[]}
         velocity={[]}
-        streak={0}
+        vocabularySize={0}
         storageNote="Reading history is kept in this browser only."
-        documentProgress={[]}
-        onRefresh={noop}
         onClear={noop}
-        onOpenSession={noop}
-        onResume={noop}
       />,
     );
     expect(html).toContain('data-testid="sightline-storage-note"');
+    expect(html).toContain('data-testid="sightline-warehouse-summary"');
+    expect(html).toContain('Reading history is kept in this browser only.');
     expect(html).toContain('No sessions recorded yet');
-    expect(html).toContain('Reading positions are saved here');
+    expect(html).toContain('data-testid="sightline-warehouse-clear"');
+  });
+
+  it('renders the marks panel with saved positions and an empty library', () => {
+    const html = renderToStaticMarkup(
+      <LibraryPanel
+        bookmarks={[{ id: 'b1', tokenIndex: 12, label: 'Findings', createdAt: Date.now() }]}
+        highlights={[{ id: 'h1', startToken: 4, endToken: 9, color: 'amber' }]}
+        notes={[{ id: 'n1', tokenIndex: 7, text: 'Worth citing.' }]}
+        progress={[
+          { documentId: 'reading-notes.md', title: 'Reading Notes', tokenIndex: 12, tokenCount: 40, updatedAt: Date.now() },
+        ]}
+        currentDocumentId="reading-notes.md"
+        highlightColor="amber"
+        onColor={noop}
+        onJump={noop}
+        onInspect={noop}
+        onRemoveBookmark={noop}
+        onRemoveHighlight={noop}
+        onRemoveNote={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="sightline-bookmark-list"');
+    expect(html).toContain('data-testid="sightline-highlight-list"');
+    expect(html).toContain('data-testid="sightline-note-list"');
+    expect(html).toContain('data-testid="sightline-progress-list"');
+    expect(html).toContain('Worth citing.');
+    expect(html).toContain('open now');
   });
 
   it('offers every planned export with its availability note', () => {
@@ -221,34 +333,36 @@ describe('control panels render with real data', () => {
       <ExportPanel
         draft={draftFromModel(model())}
         onDraft={noop}
-        onTag={noop}
+        onAddTag={noop}
         onRemoveTag={noop}
         onSuggestTags={noop}
-        onReadingLevel={noop}
-        socialPreview={socialTags(draftFromModel(model()), 'A local study.')}
-        structuredPreview="{}"
+        onMeasuredLevel={noop}
         rows={describeExports(undefined, exportInputs(false))}
-        busyExport=""
+        busy={null}
+        message=""
+        filePreview="reading-notes-weighted.pdf"
         onDownload={noop}
         onImportState={noop}
         onExportState={noop}
-        validation={[]}
-        fileNamePreview="reading-notes-weighted.pdf"
-        message=""
+        state={createDefaultState()}
         model={undefined}
-        metrics={undefined}
       />,
     );
     for (const definition of EXPORT_DEFINITIONS) {
       expect(html, `${definition.id} row`).toContain(`data-testid="sightline-export-${definition.id}"`);
-      expect(html, `${definition.id} note`).toContain(`data-testid="sightline-note-${definition.id}"`);
     }
-    expect(html).toContain('Open a document to enable this export');
+    expect(html).toContain('Open a document to enable this export.');
     // The reader-state export is about the session rather than the document.
     const readerState = html.slice(html.indexOf('data-testid="sightline-export-reader-state"'));
     expect(readerState.slice(0, 200)).not.toContain('disabled=""');
     expect(html).toContain('data-testid="sightline-meta-title"');
+    expect(html).toContain('data-testid="sightline-tag-input"');
+    expect(html).toContain('data-testid="sightline-state-import"');
+    expect(html).toContain('data-testid="sightline-social-table"');
+    expect(html).toContain('og:title');
+    expect(html).toContain('data-testid="sightline-structured-data"');
     expect(html).toContain('data-testid="sightline-file-preview"');
+    expect(html).toContain('reading-notes-weighted.pdf');
   });
 });
 
@@ -261,6 +375,23 @@ describe('engine surfaces accept the settings the panels write', () => {
 
   it('derives the emphasis configuration from the chosen level', () => {
     expect(emphasisForLevel(3).fraction).toBeCloseTo(0.4, 5);
-    expect(DEFAULT_GRADIENT.direction).toBe('horizontal');
+    expect(emphasisForLevel(5).fraction).toBeGreaterThan(emphasisForLevel(1).fraction);
+  });
+
+  it('reports retention from the reviews rather than from the words collected', () => {
+    expect(retentionRate([])).toBe(0);
+    const now = Date.now();
+    const entry = {
+      word: 'pacing',
+      seen: 4,
+      correct: 3,
+      weight: 1.2,
+      averageMs: 900,
+      intervalDays: 2,
+      dueAt: now,
+      addedAt: now - 86_400_000,
+    };
+    expect(retentionRate([entry])).toBe(75);
+    expect(DEFAULT_COLLECT.minLetters).toBeGreaterThan(2);
   });
 });

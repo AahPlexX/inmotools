@@ -168,6 +168,8 @@ export interface DocumentModel {
   readonly metrics: ProseMetrics;
   /** Milliseconds spent ingesting, for the ingestion report. */
   readonly ingestMs: number;
+  /** Page geometry for formats that carry fixed pages, such as PDF. */
+  readonly pages?: readonly DocumentPageGeometry[];
 }
 
 export interface IngestFailure {
@@ -206,6 +208,23 @@ export interface PdfPageText {
   readonly width: number;
   readonly height: number;
   readonly items: readonly PdfTextItem[];
+  /** Page rotation in degrees as declared by the document. */
+  readonly rotation?: number;
+}
+
+/**
+ * Page geometry kept on the finished model. Physical page size matters for
+ * citation work (a brief is quoted by page) and for spotting scans, so the
+ * measurements survive ingestion instead of being dropped with the decode.
+ */
+export interface DocumentPageGeometry {
+  readonly pageNumber: number;
+  /** Page width in PDF user-space units, which are 1/72 inch. */
+  readonly width: number;
+  /** Page height in PDF user-space units. */
+  readonly height: number;
+  readonly rotation: number;
+  readonly characters: number;
 }
 
 export interface PdfTextItem {

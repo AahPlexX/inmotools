@@ -40,6 +40,12 @@ export interface PacerConfig {
   readonly glideSeconds: number;
 }
 
+export const PACER_SHAPES: readonly { readonly id: PacerShape; readonly label: string; readonly detail: string }[] = [
+  { id: 'bar', label: 'Bar', detail: 'A band centred on the word, wide enough to cover the next fixation.' },
+  { id: 'underline', label: 'Underline', detail: 'A line under the word, which leaves the letters themselves unobstructed.' },
+  { id: 'window', label: 'Window', detail: 'A translucent panel over the word, so the surrounding line stays visible.' },
+];
+
 export const DEFAULT_PACER: PacerConfig = {
   shape: 'underline',
   anchorFraction: 0.45,

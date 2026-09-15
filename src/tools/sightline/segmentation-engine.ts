@@ -15,6 +15,7 @@ import {
   type ChapterNode,
   type DiagnosticLevel,
   type DocumentMetadata,
+  DocumentPageGeometry,
   type DocumentModel,
   type IngestDiagnostic,
   type ParagraphKind,
@@ -56,6 +57,8 @@ export interface BuildModelInput {
   readonly tokenLimit?: number;
   readonly ingestMs?: number;
   readonly orp?: { mode?: OrpMode; ratio?: number };
+  /** Page geometry from the decoded source, for the page map. */
+  readonly pages?: readonly DocumentPageGeometry[];
 }
 
 const ABBREVIATIONS = new Set([
@@ -365,6 +368,7 @@ export const buildDocumentModel = (input: BuildModelInput): DocumentModel => {
     paragraphBreaks,
     metrics,
     ingestMs: input.ingestMs ?? 0,
+    ...(input.pages && input.pages.length > 0 ? { pages: input.pages } : {}),
   };
 };
 

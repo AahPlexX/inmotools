@@ -24,6 +24,7 @@ import {
 import { normalizeParagraphText, splitSentences, type RawChapter, type RawParagraph } from './segmentation-engine';
 import type {
   DocumentMetadata,
+  DocumentPageGeometry,
   IngestDiagnostic,
   PdfExtraction,
   PdfPageText,
@@ -37,6 +38,7 @@ export interface PdfStructure {
   readonly diagnostics: readonly IngestDiagnostic[];
   readonly pageCharacterCounts: readonly number[];
   readonly pageCount: number;
+  readonly pages: readonly DocumentPageGeometry[];
 }
 
 export interface PdfLayoutOptions {
@@ -414,6 +416,17 @@ export const buildPdfStructure = (
     });
   }
 
+  const pages: DocumentPageGeometry[] = extraction.pages.map((page, index) => {
+    const characters = pageCharacterCounts[index] ?? 0;
+    return {
+      pageNumber: page.pageNumber,
+      width: page.width,
+      height: page.height,
+      rotation: page.rotation ?? 0,
+      characters,
+    };
+  });
+
   return {
     paragraphs,
     chapters,
@@ -421,6 +434,7 @@ export const buildPdfStructure = (
     diagnostics,
     pageCharacterCounts,
     pageCount: extraction.pages.length,
+    pages,
   };
 };
 

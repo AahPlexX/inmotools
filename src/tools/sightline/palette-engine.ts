@@ -31,9 +31,9 @@ export interface ReaderTheme {
 export const READER_THEMES: readonly ReaderTheme[] = [
   { id: 'parchment', label: 'Parchment', detail: 'The default light reading surface.', background: '#fbf7ef', surface: '#ffffff', text: '#1f2937', muted: '#6b7280', accent: '#1d4ed8', dark: false, paper: true },
   { id: 'paper', label: 'Paper', detail: 'Plain white with near-black text.', background: '#ffffff', surface: '#ffffff', text: '#111827', muted: '#4b5563', accent: '#1d4ed8', dark: false, paper: true },
-  { id: 'sepia', label: 'Sepia', detail: 'Warm paper tone, gentler than white in bright rooms.', background: '#f4ecd8', surface: '#fbf3e4', text: '#3f3427', muted: '#7a6a55', accent: '#8a5a1c', dark: false, paper: true },
-  { id: 'solarized-light', label: 'Solarized Light', detail: 'Low-contrast light palette designed for long sessions.', background: '#fdf6e3', surface: '#fef9ee', text: '#073642', muted: '#586e75', accent: '#268bd2', dark: false, paper: true },
-  { id: 'solarized-dark', label: 'Solarized Dark', detail: 'The matching dark palette.', background: '#002b36', surface: '#073642', text: '#93a1a1', muted: '#6c8489', accent: '#b58900', dark: true },
+  { id: 'sepia', label: 'Sepia', detail: 'Warm paper tone, gentler than white in bright rooms.', background: '#f4ecd8', surface: '#fbf3e4', text: '#3f3427', muted: '#6a5a45', accent: '#8a5a1c', dark: false, paper: true },
+  { id: 'solarized-light', label: 'Solarized Light', detail: 'Low-contrast light palette designed for long sessions.', background: '#fdf6e3', surface: '#fef9ee', text: '#073642', muted: '#586e75', accent: '#1f6fb0', dark: false, paper: true },
+  { id: 'solarized-dark', label: 'Solarized Dark', detail: 'The matching dark palette.', background: '#002b36', surface: '#073642', text: '#93a1a1', muted: '#8ba1a6', accent: '#b58900', dark: true },
   { id: 'nord', label: 'Nord', detail: 'Cool blue-grey dark palette.', background: '#2e3440', surface: '#3b4252', text: '#e5e9f0', muted: '#a8b2c1', accent: '#88c0d0', dark: true },
   { id: 'gruvbox', label: 'Gruvbox', detail: 'Warm dark palette with amber highlights.', background: '#282828', surface: '#3c3836', text: '#ebdbb2', muted: '#bdae93', accent: '#d79921', dark: true },
   { id: 'oled', label: 'OLED True Black', detail: 'Pure black background; the panel draws no light for it.', background: '#000000', surface: '#0a0a0a', text: '#e8e8e8', muted: '#9ca3af', accent: '#60a5fa', dark: true },

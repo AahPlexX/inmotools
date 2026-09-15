@@ -173,7 +173,13 @@ const toModelInput = (
   byteLength: number,
   encoding: string,
   metadata: BuildModelInput['metadata'],
-  structure: { paragraphs: BuildModelInput['paragraphs']; chapters?: BuildModelInput['chapters']; diagnostics?: readonly IngestDiagnostic[] },
+  structure: {
+    paragraphs: BuildModelInput['paragraphs'];
+    chapters?: BuildModelInput['chapters'];
+    diagnostics?: readonly IngestDiagnostic[];
+    /** PDF decoding keeps page geometry; other formats have no fixed pages. */
+    pages?: BuildModelInput['pages'];
+  },
   options: IngestOptions,
   ingestMs: number,
 ): BuildModelInput => ({
@@ -189,6 +195,7 @@ const toModelInput = (
   includeNotes: options.includeNotes ?? false,
   tokenLimit: options.tokenLimit,
   ingestMs,
+  ...(structure.pages ? { pages: structure.pages } : {}),
 });
 
 const htmlMetadata = (structure: HtmlStructure, fileName: string) => ({

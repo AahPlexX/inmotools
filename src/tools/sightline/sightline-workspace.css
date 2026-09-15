@@ -580,3 +580,481 @@
   .sightline-pacer { transition-duration: 0s !important; }
   .sightline-page { scroll-behavior: auto; }
 }
+
+/* ------------------------------------------------------------------ layout
+   The workspace is a vertical stack: source, contents, then a two-column
+   region holding the reading surface and the control panels. */
+.sightline {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sightline-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .sightline-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sightline-panels {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-panel-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-source {
+  border-style: dashed;
+}
+
+.sightline-source--dragging {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+
+/* Grid children must be allowed to shrink, or a wide table pushes the card. */
+.sightline-card > *,
+.sightline-surface > *,
+.sightline-reader-body > * {
+  min-width: 0;
+}
+
+.sightline-row--wrap {
+  flex-wrap: wrap;
+}
+
+.sightline-row--inline {
+  gap: 6px;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.sightline-field--inline {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.sightline-field--inline > span {
+  white-space: nowrap;
+}
+
+.sightline-field--scrub {
+  width: 100%;
+}
+
+.sightline-field--scrub > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ----------------------------------------------------------------- buttons */
+.sightline-button--file {
+  position: relative;
+  overflow: hidden;
+}
+
+.sightline-button--file > input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+
+.sightline-button--small {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: .74rem;
+}
+
+.sightline-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sightline-accent, var(--signal));
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sightline-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 650;
+}
+
+.sightline-chip:hover:not(:disabled) {
+  border-color: var(--signal);
+  color: var(--signal-strong);
+}
+
+.sightline-chip:disabled {
+  opacity: .55;
+}
+
+.sightline-chip--on,
+.sightline-chip[aria-pressed='true'] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal-strong);
+}
+
+.sightline-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+}
+
+/* --------------------------------------------------------------- contents */
+.sightline-chapter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sightline-chapter:last-child {
+  border-bottom: 0;
+}
+
+.sightline-chapter--level-2 { padding-left: 12px; }
+.sightline-chapter--level-3 { padding-left: 24px; }
+.sightline-chapter--level-4 { padding-left: 36px; }
+.sightline-chapter--level-5,
+.sightline-chapter--level-6 { padding-left: 48px; }
+
+.sightline-pages {
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.sightline-pages > summary {
+  cursor: pointer;
+}
+
+.sightline-page-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+
+/* ---------------------------------------------------------------- surface */
+.sightline-reader-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-page-scroll {
+  position: relative;
+  max-height: min(62vh, 620px);
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sightline-surface, var(--surface));
+  font-family: var(--sightline-font, inherit);
+  font-size: var(--sightline-page-size, .95rem);
+  line-height: var(--sightline-line-height, 1.7);
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+}
+
+.sightline-paragraph {
+  margin: 0 0 .75em;
+  text-align: left;
+}
+
+.sightline-paragraph--heading {
+  margin-bottom: .3em;
+  font-size: 1.2em;
+  font-weight: 720;
+  letter-spacing: -.01em;
+}
+
+.sightline-paragraph--quote {
+  padding-left: 10px;
+  border-left: 3px solid var(--line-strong);
+  font-style: italic;
+}
+
+.sightline-paragraph--list-item {
+  padding-left: 14px;
+  text-indent: -14px;
+}
+
+.sightline-paragraph--note,
+.sightline-paragraph--caption {
+  font-size: .84em;
+  color: var(--sightline-muted, var(--muted));
+}
+
+.sightline-page-word[data-current='true'] {
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sightline-accent, #c2410c) 40%, transparent);
+}
+
+.sightline-columns {
+  position: absolute;
+  inset: 0;
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+}
+
+.sightline-column-word {
+  display: inline-block;
+  margin-right: .28em;
+}
+
+.sightline-column-word[data-current='true'] {
+  color: var(--sightline-accent, #c2410c);
+  font-weight: 700;
+}
+
+.sightline-pacer--idle {
+  opacity: 0;
+}
+
+.sightline-pacer--underline {
+  border-radius: 2px;
+}
+
+.sightline-pacer--window {
+  border-radius: 4px;
+  opacity: .22;
+}
+
+.sightline-pacer--bar {
+  opacity: .3;
+}
+
+.sightline-current {
+  margin: 0;
+  width: 100%;
+}
+
+.sightline-rsvp-line {
+  display: block;
+  white-space: pre;
+  font-size: var(--sightline-word-size, 3.4rem);
+  letter-spacing: var(--sightline-letter-spacing, 0);
+}
+
+.sightline-empty {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--sightline-muted, var(--muted));
+  font-size: .84rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------- measures */
+.sightline-scrub {
+  display: grid;
+  gap: 6px;
+}
+
+.sightline-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sightline-note-field {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.sightline-note--warning {
+  color: var(--danger, #a11);
+}
+
+/* ------------------------------------------------------------------ lists */
+.sightline-list,
+.sightline-note-list,
+.sightline-bookmark-list,
+.sightline-progress-list,
+.sightline-cloze-list,
+.sightline-export-list,
+.sightline-velocity-list,
+.sightline-diagnostics,
+.sightline-limits {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  font-size: .78rem;
+}
+
+.sightline-bookmark-list > li,
+.sightline-progress-list > li,
+.sightline-export-list > li,
+.sightline-velocity-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sightline-bookmark-list > li:last-child,
+.sightline-progress-list > li:last-child,
+.sightline-export-list > li:last-child,
+.sightline-velocity-list > li:last-child {
+  border-bottom: 0;
+}
+
+.sightline-export-list > li {
+  justify-content: space-between;
+}
+
+.sightline-export-list strong {
+  font-size: .82rem;
+}
+
+.sightline-velocity-list > li > span:first-child {
+  min-width: 82px;
+  color: var(--muted);
+}
+
+.sightline-velocity-bar {
+  height: 8px;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--signal);
+}
+
+.sightline-cloze-list > li {
+  padding: 6px 8px;
+  border-left: 3px solid var(--signal);
+  background: var(--surface-strong);
+}
+
+.sightline-diagnostic {
+  padding: 6px 8px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+
+.sightline-diagnostic--error { border-left-color: var(--danger, #b4231f); }
+.sightline-diagnostic--warning { border-left-color: #b45309; }
+.sightline-diagnostic--info { border-left-color: var(--signal); }
+
+.sightline-brief {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: var(--ink);
+  font: 500 .72rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------- keyboard */
+.sightline :focus-visible {
+  outline: 3px solid #b45309;
+  outline-offset: 2px;
+}
+
+.sightline .sightline-btn:focus,
+.sightline button:focus,
+.sightline a:focus,
+.sightline input:focus,
+.sightline select:focus,
+.sightline textarea:focus,
+.sightline summary:focus,
+.sightline [tabindex]:focus {
+  outline: 3px solid #b45309;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sightline-pacer {
+    transition: none;
+  }
+}
+
+/* The anchored line scales with the viewport so a long word or a five-word
+   frame cannot push the stage wider than its container. */
+.sightline-rsvp-line {
+  font-size: min(var(--sightline-word-size, 3.4rem), 7vw);
+}
+
+.sightline-marker {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sightline-rsvp-left,
+.sightline-rsvp-right {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sightline-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sightline-facts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sightline-facts dt {
+  color: var(--sightline-muted, var(--muted));
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sightline-facts dd {
+  margin: 0;
+  font-size: .9rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}

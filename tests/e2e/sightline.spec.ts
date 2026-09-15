@@ -84,6 +84,14 @@ test('pasted text is read through the chosen markup dialect', async ({ page }) =
   await expect(page.getByTestId('sightline-rsvp')).toBeVisible();
 });
 
+test('the clipboard is offered as an ingestion path', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await page.getByTestId('sightline-clipboard').click();
+  // A browser that grants clipboard access ingests the text; one that refuses
+  // says so rather than failing silently.
+  await expect(page.getByTestId('sightline-status')).toContainText(/clipboard|words/i);
+});
+
 test('keyboard control plays, steps, and bookmarks without a mouse', async ({ page }) => {
   await loadSample(page);
   const stage = page.getByTestId('sightline-stage');
@@ -178,6 +186,10 @@ test('themes, type, and trail settings reach the reading surface', async ({ page
 
   await page.getByTestId('sightline-font').selectOption('lexend');
   await expect(page.getByTestId('sightline-font')).toHaveValue('lexend');
+
+  await openPanel(page, 'look');
+  await expect(page.getByTestId('sightline-eccentricity')).toContainText('degrees');
+  await page.getByTestId('sightline-columns').fill('4');
 
   await page.getByTestId('sightline-emphasis').fill('5');
   await expect(page.getByTestId('sightline-emphasis')).toHaveValue('5');

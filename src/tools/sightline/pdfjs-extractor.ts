@@ -103,6 +103,9 @@ export const createPdfJsExtractor = (): PdfTextExtractor => ({
             width: viewport.width,
             height: viewport.height,
             items,
+            // `viewport` is already rotated, so the declared angle is kept
+            // separately for the page-geometry report.
+            rotation: page.rotate,
           });
         } finally {
           page.cleanup();
