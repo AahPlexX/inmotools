@@ -120,6 +120,7 @@ export interface CadExactKernel {
   split(shape: CadKernelShape, tool: CadKernelShape): CadKernelShape[];
   mirror(shape: CadKernelShape, planeOrigin: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelShape;
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
+  defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh;
   volume(shape: CadKernelShape): number;
   area(shape: CadKernelShape): number;

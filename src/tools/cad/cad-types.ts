@@ -27,7 +27,8 @@ export type CadFeatureType =
   | 'datum-plane'
   | 'datum-axis'
   | 'surface'
-  | 'heal';
+  | 'heal'
+  | 'defeature';
 
 export type CadFeatureStatus = 'clean' | 'dirty' | 'building' | 'failed' | 'blocked' | 'suppressed';
 

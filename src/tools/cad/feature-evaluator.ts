@@ -355,6 +355,15 @@ function shellFeature(
   return kernel.shell(shape, resolvedTopologyIds(feature, kernel, shape, 'face'), thickness);
 }
 
+function defeatureFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const shape = singleDependencyShape(feature, featureShapes, 'defeature');
+  return kernel.defeature(shape, resolvedTopologyIds(feature, kernel, shape, 'face'));
+}
+
 /**
  * occt-wasm's raw draft() takes exactly one face handle, unlike
  * fillet/chamfer/shell which accept an array. Batch multi-face draft would
@@ -639,6 +648,8 @@ function createFeatureShape(
       return chamferFeature(feature, kernel, featureShapes);
     case 'shell':
       return shellFeature(feature, kernel, featureShapes);
+    case 'defeature':
+      return defeatureFeature(feature, kernel, featureShapes);
     case 'draft':
       return draftFeature(feature, kernel, featureShapes);
     case 'offset':

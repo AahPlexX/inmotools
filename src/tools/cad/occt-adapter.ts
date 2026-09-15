@@ -369,6 +369,12 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.thicken(this.#unwrap(shape), thickness, 1e-6));
   }
 
+  defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape {
+    return this.#withResolvedSubshapes(shape, 'face', faceIds, (faces) => (
+      this.#wrap(this.#kernel.defeature(this.#unwrap(shape), faces, 0))
+    ));
+  }
+
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh {
     const mesh = this.#kernel.tessellate(this.#unwrap(shape), options);
     return {
