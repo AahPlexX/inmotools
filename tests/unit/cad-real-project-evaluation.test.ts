@@ -229,4 +229,83 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('cuts a countersink hole by fusing a conical frustum with the full-depth bore', () => {
+    const holeSketch: CadSketch = {
+      id: 'hole-sketch',
+      label: 'Countersink position',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'hole-center', type: 'point', x: 10, y: 5, construction: false },
+        { id: 'hole-circle', type: 'circle', centerPointId: 'hole-center', radius: 1, construction: false },
+        { id: 'cs-circle', type: 'circle', centerPointId: 'hole-center', radius: 2, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const project: CadProject = {
+      ...createCadProject('Countersink hole fixture'),
+      sketches: [holeSketch],
+      features: [
+        feature({
+          id: 'box-1',
+          type: 'primitive',
+          parameters: { kind: 'box', width: 20, depth: 10, height: 5 },
+        }),
+        feature({
+          id: 'hole-1',
+          type: 'hole',
+          dependsOn: ['box-1'],
+          parameters: {
+            sketchId: 'hole-sketch',
+            profileEntityIds: ['hole-circle'],
+            depth: 4,
+            reversed: true,
+            countersink: { profileEntityIds: ['cs-circle'], angle: Math.PI / 2 },
+          },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // 90 degree included angle (45 degree half-angle, tan = 1): csDepth = (2 - 1) / 1 = 1.
+      // Volume alone can't distinguish "wide end at the surface" from "wide end buried inside" -
+      // fusing a frustum with a coaxial full-depth bore of its own narrow-end radius removes
+      // exactly the same total volume either way, since the bore is always a subset of the
+      // frustum's swept solid. So this also probes orientation directly below.
+      const csDepth = (2 - 1) / Math.tan(Math.PI / 2 / 2);
+      const frustumVolume = (Math.PI * csDepth / 3) * (2 ** 2 + 2 * 1 + 1 ** 2);
+      const remainingBoreVolume = Math.PI * 1 ** 2 * (4 - csDepth);
+      const expectedVolume = 20 * 10 * 5 - frustumVolume - remainingBoreVolume;
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(expectedVolume, 4);
+
+      // Orientation proof: a short probe cylinder of radius 1.5 (strictly between the bore and
+      // countersink radii) placed just inside the surface must find no material at all, since a
+      // correctly-oriented countersink has already opened out past 1.5 well before this depth.
+      // A backwards frustum (narrow end at the surface) would still have solid material there.
+      const probeCylinder = kernel.cylinder(1.5, 0.05);
+      let placedProbe;
+      try {
+        placedProbe = kernel.placeAlongAxis(probeCylinder, [10, 5, 0.02], [0, 0, 1]);
+      } finally {
+        kernel.release(probeCylinder);
+      }
+      try {
+        const intersection = kernel.common(finalBody.shape, placedProbe);
+        try {
+          expect(kernel.volume(intersection)).toBeLessThan(0.01);
+        } finally {
+          kernel.release(intersection);
+        }
+      } finally {
+        kernel.release(placedProbe);
+      }
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
 });

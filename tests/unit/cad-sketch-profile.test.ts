@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { CadSketch } from '../../src/tools/cad/sketch-types';
+import type { CadKernelVector3 } from '../../src/tools/cad/kernel-contract';
 import {
+  alignmentRotation,
   buildSketchProfile3d,
   negate,
   negateComponent,
@@ -168,6 +170,95 @@ describe('negateComponent / negate (property-based)', () => {
           expect([Object.is(nx, -0), Object.is(ny, -0), Object.is(nz, -0)]).toEqual([false, false, false]);
         },
       ),
+    );
+  });
+});
+
+// Independent vector math for proving alignmentRotation, deliberately not reusing
+// any implementation detail under test (same spirit as the SVG arc-sweep proof).
+function length3([x, y, z]: CadKernelVector3): number {
+  return Math.hypot(x, y, z);
+}
+
+function normalize3(vector: CadKernelVector3): CadKernelVector3 {
+  const length = length3(vector);
+  return [vector[0] / length, vector[1] / length, vector[2] / length];
+}
+
+function dot3([ax, ay, az]: CadKernelVector3, [bx, by, bz]: CadKernelVector3): number {
+  return ax * bx + ay * by + az * bz;
+}
+
+function cross3([ax, ay, az]: CadKernelVector3, [bx, by, bz]: CadKernelVector3): CadKernelVector3 {
+  return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
+}
+
+/** Rodrigues' rotation formula: rotates `v` by `angle` about unit `axis`. */
+function rotateByAxisAngle(v: CadKernelVector3, axis: CadKernelVector3, angle: number): CadKernelVector3 {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const kCrossV = cross3(axis, v);
+  const kDotV = dot3(axis, v);
+  return [
+    v[0] * cos + kCrossV[0] * sin + axis[0] * kDotV * (1 - cos),
+    v[1] * cos + kCrossV[1] * sin + axis[1] * kDotV * (1 - cos),
+    v[2] * cos + kCrossV[2] * sin + axis[2] * kDotV * (1 - cos),
+  ];
+}
+
+function nonZeroVector3(): fc.Arbitrary<CadKernelVector3> {
+  return fc.tuple(
+    fc.float({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
+    fc.float({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
+    fc.float({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }),
+  ).filter(([x, y, z]) => length3([x, y, z]) > 1e-3) as fc.Arbitrary<CadKernelVector3>;
+}
+
+describe('alignmentRotation (property-based)', () => {
+  it('returns null when `to` already points the same direction as `from`, at any positive scale', () => {
+    fc.assert(
+      fc.property(nonZeroVector3(), fc.float({ min: Math.fround(0.01), max: 100, noNaN: true }), (from, scale) => {
+        const to: CadKernelVector3 = [from[0] * scale, from[1] * scale, from[2] * scale];
+        expect(alignmentRotation(from, to)).toBeNull();
+      }),
+    );
+  });
+
+  it('picks a perpendicular axis and a pi rotation for exactly antiparallel directions', () => {
+    fc.assert(
+      fc.property(nonZeroVector3(), fc.float({ min: Math.fround(0.01), max: 100, noNaN: true }), (from, scale) => {
+        const to: CadKernelVector3 = [-from[0] * scale, -from[1] * scale, -from[2] * scale];
+        const rotation = alignmentRotation(from, to);
+        expect(rotation).not.toBeNull();
+        const { axis, angle } = rotation!;
+        expect(angle).toBeCloseTo(Math.PI, 6);
+        expect(length3(axis)).toBeCloseTo(1, 6);
+        expect(Math.abs(dot3(axis, normalize3(from)))).toBeLessThan(1e-6);
+      }),
+    );
+  });
+
+  it('produces a rotation that, applied via an independent Rodrigues formula, carries `from` exactly onto `to`', () => {
+    fc.assert(
+      fc.property(nonZeroVector3(), nonZeroVector3(), (from, to) => {
+        const fromUnit = normalize3(from);
+        const toUnit = normalize3(to);
+        // Skip the (near-)parallel and (near-)antiparallel cases: those are covered by
+        // their own dedicated properties above, and the axis is only well-defined here.
+        fc.pre(Math.abs(dot3(fromUnit, toUnit)) < 1 - 1e-6);
+
+        const rotation = alignmentRotation(from, to);
+        expect(rotation).not.toBeNull();
+        const { axis, angle } = rotation!;
+        expect(length3(axis)).toBeCloseTo(1, 6);
+        expect(angle).toBeGreaterThan(0);
+        expect(angle).toBeLessThan(Math.PI);
+
+        const rotated = rotateByAxisAngle(fromUnit, axis, angle);
+        expect(rotated[0]).toBeCloseTo(toUnit[0], 5);
+        expect(rotated[1]).toBeCloseTo(toUnit[1], 5);
+        expect(rotated[2]).toBeCloseTo(toUnit[2], 5);
+      }),
     );
   });
 });

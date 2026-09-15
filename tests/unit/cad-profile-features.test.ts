@@ -90,6 +90,8 @@ function kernelFixture() {
     revolve: vi.fn(() => result),
     cut: vi.fn(),
     fuse: vi.fn(),
+    cone: vi.fn(),
+    placeAlongAxis: vi.fn(),
     box: vi.fn(),
     bounds: vi.fn(),
     release: vi.fn(),
@@ -104,6 +106,17 @@ function circleSketchWithCounterbore(): CadSketch {
     entities: [
       ...base.entities,
       { id: 'cb-circle', type: 'circle', centerPointId: 'center', radius: 4, construction: false },
+    ],
+  };
+}
+
+function circleSketchWithCountersink(): CadSketch {
+  const base = circleSketch();
+  return {
+    ...base,
+    entities: [
+      ...base.entities,
+      { id: 'cs-circle', type: 'circle', centerPointId: 'center', radius: 4, construction: false },
     ],
   };
 }
@@ -454,6 +467,223 @@ describe('CAD sketch-driven exact features', () => {
           profileEntityIds: ['circle'],
           depth: 3,
           counterbore: { depth: 1 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/profileEntityIds/i);
+  });
+
+  it('fuses a conical frustum with the full-depth bore for a countersink', () => {
+    const { kernel, profile } = kernelFixture();
+    const box = token('box');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    const boreTool = token('bore-tool');
+    const cone = token('cone');
+    const placedCone = token('placed-cone');
+    const fusedTool = token('fused-tool');
+    const cutResult = token('cut-result');
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValueOnce(boreTool);
+    (kernel.cone as ReturnType<typeof vi.fn>).mockReturnValue(cone);
+    (kernel.placeAlongAxis as ReturnType<typeof vi.fn>).mockReturnValue(placedCone);
+    (kernel.fuse as ReturnType<typeof vi.fn>).mockReturnValue(fusedTool);
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(cutResult);
+
+    const input: CadProject = {
+      ...createCadProject('Countersink hole fixture'),
+      sketches: [circleSketchWithCountersink()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 4,
+          countersink: { profileEntityIds: ['cs-circle'], angle: Math.PI / 2 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    // circle radius 2 (bore) and cs-circle radius 4 (countersink), 90 degree included angle
+    // (45 degree half-angle, tan = 1): csDepth = (4 - 2) / 1 = 2.
+    expect(kernel.cone).toHaveBeenCalledWith(4, 2, expect.closeTo(2, 10));
+    expect(kernel.placeAlongAxis).toHaveBeenCalledWith(cone, [10, 5, 0], [0, 0, -1]);
+    expect(kernel.fuse).toHaveBeenCalledWith(boreTool, placedCone);
+    expect(kernel.cut).toHaveBeenCalledWith(box, fusedTool);
+    expect(kernel.release).toHaveBeenCalledWith(cone);
+    expect(kernel.release).toHaveBeenCalledWith(boreTool);
+    expect(kernel.release).toHaveBeenCalledWith(placedCone);
+    expect(kernel.release).toHaveBeenCalledWith(fusedTool);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hole-1', shape: cutResult }]);
+  });
+
+  it('rejects a hole with both a counterbore and a countersink', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Conflicting termination fixture'),
+      sketches: [{
+        ...circleSketchWithCounterbore(),
+        entities: [
+          ...circleSketchWithCounterbore().entities,
+          { id: 'cs-circle', type: 'circle', centerPointId: 'center', radius: 4, construction: false },
+        ],
+      }],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          counterbore: { profileEntityIds: ['cb-circle'], depth: 1 },
+          countersink: { profileEntityIds: ['cs-circle'], angle: Math.PI / 2 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/counterbore.*countersink|countersink.*counterbore/i);
+  });
+
+  it('rejects a countersink diameter no larger than the hole diameter', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Undersized countersink fixture'),
+      sketches: [{
+        ...circleSketchWithCountersink(),
+        entities: circleSketchWithCountersink().entities.map((entity) => (
+          entity.id === 'cs-circle' ? { ...entity, radius: 2 } : entity
+        )),
+      }],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          countersink: { profileEntityIds: ['cs-circle'], angle: Math.PI / 2 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/countersink diameter/i);
+  });
+
+  it('rejects a countersink angle outside (0, pi)', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Invalid angle countersink fixture'),
+      sketches: [circleSketchWithCountersink()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          countersink: { profileEntityIds: ['cs-circle'], angle: Math.PI },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/angle/i);
+  });
+
+  it('rejects a countersink profile that is not a single circle entity', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Non-circle countersink fixture'),
+      sketches: [{
+        ...circleSketch(),
+        entities: [...circleSketch().entities, ...rectangleSketch().entities],
+      }],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          // A closed rectangle is a valid profile, just not a circle - this must fail
+          // countersink's own "must be a circle" check, not the earlier closed-loop check.
+          countersink: { profileEntityIds: ['top', 'bottom', 'left', 'right'], angle: Math.PI / 2 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/circle/i);
+  });
+
+  it('rejects a countersink missing profileEntityIds', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Malformed countersink fixture'),
+      sketches: [circleSketchWithCountersink()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          countersink: { angle: Math.PI / 2 },
         }, ['box-1']),
       ],
       bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],

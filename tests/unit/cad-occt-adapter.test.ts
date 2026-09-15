@@ -247,6 +247,62 @@ describe('CAD exact OCCT adapter', () => {
     expect(() => kernel.mirror(box, [0, 0, 0], [0, 0, 0])).toThrow(/non-zero/);
   });
 
+  it('placeAlongAxis is a no-op when the target direction already matches the canonical +Z axis', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const placed = kernel.placeAlongAxis(cylinder, [0, 0, 0], [0, 0, 1]);
+    try {
+      expectBoundsClose(kernel.bounds(placed), kernel.bounds(cylinder));
+    } finally {
+      kernel.release(placed);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('placeAlongAxis translates a canonically-oriented shape to an arbitrary origin', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const placed = kernel.placeAlongAxis(cylinder, [10, 5, -3], [0, 0, 1]);
+    try {
+      expect(kernel.volume(placed)).toBeCloseTo(kernel.volume(cylinder), 8);
+      expectBoundsClose(kernel.bounds(placed), { min: [8, 3, -3], max: [12, 7, 2] });
+    } finally {
+      kernel.release(placed);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('placeAlongAxis rotates a canonically-oriented shape to lie along an arbitrary direction', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const placed = kernel.placeAlongAxis(cylinder, [0, 0, 0], [1, 0, 0]);
+    try {
+      expect(kernel.volume(placed)).toBeCloseTo(kernel.volume(cylinder), 8);
+      expectBoundsClose(kernel.bounds(placed), { min: [0, -2, -2], max: [5, 2, 2] });
+    } finally {
+      kernel.release(placed);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('placeAlongAxis flips a canonically-oriented shape onto the exactly antiparallel direction', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const placed = kernel.placeAlongAxis(cylinder, [0, 0, 0], [0, 0, -1]);
+    try {
+      expect(kernel.volume(placed)).toBeCloseTo(kernel.volume(cylinder), 8);
+      expectBoundsClose(kernel.bounds(placed), { min: [-2, -2, -5], max: [2, 2, 0] });
+    } finally {
+      kernel.release(placed);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('rejects a placement direction with a zero-length vector', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    try {
+      expect(() => kernel.placeAlongAxis(cylinder, [0, 0, 0], [0, 0, 0])).toThrow(/non-zero/);
+    } finally {
+      kernel.release(cylinder);
+    }
+  });
+
   it('thickens a planar exact face into a solid of the expected volume', () => {
     const face = kernel.profileFace({
       normal: [0, 0, 1],
