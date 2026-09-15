@@ -57,13 +57,16 @@ layouts. This keeps every dependency in the lockfile exactly pinned and independ
       `FiberCraftDocument` / per-craft type model.
 - [ ] **Slice 1 — Shared workspace shell.** Canvas host, tool/mode switcher, palette/inspector
       panels, undo/redo history, autosave, catalog/route registration behind a working landing view.
-      **In progress:** the browser acceptance contract is defined; implementation is the current
-      milestone.
+      **In progress:** the crochet-first Canvas2D shell, palette/inspector, reversible history,
+      IndexedDB draft restore, catalog entry, lazy loader, canonical alias, and focused browser
+      acceptance spec are implemented. Cross-discipline mode switching and fresh browser/build
+      verification remain open; the shared CI currently stops first on unrelated Vector path-motion
+      unit failures.
 - [ ] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator.
       **Started:** shared grid/polar geometry, gauge math, the crochet symbol library, and focused
       unit coverage are present. C2C/filet compilation, written instructions, and interactive
-      crochet editing remain open.
+      row/grid editing remain open.
 - [ ] **Slice 3 — Cross-stitch & counted-thread engine.** Precision grid, raster quantization
       worker, DMC/Anchor/Madeira/Sullivan floss matcher (CIEDE2000 via `culori`), symbol/legend
       generator, skein/yardage calculator.

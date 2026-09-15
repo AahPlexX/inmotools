@@ -18,5 +18,8 @@ describe('focused E2E spec selection', () => {
     expect(selectE2eSpecs(['src/tools/photo/PhotoWorkspace.tsx'])).toEqual([
       'tests/e2e/photo.spec.ts',
     ]);
+    expect(selectE2eSpecs(['src/tools/fiber-craft/FiberCraftWorkspace.tsx'])).toEqual([
+      'tests/e2e/fiber-craft.spec.ts',
+    ]);
   });
 });
