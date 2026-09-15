@@ -87,10 +87,21 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 
 ## Milestones
 
-- **A. Foundation & engine** — `typing-engine.ts`, corpora, storage, audio, exports, styles, and workspace UI, registered in catalog/loader (this commit).
-- **B. Focused unit tests** — engine reducer, metrics math, drill generator, n-gram/per-key analytics, storage envelope round-trip.
-- **C. Focused browser spec** — launch route, configure a 15s test, type via keyboard simulation, observe live metrics, save, and export a JSON test envelope.
-- **D. Integration & Pages verification** — merge to `main` only after unit + build + browser spec pass on `feature/typing-workstation` and the exact-main revision, with Pages deployment green.
+- **A. Foundation & engine — complete.** `typing-engine.ts`, corpora, storage, audio, exports, styles, workspace UI, catalog and loader are implemented on `feature/typing-workstation`.
+- **B. Focused unit tests — complete.** 34 focused tests cover engine behavior and metrics, corpora, IndexedDB storage, and export envelopes.
+- **C. Focused browser spec — complete.** Desktop and mobile Chromium cover route launch, custom-text configuration, non-timed finite-target completion, result metadata, auto-save-on-export, downloaded JSON envelope contents, reload persistence, serious/critical automated accessibility checks, and 320 CSS-pixel reflow.
+- **D. Integration & Pages verification — pending.** Merge to `main` only after the user authorizes integration from this dedicated branch; then validate the exact integrated `origin/main` revision and require the Pages deployment to be green.
+
+## Latest focused acceptance evidence
+
+- Source revision: `11d99cf1a9060a8cbd89a48867507e404fb828ff` (`fix(typing): finish finite targets and label results`).
+- Dedicated workflow run: `35020326518` (`Typing Workstation validation`).
+- Frozen `pnpm install --frozen-lockfile`: passed.
+- Focused unit tests: 34 passed.
+- Production `pnpm build`: passed.
+- Playwright: 6/6 passed across desktop Chromium and mobile Chromium.
+- Browser coverage proves JSON download metadata/envelope, IndexedDB persistence across reload, non-timed completion, no serious/critical Axe violations at rest, and no page-level horizontal overflow at 320 CSS pixels.
+- The earlier repository-wide Pages baseline remained blocked by three pre-existing Vector Studio unit failures; no typing unit failure was present. That unrelated baseline is not treated as Typing Workstation regression evidence.
 
 ## Non-goals / explicit exclusions
 
@@ -100,6 +111,8 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 
 ## Validation
 
-- `pnpm test:unit` covers engine + storage envelope + drill/analytics helpers.
-- `pnpm build` verifies TypeScript and Vite production build.
-- `pnpm test:e2e` (Playwright) covers the launch route, an in-canvas 15s test, live metric render, save, and CSV/JSON export path.
+- `.github/workflows/typing-workstation.yml` is the focused branch gate.
+- Focused Vitest coverage verifies engine, corpora, storage, and exports without rerunning unrelated tool suites.
+- `pnpm build` verifies TypeScript and the Vite production bundle.
+- `tests/e2e/typing.spec.ts` verifies the critical completion → save/export → persistence path plus desktop/mobile accessibility and 320 CSS-pixel reflow.
+- Exact-main integration and Pages verification remain Milestone D and are intentionally not claimed from the dedicated feature branch.
