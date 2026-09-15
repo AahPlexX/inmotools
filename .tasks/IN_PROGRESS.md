@@ -1,5 +1,11 @@
 # In Progress
 
+- **Typing Workstation** — local speed-typing calculator, ergonomic touch-typing testing and adaptive motor-skill training tool with a 30-feature ledger.
+  - Contract and full feature ledger: `docs/superpowers/plans/2026-09-15-typing-workstation.md`.
+  - Current milestone: Milestone A — engine, corpora, storage, audio, exports, workspace UI and catalog wiring implemented on `feature/typing-workstation`; awaiting focused unit tests, browser spec, `pnpm test:unit`/`pnpm build`, and Pages deployment on the exact integrated `origin/main` revision.
+  - Completion: every ledger item implemented and verified through reachable UI, validated exports (CSV/JSON/PDF/keystrokes/Markdown) with editable tags at export, IndexedDB persistence proven, responsive keyboard access, exact-main integration, and Pages deployment. Deferred items must land in `NEXT.md` with rationale rather than being silently dropped.
+  - Scope: `src/tools/typing/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved; this workstream must not merge to `main` before its own completion gates pass.
+
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
   - Current milestone: Sass token map export integrated at 3ec9e435; dedicated Web Layout run 34853354606 passed frozen install, 20 units, build and desktop/mobile browser tests. Pages deployed and the live export control was inspected. Shared Web Layout accessibility timeouts remain unresolved; current repository-wide gates fail in Crystal/Vector unit tests. Full 60-feature ledger remains active with no scope reduction.
