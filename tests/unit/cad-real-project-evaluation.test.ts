@@ -175,4 +175,58 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('cuts a counterbore hole by fusing a wider shallow tool with the full-depth bore', () => {
+    const holeSketch: CadSketch = {
+      id: 'hole-sketch',
+      label: 'Counterbore position',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'hole-center', type: 'point', x: 10, y: 5, construction: false },
+        { id: 'hole-circle', type: 'circle', centerPointId: 'hole-center', radius: 1, construction: false },
+        { id: 'cb-circle', type: 'circle', centerPointId: 'hole-center', radius: 2, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const project: CadProject = {
+      ...createCadProject('Counterbore hole fixture'),
+      sketches: [holeSketch],
+      features: [
+        feature({
+          id: 'box-1',
+          type: 'primitive',
+          parameters: { kind: 'box', width: 20, depth: 10, height: 5 },
+        }),
+        feature({
+          id: 'hole-1',
+          type: 'hole',
+          dependsOn: ['box-1'],
+          parameters: {
+            sketchId: 'hole-sketch',
+            profileEntityIds: ['hole-circle'],
+            depth: 4,
+            reversed: true,
+            counterbore: { profileEntityIds: ['cb-circle'], depth: 1.5 },
+          },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // Bore (r=1, full 4mm depth) union counterbore (r=2, 1.5mm shallow recess), coaxial:
+      // the bore is a subset of the counterbore's radius within the overlap, so the union
+      // volume is the bore's own volume plus only the counterbore's *extra* annular volume.
+      const boreVolume = Math.PI * 1 ** 2 * 4;
+      const counterboreExtraVolume = Math.PI * (2 ** 2 - 1 ** 2) * 1.5;
+      const expectedVolume = 20 * 10 * 5 - boreVolume - counterboreExtraVolume;
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(expectedVolume, 4);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
 });

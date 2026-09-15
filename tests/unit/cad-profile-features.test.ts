@@ -89,11 +89,23 @@ function kernelFixture() {
     extrude: vi.fn(() => result),
     revolve: vi.fn(() => result),
     cut: vi.fn(),
+    fuse: vi.fn(),
     box: vi.fn(),
     bounds: vi.fn(),
     release: vi.fn(),
   } as unknown as CadFeatureKernel;
   return { kernel, profile, result };
+}
+
+function circleSketchWithCounterbore(): CadSketch {
+  const base = circleSketch();
+  return {
+    ...base,
+    entities: [
+      ...base.entities,
+      { id: 'cb-circle', type: 'circle', centerPointId: 'center', radius: 4, construction: false },
+    ],
+  };
 }
 
 const profileEntityIds = ['top', 'bottom', 'left', 'right'];
@@ -324,5 +336,138 @@ describe('CAD sketch-driven exact features', () => {
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'hole-1' });
     expect((thrown as Error).message).toMatch(/depth.*throughAll|throughAll.*depth/i);
+  });
+
+  it('fuses a wider shallow counterbore tool with the full-depth bore before cutting', () => {
+    const { kernel, profile } = kernelFixture();
+    const box = token('box');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    const boreTool = token('bore-tool');
+    const counterboreTool = token('counterbore-tool');
+    const fusedTool = token('fused-tool');
+    const cutResult = token('cut-result');
+    (kernel.extrude as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(boreTool)
+      .mockReturnValueOnce(counterboreTool);
+    (kernel.fuse as ReturnType<typeof vi.fn>).mockReturnValue(fusedTool);
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(cutResult);
+
+    const input: CadProject = {
+      ...createCadProject('Counterbore hole fixture'),
+      sketches: [circleSketchWithCounterbore()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 4,
+          counterbore: { profileEntityIds: ['cb-circle'], depth: 1.5 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.extrude).toHaveBeenNthCalledWith(1, profile, 4, [0, 0, -1]);
+    expect(kernel.extrude).toHaveBeenNthCalledWith(2, profile, 1.5, [0, 0, -1]);
+    expect(kernel.fuse).toHaveBeenCalledWith(boreTool, counterboreTool);
+    expect(kernel.cut).toHaveBeenCalledWith(box, fusedTool);
+    expect(kernel.release).toHaveBeenCalledWith(boreTool);
+    expect(kernel.release).toHaveBeenCalledWith(counterboreTool);
+    expect(kernel.release).toHaveBeenCalledWith(fusedTool);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'hole-1', shape: cutResult }]);
+  });
+
+  it('allows a counterbore on a through-all hole without comparing it against a fixed depth', () => {
+    const { kernel } = kernelFixture();
+    const box = token('box');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    (kernel.bounds as ReturnType<typeof vi.fn>).mockReturnValue({ min: [0, 0, 0], max: [20, 10, 5] });
+    (kernel.extrude as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(token('bore-tool'))
+      .mockReturnValueOnce(token('counterbore-tool'));
+    (kernel.fuse as ReturnType<typeof vi.fn>).mockReturnValue(token('fused-tool'));
+    (kernel.cut as ReturnType<typeof vi.fn>).mockReturnValue(token('cut-result'));
+
+    const input: CadProject = {
+      ...createCadProject('Through-all counterbore fixture'),
+      sketches: [circleSketchWithCounterbore()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          throughAll: true,
+          counterbore: { profileEntityIds: ['cb-circle'], depth: 1.5 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    expect(() => evaluateCadFeatures(input, kernel)).not.toThrow();
+    expect(kernel.fuse).toHaveBeenCalled();
+  });
+
+  it('rejects a counterbore at least as deep as the hole itself', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Overdeep counterbore fixture'),
+      sketches: [circleSketchWithCounterbore()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          counterbore: { profileEntityIds: ['cb-circle'], depth: 3 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/counterbore depth/i);
+  });
+
+  it('rejects a counterbore missing profileEntityIds', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Malformed counterbore fixture'),
+      sketches: [circleSketchWithCounterbore()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('hole-1', 'hole', {
+          sketchId: 'sketch-circle',
+          profileEntityIds: ['circle'],
+          depth: 3,
+          counterbore: { depth: 1 },
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'hole-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'hole-1' });
+    expect((thrown as Error).message).toMatch(/profileEntityIds/i);
   });
 });
