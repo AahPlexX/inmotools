@@ -9,9 +9,16 @@ type Props = {
   pageNumber: number;
   zoom: number;
   onDocumentReady?: (pageCount: number) => void;
+  onPageRequest?: (pageNumber: number) => void;
 };
 
-export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: Props) {
+type PdfDocumentTextMatch = PdfTextMatch & {
+  page: number;
+};
+
+const MAX_DOCUMENT_SEARCH_RESULTS = 200;
+
+export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady, onPageRequest }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<PdfJsDocumentSession | null>(null);
@@ -20,8 +27,8 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
   const [rendered, setRendered] = useState<PdfRenderedPage | null>(null);
   const [status, setStatus] = useState('Loading PDF renderer…');
   const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<PdfTextMatch[]>([]);
-  const [searchStatus, setSearchStatus] = useState('Enter text to search the current page.');
+  const [matches, setMatches] = useState<PdfDocumentTextMatch[]>([]);
+  const [searchStatus, setSearchStatus] = useState('Enter text to search this document.');
 
   useEffect(() => {
     let disposed = false;
@@ -31,7 +38,7 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
     if (previous) void previous.destroy();
     setRendered(null);
     setMatches([]);
-    setSearchStatus('Enter text to search the current page.');
+    setSearchStatus('Enter text to search this document.');
     setStatus('Loading PDF renderer…');
 
     void (async () => {
@@ -69,9 +76,6 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
     if (!session || !canvas || !textLayer) return;
     let disposed = false;
     const activePage = pageNumber;
-    searchRequestRef.current += 1;
-    setMatches([]);
-    setSearchStatus('Enter text to search the current page.');
     setRendered(null);
     setStatus(`Rendering page ${activePage}…`);
 
@@ -92,12 +96,13 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
     };
   }, [pageNumber, sessionVersion, zoom]);
 
-  async function searchCurrentPage() {
+  async function searchDocument() {
     const needle = query.trim();
     const session = sessionRef.current;
     if (!needle) {
+      searchRequestRef.current += 1;
       setMatches([]);
-      setSearchStatus('Enter text to search the current page.');
+      setSearchStatus('Enter text to search this document.');
       return;
     }
     if (!session) {
@@ -106,20 +111,31 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
     }
 
     const request = ++searchRequestRef.current;
-    const activePage = pageNumber;
+    const nextMatches: PdfDocumentTextMatch[] = [];
     setMatches([]);
-    setSearchStatus(`Searching page ${activePage}…`);
+    setSearchStatus(`Searching ${session.pageCount} page${session.pageCount === 1 ? '' : 's'}…`);
+
     try {
-      const text = await session.getPageText(activePage);
+      for (let page = 1; page <= session.pageCount && nextMatches.length < MAX_DOCUMENT_SEARCH_RESULTS; page += 1) {
+        const text = await session.getPageText(page);
+        if (request !== searchRequestRef.current || sessionRef.current !== session) return;
+        const remaining = MAX_DOCUMENT_SEARCH_RESULTS - nextMatches.length;
+        const pageMatches = findPdfTextMatches(text, needle, { maxResults: remaining });
+        nextMatches.push(...pageMatches.map((match) => ({ ...match, page })));
+      }
+
       if (request !== searchRequestRef.current || sessionRef.current !== session) return;
-      const nextMatches = findPdfTextMatches(text, needle);
       setMatches(nextMatches);
-      setSearchStatus(nextMatches.length
-        ? `${nextMatches.length} ${nextMatches.length === 1 ? 'match' : 'matches'} on page ${activePage}.`
-        : `No matches on page ${activePage}.`);
+      if (!nextMatches.length) {
+        setSearchStatus('No matches in this document.');
+      } else if (nextMatches.length >= MAX_DOCUMENT_SEARCH_RESULTS) {
+        setSearchStatus(`Showing the first ${MAX_DOCUMENT_SEARCH_RESULTS} matches in this document.`);
+      } else {
+        setSearchStatus(`${nextMatches.length} ${nextMatches.length === 1 ? 'match' : 'matches'} in this document.`);
+      }
     } catch (error) {
       if (request !== searchRequestRef.current) return;
-      setSearchStatus(`Page search failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      setSearchStatus(`Document search failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
   }
 
@@ -153,27 +169,36 @@ export default function PdfCanvas({ file, pageNumber, zoom, onDocumentReady }: P
       style={{ marginTop: 12 }}
       onSubmit={(event) => {
         event.preventDefault();
-        void searchCurrentPage();
+        void searchDocument();
       }}
     >
       <div className="field">
-        <label htmlFor="pdf-page-search">Search current page</label>
+        <label htmlFor="pdf-document-search">Search document</label>
         <div className="button-row" style={{ alignItems: 'end' }}>
           <input
-            id="pdf-page-search"
+            id="pdf-document-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find text on this page"
+            placeholder="Find text across all pages"
             autoComplete="off"
           />
-          <button className="action-button secondary" type="submit">Search page</button>
+          <button className="action-button secondary" type="submit">Search document</button>
         </div>
       </div>
     </form>
     <p className="help-text" role="status" data-testid="pdf-search-status">{searchStatus}</p>
     {matches.length ? <ol data-testid="pdf-search-results" className="help-text" style={{ marginTop: 8 }}>
-      {matches.map((match, index) => <li key={`${match.index}-${index}`}>{match.excerpt || '(match in whitespace)'}</li>)}
+      {matches.map((match, index) => <li key={`${match.page}-${match.index}-${index}`}>
+        <button
+          className="action-button secondary"
+          type="button"
+          disabled={!onPageRequest}
+          aria-label={`Go to page ${match.page}`}
+          onClick={() => onPageRequest?.(match.page)}
+        >Page {match.page}</button>{' '}
+        {match.excerpt || '(match in whitespace)'}
+      </li>)}
     </ol> : null}
   </div>;
 }
