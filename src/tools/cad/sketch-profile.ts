@@ -260,6 +260,50 @@ export function negate([x, y, z]: CadKernelVector3): CadKernelVector3 {
   return [negateComponent(x), negateComponent(y), negateComponent(z)];
 }
 
+function vectorLength([x, y, z]: CadKernelVector3): number {
+  return Math.hypot(x, y, z);
+}
+
+function normalizeVector(vector: CadKernelVector3): CadKernelVector3 {
+  const length = vectorLength(vector);
+  if (length <= 1e-12) throw new Error('Cannot normalize a zero-length vector.');
+  return [vector[0] / length, vector[1] / length, vector[2] / length];
+}
+
+function crossVector([ax, ay, az]: CadKernelVector3, [bx, by, bz]: CadKernelVector3): CadKernelVector3 {
+  return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
+}
+
+function dotVector([ax, ay, az]: CadKernelVector3, [bx, by, bz]: CadKernelVector3): number {
+  return ax * bx + ay * by + az * bz;
+}
+
+export interface AxisRotation {
+  axis: CadKernelVector3;
+  angle: number;
+}
+
+/**
+ * The rotation that carries unit direction `from` onto unit direction `to`,
+ * about an axis through the origin. Returns null when they already point the
+ * same way (no rotation needed). Exactly antiparallel directions have a
+ * genuinely ambiguous axis - any axis perpendicular to `from` gives the same
+ * 180-degree result - so one is picked deterministically; this is only
+ * meaningful for placing axisymmetric shapes (cones, cylinders), where the
+ * choice of which perpendicular axis doesn't change the resulting shape.
+ */
+export function alignmentRotation(from: CadKernelVector3, to: CadKernelVector3): AxisRotation | null {
+  const fromUnit = normalizeVector(from);
+  const toUnit = normalizeVector(to);
+  const cosine = Math.min(1, Math.max(-1, dotVector(fromUnit, toUnit)));
+  if (cosine > 1 - 1e-9) return null;
+  if (cosine < -1 + 1e-9) {
+    const arbitrary: CadKernelVector3 = Math.abs(fromUnit[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    return { axis: normalizeVector(crossVector(fromUnit, arbitrary)), angle: Math.PI };
+  }
+  return { axis: normalizeVector(crossVector(fromUnit, toUnit)), angle: Math.acos(cosine) };
+}
+
 function curveEdge(
   entity: TraversableEntity['entity'],
   reversed: boolean,

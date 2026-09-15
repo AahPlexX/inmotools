@@ -8,7 +8,7 @@ import type {
   CadKernelTessellationOptions,
   CadKernelVector3,
 } from './kernel-contract';
-import type { CadSketchProfile3d, CadSketchWire3d } from './sketch-profile';
+import { alignmentRotation, type CadSketchProfile3d, type CadSketchWire3d } from './sketch-profile';
 import type { TopologyCandidate, TopologyKind } from './topology-ref';
 
 export interface OcctCadKernelAdapterOptions {
@@ -363,6 +363,20 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     const magnitude = vectorLength(planeNormal);
     if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('Mirror plane normal must be a finite non-zero vector.');
     return this.#wrap(this.#kernel.mirror(this.#unwrap(shape), asVec3(planeOrigin), asVec3(planeNormal)));
+  }
+
+  placeAlongAxis(shape: CadKernelShape, origin: CadKernelVector3, direction: CadKernelVector3): CadKernelShape {
+    const magnitude = vectorLength(direction);
+    if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('Placement direction must be a finite non-zero vector.');
+    const handle = this.#unwrap(shape);
+    const rotation = alignmentRotation([0, 0, 1], direction);
+    let positioned = handle;
+    if (rotation) {
+      positioned = this.#kernel.rotate(handle, { point: { x: 0, y: 0, z: 0 }, direction: asVec3(rotation.axis) }, rotation.angle);
+    }
+    const translated = this.#kernel.translate(positioned, origin[0], origin[1], origin[2]);
+    if (positioned !== handle) this.#kernel.release(positioned);
+    return this.#wrap(translated);
   }
 
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape {

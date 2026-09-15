@@ -120,6 +120,14 @@ export interface CadExactKernel {
   /** Splits by one or more tool surfaces (BOPAlgo_Splitter). Returns one compound of the fragments, not separate shapes. */
   split(shape: CadKernelShape, tools: readonly CadKernelShape[]): CadKernelShape;
   mirror(shape: CadKernelShape, planeOrigin: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelShape;
+  /**
+   * Positions a shape built at the canonical origin with its local axis along
+   * +Z (box/cylinder/cone/torus primitives) so that axis points along
+   * `direction`, located at `origin`. Only meaningful for axisymmetric
+   * shapes: the twist around the target axis is left unresolved, which only
+   * matters for a shape that isn't symmetric about its own +Z axis.
+   */
+  placeAlongAxis(shape: CadKernelShape, origin: CadKernelVector3, direction: CadKernelVector3): CadKernelShape;
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
   defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;
   heal(shape: CadKernelShape): CadKernelShape;

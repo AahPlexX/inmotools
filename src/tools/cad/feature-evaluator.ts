@@ -483,7 +483,9 @@ function mirrorFeature(
  * already-verified primitives (profile placement, extrude, cut) instead of
  * adding new kernel surface area. An optional counterbore fuses a second,
  * wider tool built from a concentric sketch circle into the bore before
- * cutting. Countersink presets and patterned placement are not yet supported.
+ * cutting; an optional countersink instead fuses a conical frustum (sized
+ * from a concentric sketch circle and an included angle) via the exact same
+ * pattern. Patterned placement is not yet supported.
  */
 interface CounterboreSpec {
   profileEntityIds: string[];
@@ -509,6 +511,48 @@ function parameterCounterbore(feature: CadFeature): CounterboreSpec | null {
   }
   return { profileEntityIds: record.profileEntityIds as string[], depth: record.depth };
 }
+
+interface CountersinkSpec {
+  profileEntityIds: string[];
+  /** Full included angle of the conical recess, in radians, strictly between 0 and pi. */
+  angle: number;
+}
+
+function parameterCountersink(feature: CadFeature): CountersinkSpec | null {
+  const value = feature.parameters.countersink;
+  if (value === undefined) return null;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'countersink' must be an object when provided.`);
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    !Array.isArray(record.profileEntityIds)
+    || record.profileEntityIds.length === 0
+    || record.profileEntityIds.some((id) => typeof id !== 'string' || id.length === 0)
+  ) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} countersink requires profileEntityIds.`);
+  }
+  if (typeof record.angle !== 'number' || !Number.isFinite(record.angle) || record.angle <= 0 || record.angle >= Math.PI) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} countersink requires a finite angle in radians, strictly between 0 and pi.`);
+  }
+  return { profileEntityIds: record.profileEntityIds as string[], angle: record.angle };
+}
+
+/** A countersink/counterbore's numeric radius comes from the profile's own resolved geometry
+ * rather than the sketch entity, so it works the same way regardless of how the circle was
+ * drawn or constrained - but that only works when the profile really is a single circle. */
+function circleProfileGeometry(
+  feature: CadFeature,
+  profile3d: CadSketchProfile3d,
+  role: string,
+): { center: CadKernelVector3; radius: number } {
+  const edge = profile3d.edges.length === 1 ? profile3d.edges[0] : undefined;
+  if (!edge || edge.kind !== 'circle') {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} ${role} must reference a single circle entity.`);
+  }
+  return { center: edge.center, radius: edge.radius };
+}
+
 /** A cut tool sized to a fixed depth is only guaranteed to reach through a body if it exceeds
  * the body's bounding diagonal; the diagonal is a direction-agnostic safe over-estimate that
  * avoids projecting onto the cut direction, and the boolean cut only removes what actually
@@ -535,6 +579,10 @@ function holeFeature(
   }
   const depth = throughAll ? undefined : parameterNumber(feature, 'depth');
   const counterbore = parameterCounterbore(feature);
+  const countersink = parameterCountersink(feature);
+  if (counterbore && countersink) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} cannot specify both a counterbore and a countersink.`);
+  }
   if (counterbore && depth !== undefined && counterbore.depth >= depth) {
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore depth must be less than the hole depth.`);
   }
@@ -543,39 +591,77 @@ function holeFeature(
     const reversed = feature.parameters.reversed === true;
     const direction: CadKernelVector3 = reversed ? profile3d.normal : negate(profile3d.normal);
     const tool = kernel.extrude(profile, depth ?? throughAllDepth(kernel, shape), direction);
-    if (!counterbore) {
+
+    if (counterbore) {
+      const sketch = sketchForFeature(feature, project);
+      let counterboreProfile3d: CadSketchProfile3d;
       try {
-        return kernel.cut(shape, tool);
+        counterboreProfile3d = buildSketchProfile3d(sketch, counterbore.profileEntityIds, datumPlanes);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore profile is invalid: ${message}`, { cause: error });
+      }
+      const counterboreFace = kernel.profileFace(counterboreProfile3d);
+      let counterboreTool: CadKernelShape;
+      try {
+        counterboreTool = kernel.extrude(counterboreFace, counterbore.depth, direction);
+      } finally {
+        kernel.release(counterboreFace);
+      }
+      let fusedTool: CadKernelShape;
+      try {
+        fusedTool = kernel.fuse(tool, counterboreTool);
       } finally {
         kernel.release(tool);
+        kernel.release(counterboreTool);
+      }
+      try {
+        return kernel.cut(shape, fusedTool);
+      } finally {
+        kernel.release(fusedTool);
       }
     }
-    const sketch = sketchForFeature(feature, project);
-    let counterboreProfile3d: CadSketchProfile3d;
-    try {
-      counterboreProfile3d = buildSketchProfile3d(sketch, counterbore.profileEntityIds, datumPlanes);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new CadFeatureEvaluationError(feature.id, `${feature.label} counterbore profile is invalid: ${message}`, { cause: error });
+
+    if (countersink) {
+      const sketch = sketchForFeature(feature, project);
+      let countersinkProfile3d: CadSketchProfile3d;
+      try {
+        countersinkProfile3d = buildSketchProfile3d(sketch, countersink.profileEntityIds, datumPlanes);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} countersink profile is invalid: ${message}`, { cause: error });
+      }
+      const bore = circleProfileGeometry(feature, profile3d, 'hole profile');
+      const sink = circleProfileGeometry(feature, countersinkProfile3d, 'countersink profile');
+      if (sink.radius <= bore.radius) {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} countersink diameter must be larger than the hole diameter.`);
+      }
+      const countersinkDepth = (sink.radius - bore.radius) / Math.tan(countersink.angle / 2);
+      const cone = kernel.cone(sink.radius, bore.radius, countersinkDepth);
+      let placedCone: CadKernelShape;
+      try {
+        placedCone = kernel.placeAlongAxis(cone, bore.center, direction);
+      } finally {
+        kernel.release(cone);
+      }
+      let fusedTool: CadKernelShape;
+      try {
+        fusedTool = kernel.fuse(tool, placedCone);
+      } finally {
+        kernel.release(tool);
+        kernel.release(placedCone);
+      }
+      try {
+        return kernel.cut(shape, fusedTool);
+      } finally {
+        kernel.release(fusedTool);
+      }
     }
-    const counterboreFace = kernel.profileFace(counterboreProfile3d);
-    let counterboreTool: CadKernelShape;
+
     try {
-      counterboreTool = kernel.extrude(counterboreFace, counterbore.depth, direction);
-    } finally {
-      kernel.release(counterboreFace);
-    }
-    let fusedTool: CadKernelShape;
-    try {
-      fusedTool = kernel.fuse(tool, counterboreTool);
+      return kernel.cut(shape, tool);
     } finally {
       kernel.release(tool);
-      kernel.release(counterboreTool);
-    }
-    try {
-      return kernel.cut(shape, fusedTool);
-    } finally {
-      kernel.release(fusedTool);
     }
   });
 }
