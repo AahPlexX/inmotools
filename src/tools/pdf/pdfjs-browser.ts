@@ -1,12 +1,13 @@
 import {
   GlobalWorkerOptions,
+  TextLayer,
   getDocument,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
   type RenderTask,
 } from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { canvasRenderPlan, normalizedPdfZoom, PdfRenderCoordinator } from './pdf-renderer';
+import { canvasRenderPlan, normalizedPdfZoom, PdfRenderCoordinator, type PdfCancelableRender } from './pdf-renderer';
 
 export const PDFJS_WORKER_URL = pdfWorkerUrl;
 
@@ -24,7 +25,7 @@ function configurePdfWorker(): void {
 }
 
 export function isPdfRenderCancellation(error: unknown): boolean {
-  return error instanceof Error && error.name === 'RenderingCancelledException';
+  return error instanceof Error && (error.name === 'RenderingCancelledException' || error.name === 'AbortException');
 }
 
 export class PdfJsDocumentSession {
@@ -56,16 +57,36 @@ export class PdfJsDocumentSession {
     this.coordinator.cancel(pageNumber);
   }
 
+  private assertPageNumber(pageNumber: number): void {
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.document.numPages) {
+      throw new Error(`PDF page ${pageNumber} is outside this ${this.document.numPages}-page document.`);
+    }
+  }
+
+  async getPageText(pageNumber: number): Promise<string> {
+    if (this.destroyed) throw new Error('Cannot extract text from a destroyed PDF.js session.');
+    this.assertPageNumber(pageNumber);
+    const page = await this.document.getPage(pageNumber);
+    try {
+      const content = await page.getTextContent({ includeMarkedContent: true, disableNormalization: false });
+      return content.items.flatMap((item) => {
+        if (!('str' in item)) return [];
+        return [`${item.str}${item.hasEOL ? '\n' : ''}`];
+      }).join('');
+    } finally {
+      page.cleanup();
+    }
+  }
+
   async renderPage(
     pageNumber: number,
     canvas: HTMLCanvasElement,
     zoom: number,
     devicePixelRatio = window.devicePixelRatio || 1,
+    textLayerContainer?: HTMLElement,
   ): Promise<PdfRenderedPage> {
     if (this.destroyed) throw new Error('Cannot render from a destroyed PDF.js session.');
-    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.document.numPages) {
-      throw new Error(`PDF page ${pageNumber} is outside this ${this.document.numPages}-page document.`);
-    }
+    this.assertPageNumber(pageNumber);
     const page = await this.document.getPage(pageNumber);
     const viewport = page.getViewport({ scale: normalizedPdfZoom(zoom) });
     const plan = canvasRenderPlan(viewport, devicePixelRatio);
@@ -84,11 +105,33 @@ export class PdfJsDocumentSession {
       transform: plan.transform ?? undefined,
       background: '#ffffff',
     });
-    this.coordinator.replace(pageNumber, renderTask);
+
+    let textLayer: TextLayer | null = null;
+    let task: PdfCancelableRender = renderTask;
+    if (textLayerContainer) {
+      textLayerContainer.replaceChildren();
+      textLayerContainer.style.setProperty('--total-scale-factor', String(viewport.scale));
+      textLayer = new TextLayer({
+        textContentSource: page.streamTextContent({ includeMarkedContent: true, disableNormalization: true }),
+        images: null,
+        container: textLayerContainer,
+        viewport,
+      });
+      const textPromise = textLayer.render();
+      task = {
+        cancel: () => {
+          renderTask.cancel();
+          textLayer?.cancel();
+        },
+        promise: Promise.all([renderTask.promise, textPromise]),
+      };
+    }
+
+    this.coordinator.replace(pageNumber, task);
     try {
-      await renderTask.promise;
+      await task.promise;
     } finally {
-      this.coordinator.release(pageNumber, renderTask);
+      this.coordinator.release(pageNumber, task);
       page.cleanup();
     }
 
