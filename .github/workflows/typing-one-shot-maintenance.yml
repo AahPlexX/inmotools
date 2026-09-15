@@ -18,49 +18,54 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: feature/typing-workstation
-      - name: Add accessible custom-text dialog semantics
+      - name: Complete finite targets and label result controls
         run: |
           python - <<'PY'
           from pathlib import Path
 
           path = Path('src/tools/typing/TypingWorkspace.tsx')
           text = path.read_text()
-          old = '''function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
-            const [text, setText] = useState(value);
-            return (
-              <div className="tw-modal-backdrop" role="dialog" aria-modal="true">
-                <div className="tw-modal">
-                  <h3>Paste or edit custom text</h3>
-                  <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything is kept locally. Longer prose becomes book-length practice.</p>
-                  <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
-                  <div className="row">
-                    <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
-                    <button type="button" onClick={() => onApply(text)}>Use this text</button>
-                  </div>
-                </div>
-              </div>
-            );
-          }'''
-          new = '''function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
-            const [text, setText] = useState(value);
-            return (
-              <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-custom-text-title">
-                <div className="tw-modal">
-                  <h3 id="tw-custom-text-title">Paste or edit custom text</h3>
-                  <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything is kept locally. Longer prose becomes book-length practice.</p>
-                  <label htmlFor="tw-custom-text-input">Custom text</label>
-                  <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
-                  <div className="row">
-                    <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
-                    <button type="button" onClick={() => onApply(text)}>Use this text</button>
-                  </div>
-                </div>
-              </div>
-            );
-          }'''
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected exactly one custom modal block, found {text.count(old)}')
-          path.write_text(text.replace(old, new))
+
+          replacements = [
+              (
+                  "  initState,\n  ngramLatencies,",
+                  "  initState,\n  isCleanlyCompleted,\n  ngramLatencies,",
+                  'isCleanlyCompleted import',
+              ),
+              (
+                  "  }, [running, now, engine.startedAt, totalDurationMs]);\n\n  // Watch for engine.finished transition.",
+                  "  }, [running, now, engine.startedAt, totalDurationMs]);\n\n  // Finite non-timed modes finish as soon as the target is cleanly completed.\n  useEffect(() => {\n    if (!running || engine.finished || totalDurationMs !== 0 || config.durationMode === 'zen') return;\n    if (!isCleanlyCompleted(engine)) return;\n    const lastEvent = engine.events[engine.events.length - 1];\n    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });\n  }, [running, engine, totalDurationMs, config.durationMode]);\n\n  // Watch for engine.finished transition.",
+                  'finite target completion effect',
+              ),
+              (
+                  "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\">\n      <div className=\"tw-modal\">\n        <h3>Test result</h3>",
+                  "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-test-result-title\">\n      <div className=\"tw-modal\">\n        <h3 id=\"tw-test-result-title\">Test result</h3>",
+                  'result dialog name',
+              ),
+              (
+                  "        <label>Typist name</label>\n        <input type=\"text\" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />\n        <label>Organization / classroom</label>\n        <input type=\"text\" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />\n        <label>Certified by (proctor)</label>\n        <input type=\"text\" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />\n        <label>Tags (Enter to add)</label>",
+                  "        <label htmlFor=\"tw-result-typist\">Typist name</label>\n        <input id=\"tw-result-typist\" autoFocus type=\"text\" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />\n        <label htmlFor=\"tw-result-organization\">Organization / classroom</label>\n        <input id=\"tw-result-organization\" type=\"text\" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />\n        <label htmlFor=\"tw-result-certified-by\">Certified by (proctor)</label>\n        <input id=\"tw-result-certified-by\" type=\"text\" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />\n        <label htmlFor=\"tw-result-tag\">Tags (Enter to add)</label>",
+                  'result text labels',
+              ),
+              (
+                  "          <input\n            type=\"text\"\n            value={tagInput}",
+                  "          <input\n            id=\"tw-result-tag\"\n            type=\"text\"\n            value={tagInput}",
+                  'result tag input label target',
+              ),
+              (
+                  "        <label>Notes</label>\n        <textarea value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />",
+                  "        <label htmlFor=\"tw-result-notes\">Notes</label>\n        <textarea id=\"tw-result-notes\" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />",
+                  'result notes label',
+              ),
+          ]
+
+          for old, new, label in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one {label} target, found {count}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
           PY
           git diff --check
       - name: Commit branch-only patch
@@ -68,5 +73,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/tools/typing/TypingWorkspace.tsx
-          git commit -m "fix(typing): label custom text dialog"
+          git commit -m "fix(typing): finish finite targets and label results"
           git push origin HEAD:feature/typing-workstation
