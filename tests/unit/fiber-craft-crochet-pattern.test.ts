@@ -9,6 +9,14 @@ import {
 } from '../../src/tools/fiber-craft/crochet-document-engine';
 import { describeCrochetChart } from '../../src/tools/fiber-craft/engines/chart-description-engine';
 import {
+  addCountedBackstitch,
+  addCountedFrenchKnot,
+  COUNTED_STITCH_KINDS,
+  createStarterCountedThreadDocument,
+  generateCountedThreadLegend,
+  setCountedThreadStitch,
+} from '../../src/tools/fiber-craft/engines/counted-thread-engine';
+import {
   analyzeAmigurumiGrowth,
   compileC2CRows,
   compileCrochetWrittenPattern,
@@ -123,5 +131,62 @@ describe('crochet pattern compilers and references', () => {
     expect(description.details).toHaveLength(12);
     expect(description.details[0]).toContain('1 filled, 11 open. Marked complete.');
     expect(description.details[0]).toContain('Accent');
+  });
+});
+
+describe('counted-thread precision grid and generated legend', () => {
+  test('stores every supported cross, half, quarter, and three-quarter stitch at an addressable cell', () => {
+    let document = createStarterCountedThreadDocument(FIXED_TIME);
+    expect(COUNTED_STITCH_KINDS).toEqual([
+      'full-cross',
+      'half-forward',
+      'half-back',
+      'quarter-nw',
+      'quarter-ne',
+      'quarter-sw',
+      'quarter-se',
+      'three-quarter-nw',
+      'three-quarter-ne',
+      'three-quarter-sw',
+      'three-quarter-se',
+    ]);
+
+    COUNTED_STITCH_KINDS.forEach((kind, index) => {
+      document = setCountedThreadStitch(document, Math.floor(index / 4), index % 4, kind, index % 2 === 0 ? 'primary' : 'accent', FIXED_TIME);
+    });
+
+    if (document.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
+    expect(document.metadata.discipline).toBe('cross-stitch');
+    expect(document.chart.cells.filter((cell) => cell.stitchKind !== null)).toHaveLength(COUNTED_STITCH_KINDS.length);
+    COUNTED_STITCH_KINDS.forEach((kind, index) => {
+      expect(document.chart.cells.find((cell) => cell.row === Math.floor(index / 4) && cell.col === index % 4)?.stitchKind).toBe(kind);
+    });
+  });
+
+  test('keeps French knots and backstitch lines on the same grid and generates one unique legend symbol per used color', () => {
+    let document = createStarterCountedThreadDocument(FIXED_TIME);
+    document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', FIXED_TIME);
+    document = setCountedThreadStitch(document, 0, 1, 'quarter-ne', 'accent', FIXED_TIME);
+    document = addCountedFrenchKnot(document, { row: 1.5, col: 1.5 }, 'contrast', FIXED_TIME);
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', FIXED_TIME);
+
+    if (document.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
+    expect(document.chart.knots).toHaveLength(1);
+    expect(document.chart.backstitches).toHaveLength(1);
+
+    const legend = generateCountedThreadLegend(document);
+    expect(legend.map((entry) => entry.colorId)).toEqual(['primary', 'accent', 'contrast']);
+    expect(new Set(legend.map((entry) => entry.symbol)).size).toBe(legend.length);
+    expect(legend.find((entry) => entry.colorId === 'primary')?.usageCount).toBe(2);
+    expect(legend.find((entry) => entry.colorId === 'accent')?.usageCount).toBe(1);
+    expect(legend.find((entry) => entry.colorId === 'contrast')?.usageCount).toBe(1);
+  });
+
+  test('rejects invalid counted-grid coordinates and palette references', () => {
+    const document = createStarterCountedThreadDocument(FIXED_TIME);
+    expect(() => setCountedThreadStitch(document, -1, 0, 'full-cross', 'primary', FIXED_TIME)).toThrow(/outside/i);
+    expect(() => setCountedThreadStitch(document, 0, 0, 'full-cross', 'missing', FIXED_TIME)).toThrow(/palette/i);
+    expect(() => addCountedFrenchKnot(document, { row: 0.25, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/half-grid/i);
+    expect(() => addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 0.5, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/different/i);
   });
 });
