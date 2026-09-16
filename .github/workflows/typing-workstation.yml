@@ -26,12 +26,7 @@ jobs:
           install: false
       - run: pnpm install --frozen-lockfile
       - name: Focused typing unit tests
-        run: >-
-          pnpm exec vitest run
-          tests/unit/typing-engine.test.ts
-          tests/unit/typing-corpora.test.ts
-          tests/unit/typing-storage.test.ts
-          tests/unit/typing-export.test.ts
+        run: pnpm exec vitest run tests/unit/typing-*.test.ts
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - name: Typing browser tests
