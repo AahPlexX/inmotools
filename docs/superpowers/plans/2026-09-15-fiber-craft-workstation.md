@@ -1,9 +1,9 @@
 # Fiber Craft Workstation
 
-**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete)
+**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **17/65 complete**
+**Function progress:** **19/65 complete**
 
 ## Goal
 
@@ -71,13 +71,16 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-52** bidirectional physical-dimension and gauge scaling for grid and round crochet charts.
 - **FC-54** editable CYC project-level difficulty plus persisted technique tags.
 - **FC-55** structured accessible chart description generated from the same canonical round/grid data as the visual chart.
+- **FC-56** vector multi-page crochet pattern-book PDF with cover, project/material reference, legend, vector diagram, and paginated written instructions.
+- **FC-59** high-resolution crochet PNG export at selectable 1×–4× bitmap resolution for both round and grid charts.
 
-Latest acceptance milestone: focused Fiber run `35119952007` at code head `d03ba45b` passed all
-52 focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
-and mobile Chromium workflow. The browser scenario covers themes, accessible round/grid chart
-summaries, vector symbol rendering, gauge and classification persistence, plus the real `.craftproj`
-save → mutate → re-import → autosave → reload/recovery path. Imported project data remains validated
-at the file boundary before it can replace the live document.
+Latest acceptance milestone: focused Fiber run `35122405166` at code head `f8ecd62f` passed all
+54 focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
+and mobile Chromium workflow. The browser scenario generated and inspected real 3840×2880 and
+1920×1440 PNG files plus the multi-page PDF on both viewports, while retaining the accepted themes,
+accessible descriptions, vector symbols, gauge/classification persistence, `.craftproj` portability,
+autosave, and recovery path. The PDF exporter is code-split behind its user action so the existing
+`pdf-lib` dependency is not pulled into the initial Fiber workspace chunk.
 
 ## Delivery slices
 
@@ -105,9 +108,10 @@ at the file boundary before it can replace the live document.
       draping, yardage/backing estimator.
 - [ ] **Slice 6 — Embroidery digitizing engine.** Vector path authoring, satin/tatami/underlay
       generation, color-stop/trim sequencing, DST/EXP/JEF/PES encoders, appliqué placement export.
-- [ ] **Slice 7 — Export, metadata & publishing.** Multi-page pattern-book PDF, SVG/DXF cutter
-      export, materials CSV, metadata/copyright studio, OpenGraph preview card, offline PWA bundle
-      and remaining publishing/export surfaces.
+- [ ] **Slice 7 — Export, metadata & publishing.** **In progress:** FC-56 vector multi-page
+      pattern-book PDF and FC-59 high-resolution PNG are accepted. SVG/DXF cutter export,
+      embroidery bundle export, materials/shopping export, metadata/copyright and export-time tag
+      review, OpenGraph preview card, offline PWA project bundling, and batch export remain open.
 - [ ] **Slice 8 — Verification & merge readiness.** Full unit + Playwright + axe-core sweep,
       catalog/homepage link assertion, production build, deployment check. No merge to `main`
       until this slice is green.
@@ -121,7 +125,7 @@ at the file boundary before it can replace the live document.
   milestone rather than after every helper/function. A second spot-check is warranted when a change
   crosses engine/state/UI/persistence boundaries or when the previous check exposed a defect.
 - **Dedicated Fiber gate:** `.github/workflows/fiber-craft.yml` runs on Fiber-relevant paths only:
-  frozen install → 52 focused unit/selector checks → production TypeScript/Vite build → one
+  frozen install → 54 focused unit/selector checks → production TypeScript/Vite build → one
   consolidated Playwright workflow on desktop and mobile Chromium.
 - **Avoid no-value reruns:** documentation-only commits and unrelated upstream changes do not
   invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at integration
