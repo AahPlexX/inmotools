@@ -379,6 +379,21 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(translated);
   }
 
+  translate(shape: CadKernelShape, offset: CadKernelVector3): CadKernelShape {
+    return this.#wrap(this.#kernel.translate(this.#unwrap(shape), offset[0], offset[1], offset[2]));
+  }
+
+  rotateAroundAxis(shape: CadKernelShape, axisOrigin: CadKernelVector3, axisDirection: CadKernelVector3, angle: number): CadKernelShape {
+    const magnitude = vectorLength(axisDirection);
+    if (!Number.isFinite(magnitude) || magnitude <= 0) throw new Error('Rotation axis direction must be a finite non-zero vector.');
+    return this.#wrap(this.#kernel.rotate(this.#unwrap(shape), { point: asVec3(axisOrigin), direction: asVec3(axisDirection) }, angle));
+  }
+
+  compound(shapes: readonly CadKernelShape[]): CadKernelShape {
+    if (shapes.length === 0) throw new Error('Compound requires at least one shape.');
+    return this.#wrap(this.#kernel.makeCompound(this.#unwrapMany(shapes)));
+  }
+
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape {
     if (!Number.isFinite(thickness) || thickness === 0) throw new Error('Thicken thickness must be a finite non-zero number.');
     return this.#wrap(this.#kernel.thicken(this.#unwrap(shape), thickness, 1e-6));

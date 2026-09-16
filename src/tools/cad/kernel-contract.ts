@@ -128,6 +128,17 @@ export interface CadExactKernel {
    * matters for a shape that isn't symmetric about its own +Z axis.
    */
   placeAlongAxis(shape: CadKernelShape, origin: CadKernelVector3, direction: CadKernelVector3): CadKernelShape;
+  /** Translates a shape by a fixed offset. Returns a new shape; the input is left untouched. */
+  translate(shape: CadKernelShape, offset: CadKernelVector3): CadKernelShape;
+  /**
+   * Rotates a shape by `angle` radians about the axis through `axisOrigin`
+   * along `axisDirection`. Unlike placeAlongAxis, the angle is given
+   * directly rather than derived from aligning one direction onto another.
+   * Returns a new shape; the input is left untouched.
+   */
+  rotateAroundAxis(shape: CadKernelShape, axisOrigin: CadKernelVector3, axisDirection: CadKernelVector3, angle: number): CadKernelShape;
+  /** Groups shapes into a single compound - a loose grouping, not a boolean union. */
+  compound(shapes: readonly CadKernelShape[]): CadKernelShape;
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
   defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;
   heal(shape: CadKernelShape): CadKernelShape;

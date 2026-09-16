@@ -72,6 +72,14 @@ function parameterNonZeroNumber(feature: CadFeature, key: string): number {
   return value;
 }
 
+function parameterPositiveInteger(feature: CadFeature, key: string): number {
+  const value = feature.parameters[key];
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a positive integer.`);
+  }
+  return value;
+}
+
 function parameterString(feature: CadFeature, key: string): string {
   const value = feature.parameters[key];
   if (typeof value !== 'string' || value.length === 0) {
@@ -537,6 +545,55 @@ function mirrorFeature(
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} mirror plane is invalid: ${message}`, { cause: error });
   }
   return kernel.mirror(shape, plane.origin, plane.normal);
+}
+
+/**
+ * Pattern: repeats a dependency shape into N rigidly-transformed instances,
+ * combined into a single compound - deliberately not tracked as separate
+ * bodies/features. A compound is exactly one CadKernelShape (the same
+ * reasoning `split` already established for its multi-fragment result), so
+ * this fits the one-shape-per-feature model without inventing multi-output
+ * feature semantics that nothing else in the schema supports yet. Each
+ * instance is a fresh, independent transform of the dependency shape
+ * (translate/rotateAroundAxis never mutate their input), so `count`
+ * includes the untransformed first instance at offset/angle zero.
+ */
+function patternFeature(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const shape = singleDependencyShape(feature, featureShapes, 'pattern');
+  const count = parameterPositiveInteger(feature, 'count');
+  const kind = feature.parameters.kind;
+
+  const instances: CadKernelShape[] = [];
+  try {
+    if (kind === 'linear') {
+      const step = parameterVector3(feature, 'step');
+      if (Math.hypot(step[0], step[1], step[2]) === 0) {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} linear pattern 'step' must be a non-zero vector.`);
+      }
+      for (let i = 0; i < count; i += 1) {
+        instances.push(kernel.translate(shape, [step[0] * i, step[1] * i, step[2] * i]));
+      }
+    } else if (kind === 'circular') {
+      const axisOrigin = parameterVector3(feature, 'axisOrigin');
+      const axisDirection = parameterVector3(feature, 'axisDirection');
+      const angleStep = parameterNonZeroNumber(feature, 'angleStep');
+      for (let i = 0; i < count; i += 1) {
+        instances.push(kernel.rotateAroundAxis(shape, axisOrigin, axisDirection, angleStep * i));
+      }
+    } else {
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label} pattern kind '${String(kind)}' is not supported; use 'linear' or 'circular'.`,
+      );
+    }
+    return kernel.compound(instances);
+  } finally {
+    for (const instance of instances) kernel.release(instance);
+  }
 }
 
 /**
@@ -1028,6 +1085,8 @@ function createFeatureShape(
       return offsetFeature(feature, kernel, featureShapes);
     case 'mirror':
       return mirrorFeature(feature, project, datumPlanes, kernel, featureShapes);
+    case 'pattern':
+      return patternFeature(feature, kernel, featureShapes);
     case 'thicken':
       return thickenFeature(feature, kernel, featureShapes);
     case 'hole':
