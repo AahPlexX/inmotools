@@ -50,6 +50,24 @@ describe('typing exports', () => {
     expect(csv).toContain('morning|code');
   });
 
+  it('preserves editable bulk export metadata in CSV', () => {
+    const meta = {
+      ...EMPTY_EXPORT_METADATA,
+      typistName: 'Grace',
+      organization: 'Records Office',
+      certifiedBy: 'Supervisor',
+      tags: ['archive', 'verified'],
+      notes: 'quarterly export',
+    };
+    const csv = testsToCsv([sampleTest], meta);
+    const header = csv.split('\n')[0]!;
+    expect(header).toContain('export_tags');
+    expect(header).toContain('export_notes');
+    expect(csv).toContain('archive|verified');
+    expect(csv).toContain('quarterly export');
+    expect(csv).toContain('Records Office');
+  });
+
   it('emits keystroke CSV rows', () => {
     const csv = keystrokesToCsv(sampleTest.keystrokes!);
     expect(csv.split('\n')[0]).toContain('seq,time_ms,key,code');
