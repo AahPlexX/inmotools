@@ -49,12 +49,10 @@ describe('typing corpora', () => {
     expect(quotesByLength('long').every((q) => q.length === 'long')).toBe(true);
   });
 
-  it('ships programmer code snippets across common languages', () => {
-    const langs = new Set(CODE_SNIPPETS.map((s) => s.language));
-    expect(langs.has('javascript')).toBe(true);
-    expect(langs.has('typescript')).toBe(true);
-    expect(langs.has('python')).toBe(true);
-    expect(langs.has('sql')).toBe(true);
+  it('ships programmer snippets for every promised language', () => {
+    const langs = Array.from(new Set(CODE_SNIPPETS.map((s) => s.language))).sort();
+    expect(langs).toEqual(['cpp', 'css', 'html', 'javascript', 'python', 'rust', 'sql', 'typescript']);
+    expect(CODE_SNIPPETS.every((snippet) => snippet.text.trim().length > 0)).toBe(true);
   });
 
   it('maps corpus modes to the right pool', () => {
