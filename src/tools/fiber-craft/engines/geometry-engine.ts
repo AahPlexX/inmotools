@@ -61,7 +61,6 @@ export function mirrorGridVertical(chart: GridChart): GridChart {
 }
 
 export function rotateGrid90(chart: GridChart): GridChart {
-  // (row, col) in an R x C grid rotates clockwise into (col, R - 1 - row) in a C x R grid.
   const cells = chart.cells.map((cell) => ({
     ...cell,
     row: cell.col,
@@ -83,7 +82,6 @@ export function resizeGridChart(chart: GridChart, rows: number, cols: number): G
   return { ...chart, rows, cols, cells };
 }
 
-/** Counts, per row, how many cells hold a non-null symbol (a stitch), for growth validation. */
 export function stitchCountsByRow(chart: GridChart): readonly number[] {
   const counts = new Array<number>(chart.rows).fill(0);
   for (const cell of chart.cells) {
@@ -99,11 +97,6 @@ export interface StitchGrowthFinding {
   readonly delta: number;
 }
 
-/**
- * Compares each row's actual stitch count against an expected-count function, surfacing every
- * mismatch. `expectedForRow` is supplied by the caller (flat rows expect a constant count;
- * shaped amigurumi rounds expect a caller-provided target curve).
- */
 export function findStitchGrowthMismatches(
   chart: GridChart,
   expectedForRow: (row: number) => number,
@@ -117,8 +110,6 @@ export function findStitchGrowthMismatches(
   }
   return findings;
 }
-
-// --- Polar (round) geometry: mandalas, doilies, amigurumi bases ---
 
 export function createEmptyPolarChart(stitchesPerRound: readonly number[]): PolarChart {
   if (stitchesPerRound.length === 0) throw new Error('At least one round is required.');
@@ -149,10 +140,6 @@ export function setPolarNode(
   return { ...chart, nodes };
 }
 
-/**
- * Cartesian (x, y) position, centered at the origin, for a polar node — used only for on-screen
- * placement; the underlying data model stays purely round/angle-indexed.
- */
 export function polarNodeToCartesian(
   node: PolarStitchNode,
   ringSpacing: number,
@@ -170,34 +157,111 @@ export function stitchCountsByRound(chart: PolarChart): readonly number[] {
   return counts;
 }
 
-// --- Gauge and physical-dimension math (shared by every discipline) ---
-
 const CM_PER_INCH = 2.54;
+
+const requireGauge = (gauge: GaugeSwatch): void => {
+  if (!Number.isFinite(gauge.stitchCount) || gauge.stitchCount <= 0) throw new Error('Gauge stitch count must be positive.');
+  if (!Number.isFinite(gauge.rowCount) || gauge.rowCount <= 0) throw new Error('Gauge row count must be positive.');
+  if (!Number.isFinite(gauge.span) || gauge.span <= 0) throw new Error('Gauge span must be positive.');
+};
 
 export function convertLength(value: number, from: LengthUnit, to: LengthUnit): number {
   if (from === to) return value;
   return from === 'in' ? value * CM_PER_INCH : value / CM_PER_INCH;
 }
 
-/** Stitches (or rows) per unit length, from a measured gauge swatch. */
 export function gaugeDensity(gauge: GaugeSwatch, unit: LengthUnit): number {
-  if (gauge.span <= 0) throw new Error('Gauge span must be positive.');
+  requireGauge(gauge);
   const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
   return gauge.stitchCount / spanInUnit;
 }
 
+export function rowDensity(gauge: GaugeSwatch, unit: LengthUnit): number {
+  requireGauge(gauge);
+  const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
+  return gauge.rowCount / spanInUnit;
+}
+
 export function stitchesToLength(stitchCount: number, gauge: GaugeSwatch, unit: LengthUnit): number {
+  requireGauge(gauge);
   const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
   return (stitchCount / gauge.stitchCount) * spanInUnit;
 }
 
 export function lengthToStitches(length: number, gauge: GaugeSwatch, unit: LengthUnit): number {
+  requireGauge(gauge);
   const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
   return (length / spanInUnit) * gauge.stitchCount;
 }
 
-/** Row-to-stitch aspect ratio implied by a gauge swatch, for FC-43's non-square knitting grid. */
+export function rowsToLength(rowCount: number, gauge: GaugeSwatch, unit: LengthUnit): number {
+  requireGauge(gauge);
+  const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
+  return (rowCount / gauge.rowCount) * spanInUnit;
+}
+
+export function lengthToRows(length: number, gauge: GaugeSwatch, unit: LengthUnit): number {
+  requireGauge(gauge);
+  const spanInUnit = convertLength(gauge.span, gauge.unit, unit);
+  return (length / spanInUnit) * gauge.rowCount;
+}
+
+export interface GridPhysicalDimensions {
+  readonly width: number;
+  readonly height: number;
+  readonly unit: LengthUnit;
+}
+
+export function gridPhysicalDimensions(
+  chart: Pick<GridChart, 'rows' | 'cols'>,
+  gauge: GaugeSwatch,
+  unit: LengthUnit,
+): GridPhysicalDimensions {
+  return {
+    width: stitchesToLength(chart.cols, gauge, unit),
+    height: rowsToLength(chart.rows, gauge, unit),
+    unit,
+  };
+}
+
+export function gridCountsForPhysicalSize(
+  width: number,
+  height: number,
+  gauge: GaugeSwatch,
+  unit: LengthUnit,
+): { readonly cols: number; readonly rows: number } {
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+    throw new Error('Finished width and height must be positive.');
+  }
+  return {
+    cols: Math.max(1, Math.round(lengthToStitches(width, gauge, unit))),
+    rows: Math.max(1, Math.round(lengthToRows(height, gauge, unit))),
+  };
+}
+
+export function polarRoundPhysicalDimensions(
+  chart: PolarChart,
+  round: number,
+  gauge: GaugeSwatch,
+  unit: LengthUnit,
+): { readonly stitches: number; readonly circumference: number; readonly diameter: number; readonly unit: LengthUnit } {
+  if (!Number.isInteger(round) || round < 0 || round >= chart.rounds) throw new Error('Round is outside this chart.');
+  const stitches = chart.nodes.filter((node) => node.round === round).length;
+  if (stitches <= 0) throw new Error('Round has no stitch positions.');
+  const circumference = stitchesToLength(stitches, gauge, unit);
+  return { stitches, circumference, diameter: circumference / Math.PI, unit };
+}
+
+export function roundStitchesForDiameter(
+  diameter: number,
+  gauge: GaugeSwatch,
+  unit: LengthUnit,
+): number {
+  if (!Number.isFinite(diameter) || diameter <= 0) throw new Error('Finished diameter must be positive.');
+  return Math.max(1, Math.round(lengthToStitches(diameter * Math.PI, gauge, unit)));
+}
+
 export function gaugeAspectRatio(gauge: GaugeSwatch): number {
-  if (gauge.stitchCount <= 0) throw new Error('Gauge stitch count must be positive.');
+  requireGauge(gauge);
   return gauge.rowCount / gauge.stitchCount;
 }

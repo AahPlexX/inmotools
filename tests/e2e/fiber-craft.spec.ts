@@ -33,6 +33,21 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Use these project defaults' }).click();
     await expect(page.getByLabel('Project yarn / material')).toHaveValue('4 Medium');
 
+    await page.locator('#fiber-gauge-stitches').fill('20');
+    await page.locator('#fiber-gauge-rows').fill('28');
+    await page.locator('#fiber-gauge-span').fill('4');
+    await page.locator('#fiber-gauge-unit').selectOption('in');
+    await page.getByRole('button', { name: 'Save measured gauge' }).click();
+    await expect(page.getByTestId('gauge-scaling')).toContainText('6 stitches ≈ 1.20 in circumference');
+    await page.locator('#fiber-finished-diameter').fill('4');
+    await expect(page.getByTestId('gauge-recommendation')).toContainText('63 stitches');
+
+    await page.locator('#fiber-project-level').selectOption('Intermediate');
+    await page.locator('#fiber-technique-tags').fill('amigurumi, shaping, amigurumi');
+    await page.getByRole('button', { name: 'Save pattern details' }).click();
+    await expect(page.getByTestId('pattern-details-summary')).toContainText('Intermediate');
+    await expect(page.getByTestId('pattern-details-summary')).toContainText('amigurumi · shaping');
+
     await page.getByLabel('Chart mode').selectOption('grid');
     const firstCell = page.getByRole('button', { name: 'Row 1, column 1, open' });
     await firstCell.click();
@@ -59,6 +74,9 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByLabel('Open project file').setInputFiles(projectPath!);
     await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
+    await expect(page.locator('#fiber-gauge-stitches')).toHaveValue('20');
+    await expect(page.locator('#fiber-project-level')).toHaveValue('Intermediate');
+    await expect(page.getByTestId('pattern-details-summary')).toContainText('amigurumi · shaping');
 
     await expect(page.locator('p.fiber-craft-status')).toContainText('Saved locally', { timeout: 3_000 });
     await page.reload();
@@ -68,5 +86,6 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByLabel('Chart mode')).toHaveValue('grid');
     await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
+    await expect(page.locator('#fiber-project-level')).toHaveValue('Intermediate');
   });
 });

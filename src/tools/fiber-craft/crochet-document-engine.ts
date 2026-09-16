@@ -8,12 +8,15 @@ import { getCrochetSymbol } from './engines/symbol-library';
 import {
   createEmptyMetadata,
   type FiberCraftDocument,
+  type GaugeSwatch,
   type GridChart,
   type PolarChart,
 } from './fiber-craft-types';
 
 export const STARTER_CROCHET_STITCHES = 6;
 export const STARTER_CROCHET_GRID_SIZE = 12;
+export const CYC_PROJECT_LEVELS = ['Basic', 'Easy', 'Intermediate', 'Complex'] as const;
+export type CycProjectLevel = (typeof CYC_PROJECT_LEVELS)[number];
 
 const withUpdatedChart = (
   document: FiberCraftDocument,
@@ -56,6 +59,7 @@ export const createStarterCrochetDocument = (now = new Date().toISOString()): Fi
     metadata: {
       ...metadata,
       title: 'Crochet round chart',
+      difficulty: 'Basic',
       createdAt: now,
       updatedAt: now,
     },
@@ -112,11 +116,7 @@ export const workNextCrochetStitch = (
   }
   const target = chart.nodes.find((node) => node.round === round && node.symbolId === null);
   if (!target) throw new Error('Every stitch in this round is already worked.');
-  return withUpdatedChart(
-    document,
-    setPolarNode(chart, round, target.angleIndex, colorId, symbolId),
-    now,
-  );
+  return withUpdatedChart(document, setPolarNode(chart, round, target.angleIndex, colorId, symbolId), now);
 };
 
 export const crochetRoundProgress = (
@@ -125,10 +125,7 @@ export const crochetRoundProgress = (
 ): { readonly worked: number; readonly total: number } => {
   const chart = requirePolarChart(document);
   const nodes = chart.nodes.filter((node) => node.round === round);
-  return {
-    worked: nodes.filter((node) => node.symbolId !== null).length,
-    total: nodes.length,
-  };
+  return { worked: nodes.filter((node) => node.symbolId !== null).length, total: nodes.length };
 };
 
 export const switchCrochetChartMode = (
@@ -141,11 +138,7 @@ export const switchCrochetChartMode = (
     return withUpdatedChart(document, createEmptyPolarChart([STARTER_CROCHET_STITCHES]), now);
   }
   if (document.chart.kind === 'grid') return document;
-  return withUpdatedChart(
-    document,
-    createEmptyGridChart(STARTER_CROCHET_GRID_SIZE, STARTER_CROCHET_GRID_SIZE),
-    now,
-  );
+  return withUpdatedChart(document, createEmptyGridChart(STARTER_CROCHET_GRID_SIZE, STARTER_CROCHET_GRID_SIZE), now);
 };
 
 export const toggleCrochetGridCell = (
@@ -194,6 +187,51 @@ export const setCrochetYarnReference = (
       ...next.metadata,
       materialClass: materialClass.trim(),
       toolSize: toolSize.trim(),
+      updatedAt: now,
+    },
+  };
+};
+
+export const setCrochetGauge = (
+  document: FiberCraftDocument,
+  gauge: GaugeSwatch,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (!Number.isFinite(gauge.stitchCount) || gauge.stitchCount <= 0
+    || !Number.isFinite(gauge.rowCount) || gauge.rowCount <= 0
+    || !Number.isFinite(gauge.span) || gauge.span <= 0
+    || (gauge.unit !== 'in' && gauge.unit !== 'cm')) {
+    throw new Error('Gauge needs positive stitch, row, and span values in inches or centimeters.');
+  }
+  return {
+    ...document,
+    gauge: { ...gauge },
+    metadata: { ...document.metadata, updatedAt: now },
+  };
+};
+
+export const setCrochetPatternClassification = (
+  document: FiberCraftDocument,
+  difficulty: CycProjectLevel,
+  techniqueTags: readonly string[],
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (!CYC_PROJECT_LEVELS.includes(difficulty)) throw new Error('Choose a supported project level.');
+  const seen = new Set<string>();
+  const normalizedTags: string[] = [];
+  for (const rawTag of techniqueTags) {
+    const tag = rawTag.trim();
+    const key = tag.toLocaleLowerCase();
+    if (!tag || seen.has(key)) continue;
+    seen.add(key);
+    normalizedTags.push(tag);
+  }
+  return {
+    ...document,
+    metadata: {
+      ...document.metadata,
+      difficulty,
+      techniqueTags: normalizedTags,
       updatedAt: now,
     },
   };
