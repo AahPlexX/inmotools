@@ -27,3 +27,7 @@ No truncated code or missing package import was confirmed in inspected files. Th
 - MDN dialog element: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/dialog
 
 Research date: 2026-09-16 UTC. GOVERNANCE.md was read and not modified.
+
+## Integration evidence
+
+Implemented on main at 1e9bef197327337d638b5a0bfd50b203165fcc48. All 191 Markdown units pass after changes; Pages deployment succeeded. Live source highlight spans, syntax dialog opening/closing and visible find/replace were verified. Focused run 35144034742 passed 78/80 checks; both failures were an obsolete single-draft assumption in the same desktop/mobile test. The corrected test now verifies both preserved drafts and deletes only the requested one. Exact-main rerun remains required. Full validation fails outside Markdown in Vector tests.
