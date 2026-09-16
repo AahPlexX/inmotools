@@ -1,0 +1,14 @@
+/* Counted-thread authoring extends the shared Fiber Craft workspace without changing crochet layout primitives. */
+.fiber-counted-grid-scroll { overflow: auto; padding: 16px; background: var(--surface); overscroll-behavior: contain; scrollbar-gutter: stable; }
+.fiber-counted-grid-scroll:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.fiber-counted-grid { display: grid; gap: 0; width: max-content; border: 1px solid var(--line-strong); background: var(--line-strong); }
+.fiber-counted-cell { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-right: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background: var(--surface); color: var(--counted-color, var(--ink)); cursor: pointer; font: 800 24px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fiber-counted-cell:hover { box-shadow: inset 0 0 0 2px var(--ink); z-index: 1; }
+.fiber-counted-cell:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; z-index: 2; }
+.fiber-counted-coordinate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fiber-counted-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.fiber-counted-legend li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 36px; }
+.fiber-counted-legend strong { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+.fiber-counted-legend span, .fiber-counted-legend small { overflow-wrap: anywhere; }
+.fiber-counted-legend small { color: var(--muted); }
+@media (max-width: 420px) { .fiber-counted-coordinate-grid { grid-template-columns: minmax(0, 1fr); } }
