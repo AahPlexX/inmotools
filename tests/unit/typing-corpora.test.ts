@@ -44,6 +44,10 @@ describe('typing corpora', () => {
     expect(dvorak.rows[1]?.keys[5]).toBe('f');
     expect(dvorak.fingers.f).toBe('r2');
     expect(dvorak.fingers[' ']).toBe('thumb');
+
+    const qwertz = findLayout('qwertz');
+    expect(qwertz.rows[1]?.keys[5]).toBe('z');
+    expect(qwertz.fingers.z).toBe('r2');
   });
 
   it('bundles medical, legal, kids sentences and quotes', () => {
