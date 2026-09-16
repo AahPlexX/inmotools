@@ -36,6 +36,15 @@ export const TIMED_BUFFER_WORDS = 50;
 export const ZEN_INITIAL_WORDS = 250;
 export const ZEN_CHUNK_WORDS = 160;
 
+const TIME_DURATION_VALUES = [15, 30, 60, 120] as const;
+const WORD_DURATION_VALUES = [10, 25, 50, 100, 200] as const;
+
+export function normalizeDurationValue(mode: DurationMode, currentValue: number): number {
+  if (mode === 'time') return TIME_DURATION_VALUES.includes(currentValue as (typeof TIME_DURATION_VALUES)[number]) ? currentValue : 30;
+  if (mode === 'words') return WORD_DURATION_VALUES.includes(currentValue as (typeof WORD_DURATION_VALUES)[number]) ? currentValue : 25;
+  return currentValue;
+}
+
 export function countWords(text: string): number {
   return text.match(/\S+/g)?.length ?? 0;
 }
