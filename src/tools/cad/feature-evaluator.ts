@@ -1,4 +1,4 @@
-import type { CadFeature, CadProject } from './cad-types';
+import type { CadFeature, CadProject, CadTopologyRefRecord } from './cad-types';
 import type { CadExactKernel, CadHelixDefinition, CadKernelShape, CadKernelVector3 } from './kernel-contract';
 import {
   buildSketchPath3d,
@@ -424,6 +424,47 @@ function splitFeature(
  * yet. Rather than guess at that sequencing, this rejects more than one
  * resolved face and leaves batch draft as an explicit follow-up.
  */
+/**
+ * Resolves one persisted topology reference's semantic id against whatever
+ * shape is passed in - unlike resolvedTopologyIds, which resolves every
+ * reference of a kind against a single shared shape, this lets a caller
+ * resolve references one at a time against a shape that changes between
+ * resolutions (draft's raw kernel op only accepts one face at a time, so
+ * later faces must be re-resolved against each earlier draft's own output -
+ * OCCT's raw subshape ordinals aren't stable across an operation like this).
+ */
+function resolvedSingleTopologyId(
+  feature: CadFeature,
+  kernel: CadFeatureKernel,
+  shape: CadKernelShape,
+  kind: TopologyKind,
+  reference: CadTopologyRefRecord,
+): string {
+  const candidates = kernel.topologyCandidates(shape, reference.producerFeatureId, kind);
+  const result = resolveTopologyRef(reference, candidates);
+  if (result.status === 'missing') {
+    throw new CadFeatureEvaluationError(
+      feature.id,
+      `${feature.label} ${kind} reference '${reference.role}' could not be resolved on the current exact shape.`,
+    );
+  }
+  if (result.status === 'ambiguous') {
+    throw new CadFeatureEvaluationError(
+      feature.id,
+      `${feature.label} ${kind} reference '${reference.role}' is ambiguous across ${result.candidates.length} current candidates.`,
+    );
+  }
+  return result.candidate.id;
+}
+
+/**
+ * Drafts one face at a time, in the order the references are persisted:
+ * occt-wasm's raw draft() takes exactly one face handle, so each subsequent
+ * face is re-resolved by semantic fingerprint against the PREVIOUS draft's
+ * own output rather than the original shape or a cached index - the same
+ * fingerprint-based resolution every other topology-driven feature already
+ * relies on, just invoked once per step instead of once per feature.
+ */
 function draftFeature(
   feature: CadFeature,
   kernel: CadFeatureKernel,
@@ -432,14 +473,33 @@ function draftFeature(
   const angle = parameterNumber(feature, 'angle');
   const direction = parameterVector3(feature, 'direction');
   const shape = singleDependencyShape(feature, featureShapes, 'draft');
-  const faceIds = resolvedTopologyIds(feature, kernel, shape, 'face');
-  if (faceIds.length !== 1) {
+  const producerFeatureId = feature.dependsOn[0]!;
+  const references = feature.topologyRefs.filter((reference) => reference.kind === 'face');
+  if (references.length === 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} requires at least one persisted face reference.`);
+  }
+  if (references.some((reference) => reference.producerFeatureId !== producerFeatureId)) {
     throw new CadFeatureEvaluationError(
       feature.id,
-      `${feature.label} draft supports exactly one face per feature today; add another draft feature for additional faces.`,
+      `${feature.label} face references must target dependency '${producerFeatureId}'.`,
     );
   }
-  return kernel.draft(shape, faceIds, angle, direction);
+
+  let current = shape;
+  let ownsCurrent = false;
+  try {
+    for (const reference of references) {
+      const faceId = resolvedSingleTopologyId(feature, kernel, current, 'face', reference);
+      const next = kernel.draft(current, [faceId], angle, direction);
+      if (ownsCurrent) kernel.release(current);
+      current = next;
+      ownsCurrent = true;
+    }
+    return current;
+  } catch (error) {
+    if (ownsCurrent) kernel.release(current);
+    throw error;
+  }
 }
 
 function offsetFeature(
