@@ -10,7 +10,7 @@ Add a local-first typing speed calculator, ergonomic touch-typing testing surfac
 
 ## Architecture
 
-- New workspace under `src/tools/typing/` with an isolated engine (`typing-engine.ts`), corpora (`typing-corpora.ts`), persistence (`typing-storage.ts` — Dexie/IndexedDB), audio synthesis (`typing-audio.ts` — Web Audio API), export module (`typing-export.ts`), scoped styles (`typing-styles.css`), and a React workspace component (`TypingWorkspace.tsx`).
+- New workspace under `src/tools/typing/` with an isolated engine (`typing-engine.ts`), corpora (`typing-corpora.ts`), duration-aware target builder (`typing-target.ts`), persistence (`typing-storage.ts` — Dexie/IndexedDB), audio synthesis (`typing-audio.ts` — Web Audio API), export module (`typing-export.ts`), scoped styles (`typing-styles.css`), and a React workspace component (`TypingWorkspace.tsx`).
 - Registered via the central catalog (`src/catalog.ts`) and workspace loader (`src/tools/workspaces.tsx`), with no changes to other tools.
 - All computations and persistence run in the browser. No backend, no telemetry, no network call. Optional Web Serial / Web Bluetooth is not required — the tool measures keystrokes purely via `KeyboardEvent` timings.
 
@@ -25,6 +25,7 @@ Add a local-first typing speed calculator, ergonomic touch-typing testing surfac
   - `howler@2.2.4` (with `@types/howler@2.2.13`) — reserved for future sample-based mechanical profiles (Web Audio path used for the current synth).
   - `papaparse@5.7.0` — CSV parse/serialize for imports and history exports (already present, verified suitable).
   - `jspdf@4.2.1` — client-side vector PDF certificate generation.
+  - `@fontsource/jetbrains-mono@5.3.0`, `@fontsource/fira-code@5.3.0`, `@fontsource/roboto-mono@5.3.0`, `@fontsource/atkinson-hyperlegible@5.3.0`, and `@fontsource/opendyslexic@5.3.0` — self-hosted selectable typing fonts with no CDN dependency.
 - No `^` / `~` prefixes used, in line with the repo's pinned-dependency policy.
 
 ## Feature ledger
@@ -87,21 +88,22 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 
 ## Milestones
 
-- **A. Foundation & engine — complete.** `typing-engine.ts`, corpora, storage, audio, exports, styles, workspace UI, catalog and loader are implemented on `feature/typing-workstation`.
-- **B. Focused unit tests — complete.** 34 focused tests cover engine behavior and metrics, corpora, IndexedDB storage, and export envelopes.
-- **C. Focused browser spec — complete.** Desktop and mobile Chromium cover route launch, custom-text configuration, non-timed finite-target completion, result metadata, auto-save-on-export, downloaded JSON envelope contents, reload persistence, serious/critical automated accessibility checks, and 320 CSS-pixel reflow.
+- **A. Foundation & engine — complete.** `typing-engine.ts`, corpora, target generation, storage, audio, exports, styles, workspace UI, catalog and loader are implemented on `feature/typing-workstation`.
+- **B. Focused unit tests — complete.** 46 focused tests cover engine behavior and metrics, strict-mode/correction regressions, Enter-to-newline transcription, duration-family normalization and target sizing, corpora, IndexedDB storage, and export envelopes.
+- **C. Focused browser spec — complete.** Desktop and mobile Chromium cover route launch, duration-family normalization, exact word-count targets, multiline custom transcription through a real Enter keypress, finite-target completion, result metadata, auto-save-on-export, downloaded JSON envelope contents, reload persistence, bundled OpenDyslexic loading, modal focus/Escape semantics, serious/critical automated accessibility checks, and 320 CSS-pixel reflow.
 - **D. Integration & Pages verification — pending.** Merge to `main` only after the user authorizes integration from this dedicated branch; then validate the exact integrated `origin/main` revision and require the Pages deployment to be green.
 
 ## Latest focused acceptance evidence
 
-- Source revision: `11d99cf1a9060a8cbd89a48867507e404fb828ff` (`fix(typing): finish finite targets and label results`).
-- Dedicated workflow run: `35020326518` (`Typing Workstation validation`).
-- Frozen `pnpm install --frozen-lockfile`: passed.
-- Focused unit tests: 34 passed.
+- Accepted branch revision: `bbf895d074a7d9119e4ea687566325658db905e5` (`test(typing): scope font selector structurally`).
+- Core source fix revision: `cb5242b03b672ffc94f6c0e311fdb1bc94b55468` (`fix(typing): normalize duration and multiline input [skip ci]`).
+- Dedicated workflow run: `35117376116`, job `104866123548` (`Typing Workstation validation`).
+- Frozen `pnpm install --frozen-lockfile`: passed, including repository supply-chain policy verification.
+- Focused unit tests: 46/46 passed across six Typing test files.
 - Production `pnpm build`: passed.
-- Playwright: 6/6 passed across desktop Chromium and mobile Chromium.
-- Browser coverage proves JSON download metadata/envelope, IndexedDB persistence across reload, non-timed completion, no serious/critical Axe violations at rest, and no page-level horizontal overflow at 320 CSS pixels.
-- The earlier repository-wide Pages baseline remained blocked by three pre-existing Vector Studio unit failures; no typing unit failure was present. That unrelated baseline is not treated as Typing Workstation regression evidence.
+- Playwright: 8/8 passed across desktop Chromium and mobile Chromium.
+- Browser coverage proves 30-second → word-count normalization to a valid 25-word default, explicit 10-word targets, multiline custom completion through a real Enter/newline, JSON download metadata/envelope with the newline preserved, IndexedDB persistence across reload, bundled OpenDyslexic loading, export/clear modal keyboard semantics, no serious/critical Axe violations at rest, and no page-level horizontal overflow at 320 CSS pixels.
+- The earlier repository-wide Pages baseline remained blocked by unrelated Vector Studio unit failures; no typing unit failure was present. That historical baseline is not treated as Typing Workstation regression evidence.
 
 ## Non-goals / explicit exclusions
 
@@ -112,7 +114,7 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 ## Validation
 
 - `.github/workflows/typing-workstation.yml` is the focused branch gate.
-- Focused Vitest coverage verifies engine, corpora, storage, and exports without rerunning unrelated tool suites.
+- Focused Vitest coverage is convention-discovered via `tests/unit/typing-*.test.ts`, preventing new Typing unit files from being silently omitted; it verifies engine, duration/target generation, corpora, storage, and exports without rerunning unrelated tool suites.
 - `pnpm build` verifies TypeScript and the Vite production bundle.
-- `tests/e2e/typing.spec.ts` verifies the critical completion → save/export → persistence path plus desktop/mobile accessibility and 320 CSS-pixel reflow.
+- `tests/e2e/typing.spec.ts` verifies the critical multiline completion → save/export → persistence path, duration normalization, bundled-font availability, modal keyboard semantics, desktop/mobile accessibility, and 320 CSS-pixel reflow.
 - Exact-main integration and Pages verification remain Milestone D and are intentionally not claimed from the dedicated feature branch.
