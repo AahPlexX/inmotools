@@ -38,7 +38,7 @@ jobs:
 
           python <<'PY'
           from pathlib import Path
-          import json, re
+          import re
 
           tracker = Path('.tasks/IN_PROGRESS.md').read_text()
           match = re.search(r'(?ms)^- \*\*Typing Workstation\*\*.*?(?=^\- \*\*|\Z)', tracker)
@@ -83,13 +83,11 @@ jobs:
             exit 1
           fi
 
-          # Shared integration files start from current main, then receive the
-          # Typing-only additions captured above.
           git checkout --theirs -- .tasks/IN_PROGRESS.md package.json pnpm-lock.yaml src/catalog.ts src/tools/workspaces.tsx
 
           python <<'PY'
           from pathlib import Path
-          import copy, json
+          import json
 
           base = json.loads(Path('/tmp/base-package.json').read_text())
           ours = json.loads(Path('/tmp/typing-package.json').read_text())
@@ -152,6 +150,9 @@ jobs:
 
           pnpm install --lockfile-only
 
+          # Replacing a conflicted working-tree file does not clear the index's
+          # unmerged state; stage the explicitly resolved shared files first.
+          git add .tasks/IN_PROGRESS.md package.json pnpm-lock.yaml src/catalog.ts src/tools/workspaces.tsx
           if git diff --name-only --diff-filter=U | grep -q .; then
             echo 'Unresolved merge conflicts remain' >&2
             git diff --name-only --diff-filter=U >&2
