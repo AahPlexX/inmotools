@@ -1,9 +1,7 @@
 import { generateWords } from './typing-engine';
 import {
   CODE_SNIPPETS,
-  ENGLISH_TOP_200,
   ENGLISH_TOP_1000,
-  ENGLISH_TOP_5000,
   KIDS_SENTENCES,
   LANGUAGE_POOLS,
   LEGAL_SENTENCES,
@@ -105,12 +103,8 @@ export function buildTargetText(cfg: TargetConfig, seed?: number): string {
   const capacity = targetWordCapacity(cfg);
   const exactWords = cfg.durationMode === 'words';
 
-  if (cfg.mode === 'words-200') return generateWords(ENGLISH_TOP_200, capacity, seed);
-  if (cfg.mode === 'words-1000') {
-    return generateWords(cfg.language === 'english' ? ENGLISH_TOP_1000 : LANGUAGE_POOLS[cfg.language], capacity, seed);
-  }
-  if (cfg.mode === 'words-5000') {
-    return generateWords(cfg.language === 'english' ? ENGLISH_TOP_5000 : LANGUAGE_POOLS[cfg.language], capacity, seed);
+  if (cfg.mode === 'words-200' || cfg.mode === 'words-1000' || cfg.mode === 'words-5000') {
+    return generateWords(poolForMode(cfg.mode, cfg.language), capacity, seed);
   }
 
   let source = '';
