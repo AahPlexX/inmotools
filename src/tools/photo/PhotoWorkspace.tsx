@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { downloadBlob } from '../../lib/download';
 import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
+import type { PhotoCompositionOverlay } from './PhotoCropOverlay';
 import PhotoExportDialog from './PhotoExportDialog';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
 import PhotoRawControls from './PhotoRawControls';
@@ -280,6 +281,8 @@ export default function PhotoWorkspace() {
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
+  const [geometryInteraction, setGeometryInteraction] = useState<'crop' | 'straighten' | null>(null);
+  const [compositionOverlay, setCompositionOverlay] = useState<PhotoCompositionOverlay>('thirds');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState('');
   const [projectCreatedAt, setProjectCreatedAt] = useState(0);
@@ -319,6 +322,10 @@ export default function PhotoWorkspace() {
     && parsedCustomRatioHeight > 0;
   const directClipboardAvailable = typeof navigator !== 'undefined'
     && typeof navigator.clipboard?.read === 'function';
+
+  useEffect(() => {
+    setGeometryInteraction(null);
+  }, [source?.originalUrl]);
 
   const refreshLocalProjects = useCallback(async (store = projectStoreRef.current) => {
     if (!store) return;
@@ -1222,6 +1229,40 @@ export default function PhotoWorkspace() {
           <h2>Crop & geometry</h2>
           <p>Frame precisely and correct optical or keystone distortion with the same reversible recipe used at export resolution.</p>
         </div>
+        <div className="photo-inline-actions" role="group" aria-label="Direct geometry tools">
+          <button
+            type="button"
+            aria-pressed={geometryInteraction === 'crop'}
+            disabled={!source}
+            onClick={() => {
+              setCanvasInteraction(null);
+              setGeometryInteraction((current) => current === 'crop' ? null : 'crop');
+            }}
+          >Edit crop on photo</button>
+          <button
+            type="button"
+            aria-pressed={geometryInteraction === 'straighten'}
+            disabled={!source}
+            onClick={() => {
+              setCanvasInteraction(null);
+              setGeometryInteraction((current) => current === 'straighten' ? null : 'straighten');
+            }}
+          >Straighten on photo</button>
+        </div>
+        <label className="photo-control photo-composition-control">
+          <span>Composition overlay</span>
+          <select
+            aria-label="Composition overlay"
+            value={compositionOverlay}
+            onChange={(event) => setCompositionOverlay(event.target.value as PhotoCompositionOverlay)}
+          >
+            <option value="none">None</option>
+            <option value="thirds">Rule of thirds</option>
+            <option value="grid">Grid</option>
+            <option value="diagonal">Diagonal</option>
+            <option value="golden">Golden ratio</option>
+          </select>
+        </label>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => applyCropRatio(null)}>Original</button>
           <button type="button" onClick={() => applyCropRatio(1)}>1:1</button>
@@ -1675,7 +1716,16 @@ export default function PhotoWorkspace() {
             ['retouch', 'Retouch'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
-            <button type="button" key={id} aria-pressed={panel === id} onClick={() => { setPanel(id); if (id !== 'local' && id !== 'retouch') setCanvasInteraction(null); }}>{label}</button>
+            <button
+              type="button"
+              key={id}
+              aria-pressed={panel === id}
+              onClick={() => {
+                setPanel(id);
+                if (id !== 'local' && id !== 'retouch') setCanvasInteraction(null);
+                if (id !== 'geometry') setGeometryInteraction(null);
+              }}
+            >{label}</button>
           ))}
         </nav>
 
@@ -1690,7 +1740,19 @@ export default function PhotoWorkspace() {
           localAdjustments={recipe.localAdjustments}
           retouch={recipe.retouch}
           interaction={canvasInteraction}
+          crop={recipe.crop}
+          geometryMode={geometryInteraction}
+          compositionOverlay={compositionOverlay}
           onGesture={handleCanvasGesture}
+          onCropCommit={(crop) => {
+            patchRecipe({ crop });
+            setStatus(`Crop updated · ${Math.round(crop.width * 1000) / 10}% × ${Math.round(crop.height * 1000) / 10}%`);
+          }}
+          onStraightenCommit={(degrees) => {
+            patchRecipe({ straighten: degrees });
+            setGeometryInteraction(null);
+            setStatus(`Straighten set to ${degrees.toFixed(1)}°.`);
+          }}
           onZoomChange={setZoom}
         />
 

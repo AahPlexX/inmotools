@@ -441,3 +441,129 @@
   .photo-studio *::before,
   .photo-studio *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* Direct crop and straighten overlays */
+.photo-geometry-frame { position: relative; }
+
+.photo-crop-overlay,
+.photo-straighten-guide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scale(var(--photo-zoom, 1));
+  transform-origin: center center;
+}
+
+.photo-crop-overlay {
+  pointer-events: none;
+  line-height: normal;
+}
+
+.photo-crop-overlay.is-interactive { pointer-events: auto; }
+
+.photo-crop-dim {
+  position: absolute;
+  background: rgb(0 0 0 / 0.48);
+  pointer-events: none;
+}
+
+.photo-crop-dim-top { inset: 0 0 auto; }
+.photo-crop-dim-left { left: 0; }
+.photo-crop-dim-bottom { left: 0; right: 0; }
+
+.photo-crop-frame {
+  position: absolute;
+  overflow: hidden;
+  border: 2px solid rgb(255 255 255 / 0.94);
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.8);
+  pointer-events: none;
+}
+
+.photo-composition-guides {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.photo-composition-guides line,
+.photo-straighten-guide line {
+  vector-effect: non-scaling-stroke;
+  stroke: rgb(255 255 255 / 0.82);
+  stroke-width: 1.25;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9));
+}
+
+.photo-crop-move-target {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  cursor: move;
+  touch-action: none;
+}
+
+.photo-crop-handle {
+  position: absolute;
+  z-index: 3;
+  inline-size: 32px;
+  block-size: 32px;
+  min-inline-size: 32px;
+  min-block-size: 32px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid white;
+  border-radius: 0.35rem;
+  background: #111827;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.76), 0 0.2rem 0.55rem rgb(0 0 0 / 0.32);
+  touch-action: none;
+  transform: translate(-50%, -50%) scale(var(--photo-inverse-zoom, 1));
+}
+
+.photo-crop-handle-n,
+.photo-crop-handle-s { cursor: ns-resize; }
+.photo-crop-handle-e,
+.photo-crop-handle-w { cursor: ew-resize; }
+.photo-crop-handle-ne,
+.photo-crop-handle-sw { cursor: nesw-resize; }
+.photo-crop-handle-nw,
+.photo-crop-handle-se { cursor: nwse-resize; }
+
+.photo-crop-handle:focus-visible,
+.photo-crop-move-target:focus-visible {
+  outline: 3px solid var(--focus-ring, #60a5fa);
+  outline-offset: 3px;
+}
+
+.photo-crop-readout {
+  position: absolute;
+  z-index: 4;
+  left: 0.55rem;
+  bottom: 0.55rem;
+  max-width: calc(100% - 1.1rem);
+  padding: 0.3rem 0.48rem;
+  border-radius: 0.45rem;
+  background: rgb(0 0 0 / 0.74);
+  color: white;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.photo-straighten-guide {
+  pointer-events: none;
+  overflow: visible;
+}
+
+.photo-straighten-guide line {
+  stroke-width: 2;
+}
+
+.photo-composition-control {
+  margin-block: 0.65rem;
+}
