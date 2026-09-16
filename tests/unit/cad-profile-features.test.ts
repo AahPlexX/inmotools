@@ -55,6 +55,22 @@ function feature(
   };
 }
 
+function lineSketch(): CadSketch {
+  return {
+    id: 'sketch-line',
+    label: 'Rib centerline',
+    plane: { kind: 'origin', plane: 'XY' },
+    entities: [
+      { id: 'p1', type: 'point', x: 0, y: 5, construction: false },
+      { id: 'p2', type: 'point', x: 20, y: 5, construction: false },
+      { id: 'centerline', type: 'line', startPointId: 'p1', endPointId: 'p2', construction: false },
+      { id: 'c1', type: 'point', x: 10, y: 5, construction: false },
+      { id: 'arc-centerline', type: 'arc', centerPointId: 'c1', startPointId: 'p1', endPointId: 'p2', clockwise: false, construction: false },
+    ],
+    constraints: [],
+  };
+}
+
 function circleSketch(): CadSketch {
   return {
     id: 'sketch-circle',
@@ -699,5 +715,141 @@ describe('CAD sketch-driven exact features', () => {
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'hole-1' });
     expect((thrown as Error).message).toMatch(/profileEntityIds/i);
+  });
+
+  it('extrudes a thickened wall along a straight centerline and fuses it onto the body', () => {
+    const { kernel } = kernelFixture();
+    const box = token('box');
+    const face = token('rib-face');
+    const tool = token('rib-tool');
+    const fused = token('fused-body');
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(box);
+    (kernel.profileFace as ReturnType<typeof vi.fn>).mockReturnValue(face);
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValue(tool);
+    (kernel.fuse as ReturnType<typeof vi.fn>).mockReturnValue(fused);
+
+    const input: CadProject = {
+      ...createCadProject('Rib fixture'),
+      sketches: [lineSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('rib-1', 'rib', {
+          sketchId: 'sketch-line',
+          profileEntityIds: ['centerline'],
+          thickness: 2,
+          depth: 3,
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'rib-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    // Centerline (0,5,0) -> (20,5,0) on the XY plane, thickness 2 (halfThickness 1): the
+    // in-plane perpendicular to the line direction is [0,1,0], so the wall spans y in [4,6].
+    expect(kernel.profileFace).toHaveBeenCalledWith({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [0, 6, 0], end: [20, 6, 0] },
+        { kind: 'line', start: [20, 6, 0], end: [20, 4, 0] },
+        { kind: 'line', start: [20, 4, 0], end: [0, 4, 0] },
+        { kind: 'line', start: [0, 4, 0], end: [0, 6, 0] },
+      ],
+    });
+    expect(kernel.extrude).toHaveBeenCalledWith(face, 3, [0, 0, 1]);
+    expect(kernel.fuse).toHaveBeenCalledWith(box, tool);
+    expect(kernel.release).toHaveBeenCalledWith(face);
+    expect(kernel.release).toHaveBeenCalledWith(tool);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'rib-1', shape: fused }]);
+  });
+
+  it('reverses a rib to extrude opposite the sketch normal when requested', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+    (kernel.profileFace as ReturnType<typeof vi.fn>).mockReturnValue(token('rib-face'));
+    (kernel.extrude as ReturnType<typeof vi.fn>).mockReturnValue(token('rib-tool'));
+    (kernel.fuse as ReturnType<typeof vi.fn>).mockReturnValue(token('fused-body'));
+
+    const input: CadProject = {
+      ...createCadProject('Reversed rib fixture'),
+      sketches: [lineSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('rib-1', 'rib', {
+          sketchId: 'sketch-line',
+          profileEntityIds: ['centerline'],
+          thickness: 2,
+          depth: 3,
+          reversed: true,
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'rib-1'], visible: true }],
+    };
+
+    evaluateCadFeatures(input, kernel);
+
+    expect(kernel.extrude).toHaveBeenCalledWith(token('rib-face'), 3, [0, 0, -1]);
+  });
+
+  it('rejects a rib centerline referencing more than one entity', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Multi-entity rib fixture'),
+      sketches: [lineSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('rib-1', 'rib', {
+          sketchId: 'sketch-line',
+          profileEntityIds: ['centerline', 'arc-centerline'],
+          thickness: 2,
+          depth: 3,
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'rib-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'rib-1' });
+    expect((thrown as Error).message).toMatch(/exactly one/i);
+  });
+
+  it('rejects a rib centerline that is not a straight line entity', () => {
+    const { kernel } = kernelFixture();
+    (kernel.box as ReturnType<typeof vi.fn>).mockReturnValue(token('box'));
+
+    const input: CadProject = {
+      ...createCadProject('Arc centerline rib fixture'),
+      sketches: [lineSketch()],
+      features: [
+        feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+        feature('rib-1', 'rib', {
+          sketchId: 'sketch-line',
+          profileEntityIds: ['arc-centerline'],
+          thickness: 2,
+          depth: 3,
+        }, ['box-1']),
+      ],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['box-1', 'rib-1'], visible: true }],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'rib-1' });
+    expect((thrown as Error).message).toMatch(/straight line/i);
   });
 });

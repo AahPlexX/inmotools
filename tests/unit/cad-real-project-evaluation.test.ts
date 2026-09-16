@@ -308,4 +308,61 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('adds a rib wall onto a body by fusing an extruded, thickened centerline', () => {
+    const ribSketch: CadSketch = {
+      id: 'rib-sketch',
+      label: 'Rib centerline',
+      plane: { kind: 'datum', datumId: 'top-face' },
+      entities: [
+        { id: 'p1', type: 'point', x: 5, y: 5, construction: false },
+        { id: 'p2', type: 'point', x: 15, y: 5, construction: false },
+        { id: 'centerline', type: 'line', startPointId: 'p1', endPointId: 'p2', construction: false },
+      ],
+      constraints: [],
+    };
+
+    const project: CadProject = {
+      ...createCadProject('Rib fixture'),
+      sketches: [ribSketch],
+      features: [
+        feature({
+          id: 'box-1',
+          type: 'primitive',
+          parameters: { kind: 'box', width: 20, depth: 10, height: 5 },
+        }),
+        feature({
+          id: 'top-face',
+          type: 'datum-plane',
+          parameters: { basePlane: 'XY', distance: 5 },
+        }),
+        feature({
+          id: 'rib-1',
+          type: 'rib',
+          dependsOn: ['box-1'],
+          parameters: { sketchId: 'rib-sketch', profileEntityIds: ['centerline'], thickness: 2, depth: 3 },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['box-1', 'top-face', 'rib-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // The rib wall (length 10, thickness 2, depth 3) sits flush on the box's top face with
+      // zero overlap volume, so the fused total is exactly the sum of the two solids.
+      const boxVolume = 20 * 10 * 5;
+      const ribVolume = 10 * 2 * 3;
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(boxVolume + ribVolume, 6);
+
+      const bounds = kernel.bounds(finalBody.shape);
+      expect(bounds.min).toEqual([0, 0, 0]);
+      expect(bounds.max[0]).toBeCloseTo(20, 6);
+      expect(bounds.max[1]).toBeCloseTo(10, 6);
+      expect(bounds.max[2]).toBeCloseTo(8, 6);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
 });

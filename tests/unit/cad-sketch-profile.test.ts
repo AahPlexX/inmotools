@@ -7,6 +7,7 @@ import {
   buildSketchProfile3d,
   negate,
   negateComponent,
+  perpendicularInPlane,
   resolveDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
@@ -258,6 +259,25 @@ describe('alignmentRotation (property-based)', () => {
         expect(rotated[0]).toBeCloseTo(toUnit[0], 5);
         expect(rotated[1]).toBeCloseTo(toUnit[1], 5);
         expect(rotated[2]).toBeCloseTo(toUnit[2], 5);
+      }),
+    );
+  });
+});
+
+describe('perpendicularInPlane (property-based)', () => {
+  it('returns a unit vector perpendicular to both the given direction and the plane normal', () => {
+    fc.assert(
+      fc.property(nonZeroVector3(), nonZeroVector3(), (direction, planeNormal) => {
+        // Skip the degenerate case where direction is parallel to the plane's own normal -
+        // there is no "in-plane sideways" direction for a line that isn't in the plane at all.
+        const normalizedNormal = normalize3(planeNormal);
+        const normalizedDirection = normalize3(direction);
+        fc.pre(Math.abs(dot3(normalizedNormal, normalizedDirection)) < 1 - 1e-6);
+
+        const perpendicular = perpendicularInPlane(direction, planeNormal);
+        expect(length3(perpendicular)).toBeCloseTo(1, 6);
+        expect(Math.abs(dot3(perpendicular, normalizedDirection))).toBeLessThan(1e-5);
+        expect(Math.abs(dot3(perpendicular, normalizedNormal))).toBeLessThan(1e-5);
       }),
     );
   });
