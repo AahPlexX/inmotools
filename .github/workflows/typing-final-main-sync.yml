@@ -1,0 +1,104 @@
+name: Typing final current-main sync
+
+on:
+  push:
+    branches:
+      - feature/typing-workstation
+    paths:
+      - .github/workflows/typing-final-main-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/typing-workstation
+          fetch-depth: 0
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Merge exact current main and preserve Typing additions
+        env:
+          EXPECTED_MAIN: 3215f6826ebca52c3f062d189a545f1615fff035
+        run: |
+          set -euo pipefail
+          git config user.name "AahPlexX"
+          git config user.email "130876266+AahPlexX@users.noreply.github.com"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+
+          MERGE_BASE="$(git merge-base HEAD origin/main)"
+          cp package.json /tmp/typing-package.json
+          git show "$MERGE_BASE:package.json" > /tmp/base-package.json
+
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_status=$?
+          set -e
+
+          mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
+          expected=(package.json pnpm-lock.yaml pnpm-workspace.yaml)
+          for path in "${unresolved[@]}"; do
+            allowed=false
+            for candidate in "${expected[@]}"; do
+              if [[ "$path" == "$candidate" ]]; then allowed=true; break; fi
+            done
+            if [[ "$allowed" != true ]]; then
+              echo "Unexpected merge conflict: $path" >&2
+              exit 1
+            fi
+          done
+          if [[ $merge_status -ne 0 && ${#unresolved[@]} -eq 0 ]]; then
+            echo "Merge failed without expected resolvable conflicts" >&2
+            exit 1
+          fi
+
+          git checkout --theirs -- package.json pnpm-lock.yaml pnpm-workspace.yaml
+
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          base = json.loads(Path('/tmp/base-package.json').read_text())
+          ours = json.loads(Path('/tmp/typing-package.json').read_text())
+          path = Path('package.json')
+          target = json.loads(path.read_text())
+
+          for section in ('dependencies', 'devDependencies'):
+              base_section = base.get(section, {})
+              ours_section = ours.get(section, {})
+              target.setdefault(section, {})
+              other = 'devDependencies' if section == 'dependencies' else 'dependencies'
+              for name, version in ours_section.items():
+                  if base_section.get(name) != version:
+                      target[section][name] = version
+                      if target.get(other, {}).get(name) == version:
+                          del target[other][name]
+              target[section] = dict(sorted(target[section].items()))
+          path.write_text(json.dumps(target, indent=2) + '\n')
+
+          workspace = Path('pnpm-workspace.yaml')
+          text = workspace.read_text()
+          if 'allowBuilds:\n' not in text:
+              raise SystemExit('allowBuilds block missing from current main workspace config')
+          if '  core-js: false\n' not in text:
+              text = text.replace('allowBuilds:\n', 'allowBuilds:\n  core-js: false\n', 1)
+          workspace.write_text(text)
+          PY
+
+          pnpm install --lockfile-only
+          git add package.json pnpm-lock.yaml pnpm-workspace.yaml
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo 'Unresolved merge conflicts remain' >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+
+          git add .
+          git commit -m "merge: sync latest main into typing workstation"
+          git push origin HEAD:feature/typing-workstation
