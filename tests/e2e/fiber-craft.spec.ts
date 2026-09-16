@@ -12,7 +12,7 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(undo).toBeDisabled();
     await expect(redo).toBeDisabled();
 
-    await page.getByLabel('Stitch symbol').selectOption('sc-dc');
+    await page.getByLabel('Stitch symbol', { exact: true }).selectOption('sc-dc');
     await page.getByRole('button', { name: 'Place next stitch' }).click();
     await expect(page.getByTestId('active-round-progress')).toHaveText('1 of 6 stitches worked');
     await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-symbol-rendering', 'vector');
