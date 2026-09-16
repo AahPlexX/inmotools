@@ -24,13 +24,18 @@ async function clearTypingDatabase(page: Page) {
   }, DB_NAME);
 }
 
+function wordCountSelect(workspace: ReturnType<Page['getByTestId']>) {
+  const configuration = workspace.getByRole('region', { name: 'Test configuration' });
+  return configuration.locator('label').filter({ hasText: /^\s*Words/ }).locator('select');
+}
+
 test('completes a multiline word-count custom target, persists it, and exports the JSON envelope', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
 
   await workspace.getByLabel('Mode').selectOption('custom');
   await workspace.getByLabel('Duration').selectOption('words');
-  const wordsSelect = workspace.getByLabel('Words', { exact: true });
+  const wordsSelect = wordCountSelect(workspace);
   await expect(wordsSelect).toHaveValue('25');
   await wordsSelect.selectOption('10');
   await workspace.getByRole('button', { name: 'Paste text' }).click();
@@ -82,7 +87,7 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
 
   await workspace.getByLabel('Mode').selectOption('words-1000');
   await workspace.getByLabel('Duration').selectOption('words');
-  const wordsSelect = workspace.getByLabel('Words', { exact: true });
+  const wordsSelect = wordCountSelect(workspace);
   await expect(wordsSelect).toHaveValue('25');
   await wordsSelect.selectOption('10');
 
