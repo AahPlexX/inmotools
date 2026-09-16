@@ -81,7 +81,9 @@ function getDb(): TypingDb {
 // Tests
 // --------------------------------------------------------------------
 export async function saveTest(test: StoredTest): Promise<number> {
-  return getDb().tests.add(test);
+  const localTest = { ...test };
+  delete localTest.id;
+  return getDb().tests.add(localTest);
 }
 
 export async function updateTestTags(id: number, tags: string[], notes?: string): Promise<void> {
