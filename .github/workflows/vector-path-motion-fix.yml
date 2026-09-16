@@ -1,0 +1,123 @@
+name: Vector path motion fix
+
+on:
+  push:
+    branches:
+      - fix/vector-path-motion-20260916
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: fix/vector-path-motion-20260916
+
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply path translation fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/tools/svg/vector-engine.ts')
+          source = path.read_text()
+
+          import_old = "import { DEFAULT_FILL, DEFAULT_STROKE } from './vector-types';\n"
+          import_new = "import { SVGPathData } from 'svg-pathdata';\nimport { DEFAULT_FILL, DEFAULT_STROKE } from './vector-types';\n"
+          if import_old not in source:
+              raise SystemExit('Expected vector-types import anchor not found')
+          source = source.replace(import_old, import_new, 1)
+
+          old = '''function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
+            if (element.type === 'group') {
+              return {
+                ...element,
+                x: element.x + dx,
+                y: element.y + dy,
+                children: element.children.map((child) => moveElement(child, dx, dy)),
+                composition: element.composition
+                  ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
+                  : undefined,
+              };
+            }
+            if (element.type === 'line') {
+              return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
+            }
+            return { ...element, x: element.x + dx, y: element.y + dy };
+          }
+'''
+          new = '''function translatedPathData(pathData: string, dx: number, dy: number): string {
+            return new SVGPathData(pathData)
+              .translate(dx, dy)
+              .encode()
+              .replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ')
+              .trim()
+              .replace(/\\s+/g, ' ');
+          }
+
+          function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
+            if (element.type === 'group') {
+              return {
+                ...element,
+                x: element.x + dx,
+                y: element.y + dy,
+                children: element.children.map((child) => moveElement(child, dx, dy)),
+                composition: element.composition
+                  ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
+                  : undefined,
+              };
+            }
+            if (element.type === 'line') {
+              return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
+            }
+            if (element.type === 'path') {
+              try {
+                return {
+                  ...element,
+                  x: element.x + dx,
+                  y: element.y + dy,
+                  d: translatedPathData(element.d, dx, dy),
+                };
+              } catch {
+                return element;
+              }
+            }
+            return { ...element, x: element.x + dx, y: element.y + dy };
+          }
+'''
+          if old not in source:
+              raise SystemExit('Expected moveElement implementation not found')
+          source = source.replace(old, new, 1)
+          path.write_text(source)
+          PY
+
+          pnpm add --save-exact svg-pathdata@9.0.0
+
+      - name: Focused Vector tests
+        run: pnpm exec vitest run tests/unit/vector-engine-path-motion.test.ts tests/unit/vector-engine.test.ts tests/unit/vector-export.test.ts tests/unit/vector-duplicate-ids.test.ts tests/unit/vector-selection.test.ts
+
+      - name: Production build
+        run: pnpm build
+
+      - name: Commit verified fix and remove diagnostic workflow
+        shell: bash
+        run: |
+          rm .github/workflows/vector-path-motion-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json pnpm-lock.yaml src/tools/svg/vector-engine.ts .github/workflows/vector-path-motion-fix.yml
+          git commit -m "fix(vector): translate SVG path geometry during motion"
+          git push origin HEAD:fix/vector-path-motion-20260916
