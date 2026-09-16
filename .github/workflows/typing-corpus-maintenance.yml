@@ -1,0 +1,120 @@
+name: Typing corpus one-shot maintenance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/typing-workstation]
+    paths:
+      - '.github/workflows/typing-corpus-maintenance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.ref_name == 'feature/typing-workstation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/typing-workstation
+          fetch-depth: 0
+      - name: Generate exact ranked English tiers
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          import re
+          import urllib.request
+
+          source_commit = '525f9b560de45753a5ea01069454e72e9aa541c6'
+          source_url = f'https://raw.githubusercontent.com/hermitdave/FrequencyWords/{source_commit}/content/2018/en/en_50k.txt'
+          with urllib.request.urlopen(source_url, timeout=30) as response:
+              raw = response.read().decode('utf-8')
+
+          words = []
+          seen = set()
+          for line in raw.splitlines():
+              parts = line.rsplit(' ', 1)
+              if len(parts) != 2:
+                  continue
+              token = parts[0].strip().lower()
+              if not re.fullmatch(r'[a-z]+', token):
+                  continue
+              if token in seen:
+                  continue
+              seen.add(token)
+              words.append(token)
+              if len(words) == 5000:
+                  break
+
+          if len(words) != 5000:
+              raise SystemExit(f'expected 5000 ranked alphabetic tokens, found {len(words)}')
+          if len(set(words)) != 5000:
+              raise SystemExit('generated corpus is not unique')
+
+          generated = Path('src/tools/typing/typing-english-frequency.ts')
+          rows = []
+          for i in range(0, len(words), 12):
+              rows.append('  ' + ', '.join(json.dumps(word) for word in words[i:i + 12]) + ',')
+          generated.write_text(
+              "// Derived from hermitdave/FrequencyWords content/2018/en/en_50k.txt\n"
+              f"// pinned at {source_commit}. Source content is CC BY-SA 4.0.\n"
+              "// Transformation: preserve source frequency order, lowercase, keep ASCII alphabetic\n"
+              "// tokens, deduplicate, and take the first 5,000. See THIRD_PARTY_NOTICES.md.\n"
+              "export const ENGLISH_FREQUENCY_5000: readonly string[] = [\n"
+              + '\n'.join(rows)
+              + "\n];\n"
+          )
+
+          corpus_path = Path('src/tools/typing/typing-corpora.ts')
+          corpus = corpus_path.read_text()
+          import_line = "import { ENGLISH_FREQUENCY_5000 } from './typing-english-frequency';\n\n"
+          if import_line not in corpus:
+              marker = "// All content is bundled — the tool ships offline and never fetches a corpus.\n\n"
+              if corpus.count(marker) != 1:
+                  raise SystemExit('typing-corpora import marker changed')
+              corpus = corpus.replace(marker, marker + import_line, 1)
+
+          start = corpus.index('// --------------------------------------------------------------------\n// English frequency-curated word tiers')
+          helper = corpus.index('function toWordArray', start)
+          corpus = corpus[:start] + (
+              "// --------------------------------------------------------------------\n"
+              "// English frequency-ranked tiers. The underlying 5,000-token list is generated\n"
+              "// from the pinned FrequencyWords source documented in THIRD_PARTY_NOTICES.md.\n"
+              "// --------------------------------------------------------------------\n"
+          ) + corpus[helper:]
+
+          export_start = corpus.index('export const ENGLISH_TOP_200:')
+          languages_marker = corpus.index('// --------------------------------------------------------------------\n// Other-language pools', export_start)
+          corpus = corpus[:export_start] + (
+              "export const ENGLISH_TOP_200: string[] = ENGLISH_FREQUENCY_5000.slice(0, 200);\n"
+              "export const ENGLISH_TOP_1000: string[] = ENGLISH_FREQUENCY_5000.slice(0, 1000);\n"
+              "export const ENGLISH_TOP_5000: string[] = ENGLISH_FREQUENCY_5000.slice(0, 5000);\n\n"
+          ) + corpus[languages_marker:]
+          corpus_path.write_text(corpus)
+
+          Path('src/tools/typing/THIRD_PARTY_NOTICES.md').write_text(
+              "# Typing Workstation third-party data notice\n\n"
+              "## English frequency-ranked practice corpus\n\n"
+              "`typing-english-frequency.ts` is an adapted data subset of **FrequencyWords** by Hermit Dave, "
+              "using `content/2018/en/en_50k.txt` pinned at commit " + source_commit + ". FrequencyWords states "
+              "that its generated content is licensed under **Creative Commons Attribution-ShareAlike 4.0 International "
+              "(CC BY-SA 4.0)** and derives its 2018 frequency lists from the OpenSubtitles 2018 corpus.\n\n"
+              "Source: https://github.com/hermitdave/FrequencyWords\n\n"
+              "License: https://creativecommons.org/licenses/by-sa/4.0/\n\n"
+              "Transformation used here: preserve the source frequency order, lowercase tokens, retain ASCII alphabetic "
+              "tokens, remove duplicates, then take the first 5,000 accepted entries. The derived data file is redistributed "
+              "under CC BY-SA 4.0. The surrounding InMo Tools code remains under its repository license.\n"
+          )
+
+          if 'ENGLISH_FREQUENCY_5000.slice(0, 5000)' not in corpus:
+              raise SystemExit('corpus wiring assertion failed')
+      - name: Commit corpus correction
+        run: |
+          git config user.name "AahPlexX"
+          git config user.email "130876266+AahPlexX@users.noreply.github.com"
+          git add src/tools/typing/typing-corpora.ts src/tools/typing/typing-english-frequency.ts src/tools/typing/THIRD_PARTY_NOTICES.md
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(typing): ship exact ranked English corpus tiers [skip ci]"
+          git push origin HEAD:feature/typing-workstation
