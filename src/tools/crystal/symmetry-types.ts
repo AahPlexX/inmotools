@@ -26,3 +26,17 @@ export interface SymmetryAdapterCell {
   readonly positions: readonly (readonly [number, number, number])[];
   readonly numbers: readonly number[];
 }
+
+export interface SymmetrySweepPoint {
+  readonly tolerance: number;
+  readonly number: number;
+  readonly hmSymbol: string;
+  readonly operationCount: number;
+  readonly wyckoffs: readonly string[];
+}
+
+export interface SymmetryBreakInspection {
+  readonly surviving: readonly CrystalSymmetryOperation[];
+  readonly broken: readonly CrystalSymmetryOperation[];
+  readonly offendingSiteIds: readonly string[];
+}

@@ -5,8 +5,10 @@ import {
   applySymmetryOperation,
   crystalToMoyoCell,
   generateEquivalentSites,
+  inspectSymmetryBreak,
   reflectionAllowed,
   standardizeCrystal,
+  sweepSymmetryTolerance,
   validateSourceSymmetry,
 } from '../../src/tools/crystal/symmetry-engine';
 import type { CrystalSymmetryOperation } from '../../src/tools/crystal/symmetry-types';
@@ -124,5 +126,33 @@ describe('crystal symmetry operations', () => {
     expect(findings.length).toBeGreaterThan(0);
     expect(findings[0]!.severity).toBe('warning');
     expect(findings[0]!.siteIds.length).toBeGreaterThan(0);
+  });
+});
+
+describe('crystal symmetry stability diagnostics', () => {
+  it('sweeps tolerances in ascending deterministic order after rejecting invalid inputs', async () => {
+    const bcc = createStarterStructure('bcc');
+    await expect(sweepSymmetryTolerance(bcc, [1e-4, 1e-4])).rejects.toThrow(/tolerance/i);
+    await expect(sweepSymmetryTolerance(bcc, [0])).rejects.toThrow(/tolerance/i);
+    await expect(sweepSymmetryTolerance(bcc, [Number.NaN])).rejects.toThrow(/tolerance/i);
+
+    const displaced = updateCrystalSite(bcc, bcc.sites[1]!.id, { fractional: [0.51, 0.5, 0.5] });
+    const points = await sweepSymmetryTolerance(displaced, [0.2, 1e-4]);
+    expect(points.map((point) => point.tolerance)).toEqual([1e-4, 0.2]);
+    expect(points[1]!.operationCount).toBeGreaterThan(points[0]!.operationCount);
+    expect(points[1]!.number).toBe(229);
+    expect(points[0]!.hmSymbol).not.toBe(points[1]!.hmSymbol);
+    expect(points[1]!.wyckoffs).toHaveLength(2);
+  });
+
+  it('reports surviving and broken operations with the offending site', async () => {
+    const bcc = createStarterStructure('bcc');
+    const movedSite = bcc.sites[1]!;
+    const displaced = updateCrystalSite(bcc, movedSite.id, { fractional: [0.51, 0.5, 0.5] });
+    const inspection = await inspectSymmetryBreak(bcc, displaced, 1e-4);
+
+    expect(inspection.surviving.length).toBeGreaterThan(0);
+    expect(inspection.broken.length).toBeGreaterThan(0);
+    expect(inspection.offendingSiteIds).toContain(movedSite.id);
   });
 });
