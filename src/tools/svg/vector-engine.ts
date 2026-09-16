@@ -8,6 +8,7 @@ import type {
   VectorPoint,
   VectorSelectionResult,
 } from './vector-types';
+import { SVGPathData } from 'svg-pathdata';
 import { DEFAULT_FILL, DEFAULT_STROKE } from './vector-types';
 
 let idSequence = 0;
@@ -103,6 +104,15 @@ export function removeSelection(document: VectorDocument, selection: readonly st
   return { ...document, elements: document.elements.filter((element) => !selected.has(element.id)) };
 }
 
+function translatedPathData(pathData: string, dx: number, dy: number): string {
+  return new SVGPathData(pathData)
+    .translate(dx, dy)
+    .encode()
+    .replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
   if (element.type === 'group') {
     return {
@@ -117,6 +127,18 @@ function moveElement(element: VectorElement, dx: number, dy: number): VectorElem
   }
   if (element.type === 'line') {
     return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
+  }
+  if (element.type === 'path') {
+    try {
+      return {
+        ...element,
+        x: element.x + dx,
+        y: element.y + dy,
+        d: translatedPathData(element.d, dx, dy),
+      };
+    } catch {
+      return element;
+    }
   }
   return { ...element, x: element.x + dx, y: element.y + dy };
 }
