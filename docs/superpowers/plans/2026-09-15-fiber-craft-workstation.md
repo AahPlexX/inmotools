@@ -1,9 +1,9 @@
 # Fiber Craft Workstation
 
-**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine near-complete)
+**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **11/65 complete**
+**Function progress:** **13/65 complete**
 
 ## Goal
 
@@ -46,8 +46,8 @@ export), existing `papaparse` `5.7.0` (materials/floss/yardage CSV export), exis
 **No new npm dependencies are added yet.** Property-based testing is a deliberate future option
 for combinatorial engines: current official fast-check guidance recommends `fast-check` plus
 `@fast-check/vitest` for Vitest, with deterministic replay and shrinking. The current crochet
-state space remains compact enough that Vitest `test.for` plus invariant-focused tests provides
-high signal without lockfile churn. Re-evaluate property-based testing when transforms,
+state space remains compact enough that Vitest parameterization plus invariant-focused tests
+provides high signal without lockfile churn. Re-evaluate property-based testing when transforms,
 quantization, binary embroidery encoders, or similarly high-dimensional logic lands.
 
 ## Verified function ledger
@@ -56,7 +56,9 @@ The following design-spec functions are complete and accepted on the dedicated b
 
 - **FC-02** layered undo/redo history.
 - **FC-03** browser-local autosave and explicit recovery.
+- **FC-04** portable `.craftproj` save/load with validated local import and lossless project-state round trip.
 - **FC-09** concentric crochet round canvas.
+- **FC-10** US/UK crochet symbol library rendered as reusable vector glyph geometry on the chart.
 - **FC-11** C2C compiler with diagonal row-by-row block counts.
 - **FC-12** filet crochet grid mode and filled/open mesh written output.
 - **FC-13** amigurumi round-shaping assistant.
@@ -66,9 +68,12 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
 
-**FC-10 remains intentionally uncounted.** The symbol definitions and US/UK naming switch are
-present, but the chart still renders textual abbreviations rather than the required actual vector
-crochet chart glyphs. It becomes complete only when the visual chart itself uses the symbol set.
+Acceptance milestone: focused Fiber run `35118429046` at code head `eafbbdd5` passed all 47
+focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
+and mobile Chromium workflow. The browser scenario covers vector symbol rendering plus an actual
+`.craftproj` save → mutate → re-import → autosave → reload/recovery path. Imported project data is
+validated at the file boundary for metadata, gauge, palette, embedded swatches, chart structure,
+settings, and progress data before it can replace the live document.
 
 ## Delivery slices
 
@@ -78,17 +83,13 @@ crochet chart glyphs. It becomes complete only when the visual chart itself uses
       panels, undo/redo history, autosave, catalog/route registration behind a working landing view.
       **In progress:** crochet Canvas/grid hosts, palette/inspector, reversible history, IndexedDB
       draft restore for round and grid documents, catalog entry, lazy loader, canonical alias,
-      progress tracking, and one-action active-row recenter are implemented. Dedicated Fiber
-      validation run `35046436107` at code head `7f213326` passed all 41 focused checks, the
-      production TypeScript/Vite build, and the consolidated desktop/mobile Chromium workflow.
-      Cross-discipline mode switching, portable `.craftproj`, shared zoom/pan/rulers, transforms,
-      screen/print themes, and complete keyboard/touch authoring remain open.
-- [ ] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
-      symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator.
-      **Near-complete:** round and grid editing, C2C/filet compilers, written instructions,
-      stitch/growth validation, amigurumi targets, CYC yarn/hook guidance, persistent progress, and
-      responsive browser workflows are accepted. **FC-10 vector chart-symbol rendering is the
-      remaining Slice 2 blocker.**
+      portable `.craftproj`, progress tracking, and one-action active-row recenter are accepted.
+      Cross-discipline mode switching, shared zoom/pan/rulers, transforms, screen/print themes, and
+      complete keyboard/touch authoring remain open.
+- [x] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
+      vector symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator,
+      amigurumi shaping, and yarn/hook reference guidance are implemented and accepted through the
+      focused unit/build/desktop-mobile browser gate.
 - [ ] **Slice 3 — Cross-stitch & counted-thread engine.** Precision grid, raster quantization
       worker, DMC/Anchor/Madeira/Sullivan floss matcher (CIEDE2000 via `culori`), symbol/legend
       generator, skein/yardage calculator.
@@ -101,21 +102,21 @@ crochet chart glyphs. It becomes complete only when the visual chart itself uses
       generation, color-stop/trim sequencing, DST/EXP/JEF/PES encoders, appliqué placement export.
 - [ ] **Slice 7 — Export, metadata & publishing.** Multi-page pattern-book PDF, SVG/DXF cutter
       export, materials CSV, metadata/copyright studio, OpenGraph preview card, offline PWA bundle
-      and `.craftproj` packaging.
+      and remaining publishing/export surfaces.
 - [ ] **Slice 8 — Verification & merge readiness.** Full unit + Playwright + axe-core sweep,
       catalog/homepage link assertion, production build, deployment check. No merge to `main`
       until this slice is green.
 
 ## Testing strategy
 
-- **Pure engine work:** favor invariant-focused Vitest checks and `test.for` data tables over one
-  hand-written test per input example. Keep small deterministic regression fixtures for previously
-  demonstrated defects and standards-bound values.
+- **Pure engine work:** favor invariant-focused Vitest checks and data tables over one hand-written
+  test per input example. Keep small deterministic regression fixtures for previously demonstrated
+  defects and standards-bound values.
 - **Spot-check cadence:** implement coherent coupled changes sequentially, then validate after the
   milestone rather than after every helper/function. A second spot-check is warranted when a change
   crosses engine/state/UI/persistence boundaries or when the previous check exposed a defect.
 - **Dedicated Fiber gate:** `.github/workflows/fiber-craft.yml` runs on Fiber-relevant paths only:
-  frozen install → 41 focused unit/selector checks → production TypeScript/Vite build → one
+  frozen install → 47 focused unit/selector checks → production TypeScript/Vite build → one
   consolidated Playwright workflow on desktop and mobile Chromium.
 - **Avoid no-value reruns:** documentation-only commits and unrelated Crystal-only upstream changes
   do not invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at
@@ -123,6 +124,10 @@ crochet chart glyphs. It becomes complete only when the visual chart itself uses
 - **Property-based escalation:** add exactly pinned `fast-check` and `@fast-check/vitest` only when
   generated cases and shrinking materially reduce maintenance for high-dimensional logic. Do not
   add a dependency merely to replace a small, readable invariant table.
+- **Browser setup:** retain Playwright's supported install flow. Current Playwright guidance does
+  not recommend caching browser binaries because restore time is comparable to download time and
+  Linux OS dependencies still need installation; efficiency therefore comes primarily from fewer,
+  milestone-scoped browser cycles rather than weaker coverage.
 
 ## Verification gate (every slice)
 
