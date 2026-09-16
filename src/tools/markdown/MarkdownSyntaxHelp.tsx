@@ -32,7 +32,7 @@ export default function MarkdownSyntaxHelp() {
 
   return (
     <>
-      <button type="button" onClick={() => dialogRef.current?.showModal()}>Markdown help</button>
+      <button type="button" title="Markdown syntax guide" onClick={() => dialogRef.current?.showModal()}>Markdown help · Syntax guide</button>
       <dialog
         ref={dialogRef}
         className="markdown-workbench-help-dialog"
@@ -49,7 +49,7 @@ export default function MarkdownSyntaxHelp() {
         </div>
         <div className="markdown-workbench-help-body">
           <p className="markdown-workbench-help-intro">
-            Type these patterns in the editor. Syntax suggestions can also offer common structures as you start a line.
+            Type these patterns in the editor, or use the buttons above the source to format selected text. Find / replace is available there too. Syntax suggestions offer common structures as you start a line; Ctrl or Command + Space opens suggestions on an empty line.
           </p>
           <div className="markdown-workbench-help-grid">
             {SYNTAX_GROUPS.map((group) => (

@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownKeymap } from '@codemirror/lang-markdown';
-import { searchKeymap } from '@codemirror/search';
+import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
@@ -115,6 +116,7 @@ export default function MarkdownEditor({
         highlightActiveLine(),
         closeBrackets(),
         markdown(),
+        syntaxHighlighting(defaultHighlightStyle),
         wrapCompartment.of(lineWrappingRef.current ? EditorView.lineWrapping : []),
         suggestionsCompartment.of(buildSuggestions(syntaxSuggestionsRef.current)),
         keymap.of([...closeBracketsKeymap, ...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
@@ -210,5 +212,27 @@ export default function MarkdownEditor({
     view.focus();
   }, [revealRequest]);
 
-  return <div className="markdown-workbench-editor" ref={hostRef} />;
+  const insertPattern = (before: string, after: string, fallback: string, useSelection = true) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    const selected = (useSelection ? view.state.sliceDoc(from, to) : '') || fallback;
+    view.dispatch({ changes: { from, to, insert: before + selected + after },
+      selection: { anchor: from + before.length, head: from + before.length + selected.length },
+      userEvent: 'input' });
+    view.focus();
+  };
+
+  return <>
+    <div className="markdown-workbench-format-actions" role="group" aria-label="Insert Markdown">
+      <button type="button" onClick={() => insertPattern('**', '**', 'bold text')}>Bold</button>
+      <button type="button" onClick={() => insertPattern('*', '*', 'italic text')}>Italic</button>
+      <button type="button" onClick={() => insertPattern('~~', '~~', 'deleted text')}>Strikethrough</button>
+      <button type="button" onClick={() => insertPattern('[', '](https://example.com)', 'link text')}>Link</button>
+      <button type="button" onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')}>Task</button>
+      <button type="button" onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)}>Table</button>
+      <button type="button" onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }}>Find / replace</button>
+    </div>
+    <div className="markdown-workbench-editor" ref={hostRef} />
+  </>;
 }

@@ -46,6 +46,46 @@ test('markdown help opens an accessible syntax guide modal with supported exampl
   await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
+  await expect(openHelp).toBeFocused();
+});
+
+test('source highlighting, selection formatting and visible search work together', async ({page}) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'selected words');
+  const editor = editorLocator(page);
+  await editor.press('ControlOrMeta+a');
+  await page.getByRole('button', {name:'Bold',exact:true}).click();
+  await expect(editor).toContainText('**selected words**');
+  await expect(page.locator('.markdown-workbench-preview strong')).toHaveText('selected words');
+  await expect.poll(() => editor.locator('span').evaluateAll(nodes => nodes.some(node => getComputedStyle(node).fontWeight === '700'))).toBe(true);
+  await editor.press('ControlOrMeta+z');
+  await expect(editor).not.toContainText('**');
+  await page.getByRole('button', {name:'Find / replace',exact:true}).click();
+  await expect(page.locator('.cm-search')).toBeVisible();
+});
+
+test('syntax guide fits narrow landscape and keeps its close control reachable', async ({page}) => {
+  await page.setViewportSize({width:568,height:320});
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByRole('button', {name:'Markdown help'}).click();
+  const dialog=page.getByRole('dialog',{name:'Markdown syntax guide'});
+  const bounds=await dialog.boundingBox();
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(321);
+  await expect(dialog.getByRole('button',{name:'Close',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('manual save does not report success when IndexedDB fails', async ({page}) => {
+  await page.addInitScript(() => {
+    IDBDatabase.prototype.transaction = function() { throw new DOMException('Test storage failure','QuotaExceededError'); };
+  });
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByRole('button',{name:'Save draft',exact:true}).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Local autosave failed');
+  await page.getByRole('button',{name:'New',exact:true}).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Could not save the current document');
+  await expect(editorLocator(page)).toContainText('Untitled document');
 });
 
 test('ATX heading levels are visibly distinct in the rendered preview', async ({ page }) => {
