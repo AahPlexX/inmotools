@@ -69,7 +69,7 @@ test('completes a non-timed custom target, persists it, and exports the JSON env
   await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
 });
 
-test('honors exact word-count duration and exposes modal semantics', async ({ page }) => {
+test('honors exact word-count duration, bundled fonts, and modal semantics', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
 
@@ -80,6 +80,14 @@ test('honors exact word-count duration and exposes modal semantics', async ({ pa
   const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
   const targetWordCount = await canvas.evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
   expect(targetWordCount).toBe(10);
+
+  await workspace.getByLabel('Font').selectOption('dyslexic');
+  await expect(canvas).toHaveCSS('font-family', /OpenDyslexic/);
+  const dyslexicLoaded = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return document.fonts.check('16px "OpenDyslexic"');
+  });
+  expect(dyslexicLoaded).toBe(true);
 
   await workspace.getByRole('button', { name: 'Export…' }).click();
   const exportDialog = workspace.getByRole('dialog', { name: 'Export history' });
