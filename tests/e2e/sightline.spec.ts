@@ -160,12 +160,12 @@ test('each presentation engine draws its own surface', async ({ page }) => {
   await page.getByTestId('sightline-engine-drill').click();
   await expect(page.getByTestId('sightline-drill-stage')).toBeVisible();
   await openPanel(page, 'drill');
-  const plan = page.getByTestId('sightline-drill-plan');
-  await expect(plan).toContainText('flashes');
   await page.getByTestId('sightline-flash-range').fill('40');
   await page.getByTestId('sightline-drill-gap').fill('100');
   await page.getByTestId('sightline-flash-count').fill('5');
   await page.getByTestId('sightline-drill-run').click();
+  const plan = page.getByTestId('sightline-drill-plan');
+  await expect(plan).toContainText('flashes');
   await expect(page.getByTestId('sightline-drill-card')).toBeVisible();
   await expect(page.getByTestId('sightline-drill-progress')).toContainText('flash 1 of 5');
 

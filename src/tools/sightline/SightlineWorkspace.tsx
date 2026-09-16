@@ -1641,7 +1641,21 @@ export default function SightlineWorkspace() {
           </div>
 
           <div className="sightline-reader-body">
-            <div className="sightline-stage" ref={stageRef} data-testid="sightline-stage" data-engine={engine} tabIndex={0} aria-label="Reading stage. Space starts and pauses reading.">
+            <div
+              className="sightline-stage"
+              ref={stageRef}
+              data-testid="sightline-stage"
+              data-engine={engine}
+              tabIndex={0}
+              aria-label="Reading stage. Space starts and pauses reading."
+              onKeyDown={(event) => {
+                if (event.key !== ' ') return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (playing) stop('pause');
+                else start();
+              }}
+            >
               {!model ? (
                 <p className="sightline-empty" data-testid="sightline-empty">
                   No document is open yet. Open a file, paste text, or load the sample passage above; the reader, the drills, and
