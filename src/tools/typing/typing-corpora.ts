@@ -69,6 +69,26 @@ const QWERTY_FINGERS: Record<string, string> = {
   ' ': 'thumb',
 };
 
+
+const FINGER_POSITIONS: readonly (readonly string[])[] = [
+  ['l5','l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],
+  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5','r5'],
+  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],
+  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5'],
+  ['thumb'],
+];
+
+function fingersForRows(rows: LayoutRow[]): Record<string, string> {
+  const fingers: Record<string, string> = {};
+  rows.forEach((row, rowIndex) => {
+    row.keys.forEach((key, keyIndex) => {
+      const finger = FINGER_POSITIONS[rowIndex]?.[keyIndex];
+      if (finger) fingers[key] = finger;
+    });
+  });
+  return fingers;
+}
+
 export const LAYOUTS: LayoutDefinition[] = [
   {
     id: 'qwerty', label: 'QWERTY',
@@ -152,7 +172,7 @@ export const LAYOUTS: LayoutDefinition[] = [
 export function findLayout(id: LayoutId): LayoutDefinition {
   const found = LAYOUTS.find((l) => l.id === id);
   if (!found) throw new Error(`Unknown layout: ${id}`);
-  return found;
+  return { ...found, fingers: fingersForRows(found.rows) };
 }
 
 // --------------------------------------------------------------------
