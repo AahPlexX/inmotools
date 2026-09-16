@@ -660,7 +660,7 @@ export default function TypingWorkspace() {
       await updateTestTags(savedTestId, meta.tags, meta.notes);
       setHistory(await listTests());
     }
-    if (format === 'csv') downloadText(testsToCsv([currentTest]), suggestFilename('csv', 'test'), 'text/csv;charset=utf-8');
+    if (format === 'csv') downloadText(testsToCsv([currentTest], meta), suggestFilename('csv', 'test'), 'text/csv;charset=utf-8');
     if (format === 'json') downloadText(testToJson(currentTest, meta), suggestFilename('json', 'test'), 'application/json');
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
@@ -670,7 +670,7 @@ export default function TypingWorkspace() {
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
     const filtered = await filterTests(filterTagText ? { tags: filterTagText.split(',').map((s) => s.trim()).filter(Boolean) } : {});
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
-    if (format === 'csv') downloadText(testsToCsv(filtered), stamp, 'text/csv;charset=utf-8');
+    if (format === 'csv') downloadText(testsToCsv(filtered, meta), stamp, 'text/csv;charset=utf-8');
     if (format === 'json') downloadText(testsToJson(filtered, meta), stamp, 'application/json');
     if (format === 'md') downloadText(sessionMarkdown(filtered, meta), stamp, 'text/markdown;charset=utf-8');
     setStatusText(`Exported ${format === 'md' ? 'Markdown' : format.toUpperCase()} history.`);
