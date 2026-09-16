@@ -16,7 +16,7 @@ Scope: Markdown Workbench on main 3215f6826ebca52c3f062d189a545f1615fff035. No d
 
 ## Verification and completion
 
-Baseline: 191 Markdown unit tests passed across 18 files. Production build with changes passed. Browser regressions cover highlight styling, selection formatting/undo, visible search, dialog focus return and landscape sizing, and failed storage preserving edits. Exact-main browser CI and deployment must pass before closing this entry.
+Baseline: 191 Markdown unit tests passed across 18 files. Production build with changes passed. Browser regressions cover highlight styling, selection formatting/undo, visible search, dialog focus return and landscape sizing, and failed storage preserving edits. Focused browser CI and deployment evidence is recorded below; the broader follow-up items remain open.
 
 No truncated code or missing package import was confirmed in inspected files. This audit does not certify every possible Markdown extension or browser behavior. Preview fenced-code language coloring remains separate from the source highlighting fix and is not implemented by this change. Follow-up verification remains for delayed file-read cancellation and save completion during active typing; these guards have source/build review but no dedicated browser regression yet.
 
@@ -30,4 +30,4 @@ Research date: 2026-09-16 UTC. GOVERNANCE.md was read and not modified.
 
 ## Integration evidence
 
-Implemented on main at 1e9bef197327337d638b5a0bfd50b203165fcc48. All 191 Markdown units pass after changes; Pages deployment succeeded. Live source highlight spans, syntax dialog opening/closing and visible find/replace were verified. Focused run 35144034742 passed 78/80 checks; both failures were an obsolete single-draft assumption in the same desktop/mobile test. The corrected test now verifies both preserved drafts and deletes only the requested one. Exact-main rerun remains required. Full validation fails outside Markdown in Vector tests.
+Implemented on main at 1e9bef197327337d638b5a0bfd50b203165fcc48. All 191 Markdown units pass after changes; Pages deployment succeeded. Live source highlight spans, syntax dialog opening/closing and visible find/replace were verified. Focused run 35144034742 passed 78/80 checks; both failures were an obsolete single-draft assumption in the same desktop/mobile test. The corrected test now verifies both preserved drafts and deletes only the requested one. Rerun 35144496126 at main 007be946664ebee98e05f9dd56ddf7d9183c23b1 passed all 50 checks in the affected workflow spec on desktop/mobile; build and Pages deployment also passed. The application source tree is identical to the first run, where all UX and Mermaid checks passed. Full validation fails outside Markdown in Vector tests.
