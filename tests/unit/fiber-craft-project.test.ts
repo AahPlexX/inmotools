@@ -19,6 +19,12 @@ const numbersInPrimitive = (primitive: ReturnType<typeof crochetGlyphPrimitives>
   }
 };
 
+const projectEnvelope = (document: unknown): string => JSON.stringify({
+  kind: FIBER_CRAFT_PROJECT_KIND,
+  bundleVersion: 1,
+  document,
+});
+
 describe('portable Fiber Craft project bundle', () => {
   it('round-trips the complete local crochet document without losing embedded project data', () => {
     const starter = createStarterCrochetDocument('2026-09-16T00:00:00.000Z');
@@ -26,6 +32,7 @@ describe('portable Fiber Craft project bundle', () => {
     const document = {
       ...worked,
       metadata: { ...worked.metadata, title: 'Market Bag', author: 'Pattern Author', techniqueTags: ['rounds', 'mesh'] },
+      gauge: { stitchCount: 16, rowCount: 20, span: 4, unit: 'in' as const },
       swatchImages: { yarn: 'data:image/png;base64,AA==' },
       completedSteps: ['round:0'],
     };
@@ -35,8 +42,25 @@ describe('portable Fiber Craft project bundle', () => {
 
   it('rejects unrelated envelopes and invalid project data', () => {
     expect(() => parseFiberCraftProject('{"kind":"other","bundleVersion":1,"document":{}}')).toThrow(/not an InmoTools Fiber Craft project/);
-    expect(() => parseFiberCraftProject(JSON.stringify({ kind: FIBER_CRAFT_PROJECT_KIND, bundleVersion: 1, document: {} }))).toThrow(/invalid or unsupported/);
+    expect(() => parseFiberCraftProject(projectEnvelope({}))).toThrow(/invalid or unsupported/);
     expect(() => parseFiberCraftProject('{not json')).toThrow(/not valid JSON/);
+  });
+
+  it('rejects malformed imported metadata and optional project payloads at the file boundary', () => {
+    const starter = createStarterCrochetDocument('2026-09-16T00:00:00.000Z');
+    const malformed: readonly [string, unknown][] = [
+      ['metadata title', { ...starter, metadata: { ...starter.metadata, title: 42 } }],
+      ['technique tags', { ...starter, metadata: { ...starter.metadata, techniqueTags: ['rounds', 42] } }],
+      ['gauge span', { ...starter, gauge: { stitchCount: 16, rowCount: 20, span: 0, unit: 'in' } }],
+      ['gauge unit', { ...starter, gauge: { stitchCount: 16, rowCount: 20, span: 4, unit: 'yards' } }],
+      ['swatch value', { ...starter, swatchImages: { yarn: 42 } }],
+      ['swatch encoding', { ...starter, swatchImages: { yarn: 'https://example.invalid/yarn.png' } }],
+      ['palette hex', { ...starter, palette: [{ ...starter.palette[0], hex: 'not-a-color' }] }],
+      ['progress id', { ...starter, completedSteps: [''] }],
+    ];
+    for (const [label, document] of malformed) {
+      expect(() => parseFiberCraftProject(projectEnvelope(document)), label).toThrow(/invalid or unsupported/);
+    }
   });
 
   it('creates a portable, filesystem-safe craftproj filename', () => {

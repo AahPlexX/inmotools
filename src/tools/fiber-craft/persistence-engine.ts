@@ -12,16 +12,47 @@ const DB_VERSION = 1;
 const STORE_NAME = 'projects';
 const AUTOSAVE_KEY = 'autosave';
 const SYMBOL_IDS = new Set(CROCHET_SYMBOLS.map((symbol) => symbol.id));
+const COLOR_HEX = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+const isFinitePositiveNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+const isCrochetMetadata = (value: unknown): boolean => {
+  if (!isRecord(value) || value.discipline !== 'crochet') return false;
+  const stringFields = [
+    'title',
+    'author',
+    'difficulty',
+    'materialClass',
+    'toolSize',
+    'license',
+    'notes',
+    'createdAt',
+    'updatedAt',
+  ] as const;
+  return stringFields.every((field) => typeof value[field] === 'string')
+    && Array.isArray(value.techniqueTags)
+    && value.techniqueTags.every((tag) => typeof tag === 'string');
+};
+
+const isGauge = (value: unknown): boolean => {
+  if (value === undefined) return true;
+  if (!isRecord(value)) return false;
+  return isFinitePositiveNumber(value.stitchCount)
+    && isFinitePositiveNumber(value.rowCount)
+    && isFinitePositiveNumber(value.span)
+    && (value.unit === 'in' || value.unit === 'cm');
+};
 
 const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is PolarChart => {
   if (!isRecord(value) || value.kind !== 'polar' || !Number.isInteger(value.rounds) || Number(value.rounds) <= 0) return false;
   if (!Array.isArray(value.nodes)) return false;
   const rounds = Number(value.rounds);
   const seen = new Set<string>();
-  return value.nodes.every((node) => {
+  const validNodes = value.nodes.every((node) => {
     if (!isRecord(node)) return false;
     const round = Number(node.round);
     const angleIndex = Number(node.angleIndex);
@@ -37,6 +68,16 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
       && (symbolId === null || (typeof symbolId === 'string' && SYMBOL_IDS.has(symbolId)))
       && (colorId === null || (typeof colorId === 'string' && paletteIds.has(colorId)));
   });
+  if (!validNodes) return false;
+
+  for (let round = 0; round < rounds; round += 1) {
+    const roundNodes = value.nodes.filter((node) => isRecord(node) && node.round === round) as Record<string, unknown>[];
+    if (roundNodes.length === 0) return false;
+    const declaredCount = Number(roundNodes[0]?.stitchesInRound);
+    if (!Number.isInteger(declaredCount) || declaredCount <= 0 || roundNodes.length !== declaredCount) return false;
+    if (!roundNodes.every((node) => node.stitchesInRound === declaredCount)) return false;
+  }
+  return true;
 };
 
 const isGridChart = (value: unknown, paletteIds: ReadonlySet<string>): value is GridChart => {
@@ -75,21 +116,32 @@ const hasValidCrochetSettings = (value: Record<string, unknown>): boolean => {
     || (Number.isInteger(yarnWeight) && Number(yarnWeight) >= 0 && Number(yarnWeight) <= 7);
 };
 
+const hasValidSwatchImages = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  return Object.values(value).every((image) => typeof image === 'string' && image.startsWith('data:'));
+};
+
 export const isRestorableCrochetDocument = (value: unknown): value is FiberCraftDocument => {
-  if (!isRecord(value) || value.formatVersion !== 1 || !isRecord(value.metadata)) return false;
-  if (value.metadata.discipline !== 'crochet' || !Array.isArray(value.palette)) return false;
+  if (!isRecord(value) || value.formatVersion !== 1 || !isCrochetMetadata(value.metadata)) return false;
+  if (!Array.isArray(value.palette) || value.palette.length === 0) return false;
   const paletteIds = new Set<string>();
   for (const color of value.palette) {
-    if (!isRecord(color) || typeof color.id !== 'string' || typeof color.label !== 'string' || typeof color.hex !== 'string') return false;
+    if (!isRecord(color)
+      || typeof color.id !== 'string' || color.id.trim() === ''
+      || typeof color.label !== 'string'
+      || typeof color.hex !== 'string' || !COLOR_HEX.test(color.hex)
+      || (color.paletteCode !== undefined && typeof color.paletteCode !== 'string')
+      || (color.paletteName !== undefined && typeof color.paletteName !== 'string')) return false;
     if (paletteIds.has(color.id)) return false;
     paletteIds.add(color.id);
   }
   const chartValid = isPolarChart(value.chart, paletteIds) || isGridChart(value.chart, paletteIds);
   return chartValid
     && hasValidCrochetSettings(value)
-    && isRecord(value.swatchImages)
+    && isGauge(value.gauge)
+    && hasValidSwatchImages(value.swatchImages)
     && Array.isArray(value.completedSteps)
-    && value.completedSteps.every((step) => typeof step === 'string');
+    && value.completedSteps.every((step) => typeof step === 'string' && step.trim() !== '');
 };
 
 export const createIndexedDbFiberCraftStore = (): FiberCraftStore => {
