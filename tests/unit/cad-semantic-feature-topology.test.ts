@@ -215,10 +215,14 @@ describe('CAD semantic topology feature resolution', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'taper', shape: drafted }]);
   });
 
-  it('rejects a multi-face draft instead of guessing a sequential application order', () => {
+  it('drafts multiple faces sequentially, resolving each against the shape the previous draft produced', () => {
     const base = token('base');
+    const afterFirstDraft = token('after-first-draft');
+    const afterSecondDraft = token('after-second-draft');
     const topologyCandidates = vi.fn(() => faceCandidates);
-    const draft = vi.fn();
+    const draft = vi.fn()
+      .mockReturnValueOnce(afterFirstDraft)
+      .mockReturnValueOnce(afterSecondDraft);
     const kernel = {
       box: vi.fn(() => base),
       topologyCandidates,
@@ -234,11 +238,37 @@ describe('CAD semantic topology feature resolution', () => {
       bounds: { min: [0, 0, 0], max: [20, 10, 0] },
     };
 
+    const result = evaluateCadFeatures(project([
+      feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('taper', 'draft', { angle: 0.1, direction: [0, 0, 1] }, ['base'], [topFaceRef(), secondFaceRef]),
+    ]), kernel);
+
+    // The second face is resolved against the FIRST draft's own output, not the original
+    // shape - re-resolving fingerprints per step is what makes sequential drafting safe at
+    // all, since OCCT's raw subshape ordinals aren't stable across an operation like this.
+    expect(topologyCandidates).toHaveBeenNthCalledWith(1, base, 'base', 'face');
+    expect(topologyCandidates).toHaveBeenNthCalledWith(2, afterFirstDraft, 'base', 'face');
+    expect(draft).toHaveBeenNthCalledWith(1, base, ['topo:face:0'], 0.1, [0, 0, 1]);
+    expect(draft).toHaveBeenNthCalledWith(2, afterFirstDraft, ['topo:face:1'], 0.1, [0, 0, 1]);
+    expect(kernel.release).toHaveBeenCalledWith(afterFirstDraft);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'taper', shape: afterSecondDraft }]);
+  });
+
+  it('rejects a draft feature with no persisted face references', () => {
+    const base = token('base');
+    const draft = vi.fn();
+    const kernel = {
+      box: vi.fn(() => base),
+      topologyCandidates: vi.fn(() => faceCandidates),
+      draft,
+      release: vi.fn(),
+    } as unknown as CadFeatureKernel;
+
     let thrown: unknown;
     try {
       evaluateCadFeatures(project([
         feature('base', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
-        feature('taper', 'draft', { angle: 0.1, direction: [0, 0, 1] }, ['base'], [topFaceRef(), secondFaceRef]),
+        feature('taper', 'draft', { angle: 0.1, direction: [0, 0, 1] }, ['base'], []),
       ]), kernel);
     } catch (error) {
       thrown = error;
@@ -246,7 +276,7 @@ describe('CAD semantic topology feature resolution', () => {
 
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'taper' });
-    expect((thrown as Error).message).toMatch(/exactly one face/i);
+    expect((thrown as Error).message).toMatch(/at least one/i);
     expect(draft).not.toHaveBeenCalled();
   });
 

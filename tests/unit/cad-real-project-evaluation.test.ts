@@ -365,4 +365,59 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('drafts two faces of the same body regardless of which order the topology references are given in', () => {
+    // Probe the same box shape standalone for two real, ephemeral face fingerprints - not
+    // hand-invented references - exactly as the fillet integration fixture above does.
+    const probeBox = kernel.box(20, 10, 5);
+    const faceCandidates = kernel.topologyCandidates(probeBox, 'box-1', 'face');
+    const sideFace = [...faceCandidates].sort((left, right) => right.centroid![0]! - left.centroid![0]!)[0]!;
+    const endFace = [...faceCandidates].sort((left, right) => right.centroid![1]! - left.centroid![1]!)[0]!;
+    kernel.release(probeBox);
+
+    const sideRef = {
+      id: 'ref-side', producerFeatureId: 'box-1', kind: 'face' as const, role: 'side-face',
+      centroid: sideFace.centroid, bounds: sideFace.bounds,
+    };
+    const endRef = {
+      id: 'ref-end', producerFeatureId: 'box-1', kind: 'face' as const, role: 'end-face',
+      centroid: endFace.centroid, bounds: endFace.bounds,
+    };
+
+    function draftFaces(topologyRefs: typeof sideRef[]): number {
+      const project: CadProject = {
+        ...createCadProject('Multi-face draft fixture'),
+        sketches: [],
+        features: [
+          feature({ id: 'box-1', type: 'primitive', parameters: { kind: 'box', width: 20, depth: 10, height: 5 } }),
+          feature({
+            id: 'taper',
+            type: 'draft',
+            dependsOn: ['box-1'],
+            topologyRefs,
+            parameters: { angle: 0.1, direction: [0, 0, 1] },
+          }),
+        ],
+        bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['box-1', 'taper'], visible: true }],
+      };
+      const result = evaluateCadFeatures(project, kernel);
+      const finalBody = result.bodies[0]!;
+      const volume = kernel.volume(finalBody.shape);
+      kernel.release(finalBody.shape);
+      return volume;
+    }
+
+    const sideOnly = draftFaces([sideRef]);
+    const sideThenEnd = draftFaces([sideRef, endRef]);
+    const endThenSide = draftFaces([endRef, sideRef]);
+
+    // Re-resolving by fingerprint after each step means the order the references are given
+    // in cannot change which faces end up drafted, or the final result.
+    expect(sideThenEnd).toBeCloseTo(endThenSide, 6);
+    // The second face genuinely contributed its own change on top of the first - not a stale
+    // fingerprint silently matching the same already-drafted face twice, and not a resolution
+    // that quietly no-ops on the second step.
+    expect(sideThenEnd).not.toBeCloseTo(sideOnly, 4);
+    expect(sideThenEnd).not.toBeCloseTo(1000, 4);
+  });
 });
