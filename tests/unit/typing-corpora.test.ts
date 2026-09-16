@@ -15,11 +15,15 @@ import {
 } from '../../src/tools/typing/typing-corpora';
 
 describe('typing corpora', () => {
-  it('provides frequency tiers of unique words', () => {
-    expect(ENGLISH_TOP_200.length).toBeGreaterThan(100);
-    expect(new Set(ENGLISH_TOP_200).size).toBe(ENGLISH_TOP_200.length);
-    expect(ENGLISH_TOP_1000.length).toBeGreaterThan(ENGLISH_TOP_200.length);
-    expect(ENGLISH_TOP_5000.length).toBeGreaterThan(ENGLISH_TOP_1000.length);
+  it('provides exact unique English frequency tiers matching their labels', () => {
+    expect(ENGLISH_TOP_200).toHaveLength(200);
+    expect(new Set(ENGLISH_TOP_200).size).toBe(200);
+    expect(ENGLISH_TOP_1000).toHaveLength(1000);
+    expect(new Set(ENGLISH_TOP_1000).size).toBe(1000);
+    expect(ENGLISH_TOP_5000).toHaveLength(5000);
+    expect(new Set(ENGLISH_TOP_5000).size).toBe(5000);
+    expect(ENGLISH_TOP_1000.slice(0, 200)).toEqual(ENGLISH_TOP_200);
+    expect(ENGLISH_TOP_5000.slice(0, 1000)).toEqual(ENGLISH_TOP_1000);
   });
 
   it('serves keyboard layouts including QWERTY, Dvorak, Colemak, Workman, AZERTY, QWERTZ, BAPO', () => {
@@ -53,7 +57,8 @@ describe('typing corpora', () => {
   });
 
   it('maps corpus modes to the right pool', () => {
-    expect(poolForMode('words-200', 'english').length).toBeGreaterThan(0);
-    expect(poolForMode('words-1000', 'english').length).toBeGreaterThan(poolForMode('words-200', 'english').length);
+    expect(poolForMode('words-200', 'english')).toEqual(ENGLISH_TOP_200);
+    expect(poolForMode('words-1000', 'english')).toEqual(ENGLISH_TOP_1000);
+    expect(poolForMode('words-5000', 'english')).toEqual(ENGLISH_TOP_5000);
   });
 });
