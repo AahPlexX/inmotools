@@ -168,6 +168,59 @@ test('exports history metadata across formats and re-imports a bundle without id
   await expect(totalTests).toContainText('2');
 });
 
+test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  const dictionaryCsv = 'alpha,beta,gamma,delta,epsilon\nzeta,eta,theta,iota,kappa';
+  const dictionaryInput = workspace.locator('label').filter({ hasText: /Load CSV dictionary/ }).locator('input[type="file"]');
+  await dictionaryInput.setInputFiles({ name: 'practice.csv', mimeType: 'text/csv', buffer: Buffer.from(dictionaryCsv) });
+  await expect(workspace).toContainText('Loaded 10 custom words.');
+  await expect(workspace.getByLabel('Mode')).toHaveValue('custom');
+
+  await workspace.getByLabel('Duration').selectOption('words');
+  await wordCountSelect(workspace).selectOption('10');
+  const expectedTarget = 'alpha beta gamma delta epsilon zeta eta theta iota kappa';
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  const renderedTarget = await canvas.evaluate((element) => (element.textContent ?? '').replace(/\u00a0/g, ' ').trim());
+  expect(renderedTarget).toBe(expectedTarget);
+
+  await canvas.focus();
+  await page.keyboard.type(expectedTarget, { delay: 8 });
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  await expect(resultDialog.getByRole('checkbox', { name: 'Save raw keystroke log' })).toBeChecked();
+
+  const rawPromise = page.waitForEvent('download');
+  await resultDialog.getByRole('button', { name: 'Export keystrokes' }).click();
+  const rawDownload = await rawPromise;
+  expect(rawDownload.suggestedFilename()).toMatch(/^typing-test-.*-keystrokes\.csv$/);
+  const rawCsv = (await downloadBuffer(rawDownload)).toString('utf8');
+  expect(rawCsv.split('\n')[0]).toContain('seq,time_ms,key,code,expected,index,correct');
+  expect(rawCsv).toContain('KeyA');
+
+  const history = workspace.getByRole('region', { name: 'Session history' });
+  const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(totalTests).toContainText('1');
+
+  await workspace.getByRole('button', { name: 'New text' }).click();
+  await canvas.focus();
+  await page.keyboard.type(expectedTarget, { delay: 8 });
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByLabel('Typist name').fill('Certificate Typist');
+  await resultDialog.getByLabel('Organization / classroom').fill('Typing Lab');
+  await resultDialog.getByLabel('Certified by (proctor)').fill('Browser Proctor');
+
+  const pdfPromise = page.waitForEvent('download');
+  await resultDialog.getByRole('button', { name: 'PDF certificate' }).click();
+  const pdfDownload = await pdfPromise;
+  expect(pdfDownload.suggestedFilename()).toMatch(/^typing-test-.*\.pdf$/);
+  const pdfBuffer = await downloadBuffer(pdfDownload);
+  expect(pdfBuffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  expect(pdfBuffer.length).toBeGreaterThan(500);
+  await expect(totalTests).toContainText('2');
+});
+
 test('normalizes duration families, honors exact word count, bundles fonts, and exposes modal semantics', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
