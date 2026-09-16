@@ -27,42 +27,44 @@ jobs:
           text = path.read_text()
 
           marker = '\nexport const LAYOUTS: LayoutDefinition[] = ['
-          helper = '''
-
-const FINGER_POSITIONS: readonly (readonly string[])[] = [
-  ['l5','l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],
-  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5','r5'],
-  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],
-  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5'],
-  ['thumb'],
-];
-
-function fingersForRows(rows: LayoutRow[]): Record<string, string> {
-  const fingers: Record<string, string> = {};
-  rows.forEach((row, rowIndex) => {
-    row.keys.forEach((key, keyIndex) => {
-      const finger = FINGER_POSITIONS[rowIndex]?.[keyIndex];
-      if (finger) fingers[key] = finger;
-    });
-  });
-  return fingers;
-}
-
-export const LAYOUTS: LayoutDefinition[] = ['''
+          helper = (
+              "\n\nconst FINGER_POSITIONS: readonly (readonly string[])[] = [\n"
+              "  ['l5','l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],\n"
+              "  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5','r5'],\n"
+              "  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5','r5'],\n"
+              "  ['l5','l4','l3','l2','l2','r2','r2','r3','r4','r5','r5'],\n"
+              "  ['thumb'],\n"
+              "];\n\n"
+              "function fingersForRows(rows: LayoutRow[]): Record<string, string> {\n"
+              "  const fingers: Record<string, string> = {};\n"
+              "  rows.forEach((row, rowIndex) => {\n"
+              "    row.keys.forEach((key, keyIndex) => {\n"
+              "      const finger = FINGER_POSITIONS[rowIndex]?.[keyIndex];\n"
+              "      if (finger) fingers[key] = finger;\n"
+              "    });\n"
+              "  });\n"
+              "  return fingers;\n"
+              "}\n\n"
+              "export const LAYOUTS: LayoutDefinition[] = ["
+          )
           if text.count(marker) != 1:
               raise SystemExit(f'layout marker expected 1 match, found {text.count(marker)}')
           text = text.replace(marker, helper, 1)
 
-          old_return = '''export function findLayout(id: LayoutId): LayoutDefinition {
-  const found = LAYOUTS.find((l) => l.id === id);
-  if (!found) throw new Error(`Unknown layout: ${id}`);
-  return found;
-}'''
-          new_return = '''export function findLayout(id: LayoutId): LayoutDefinition {
-  const found = LAYOUTS.find((l) => l.id === id);
-  if (!found) throw new Error(`Unknown layout: ${id}`);
-  return { ...found, fingers: fingersForRows(found.rows) };
-}'''
+          old_return = (
+              "export function findLayout(id: LayoutId): LayoutDefinition {\n"
+              "  const found = LAYOUTS.find((l) => l.id === id);\n"
+              "  if (!found) throw new Error(`Unknown layout: ${id}`);\n"
+              "  return found;\n"
+              "}"
+          )
+          new_return = (
+              "export function findLayout(id: LayoutId): LayoutDefinition {\n"
+              "  const found = LAYOUTS.find((l) => l.id === id);\n"
+              "  if (!found) throw new Error(`Unknown layout: ${id}`);\n"
+              "  return { ...found, fingers: fingersForRows(found.rows) };\n"
+              "}"
+          )
           if text.count(old_return) != 1:
               raise SystemExit(f'findLayout guard expected 1 match, found {text.count(old_return)}')
           text = text.replace(old_return, new_return, 1)
