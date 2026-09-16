@@ -384,3 +384,26 @@
     flex: 1 1 auto;
   }
 }
+
+.crystal-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.crystal-panel-heading h3 {
+  margin: 0 0 4px;
+}
+
+.crystal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crystal-defect-buttons,
+.crystal-symmetry-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

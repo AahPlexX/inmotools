@@ -204,7 +204,7 @@ export async function analyzeCrystalSymmetry(
   const group = module.space_group_type(dataset.number);
   return {
     number: dataset.number,
-    hmSymbol: dataset.hm_symbol,
+    hmSymbol: dataset.hm_symbol.replace(/\s+/g, ''),
     hallNumber: dataset.hall_number,
     crystalSystem: group.crystal_system.toLowerCase(),
     pointGroup: group.geometric_crystal_class,

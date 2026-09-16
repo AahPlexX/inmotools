@@ -398,10 +398,10 @@ test('builds vacancy, substitution and interstitial defects with undo', async ({
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
   await page.getByLabel('Defect site').selectOption({ index: 0 });
   await page.getByRole('button', { name: 'Create vacancy' }).click();
-  await expect(page.getByTestId('crystal-site-count')).toContainText('1 site');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('7 sites');
   await expect(page.getByTestId('crystal-defect-status')).toContainText(/vacancy/i);
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(page.getByTestId('crystal-site-count')).toContainText('2 sites');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('8 sites');
 
   await page.getByLabel('Defect element').fill('Fe');
   await page.getByRole('button', { name: 'Create substitution' }).click();
@@ -409,18 +409,18 @@ test('builds vacancy, substitution and interstitial defects with undo', async ({
   await page.getByRole('button', { name: 'Undo' }).click();
 
   await page.getByRole('button', { name: 'Create interstitial' }).click();
-  await expect(page.getByTestId('crystal-site-count')).toContainText('3 sites');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('9 sites');
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(page.getByTestId('crystal-site-count')).toContainText('2 sites');
+  await expect(page.getByTestId('crystal-site-count')).toContainText('8 sites');
 });
 
 test('applies a cubic cell constraint to subsequent edits', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
   await page.getByLabel('Crystal system constraint').selectOption('cubic');
-  await page.getByLabel(/^a \(/).fill('4');
-  await expect(page.getByLabel(/^b \(/)).toHaveValue('4');
-  await expect(page.getByLabel(/^c \(/)).toHaveValue('4');
+  await page.getByLabel(/^Cell a \(/).fill('4');
+  await expect(page.getByLabel(/^Cell b \(/)).toHaveValue('4');
+  await expect(page.getByLabel(/^Cell c \(/)).toHaveValue('4');
 });
 
 test('detects BCC symmetry and shows one operation and Wyckoff result', async ({ page }) => {
@@ -445,6 +445,8 @@ test('runs a symmetry tolerance sweep', async ({ page }) => {
 test('inspects a symmetry break after perturbing a site', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
   await page.getByLabel(/Fe2 fractional x/).fill('0.51');
   await page.getByRole('button', { name: 'Inspect symmetry break' }).click();
   await expect(page.getByTestId('crystal-symmetry-break')).toContainText(/broken/i);
@@ -454,6 +456,8 @@ test('inspects a symmetry break after perturbing a site', async ({ page }) => {
 test('previews and applies a standardized symmetry cell', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
   await page.getByLabel('Standardized cell').selectOption('primitive');
   await page.getByRole('button', { name: 'Preview standardized cell' }).click();
   await expect(page.getByTestId('crystal-symmetry-standard-preview')).toContainText('1 site');
