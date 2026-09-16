@@ -69,6 +69,33 @@ test('completes a non-timed custom target, persists it, and exports the JSON env
   await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
 });
 
+test('honors exact word-count duration and exposes modal semantics', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await workspace.getByLabel('Mode').selectOption('words-1000');
+  await workspace.getByLabel('Duration').selectOption('words');
+  await workspace.getByLabel('Words').selectOption('10');
+
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  const targetWordCount = await canvas.evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
+  expect(targetWordCount).toBe(10);
+
+  await workspace.getByRole('button', { name: 'Export…' }).click();
+  const exportDialog = workspace.getByRole('dialog', { name: 'Export history' });
+  await expect(exportDialog).toBeVisible();
+  await expect(exportDialog.getByLabel('Typist name')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(exportDialog).toBeHidden();
+
+  await workspace.getByRole('button', { name: 'Clear history…' }).click();
+  const clearDialog = workspace.getByRole('alertdialog', { name: 'Clear local test history?' });
+  await expect(clearDialog).toBeVisible();
+  await expect(clearDialog).toContainText('This removes every locally stored test from this browser.');
+  await page.keyboard.press('Escape');
+  await expect(clearDialog).toBeHidden();
+});
+
 test('has no serious or critical automated accessibility violations at rest', async ({ page }) => {
   await openWorkspace(page);
   const results = await new AxeBuilder({ page })
