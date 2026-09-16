@@ -22,6 +22,7 @@ describe('typing corpora', () => {
     expect(new Set(ENGLISH_TOP_1000).size).toBe(1000);
     expect(ENGLISH_TOP_5000).toHaveLength(5000);
     expect(new Set(ENGLISH_TOP_5000).size).toBe(5000);
+    expect(ENGLISH_TOP_5000.every((word) => /^[a-z]+$/.test(word))).toBe(true);
     expect(ENGLISH_TOP_1000.slice(0, 200)).toEqual(ENGLISH_TOP_200);
     expect(ENGLISH_TOP_5000.slice(0, 1000)).toEqual(ENGLISH_TOP_1000);
   });
