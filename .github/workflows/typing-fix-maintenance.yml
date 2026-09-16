@@ -50,8 +50,8 @@ jobs:
           replace_once(engine, "const match = normalize(key, opts.caseSensitive) === normalize(expected, opts.caseSensitive);", "const match = normalize(committedKey, opts.caseSensitive) === normalize(expected, opts.caseSensitive);")
           text = Path(engine).read_text()
           typed_count = text.count("typed: key")
-          if typed_count != 4:
-              raise SystemExit(f'{engine}: expected four remaining typed:key matches, found {typed_count}')
+          if typed_count != 5:
+              raise SystemExit(f'{engine}: expected five remaining typed:key matches, found {typed_count}')
           Path(engine).write_text(text.replace("typed: key", "typed: committedKey"))
 
           workspace = 'src/tools/typing/TypingWorkspace.tsx'
