@@ -44,7 +44,7 @@ describe('Mermaid render contract', () => {
     expect(result.bindFunctions).toBe(bindFunctions);
   });
 
-  it('turns Mermaid 12 Gantt metadata crashes into a line-specific authoring error', async () => {
+  it('rejects impossible Gantt metadata before Mermaid can enter its unstable render path', async () => {
     const source = [
       'gantt',
       '  title Schedule',
@@ -52,12 +52,13 @@ describe('Mermaid render contract', () => {
       '  Alpha :a1, 2026-01-05, 3d',
       '  Beta :b1, 2026-01-12, 2d, extra',
     ].join('\n');
-    const render = vi.fn().mockRejectedValue(new TypeError("Cannot read properties of undefined (reading 'type')"));
+    const render = vi.fn().mockResolvedValue({ svg: '<svg>should-not-render</svg>', diagramType: 'gantt' });
 
     const result = await renderMermaidDiagram(render, 'gantt-1', source);
     expect(result).toEqual({
       error: 'Mermaid Gantt task on line 5 has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.',
     });
+    expect(render).not.toHaveBeenCalled();
   });
 
   it('does not mistake Gantt directives or accessible descriptions for task metadata', async () => {
@@ -77,6 +78,20 @@ describe('Mermaid render contract', () => {
     const render = vi.fn().mockResolvedValue({ svg: '<svg>ok</svg>', diagramType: 'gantt' });
 
     const result = await renderMermaidDiagram(render, 'gantt-2', source);
+    expect(result.svg).toBe('<svg>ok</svg>');
+    expect(render).toHaveBeenCalledOnce();
+  });
+
+  it('does not treat a later gantt token inside another Mermaid diagram as a Gantt declaration', async () => {
+    const source = [
+      'flowchart LR',
+      '  gantt["gantt"]',
+      '  note["metadata: a,b,c,d"]',
+      '  gantt --> note',
+    ].join('\n');
+    const render = vi.fn().mockResolvedValue({ svg: '<svg>ok</svg>', diagramType: 'flowchart-v2' });
+
+    const result = await renderMermaidDiagram(render, 'flowchart-with-gantt-label', source);
     expect(result.svg).toBe('<svg>ok</svg>');
     expect(render).toHaveBeenCalledOnce();
   });

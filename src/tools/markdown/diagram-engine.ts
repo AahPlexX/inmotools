@@ -11,7 +11,6 @@ export const MAX_MERMAID_FLOWCHART_LINES = 4_000;
 const REQUIRED_IDLE_TIMEOUT_MS = 500;
 const GANTT_TASK_TAGS = new Set(['active', 'done', 'crit', 'milestone', 'vert']);
 const GANTT_DIRECTIVE = /^(?:gantt\b|title\b|dateFormat\b|inclusiveEndDates\b|topAxis\b|axisFormat\b|tickInterval\b|includes\b|excludes\b|todayMarker\b|weekday\b|weekend\b|section\b|accTitle\b|accDescr\b|click\b)/i;
-const GANTT_INTERNAL_TYPE_ERROR = /Cannot read properties of undefined \(reading ['"]type['"]\)/i;
 
 export interface MermaidRenderResult {
   readonly svg: string;
@@ -58,8 +57,37 @@ export const prepareMermaidSource = (source: string): PreparedMermaidSource => {
   return { ok: true, source: prepared };
 };
 
+const firstMermaidStatement = (source: string): string | undefined => {
+  const lines = source.split(/\r?\n/);
+  let inFrontmatter = false;
+  let canOpenFrontmatter = true;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (canOpenFrontmatter && trimmed === '---') {
+      inFrontmatter = true;
+      canOpenFrontmatter = false;
+      continue;
+    }
+    if (inFrontmatter) {
+      if (trimmed === '---') inFrontmatter = false;
+      continue;
+    }
+
+    canOpenFrontmatter = false;
+    if (trimmed.startsWith('%%')) continue;
+    return trimmed;
+  }
+
+  return undefined;
+};
+
+const isGanttSource = (source: string): boolean => /^gantt\b/i.test(firstMermaidStatement(source) ?? '');
+
 const findInvalidGanttMetadataLine = (source: string): number | undefined => {
-  if (!/^\s*gantt\b/m.test(source)) return undefined;
+  if (!isGanttSource(source)) return undefined;
 
   const lines = source.split(/\r?\n/);
   let inFrontmatter = false;
@@ -105,6 +133,10 @@ const findInvalidGanttMetadataLine = (source: string): number | undefined => {
   return undefined;
 };
 
+const ganttMetadataError = (line: number): { error: string } => ({
+  error: `Mermaid Gantt task on line ${line} has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.`,
+});
+
 export const renderMermaidDiagram = async (
   render: MermaidRenderFn,
   id: string,
@@ -113,24 +145,17 @@ export const renderMermaidDiagram = async (
   const prepared = prepareMermaidSource(source);
   if (!prepared.ok) return { error: prepared.error };
 
+  // Mermaid 12.0.0 can accept malformed Gantt task rows far enough to enter
+  // unstable renderer code. The grammar has a strict upper bound of three
+  // non-tag metadata items, so reject only that impossible task shape before
+  // invoking Mermaid. Directive/frontmatter lines are excluded by the scanner.
+  const invalidGanttLine = findInvalidGanttMetadataLine(prepared.source);
+  if (invalidGanttLine !== undefined) return ganttMetadataError(invalidGanttLine);
+
   try {
     return await render(id, prepared.source);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Mermaid rendering failed.';
-
-    // Mermaid 12.0.0 can accept malformed Gantt task rows and then fail in the
-    // renderer with this internal TypeError. Diagnose task metadata only after
-    // that exact upstream failure so valid directives/frontmatter containing
-    // commas are never rejected before Mermaid has rendered them successfully.
-    if (GANTT_INTERNAL_TYPE_ERROR.test(message)) {
-      const invalidGanttLine = findInvalidGanttMetadataLine(prepared.source);
-      if (invalidGanttLine !== undefined) {
-        return {
-          error: `Mermaid Gantt task on line ${invalidGanttLine} has too many metadata items. Use at most an id, a start value, and an end/duration value after optional task tags.`,
-        };
-      }
-    }
-
     return { error: message };
   }
 };

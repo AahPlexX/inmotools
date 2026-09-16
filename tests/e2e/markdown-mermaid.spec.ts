@@ -87,7 +87,7 @@ test('Source-view Copy HTML awaits rendered Mermaid instead of copying its code 
   await page.getByRole('button', { name: 'Source', exact: true }).click();
 
   await page.getByRole('button', { name: 'Copy HTML', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Copied the rendered HTML', { timeout: 15_000 });
+  await expect(page.locator('.markdown-workbench-status')).toContainText('Copied the rendered HTML', { timeout: 15_000 });
   const html = await page.evaluate(() => navigator.clipboard.readText());
   expect(html).toContain('markdown-workbench-diagram');
   expect(html).toContain('<svg');
@@ -102,7 +102,7 @@ test('Source-view EPUB packages rendered Mermaid SVG instead of its code fence',
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'EPUB (structural)', exact: true }).click();
   const zip = await JSZip.loadAsync(await readDownloadBytes(await downloadPromise));
-  const chapter = await zip.file('OEBPS/document.xhtml')?.async('string');
+  const chapter = await zip.file('OEBPS/chapter1.xhtml')?.async('string');
   expect(chapter).toBeTruthy();
   expect(chapter).toContain('<svg');
   expect(chapter).not.toContain('language-mermaid');
