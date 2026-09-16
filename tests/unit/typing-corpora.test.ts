@@ -37,6 +37,15 @@ describe('typing corpora', () => {
     expect(() => findLayout('nonexistent' as never)).toThrow();
   });
 
+  it('assigns finger guidance by physical key position for alternate layouts', () => {
+    const dvorak = findLayout('dvorak');
+    expect(dvorak.rows[1]?.keys[3]).toBe('p');
+    expect(dvorak.fingers.p).toBe('l2');
+    expect(dvorak.rows[1]?.keys[5]).toBe('f');
+    expect(dvorak.fingers.f).toBe('r2');
+    expect(dvorak.fingers[' ']).toBe('thumb');
+  });
+
   it('bundles medical, legal, kids sentences and quotes', () => {
     expect(MEDICAL_SENTENCES.length).toBeGreaterThan(0);
     expect(LEGAL_SENTENCES.length).toBeGreaterThan(0);
