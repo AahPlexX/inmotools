@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/fira-code/400.css';
+import '@fontsource/roboto-mono/400.css';
+import '@fontsource/atkinson-hyperlegible/400.css';
+import '@fontsource/opendyslexic/400.css';
 import Chart from 'chart.js/auto';
 import confetti from 'canvas-confetti';
 import { diffChars } from 'diff';
@@ -269,7 +274,17 @@ export default function TypingWorkspace() {
     void (async () => {
       try {
         const saved = await readPreference<Partial<Config> | null>('config', null);
-        if (saved) setConfig((c) => ({ ...c, ...saved }));
+        if (saved) {
+          const restored = { ...DEFAULT_CONFIG, ...saved };
+          const restoredTarget = buildTargetText(restored, seed);
+          setConfig(restored);
+          setTarget(restoredTarget);
+          dispatch({ type: 'reset', initial: initState(restoredTarget, {
+            errorMode: restored.errorMode,
+            allowExtraChars: restored.allowExtras,
+            caseSensitive: restored.caseSensitive,
+          }) });
+        }
         const rows = await listTests();
         setHistory(rows);
       } catch { /* IndexedDB unavailable, keep defaults */ }
@@ -640,6 +655,7 @@ export default function TypingWorkspace() {
     if (format === 'json') downloadText(testToJson(currentTest, meta), suggestFilename('json', 'test'), 'application/json');
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
+    setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);
   }, [config, engine, history, metrics, savedTestId, target, handleSave]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
@@ -648,6 +664,7 @@ export default function TypingWorkspace() {
     if (format === 'csv') downloadText(testsToCsv(filtered), stamp, 'text/csv;charset=utf-8');
     if (format === 'json') downloadText(testsToJson(filtered, meta), stamp, 'application/json');
     if (format === 'md') downloadText(sessionMarkdown(filtered, meta), stamp, 'text/markdown;charset=utf-8');
+    setStatusText(`Exported ${format === 'md' ? 'Markdown' : format.toUpperCase()} history.`);
   }, [filterTagText]);
 
   // Import handlers.

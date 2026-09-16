@@ -174,12 +174,13 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
   const targetCell = cells[cursor];
   if (targetCell === undefined) {
     // Beyond the visible cells — treat as extra beyond target completion.
+    const extraIndex = cursor;
     if (opts.allowExtraChars) {
       cells.push({ expected: '', typed: key, state: 'extra', t });
       extraKeystrokes += 1;
       cursor += 1;
     }
-    events.push({ t, key, code, correct: false, index: cursor, expected: '' });
+    events.push({ t, key, code, correct: false, index: extraIndex, expected: '' });
     return { ...state, startedAt, events, cells, cursor, extraKeystrokes, totalKeystrokes };
   }
 
