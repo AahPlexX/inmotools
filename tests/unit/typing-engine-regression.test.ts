@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeMetrics, extendTarget, finish, initState, pressKey } from '../../src/tools/typing/typing-engine';
+import { computeMetrics, extendTarget, finish, initState, isCleanlyCompleted, pressKey } from '../../src/tools/typing/typing-engine';
 
 describe('typing engine regression contracts', () => {
   it('keeps strict mode on the incorrect character until it is corrected', () => {
@@ -34,6 +34,19 @@ describe('typing engine regression contracts', () => {
     const metrics = computeMetrics(state);
     expect(metrics.correctChars).toBe(2);
     expect(metrics.accuracy).toBe(100);
+  });
+
+  it('treats Enter as the expected newline character without losing the raw keyboard event value', () => {
+    let state = initState('a\nb');
+    state = pressKey(state, 'a', 'KeyA', 100);
+    state = pressKey(state, 'Enter', 'Enter', 200);
+    state = pressKey(state, 'b', 'KeyB', 300);
+
+    expect(state.cursor).toBe(3);
+    expect(state.correctKeystrokes).toBe(3);
+    expect(state.events[1]).toMatchObject({ key: 'Enter', expected: '\n', correct: true });
+    expect(state.cells[1]).toMatchObject({ typed: '\n', state: 'correct' });
+    expect(isCleanlyCompleted(state)).toBe(true);
   });
 
   it('extends an active target without resetting cursor, events, or timing', () => {
