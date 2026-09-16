@@ -21,13 +21,26 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: feature/typing-workstation
-      - name: Correct typing engine contracts
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Bundle the selectable local fonts with exact pins
+        run: >-
+          pnpm add --save-exact
+          @fontsource/jetbrains-mono@5.3.0
+          @fontsource/fira-code@5.3.0
+          @fontsource/roboto-mono@5.3.0
+          @fontsource/atkinson-hyperlegible@5.3.0
+          @fontsource/opendyslexic@5.3.0
+      - name: Restore matching targets, announce exports, and correct extra-key indexing
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('src/tools/typing/typing-engine.ts')
-          text = path.read_text()
+          workspace_path = Path('src/tools/typing/TypingWorkspace.tsx')
+          text = workspace_path.read_text()
 
           def once(old: str, new: str, label: str):
               global text
@@ -37,201 +50,44 @@ jobs:
               text = text.replace(old, new, 1)
 
           once(
-              "function normalize(ch: string, sensitive: boolean): string {\n  return sensitive ? ch : ch.toLocaleLowerCase();\n}",
-              "export function extendTarget(state: EngineState, extension: string): EngineState {\n  if (state.finished || extension.length === 0) return state;\n  const appended = Array.from(extension, (ch) => ({ expected: ch, typed: '', state: 'pending' as const }));\n  return {\n    ...state,\n    targetText: state.targetText + extension,\n    cells: [...state.cells, ...appended],\n  };\n}\n\nfunction normalize(ch: string, sensitive: boolean): string {\n  return sensitive ? ch : ch.toLocaleLowerCase();\n}",
-              'extendTarget insertion',
+              "import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';\nimport Chart from 'chart.js/auto';",
+              "import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';\nimport '@fontsource/jetbrains-mono/400.css';\nimport '@fontsource/fira-code/400.css';\nimport '@fontsource/roboto-mono/400.css';\nimport '@fontsource/atkinson-hyperlegible/400.css';\nimport '@fontsource/opendyslexic/400.css';\nimport Chart from 'chart.js/auto';",
+              'font imports',
           )
 
           once(
-              "  if (key === 'Backspace') {\n    if (!opts.allowBackspace) return { ...state, backspaces: state.backspaces + 1 };\n    if (state.cursor === 0) return state;\n    const next = { ...state, cells: state.cells.slice(), cursor: state.cursor - 1, backspaces: state.backspaces + 1 };",
-              "  if (key === 'Backspace') {\n    if (!opts.allowBackspace) return { ...state, backspaces: state.backspaces + 1 };\n    const current = state.cells[state.cursor];\n    if (current?.state === 'incorrect' && current.expected !== '') {\n      const cells = state.cells.slice();\n      cells[state.cursor] = { ...current, typed: '', state: 'pending', t: undefined };\n      return { ...state, cells, backspaces: state.backspaces + 1 };\n    }\n    if (state.cursor === 0) return state;\n    const next = { ...state, cells: state.cells.slice(), cursor: state.cursor - 1, backspaces: state.backspaces + 1 };",
-              'strict current-error backspace handling',
+              "        const saved = await readPreference<Partial<Config> | null>('config', null);\n        if (saved) setConfig((c) => ({ ...c, ...saved }));\n        const rows = await listTests();",
+              "        const saved = await readPreference<Partial<Config> | null>('config', null);\n        if (saved) {\n          const restored = { ...DEFAULT_CONFIG, ...saved };\n          const restoredTarget = buildTargetText(restored, seed);\n          setConfig(restored);\n          setTarget(restoredTarget);\n          dispatch({ type: 'reset', initial: initState(restoredTarget, {\n            errorMode: restored.errorMode,\n            allowExtraChars: restored.allowExtras,\n            caseSensitive: restored.caseSensitive,\n          }) });\n        }\n        const rows = await listTests();",
+              'persisted config target restoration',
           )
 
           once(
-              "    if (opts.freeMovement) {\n      // Missed the expected char and moved forward.\n      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };\n      incorrectKeystrokes += 1;\n      missedChars += 1;\n      cursor += 1;\n    } else {\n      // Strict mode: record the error but stay put; typed char occupies the cell visibly.\n      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };\n      incorrectKeystrokes += 1;\n      cursor += 1;\n    }",
-              "    if (opts.freeMovement) {\n      // Missed the expected char and moved forward.\n      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };\n      incorrectKeystrokes += 1;\n      missedChars += 1;\n      cursor += 1;\n    } else if (opts.errorMode === 'strict') {\n      // Strict mode records the error at the current character and waits for correction.\n      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };\n      incorrectKeystrokes += 1;\n    } else {\n      // Confidence mode advances but intentionally does not allow Backspace.\n      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };\n      incorrectKeystrokes += 1;\n      cursor += 1;\n    }",
-              'strict movement contract',
+              "    if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');\n  }, [config, engine, history, metrics, savedTestId, target, handleSave]);",
+              "    if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');\n    setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);\n  }, [config, engine, history, metrics, savedTestId, target, handleSave]);",
+              'single export announcement',
           )
 
           once(
-              "  const correct = state.correctKeystrokes;\n  const incorrect = state.incorrectKeystrokes;\n  const total = correct + incorrect + state.extraKeystrokes;\n  const grossWpm = minutes > 0 ? (total / STANDARD_WORD) / minutes : 0;\n  const netCharacters = Math.max(0, correct - state.missedChars);\n  const netWpm = minutes > 0 ? Math.max(0, (correct / STANDARD_WORD) / minutes - incorrect / minutes) : 0;\n  const rawCpm = minutes > 0 ? total / minutes : 0;\n  const accuracyDen = correct + incorrect + state.missedChars;\n  const accuracy = accuracyDen > 0 ? (correct / accuracyDen) * 100 : 0;",
-              "  const correctPresses = state.correctKeystrokes;\n  const incorrectPresses = state.incorrectKeystrokes;\n  const total = correctPresses + incorrectPresses + state.extraKeystrokes;\n  const finalCorrectChars = state.cells\n    .slice(0, state.targetText.length)\n    .filter((cell) => cell.state === 'correct').length;\n  const grossWpm = minutes > 0 ? (total / STANDARD_WORD) / minutes : 0;\n  const netWpm = minutes > 0 ? (finalCorrectChars / STANDARD_WORD) / minutes : 0;\n  const rawCpm = minutes > 0 ? total / minutes : 0;\n  const accuracyDen = total;\n  const accuracy = accuracyDen > 0 ? (correctPresses / accuracyDen) * 100 : 0;",
-              'final-state metrics',
+              "    if (format === 'md') downloadText(sessionMarkdown(filtered, meta), stamp, 'text/markdown;charset=utf-8');\n  }, [filterTagText]);",
+              "    if (format === 'md') downloadText(sessionMarkdown(filtered, meta), stamp, 'text/markdown;charset=utf-8');\n    setStatusText(`Exported ${format === 'md' ? 'Markdown' : format.toUpperCase()} history.`);\n  }, [filterTagText]);",
+              'history export announcement',
           )
 
-          once(
-              "    correctChars: netCharacters,\n    incorrectChars: incorrect,",
-              "    correctChars: finalCorrectChars,\n    incorrectChars: incorrectPresses,",
-              'metrics return values',
-          )
+          workspace_path.write_text(text)
 
-          path.write_text(text)
-          PY
-          git diff --check
-      - name: Correct target lifecycle, cues, charts, and modal semantics
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('src/tools/typing/TypingWorkspace.tsx')
-          text = path.read_text()
-
-          def once(old: str, new: str, label: str):
-              global text
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{label}: expected exactly one target, found {count}')
-              text = text.replace(old, new, 1)
-
-          once(
-              "import {\n  DEFAULT_OPTIONS,\n  computeMetrics,\n  finish,\n  generateDrill,\n  generateWords,\n  ghostSeries,\n  initState,\n  isCleanlyCompleted,\n  ngramLatencies,",
-              "import {\n  computeMetrics,\n  extendTarget,\n  finish,\n  generateDrill,\n  ghostSeries,\n  initState,\n  isCleanlyCompleted,\n  ngramLatencies,",
-              'engine imports',
-          )
-          once(
-              "  CODE_SNIPPETS,\n  ENGLISH_TOP_200,\n  ENGLISH_TOP_1000,\n  ENGLISH_TOP_5000,\n  KIDS_SENTENCES,\n  LANGUAGE_POOLS,\n  LAYOUTS,\n  LEGAL_SENTENCES,\n  MEDICAL_SENTENCES,\n  NUMBER_SEEDS,\n  PUNCTUATION_SEEDS,\n  QUOTES,\n  findLayout,\n  poolForMode,\n  quotesByLength,",
-              "  CODE_SNIPPETS,\n  ENGLISH_TOP_1000,\n  LANGUAGE_POOLS,\n  LAYOUTS,\n  findLayout,",
-              'corpus imports',
-          )
-          once(
-              "import { createAudioController, type SwitchProfile, type AudioController } from './typing-audio';",
-              "import { createAudioController, type SwitchProfile, type AudioController } from './typing-audio';\nimport { buildTargetText, buildZenChunk, type DurationMode } from './typing-target';",
-              'target imports',
-          )
-
-          once(
-              "interface EngineAction {\n  type: 'press' | 'reset' | 'finish' | 'restart';\n  key?: string;",
-              "interface EngineAction {\n  type: 'press' | 'reset' | 'finish' | 'restart' | 'extend';\n  key?: string;\n  text?: string;",
-              'engine action type',
-          )
-          once(
-              "    case 'finish':\n      return finish(state, action.reason ?? 'aborted', action.t ?? performance.now());\n    default:",
-              "    case 'finish':\n      return finish(state, action.reason ?? 'aborted', action.t ?? performance.now());\n    case 'extend':\n      return extendTarget(state, action.text ?? '');\n    default:",
-              'engine reducer extension',
-          )
-          once("type DurationMode = 'time' | 'words' | 'quote' | 'zen' | 'certification';\n", "", 'local DurationMode type')
-
-          text, count = re.subn(
-              r"function buildTargetText\(cfg: Config, seed\?: number\): string \{.*?\n\}\n\n(?=function classifyDuration)",
-              "",
-              text,
-              count=1,
-              flags=re.S,
-          )
-          if count != 1:
-              raise SystemExit(f'local buildTargetText removal: expected 1, found {count}')
-
-          once(
-              "function formatMs(ms: number): string {\n  const s = Math.max(0, Math.round(ms / 1000));\n  const m = Math.floor(s / 60);\n  const rem = s % 60;\n  return `${String(m).padStart(1, '0')}:${String(rem).padStart(2, '0')}`;\n}",
-              "function formatMs(ms: number): string {\n  const s = Math.max(0, Math.round(ms / 1000));\n  const m = Math.floor(s / 60);\n  const rem = s % 60;\n  return `${String(m).padStart(1, '0')}:${String(rem).padStart(2, '0')}`;\n}\n\nfunction trapDialogKeyboard(event: React.KeyboardEvent<HTMLDivElement>, onClose: () => void): void {\n  if (event.key === 'Escape') {\n    event.preventDefault();\n    event.stopPropagation();\n    onClose();\n    return;\n  }\n  if (event.key !== 'Tab') return;\n  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(\n    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex=\"-1\"])',\n  )).filter((element) => element.getClientRects().length > 0);\n  if (focusable.length === 0) {\n    event.preventDefault();\n    return;\n  }\n  const first = focusable[0]!;\n  const last = focusable[focusable.length - 1]!;\n  if (event.shiftKey && document.activeElement === first) {\n    event.preventDefault();\n    last.focus();\n  } else if (!event.shiftKey && document.activeElement === last) {\n    event.preventDefault();\n    first.focus();\n  }\n}",
-              'dialog keyboard helper',
-          )
-
-          once(
-              "  const histChartRef = useRef<Chart | null>(null);",
-              "  const histChartRef = useRef<Chart | null>(null);\n  const milestoneRef = useRef<Set<number>>(new Set());\n  const zenChunkRef = useRef(0);",
-              'session refs',
-          )
-
-          once(
-              "  // Watch for engine.finished transition.\n  useEffect(() => {",
-              "  // Zen mode replenishes the active target before the typist reaches its end.\n  useEffect(() => {\n    if (!running || engine.finished || config.durationMode !== 'zen') return;\n    if (engine.targetText.length - engine.cursor >= 320) return;\n    zenChunkRef.current += 1;\n    const chunk = buildZenChunk(config.language, seed + zenChunkRef.current);\n    const extension = `${engine.targetText.endsWith(' ') ? '' : ' '}${chunk}`;\n    setTarget((current) => current + extension);\n    dispatch({ type: 'extend', text: extension });\n  }, [running, engine.finished, engine.targetText, engine.cursor, config.durationMode, config.language, seed]);\n\n  // Milestone cues mark quarter-progress without changing typing state.\n  useEffect(() => {\n    if (!running || engine.finished || config.audioProfile === 'off') return;\n    const progress = totalDurationMs > 0 && engine.startedAt != null\n      ? Math.min(1, Math.max(0, (now - engine.startedAt) / totalDurationMs))\n      : Math.min(1, engine.cursor / Math.max(1, engine.targetText.length));\n    for (const threshold of [0.25, 0.5, 0.75]) {\n      if (progress >= threshold && !milestoneRef.current.has(threshold)) {\n        milestoneRef.current.add(threshold);\n        audioRef.current?.playMilestone();\n        break;\n      }\n    }\n  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, now, totalDurationMs, config.audioProfile]);\n\n  // Watch for engine.finished transition.\n  useEffect(() => {",
-              'zen and milestone effects',
-          )
-
-          once(
-              "      const metrics = computeMetrics(engine);\n      audioRef.current?.playCompletion();\n      if (metrics.netWpm > 0 && engine.finishReason === 'completed') {",
-              "      const metrics = computeMetrics(engine);\n      if (config.audioProfile !== 'off') {\n        if (engine.finishReason === 'failed') audioRef.current?.playFail();\n        else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();\n      }\n      if (metrics.netWpm > 0 && engine.finishReason === 'completed') {",
-              'completion cue routing',
-          )
-          once(
-              "  }, [engine.finished, engine.finishReason, running]);",
-              "  }, [engine.finished, engine.finishReason, running, config.audioProfile]);",
-              'finish dependencies',
-          )
-
-          once(
-              "    const rollingSize = 10;\n    const sorted = history.slice().sort((a, b) => a.savedAt - b.savedAt);\n    const labels = sorted.map((t, i) => (t.savedAt ? new Date(t.savedAt).toLocaleDateString() : String(i + 1)));\n    const wpm = sorted.map((t) => t.netWpm);\n    const acc = sorted.map((t) => t.accuracy);\n    const rolling = wpm.map((_, i) => {\n      const window = wpm.slice(Math.max(0, i - rollingSize + 1), i + 1);\n      return round(window.reduce((a, b) => a + b, 0) / window.length);\n    });",
-              "    const sorted = history.slice().sort((a, b) => a.savedAt - b.savedAt);\n    const labels = sorted.map((t, i) => (t.savedAt ? new Date(t.savedAt).toLocaleDateString() : String(i + 1)));\n    const wpm = sorted.map((t) => t.netWpm);\n    const acc = sorted.map((t) => t.accuracy);\n    const rollingFor = (size: number) => wpm.map((_, i) => {\n      const window = wpm.slice(Math.max(0, i - size + 1), i + 1);\n      return round(window.reduce((a, b) => a + b, 0) / window.length);\n    });\n    const rolling10 = rollingFor(10);\n    const rolling50 = rollingFor(50);\n    const allTime = wpm.map((_, i) => round(wpm.slice(0, i + 1).reduce((a, b) => a + b, 0) / (i + 1)));",
-              'history rolling series',
-          )
-          once(
-              "          { label: `Rolling ${rollingSize}-test avg`, data: rolling, borderColor: '#7dd39b', backgroundColor: 'transparent', pointRadius: 0 },\n          { label: 'Accuracy %', data: acc, borderColor: '#d97706', backgroundColor: 'transparent', yAxisID: 'y2', pointRadius: 1 },",
-              "          { label: 'Rolling 10-test avg', data: rolling10, borderColor: '#7dd39b', backgroundColor: 'transparent', pointRadius: 0 },\n          { label: 'Rolling 50-test avg', data: rolling50, borderColor: '#6b7280', backgroundColor: 'transparent', borderDash: [6, 3], pointRadius: 0 },\n          { label: 'All-time avg', data: allTime, borderColor: '#7c3aed', backgroundColor: 'transparent', borderDash: [2, 3], pointRadius: 0 },\n          { label: 'Accuracy %', data: acc, borderColor: '#d97706', backgroundColor: 'transparent', yAxisID: 'y2', pointRadius: 1 },",
-              'history chart datasets',
-          )
-
-          once(
-              "    setRunning(false);\n    setSavedTestId(null);\n    setStatusText('New text ready.');",
-              "    setRunning(false);\n    setSavedTestId(null);\n    milestoneRef.current.clear();\n    zenChunkRef.current = 0;\n    setStatusText('New text ready.');",
-              'session ref reset',
-          )
-
-          once(
-              "  const applyConfig = useCallback((patch: Partial<Config>) => {\n    setConfig((c) => ({ ...c, ...patch }));\n    if ('mode' in patch || 'durationValue' in patch || 'quoteLength' in patch || 'language' in patch || 'codeIndex' in patch || 'customText' in patch) {\n      rebuildTarget(patch);\n    }\n    if ('errorMode' in patch || 'allowExtras' in patch || 'caseSensitive' in patch) {\n      dispatch({ type: 'reset', initial: initState(target, {\n        errorMode: (patch.errorMode ?? config.errorMode),\n        allowExtraChars: (patch.allowExtras ?? config.allowExtras),\n        caseSensitive: (patch.caseSensitive ?? config.caseSensitive),\n      }) });\n    }\n  }, [config, rebuildTarget, target]);",
-              "  const applyConfig = useCallback((patch: Partial<Config>) => {\n    const normalized: Partial<Config> = { ...patch };\n    if (patch.durationMode === 'quote') normalized.mode = 'quote';\n    if (patch.durationMode === 'zen') normalized.mode = 'zen';\n    if (patch.mode === 'quote' && patch.durationMode === undefined) normalized.durationMode = 'quote';\n    if (patch.mode === 'zen' && patch.durationMode === undefined) normalized.durationMode = 'zen';\n    if (patch.mode && patch.mode !== 'quote' && patch.mode !== 'zen' && patch.durationMode === undefined\n        && (config.durationMode === 'quote' || config.durationMode === 'zen')) {\n      normalized.durationMode = 'time';\n    }\n    setConfig((c) => ({ ...c, ...normalized }));\n    if ('mode' in normalized || 'durationMode' in normalized || 'durationValue' in normalized || 'quoteLength' in normalized || 'language' in normalized || 'codeIndex' in normalized || 'customText' in normalized) {\n      rebuildTarget(normalized);\n    }\n    if ('errorMode' in normalized || 'allowExtras' in normalized || 'caseSensitive' in normalized) {\n      dispatch({ type: 'reset', initial: initState(target, {\n        errorMode: (normalized.errorMode ?? config.errorMode),\n        allowExtraChars: (normalized.allowExtras ?? config.allowExtras),\n        caseSensitive: (normalized.caseSensitive ?? config.caseSensitive),\n      }) });\n    }\n  }, [config, rebuildTarget, target]);",
-              'config normalization and rebuild',
-          )
-
-          once(
-              "          <div className=\"tw-chart\"><canvas ref={wpmChartRef} /></div>",
-              "          <div className=\"tw-chart\"><canvas ref={wpmChartRef} role=\"img\" aria-label=\"Live net WPM, raw WPM, personal-best ghost, and target pace chart\" /></div>",
-              'live chart accessibility',
-          )
-          once(
-              "        <div className=\"tw-chart\" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} /></div>",
-              "        <div className=\"tw-chart\" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role=\"img\" aria-label=\"Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy\" /></div>",
-              'history chart accessibility',
-          )
-
-          once(
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-test-result-title\">",
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-test-result-title\" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>",
-              'result dialog key containment',
-          )
-          once(
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\">\n      <div className=\"tw-modal\">\n        <h3>Export history</h3>",
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-export-history-title\" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>\n      <div className=\"tw-modal\">\n        <h3 id=\"tw-export-history-title\">Export history</h3>",
-              'history export dialog name',
-          )
-          once(
-              "        <label>Typist name</label>\n        <input type=\"text\" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />\n        <label>Organization</label>\n        <input type=\"text\" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />\n        <label>Certified by</label>\n        <input type=\"text\" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />\n        <label>Global tags to add (Enter to add)</label>",
-              "        <label htmlFor=\"tw-history-typist\">Typist name</label>\n        <input id=\"tw-history-typist\" autoFocus type=\"text\" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />\n        <label htmlFor=\"tw-history-organization\">Organization</label>\n        <input id=\"tw-history-organization\" type=\"text\" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />\n        <label htmlFor=\"tw-history-certified-by\">Certified by</label>\n        <input id=\"tw-history-certified-by\" type=\"text\" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />\n        <label htmlFor=\"tw-history-tag\">Global tags to add (Enter to add)</label>",
-              'history export field labels',
-          )
-
-          needle = "          <input\n            type=\"text\"\n            value={tagInput}"
-          positions = [m.start() for m in re.finditer(re.escape(needle), text)]
-          if len(positions) != 1:
-              raise SystemExit(f'history tag input after result labeling: expected 1 unlabeled target, found {len(positions)}')
-          text = text.replace(needle, "          <input\n            id=\"tw-history-tag\"\n            type=\"text\"\n            value={tagInput}", 1)
-
-          once(
-              "        <label>Notes</label>\n        <textarea value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />\n        <label>\n          <input type=\"checkbox\" checked={meta.includeKeystrokes}",
-              "        <label htmlFor=\"tw-history-notes\">Notes</label>\n        <textarea id=\"tw-history-notes\" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />\n        <label>\n          <input type=\"checkbox\" checked={meta.includeKeystrokes}",
-              'history notes label',
-          )
-          once(
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-custom-text-title\">",
-              "    <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"tw-custom-text-title\" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>",
-              'custom dialog key containment',
-          )
-
-          once(
-              "        <div className=\"tw-modal-backdrop\" role=\"dialog\" aria-modal=\"true\">\n          <div className=\"tw-modal\">\n            <h3>Clear local test history?</h3>\n            <p>This removes every locally stored test from this browser. Exports are not affected.</p>\n            <div className=\"row\">\n              <button type=\"button\" className=\"subtle\" onClick={() => setConfirmClear(false)}>Cancel</button>",
-              "        <div className=\"tw-modal-backdrop\" role=\"alertdialog\" aria-modal=\"true\" aria-labelledby=\"tw-clear-history-title\" aria-describedby=\"tw-clear-history-description\" onKeyDown={(event) => trapDialogKeyboard(event, () => setConfirmClear(false))}>\n          <div className=\"tw-modal\">\n            <h3 id=\"tw-clear-history-title\">Clear local test history?</h3>\n            <p id=\"tw-clear-history-description\">This removes every locally stored test from this browser. Exports are not affected.</p>\n            <div className=\"row\">\n              <button autoFocus type=\"button\" className=\"subtle\" onClick={() => setConfirmClear(false)}>Cancel</button>",
-              'clear-history alert dialog semantics',
-          )
-
-          path.write_text(text)
+          engine_path = Path('src/tools/typing/typing-engine.ts')
+          engine = engine_path.read_text()
+          old = "    if (opts.allowExtraChars) {\n      cells.push({ expected: '', typed: key, state: 'extra', t });\n      extraKeystrokes += 1;\n      cursor += 1;\n    }\n    events.push({ t, key, code, correct: false, index: cursor, expected: '' });"
+          new = "    const extraIndex = cursor;\n    if (opts.allowExtraChars) {\n      cells.push({ expected: '', typed: key, state: 'extra', t });\n      extraKeystrokes += 1;\n      cursor += 1;\n    }\n    events.push({ t, key, code, correct: false, index: extraIndex, expected: '' });"
+          if engine.count(old) != 1:
+              raise SystemExit(f'extra-key event indexing: expected exactly one target, found {engine.count(old)}')
+          engine_path.write_text(engine.replace(old, new, 1))
           PY
           git diff --check
       - name: Commit guarded corrections
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/tools/typing/typing-engine.ts src/tools/typing/TypingWorkspace.tsx
-          git commit -m "fix(typing): honor duration and input contracts"
+          git add package.json pnpm-lock.yaml src/tools/typing/TypingWorkspace.tsx src/tools/typing/typing-engine.ts
+          git commit -m "fix(typing): bundle selectable fonts and restore persisted targets"
           git push origin HEAD:feature/typing-workstation
