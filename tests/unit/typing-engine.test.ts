@@ -97,12 +97,14 @@ describe('metrics', () => {
     let state = initState('abcd');
     state = pressKey(state, 'a', 'KeyA', 100);
     state = pressKey(state, 'x', 'KeyX', 200);
-    state = pressKey(state, 'c', 'KeyC', 300);
-    state = pressKey(state, 'd', 'KeyD', 400);
-    state = finish(state, 'completed', 500);
+    state = pressKey(state, 'b', 'KeyB', 300); // strict-mode correction
+    state = pressKey(state, 'c', 'KeyC', 400);
+    state = pressKey(state, 'd', 'KeyD', 500);
+    state = finish(state, 'completed', 600);
     const metrics = computeMetrics(state);
     expect(metrics.accuracy).toBeLessThan(100);
     expect(metrics.incorrectChars).toBe(1);
+    expect(metrics.correctChars).toBe(4);
   });
 
   it('produces a wpm series with per-second samples', () => {
