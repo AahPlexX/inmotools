@@ -101,6 +101,33 @@ test('the clipboard is offered as an ingestion path', async ({ page }) => {
   await expect(page.getByTestId('sightline-status')).toContainText(/clipboard|words/i);
 });
 
+test('source ingestion supports multiple files and full-workspace drops', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  const picker = page.getByTestId('sightline-file');
+  await expect(picker).toHaveAttribute('multiple', '');
+  await picker.setInputFiles([
+    { name: 'first.txt', mimeType: 'text/plain', buffer: Buffer.from('First local document for batch ingestion.') },
+    { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('Second local document becomes the active reader.') },
+  ]);
+  await expect(page.getByTestId('sightline-status')).toContainText(/2 documents|second\.txt/i);
+
+  const dataTransfer = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['Dropped from the whole workspace.'], 'dropped.txt', { type: 'text/plain' }));
+    return transfer;
+  });
+  await page.getByTestId('sightline-velocity').dispatchEvent('drop', { dataTransfer });
+  await expect(page.getByTestId('sightline-status')).toContainText(/dropped\.txt/i);
+});
+
+test('the sample library offers more than one built-in reading', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await expect(page.getByTestId('sightline-sample-select').locator('option')).toHaveCount(3);
+  await page.getByTestId('sightline-sample-select').selectOption('technical');
+  await page.getByTestId('sightline-sample').click();
+  await expect(page.getByTestId('sightline-status')).toContainText(/technical/i);
+});
+
 test('keyboard control plays, steps, and bookmarks without a mouse', async ({ page }) => {
   await loadSample(page);
   const stage = page.getByTestId('sightline-stage');
@@ -269,7 +296,7 @@ test('metadata, tags, and social fields are edited at export time', async ({ pag
   await page.getByTestId('sightline-tag-input').press('Enter');
 
   await expect(page.getByTestId('sightline-file-preview')).toHaveText('paced-reading-study-weighted.pdf');
-  await expect(page.getByRole('button', { name: 'reading ×' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'reading Ã—' })).toBeVisible();
   await page.getByRole('button', { name: 'Use measured reading level' }).click();
   await expect(page.locator('table').filter({ hasText: 'og:title' }).first()).toBeVisible();
 });
