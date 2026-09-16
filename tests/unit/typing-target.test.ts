@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quotesByLength } from '../../src/tools/typing/typing-corpora';
+import { LANGUAGE_POOLS, quotesByLength } from '../../src/tools/typing/typing-corpora';
 import {
   buildTargetText,
   buildZenChunk,
@@ -31,6 +31,20 @@ describe('typing target duration contracts', () => {
   it('builds exactly the selected number of words for word-count tests', () => {
     const target = buildTargetText({ ...BASE, durationMode: 'words', durationValue: 10 }, 42);
     expect(countWords(target)).toBe(10);
+  });
+
+  it('uses the selected non-English pool in top-word modes', () => {
+    const target = buildTargetText({
+      ...BASE,
+      language: 'spanish',
+      mode: 'words-200',
+      durationMode: 'words',
+      durationValue: 10,
+    }, 42);
+    const spanish = new Set(LANGUAGE_POOLS.spanish.slice(0, 200));
+    const words = target.split(/\s+/).filter(Boolean);
+    expect(words).toHaveLength(10);
+    expect(words.every((word) => spanish.has(word))).toBe(true);
   });
 
   it('applies word-count duration to fixed specialized corpora without losing their original whitespace before the cutoff', () => {
