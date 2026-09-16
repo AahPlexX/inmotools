@@ -24,22 +24,28 @@ async function clearTypingDatabase(page: Page) {
   }, DB_NAME);
 }
 
-test('completes a non-timed custom target, persists it, and exports the JSON envelope', async ({ page }) => {
+test('completes a multiline word-count custom target, persists it, and exports the JSON envelope', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
 
   await workspace.getByLabel('Mode').selectOption('custom');
   await workspace.getByLabel('Duration').selectOption('words');
+  const wordsSelect = workspace.getByLabel('Words', { exact: true });
+  await expect(wordsSelect).toHaveValue('25');
+  await wordsSelect.selectOption('10');
   await workspace.getByRole('button', { name: 'Paste text' }).click();
 
   const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
   await expect(customDialog).toBeVisible();
-  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill('test');
+  const customText = 'one two three four five\nsix seven eight nine ten';
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill(customText);
   await customDialog.getByRole('button', { name: 'Use this text' }).click();
 
   const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
   await canvas.focus();
-  await page.keyboard.type('test', { delay: 40 });
+  await page.keyboard.type('one two three four five', { delay: 20 });
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('six seven eight nine ten', { delay: 20 });
 
   const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
   await expect(resultDialog).toBeVisible();
@@ -62,6 +68,7 @@ test('completes a non-timed custom target, persists it, and exports the JSON env
   expect(exported.schemaVersion).toBe(1);
   expect(exported.typistName).toBe('Browser Regression');
   expect(exported.test.finishReason).toBe('completed');
+  expect(exported.test.targetText).toContain('\n');
   expect(exported.test.tags).toContain('e2e');
 
   await page.reload();
@@ -69,13 +76,15 @@ test('completes a non-timed custom target, persists it, and exports the JSON env
   await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
 });
 
-test('honors exact word-count duration, bundled fonts, and modal semantics', async ({ page }) => {
+test('normalizes duration families, honors exact word count, bundles fonts, and exposes modal semantics', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
 
   await workspace.getByLabel('Mode').selectOption('words-1000');
   await workspace.getByLabel('Duration').selectOption('words');
-  await workspace.getByLabel('Words').selectOption('10');
+  const wordsSelect = workspace.getByLabel('Words', { exact: true });
+  await expect(wordsSelect).toHaveValue('25');
+  await wordsSelect.selectOption('10');
 
   const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
   const targetWordCount = await canvas.evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
