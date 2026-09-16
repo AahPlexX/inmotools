@@ -98,6 +98,13 @@ test.describe('Fiber Craft Workstation', () => {
     expect(patternPdf.suggestedFilename()).toBe('crochet-round-chart-pattern-book.pdf');
     await inspectPdfDownload(patternPdf);
 
+    const [socialPreview] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export social preview' }).click(),
+    ]);
+    expect(socialPreview.suggestedFilename()).toBe('crochet-round-chart-social-preview.png');
+    await expect(inspectPngDownload(socialPreview)).resolves.toEqual({ width: 1200, height: 630 });
+
     await page.getByLabel('Chart mode').selectOption('grid');
     const firstCell = page.getByRole('button', { name: 'Row 1, column 1, open' });
     await firstCell.click();
@@ -144,5 +151,27 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
     await expect(page.locator('#fiber-project-level')).toHaveValue('Intermediate');
+  });
+
+  test('reopens the Fiber workspace while offline after the PWA is installed', async ({ page, context }) => {
+    await page.goto('./#/fiber-craft-workstation');
+    await expect(page.getByRole('heading', { name: 'Fiber Craft Workstation' })).toBeVisible();
+    await expect(page.evaluate(() => 'serviceWorker' in navigator)).resolves.toBe(true);
+    await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.ready;
+      if (!registration.active) throw new Error('Service worker did not activate.');
+    });
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+    await context.setOffline(true);
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('heading', { name: 'Fiber Craft Workstation' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Save .craftproj' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
+    } finally {
+      await context.setOffline(false);
+    }
   });
 });
