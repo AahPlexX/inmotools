@@ -123,14 +123,17 @@ test('keyboard control plays, steps, and bookmarks without a mouse', async ({ pa
 });
 
 test('the clock advances the words and reports a measured rate', async ({ page }) => {
+  await page.clock.install();
   await loadSample(page);
   await page.getByTestId('sightline-wpm-range').fill('900');
   await page.getByTestId('sightline-play').click();
+  await expect(page.getByTestId('sightline-play')).toHaveText('Pause');
+  await page.clock.runFor(1_000);
+  await expect(page.getByTestId('sightline-position')).not.toContainText('word 1 of');
   await expect.poll(async () => {
     const liveWpm = await page.getByTestId('sightline-live-wpm').textContent();
     return Number.parseInt(liveWpm ?? '', 10);
   }).toBeGreaterThan(0);
-  await expect(page.getByTestId('sightline-position')).not.toContainText('word 1 of');
 
   await page.getByTestId('sightline-play').click();
   await expect(page.getByTestId('sightline-play')).toHaveText('Read');
