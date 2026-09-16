@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `259c38e9d055a8feb49cd72a4a5d45260d8ac9d0`
+**Last tracked implementation commit:** `6ab47928ed819f21b3e723de02b026f72cb3fd7c`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -110,6 +110,8 @@ A capability counts only when production behavior exists, relevant validation pa
 - Counterbore hole termination implemented at `9de39833aeeef1c1bb64d1bb0a2abc82902c80e3` (RED at `635539c`): a second concentric sketch circle extrudes to its own depth and fuses with the full-depth bore tool before one cut, rejecting a counterbore at least as deep as the hole (degenerate) or missing `profileEntityIds`. Verified against the real kernel: fused-tool removed volume matches the hand-computed bore-plus-annular-extra expectation exactly.
 
 - Countersink hole termination implemented at `259c38e9d055a8feb49cd72a4a5d45260d8ac9d0` (RED at `addb655`), resolving the deferred conical-geometry question: `CadExactKernel` gains `placeAlongAxis(shape, origin, direction)`, positioning a canonical +Z-axis primitive at an arbitrary 3D placement via `occt-wasm`'s raw `rotate`/`translate`, using a new pure `alignmentRotation()` in `sketch-profile.ts` (property-tested against an independently-implemented Rodrigues rotation, including the ambiguous-axis antiparallel case). Countersink itself fuses a `kernel.cone()` frustum (sized from a concentric sketch circle and an included angle, narrow end matching the bore radius) with the full-depth bore before one cut — mutually exclusive with counterbore, rejects an out-of-range angle, an undersized diameter, a non-circle profile, or missing parameters. Verified against the real kernel two ways: total removed volume matches a hand-computed frustum-plus-remaining-bore expectation, and — since that volume is orientation-invariant by construction — a probe-cylinder check independently proves the wide end lands at the surface rather than buried mid-depth.
+
+- `rib` implemented at `6ab47928ed819f21b3e723de02b026f72cb3fd7c` (RED at `1c3eaee`). First checked whether a distinct feature type was even warranted: `extrude`+`boolean:fuse` already fully composes a boss onto an existing body with the existing feature types, so a `rib` was only worth adding if it did something that composition can't — automatically building the wall's cross-section from a single-line centerline plus a thickness, instead of requiring the user to hand-draw the offset rectangle. New pure `perpendicularInPlane()` in `sketch-profile.ts` (property-tested) derives the in-plane sideways offset direction; the wall's four corners come from offsetting the centerline's endpoints by half the thickness on each side, extruded by `depth` and fused onto the dependency body. Scoped to a single straight-line centerline only — multi-segment/curved centerlines need real 2D polyline offset with mitered corners, a separate piece of geometry, and are rejected rather than approximated. Verified against the real kernel: a rib welded flush onto a body's top face gives a fused volume exactly equal to the hand-computed sum of the two solids.
 
 ## Freshness invariant
 
