@@ -1,7 +1,24 @@
-import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { expect, test, type Download } from '@playwright/test';
+
+const inspectPngDownload = async (download: Download) => {
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const bytes = await readFile(path!);
+  expect([...bytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+};
+
+const inspectPdfDownload = async (download: Download) => {
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const bytes = await readFile(path!);
+  expect(bytes.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  expect(bytes.byteLength).toBeGreaterThan(1_000);
+};
 
 test.describe('Fiber Craft Workstation', () => {
-  test('edits crochet charts, moves a portable project, and restores the local session', async ({ page }) => {
+  test('edits crochet charts, exports patterns, moves a portable project, and restores the local session', async ({ page }) => {
     await page.goto('./#/fiber-craft-workstation');
 
     await expect(page.getByRole('heading', { name: 'Fiber Craft Workstation' })).toBeVisible();
@@ -66,6 +83,21 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('pattern-details-summary')).toContainText('Intermediate');
     await expect(page.getByTestId('pattern-details-summary')).toContainText('amigurumi · shaping');
 
+    await page.locator('#fiber-png-scale').selectOption('4');
+    const [roundPng] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export PNG' }).click(),
+    ]);
+    expect(roundPng.suggestedFilename()).toBe('crochet-round-chart-4x.png');
+    await expect(inspectPngDownload(roundPng)).resolves.toEqual({ width: 3840, height: 2880 });
+
+    const [patternPdf] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export pattern PDF' }).click(),
+    ]);
+    expect(patternPdf.suggestedFilename()).toBe('crochet-round-chart-pattern-book.pdf');
+    await inspectPdfDownload(patternPdf);
+
     await page.getByLabel('Chart mode').selectOption('grid');
     const firstCell = page.getByRole('button', { name: 'Row 1, column 1, open' });
     await firstCell.click();
@@ -79,6 +111,14 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByLabel('Row 1', { exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Mark row complete' }).click();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
+
+    await page.locator('#fiber-png-scale').selectOption('2');
+    const [gridPng] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export PNG' }).click(),
+    ]);
+    expect(gridPng.suggestedFilename()).toBe('crochet-round-chart-2x.png');
+    await expect(inspectPngDownload(gridPng)).resolves.toEqual({ width: 1920, height: 1440 });
 
     const [projectDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save .craftproj' }).click()]);
     expect(projectDownload.suggestedFilename()).toBe('crochet-round-chart.craftproj');
