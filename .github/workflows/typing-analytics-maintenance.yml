@@ -32,25 +32,26 @@ jobs:
               raise SystemExit(f'median guard expected 1 match, found {engine.count(old_median)}')
           engine = engine.replace(old_median, new_median, 1)
 
-          clean_block = """export function isCleanlyCompleted(state: EngineState): boolean {
-  const original = state.targetText.length;
-  if (state.cursor < original) return false;
-  return state.cells.slice(0, original).every((c) => c.state === 'correct');
-}
-"""
-          completion_block = clean_block + """
-/**
- * Returns true once a finite target has been completed according to the active
- * correction mode. Strict mode requires a clean target; modes that explicitly
- * allow forward movement complete once the original target has been traversed.
- */
-export function isTargetCompleted(state: EngineState): boolean {
-  const original = state.targetText.length;
-  if (state.cursor < original) return false;
-  if (state.options.errorMode === 'strict') return isCleanlyCompleted(state);
-  return true;
-}
-"""
+          clean_block = (
+              "export function isCleanlyCompleted(state: EngineState): boolean {\n"
+              "  const original = state.targetText.length;\n"
+              "  if (state.cursor < original) return false;\n"
+              "  return state.cells.slice(0, original).every((c) => c.state === 'correct');\n"
+              "}\n"
+          )
+          completion_block = clean_block + (
+              "\n/**\n"
+              " * Returns true once a finite target has been completed according to the active\n"
+              " * correction mode. Strict mode requires a clean target; modes that explicitly\n"
+              " * allow forward movement complete once the original target has been traversed.\n"
+              " */\n"
+              "export function isTargetCompleted(state: EngineState): boolean {\n"
+              "  const original = state.targetText.length;\n"
+              "  if (state.cursor < original) return false;\n"
+              "  if (state.options.errorMode === 'strict') return isCleanlyCompleted(state);\n"
+              "  return true;\n"
+              "}\n"
+          )
           if engine.count(clean_block) != 1:
               raise SystemExit(f'completion guard expected 1 match, found {engine.count(clean_block)}')
           engine = engine.replace(clean_block, completion_block, 1)
