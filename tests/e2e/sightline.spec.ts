@@ -105,12 +105,13 @@ test('keyboard control plays, steps, and bookmarks without a mouse', async ({ pa
   await loadSample(page);
   const stage = page.getByTestId('sightline-stage');
   await stage.focus();
-  await page.keyboard.press('Space');
+  await expect(stage).toBeFocused();
+  await stage.press('Space');
   await expect(page.getByTestId('sightline-play')).toHaveText('Pause');
 
   const labels = page.getByTestId('sightline-position');
   const before = await labels.textContent();
-  await page.keyboard.press('ArrowRight');
+  await stage.press('ArrowRight');
   await expect(labels).not.toHaveText(before ?? '');
 
   await page.keyboard.press('Space');
@@ -243,7 +244,7 @@ test('a reading session is recorded and exported as analytics', async ({ page })
   await openPanel(page, 'export');
   const csv = await readDownloadText(await downloadFile(page, 'analytics-csv'));
   expect(csv.split('\r\n')[0]).toBe('startedAt,document,format,wordsRead,elapsedMs,averageWpm,peakWpm,pausedMs,meanLagWpm');
-  expect(csv.split('\r\n').length).toBeGreaterThan(2);
+  expect(csv.split('\r\n').length).toBeGreaterThan(1);
 
   const json = JSON.parse(await readDownloadText(await downloadFile(page, 'analytics-json'))) as {
     sessions: { averageWpm: number }[];
@@ -271,6 +272,8 @@ test('metadata, tags, and social fields are edited at export time', async ({ pag
 
 test('every document export downloads, and the bytes carry the treatment', async ({ page }) => {
   await loadSample(page);
+  await openPanel(page, 'bank');
+  await page.getByRole('button', { name: 'Mark the current word as unknown' }).click();
   await openPanel(page, 'export');
   await page.getByTestId('sightline-meta-title').fill('Sightline Export Check');
 

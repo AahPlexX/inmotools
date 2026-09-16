@@ -409,6 +409,7 @@
 .sightline-peripheral {
   position: relative;
   display: block;
+  width: 100%;
   height: 340px;
   overflow: hidden;
   font-family: var(--sightline-font, inherit);

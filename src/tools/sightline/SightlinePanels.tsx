@@ -1430,7 +1430,7 @@ export function ExportPanel({
 
       <section className="sightline-card" aria-labelledby="sightline-social-heading">
         <h2 id="sightline-social-heading">Social and structured data</h2>
-        <div className="sightline-scroll-x">
+        <div className="sightline-scroll-x" tabIndex={0} role="region" aria-label="Social and structured data tags">
           <table className="sightline-table" data-testid="sightline-social-table">
             <caption className="sightline-visually-hidden">Open Graph and social card tags written into the HTML export</caption>
             <thead>
