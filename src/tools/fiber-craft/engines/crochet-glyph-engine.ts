@@ -1,4 +1,4 @@
-import { getCrochetSymbol, type CrochetGlyphKind } from './symbol-library';
+import { getCrochetSymbol } from './symbol-library';
 
 export interface GlyphPoint {
   readonly x: number;
@@ -28,20 +28,8 @@ const tallStitch = (diagonalBars: number): readonly CrochetGlyphPrimitive[] => {
   return primitives;
 };
 
-const tallStitchForKind = (kind: CrochetGlyphKind): readonly CrochetGlyphPrimitive[] => {
-  switch (kind) {
-    case 't-bar-1': return tallStitch(0);
-    case 't-bar-2': return tallStitch(1);
-    case 't-bar-3': return tallStitch(2);
-    case 't-bar-4': return tallStitch(3);
-    default: return [];
-  }
-};
-
 export function crochetGlyphPrimitives(symbolId: string): readonly CrochetGlyphPrimitive[] {
   const { glyph } = getCrochetSymbol(symbolId);
-  const tall = tallStitchForKind(glyph);
-  if (tall.length > 0) return tall;
 
   switch (glyph) {
     case 'oval':
@@ -50,6 +38,14 @@ export function crochetGlyphPrimitives(symbolId: string): readonly CrochetGlyphP
       return [{ kind: 'circle', cx: 0, cy: 0, r: 0.23, filled: true }];
     case 'cross':
       return [line(-0.58, -0.58, 0.58, 0.58), line(0.58, -0.58, -0.58, 0.58)];
+    case 't-bar-1':
+      return tallStitch(0);
+    case 't-bar-2':
+      return tallStitch(1);
+    case 't-bar-3':
+      return tallStitch(2);
+    case 't-bar-4':
+      return tallStitch(3);
     case 'post-front':
       return [
         ...tallStitch(1),
