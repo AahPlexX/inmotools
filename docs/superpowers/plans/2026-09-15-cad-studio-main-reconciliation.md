@@ -67,6 +67,7 @@ Steps when the gate is judged met:
 
 Because Track 1's commits are pure additions plus a mechanical dependency merge, reverting them (if something unexpected broke) is a clean `git revert` of the merge commit with no entanglement in other tools' code. Track 2's activation PR is deliberately small and isolated for the same reason — if the deployed smoke check in step 6 fails, reverting just that PR immediately makes CAD invisible again without touching any of the underlying feature code, which stays safely on `main` for the next attempt.
 
-## Open question for the user
+## Decisions (confirmed 2026-09-15)
 
-The two-track split and Track 1 (sync now, resolve the trivial conflict, keep it current) don't need new authorization beyond what's already been asked for — this plan treats it as safe to start executing. The one **real decision that belongs to you**, not something I should decide unilaterally, is Track 2's timing: activate once there's a genuinely usable end-to-end flow (sooner, dark-launch style, matching how the rest of the repo already ships incrementally-honest tools), or hold activation until the full 195/195 + all-gates completion bar the ledger currently states. I can proceed either way; I just don't want to silently pick a release-strategy decision that's really yours to make.
+- **Track 1:** proceed now. Executed in this same session; see the ledger for the resulting sync commit.
+- **Track 2 gate:** the ledger's existing deterministic completion equation stands unchanged — activation (catalog/router registration, making CAD Studio reachable) waits for the full 195/195 capability floor and all G0–G15 gates, not an earlier "usable flow" milestone. This was the user's explicit call, not assumed.
