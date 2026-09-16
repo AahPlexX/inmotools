@@ -41,12 +41,16 @@ export function parseFiberCraftProject(text: string): FiberCraftDocument {
   return parsed.document;
 }
 
-export function fiberCraftProjectFilename(title: string): string {
+export function fiberCraftFilenameStem(title: string): string {
   const stem = title
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
-  return `${stem || 'fiber-craft-project'}.craftproj`;
+  return stem || 'fiber-craft-project';
+}
+
+export function fiberCraftProjectFilename(title: string): string {
+  return `${fiberCraftFilenameStem(title)}.craftproj`;
 }

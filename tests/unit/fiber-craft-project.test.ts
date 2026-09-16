@@ -1,7 +1,15 @@
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createStarterCrochetDocument, workNextCrochetStitch } from '../../src/tools/fiber-craft/crochet-document-engine';
+import { crochetPngDimensions } from '../../src/tools/fiber-craft/engines/crochet-chart-renderer';
 import { crochetGlyphPrimitives } from '../../src/tools/fiber-craft/engines/crochet-glyph-engine';
 import { CROCHET_SYMBOLS } from '../../src/tools/fiber-craft/engines/symbol-library';
+import {
+  buildCrochetPatternBookModel,
+  buildCrochetPatternPdf,
+  fiberCraftPatternPdfFilename,
+  fiberCraftPngFilename,
+} from '../../src/tools/fiber-craft/pattern-export-engine';
 import {
   FIBER_CRAFT_PROJECT_KIND,
   fiberCraftProjectFilename,
@@ -88,5 +96,44 @@ describe('crochet vector glyph geometry', () => {
     expect(crochetGlyphPrimitives('dc-tr')).toHaveLength(3);
     expect(crochetGlyphPrimitives('tr-dtr')).toHaveLength(4);
     expect(crochetGlyphPrimitives('dtr-trtr')).toHaveLength(5);
+  });
+});
+
+describe('crochet publishing exports', () => {
+  it('builds a multi-page vector pattern book with project metadata, legend, and instructions', async () => {
+    const starter = createStarterCrochetDocument('2026-09-16T00:00:00.000Z');
+    const worked = workNextCrochetStitch(starter, 0, 'sc-dc', 'primary', '2026-09-16T00:01:00.000Z');
+    const document = {
+      ...worked,
+      metadata: {
+        ...worked.metadata,
+        title: 'Market Bag',
+        author: 'Pattern Author',
+        difficulty: 'Intermediate',
+        techniqueTags: ['rounds', 'shaping'],
+        materialClass: '4 Medium',
+        toolSize: '5.5 mm',
+      },
+      gauge: { stitchCount: 20, rowCount: 28, span: 4, unit: 'in' as const },
+    };
+    const model = buildCrochetPatternBookModel(document, 'us');
+    expect(model.materials).toContain('Yarn / material: 4 Medium');
+    expect(model.legend.some((line) => line.includes('single crochet (sc)'))).toBe(true);
+    expect(model.instructions[0]).toContain('Round 1: 1 sc [Primary]');
+
+    const bytes = await buildCrochetPatternPdf(document, 'us');
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(4);
+    expect(pdf.getTitle()).toBe('Market Bag');
+    expect(pdf.getAuthor()).toBe('Pattern Author');
+  });
+
+  it('bounds PNG export scales and produces stable export filenames', () => {
+    expect(crochetPngDimensions(1)).toEqual({ width: 960, height: 720 });
+    expect(crochetPngDimensions(4)).toEqual({ width: 3840, height: 2880 });
+    expect(() => crochetPngDimensions(5)).toThrow(/1 to 4/);
+    expect(fiberCraftPngFilename('Héirloom Market Bag', 4)).toBe('heirloom-market-bag-4x.png');
+    expect(fiberCraftPatternPdfFilename('Héirloom Market Bag')).toBe('heirloom-market-bag-pattern-book.pdf');
   });
 });

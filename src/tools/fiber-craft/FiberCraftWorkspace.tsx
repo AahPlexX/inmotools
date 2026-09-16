@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react';
-import { downloadText } from '../../lib/download';
+import { downloadBlob, downloadBytes, downloadText } from '../../lib/download';
 import {
   addCrochetRound,
   createStarterCrochetDocument,
@@ -26,8 +26,11 @@ import {
   FiberCraftChartDescription,
   type FiberCraftTheme,
 } from './FiberCraftAccessibility';
-import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './engines/crochet-glyph-engine';
-import { polarNodeToCartesian } from './engines/geometry-engine';
+import {
+  crochetPngDimensions,
+  renderCrochetChartCanvas,
+  type CrochetPngScale,
+} from './engines/crochet-chart-renderer';
 import { CROCHET_SYMBOLS, crochetSymbolLabel, type CrochetDialect } from './engines/symbol-library';
 import {
   commitFiberCraftHistory,
@@ -37,7 +40,12 @@ import {
   type FiberCraftHistory,
 } from './history-engine';
 import { createIndexedDbFiberCraftStore, type FiberCraftStore } from './persistence-engine';
-import { fiberCraftProjectFilename, parseFiberCraftProject, serializeFiberCraftProject } from './project-bundle-engine';
+import {
+  fiberCraftFilenameStem,
+  fiberCraftProjectFilename,
+  parseFiberCraftProject,
+  serializeFiberCraftProject,
+} from './project-bundle-engine';
 import type { ColorSlot, FiberCraftDocument, GaugeSwatch, PolarChart } from './fiber-craft-types';
 import './fiber-craft-workspace.css';
 import './fiber-craft-accessibility.css';
@@ -58,61 +66,6 @@ const historyReducer = (history: FiberCraftHistory, action: HistoryAction): Fibe
   }
 };
 
-const CANVAS_THEME_COLORS: Record<FiberCraftTheme, {
-  readonly background: string;
-  readonly emptyFill: string;
-  readonly ring: string;
-  readonly active: string;
-  readonly complete: string;
-  readonly emptyStroke: string;
-}> = {
-  light: { background: '#fbfcfd', emptyFill: '#ffffff', ring: '#d7dde3', active: '#205bd6', complete: '#087a55', emptyStroke: '#aeb8c2' },
-  'dark-room': { background: '#090e13', emptyFill: '#111820', ring: '#667787', active: '#9fc2ff', complete: '#85e6b9', emptyStroke: '#8b9ba9' },
-  'high-contrast': { background: '#ffffff', emptyFill: '#ffffff', ring: '#000000', active: '#000000', complete: '#000000', emptyStroke: '#000000' },
-};
-
-const glyphInkForSwatch = (hex: string | undefined): string => {
-  if (!hex) return '#101820';
-  const match = /^#([0-9a-f]{6})$/i.exec(hex);
-  if (!match) return '#101820';
-  const value = Number.parseInt(match[1], 16);
-  const red = (value >> 16) & 0xff;
-  const green = (value >> 8) & 0xff;
-  const blue = value & 0xff;
-  return (red * 299 + green * 587 + blue * 114) / 1000 >= 150 ? '#101820' : '#ffffff';
-};
-
-const drawGlyphPrimitive = (context: CanvasRenderingContext2D, primitive: CrochetGlyphPrimitive): void => {
-  context.beginPath();
-  switch (primitive.kind) {
-    case 'line': context.moveTo(primitive.x1, primitive.y1); context.lineTo(primitive.x2, primitive.y2); context.stroke(); return;
-    case 'ellipse': context.ellipse(primitive.cx, primitive.cy, primitive.rx, primitive.ry, 0, 0, Math.PI * 2); primitive.filled ? context.fill() : context.stroke(); return;
-    case 'circle': context.arc(primitive.cx, primitive.cy, primitive.r, 0, Math.PI * 2); primitive.filled ? context.fill() : context.stroke(); return;
-    case 'arc': context.arc(primitive.cx, primitive.cy, primitive.r, primitive.startAngle, primitive.endAngle, primitive.anticlockwise); context.stroke(); return;
-    case 'polyline':
-      if (primitive.points.length === 0) return;
-      context.moveTo(primitive.points[0].x, primitive.points[0].y);
-      for (const point of primitive.points.slice(1)) context.lineTo(point.x, point.y);
-      if (primitive.closed) context.closePath();
-      context.stroke();
-      return;
-  }
-};
-
-const drawCrochetGlyph = (context: CanvasRenderingContext2D, symbolId: string, x: number, y: number, size: number, rotation: number, ink: string): void => {
-  context.save();
-  context.translate(x, y);
-  context.rotate(rotation);
-  context.scale(size, size);
-  context.strokeStyle = ink;
-  context.fillStyle = ink;
-  context.lineWidth = 0.12;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
-  for (const primitive of crochetGlyphPrimitives(symbolId)) drawGlyphPrimitive(context, primitive);
-  context.restore();
-};
-
 function CrochetCanvas({ chart, palette, activeRound, completedSteps, theme }: {
   chart: PolarChart;
   palette: readonly ColorSlot[];
@@ -127,47 +80,14 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps, theme }: {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    const colors = CANVAS_THEME_COLORS[theme];
-    const width = canvas.width;
-    const height = canvas.height;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const spacing = Math.min(width, height) / (2 * (Math.max(chart.rounds, 1) + 1));
-    const nodeRadius = Math.max(10, Math.min(20, spacing * 0.3));
-
-    context.clearRect(0, 0, width, height);
-    context.fillStyle = colors.background;
-    context.fillRect(0, 0, width, height);
-    for (let round = 0; round < chart.rounds; round += 1) {
-      const complete = completedSteps.includes(`round:${round}`);
-      context.beginPath();
-      context.arc(centerX, centerY, (round + 1) * spacing, 0, Math.PI * 2);
-      context.lineWidth = round === activeRound ? 5 : complete ? 3 : 2;
-      context.strokeStyle = round === activeRound ? colors.active : complete ? colors.complete : colors.ring;
-      context.setLineDash(complete ? [10, 6] : []);
-      context.stroke();
-    }
-    context.setLineDash([]);
-
-    for (const node of chart.nodes) {
-      const point = polarNodeToCartesian(node, spacing);
-      const x = centerX + point.x;
-      const y = centerY + point.y;
-      const swatch = node.colorId ? palette.find((color) => color.id === node.colorId) : undefined;
-      const fill = theme === 'high-contrast' ? colors.emptyFill : swatch?.hex ?? colors.emptyFill;
-      const ink = theme === 'high-contrast' ? '#000000' : glyphInkForSwatch(fill);
-      context.beginPath();
-      context.arc(x, y, nodeRadius, 0, Math.PI * 2);
-      context.fillStyle = fill;
-      context.fill();
-      context.lineWidth = 2;
-      context.strokeStyle = node.symbolId ? ink : colors.emptyStroke;
-      context.stroke();
-      if (node.symbolId) {
-        const angle = (2 * Math.PI * node.angleIndex) / node.stitchesInRound;
-        drawCrochetGlyph(context, node.symbolId, x, y, nodeRadius * 0.82, angle + Math.PI / 2, ink);
-      }
-    }
+    renderCrochetChartCanvas(context, chart, palette, {
+      width: canvas.width,
+      height: canvas.height,
+      theme,
+      activeRound,
+      completedSteps,
+      showProgress: true,
+    });
   }, [activeRound, chart, completedSteps, palette, theme]);
 
   return (
@@ -193,6 +113,7 @@ export default function FiberCraftWorkspace() {
   const [dialect, setDialect] = useState<CrochetDialect>('us');
   const [theme, setTheme] = useState<FiberCraftTheme>('light');
   const [descriptionVisible, setDescriptionVisible] = useState(true);
+  const [pngScale, setPngScale] = useState<CrochetPngScale>(2);
   const [activeRound, setActiveRound] = useState(0);
   const [activeGridRow, setActiveGridRow] = useState(0);
   const [selectedSymbol, setSelectedSymbol] = useState('sc-dc');
@@ -292,6 +213,37 @@ export default function FiberCraftWorkspace() {
       setStatus(`Saved ${filename}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the project file.'); }
   };
+  const exportPng = async () => {
+    try {
+      if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('PNG export currently supports crochet round and grid charts.');
+      const dimensions = crochetPngDimensions(pngScale);
+      const canvas = window.document.createElement('canvas');
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('This browser could not create a PNG rendering canvas.');
+      renderCrochetChartCanvas(context, document.chart, document.palette, {
+        ...dimensions,
+        theme: 'light',
+        showProgress: false,
+      });
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error('This browser could not encode the PNG file.')), 'image/png');
+      });
+      const filename = `${fiberCraftFilenameStem(document.metadata.title)}-${pngScale}x.png`;
+      downloadBlob(blob, filename);
+      setStatus(`Exported ${filename} at ${dimensions.width} × ${dimensions.height} pixels.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the PNG.'); }
+  };
+  const exportPatternPdf = async () => {
+    try {
+      const { buildCrochetPatternPdf, fiberCraftPatternPdfFilename } = await import('./pattern-export-engine');
+      const bytes = await buildCrochetPatternPdf(document, dialect);
+      const filename = fiberCraftPatternPdfFilename(document.metadata.title);
+      downloadBytes(bytes, filename, 'application/pdf');
+      setStatus(`Exported ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the pattern PDF.'); }
+  };
   const openProjectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -340,6 +292,7 @@ export default function FiberCraftWorkspace() {
             {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
               : <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
+            <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPatternPdf()}>Export pattern PDF</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions.</p></section>
             <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
           </aside>
         </div>
