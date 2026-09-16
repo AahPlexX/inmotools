@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react';
+import { downloadText } from '../../lib/download';
 import {
   addCrochetRound,
   createStarterCrochetDocument,
@@ -11,10 +12,10 @@ import {
   workNextCrochetStitch,
 } from './crochet-document-engine';
 import { CrochetGridPanel, CrochetRoundInsights, YarnReferencePanel } from './CrochetPatternPanels';
+import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './engines/crochet-glyph-engine';
 import { polarNodeToCartesian } from './engines/geometry-engine';
 import {
   CROCHET_SYMBOLS,
-  crochetSymbolAbbreviation,
   crochetSymbolLabel,
   type CrochetDialect,
 } from './engines/symbol-library';
@@ -26,6 +27,11 @@ import {
   type FiberCraftHistory,
 } from './history-engine';
 import { createIndexedDbFiberCraftStore, type FiberCraftStore } from './persistence-engine';
+import {
+  fiberCraftProjectFilename,
+  parseFiberCraftProject,
+  serializeFiberCraftProject,
+} from './project-bundle-engine';
 import type { ColorSlot, FiberCraftDocument, PolarChart } from './fiber-craft-types';
 import './fiber-craft-workspace.css';
 
@@ -48,20 +54,85 @@ const historyReducer = (history: FiberCraftHistory, action: HistoryAction): Fibe
   }
 };
 
+const glyphInkForSwatch = (hex: string | undefined): string => {
+  if (!hex) return '#101820';
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return '#101820';
+  const value = Number.parseInt(match[1], 16);
+  const red = (value >> 16) & 0xff;
+  const green = (value >> 8) & 0xff;
+  const blue = value & 0xff;
+  const perceived = (red * 299 + green * 587 + blue * 114) / 1000;
+  return perceived >= 150 ? '#101820' : '#ffffff';
+};
+
+const drawGlyphPrimitive = (context: CanvasRenderingContext2D, primitive: CrochetGlyphPrimitive): void => {
+  context.beginPath();
+  switch (primitive.kind) {
+    case 'line':
+      context.moveTo(primitive.x1, primitive.y1);
+      context.lineTo(primitive.x2, primitive.y2);
+      context.stroke();
+      return;
+    case 'ellipse':
+      context.ellipse(primitive.cx, primitive.cy, primitive.rx, primitive.ry, 0, 0, Math.PI * 2);
+      if (primitive.filled) context.fill();
+      else context.stroke();
+      return;
+    case 'circle':
+      context.arc(primitive.cx, primitive.cy, primitive.r, 0, Math.PI * 2);
+      if (primitive.filled) context.fill();
+      else context.stroke();
+      return;
+    case 'arc':
+      context.arc(primitive.cx, primitive.cy, primitive.r, primitive.startAngle, primitive.endAngle, primitive.anticlockwise);
+      context.stroke();
+      return;
+    case 'polyline':
+      if (primitive.points.length === 0) return;
+      context.moveTo(primitive.points[0].x, primitive.points[0].y);
+      for (const point of primitive.points.slice(1)) context.lineTo(point.x, point.y);
+      if (primitive.closed) context.closePath();
+      context.stroke();
+      return;
+  }
+};
+
+const drawCrochetGlyph = (
+  context: CanvasRenderingContext2D,
+  symbolId: string,
+  x: number,
+  y: number,
+  size: number,
+  rotation: number,
+  ink: string,
+): void => {
+  context.save();
+  context.translate(x, y);
+  context.rotate(rotation);
+  context.scale(size, size);
+  context.strokeStyle = ink;
+  context.fillStyle = ink;
+  context.lineWidth = 0.12;
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  for (const primitive of crochetGlyphPrimitives(symbolId)) drawGlyphPrimitive(context, primitive);
+  context.restore();
+};
+
 function CrochetCanvas({
   chart,
   palette,
-  dialect,
   activeRound,
   completedSteps,
 }: {
   chart: PolarChart;
   palette: readonly ColorSlot[];
-  dialect: CrochetDialect;
   activeRound: number;
   completedSteps: readonly string[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderedSymbols = chart.nodes.filter((node) => node.symbolId !== null).length;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -89,27 +160,25 @@ function CrochetCanvas({
     }
     context.setLineDash([]);
 
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.font = '600 18px ui-sans-serif, system-ui, sans-serif';
     for (const node of chart.nodes) {
       const point = polarNodeToCartesian(node, spacing);
       const x = centerX + point.x;
       const y = centerY + point.y;
       const swatch = node.colorId ? palette.find((color) => color.id === node.colorId) : undefined;
+      const ink = glyphInkForSwatch(swatch?.hex);
       context.beginPath();
       context.arc(x, y, nodeRadius, 0, Math.PI * 2);
       context.fillStyle = swatch?.hex ?? '#ffffff';
       context.fill();
       context.lineWidth = 2;
-      context.strokeStyle = node.symbolId ? '#101820' : '#aeb8c2';
+      context.strokeStyle = node.symbolId ? ink : '#aeb8c2';
       context.stroke();
       if (node.symbolId) {
-        context.fillStyle = '#101820';
-        context.fillText(crochetSymbolAbbreviation(node.symbolId, dialect), x, y);
+        const angle = (2 * Math.PI * node.angleIndex) / node.stitchesInRound;
+        drawCrochetGlyph(context, node.symbolId, x, y, nodeRadius * 0.82, angle + Math.PI / 2, ink);
       }
     }
-  }, [activeRound, chart, completedSteps, dialect, palette]);
+  }, [activeRound, chart, completedSteps, palette]);
 
   return (
     <canvas
@@ -117,8 +186,10 @@ function CrochetCanvas({
       className="fiber-craft-canvas"
       width={960}
       height={720}
-      aria-label={`Crochet round chart. Round ${activeRound + 1} is active.`}
+      aria-label={`Crochet round chart with vector stitch symbols. Round ${activeRound + 1} is active.`}
       data-testid="crochet-round-canvas"
+      data-symbol-rendering="vector"
+      data-rendered-symbols={renderedSymbols}
     >
       Crochet round chart with {chart.rounds} rounds. Round {activeRound + 1} is active.
     </canvas>
@@ -273,6 +344,34 @@ export default function FiberCraftWorkspace() {
     }
   };
 
+  const saveProjectFile = () => {
+    try {
+      const filename = fiberCraftProjectFilename(document.metadata.title);
+      downloadText(serializeFiberCraftProject(document), filename, 'application/json;charset=utf-8');
+      setStatus(`Saved ${filename}.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not save the project file.');
+    }
+  };
+
+  const openProjectFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const loaded = parseFiberCraftProject(await file.text());
+      dispatch({ type: 'replace', document: loaded });
+      setPendingRestore(null);
+      if (loaded.chart.kind === 'polar') setActiveRound(0);
+      if (loaded.chart.kind === 'grid') setActiveGridRow(0);
+      setStatus(`Loaded ${file.name}. Changes will continue saving locally.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not open the project file.');
+    } finally {
+      input.value = '';
+    }
+  };
+
   const restoreDraft = () => {
     if (!pendingRestore) return;
     dispatch({ type: 'replace', document: pendingRestore });
@@ -352,7 +451,6 @@ export default function FiberCraftWorkspace() {
               <CrochetCanvas
                 chart={roundChart}
                 palette={document.palette}
-                dialect={dialect}
                 activeRound={activeRound}
                 completedSteps={document.completedSteps}
               />
@@ -434,6 +532,21 @@ export default function FiberCraftWorkspace() {
                   </span>
                 ))}
               </div>
+            </section>
+
+            <section>
+              <h3>Project file</h3>
+              <button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button>
+              <label className="fiber-craft-field" htmlFor="fiber-project-file">
+                <span>Open project file</span>
+                <input
+                  id="fiber-project-file"
+                  type="file"
+                  accept=".craftproj,application/json"
+                  onChange={openProjectFile}
+                />
+              </label>
+              <p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p>
             </section>
           </aside>
         </div>

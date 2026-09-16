@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Fiber Craft Workstation', () => {
-  test('edits round and grid crochet patterns and restores the local project', async ({ page }) => {
+  test('edits crochet charts, moves a portable project, and restores the local session', async ({ page }) => {
     await page.goto('./#/fiber-craft-workstation');
 
     await expect(page.getByRole('heading', { name: 'Fiber Craft Workstation' })).toBeVisible();
@@ -15,6 +15,8 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByLabel('Stitch symbol').selectOption('sc-dc');
     await page.getByRole('button', { name: 'Place next stitch' }).click();
     await expect(page.getByTestId('active-round-progress')).toHaveText('1 of 6 stitches worked');
+    await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-symbol-rendering', 'vector');
+    await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-rendered-symbols', '1');
     await expect(page.getByTestId('written-pattern')).toContainText('1 sc [Primary]');
     await expect(undo).toBeEnabled();
 
@@ -41,6 +43,22 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Center active row' }).click();
     await expect(page.getByLabel('Row 1', { exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Mark row complete' }).click();
+    await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
+
+    const [projectDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Save .craftproj' }).click(),
+    ]);
+    expect(projectDownload.suggestedFilename()).toBe('untitled-pattern.craftproj');
+    const projectPath = await projectDownload.path();
+    expect(projectPath).not.toBeNull();
+
+    await page.getByRole('button', { name: /Row 1, column 1, filled/ }).click();
+    await page.getByRole('button', { name: 'Mark row unfinished' }).click();
+    await expect(page.getByRole('button', { name: 'Row 1, column 1, open' })).toBeVisible();
+    await page.getByLabel('Open project file').setInputFiles(projectPath!);
+    await expect(page.locator('p.fiber-craft-status')).toContainText('Loaded untitled-pattern.craftproj');
+    await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
     await expect(page.locator('p.fiber-craft-status')).toContainText('Saved locally', { timeout: 3_000 });
