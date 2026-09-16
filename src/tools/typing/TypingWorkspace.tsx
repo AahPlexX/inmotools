@@ -317,10 +317,17 @@ export default function TypingWorkspace() {
   useEffect(() => {
     void (async () => {
       const dur = classifyDuration(config);
-      const pb = await findPersonalBest(config.mode, dur.value);
+      const pb = await findPersonalBest({
+      mode: config.mode,
+      durationMode: dur.mode,
+      durationValue: dur.value,
+      language: config.language,
+      layout: config.layout,
+      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
+    });
       setPersonalBest(pb ?? null);
     })();
-  }, [config.mode, config.durationMode, config.durationValue]);
+  }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
 
   // Wall-clock tick while a test is running.
   useEffect(() => {
@@ -576,6 +583,7 @@ export default function TypingWorkspace() {
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
+      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
       language: config.language,
       layout: config.layout,
       targetText: target,
@@ -597,7 +605,14 @@ export default function TypingWorkspace() {
     const id = await saveTest(stored);
     setSavedTestId(id);
     setHistory(await listTests());
-    setPersonalBest(await findPersonalBest(config.mode, dur.value) ?? null);
+    setPersonalBest(await findPersonalBest({
+      mode: config.mode,
+      durationMode: dur.mode,
+      durationValue: dur.value,
+      language: config.language,
+      layout: config.layout,
+      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
+    }) ?? null);
     setSaveModalOpen(false);
     setStatusText('Test saved to local history.');
   }, [config, engine, metrics, target]);
@@ -615,6 +630,7 @@ export default function TypingWorkspace() {
           mode: config.mode,
           durationMode: dur.mode,
           durationValue: dur.value,
+          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
           language: config.language,
           layout: config.layout,
           targetText: target,
@@ -638,6 +654,7 @@ export default function TypingWorkspace() {
           mode: config.mode,
           durationMode: dur.mode,
           durationValue: dur.value,
+          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
           language: config.language,
           layout: config.layout,
           targetText: target,
