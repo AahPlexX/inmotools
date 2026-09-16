@@ -53,6 +53,12 @@ describe('typing storage', () => {
     expect(rows[0]?.tags).toEqual(['morning']);
   });
 
+  it('rejects malformed runtime records instead of persisting crash-prone history data', async () => {
+    const malformed = { ...makeTest(), tags: 'not-an-array' } as unknown as StoredTest;
+    await expect(saveTest(malformed)).rejects.toThrow(/invalid typing test/i);
+    expect(await listTests()).toHaveLength(0);
+  });
+
   it('assigns fresh local ids when imported records carry an existing id', async () => {
     const first = await saveTest(makeTest({ id: 7, notes: 'first import' }));
     const second = await saveTest(makeTest({ id: 7, notes: 'second import' }));
