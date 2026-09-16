@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const ROUTE = '/inmotools/#/tools/typing-workstation';
@@ -22,6 +22,14 @@ async function clearTypingDatabase(page: Page) {
       request.onblocked = () => reject(new Error('IndexedDB delete was blocked'));
     });
   }, DB_NAME);
+}
+
+async function downloadBuffer(download: Download): Promise<Buffer> {
+  const stream = await download.createReadStream();
+  expect(stream).not.toBeNull();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
 function wordCountSelect(workspace: ReturnType<Page['getByTestId']>) {
@@ -69,11 +77,7 @@ test('completes a multiline word-count custom target, persists it, and exports t
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^typing-test-.*\.json$/);
 
-  const stream = await download.createReadStream();
-  expect(stream).not.toBeNull();
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
-  const exported = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  const exported = JSON.parse((await downloadBuffer(download)).toString('utf8'));
   expect(exported.tool).toBe('inmotools-typing-workstation');
   expect(exported.schemaVersion).toBe(1);
   expect(exported.typistName).toBe('Browser Regression');
@@ -84,6 +88,84 @@ test('completes a multiline word-count custom target, persists it, and exports t
   await page.reload();
   const history = page.getByRole('region', { name: 'Session history' });
   await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
+});
+
+test('exports history metadata across formats and re-imports a bundle without id collisions', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByLabel('Duration').selectOption('words');
+  await wordCountSelect(workspace).selectOption('10');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill('one two three four five six seven eight nine ten');
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  await canvas.focus();
+  await page.keyboard.type('one two three four five six seven eight nine ten', { delay: 10 });
+
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByPlaceholder('add tag').fill('saved-tag');
+  await resultDialog.getByPlaceholder('add tag').press('Enter');
+  await resultDialog.getByLabel('Notes').fill('saved note');
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+  const history = workspace.getByRole('region', { name: 'Session history' });
+  const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(totalTests).toContainText('1');
+
+  await workspace.getByRole('button', { name: 'Export…' }).click();
+  const exportDialog = workspace.getByRole('dialog', { name: 'Export history' });
+  await exportDialog.getByLabel('Typist name').fill('History Typist');
+  await exportDialog.getByLabel('Organization').fill('Records Office');
+  await exportDialog.getByLabel('Certified by').fill('Supervisor');
+  await exportDialog.getByLabel('Global tags to add (Enter to add)').fill('archive');
+  await exportDialog.getByLabel('Global tags to add (Enter to add)').press('Enter');
+  await exportDialog.getByLabel('Notes').fill('quarterly export');
+
+  const csvPromise = page.waitForEvent('download');
+  await exportDialog.getByRole('button', { name: 'Export CSV' }).click();
+  const csvDownload = await csvPromise;
+  expect(csvDownload.suggestedFilename()).toMatch(/^typing-history-.*\.csv$/);
+  const csv = (await downloadBuffer(csvDownload)).toString('utf8');
+  expect(csv).toContain('export_tags');
+  expect(csv).toContain('archive');
+  expect(csv).toContain('quarterly export');
+  expect(csv).toContain('Records Office');
+
+  const mdPromise = page.waitForEvent('download');
+  await exportDialog.getByRole('button', { name: 'Export Markdown' }).click();
+  const markdownDownload = await mdPromise;
+  expect(markdownDownload.suggestedFilename()).toMatch(/^typing-history-.*\.md$/);
+  const markdown = (await downloadBuffer(markdownDownload)).toString('utf8');
+  expect(markdown).toContain('History Typist');
+  expect(markdown).toContain('Records Office');
+  expect(markdown).toContain('archive');
+  expect(markdown).toContain('quarterly export');
+
+  const jsonPromise = page.waitForEvent('download');
+  await exportDialog.getByRole('button', { name: 'Export JSON' }).click();
+  const jsonDownload = await jsonPromise;
+  expect(jsonDownload.suggestedFilename()).toMatch(/^typing-history-.*\.json$/);
+  const jsonBuffer = await downloadBuffer(jsonDownload);
+  const bundle = JSON.parse(jsonBuffer.toString('utf8'));
+  expect(bundle.typistName).toBe('History Typist');
+  expect(bundle.organization).toBe('Records Office');
+  expect(bundle.globalTags).toContain('archive');
+  expect(bundle.notes).toBe('quarterly export');
+  expect(bundle.tests).toHaveLength(1);
+  expect(bundle.tests[0].id).toEqual(expect.any(Number));
+
+  await page.keyboard.press('Escape');
+  await expect(exportDialog).toBeHidden();
+
+  const importInput = workspace.locator('label').filter({ hasText: /Import JSON/ }).locator('input[type="file"]');
+  await importInput.setInputFiles({ name: 'typing-history.json', mimeType: 'application/json', buffer: jsonBuffer });
+  await expect(workspace).toContainText('Imported 1 test.');
+  await expect(totalTests).toContainText('2');
 });
 
 test('normalizes duration families, honors exact word count, bundles fonts, and exposes modal semantics', async ({ page }) => {
