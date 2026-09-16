@@ -16,4 +16,4 @@
 - **Photo Studio** — local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
   - Design: `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
-  - Current milestone: capability expansion Phase 1 / Task 1.5 — RAW acquisition, supported development controls, camera/source inspection, and embedded previews implemented; exposure baseline remains open. Authoritative gates/evidence: `.tasks/PHOTO_STUDIO.md`.
+  - Current milestone: capability expansion Phase 2 / Task 2.1 direct crop/composition geometry is GREEN at `58fca145c36e977c23aab118c27fa7b1a40c092c`; Task 2.2 per-channel curves/levels/channel mixer is next. Phase 1 / Task 1.5 remains an explicit release blocker because the current RAW wrapper does not expose LibRaw pre-demosaic exposure shift. Authoritative gates/evidence: `.tasks/PHOTO_STUDIO.md`.
