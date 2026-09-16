@@ -304,6 +304,17 @@ export function alignmentRotation(from: CadKernelVector3, to: CadKernelVector3):
   return { axis: normalizeVector(crossVector(fromUnit, toUnit)), angle: Math.acos(cosine) };
 }
 
+/**
+ * A unit vector perpendicular to both `direction` and `planeNormal` - the
+ * in-plane "sideways" direction used to offset a centerline into a wall of a
+ * given thickness (e.g. a rib). Throws if `direction` is parallel to
+ * `planeNormal`, since a line that isn't actually in the plane has no
+ * meaningful in-plane sideways direction.
+ */
+export function perpendicularInPlane(direction: CadKernelVector3, planeNormal: CadKernelVector3): CadKernelVector3 {
+  return normalizeVector(crossVector(normalizeVector(planeNormal), normalizeVector(direction)));
+}
+
 function curveEdge(
   entity: TraversableEntity['entity'],
   reversed: boolean,

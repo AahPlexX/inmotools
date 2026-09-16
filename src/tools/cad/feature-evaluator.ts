@@ -4,10 +4,12 @@ import {
   buildSketchPath3d,
   buildSketchProfile3d,
   negate,
+  perpendicularInPlane,
   resolveDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
   type CadDatumPlaneFrames,
+  type CadSketchPlane3d,
   type CadSketchProfile3d,
   type CadSketchWire3d,
   type PlaneFrame,
@@ -666,6 +668,98 @@ function holeFeature(
   });
 }
 
+/**
+ * Rib: extrudes a thin wall along a straight sketch centerline and fuses it
+ * onto the dependency body. The wall's cross-section is built automatically
+ * by offsetting the centerline by half the thickness on each side, in-plane,
+ * rather than requiring the user to hand-draw the offset rectangle - the one
+ * thing a plain extrude+fuse composition doesn't already give for free.
+ * Scope is deliberately narrow: a single straight-line centerline only.
+ * Multi-segment or curved centerlines would need real 2D polyline offset
+ * with mitered corners, which is a genuinely separate piece of geometry.
+ */
+function ribFeature(
+  feature: CadFeature,
+  project: CadProject,
+  datumPlanes: CadDatumPlaneFrames,
+  kernel: CadFeatureKernel,
+  featureShapes: ReadonlyMap<string, CadKernelShape>,
+): CadKernelShape {
+  const thickness = parameterNumber(feature, 'thickness');
+  const depth = parameterNumber(feature, 'depth');
+  const shape = singleDependencyShape(feature, featureShapes, 'rib');
+  const sketch = sketchForFeature(feature, project);
+  const pathEntityIds = parameterStringArray(feature, 'profileEntityIds');
+  if (pathEntityIds.length !== 1) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} centerline must reference exactly one straight line entity.`);
+  }
+
+  let path: CadSketchWire3d;
+  try {
+    path = buildSketchPath3d(sketch, pathEntityIds, datumPlanes);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} centerline is invalid: ${message}`, { cause: error });
+  }
+  const centerlineEdge = path.edges.length === 1 ? path.edges[0] : undefined;
+  if (!centerlineEdge || centerlineEdge.kind !== 'line') {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} centerline must be a single straight line entity.`);
+  }
+
+  let plane: CadSketchPlane3d;
+  try {
+    plane = resolveSketchPlane3d(sketch, datumPlanes);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} sketch plane is invalid: ${message}`, { cause: error });
+  }
+
+  const { start, end } = centerlineEdge;
+  const lineDirection: CadKernelVector3 = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+  let perpendicular: CadKernelVector3;
+  try {
+    perpendicular = perpendicularInPlane(lineDirection, plane.normal);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} centerline direction is invalid: ${message}`, { cause: error });
+  }
+
+  const halfThickness = thickness / 2;
+  const offset = (point: CadKernelVector3, sign: 1 | -1): CadKernelVector3 => [
+    point[0] + sign * perpendicular[0] * halfThickness,
+    point[1] + sign * perpendicular[1] * halfThickness,
+    point[2] + sign * perpendicular[2] * halfThickness,
+  ];
+  const a = offset(start, 1);
+  const b = offset(end, 1);
+  const c = offset(end, -1);
+  const d = offset(start, -1);
+  const wallProfile3d: CadSketchProfile3d = {
+    normal: plane.normal,
+    edges: [
+      { kind: 'line', start: a, end: b },
+      { kind: 'line', start: b, end: c },
+      { kind: 'line', start: c, end: d },
+      { kind: 'line', start: d, end: a },
+    ],
+  };
+
+  const reversed = feature.parameters.reversed === true;
+  const direction: CadKernelVector3 = reversed ? negate(plane.normal) : plane.normal;
+  const wallFace = kernel.profileFace(wallProfile3d);
+  let tool: CadKernelShape;
+  try {
+    tool = kernel.extrude(wallFace, depth, direction);
+  } finally {
+    kernel.release(wallFace);
+  }
+  try {
+    return kernel.fuse(shape, tool);
+  } finally {
+    kernel.release(tool);
+  }
+}
+
 function projectSketch(feature: CadFeature, project: CadProject, sketchId: string, role: string) {
   const sketch = project.sketches.find((candidate) => candidate.id === sketchId);
   if (!sketch) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown ${role} sketch '${sketchId}'.`);
@@ -878,6 +972,8 @@ function createFeatureShape(
       return thickenFeature(feature, kernel, featureShapes);
     case 'hole':
       return holeFeature(feature, project, datumPlanes, kernel, featureShapes);
+    case 'rib':
+      return ribFeature(feature, project, datumPlanes, kernel, featureShapes);
     default:
       if (isNonSolidPassThrough(feature)) return null;
       throw new CadFeatureEvaluationError(
