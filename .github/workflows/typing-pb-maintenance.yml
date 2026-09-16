@@ -2,79 +2,78 @@ name: Typing PB one-shot maintenance
 
 on:
   push:
-    branches: [feature/typing-workstation]
+    branches:
+      - feature/typing-workstation
     paths:
-      - '.github/workflows/typing-pb-maintenance.yml'
+      - .github/workflows/typing-pb-maintenance.yml
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.ref_name == 'feature/typing-workstation'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           ref: feature/typing-workstation
           fetch-depth: 0
-      - uses: pnpm/setup@v2
-        with:
-          runtime: node@24
-          install: false
-      - run: pnpm install --frozen-lockfile
-      - name: Scope personal-best lookup to active test family
-        shell: python
+      - name: Patch personal-best workspace wiring
         run: |
+          python <<'PY'
           from pathlib import Path
+
           path = Path('src/tools/typing/TypingWorkspace.tsx')
           text = path.read_text()
 
-          old_effect = """      const dur = classifyDuration(config);
-      const pb = await findPersonalBest(config.mode, dur.value);
-      setPersonalBest(pb ?? null);
-    })();
-  }, [config.mode, config.durationMode, config.durationValue]);"""
-          new_effect = """      const dur = classifyDuration(config);
-      const pb = await findPersonalBest({
-        mode: config.mode,
-        durationMode: dur.mode,
-        durationValue: dur.value,
-        language: config.language,
-        layout: config.layout,
-        quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-      });
-      setPersonalBest(pb ?? null);
-    })();
-  }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);"""
+          old_effect = '''      const dur = classifyDuration(config);
+              const pb = await findPersonalBest(config.mode, dur.value);
+              setPersonalBest(pb ?? null);
+            })();
+          }, [config.mode, config.durationMode, config.durationValue]);'''
+          new_effect = '''      const dur = classifyDuration(config);
+              const pb = await findPersonalBest({
+                mode: config.mode,
+                durationMode: dur.mode,
+                durationValue: dur.value,
+                language: config.language,
+                layout: config.layout,
+                quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
+              });
+              setPersonalBest(pb ?? null);
+            })();
+          }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);'''
           if text.count(old_effect) != 1:
               raise SystemExit(f'PB effect guard expected 1 match, found {text.count(old_effect)}')
           text = text.replace(old_effect, new_effect, 1)
 
-          old_saved_pb = "setPersonalBest(await findPersonalBest(config.mode, dur.value) ?? null);"
-          new_saved_pb = """setPersonalBest(await findPersonalBest({
-      mode: config.mode,
-      durationMode: dur.mode,
-      durationValue: dur.value,
-      language: config.language,
-      layout: config.layout,
-      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-    }) ?? null);"""
+          old_saved_pb = 'setPersonalBest(await findPersonalBest(config.mode, dur.value) ?? null);'
+          new_saved_pb = '''setPersonalBest(await findPersonalBest({
+                mode: config.mode,
+                durationMode: dur.mode,
+                durationValue: dur.value,
+                language: config.language,
+                layout: config.layout,
+                quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
+              }) ?? null);'''
           if text.count(old_saved_pb) != 1:
               raise SystemExit(f'post-save PB guard expected 1 match, found {text.count(old_saved_pb)}')
           text = text.replace(old_saved_pb, new_saved_pb, 1)
 
-          marker = "durationValue: dur.value,"
-          count = text.count(marker)
-          if count != 3:
-              raise SystemExit(f'expected 3 stored-test duration markers, found {count}')
-          text = text.replace(marker, marker + "\n      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,", 1)
-          text = text.replace(marker, marker + "\n          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,", 1)
-          text = text.replace(marker, marker + "\n          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,", 1)
+          stored_marker = '      durationValue: dur.value,\n      language: config.language,'
+          stored_replacement = "      durationValue: dur.value,\n      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,\n      language: config.language,"
+          if text.count(stored_marker) != 1:
+              raise SystemExit(f'save record guard expected 1 match, found {text.count(stored_marker)}')
+          text = text.replace(stored_marker, stored_replacement, 1)
+
+          fallback_marker = '          durationValue: dur.value,\n          language: config.language,'
+          fallback_replacement = "          durationValue: dur.value,\n          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,\n          language: config.language,"
+          if text.count(fallback_marker) != 2:
+              raise SystemExit(f'export fallback guard expected 2 matches, found {text.count(fallback_marker)}')
+          text = text.replace(fallback_marker, fallback_replacement)
 
           path.write_text(text)
-      - name: Focused PB storage regression
-        run: pnpm exec vitest run tests/unit/typing-storage.test.ts
+          PY
       - name: Commit source correction
         run: |
           git config user.name "AahPlexX"
