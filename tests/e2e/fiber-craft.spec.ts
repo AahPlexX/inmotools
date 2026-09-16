@@ -49,7 +49,7 @@ test.describe('Fiber Craft Workstation', () => {
       page.waitForEvent('download'),
       page.getByRole('button', { name: 'Save .craftproj' }).click(),
     ]);
-    expect(projectDownload.suggestedFilename()).toBe('untitled-pattern.craftproj');
+    expect(projectDownload.suggestedFilename()).toBe('crochet-round-chart.craftproj');
     const projectPath = await projectDownload.path();
     expect(projectPath).not.toBeNull();
 
@@ -57,7 +57,7 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Mark row unfinished' }).click();
     await expect(page.getByRole('button', { name: 'Row 1, column 1, open' })).toBeVisible();
     await page.getByLabel('Open project file').setInputFiles(projectPath!);
-    await expect(page.locator('p.fiber-craft-status')).toContainText('Loaded untitled-pattern.craftproj');
+    await expect(page.locator('p.fiber-craft-status')).toContainText('Loaded crochet-round-chart.craftproj');
     await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
