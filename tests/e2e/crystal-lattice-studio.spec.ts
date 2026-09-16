@@ -396,7 +396,7 @@ test('lists structure-health findings for the working structure', async ({ page 
 test('builds vacancy, substitution and interstitial defects with undo', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
-  await page.getByLabel('Defect site').selectOption({ index: 0 });
+  await page.getByLabel('Defect site').selectOption({ label: 'Na1' });
   await page.getByRole('button', { name: 'Create vacancy' }).click();
   await expect(page.getByTestId('crystal-site-count')).toContainText('7 sites');
   await expect(page.getByTestId('crystal-defect-status')).toContainText(/vacancy/i);
