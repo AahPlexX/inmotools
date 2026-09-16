@@ -1,0 +1,39 @@
+name: Web Layout Studio validation
+
+on:
+  push:
+    branches: [main, feat/web-layout-studio]
+    paths:
+      - 'src/tools/web-layout/**'
+      - 'tests/unit/web-layout.test.ts'
+      - 'tests/e2e/web-layout.spec.ts'
+      - '.github/workflows/web-layout.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run tests/unit/web-layout.test.ts
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test tests/e2e/web-layout.spec.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: web-layout-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

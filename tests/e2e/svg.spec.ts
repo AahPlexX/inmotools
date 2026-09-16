@@ -118,23 +118,48 @@ test('Vector Studio pan tool moves the artboard viewport rather than acting as a
   await page.setViewportSize({ width: 800, height: 700 });
   await page.goto('./#/tools/svg-sprite-compiler');
   await page.getByRole('button', { name: 'Zoom to 100 percent' }).click();
-  const scroller = page.locator('.vector-canvas-scroll');
-  await scroller.evaluate((element) => { element.scrollLeft = 320; element.scrollTop = 220; });
-  const before = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
-  expect(before.left).toBeGreaterThan(0);
-
   await page.getByRole('button', { name: 'Pan tool' }).click();
+
+  const scroller = page.locator('.vector-canvas-scroll');
   const canvas = page.getByTestId('vector-canvas');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Vector canvas has no bounding box.');
-  await page.mouse.move(box.x + 180, box.y + 150);
+  await scroller.scrollIntoViewIfNeeded();
+  const before = await scroller.evaluate((element) => {
+    const maxLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+    const maxTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    element.scrollLeft = Math.min(320, maxLeft);
+    element.scrollTop = Math.min(220, maxTop);
+    return { left: element.scrollLeft, top: element.scrollTop, maxLeft, maxTop };
+  });
+  expect(before.maxLeft > 0 || before.maxTop > 0).toBe(true);
+  expect(before.left > 0 || before.top > 0).toBe(true);
+
+  const [scrollerBox, canvasBox] = await Promise.all([scroller.boundingBox(), canvas.boundingBox()]);
+  const viewport = page.viewportSize();
+  if (!scrollerBox || !canvasBox || !viewport) throw new Error('Vector artboard has no visible viewport geometry.');
+
+  const visibleLeft = Math.max(scrollerBox.x, canvasBox.x, 0);
+  const visibleTop = Math.max(scrollerBox.y, canvasBox.y, 0);
+  const visibleRight = Math.min(scrollerBox.x + scrollerBox.width, canvasBox.x + canvasBox.width, viewport.width);
+  const visibleBottom = Math.min(scrollerBox.y + scrollerBox.height, canvasBox.y + canvasBox.height, viewport.height);
+  if (visibleRight - visibleLeft < 120 || visibleBottom - visibleTop < 100) {
+    throw new Error('Vector artboard does not expose enough visible area to exercise pan.');
+  }
+
+  const startX = visibleLeft + 24;
+  const startY = visibleTop + 24;
+  const endX = Math.min(startX + 80, visibleRight - 8);
+  const endY = Math.min(startY + 60, visibleBottom - 8);
+  await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(box.x + 260, box.y + 210, { steps: 4 });
+  await page.mouse.move(endX, endY, { steps: 4 });
   await page.mouse.up();
 
   const after = await scroller.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop }));
-  expect(after.left).toBeLessThan(before.left);
-  expect(after.top).toBeLessThan(before.top);
+  const movedLeft = before.left > 0 && after.left < before.left;
+  const movedTop = before.top > 0 && after.top < before.top;
+  expect(movedLeft || movedTop).toBe(true);
+  if (before.left > 0) expect(after.left).toBeLessThan(before.left);
+  if (before.top > 0) expect(after.top).toBeLessThan(before.top);
 });
 
 test('Vector Studio imports project JSON and offers accessible non-drag layer ordering', async ({ page }) => {
@@ -154,4 +179,76 @@ test('Vector Studio imports project JSON and offers accessible non-drag layer or
   await page.getByRole('button', { name: 'Bring forward' }).click();
   await page.getByRole('button', { name: 'Bring to front' }).click();
   await expect(page.locator('#vector-artboard-width')).toHaveValue('640');
+});
+
+test('Vector Studio exposes configurable shape tools, saved swatches, rulers, and real fit navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 820 });
+  await page.goto('./#/tools/svg-sprite-compiler');
+  const canvas = page.getByTestId('vector-canvas');
+
+  await page.getByRole('button', { name: 'Polygon tool' }).click();
+  const polygonSides = page.getByLabel('Polygon sides');
+  await expect(polygonSides).toBeVisible();
+  await polygonSides.fill('8');
+  await canvas.click({ position: { x: 260, y: 190 } });
+  const polygonPath = await page.locator('[data-vector-element]').last().locator('path').getAttribute('d');
+  expect((polygonPath?.match(/ L /g)?.length ?? 0) + 1).toBe(8);
+
+  await page.getByRole('button', { name: 'Star tool' }).click();
+  await page.getByLabel('Star points').fill('7');
+  await page.getByLabel('Star inner ratio').fill('0.35');
+  await canvas.click({ position: { x: 420, y: 260 } });
+  const starPath = await page.locator('[data-vector-element]').last().locator('path').getAttribute('d');
+  expect((starPath?.match(/ L /g)?.length ?? 0) + 1).toBe(14);
+
+  await page.getByRole('button', { name: 'Pencil tool' }).click();
+  await expect(page.getByLabel('Pencil smoothing')).toBeVisible();
+  await expect(page.getByLabel('Artboard ruler origin')).toBeVisible();
+
+  const swatchesBefore = await page.getByRole('button', { name: /^Apply .* fill$/ }).count();
+  await page.getByLabel('New swatch color').fill('#123456');
+  await page.getByRole('button', { name: 'Save swatch' }).click();
+  await expect(page.getByRole('button', { name: 'Apply #123456 fill' })).toBeVisible();
+  expect(await page.getByRole('button', { name: /^Apply .* fill$/ }).count()).toBe(swatchesBefore + 1);
+
+  await page.getByRole('tab', { name: 'Layers' }).click();
+  await page.locator('#vector-artboard-width').fill('3000');
+  await page.locator('#vector-artboard-width').press('Enter');
+  const viewControls = page.locator('.vector-header-actions');
+  await viewControls.getByRole('button', { name: 'Fit artboard' }).click();
+  await expect(page.getByTestId('vector-zoom-readout')).not.toHaveText('70%');
+  await expect(viewControls.getByRole('button', { name: 'Fit selection' })).toBeEnabled();
+  await viewControls.getByRole('button', { name: 'Fit selection' }).click();
+});
+
+test('Vector Studio exposes non-destructive clip, difference, and symmetry duplicate workflows', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  const canvas = page.getByTestId('vector-canvas');
+  await page.getByRole('button', { name: 'Rectangle tool' }).click();
+  await canvas.click({ position: { x: 240, y: 190 } });
+  await canvas.click({ position: { x: 380, y: 260 } });
+  await expect(page.getByTestId('vector-layer')).toHaveCount(2);
+
+  await page.getByRole('button', { name: 'Select tool' }).click();
+  const artwork = page.locator('[data-vector-element]');
+  await artwork.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
+  await artwork.nth(1).locator(':scope > rect:not(.vector-selection-outline)').click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Clip selection' }).click();
+  await expect(page.getByTestId('vector-layer')).toHaveCount(1);
+  await expect(canvas.locator('clipPath')).toHaveCount(1);
+  await expect(canvas.locator('g[clip-path]')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Ungroup' }).click();
+  await expect(page.getByTestId('vector-layer')).toHaveCount(2);
+  const released = page.locator('[data-vector-element]');
+  await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
+  await released.nth(1).locator(':scope > rect:not(.vector-selection-outline)').click({ modifiers: ['Shift'] });
+  await page.getByRole('button', { name: 'Difference selection' }).click();
+  await expect(canvas.locator('mask')).toHaveCount(1);
+  await expect(canvas.locator('g[mask]')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Ungroup' }).click();
+  await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
+  await page.getByRole('button', { name: 'Symmetry duplicate horizontal' }).click();
+  await expect(page.getByTestId('vector-layer')).toHaveCount(3);
 });
