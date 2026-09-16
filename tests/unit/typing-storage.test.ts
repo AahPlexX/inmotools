@@ -94,14 +94,14 @@ describe('typing storage', () => {
     expect(pb?.netWpm).toBe(90);
   });
 
-  it('keeps personal-best quote lengths isolated', async () => {
+  it('keeps personal-best quote lengths isolated without depending on an irrelevant prior duration value', async () => {
     await saveTest(makeTest({ mode: 'quote', durationMode: 'quote', durationValue: 30, quoteLength: 'short', netWpm: 80 }));
-    await saveTest(makeTest({ mode: 'quote', durationMode: 'quote', durationValue: 30, quoteLength: 'long', netWpm: 130 }));
+    await saveTest(makeTest({ mode: 'quote', durationMode: 'quote', durationValue: 60, quoteLength: 'long', netWpm: 130 }));
 
     const pb = await findPersonalBest({
       mode: 'quote',
       durationMode: 'quote',
-      durationValue: 30,
+      durationValue: 120,
       language: 'english',
       layout: 'qwerty',
       quoteLength: 'short',
