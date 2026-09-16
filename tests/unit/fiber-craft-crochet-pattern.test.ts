@@ -4,8 +4,10 @@ import {
   createStarterCrochetDocument,
   switchCrochetChartMode,
   toggleCrochetGridCell,
+  toggleCrochetProgressStep,
   workNextCrochetStitch,
 } from '../../src/tools/fiber-craft/crochet-document-engine';
+import { describeCrochetChart } from '../../src/tools/fiber-craft/engines/chart-description-engine';
 import {
   analyzeAmigurumiGrowth,
   compileC2CRows,
@@ -24,11 +26,7 @@ import {
 const FIXED_TIME = '2026-09-15T00:00:00.000Z';
 
 describe('crochet pattern compilers and references', () => {
-  test.for([
-    [2, 3],
-    [3, 3],
-    [4, 2],
-  ])('C2C diagonals cover every %i x %i grid cell exactly once', ([rows, cols]) => {
+  test.for([[2, 3], [3, 3], [4, 2]])('C2C diagonals cover every %i x %i grid cell exactly once', ([rows, cols]) => {
     const chart = createEmptyGridChart(rows, cols);
     const compiled = compileC2CRows(chart);
     const coordinates = compiled.flatMap((row) => row.blocks.map((block) => `${block.row}:${block.col}`));
@@ -59,9 +57,7 @@ describe('crochet pattern compilers and references', () => {
 
   test('written round compiler stays synchronized with the visual chart in both dialects', () => {
     let document = createStarterCrochetDocument(FIXED_TIME);
-    for (let index = 0; index < 6; index += 1) {
-      document = workNextCrochetStitch(document, 0, 'sc-dc', 'primary', FIXED_TIME);
-    }
+    for (let index = 0; index < 6; index += 1) document = workNextCrochetStitch(document, 0, 'sc-dc', 'primary', FIXED_TIME);
     const us = compileCrochetWrittenPattern(document, 'us')[0];
     const uk = compileCrochetWrittenPattern(document, 'uk')[0];
     expect(us).toMatchObject({ complete: true, worked: 6, capacity: 6, producedStitches: 6 });
@@ -70,28 +66,15 @@ describe('crochet pattern compilers and references', () => {
   });
 
   test('validator explains incomplete, target, and structural consumption mismatches', () => {
-    let document = createStarterCrochetDocument(FIXED_TIME);
-    document = addCrochetRound(document, 12, FIXED_TIME);
-    for (let index = 0; index < 12; index += 1) {
-      document = workNextCrochetStitch(document, 1, 'sc-dc', 'primary', FIXED_TIME);
-    }
+    let document = addCrochetRound(createStarterCrochetDocument(FIXED_TIME), 12, FIXED_TIME);
+    for (let index = 0; index < 12; index += 1) document = workNextCrochetStitch(document, 1, 'sc-dc', 'primary', FIXED_TIME);
     const findings = validateCrochetPattern(document, [6, 18]);
-    expect(findings.map((finding) => finding.code)).toEqual(expect.arrayContaining([
-      'incomplete-round',
-      'target-count-mismatch',
-      'base-consumption-mismatch',
-    ]));
+    expect(findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(['incomplete-round', 'target-count-mismatch', 'base-consumption-mismatch']));
   });
 
   test('amigurumi analysis classifies growth and target drift across an entire shaping curve', () => {
     const chart = createEmptyPolarChart([6, 12, 18, 18, 12]);
-    expect(analyzeAmigurumiGrowth(chart).map((round) => round.status)).toEqual([
-      'start',
-      'increase',
-      'increase',
-      'same',
-      'decrease',
-    ]);
+    expect(analyzeAmigurumiGrowth(chart).map((round) => round.status)).toEqual(['start', 'increase', 'increase', 'same', 'decrease']);
     expect(analyzeAmigurumiGrowth(chart, [6, 12, 20, 18, 12])[2].status).toBe('target-mismatch');
   });
 
@@ -114,5 +97,31 @@ describe('crochet pattern compilers and references', () => {
       expect(getYarnWeightStandard(standard.weight)).toBe(standard);
     }
     expect(getYarnWeightStandard(4)).toMatchObject({ name: 'Medium', usHook: 'I-9 to K-10½' });
+  });
+
+  test('accessible round description contains layout, progress, stitch names, colors, and dialect changes', () => {
+    let document = createStarterCrochetDocument(FIXED_TIME);
+    document = workNextCrochetStitch(document, 0, 'sc-dc', 'primary', FIXED_TIME);
+    document = toggleCrochetProgressStep(document, 'round:0', FIXED_TIME);
+    const us = describeCrochetChart(document, 'us');
+    const uk = describeCrochetChart(document, 'uk');
+    expect(us.summary).toContain('1 round');
+    expect(us.summary).toContain('1 position worked');
+    expect(us.details[0]).toContain('Round 1: 6 positions, 1 worked, 5 unworked. Marked complete.');
+    expect(us.legend.join(' ')).toContain('single crochet (sc)');
+    expect(us.legend.join(' ')).toContain('Primary');
+    expect(uk.legend.join(' ')).toContain('double crochet (dc)');
+  });
+
+  test('accessible grid description reports every row structurally without depending on color alone', () => {
+    let document = switchCrochetChartMode(createStarterCrochetDocument(FIXED_TIME), 'grid', FIXED_TIME);
+    document = toggleCrochetGridCell(document, 0, 0, 'accent', FIXED_TIME);
+    document = toggleCrochetProgressStep(document, 'row:0', FIXED_TIME);
+    const description = describeCrochetChart(document, 'us');
+    expect(description.summary).toContain('12 rows and 12 columns');
+    expect(description.summary).toContain('1 cell filled');
+    expect(description.details).toHaveLength(12);
+    expect(description.details[0]).toContain('1 filled, 11 open. Marked complete.');
+    expect(description.details[0]).toContain('Accent');
   });
 });

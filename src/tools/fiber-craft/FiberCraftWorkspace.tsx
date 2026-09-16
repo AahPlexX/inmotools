@@ -21,6 +21,11 @@ import {
   PatternDetailsPanel,
   YarnReferencePanel,
 } from './CrochetPatternPanels';
+import {
+  FIBER_CRAFT_DESCRIPTION_ID,
+  FiberCraftChartDescription,
+  type FiberCraftTheme,
+} from './FiberCraftAccessibility';
 import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './engines/crochet-glyph-engine';
 import { polarNodeToCartesian } from './engines/geometry-engine';
 import { CROCHET_SYMBOLS, crochetSymbolLabel, type CrochetDialect } from './engines/symbol-library';
@@ -35,6 +40,7 @@ import { createIndexedDbFiberCraftStore, type FiberCraftStore } from './persiste
 import { fiberCraftProjectFilename, parseFiberCraftProject, serializeFiberCraftProject } from './project-bundle-engine';
 import type { ColorSlot, FiberCraftDocument, GaugeSwatch, PolarChart } from './fiber-craft-types';
 import './fiber-craft-workspace.css';
+import './fiber-craft-accessibility.css';
 
 type HistoryAction =
   | { readonly type: 'commit'; readonly document: FiberCraftDocument }
@@ -48,11 +54,21 @@ const historyReducer = (history: FiberCraftHistory, action: HistoryAction): Fibe
     case 'undo': return undoFiberCraftHistory(history);
     case 'redo': return redoFiberCraftHistory(history);
     case 'replace': return createFiberCraftHistory(action.document);
-    default: {
-      const unreachable: never = action;
-      return unreachable;
-    }
+    default: { const unreachable: never = action; return unreachable; }
   }
+};
+
+const CANVAS_THEME_COLORS: Record<FiberCraftTheme, {
+  readonly background: string;
+  readonly emptyFill: string;
+  readonly ring: string;
+  readonly active: string;
+  readonly complete: string;
+  readonly emptyStroke: string;
+}> = {
+  light: { background: '#fbfcfd', emptyFill: '#ffffff', ring: '#d7dde3', active: '#205bd6', complete: '#087a55', emptyStroke: '#aeb8c2' },
+  'dark-room': { background: '#090e13', emptyFill: '#111820', ring: '#667787', active: '#9fc2ff', complete: '#85e6b9', emptyStroke: '#8b9ba9' },
+  'high-contrast': { background: '#ffffff', emptyFill: '#ffffff', ring: '#000000', active: '#000000', complete: '#000000', emptyStroke: '#000000' },
 };
 
 const glyphInkForSwatch = (hex: string | undefined): string => {
@@ -63,8 +79,7 @@ const glyphInkForSwatch = (hex: string | undefined): string => {
   const red = (value >> 16) & 0xff;
   const green = (value >> 8) & 0xff;
   const blue = value & 0xff;
-  const perceived = (red * 299 + green * 587 + blue * 114) / 1000;
-  return perceived >= 150 ? '#101820' : '#ffffff';
+  return (red * 299 + green * 587 + blue * 114) / 1000 >= 150 ? '#101820' : '#ffffff';
 };
 
 const drawGlyphPrimitive = (context: CanvasRenderingContext2D, primitive: CrochetGlyphPrimitive): void => {
@@ -84,15 +99,7 @@ const drawGlyphPrimitive = (context: CanvasRenderingContext2D, primitive: Croche
   }
 };
 
-const drawCrochetGlyph = (
-  context: CanvasRenderingContext2D,
-  symbolId: string,
-  x: number,
-  y: number,
-  size: number,
-  rotation: number,
-  ink: string,
-): void => {
+const drawCrochetGlyph = (context: CanvasRenderingContext2D, symbolId: string, x: number, y: number, size: number, rotation: number, ink: string): void => {
   context.save();
   context.translate(x, y);
   context.rotate(rotation);
@@ -106,11 +113,12 @@ const drawCrochetGlyph = (
   context.restore();
 };
 
-function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
+function CrochetCanvas({ chart, palette, activeRound, completedSteps, theme }: {
   chart: PolarChart;
   palette: readonly ColorSlot[];
   activeRound: number;
   completedSteps: readonly string[];
+  theme: FiberCraftTheme;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderedSymbols = chart.nodes.filter((node) => node.symbolId !== null).length;
@@ -119,6 +127,7 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
+    const colors = CANVAS_THEME_COLORS[theme];
     const width = canvas.width;
     const height = canvas.height;
     const centerX = width / 2;
@@ -127,14 +136,14 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
     const nodeRadius = Math.max(10, Math.min(20, spacing * 0.3));
 
     context.clearRect(0, 0, width, height);
-    context.fillStyle = '#fbfcfd';
+    context.fillStyle = colors.background;
     context.fillRect(0, 0, width, height);
     for (let round = 0; round < chart.rounds; round += 1) {
       const complete = completedSteps.includes(`round:${round}`);
       context.beginPath();
       context.arc(centerX, centerY, (round + 1) * spacing, 0, Math.PI * 2);
       context.lineWidth = round === activeRound ? 5 : complete ? 3 : 2;
-      context.strokeStyle = round === activeRound ? '#205bd6' : complete ? '#087a55' : '#d7dde3';
+      context.strokeStyle = round === activeRound ? colors.active : complete ? colors.complete : colors.ring;
       context.setLineDash(complete ? [10, 6] : []);
       context.stroke();
     }
@@ -145,20 +154,21 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
       const x = centerX + point.x;
       const y = centerY + point.y;
       const swatch = node.colorId ? palette.find((color) => color.id === node.colorId) : undefined;
-      const ink = glyphInkForSwatch(swatch?.hex);
+      const fill = theme === 'high-contrast' ? colors.emptyFill : swatch?.hex ?? colors.emptyFill;
+      const ink = theme === 'high-contrast' ? '#000000' : glyphInkForSwatch(fill);
       context.beginPath();
       context.arc(x, y, nodeRadius, 0, Math.PI * 2);
-      context.fillStyle = swatch?.hex ?? '#ffffff';
+      context.fillStyle = fill;
       context.fill();
       context.lineWidth = 2;
-      context.strokeStyle = node.symbolId ? ink : '#aeb8c2';
+      context.strokeStyle = node.symbolId ? ink : colors.emptyStroke;
       context.stroke();
       if (node.symbolId) {
         const angle = (2 * Math.PI * node.angleIndex) / node.stitchesInRound;
         drawCrochetGlyph(context, node.symbolId, x, y, nodeRadius * 0.82, angle + Math.PI / 2, ink);
       }
     }
-  }, [activeRound, chart, completedSteps, palette]);
+  }, [activeRound, chart, completedSteps, palette, theme]);
 
   return (
     <canvas
@@ -167,9 +177,11 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
       width={960}
       height={720}
       aria-label={`Crochet round chart with vector stitch symbols. Round ${activeRound + 1} is active.`}
+      aria-describedby={FIBER_CRAFT_DESCRIPTION_ID}
       data-testid="crochet-round-canvas"
       data-symbol-rendering="vector"
       data-rendered-symbols={renderedSymbols}
+      data-canvas-theme={theme}
     >
       Crochet round chart with {chart.rounds} rounds. Round {activeRound + 1} is active.
     </canvas>
@@ -179,6 +191,8 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps }: {
 export default function FiberCraftWorkspace() {
   const [history, dispatch] = useReducer(historyReducer, undefined, () => createFiberCraftHistory(createStarterCrochetDocument()));
   const [dialect, setDialect] = useState<CrochetDialect>('us');
+  const [theme, setTheme] = useState<FiberCraftTheme>('light');
+  const [descriptionVisible, setDescriptionVisible] = useState(true);
   const [activeRound, setActiveRound] = useState(0);
   const [activeGridRow, setActiveGridRow] = useState(0);
   const [selectedSymbol, setSelectedSymbol] = useState('sc-dc');
@@ -193,32 +207,19 @@ export default function FiberCraftWorkspace() {
   const document = history.present;
   const roundChart = document.chart.kind === 'polar' ? document.chart : null;
   const gridChart = document.chart.kind === 'grid' ? document.chart : null;
-  const progress = useMemo(
-    () => roundChart ? crochetRoundProgress(document, Math.min(activeRound, Math.max(0, roundChart.rounds - 1))) : null,
-    [activeRound, document, roundChart],
-  );
+  const progress = useMemo(() => roundChart ? crochetRoundProgress(document, Math.min(activeRound, Math.max(0, roundChart.rounds - 1))) : null, [activeRound, document, roundChart]);
 
   useEffect(() => {
-    if (typeof indexedDB === 'undefined') {
-      setStatus('Local autosave is unavailable in this browser. Current work remains on screen.');
-      return;
-    }
+    if (typeof indexedDB === 'undefined') { setStatus('Local autosave is unavailable in this browser. Current work remains on screen.'); return; }
     const store = createIndexedDbFiberCraftStore();
     storeRef.current = store;
     let active = true;
     void store.load().then((saved) => {
       if (!active) return;
-      if (saved) {
-        setPendingRestore(saved);
-        setStatus('A local draft is available to restore.');
-      } else {
-        setStatus('Ready. Changes save locally in this browser.');
-      }
+      if (saved) { setPendingRestore(saved); setStatus('A local draft is available to restore.'); }
+      else setStatus('Ready. Changes save locally in this browser.');
       setStorageReady(true);
-    }).catch(() => {
-      if (!active) return;
-      setStatus('Local autosave is unavailable in this browser. Current work remains on screen.');
-    });
+    }).catch(() => { if (active) setStatus('Local autosave is unavailable in this browser. Current work remains on screen.'); });
     return () => { active = false; };
   }, []);
 
@@ -237,74 +238,53 @@ export default function FiberCraftWorkspace() {
     if (gridChart && activeGridRow >= gridChart.rows) setActiveGridRow(Math.max(0, gridChart.rows - 1));
   }, [activeGridRow, activeRound, gridChart, roundChart]);
 
-  useEffect(() => {
-    setTargetText((document.settings?.crochet?.targetRoundCounts ?? []).join(', '));
-  }, [document.settings?.crochet?.targetRoundCounts]);
+  useEffect(() => { setTargetText((document.settings?.crochet?.targetRoundCounts ?? []).join(', ')); }, [document.settings?.crochet?.targetRoundCounts]);
 
-  const commit = (next: FiberCraftDocument, message: string) => {
-    dispatch({ type: 'commit', document: next });
-    setStatus(message);
-  };
-
+  const commit = (next: FiberCraftDocument, message: string) => { dispatch({ type: 'commit', document: next }); setStatus(message); };
   const placeNextStitch = () => {
     if (!roundChart) return;
-    try {
-      commit(workNextCrochetStitch(document, activeRound, selectedSymbol, selectedColor), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} in round ${activeRound + 1}.`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+    try { commit(workNextCrochetStitch(document, activeRound, selectedSymbol, selectedColor), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} in round ${activeRound + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
   };
-
   const addRound = () => {
     if (!roundChart) return;
     const count = Number(newRoundStitches);
-    try {
-      commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`);
-      setActiveRound(roundChart.rounds);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add this round.'); }
+    try { commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`); setActiveRound(roundChart.rounds); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add this round.'); }
   };
-
   const changeChartMode = (mode: 'round' | 'grid') => {
     if ((mode === 'round' && roundChart) || (mode === 'grid' && gridChart)) return;
-    commit(switchCrochetChartMode(document, mode), mode === 'round'
-      ? 'Opened a fresh round chart. Undo restores the previous chart.'
-      : 'Opened a fresh C2C / filet grid. Undo restores the previous chart.');
-    if (mode === 'round') setActiveRound(0);
-    else setActiveGridRow(0);
+    commit(switchCrochetChartMode(document, mode), mode === 'round' ? 'Opened a fresh round chart. Undo restores the previous chart.' : 'Opened a fresh C2C / filet grid. Undo restores the previous chart.');
+    mode === 'round' ? setActiveRound(0) : setActiveGridRow(0);
   };
-
   const toggleGridCell = (row: number, col: number) => {
     try { commit(toggleCrochetGridCell(document, row, col, selectedColor), `Updated row ${row + 1}, column ${col + 1}.`); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update this grid cell.'); }
   };
-
   const toggleProgress = (stepId: string, label: string) => {
     try {
       const wasComplete = document.completedSteps.includes(stepId);
       commit(toggleCrochetProgressStep(document, stepId), `${label} marked ${wasComplete ? 'unfinished' : 'complete'}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update progress.'); }
   };
-
   const applyTargets = () => {
     try {
       const values = targetText.trim() === '' ? [] : targetText.split(/[\s,;]+/).filter(Boolean).map(Number);
       commit(setCrochetTargetRoundCounts(document, values), values.length > 0 ? `Saved ${values.length} round-shaping targets.` : 'Cleared round-shaping targets.');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save round targets.'); }
   };
-
   const saveYarnReference = (weight: number, materialClass: string, toolSize: string) => {
     try { commit(setCrochetYarnReference(document, weight, materialClass, toolSize), 'Saved the project yarn and hook reference.'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the yarn reference.'); }
   };
-
   const saveGauge = (gauge: GaugeSwatch) => {
     try { commit(setCrochetGauge(document, gauge), `Saved measured gauge: ${gauge.stitchCount} stitches and ${gauge.rowCount} rows over ${gauge.span} ${gauge.unit}.`); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the measured gauge.'); }
   };
-
   const savePatternClassification = (difficulty: CycProjectLevel, techniqueTags: readonly string[]) => {
     try { commit(setCrochetPatternClassification(document, difficulty, techniqueTags), 'Saved the project level and technique tags.'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save pattern details.'); }
   };
-
   const saveProjectFile = () => {
     try {
       const filename = fiberCraftProjectFilename(document.metadata.title);
@@ -312,7 +292,6 @@ export default function FiberCraftWorkspace() {
       setStatus(`Saved ${filename}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the project file.'); }
   };
-
   const openProjectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -327,7 +306,6 @@ export default function FiberCraftWorkspace() {
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not open the project file.'); }
     finally { input.value = ''; }
   };
-
   const restoreDraft = () => {
     if (!pendingRestore) return;
     dispatch({ type: 'replace', document: pendingRestore });
@@ -336,79 +314,33 @@ export default function FiberCraftWorkspace() {
     setPendingRestore(null);
     setStatus('Restored the last local session.');
   };
-
-  const startFresh = () => {
-    setPendingRestore(null);
-    setStatus('Started with the current fresh chart. Changes will save locally.');
-  };
+  const startFresh = () => { setPendingRestore(null); setStatus('Started with the current fresh chart. Changes will save locally.'); };
 
   return (
     <>
-      <div className="workspace-header fiber-craft-header">
-        <div>
-          <h2>Crochet pattern workspace</h2>
-          <p>Round, C2C, and filet charting with synchronized instructions and browser-local recovery.</p>
-        </div>
-        <span className="fiber-craft-local-badge">Local draft</span>
-      </div>
-      <div className="workspace-body fiber-craft-workspace">
-        {pendingRestore ? (
-          <section className="fiber-craft-restore" aria-labelledby="fiber-restore-title">
-            <div>
-              <h3 id="fiber-restore-title">Continue your last local session?</h3>
-              <p>A browser-local Fiber Craft draft was found. Restoring does not upload or replace a file on disk.</p>
-            </div>
-            <div className="fiber-craft-actions">
-              <button className="action-button" type="button" onClick={restoreDraft}>Restore last session</button>
-              <button className="action-button secondary" type="button" onClick={startFresh}>Start fresh</button>
-            </div>
-          </section>
-        ) : null}
+      <div className="workspace-header fiber-craft-header"><div><h2>Crochet pattern workspace</h2><p>Round, C2C, and filet charting with synchronized instructions and browser-local recovery.</p></div><span className="fiber-craft-local-badge">Local draft</span></div>
+      <div className="workspace-body fiber-craft-workspace" data-fiber-theme={theme}>
+        {pendingRestore ? <section className="fiber-craft-restore" aria-labelledby="fiber-restore-title"><div><h3 id="fiber-restore-title">Continue your last local session?</h3><p>A browser-local Fiber Craft draft was found. Restoring does not upload or replace a file on disk.</p></div><div className="fiber-craft-actions"><button className="action-button" type="button" onClick={restoreDraft}>Restore last session</button><button className="action-button secondary" type="button" onClick={startFresh}>Start fresh</button></div></section> : null}
 
-        <div className="fiber-craft-toolbar" role="toolbar" aria-label="Crochet chart history, mode, and terminology">
+        <div className="fiber-craft-toolbar" role="toolbar" aria-label="Crochet chart history, mode, terminology, and display">
           <button className="action-button secondary" type="button" disabled={history.past.length === 0} onClick={() => dispatch({ type: 'undo' })}>Undo</button>
           <button className="action-button secondary" type="button" disabled={history.future.length === 0} onClick={() => dispatch({ type: 'redo' })}>Redo</button>
           <label><span>Chart mode</span><select value={roundChart ? 'round' : 'grid'} onChange={(event) => changeChartMode(event.target.value as 'round' | 'grid')}><option value="round">Round / amigurumi</option><option value="grid">C2C / filet grid</option></select></label>
           <label><span>Terminology</span><select value={dialect} onChange={(event) => setDialect(event.target.value as CrochetDialect)}><option value="us">US</option><option value="uk">UK</option></select></label>
+          <label htmlFor="fiber-display-theme"><span>Display theme</span><select id="fiber-display-theme" value={theme} onChange={(event) => setTheme(event.target.value as FiberCraftTheme)}><option value="light">Light</option><option value="dark-room">Dark room</option><option value="high-contrast">High contrast</option></select></label>
+          <button className="action-button secondary" type="button" aria-pressed={descriptionVisible} onClick={() => setDescriptionVisible((visible) => !visible)}>{descriptionVisible ? 'Hide chart description' : 'Show chart description'}</button>
           {roundChart ? <label><span>Active round</span><select value={activeRound} onChange={(event) => setActiveRound(Number(event.target.value))}>{Array.from({ length: roundChart.rounds }, (_, round) => <option key={round} value={round}>Round {round + 1}</option>)}</select></label> : null}
         </div>
 
         <div className="fiber-craft-main">
-          {roundChart ? (
-            <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading">
-              <div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div>
-              <CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} completedSteps={document.completedSteps} />
-            </section>
-          ) : gridChart ? (
-            <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} />
-          ) : null}
+          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} completedSteps={document.completedSteps} theme={theme} /></section>
+            : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} /> : null}
 
           <aside className="fiber-craft-inspector" aria-label="Crochet chart inspector">
-            {roundChart ? (
-              <>
-                <section>
-                  <h3>Stitch</h3>
-                  <label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label>
-                  <label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label>
-                  <button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button>
-                </section>
-                <section>
-                  <h3>Add a round</h3>
-                  <label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label>
-                  <button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button>
-                  <button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button>
-                </section>
-              </>
-            ) : (
-              <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>
-            )}
+            {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
+              : <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
-            <section>
-              <h3>Project file</h3>
-              <button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button>
-              <label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label>
-              <p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p>
-            </section>
+            <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
           </aside>
         </div>
 
@@ -417,6 +349,7 @@ export default function FiberCraftWorkspace() {
           <YarnReferencePanel document={document} onSaveReference={saveYarnReference} />
           <GaugeScalingPanel document={document} onSaveGauge={saveGauge} />
           <PatternDetailsPanel document={document} onSaveClassification={savePatternClassification} />
+          <FiberCraftChartDescription document={document} dialect={dialect} visible={descriptionVisible} />
         </div>
 
         <p className="fiber-craft-status" role="status" aria-live="polite">{status}</p>

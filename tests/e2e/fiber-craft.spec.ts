@@ -18,6 +18,24 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-symbol-rendering', 'vector');
     await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-rendered-symbols', '1');
     await expect(page.getByTestId('written-pattern')).toContainText('1 sc [Primary]');
+    await expect(page.getByTestId('chart-description')).toContainText('1 position worked');
+    await expect(page.getByTestId('chart-description')).toContainText('Round 1: 6 positions, 1 worked, 5 unworked.');
+
+    await page.locator('#fiber-display-theme').selectOption('dark-room');
+    await expect(page.locator('.fiber-craft-workspace')).toHaveAttribute('data-fiber-theme', 'dark-room');
+    await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-canvas-theme', 'dark-room');
+    await page.locator('#fiber-display-theme').selectOption('high-contrast');
+    await expect(page.locator('.fiber-craft-workspace')).toHaveAttribute('data-fiber-theme', 'high-contrast');
+    await expect(page.getByTestId('crochet-round-canvas')).toHaveAttribute('data-canvas-theme', 'high-contrast');
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.getByTestId('crochet-round-canvas')).toHaveCSS('filter', 'grayscale(1) contrast(1.8)');
+    await page.emulateMedia({ media: 'screen' });
+    await page.locator('#fiber-display-theme').selectOption('light');
+
+    await page.getByRole('button', { name: 'Hide chart description' }).click();
+    await expect(page.getByTestId('chart-description')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show chart description' }).click();
+    await expect(page.getByTestId('chart-description')).toBeVisible();
     await expect(undo).toBeEnabled();
 
     await undo.click();
@@ -53,6 +71,8 @@ test.describe('Fiber Craft Workstation', () => {
     await firstCell.click();
     await expect(page.getByTestId('c2c-summary')).toContainText('1 filled block');
     await expect(page.getByTestId('filet-summary')).toContainText('1 filled mesh');
+    await expect(page.getByTestId('chart-description')).toContainText('12 rows and 12 columns');
+    await expect(page.getByTestId('chart-description')).toContainText('Row 1: 1 filled, 11 open.');
     await page.getByText('C2C row-by-row counts', { exact: true }).click();
     await expect(page.getByTestId('c2c-row-counts')).toContainText('C2C row 1: 1 filled of 1 block.');
     await page.getByRole('button', { name: 'Center active row' }).click();
@@ -60,10 +80,7 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Mark row complete' }).click();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
-    const [projectDownload] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Save .craftproj' }).click(),
-    ]);
+    const [projectDownload] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save .craftproj' }).click()]);
     expect(projectDownload.suggestedFilename()).toBe('crochet-round-chart.craftproj');
     const projectPath = await projectDownload.path();
     expect(projectPath).not.toBeNull();
