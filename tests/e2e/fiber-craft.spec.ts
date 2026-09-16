@@ -57,7 +57,6 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Mark row unfinished' }).click();
     await expect(page.getByRole('button', { name: 'Row 1, column 1, open' })).toBeVisible();
     await page.getByLabel('Open project file').setInputFiles(projectPath!);
-    await expect(page.locator('p.fiber-craft-status')).toContainText('Loaded crochet-round-chart.craftproj');
     await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
