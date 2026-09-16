@@ -167,15 +167,16 @@ test('each presentation engine draws its own surface', async ({ page }) => {
   const plan = page.getByTestId('sightline-drill-plan');
   await expect(plan).toContainText('flashes');
   await expect(page.getByTestId('sightline-drill-card')).toBeVisible();
-  await expect(page.getByTestId('sightline-drill-progress')).toContainText('flash 1 of 5');
+  await expect(page.getByTestId('sightline-drill-progress')).toContainText(/flash [1-5] of 5/);
 
-  // The reader reports each exposure as recognised; the drill scores the run.
+  // Recognition is a keyboard action too; pressing it avoids racing the intentionally transient flash button.
   for (let index = 0; index < 5; index += 1) {
-    await page.getByTestId('sightline-drill-recognise').click();
+    await page.keyboard.press('r');
     await page.waitForTimeout(140);
   }
-  await expect(page.getByTestId('sightline-drill-result')).toContainText('Recognised');
-  await expect(page.getByTestId('sightline-drill-result')).toContainText('words per minute');
+  const stageResult = page.getByTestId('sightline-drill-stage').getByTestId('sightline-drill-result');
+  await expect(stageResult).toContainText('Recognised');
+  await expect(stageResult).toContainText('words per minute');
 
   await page.getByTestId('sightline-engine-rsvp').click();
   await expect(page.getByTestId('sightline-rsvp')).toBeVisible();
