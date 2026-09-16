@@ -98,6 +98,7 @@ A capability counts only when production behavior exists, relevant validation pa
 - glTF/XCAF assembly export remains part of the later professional export path.
 - Explicit environment exclusions remain IGES I/O, automatic arbitrary triangle-mesh-to-clean-parametric-B-Rep reconstruction, and guaranteed semantic STEP PMI embedding until adapter support is verified. There are no current `other` exclusions.
 - `main` contains unrelated concurrent work; CAD remains isolated until G15 reconciliation. PR #28 remains draft; no unrelated tool implementation is intentionally modified by CAD work.
+- Reconciliation planning started at `cd2ce74`: `docs/superpowers/plans/2026-09-15-cad-studio-main-reconciliation.md` measures the actual divergence (a dry-run three-way merge shows the only conflicting paths are `package.json`/`pnpm-lock.yaml` — everything else this branch touches is new) and proposes splitting source-level sync (safe to start immediately, keeps that trivial conflict from compounding) from catalog/router activation (gated on real usability, not necessarily the full 195/195 floor — flagged there as the user's timing call, not decided unilaterally here).
 
 - `fast-check@4.10.0` added (exact pin, verified) for property-based tests on the pure-math layer — real-kernel tests stay example-based. Proof of concept at `beaf10d3a213733a43637bc861aa0399a23ea44e`: `negateComponent`/`negate` now property-tested against arbitrary finite floats. 861/862 (known flake), `tsc`/build clean.
 
