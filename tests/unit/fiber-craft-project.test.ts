@@ -16,6 +16,11 @@ import {
   parseFiberCraftProject,
   serializeFiberCraftProject,
 } from '../../src/tools/fiber-craft/project-bundle-engine';
+import {
+  FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT,
+  FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH,
+  fiberCraftSocialPreviewFilename,
+} from '../../src/tools/fiber-craft/social-preview-engine';
 
 const numbersInPrimitive = (primitive: ReturnType<typeof crochetGlyphPrimitives>[number]): readonly number[] => {
   switch (primitive.kind) {
@@ -135,5 +140,7 @@ describe('crochet publishing exports', () => {
     expect(() => crochetPngDimensions(5)).toThrow(/1 to 4/);
     expect(fiberCraftPngFilename('Héirloom Market Bag', 4)).toBe('heirloom-market-bag-4x.png');
     expect(fiberCraftPatternPdfFilename('Héirloom Market Bag')).toBe('heirloom-market-bag-pattern-book.pdf');
+    expect([FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH, FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT]).toEqual([1200, 630]);
+    expect(fiberCraftSocialPreviewFilename('Héirloom Market Bag')).toBe('heirloom-market-bag-social-preview.png');
   });
 });
