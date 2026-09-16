@@ -24,6 +24,8 @@ const STITCH_LABELS: Readonly<Record<CountedStitchKind, string>> = {
   'three-quarter-se': 'Three-quarter stitch SE',
 };
 
+const CELL_SIZE = 44;
+
 const stitchMark = (kind: CountedStitchKind | null) => {
   if (!kind) return '';
   if (kind === 'full-cross') return '×';
@@ -48,6 +50,7 @@ export function CountedThreadWorkspace({ document, onCommit }: {
   const [backEndRow, setBackEndRow] = useState('1');
   const [backEndCol, setBackEndCol] = useState('1');
   const legend = useMemo(() => generateCountedThreadLegend(document), [document]);
+  const paletteById = useMemo(() => new Map(document.palette.map((color) => [color.id, color.hex])), [document.palette]);
 
   const paintCell = (row: number, col: number) => {
     const current = chart.cells.find((cell) => cell.row === row && cell.col === col);
@@ -68,12 +71,16 @@ export function CountedThreadWorkspace({ document, onCommit }: {
       <section className="fiber-craft-canvas-panel" aria-labelledby="counted-thread-heading">
         <div className="fiber-craft-panel-heading"><div><h3 id="counted-thread-heading">Counted-thread grid</h3><p>{chart.rows} rows × {chart.cols} columns · full and fractional stitches</p></div><strong data-testid="counted-thread-summary">{chart.cells.filter((cell) => cell.stitchKind).length} stitches · {chart.knots.length} knots · {chart.backstitches.length} backstitches</strong></div>
         <div className="fiber-counted-grid-scroll" tabIndex={0} aria-label="Counted-thread chart grid">
-          <div className="fiber-counted-grid" style={{ gridTemplateColumns: `repeat(${chart.cols}, 44px)` }} role="grid" aria-rowcount={chart.rows} aria-colcount={chart.cols}>
+          <div className="fiber-counted-grid" style={{ gridTemplateColumns: `repeat(${chart.cols}, ${CELL_SIZE}px)` }} role="grid" aria-rowcount={chart.rows} aria-colcount={chart.cols}>
             {chart.cells.map((cell) => {
               const color = document.palette.find((entry) => entry.id === cell.colorId);
               const label = `Row ${cell.row + 1}, column ${cell.col + 1}, ${cell.stitchKind ? STITCH_LABELS[cell.stitchKind] : 'empty'}`;
               return <button key={`${cell.row}:${cell.col}`} className="fiber-counted-cell" type="button" role="gridcell" aria-label={label} title={label} style={color ? { '--counted-color': color.hex } as React.CSSProperties : undefined} onClick={() => paintCell(cell.row, cell.col)}><span aria-hidden="true">{stitchMark(cell.stitchKind)}</span></button>;
             })}
+            <svg className="fiber-counted-overlay" data-testid="counted-thread-overlay" viewBox={`0 0 ${chart.cols * CELL_SIZE} ${chart.rows * CELL_SIZE}`} aria-hidden="true" focusable="false" preserveAspectRatio="none">
+              {chart.backstitches.map((line) => <line key={line.id} x1={line.start.col * CELL_SIZE} y1={line.start.row * CELL_SIZE} x2={line.end.col * CELL_SIZE} y2={line.end.row * CELL_SIZE} stroke={paletteById.get(line.colorId) ?? 'currentColor'} strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />)}
+              {chart.knots.map((knot) => <circle key={knot.id} cx={knot.point.col * CELL_SIZE} cy={knot.point.row * CELL_SIZE} r="5" fill={paletteById.get(knot.colorId) ?? 'currentColor'} stroke="var(--surface)" strokeWidth="2" vectorEffect="non-scaling-stroke" />)}
+            </svg>
           </div>
         </div>
       </section>
