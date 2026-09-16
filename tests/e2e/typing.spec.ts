@@ -90,6 +90,39 @@ test('completes a multiline word-count custom target, persists it, and exports t
   await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
 });
 
+test('auto-finishes a forgiving target after an error and preserves the error in scoring', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByLabel('Duration').selectOption('words');
+  await wordCountSelect(workspace).selectOption('10');
+  await workspace.getByLabel('Errors').selectOption('forgiving');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+
+  const target = 'cat dog bird fish red blue green gold sun moon';
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill(target);
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  await canvas.focus();
+  await page.keyboard.type(`x${target.slice(1)}`, { delay: 8 });
+
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  const errorSummary = resultDialog.locator('.tw-summary > div').filter({ hasText: 'Errors' });
+  await expect(errorSummary).toContainText('1');
+
+  const jsonPromise = page.waitForEvent('download');
+  await resultDialog.getByRole('button', { name: 'Export JSON' }).click();
+  const exported = JSON.parse((await downloadBuffer(await jsonPromise)).toString('utf8'));
+  expect(exported.test.finishReason).toBe('completed');
+  expect(exported.test.incorrectChars).toBe(1);
+  expect(exported.test.missedChars).toBe(1);
+  expect(exported.test.accuracy).toBeLessThan(100);
+});
+
 test('exports history metadata across formats and re-imports a bundle without id collisions', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
