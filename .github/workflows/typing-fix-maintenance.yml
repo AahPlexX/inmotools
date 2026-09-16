@@ -1,6 +1,7 @@
 name: Typing Workstation one-shot fix
 
 on:
+  workflow_dispatch:
   push:
     branches: [feature/typing-workstation]
     paths:
