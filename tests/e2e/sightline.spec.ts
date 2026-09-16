@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import JSZip from 'jszip';
 import { expect, test, type Download, type Page } from '@playwright/test';
 
 // The Sightline workspace is a single surface with engine tabs, six control
@@ -24,6 +25,13 @@ const readDownload = async (download: Download): Promise<Buffer> => {
 
 const readDownloadText = async (download: Download): Promise<string> => (await readDownload(download)).toString('utf8');
 
+const readZipEntryText = async (bytes: Buffer, path: string): Promise<string> => {
+  const zip = await JSZip.loadAsync(bytes);
+  const entry = zip.file(path);
+  if (!entry) throw new Error(`${path} is missing from the downloaded archive.`);
+  return entry.async('string');
+};
+
 const downloadFile = async (page: Page, exportId: string): Promise<Download> => {
   const button = page.getByTestId(`sightline-export-${exportId}`);
   await expect(button).toBeEnabled();
@@ -36,14 +44,15 @@ const openPanel = async (page: Page, panel: string) => {
   await expect(page.getByTestId(`sightline-panel-${panel}`)).toHaveAttribute('aria-selected', 'true');
 };
 
-/** Run the clock for a moment at a high rate and stop it again. */
+/** Finish a short real session without waiting through the whole sample. */
 const readBriefly = async (page: Page) => {
   await page.getByTestId('sightline-wpm-range').fill('900');
+  const scrub = page.getByTestId('sightline-scrub');
+  const last = Number(await scrub.getAttribute('max'));
+  await scrub.fill(String(Math.max(0, last - 8)));
   await page.getByTestId('sightline-play').click();
   await expect(page.getByTestId('sightline-play')).toHaveText('Pause');
-  await page.waitForTimeout(1_600);
-  await page.getByTestId('sightline-play').click();
-  await expect(page.getByTestId('sightline-play')).toHaveText('Read');
+  await expect(page.getByTestId('sightline-play')).toHaveText('Read', { timeout: 5_000 });
 };
 
 test('catalog link, exact route, and generic route open the same local workspace', async ({ page }) => {
@@ -116,13 +125,11 @@ test('the clock advances the words and reports a measured rate', async ({ page }
   await loadSample(page);
   await page.getByTestId('sightline-wpm-range').fill('900');
   await page.getByTestId('sightline-play').click();
-  await page.waitForTimeout(1_200);
-
-  const liveWpm = await page.getByTestId('sightline-live-wpm').textContent();
-  expect(Number.parseInt(liveWpm ?? '', 10)).toBeGreaterThan(0);
-  const progress = await page.locator('.sightline-progress-labels').textContent();
-  const seen = Number.parseInt((progress ?? '').replace(/[^0-9]/g, '').slice(0, 3), 10);
-  expect(seen).toBeGreaterThan(10);
+  await expect.poll(async () => {
+    const liveWpm = await page.getByTestId('sightline-live-wpm').textContent();
+    return Number.parseInt(liveWpm ?? '', 10);
+  }).toBeGreaterThan(0);
+  await expect(page.getByTestId('sightline-position')).not.toContainText('word 1 of');
 
   await page.getByTestId('sightline-play').click();
   await expect(page.getByTestId('sightline-play')).toHaveText('Read');
@@ -291,7 +298,7 @@ test('every document export downloads, and the bytes carry the treatment', async
   const word = await readDownload(await downloadFile(page, 'weighted-docx'));
   expect(word.subarray(0, 2).toString('utf8')).toBe('PK');
   expect(word.includes(Buffer.from('word/document.xml'))).toBe(true);
-  expect(word.includes(Buffer.from('<w:b/>'))).toBe(true);
+  expect(await readZipEntryText(word, 'word/document.xml')).toContain('<w:b/>');
 
   const epub = await readDownload(await downloadFile(page, 'weighted-epub'));
   expect(epub.subarray(0, 2).toString('utf8')).toBe('PK');

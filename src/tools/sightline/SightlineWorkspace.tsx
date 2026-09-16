@@ -1683,10 +1683,11 @@ export default function SightlineWorkspace() {
                   </p>
                 </div>
               ) : engine === 'page' ? (
-                <div className="sightline-page-scroll" ref={scrollerRef} data-testid="sightline-page">
+                <div className="sightline-page-scroll" ref={scrollerRef} data-testid="sightline-page" tabIndex={0} role="region" aria-label="Full-page reading text">
                   {pacer ? (
                     <span
                       className={`sightline-pacer sightline-pacer--${settings.pacer.shape}`}
+                      data-testid="sightline-pacer"
                       style={{
                         left: pacer.current.x,
                         top: pacer.current.y,
@@ -1697,7 +1698,7 @@ export default function SightlineWorkspace() {
                       aria-hidden="true"
                     />
                   ) : (
-                    <span className="sightline-pacer sightline-pacer--idle" aria-hidden="true" />
+                    <span className="sightline-pacer sightline-pacer--idle" data-testid="sightline-pacer" aria-hidden="true" />
                   )}
                   {model.paragraphs.map((paragraph) => {
                     const paragraphTokens = tokens.slice(paragraph.tokenStart, paragraph.tokenEnd);
