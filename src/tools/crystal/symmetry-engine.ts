@@ -2,7 +2,7 @@ import { cellToMatrix, validateCell } from './cell-engine';
 import { ELEMENTS } from './element-data';
 import { periodicDistance } from './periodic-engine';
 import type { CrystalDocument, CrystalSite, Mat3, UnitCell, Vec3 } from './crystal-types';
-import type { CrystalSymmetryOperation, CrystalSymmetryResult, SymmetryAdapterCell } from './symmetry-types';
+import type { CrystalSymmetryOperation, CrystalSymmetryResult, SymmetryAdapterCell, SymmetryBreakInspection, SymmetrySweepPoint } from './symmetry-types';
 import type { StructureHealthFinding } from './structure-health-engine';
 
 const DEFAULT_TOLERANCE = 1e-4;
@@ -291,6 +291,23 @@ export function standardizeCrystal(
   };
 }
 
+function operationFaults(
+  document: CrystalDocument,
+  operation: CrystalSymmetryOperation,
+  tolerance: number,
+): readonly string[] {
+  return document.sites
+    .filter((site) => {
+      const mapped = applySymmetryOperation(site.fractional, operation);
+      return !document.sites.some(
+        (candidate) =>
+          candidate.element === site.element &&
+          periodicDistance(mapped, candidate.fractional, document.cell) <= tolerance,
+      );
+    })
+    .map((site) => site.id);
+}
+
 export function validateSourceSymmetry(
   document: CrystalDocument,
   result: CrystalSymmetryResult,
@@ -298,16 +315,7 @@ export function validateSourceSymmetry(
 ): readonly StructureHealthFinding[] {
   const findings: StructureHealthFinding[] = [];
   result.operations.forEach((operation, index) => {
-    const siteIds = document.sites
-      .filter((site) => {
-        const mapped = applySymmetryOperation(site.fractional, operation);
-        return !document.sites.some(
-          (candidate) =>
-            candidate.element === site.element &&
-            periodicDistance(mapped, candidate.fractional, document.cell) <= tolerance,
-        );
-      })
-      .map((site) => site.id);
+    const siteIds = operationFaults(document, operation, tolerance);
     if (siteIds.length > 0) {
       findings.push({
         id: `symmetry-operation-${index + 1}`,
@@ -344,4 +352,54 @@ export function reflectionAllowed(
     if (Math.abs(phase - Math.round(phase)) > tolerance) return false;
   }
   return true;
+}
+
+export async function sweepSymmetryTolerance(
+  document: CrystalDocument,
+  tolerances: readonly number[],
+): Promise<readonly SymmetrySweepPoint[]> {
+  const seen = new Set<number>();
+  for (const tolerance of tolerances) {
+    if (!Number.isFinite(tolerance) || tolerance <= 0) {
+      throw new RangeError('Symmetry sweep tolerances must be positive finite numbers.');
+    }
+    if (seen.has(tolerance)) throw new RangeError('Symmetry sweep tolerances must be unique.');
+    seen.add(tolerance);
+  }
+  const points: SymmetrySweepPoint[] = [];
+  for (const tolerance of [...tolerances].sort((left, right) => left - right)) {
+    const result = await analyzeCrystalSymmetry(document, tolerance);
+    points.push({
+      tolerance,
+      number: result.number,
+      hmSymbol: result.hmSymbol,
+      operationCount: result.operations.length,
+      wyckoffs: result.wyckoffs,
+    });
+  }
+  return points;
+}
+
+export async function inspectSymmetryBreak(
+  before: CrystalDocument,
+  after: CrystalDocument,
+  tolerance: number,
+): Promise<SymmetryBreakInspection> {
+  if (!Number.isFinite(tolerance) || tolerance <= 0) {
+    throw new RangeError('Symmetry tolerance must be a positive finite distance in ångström.');
+  }
+  const reference = await analyzeCrystalSymmetry(before, tolerance);
+  const surviving: CrystalSymmetryOperation[] = [];
+  const broken: CrystalSymmetryOperation[] = [];
+  const offending = new Set<string>();
+  for (const operation of reference.operations) {
+    const faults = operationFaults(after, operation, tolerance);
+    if (faults.length === 0) {
+      surviving.push(operation);
+    } else {
+      broken.push(operation);
+      for (const siteId of faults) offending.add(siteId);
+    }
+  }
+  return { surviving, broken, offendingSiteIds: [...offending] };
 }
