@@ -29,6 +29,11 @@ function wordCountSelect(workspace: ReturnType<Page['getByTestId']>) {
   return configuration.locator('label').filter({ hasText: /^\s*Words/ }).locator('select');
 }
 
+function fontSelect(workspace: ReturnType<Page['getByTestId']>) {
+  const comfortPanel = workspace.getByRole('heading', { name: 'Comfort & accessibility' }).locator('..');
+  return comfortPanel.locator('label').filter({ hasText: /^\s*Font/ }).locator('select');
+}
+
 test('completes a multiline word-count custom target, persists it, and exports the JSON envelope', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
@@ -95,7 +100,7 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   const targetWordCount = await canvas.evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
   expect(targetWordCount).toBe(10);
 
-  await workspace.getByLabel('Font').selectOption('dyslexic');
+  await fontSelect(workspace).selectOption('dyslexic');
   await expect(canvas).toHaveCSS('font-family', /OpenDyslexic/);
   const dyslexicLoaded = await page.evaluate(async () => {
     await document.fonts.ready;
