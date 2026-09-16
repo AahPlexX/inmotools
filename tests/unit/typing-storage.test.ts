@@ -53,6 +53,16 @@ describe('typing storage', () => {
     expect(rows[0]?.tags).toEqual(['morning']);
   });
 
+  it('assigns fresh local ids when imported records carry an existing id', async () => {
+    const first = await saveTest(makeTest({ id: 7, notes: 'first import' }));
+    const second = await saveTest(makeTest({ id: 7, notes: 'second import' }));
+    expect(second).not.toBe(first);
+    const rows = await listTests();
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((row) => row.id)).size).toBe(2);
+    expect(rows.map((row) => row.notes).sort()).toEqual(['first import', 'second import']);
+  });
+
   it('updates tags and notes for a stored test', async () => {
     const id = await saveTest(makeTest());
     await updateTestTags(id, ['code', 'sprint'], 'daily warm-up');
