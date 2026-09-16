@@ -2,7 +2,7 @@ name: Sightline Velocity validation
 
 on:
   push:
-    branches: [feat/sightline-velocity]
+    branches: [main, feat/sightline-velocity, 'fix/sightline-*']
     paths:
       - 'src/tools/sightline/**'
       - 'src/catalog.ts'

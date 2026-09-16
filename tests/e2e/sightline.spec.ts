@@ -110,6 +110,13 @@ test('source ingestion supports multiple files and full-workspace drops', async 
     { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('Second local document becomes the active reader.') },
   ]);
   await expect(page.getByTestId('sightline-status')).toContainText(/2 documents|second\.txt/i);
+
+  await picker.setInputFiles([
+    { name: 'kept.txt', mimeType: 'text/plain', buffer: Buffer.from('This valid document should remain active.') },
+    { name: 'broken.docx', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 3]) },
+  ]);
+  await expect(page.getByTestId('sightline-status')).toContainText(/1 of 2 documents opened.*kept\.txt is active.*1 failed/i);
+  await expect(page.getByTestId('sightline-status')).not.toContainText(/broken\.docx is active/i);
   const dataTransfer = await page.evaluateHandle(() => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['Dropped from the whole workspace.'], 'dropped.txt', { type: 'text/plain' }));
@@ -282,6 +289,18 @@ test('a reading session is recorded and exported as analytics', async ({ page })
   };
   expect(json.sessions.length).toBeGreaterThan(0);
   expect(json.sessions[0]!.averageWpm).toBeGreaterThan(0);
+});
+
+test('clearing local data requires explicit confirmation and names everything it removes', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await page.getByTestId('sightline-panel-data').click();
+  const clear = page.getByTestId('sightline-warehouse-clear');
+  await expect(clear).toHaveText(/clear history and word bank/i);
+  await clear.click();
+  await expect(page.getByTestId('sightline-warehouse-confirm')).toContainText(/sessions.*document history.*word bank/i);
+  await expect(page.getByTestId('sightline-warehouse-confirm-delete')).toBeVisible();
+  await page.getByTestId('sightline-warehouse-confirm-cancel').click();
+  await expect(page.getByTestId('sightline-warehouse-confirm')).toHaveCount(0);
 });
 
 test('metadata, tags, and social fields are edited at export time', async ({ page }) => {

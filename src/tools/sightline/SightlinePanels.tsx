@@ -1037,6 +1037,7 @@ export interface DataPanelProps {
 }
 
 export function DataPanel({ summary, sessions, velocity, vocabularySize, storageNote, onClear }: DataPanelProps) {
+  const [confirmingClear, setConfirmingClear] = useState(false);
   return (
     <>
       <section className="sightline-card" aria-labelledby="sightline-warehouse-heading">
@@ -1083,10 +1084,19 @@ export function DataPanel({ summary, sessions, velocity, vocabularySize, storage
           </div>
         </dl>
         <div className="sightline-row">
-          <button type="button" className="sightline-button" data-testid="sightline-warehouse-clear" onClick={onClear}>
-            Clear the local reading history
+          <button type="button" className="sightline-button" data-testid="sightline-warehouse-clear" onClick={() => setConfirmingClear(true)}>
+            Clear history and word bank
           </button>
         </div>
+        {confirmingClear ? (
+          <div className="sightline-note" data-testid="sightline-warehouse-confirm" role="alert">
+            <p>This permanently removes saved sessions, document history, and the word bank from this browser.</p>
+            <div className="sightline-row">
+              <button type="button" className="sightline-button" data-testid="sightline-warehouse-confirm-delete" onClick={() => { setConfirmingClear(false); onClear(); }}>Delete history and word bank</button>
+              <button type="button" className="sightline-button sightline-button--small" data-testid="sightline-warehouse-confirm-cancel" onClick={() => setConfirmingClear(false)}>Cancel</button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-velocity-heading">
