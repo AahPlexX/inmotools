@@ -7,11 +7,10 @@ import { downloadBlob, downloadText } from '../../lib/download';
 import './typing-styles.css';
 
 import {
-  DEFAULT_OPTIONS,
   computeMetrics,
+  extendTarget,
   finish,
   generateDrill,
-  generateWords,
   ghostSeries,
   initState,
   isCleanlyCompleted,
@@ -27,20 +26,10 @@ import {
 } from './typing-engine';
 import {
   CODE_SNIPPETS,
-  ENGLISH_TOP_200,
   ENGLISH_TOP_1000,
-  ENGLISH_TOP_5000,
-  KIDS_SENTENCES,
   LANGUAGE_POOLS,
   LAYOUTS,
-  LEGAL_SENTENCES,
-  MEDICAL_SENTENCES,
-  NUMBER_SEEDS,
-  PUNCTUATION_SEEDS,
-  QUOTES,
   findLayout,
-  poolForMode,
-  quotesByLength,
   type CorpusMode,
   type Language,
   type LayoutId,
@@ -72,12 +61,14 @@ import {
   type ExportMetadata,
 } from './typing-export';
 import { createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
+import { buildTargetText, buildZenChunk, type DurationMode } from './typing-target';
 
 // -------------------- reducer wiring --------------------
 
 interface EngineAction {
-  type: 'press' | 'reset' | 'finish' | 'restart';
+  type: 'press' | 'reset' | 'finish' | 'restart' | 'extend';
   key?: string;
+  text?: string;
   code?: string;
   t?: number;
   initial?: EngineState;
@@ -93,6 +84,8 @@ function reducer(state: EngineState, action: EngineAction): EngineState {
       return action.initial ?? state;
     case 'finish':
       return finish(state, action.reason ?? 'aborted', action.t ?? performance.now());
+    case 'extend':
+      return extendTarget(state, action.text ?? '');
     default:
       return state;
   }
@@ -100,7 +93,6 @@ function reducer(state: EngineState, action: EngineAction): EngineState {
 
 // -------------------- configuration types --------------------
 
-type DurationMode = 'time' | 'words' | 'quote' | 'zen' | 'certification';
 type CaretStyle = 'line' | 'block' | 'underline' | 'box' | 'pulse' | 'ghost';
 type ThemeId = 'light' | 'nord' | 'dracula' | 'matrix' | 'paper' | 'cyberpunk' | 'gruvbox' | 'monokai' | 'oled' | 'high-contrast';
 type FontId = 'system' | 'dyslexic' | 'hyperlegible' | 'jetbrains' | 'fira' | 'roboto';
@@ -194,41 +186,6 @@ const CARET_OPTIONS: { id: CaretStyle; label: string }[] = [
 
 // -------------------- helpers --------------------
 
-function buildTargetText(cfg: Config, seed?: number): string {
-  switch (cfg.mode) {
-    case 'words-200':
-      return generateWords(ENGLISH_TOP_200, Math.max(10, cfg.durationValue * 2), seed);
-    case 'words-1000':
-      return generateWords(cfg.language === 'english' ? ENGLISH_TOP_1000 : LANGUAGE_POOLS[cfg.language], Math.max(10, cfg.durationValue * 2), seed);
-    case 'words-5000':
-      return generateWords(cfg.language === 'english' ? ENGLISH_TOP_5000 : LANGUAGE_POOLS[cfg.language], Math.max(10, cfg.durationValue * 2), seed);
-    case 'punctuation':
-      return PUNCTUATION_SEEDS.slice(0, 6).join(' ');
-    case 'numbers':
-      return NUMBER_SEEDS.slice(0, 5).join('  ');
-    case 'code': {
-      const snippet = CODE_SNIPPETS[cfg.codeIndex % CODE_SNIPPETS.length];
-      return snippet ? snippet.text : '';
-    }
-    case 'medical':
-      return MEDICAL_SENTENCES.slice(0, 5).join(' ');
-    case 'legal':
-      return LEGAL_SENTENCES.slice(0, 5).join(' ');
-    case 'kids':
-      return KIDS_SENTENCES.join(' ');
-    case 'quote': {
-      const options = quotesByLength(cfg.quoteLength);
-      if (options.length === 0) return QUOTES[0]?.text ?? '';
-      const rng = seed ?? Math.floor(Date.now() % 100000);
-      return options[rng % options.length]!.text;
-    }
-    case 'zen':
-      return generateWords(poolForMode('words-1000', cfg.language), 250, seed);
-    case 'custom':
-      return cfg.customText.trim();
-  }
-}
-
 function classifyDuration(cfg: Config): { mode: 'time' | 'words' | 'quote' | 'zen' | 'certification'; value: number } {
   if (cfg.durationMode === 'certification') return { mode: 'certification', value: 300 };
   return { mode: cfg.durationMode, value: cfg.durationValue };
@@ -239,6 +196,32 @@ function formatMs(ms: number): string {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return `${String(m).padStart(1, '0')}:${String(rem).padStart(2, '0')}`;
+}
+
+function trapDialogKeyboard(event: React.KeyboardEvent<HTMLDivElement>, onClose: () => void): void {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+  )).filter((element) => element.getClientRects().length > 0);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusable[0]!;
+  const last = focusable[focusable.length - 1]!;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 // -------------------- workspace component --------------------
@@ -272,6 +255,8 @@ export default function TypingWorkspace() {
   const historyChartRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
   const histChartRef = useRef<Chart | null>(null);
+  const milestoneRef = useRef<Set<number>>(new Set());
+  const zenChunkRef = useRef(0);
 
   const totalDurationMs = useMemo(() => {
     if (config.durationMode === 'time') return config.durationValue * 1000;
@@ -343,19 +328,48 @@ export default function TypingWorkspace() {
     dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });
   }, [running, engine, totalDurationMs, config.durationMode]);
 
+  // Zen mode replenishes the active target before the typist reaches its end.
+  useEffect(() => {
+    if (!running || engine.finished || config.durationMode !== 'zen') return;
+    if (engine.targetText.length - engine.cursor >= 320) return;
+    zenChunkRef.current += 1;
+    const chunk = buildZenChunk(config.language, seed + zenChunkRef.current);
+    const extension = `${engine.targetText.endsWith(' ') ? '' : ' '}${chunk}`;
+    setTarget((current) => current + extension);
+    dispatch({ type: 'extend', text: extension });
+  }, [running, engine.finished, engine.targetText, engine.cursor, config.durationMode, config.language, seed]);
+
+  // Milestone cues mark quarter-progress without changing typing state.
+  useEffect(() => {
+    if (!running || engine.finished || config.audioProfile === 'off') return;
+    const progress = totalDurationMs > 0 && engine.startedAt != null
+      ? Math.min(1, Math.max(0, (now - engine.startedAt) / totalDurationMs))
+      : Math.min(1, engine.cursor / Math.max(1, engine.targetText.length));
+    for (const threshold of [0.25, 0.5, 0.75]) {
+      if (progress >= threshold && !milestoneRef.current.has(threshold)) {
+        milestoneRef.current.add(threshold);
+        audioRef.current?.playMilestone();
+        break;
+      }
+    }
+  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, now, totalDurationMs, config.audioProfile]);
+
   // Watch for engine.finished transition.
   useEffect(() => {
     if (engine.finished && running) {
       setRunning(false);
       const metrics = computeMetrics(engine);
-      audioRef.current?.playCompletion();
+      if (config.audioProfile !== 'off') {
+        if (engine.finishReason === 'failed') audioRef.current?.playFail();
+        else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
+      }
       if (metrics.netWpm > 0 && engine.finishReason === 'completed') {
         confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
       }
       setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${metrics.netWpm} WPM, ${metrics.accuracy}% accuracy.`);
       setSaveModalOpen(true);
     }
-  }, [engine.finished, engine.finishReason, running]);
+  }, [engine.finished, engine.finishReason, running, config.audioProfile]);
 
   // Live WPM chart.
   useEffect(() => {
@@ -403,15 +417,17 @@ export default function TypingWorkspace() {
   // Historical trend chart.
   useEffect(() => {
     if (!historyChartRef.current) return;
-    const rollingSize = 10;
     const sorted = history.slice().sort((a, b) => a.savedAt - b.savedAt);
     const labels = sorted.map((t, i) => (t.savedAt ? new Date(t.savedAt).toLocaleDateString() : String(i + 1)));
     const wpm = sorted.map((t) => t.netWpm);
     const acc = sorted.map((t) => t.accuracy);
-    const rolling = wpm.map((_, i) => {
-      const window = wpm.slice(Math.max(0, i - rollingSize + 1), i + 1);
+    const rollingFor = (size: number) => wpm.map((_, i) => {
+      const window = wpm.slice(Math.max(0, i - size + 1), i + 1);
       return round(window.reduce((a, b) => a + b, 0) / window.length);
     });
+    const rolling10 = rollingFor(10);
+    const rolling50 = rollingFor(50);
+    const allTime = wpm.map((_, i) => round(wpm.slice(0, i + 1).reduce((a, b) => a + b, 0) / (i + 1)));
     if (histChartRef.current) histChartRef.current.destroy();
     histChartRef.current = new Chart(historyChartRef.current, {
       type: 'line',
@@ -419,7 +435,9 @@ export default function TypingWorkspace() {
         labels,
         datasets: [
           { label: 'Net WPM', data: wpm, borderColor: '#2a3d63', backgroundColor: 'transparent', pointRadius: 2 },
-          { label: `Rolling ${rollingSize}-test avg`, data: rolling, borderColor: '#7dd39b', backgroundColor: 'transparent', pointRadius: 0 },
+          { label: 'Rolling 10-test avg', data: rolling10, borderColor: '#7dd39b', backgroundColor: 'transparent', pointRadius: 0 },
+          { label: 'Rolling 50-test avg', data: rolling50, borderColor: '#6b7280', backgroundColor: 'transparent', borderDash: [6, 3], pointRadius: 0 },
+          { label: 'All-time avg', data: allTime, borderColor: '#7c3aed', backgroundColor: 'transparent', borderDash: [2, 3], pointRadius: 0 },
           { label: 'Accuracy %', data: acc, borderColor: '#d97706', backgroundColor: 'transparent', yAxisID: 'y2', pointRadius: 1 },
         ],
       },
@@ -460,19 +478,30 @@ export default function TypingWorkspace() {
     }) });
     setRunning(false);
     setSavedTestId(null);
+    milestoneRef.current.clear();
+    zenChunkRef.current = 0;
     setStatusText('New text ready.');
   }, [config]);
 
   const applyConfig = useCallback((patch: Partial<Config>) => {
-    setConfig((c) => ({ ...c, ...patch }));
-    if ('mode' in patch || 'durationValue' in patch || 'quoteLength' in patch || 'language' in patch || 'codeIndex' in patch || 'customText' in patch) {
-      rebuildTarget(patch);
+    const normalized: Partial<Config> = { ...patch };
+    if (patch.durationMode === 'quote') normalized.mode = 'quote';
+    if (patch.durationMode === 'zen') normalized.mode = 'zen';
+    if (patch.mode === 'quote' && patch.durationMode === undefined) normalized.durationMode = 'quote';
+    if (patch.mode === 'zen' && patch.durationMode === undefined) normalized.durationMode = 'zen';
+    if (patch.mode && patch.mode !== 'quote' && patch.mode !== 'zen' && patch.durationMode === undefined
+        && (config.durationMode === 'quote' || config.durationMode === 'zen')) {
+      normalized.durationMode = 'time';
     }
-    if ('errorMode' in patch || 'allowExtras' in patch || 'caseSensitive' in patch) {
+    setConfig((c) => ({ ...c, ...normalized }));
+    if ('mode' in normalized || 'durationMode' in normalized || 'durationValue' in normalized || 'quoteLength' in normalized || 'language' in normalized || 'codeIndex' in normalized || 'customText' in normalized) {
+      rebuildTarget(normalized);
+    }
+    if ('errorMode' in normalized || 'allowExtras' in normalized || 'caseSensitive' in normalized) {
       dispatch({ type: 'reset', initial: initState(target, {
-        errorMode: (patch.errorMode ?? config.errorMode),
-        allowExtraChars: (patch.allowExtras ?? config.allowExtras),
-        caseSensitive: (patch.caseSensitive ?? config.caseSensitive),
+        errorMode: (normalized.errorMode ?? config.errorMode),
+        allowExtraChars: (normalized.allowExtras ?? config.allowExtras),
+        caseSensitive: (normalized.caseSensitive ?? config.caseSensitive),
       }) });
     }
   }, [config, rebuildTarget, target]);
@@ -822,7 +851,7 @@ export default function TypingWorkspace() {
       <div className="tw-panels">
         <div className="tw-panel">
           <h3>WPM curve</h3>
-          <div className="tw-chart"><canvas ref={wpmChartRef} /></div>
+          <div className="tw-chart"><canvas ref={wpmChartRef} role="img" aria-label="Live net WPM, raw WPM, personal-best ghost, and target pace chart" /></div>
         </div>
         <div className="tw-panel">
           <h3>Keyboard heatmap ({layoutDef.label})</h3>
@@ -962,7 +991,7 @@ export default function TypingWorkspace() {
           <div className="tw-stat"><h3>50-test avg</h3><p>{round(rolling.last50)}</p></div>
           <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
         </div>
-        <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} /></div>
+        <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
         <table>
           <thead><tr><th>Saved</th><th>Mode</th><th>WPM</th><th>Acc</th><th>Cons</th><th>Tags</th><th>Actions</th></tr></thead>
           <tbody>
@@ -1016,12 +1045,12 @@ export default function TypingWorkspace() {
       )}
 
       {confirmClear && (
-        <div className="tw-modal-backdrop" role="dialog" aria-modal="true">
+        <div className="tw-modal-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="tw-clear-history-title" aria-describedby="tw-clear-history-description" onKeyDown={(event) => trapDialogKeyboard(event, () => setConfirmClear(false))}>
           <div className="tw-modal">
-            <h3>Clear local test history?</h3>
-            <p>This removes every locally stored test from this browser. Exports are not affected.</p>
+            <h3 id="tw-clear-history-title">Clear local test history?</h3>
+            <p id="tw-clear-history-description">This removes every locally stored test from this browser. Exports are not affected.</p>
             <div className="row">
-              <button type="button" className="subtle" onClick={() => setConfirmClear(false)}>Cancel</button>
+              <button autoFocus type="button" className="subtle" onClick={() => setConfirmClear(false)}>Cancel</button>
               <button type="button" onClick={async () => { await clearAllTests(); setHistory([]); setConfirmClear(false); }}>Clear history</button>
             </div>
           </div>
@@ -1132,7 +1161,7 @@ function SaveTestModal({ onCancel, onSave, onExport, summary }: {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
   return (
-    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title">
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
         <h3 id="tw-test-result-title">Test result</h3>
         <div className="tw-summary">
@@ -1194,22 +1223,23 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA });
   const [tagInput, setTagInput] = useState('');
   return (
-    <div className="tw-modal-backdrop" role="dialog" aria-modal="true">
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-export-history-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
-        <h3>Export history</h3>
+        <h3 id="tw-export-history-title">Export history</h3>
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>{tags ? `Filter by tags: ${tags}` : 'Exports every saved test.'}</p>
-        <label>Typist name</label>
-        <input type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
-        <label>Organization</label>
-        <input type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
-        <label>Certified by</label>
-        <input type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
-        <label>Global tags to add (Enter to add)</label>
+        <label htmlFor="tw-history-typist">Typist name</label>
+        <input id="tw-history-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
+        <label htmlFor="tw-history-organization">Organization</label>
+        <input id="tw-history-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
+        <label htmlFor="tw-history-certified-by">Certified by</label>
+        <input id="tw-history-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+        <label htmlFor="tw-history-tag">Global tags to add (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
             <span key={t} className="tw-tag">{t} <button type="button" onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
           ))}
           <input
+            id="tw-history-tag"
             type="text"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
@@ -1223,8 +1253,8 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
             }}
           />
         </div>
-        <label>Notes</label>
-        <textarea value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
+        <label htmlFor="tw-history-notes">Notes</label>
+        <textarea id="tw-history-notes" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
         <label>
           <input type="checkbox" checked={meta.includeKeystrokes} onChange={(e) => setMeta((m) => ({ ...m, includeKeystrokes: e.target.checked }))} /> Include raw keystrokes in JSON export
         </label>
@@ -1242,7 +1272,7 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
 function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
   const [text, setText] = useState(value);
   return (
-    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-custom-text-title">
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-custom-text-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
         <h3 id="tw-custom-text-title">Paste or edit custom text</h3>
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything is kept locally. Longer prose becomes book-length practice.</p>

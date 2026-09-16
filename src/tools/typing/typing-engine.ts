@@ -108,6 +108,16 @@ export function initState(targetText: string, options: Partial<EngineOptions> = 
   };
 }
 
+export function extendTarget(state: EngineState, extension: string): EngineState {
+  if (state.finished || extension.length === 0) return state;
+  const appended = Array.from(extension, (ch) => ({ expected: ch, typed: '', state: 'pending' as const }));
+  return {
+    ...state,
+    targetText: state.targetText + extension,
+    cells: [...state.cells, ...appended],
+  };
+}
+
 function normalize(ch: string, sensitive: boolean): string {
   return sensitive ? ch : ch.toLocaleLowerCase();
 }
@@ -119,6 +129,12 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
   // Backspace handling.
   if (key === 'Backspace') {
     if (!opts.allowBackspace) return { ...state, backspaces: state.backspaces + 1 };
+    const current = state.cells[state.cursor];
+    if (current?.state === 'incorrect' && current.expected !== '') {
+      const cells = state.cells.slice();
+      cells[state.cursor] = { ...current, typed: '', state: 'pending', t: undefined };
+      return { ...state, cells, backspaces: state.backspaces + 1 };
+    }
     if (state.cursor === 0) return state;
     const next = { ...state, cells: state.cells.slice(), cursor: state.cursor - 1, backspaces: state.backspaces + 1 };
     const idx = next.cursor;
@@ -193,8 +209,12 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
       incorrectKeystrokes += 1;
       missedChars += 1;
       cursor += 1;
+    } else if (opts.errorMode === 'strict') {
+      // Strict mode records the error at the current character and waits for correction.
+      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
+      incorrectKeystrokes += 1;
     } else {
-      // Strict mode: record the error but stay put; typed char occupies the cell visibly.
+      // Confidence mode advances but intentionally does not allow Backspace.
       cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
       incorrectKeystrokes += 1;
       cursor += 1;
@@ -254,15 +274,17 @@ export function computeMetrics(state: EngineState, nowT?: number): Metrics {
   const end = state.endedAt ?? nowT ?? start;
   const elapsedMs = Math.max(0, end - start);
   const minutes = elapsedMs / 60000;
-  const correct = state.correctKeystrokes;
-  const incorrect = state.incorrectKeystrokes;
-  const total = correct + incorrect + state.extraKeystrokes;
+  const correctPresses = state.correctKeystrokes;
+  const incorrectPresses = state.incorrectKeystrokes;
+  const total = correctPresses + incorrectPresses + state.extraKeystrokes;
+  const finalCorrectChars = state.cells
+    .slice(0, state.targetText.length)
+    .filter((cell) => cell.state === 'correct').length;
   const grossWpm = minutes > 0 ? (total / STANDARD_WORD) / minutes : 0;
-  const netCharacters = Math.max(0, correct - state.missedChars);
-  const netWpm = minutes > 0 ? Math.max(0, (correct / STANDARD_WORD) / minutes - incorrect / minutes) : 0;
+  const netWpm = minutes > 0 ? (finalCorrectChars / STANDARD_WORD) / minutes : 0;
   const rawCpm = minutes > 0 ? total / minutes : 0;
-  const accuracyDen = correct + incorrect + state.missedChars;
-  const accuracy = accuracyDen > 0 ? (correct / accuracyDen) * 100 : 0;
+  const accuracyDen = total;
+  const accuracy = accuracyDen > 0 ? (correctPresses / accuracyDen) * 100 : 0;
   const consistency = keystrokeConsistency(state.events);
   return {
     elapsedMs,
@@ -271,8 +293,8 @@ export function computeMetrics(state: EngineState, nowT?: number): Metrics {
     rawCpm: round(rawCpm),
     accuracy: round(accuracy),
     consistency: round(consistency),
-    correctChars: netCharacters,
-    incorrectChars: incorrect,
+    correctChars: finalCorrectChars,
+    incorrectChars: incorrectPresses,
     extraChars: state.extraKeystrokes,
     missedChars: state.missedChars,
   };
