@@ -1,12 +1,23 @@
-import { createEmptyPolarChart, setPolarNode } from './engines/geometry-engine';
+import {
+  createEmptyGridChart,
+  createEmptyPolarChart,
+  setGridCell,
+  setPolarNode,
+} from './engines/geometry-engine';
 import { getCrochetSymbol } from './engines/symbol-library';
-import { createEmptyMetadata, type FiberCraftDocument, type PolarChart } from './fiber-craft-types';
+import {
+  createEmptyMetadata,
+  type FiberCraftDocument,
+  type GridChart,
+  type PolarChart,
+} from './fiber-craft-types';
 
 export const STARTER_CROCHET_STITCHES = 6;
+export const STARTER_CROCHET_GRID_SIZE = 12;
 
 const withUpdatedChart = (
   document: FiberCraftDocument,
-  chart: PolarChart,
+  chart: GridChart | PolarChart,
   now: string,
 ): FiberCraftDocument => ({
   ...document,
@@ -16,6 +27,11 @@ const withUpdatedChart = (
 
 const requirePolarChart = (document: FiberCraftDocument): PolarChart => {
   if (document.chart.kind !== 'polar') throw new Error('This crochet action requires a round chart.');
+  return document.chart;
+};
+
+const requireGridChart = (document: FiberCraftDocument): GridChart => {
+  if (document.chart.kind !== 'grid') throw new Error('This crochet action requires a grid chart.');
   return document.chart;
 };
 
@@ -53,7 +69,7 @@ export const addCrochetRound = (
   const nodes = Array.from({ length: stitchCount }, (_, angleIndex) => ({
     round,
     angleIndex,
-    stitchCountInRound: stitchCount,
+    stitchesInRound: stitchCount,
     symbolId: null,
     colorId: null,
   }));
@@ -97,5 +113,54 @@ export const crochetRoundProgress = (
   return {
     worked: nodes.filter((node) => node.symbolId !== null).length,
     total: nodes.length,
+  };
+};
+
+export const switchCrochetChartMode = (
+  document: FiberCraftDocument,
+  mode: 'round' | 'grid',
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (mode === 'round') {
+    if (document.chart.kind === 'polar') return document;
+    return withUpdatedChart(document, createEmptyPolarChart([STARTER_CROCHET_STITCHES]), now);
+  }
+  if (document.chart.kind === 'grid') return document;
+  return withUpdatedChart(
+    document,
+    createEmptyGridChart(STARTER_CROCHET_GRID_SIZE, STARTER_CROCHET_GRID_SIZE),
+    now,
+  );
+};
+
+export const toggleCrochetGridCell = (
+  document: FiberCraftDocument,
+  row: number,
+  col: number,
+  colorId: string,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requireGridChart(document);
+  if (!document.palette.some((color) => color.id === colorId)) {
+    throw new Error('Selected color is not in this project palette.');
+  }
+  const current = chart.cells.find((cell) => cell.row === row && cell.col === col);
+  if (!current) throw new Error(`Cell (${row}, ${col}) is outside this grid.`);
+  const nextColor = current.colorId === null ? colorId : null;
+  return withUpdatedChart(document, setGridCell(chart, row, col, nextColor, null), now);
+};
+
+export const toggleCrochetProgressStep = (
+  document: FiberCraftDocument,
+  stepId: string,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const completed = new Set(document.completedSteps);
+  if (completed.has(stepId)) completed.delete(stepId);
+  else completed.add(stepId);
+  return {
+    ...document,
+    metadata: { ...document.metadata, updatedAt: now },
+    completedSteps: [...completed],
   };
 };
