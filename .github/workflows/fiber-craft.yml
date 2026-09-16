@@ -8,6 +8,7 @@ on:
       - 'tests/unit/fiber-craft-geometry.test.ts'
       - 'tests/unit/fiber-craft-state.test.ts'
       - 'tests/unit/fiber-craft-crochet-pattern.test.ts'
+      - 'tests/unit/fiber-craft-cross-stitch.test.ts'
       - 'tests/unit/fiber-craft-project.test.ts'
       - 'tests/e2e/fiber-craft.spec.ts'
       - 'scripts/select-e2e-specs.mjs'
@@ -39,6 +40,7 @@ jobs:
           tests/unit/fiber-craft-geometry.test.ts
           tests/unit/fiber-craft-state.test.ts
           tests/unit/fiber-craft-crochet-pattern.test.ts
+          tests/unit/fiber-craft-cross-stitch.test.ts
           tests/unit/fiber-craft-project.test.ts
           tests/unit/e2e-spec-selection.test.mjs
       - name: Production build
