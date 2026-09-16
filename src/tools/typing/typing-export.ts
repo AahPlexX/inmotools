@@ -33,6 +33,7 @@ export function testsToCsv(tests: StoredTest[], meta?: ExportMetadata): string {
     mode: t.mode,
     duration_mode: t.durationMode,
     duration_value: t.durationValue,
+    quote_length: t.quoteLength ?? '',
     language: t.language,
     layout: t.layout,
     finish_reason: t.finishReason,
