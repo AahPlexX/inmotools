@@ -420,4 +420,68 @@ describe('CAD real project evaluation', () => {
     expect(sideThenEnd).not.toBeCloseTo(sideOnly, 4);
     expect(sideThenEnd).not.toBeCloseTo(1000, 4);
   });
+
+  it('builds a linear pattern as one compound whose volume is exactly the sum of its non-overlapping instances', () => {
+    const project: CadProject = {
+      ...createCadProject('Linear pattern fixture'),
+      sketches: [],
+      features: [
+        feature({ id: 'seed', type: 'primitive', parameters: { kind: 'box', width: 2, depth: 2, height: 2 } }),
+        feature({
+          id: 'pattern-1', type: 'pattern', dependsOn: ['seed'],
+          parameters: { kind: 'linear', count: 3, step: [5, 0, 0] },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Row', featureIds: ['seed', 'pattern-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // Instances sit at x in [0,2], [5,7], [10,12] - spacing 5 comfortably exceeds the 2mm
+      // width, so they cannot overlap and the compound's volume is exactly additive.
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(3 * (2 * 2 * 2), 8);
+      const bounds = kernel.bounds(finalBody.shape);
+      expect(bounds.min).toEqual([0, 0, 0]);
+      expect(bounds.max).toEqual([12, 2, 2]);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
+
+  it('builds a circular pattern as one compound whose volume is exactly the sum of its non-overlapping instances', () => {
+    const project: CadProject = {
+      ...createCadProject('Circular pattern fixture'),
+      sketches: [],
+      features: [
+        feature({ id: 'seed', type: 'primitive', parameters: { kind: 'box', width: 2, depth: 2, height: 2 } }),
+        feature({
+          id: 'pattern-1', type: 'pattern', dependsOn: ['seed'],
+          parameters: { kind: 'circular', count: 4, axisOrigin: [0, 0, 0], axisDirection: [0, 0, 1], angleStep: Math.PI / 2 },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Wheel', featureIds: ['seed', 'pattern-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+
+    try {
+      // The seed box sits exactly in the first quadrant with a corner at the rotation axis
+      // (origin), so successive 90-degree instances land in the other three quadrants,
+      // touching only along zero-volume shared edges - the compound's volume is exactly
+      // additive here too, not just for translated (non-rotated) instances.
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(4 * (2 * 2 * 2), 6);
+      const bounds = kernel.bounds(finalBody.shape);
+      expect(bounds.min[0]).toBeCloseTo(-2, 6);
+      expect(bounds.min[1]).toBeCloseTo(-2, 6);
+      expect(bounds.max[0]).toBeCloseTo(2, 6);
+      expect(bounds.max[1]).toBeCloseTo(2, 6);
+      expect(bounds.min[2]).toBeCloseTo(0, 6);
+      expect(bounds.max[2]).toBeCloseTo(2, 6);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
 });

@@ -303,6 +303,64 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('translates a shape by a fixed offset without mutating the input', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const translated = kernel.translate(cylinder, [10, -3, 1]);
+    try {
+      expect(kernel.volume(translated)).toBeCloseTo(kernel.volume(cylinder), 8);
+      expectBoundsClose(kernel.bounds(translated), { min: [8, -5, 1], max: [12, -1, 6] });
+      // The input is left untouched by translate - still at its own original bounds.
+      expectBoundsClose(kernel.bounds(cylinder), { min: [-2, -2, 0], max: [2, 2, 5] });
+    } finally {
+      kernel.release(translated);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('rotates a shape by an explicit angle about an arbitrary axis without mutating the input', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    const rotated = kernel.rotateAroundAxis(cylinder, [0, 0, 0], [0, 1, 0], Math.PI / 2);
+    try {
+      expect(kernel.volume(rotated)).toBeCloseTo(kernel.volume(cylinder), 8);
+      // Same geometry as placeAlongAxis's own +X rotation case, reached via an explicit
+      // angle instead of an alignment computation.
+      expectBoundsClose(kernel.bounds(rotated), { min: [0, -2, -2], max: [5, 2, 2] });
+      expectBoundsClose(kernel.bounds(cylinder), { min: [-2, -2, 0], max: [2, 2, 5] });
+    } finally {
+      kernel.release(rotated);
+      kernel.release(cylinder);
+    }
+  });
+
+  it('rejects a rotation axis with a zero-length direction', () => {
+    const cylinder = kernel.cylinder(2, 5);
+    try {
+      expect(() => kernel.rotateAroundAxis(cylinder, [0, 0, 0], [0, 0, 0], Math.PI / 2)).toThrow(/non-zero/);
+    } finally {
+      kernel.release(cylinder);
+    }
+  });
+
+  it('groups shapes into a single compound that preserves their combined volume', () => {
+    const first = kernel.cylinder(2, 5);
+    const secondSeed = kernel.cylinder(2, 5);
+    const second = kernel.translate(secondSeed, [20, 0, 0]);
+    const grouped = kernel.compound([first, second]);
+    try {
+      expect(kernel.volume(grouped)).toBeCloseTo(kernel.volume(first) + kernel.volume(second), 8);
+      expectBoundsClose(kernel.bounds(grouped), { min: [-2, -2, 0], max: [22, 2, 5] });
+    } finally {
+      kernel.release(grouped);
+      kernel.release(first);
+      kernel.release(secondSeed);
+      kernel.release(second);
+    }
+  });
+
+  it('rejects a compound call given no shapes', () => {
+    expect(() => kernel.compound([])).toThrow(/at least one/i);
+  });
+
   it('thickens a planar exact face into a solid of the expected volume', () => {
     const face = kernel.profileFace({
       normal: [0, 0, 1],
