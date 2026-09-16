@@ -1,0 +1,123 @@
+.fiber-craft-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.fiber-craft-description { grid-column: 1 / -1; }
+.fiber-craft-description-legend { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.fiber-craft-description-legend p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+.fiber-craft-workspace[data-fiber-theme="dark-room"] {
+  color-scheme: dark;
+  --surface: #111820;
+  --ink: #f7f9fb;
+  --muted: #c5d0da;
+  --line: #485765;
+  --line-strong: #788896;
+  --good: #85e6b9;
+  --focus: #9fc2ff;
+  color: var(--ink);
+  background: #090e13;
+}
+
+.fiber-craft-workspace[data-fiber-theme="dark-room"] .fiber-craft-canvas-panel,
+.fiber-craft-workspace[data-fiber-theme="dark-room"] .fiber-craft-inspector > section,
+.fiber-craft-workspace[data-fiber-theme="dark-room"] .fiber-craft-analysis-card,
+.fiber-craft-workspace[data-fiber-theme="dark-room"] .fiber-craft-restore {
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] {
+  color-scheme: light;
+  --surface: #ffffff;
+  --ink: #000000;
+  --muted: #1a1a1a;
+  --line: #000000;
+  --line-strong: #000000;
+  --good: #000000;
+  --focus: #0000cc;
+  color: #000000;
+  background: #ffffff;
+}
+
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] .fiber-craft-canvas-panel,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] .fiber-craft-inspector > section,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] .fiber-craft-analysis-card,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] .fiber-craft-restore {
+  background: #ffffff;
+  border: 2px solid #000000;
+}
+
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] .fiber-craft-grid-cell,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] select,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] input,
+.fiber-craft-workspace[data-fiber-theme="high-contrast"] button {
+  border-color: #000000;
+}
+
+@media (forced-colors: active) {
+  .fiber-craft-workspace .fiber-craft-canvas,
+  .fiber-craft-workspace .fiber-craft-canvas-panel,
+  .fiber-craft-workspace .fiber-craft-analysis-card,
+  .fiber-craft-workspace .fiber-craft-grid-cell {
+    border: 2px solid CanvasText;
+  }
+}
+
+@media print {
+  .fiber-craft-workspace {
+    color-scheme: only light;
+    --surface: #ffffff;
+    --ink: #000000;
+    --muted: #000000;
+    --line: #000000;
+    --line-strong: #000000;
+    --good: #000000;
+    color: #000000 !important;
+    background: #ffffff !important;
+    print-color-adjust: economy;
+  }
+  .fiber-craft-workspace .fiber-craft-toolbar,
+  .fiber-craft-workspace .fiber-craft-restore,
+  .fiber-craft-workspace .fiber-craft-inspector,
+  .fiber-craft-workspace .fiber-craft-status {
+    display: none !important;
+  }
+  .fiber-craft-workspace .fiber-craft-main,
+  .fiber-craft-workspace .fiber-craft-analysis-grid {
+    display: block !important;
+  }
+  .fiber-craft-workspace .fiber-craft-canvas-panel,
+  .fiber-craft-workspace .fiber-craft-analysis-card {
+    margin: 0 0 12px;
+    border: 2px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    break-inside: avoid;
+  }
+  .fiber-craft-workspace .fiber-craft-canvas {
+    filter: grayscale(1) contrast(1.8);
+    border: 2px solid #000000;
+    background: #ffffff !important;
+  }
+  .fiber-craft-workspace .fiber-craft-grid-cell {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-color: #000000 !important;
+  }
+  .fiber-craft-workspace .fiber-craft-muted,
+  .fiber-craft-workspace .fiber-craft-plain-list,
+  .fiber-craft-workspace .fiber-craft-analysis-heading p,
+  .fiber-craft-workspace .fiber-craft-panel-heading p,
+  .fiber-craft-workspace .fiber-craft-reference-readout span {
+    color: #000000 !important;
+  }
+}

@@ -24,9 +24,19 @@
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
   - Current milestone: A — foundation and global editor
 
+- **Fiber Craft Workstation** — local-first fiber-pattern workstation; the active delivery path is crochet-first while preserving the approved multi-discipline design.
+  - Design: `docs/superpowers/specs/2026-09-15-fiber-craft-workstation-design.md`.
+  - Plan: `docs/superpowers/plans/2026-09-15-fiber-craft-workstation.md`.
+  - Dedicated branch: `feature/fiber-craft-workstation`; no second Fiber Craft branch is authorized for this workstream.
+  - Function progress: **21/65 complete** — FC-02, FC-03, FC-04, FC-07, FC-09–FC-16, FC-50–FC-52, FC-54–FC-56, FC-59, FC-63, and FC-64. Partial functions are not counted.
+  - Current milestone: Slice 2 crochet engine is complete and Slice 7 publishing is in progress. FC-56 vector pattern-book PDF, FC-59 high-resolution PNG, FC-63 social preview, and FC-64 offline PWA project use are accepted; FC-05/06/08/53 remain shared-infrastructure gaps, while the other publishing/export and later-discipline functions remain open until their actual behavior is implemented and validated.
+  - Current state: round/amigurumi plus C2C/filet editing, actual vector crochet symbols, synchronized written instructions, stitch/growth validation, CYC yarn/hook guidance, bidirectional gauge scaling, editable project difficulty/technique tags, persistent row/round progress, reversible history, IndexedDB recovery, validated portable `.craftproj` save/load, light/dark-room/high-contrast and print modes, structured accessible chart descriptions, responsive UI, catalog/route wiring, one-action active-row recenter, real vector multi-page PDF export, real 1×–4× round/grid PNG export, real 1200×630 social-preview PNG generation, and production-service-worker offline reload are implemented. Dedicated Fiber run `35123422078` at `bb8c5d33` passed 54/54 focused checks, production TypeScript/Vite build, and all 4 desktop/mobile Chromium browser cases in 12.8 seconds. The PWA build emitted `sw.js` with 150 precache entries; no duplicate Fiber-specific service worker was added.
+  - Testing cadence: use invariant-focused tables/loops for pure logic; validate coherent implementation milestones sequentially through `.github/workflows/fiber-craft.yml`; avoid redundant Fiber reruns for docs-only changes or unrelated upstream files. Property-based testing remains a targeted future option when combinatorial engines justify it. Playwright browser-binary caching is not being added because current vendor guidance does not recommend it; fewer milestone-scoped browser runs remain the supported efficiency path.
+  - Completion gate: all 65 approved functions are implemented and freshly verified, responsive/accessibility and persisted/exported behavior are validated, intended completed work is reconciled with current `origin/main`, and Pages/integration evidence is green before this entry can move to `DONE.md`.
+
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
-  - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
+  - Plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
   - Phase 1 completion: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1-completion.md`.
   - Current milestone: Phase 2 — symmetry, local environments, validation, and model building. Phase 1 document/import/export core, interactive structure editing, periodic geometry, project history, publication graphics, and acceptance baseline are integrated.
   - Latest Phase 1 acceptance evidence: all Crystal functional and Task 12 reflow/Axe/keyboard/dialog checks passed in Pages run `34729051007`, job `103648349176`, at `495ee945d60965b7e7e46bd6ed296e9b0fa8bb8d`. That repository-wide job remained red only because three later Web Layout tests failed; no Crystal failure was present.

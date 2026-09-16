@@ -1,0 +1,59 @@
+name: Fiber Craft Workstation validation
+
+on:
+  push:
+    branches: [main, feature/fiber-craft-workstation]
+    paths:
+      - 'src/tools/fiber-craft/**'
+      - 'tests/unit/fiber-craft-geometry.test.ts'
+      - 'tests/unit/fiber-craft-state.test.ts'
+      - 'tests/unit/fiber-craft-crochet-pattern.test.ts'
+      - 'tests/unit/fiber-craft-project.test.ts'
+      - 'tests/e2e/fiber-craft.spec.ts'
+      - 'scripts/select-e2e-specs.mjs'
+      - 'tests/unit/e2e-spec-selection.test.mjs'
+      - '.github/workflows/fiber-craft.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Fiber Craft unit checks
+        run: >-
+          pnpm exec vitest run
+          tests/unit/fiber-craft-geometry.test.ts
+          tests/unit/fiber-craft-state.test.ts
+          tests/unit/fiber-craft-crochet-pattern.test.ts
+          tests/unit/fiber-craft-project.test.ts
+          tests/unit/e2e-spec-selection.test.mjs
+      - name: Production build
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Fiber Craft browser workflow
+        run: pnpm exec playwright test tests/e2e/fiber-craft.spec.ts
+      - name: Upload Fiber Craft failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fiber-craft-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
