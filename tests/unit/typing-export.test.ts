@@ -50,6 +50,22 @@ describe('typing exports', () => {
     expect(csv).toContain('morning|code');
   });
 
+  it('preserves quote length in CSV and JSON exports', () => {
+    const quoteTest: StoredTest = {
+      ...sampleTest,
+      mode: 'quote',
+      durationMode: 'quote',
+      quoteLength: 'short',
+      targetText: 'A short quote target.',
+    };
+    const csv = testsToCsv([quoteTest]);
+    expect(csv.split('\n')[0]).toContain('quote_length');
+    expect(csv).toContain('short');
+
+    const parsed = JSON.parse(testToJson(quoteTest, EMPTY_EXPORT_METADATA));
+    expect(parsed.test.quoteLength).toBe('short');
+  });
+
   it('preserves editable bulk export metadata in CSV', () => {
     const meta = {
       ...EMPTY_EXPORT_METADATA,
