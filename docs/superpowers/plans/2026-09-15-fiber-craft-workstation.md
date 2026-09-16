@@ -3,7 +3,7 @@
 **Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **19/65 complete**
+**Function progress:** **21/65 complete**
 
 ## Goal
 
@@ -73,14 +73,18 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-55** structured accessible chart description generated from the same canonical round/grid data as the visual chart.
 - **FC-56** vector multi-page crochet pattern-book PDF with cover, project/material reference, legend, vector diagram, and paginated written instructions.
 - **FC-59** high-resolution crochet PNG export at selectable 1×–4× bitmap resolution for both round and grid charts.
+- **FC-63** generated 1200×630 social preview PNG with project title/details, crochet badge, and canonical chart thumbnail.
+- **FC-64** offline PWA project use verified through the generated service worker plus the same portable `.craftproj` workflow; Fiber reloads and remains usable offline without an account.
 
-Latest acceptance milestone: focused Fiber run `35122405166` at code head `f8ecd62f` passed all
-54 focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
-and mobile Chromium workflow. The browser scenario generated and inspected real 3840×2880 and
-1920×1440 PNG files plus the multi-page PDF on both viewports, while retaining the accepted themes,
-accessible descriptions, vector symbols, gauge/classification persistence, `.craftproj` portability,
-autosave, and recovery path. The PDF exporter is code-split behind its user action so the existing
-`pdf-lib` dependency is not pulled into the initial Fiber workspace chunk.
+Latest acceptance milestone: focused Fiber run `35123422078` at code head `bb8c5d33` passed all
+54 focused unit/selector checks, the production TypeScript/Vite build, and **4/4** desktop/mobile
+Chromium browser cases in 12.8 seconds. The browser suite generated and inspected the new real
+1200×630 social-preview PNG and independently proved the Fiber route reloads offline under the
+production-generated service worker on both desktop and mobile profiles. The same run retained the
+accepted pattern PDF, 1×–4× PNG export, themes, accessible descriptions, vector symbols,
+gauge/classification persistence, `.craftproj` portability, autosave, and recovery behavior.
+The PWA build precached 150 production entries and emitted `sw.js`; no duplicate Fiber-specific
+service worker or new dependency was introduced.
 
 ## Delivery slices
 
@@ -91,9 +95,10 @@ autosave, and recovery path. The PDF exporter is code-split behind its user acti
       **In progress:** crochet Canvas/grid hosts, palette/inspector, reversible history, IndexedDB
       draft restore, catalog entry, lazy loader, canonical alias, portable `.craftproj`, progress
       tracking, one-action active-row recenter, screen/print themes, gauge scaling, project
-      classification, and accessible chart descriptions are accepted. Cross-discipline mode
-      switching, shared zoom/pan/rulers, selection transforms, metric/imperial switching across all
-      measurement-bearing disciplines, and complete keyboard/touch authoring remain open.
+      classification, accessible chart descriptions, and verified offline PWA behavior are accepted.
+      Cross-discipline mode switching, shared zoom/pan/rulers, selection transforms,
+      metric/imperial switching across all measurement-bearing disciplines, and complete
+      keyboard/touch authoring remain open.
 - [x] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       vector symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator,
       amigurumi shaping, and yarn/hook reference guidance are implemented and accepted through the
@@ -109,9 +114,10 @@ autosave, and recovery path. The PDF exporter is code-split behind its user acti
 - [ ] **Slice 6 — Embroidery digitizing engine.** Vector path authoring, satin/tatami/underlay
       generation, color-stop/trim sequencing, DST/EXP/JEF/PES encoders, appliqué placement export.
 - [ ] **Slice 7 — Export, metadata & publishing.** **In progress:** FC-56 vector multi-page
-      pattern-book PDF and FC-59 high-resolution PNG are accepted. SVG/DXF cutter export,
-      embroidery bundle export, materials/shopping export, metadata/copyright and export-time tag
-      review, OpenGraph preview card, offline PWA project bundling, and batch export remain open.
+      pattern-book PDF, FC-59 high-resolution PNG, FC-63 1200×630 social preview, and FC-64 offline
+      PWA project use are accepted. SVG/DXF cutter export, embroidery bundle export,
+      materials/shopping export, metadata/copyright and export-time tag review, and batch export
+      remain open.
 - [ ] **Slice 8 — Verification & merge readiness.** Full unit + Playwright + axe-core sweep,
       catalog/homepage link assertion, production build, deployment check. No merge to `main`
       until this slice is green.
@@ -126,7 +132,9 @@ autosave, and recovery path. The PDF exporter is code-split behind its user acti
   crosses engine/state/UI/persistence boundaries or when the previous check exposed a defect.
 - **Dedicated Fiber gate:** `.github/workflows/fiber-craft.yml` runs on Fiber-relevant paths only:
   frozen install → 54 focused unit/selector checks → production TypeScript/Vite build → one
-  consolidated Playwright workflow on desktop and mobile Chromium.
+  consolidated Playwright workflow on desktop and mobile Chromium. The current browser contract
+  contains two scenarios on each viewport: the full crochet/edit/export/save/restore journey and an
+  independent production-service-worker offline reload check.
 - **Avoid no-value reruns:** documentation-only commits and unrelated upstream changes do not
   invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at integration
   and merge-readiness boundaries.
