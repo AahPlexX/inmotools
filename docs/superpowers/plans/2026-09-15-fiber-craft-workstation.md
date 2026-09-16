@@ -1,9 +1,9 @@
 # Fiber Craft Workstation
 
-**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 7 publishing in progress)
+**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 3 counted-thread in progress; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **21/65 complete**
+**Function progress:** **22/65 complete**
 
 ## Goal
 
@@ -66,6 +66,7 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-14** synchronized written crochet compiler with US/UK terminology.
 - **FC-15** stitch-count/growth validation.
 - **FC-16** yarn-weight / hook / gauge reference guidance with editable project values.
+- **FC-35** precision counted-thread grid with full, half, quarter, and three-quarter stitches plus visible French-knot and backstitch overlays on the same addressable grid.
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
 - **FC-52** bidirectional physical-dimension and gauge scaling for grid and round crochet charts.
@@ -76,15 +77,14 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-63** generated 1200×630 social preview PNG with project title/details, crochet badge, and canonical chart thumbnail.
 - **FC-64** offline PWA project use verified through the generated service worker plus the same portable `.craftproj` workflow; Fiber reloads and remains usable offline without an account.
 
-Latest acceptance milestone: focused Fiber run `35123422078` at code head `bb8c5d33` passed all
-54 focused unit/selector checks, the production TypeScript/Vite build, and **4/4** desktop/mobile
-Chromium browser cases in 12.8 seconds. The browser suite generated and inspected the new real
-1200×630 social-preview PNG and independently proved the Fiber route reloads offline under the
-production-generated service worker on both desktop and mobile profiles. The same run retained the
-accepted pattern PDF, 1×–4× PNG export, themes, accessible descriptions, vector symbols,
-gauge/classification persistence, `.craftproj` portability, autosave, and recovery behavior.
-The PWA build precached 150 production entries and emitted `sw.js`; no duplicate Fiber-specific
-service worker or new dependency was introduced.
+Latest acceptance milestone: focused Fiber run `35158987118` at code head `c6908c9c4fcde528ce05300d83f5e1f1f0eee8a5`
+passed the focused unit contract, the production TypeScript/Vite build, and the complete desktop/mobile
+Chromium browser workflow. The counted-thread browser journey now verifies full-cross and fractional
+cell authoring, live legend updates, visible French-knot and backstitch overlays, portable `.craftproj`
+round-trip, local autosave, and session recovery on both configured Chromium profiles. Pure-engine
+coverage iterates all 11 counted stitch kinds and separately validates specialty-stitch geometry and
+invalid coordinate/palette inputs. Existing crochet publishing, offline-PWA, persistence, themes,
+accessible descriptions, gauge/classification, and export behavior remained green in the same gate.
 
 ## Delivery slices
 
@@ -96,16 +96,17 @@ service worker or new dependency was introduced.
       draft restore, catalog entry, lazy loader, canonical alias, portable `.craftproj`, progress
       tracking, one-action active-row recenter, screen/print themes, gauge scaling, project
       classification, accessible chart descriptions, and verified offline PWA behavior are accepted.
-      Cross-discipline mode switching, shared zoom/pan/rulers, selection transforms,
-      metric/imperial switching across all measurement-bearing disciplines, and complete
-      keyboard/touch authoring remain open.
+      Cross-discipline mode switching is now wired for crochet and counted-thread, while shared
+      zoom/pan/rulers, selection transforms, metric/imperial switching across all measurement-bearing
+      disciplines, and complete keyboard/touch authoring remain open.
 - [x] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       vector symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator,
       amigurumi shaping, and yarn/hook reference guidance are implemented and accepted through the
       focused unit/build/desktop-mobile browser gate.
-- [ ] **Slice 3 — Cross-stitch & counted-thread engine.** Precision grid, raster quantization
-      worker, DMC/Anchor/Madeira/Sullivan floss matcher (CIEDE2000 via `culori`), symbol/legend
-      generator, skein/yardage calculator.
+- [ ] **Slice 3 — Cross-stitch & counted-thread engine.** **In progress:** FC-35 precision counted
+      grid is accepted with all 11 full/half/fractional stitch kinds plus French-knot and backstitch
+      overlays. FC-36–FC-41 remain open. FC-42 has partial live symbol-key plumbing but is not counted
+      until the required printable floss-code/name legend behavior is implemented and validated.
 - [ ] **Slice 4 — Knitting colorwork/cable engine.** Gauge-corrected non-square grid, knit/cable
       symbol matrix, stranded-float analyzer.
 - [ ] **Slice 5 — Quilting & patchwork engine.** Parametric block designer, foundation
@@ -131,13 +132,18 @@ service worker or new dependency was introduced.
   milestone rather than after every helper/function. A second spot-check is warranted when a change
   crosses engine/state/UI/persistence boundaries or when the previous check exposed a defect.
 - **Dedicated Fiber gate:** `.github/workflows/fiber-craft.yml` runs on Fiber-relevant paths only:
-  frozen install → 54 focused unit/selector checks → production TypeScript/Vite build → one
-  consolidated Playwright workflow on desktop and mobile Chromium. The current browser contract
-  contains two scenarios on each viewport: the full crochet/edit/export/save/restore journey and an
-  independent production-service-worker offline reload check.
+  frozen install → focused unit/selector checks → production TypeScript/Vite build → one consolidated
+  Playwright workflow on desktop and mobile Chromium. The browser contract now contains three
+  scenarios on each viewport: the full crochet/edit/export/save/restore journey, counted-thread
+  authoring/save/restore, and an independent production-service-worker offline reload check.
 - **Avoid no-value reruns:** documentation-only commits and unrelated upstream changes do not
   invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at integration
   and merge-readiness boundaries.
+- **Known workflow cleanup:** the Fiber workflow still carries an inert explicit path/filter for the
+  deleted standalone `tests/unit/fiber-craft-cross-stitch.test.ts`; counted-thread coverage was
+  intentionally consolidated into `fiber-craft-crochet-pattern.test.ts`. Do not recreate the
+  redundant test file. Remove the stale workflow entry the next time the Fiber workflow itself is
+  materially edited so cleanup does not manufacture a standalone browser-install/test cycle.
 - **Property-based escalation:** add exactly pinned `fast-check` and `@fast-check/vitest` only when
   generated cases and shrinking materially reduce maintenance for high-dimensional logic. Do not
   add a dependency merely to replace a small, readable invariant table.
