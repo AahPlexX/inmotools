@@ -1,5 +1,5 @@
 import { CROCHET_SYMBOLS } from './engines/symbol-library';
-import type { FiberCraftDocument, PolarChart } from './fiber-craft-types';
+import type { FiberCraftDocument, GridChart, PolarChart } from './fiber-craft-types';
 
 export interface FiberCraftStore {
   load(): Promise<FiberCraftDocument | null>;
@@ -20,6 +20,7 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
   if (!isRecord(value) || value.kind !== 'polar' || !Number.isInteger(value.rounds) || Number(value.rounds) <= 0) return false;
   if (!Array.isArray(value.nodes)) return false;
   const rounds = Number(value.rounds);
+  const seen = new Set<string>();
   return value.nodes.every((node) => {
     if (!isRecord(node)) return false;
     const round = Number(node.round);
@@ -27,12 +28,51 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
     const stitchesInRound = Number(node.stitchesInRound);
     const symbolId = node.symbolId;
     const colorId = node.colorId;
+    const key = `${round}:${angleIndex}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return Number.isInteger(round) && round >= 0 && round < rounds
       && Number.isInteger(angleIndex) && angleIndex >= 0 && angleIndex < stitchesInRound
       && Number.isInteger(stitchesInRound) && stitchesInRound > 0
       && (symbolId === null || (typeof symbolId === 'string' && SYMBOL_IDS.has(symbolId)))
       && (colorId === null || (typeof colorId === 'string' && paletteIds.has(colorId)));
   });
+};
+
+const isGridChart = (value: unknown, paletteIds: ReadonlySet<string>): value is GridChart => {
+  if (!isRecord(value) || value.kind !== 'grid') return false;
+  const rows = Number(value.rows);
+  const cols = Number(value.cols);
+  const aspectRatio = Number(value.aspectRatio);
+  if (!Number.isInteger(rows) || rows <= 0 || !Number.isInteger(cols) || cols <= 0) return false;
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0 || !Array.isArray(value.cells) || value.cells.length !== rows * cols) return false;
+  const seen = new Set<string>();
+  return value.cells.every((cell) => {
+    if (!isRecord(cell)) return false;
+    const row = Number(cell.row);
+    const col = Number(cell.col);
+    const symbolId = cell.symbolId;
+    const colorId = cell.colorId;
+    const key = `${row}:${col}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Number.isInteger(row) && row >= 0 && row < rows
+      && Number.isInteger(col) && col >= 0 && col < cols
+      && (symbolId === null || (typeof symbolId === 'string' && SYMBOL_IDS.has(symbolId)))
+      && (colorId === null || (typeof colorId === 'string' && paletteIds.has(colorId)));
+  });
+};
+
+const hasValidCrochetSettings = (value: Record<string, unknown>): boolean => {
+  if (value.settings === undefined) return true;
+  if (!isRecord(value.settings) || value.settings.crochet === undefined) return isRecord(value.settings);
+  if (!isRecord(value.settings.crochet)) return false;
+  const crochet = value.settings.crochet;
+  if (!Array.isArray(crochet.targetRoundCounts)) return false;
+  if (!crochet.targetRoundCounts.every((count) => Number.isInteger(count) && Number(count) > 0 && Number(count) <= 10_000)) return false;
+  const yarnWeight = crochet.yarnWeight;
+  return yarnWeight === null
+    || (Number.isInteger(yarnWeight) && Number(yarnWeight) >= 0 && Number(yarnWeight) <= 7);
 };
 
 export const isRestorableCrochetDocument = (value: unknown): value is FiberCraftDocument => {
@@ -44,9 +84,12 @@ export const isRestorableCrochetDocument = (value: unknown): value is FiberCraft
     if (paletteIds.has(color.id)) return false;
     paletteIds.add(color.id);
   }
-  return isPolarChart(value.chart, paletteIds)
+  const chartValid = isPolarChart(value.chart, paletteIds) || isGridChart(value.chart, paletteIds);
+  return chartValid
+    && hasValidCrochetSettings(value)
     && isRecord(value.swatchImages)
-    && Array.isArray(value.completedSteps);
+    && Array.isArray(value.completedSteps)
+    && value.completedSteps.every((step) => typeof step === 'string');
 };
 
 export const createIndexedDbFiberCraftStore = (): FiberCraftStore => {

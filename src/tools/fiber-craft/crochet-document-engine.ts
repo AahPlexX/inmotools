@@ -35,6 +35,20 @@ const requireGridChart = (document: FiberCraftDocument): GridChart => {
   return document.chart;
 };
 
+const withCrochetSettings = (
+  document: FiberCraftDocument,
+  patch: Partial<{ readonly targetRoundCounts: readonly number[]; readonly yarnWeight: number | null }>,
+): FiberCraftDocument => ({
+  ...document,
+  settings: {
+    ...document.settings,
+    crochet: {
+      targetRoundCounts: patch.targetRoundCounts ?? document.settings?.crochet?.targetRoundCounts ?? [],
+      yarnWeight: patch.yarnWeight !== undefined ? patch.yarnWeight : document.settings?.crochet?.yarnWeight ?? null,
+    },
+  },
+});
+
 export const createStarterCrochetDocument = (now = new Date().toISOString()): FiberCraftDocument => {
   const metadata = createEmptyMetadata('crochet');
   return {
@@ -51,6 +65,7 @@ export const createStarterCrochetDocument = (now = new Date().toISOString()): Fi
       { id: 'contrast', label: 'Contrast', hex: '#9b5d00' },
     ],
     chart: createEmptyPolarChart([STARTER_CROCHET_STITCHES]),
+    settings: { crochet: { targetRoundCounts: [STARTER_CROCHET_STITCHES], yarnWeight: null } },
     swatchImages: {},
     completedSteps: [],
   };
@@ -150,14 +165,50 @@ export const toggleCrochetGridCell = (
   return withUpdatedChart(document, setGridCell(chart, row, col, nextColor, null), now);
 };
 
+export const setCrochetTargetRoundCounts = (
+  document: FiberCraftDocument,
+  counts: readonly number[],
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (counts.some((count) => !Number.isInteger(count) || count <= 0 || count > 10_000)) {
+    throw new Error('Every target round count must be an integer from 1 to 10,000.');
+  }
+  const next = withCrochetSettings(document, { targetRoundCounts: [...counts] });
+  return { ...next, metadata: { ...next.metadata, updatedAt: now } };
+};
+
+export const setCrochetYarnReference = (
+  document: FiberCraftDocument,
+  yarnWeight: number | null,
+  materialClass: string,
+  toolSize: string,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (yarnWeight !== null && (!Number.isInteger(yarnWeight) || yarnWeight < 0 || yarnWeight > 7)) {
+    throw new Error('Yarn weight category must be from 0 to 7.');
+  }
+  const next = withCrochetSettings(document, { yarnWeight });
+  return {
+    ...next,
+    metadata: {
+      ...next.metadata,
+      materialClass: materialClass.trim(),
+      toolSize: toolSize.trim(),
+      updatedAt: now,
+    },
+  };
+};
+
 export const toggleCrochetProgressStep = (
   document: FiberCraftDocument,
   stepId: string,
   now = new Date().toISOString(),
 ): FiberCraftDocument => {
+  const normalized = stepId.trim();
+  if (!normalized) throw new Error('Progress step id cannot be empty.');
   const completed = new Set(document.completedSteps);
-  if (completed.has(stepId)) completed.delete(stepId);
-  else completed.add(stepId);
+  if (completed.has(normalized)) completed.delete(normalized);
+  else completed.add(normalized);
   return {
     ...document,
     metadata: { ...document.metadata, updatedAt: now },

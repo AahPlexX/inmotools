@@ -131,6 +131,17 @@ export interface PatchworkBlock {
 
 export type FiberCraftChart = GridChart | PolarChart | EmbroideryChart | PatchworkBlock;
 
+export interface CrochetProjectSettings {
+  /** Optional shaping target used by the amigurumi assistant and stitch-count validator. */
+  readonly targetRoundCounts: readonly number[];
+  /** Craft Yarn Council yarn-weight category 0–7, or null when the project has no selected reference. */
+  readonly yarnWeight: number | null;
+}
+
+export interface FiberCraftSettings {
+  readonly crochet?: CrochetProjectSettings;
+}
+
 // --- Whole-project envelope ---
 
 export interface FiberCraftDocument {
@@ -139,6 +150,8 @@ export interface FiberCraftDocument {
   palette: readonly ColorSlot[];
   gauge?: GaugeSwatch;
   chart: FiberCraftChart;
+  /** Discipline-specific settings that should survive autosave/project export without polluting shared metadata. */
+  settings?: FiberCraftSettings;
   /** Optional embedded fabric/yarn swatch photos as data URIs, keyed by id. */
   swatchImages: Readonly<Record<string, string>>;
   /** Tap-to-track progress: ids of completed rows/rounds/blocks. */
