@@ -41,66 +41,43 @@ jobs:
               raise SystemExit('Expected vector-types import anchor not found')
           source = source.replace(import_old, import_new, 1)
 
-          old = '''function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
-            if (element.type === 'group') {
-              return {
-                ...element,
-                x: element.x + dx,
-                y: element.y + dy,
-                children: element.children.map((child) => moveElement(child, dx, dy)),
-                composition: element.composition
-                  ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
-                  : undefined,
-              };
-            }
-            if (element.type === 'line') {
-              return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
-            }
-            return { ...element, x: element.x + dx, y: element.y + dy };
-          }
-'''
-          new = '''function translatedPathData(pathData: string, dx: number, dy: number): string {
-            return new SVGPathData(pathData)
-              .translate(dx, dy)
-              .encode()
-              .replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ')
-              .trim()
-              .replace(/\\s+/g, ' ');
-          }
+          move_anchor = "function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {\n"
+          helper = (
+              "function translatedPathData(pathData: string, dx: number, dy: number): string {\n"
+              "  return new SVGPathData(pathData)\n"
+              "    .translate(dx, dy)\n"
+              "    .encode()\n"
+              "    .replace(/([MmLlHhVvCcSsQqTtAaZz])/g, ' $1 ')\n"
+              "    .trim()\n"
+              "    .replace(/\\s+/g, ' ');\n"
+              "}\n\n"
+          )
+          if move_anchor not in source:
+              raise SystemExit('Expected moveElement anchor not found')
+          source = source.replace(move_anchor, helper + move_anchor, 1)
 
-          function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
-            if (element.type === 'group') {
-              return {
-                ...element,
-                x: element.x + dx,
-                y: element.y + dy,
-                children: element.children.map((child) => moveElement(child, dx, dy)),
-                composition: element.composition
-                  ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
-                  : undefined,
-              };
-            }
-            if (element.type === 'line') {
-              return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
-            }
-            if (element.type === 'path') {
-              try {
-                return {
-                  ...element,
-                  x: element.x + dx,
-                  y: element.y + dy,
-                  d: translatedPathData(element.d, dx, dy),
-                };
-              } catch {
-                return element;
-              }
-            }
-            return { ...element, x: element.x + dx, y: element.y + dy };
-          }
-'''
-          if old not in source:
-              raise SystemExit('Expected moveElement implementation not found')
-          source = source.replace(old, new, 1)
+          line_block = (
+              "  if (element.type === 'line') {\n"
+              "    return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };\n"
+              "  }\n"
+          )
+          path_block = line_block + (
+              "  if (element.type === 'path') {\n"
+              "    try {\n"
+              "      return {\n"
+              "        ...element,\n"
+              "        x: element.x + dx,\n"
+              "        y: element.y + dy,\n"
+              "        d: translatedPathData(element.d, dx, dy),\n"
+              "      };\n"
+              "    } catch {\n"
+              "      return element;\n"
+              "    }\n"
+              "  }\n"
+          )
+          if line_block not in source:
+              raise SystemExit('Expected line motion block not found')
+          source = source.replace(line_block, path_block, 1)
           path.write_text(source)
           PY
 
