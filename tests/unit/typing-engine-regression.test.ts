@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeMetrics, extendTarget, finish, initState, isCleanlyCompleted, isTargetCompleted, ngramLatencies, pressKey } from '../../src/tools/typing/typing-engine';
+import { computeMetrics, extendTarget, finish, ghostSeries, initState, isCleanlyCompleted, isTargetCompleted, ngramLatencies, pressKey, wpmSeries } from '../../src/tools/typing/typing-engine';
 
 describe('typing engine regression contracts', () => {
   it('keeps strict mode on the incorrect character until it is corrected', () => {
@@ -48,6 +48,18 @@ describe('typing engine regression contracts', () => {
     expect(state.cells[1]).toMatchObject({ typed: '\n', state: 'correct' });
     expect(isCleanlyCompleted(state)).toBe(true);
     expect(isTargetCompleted(state)).toBe(true);
+  });
+
+  it('counts committed Enter/newline events in live and ghost WPM progress', () => {
+    let state = initState('a\nb');
+    state = pressKey(state, 'a', 'KeyA', 0);
+    state = pressKey(state, 'Enter', 'Enter', 500);
+    state = pressKey(state, 'b', 'KeyB', 1000);
+    state = finish(state, 'completed', 1000);
+
+    expect(computeMetrics(state).correctChars).toBe(3);
+    expect(wpmSeries(state).at(-1)?.wpm).toBe(36);
+    expect(ghostSeries(state.events).at(-1)?.correctChars).toBe(3);
   });
 
   it('completes a fully traversed forgiving target while retaining the error for scoring', () => {
