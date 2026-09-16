@@ -4,6 +4,7 @@ import {
   buildTargetText,
   buildZenChunk,
   countWords,
+  normalizeDurationValue,
   targetWordCapacity,
   TIMED_CAPACITY_WPM,
   type TargetConfig,
@@ -20,6 +21,13 @@ const BASE: TargetConfig = {
 };
 
 describe('typing target duration contracts', () => {
+  it('normalizes values when switching between time and word-count duration families', () => {
+    expect(normalizeDurationValue('words', 30)).toBe(25);
+    expect(normalizeDurationValue('time', 25)).toBe(30);
+    expect(normalizeDurationValue('words', 50)).toBe(50);
+    expect(normalizeDurationValue('time', 60)).toBe(60);
+  });
+
   it('builds exactly the selected number of words for word-count tests', () => {
     const target = buildTargetText({ ...BASE, durationMode: 'words', durationValue: 10 }, 42);
     expect(countWords(target)).toBe(10);
