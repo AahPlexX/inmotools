@@ -27,7 +27,7 @@ export const EMPTY_EXPORT_METADATA: ExportMetadata = {
 // --------------------------------------------------------------------
 // CSV
 // --------------------------------------------------------------------
-export function testsToCsv(tests: StoredTest[]): string {
+export function testsToCsv(tests: StoredTest[], meta?: ExportMetadata): string {
   const rows = tests.map((t) => ({
     saved_at_iso: new Date(t.savedAt).toISOString(),
     mode: t.mode,
@@ -48,6 +48,13 @@ export function testsToCsv(tests: StoredTest[]): string {
     extra_chars: t.extraChars,
     tags: t.tags.join('|'),
     notes: t.notes,
+    ...(meta ? {
+      export_typist_name: meta.typistName,
+      export_organization: meta.organization,
+      export_certified_by: meta.certifiedBy,
+      export_tags: meta.tags.join('|'),
+      export_notes: meta.notes,
+    } : {}),
   }));
   return Papa.unparse(rows, { header: true, newline: '\n' });
 }
