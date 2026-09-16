@@ -1,0 +1,52 @@
+name: PR32 Mermaid diagnostic
+
+on:
+  push:
+    branches:
+      - fix/markdown-mermaid-audit-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  mermaid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current PR merge
+        uses: actions/checkout@v7
+        with:
+          ref: refs/pull/32/merge
+          fetch-depth: 0
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Record validated merge
+        run: |
+          git show -s --format='validated=%H%nparents=%P%nsubject=%s' HEAD
+      - name: Mermaid unit regressions
+        run: >-
+          pnpm exec vitest run
+          tests/unit/markdown-mermaid-hardening.test.ts
+          tests/unit/markdown-export.test.ts
+          tests/unit/markdown-mermaid-deployment.test.ts
+      - name: Production build
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Mermaid browser integration
+        run: pnpm exec playwright test tests/e2e/markdown-mermaid.spec.ts
+      - name: Upload Mermaid failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr32-mermaid-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 3
