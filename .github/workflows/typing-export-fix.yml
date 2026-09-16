@@ -1,0 +1,44 @@
+name: Typing export one-shot fix
+
+on:
+  push:
+    branches: [feature/typing-workstation]
+    paths:
+      - '.github/workflows/typing-export-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.ref_name == 'feature/typing-workstation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/typing-workstation
+          fetch-depth: 0
+      - name: Wire export metadata into CSV calls
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/tools/typing/TypingWorkspace.tsx')
+          text = path.read_text()
+          replacements = {
+            "testsToCsv([currentTest])": "testsToCsv([currentTest], meta)",
+            "testsToCsv(filtered)": "testsToCsv(filtered, meta)",
+          }
+          for old, new in replacements.items():
+            count = text.count(old)
+            if count != 1:
+              raise SystemExit(f'expected exactly one {old!r}; found {count}')
+            text = text.replace(old, new, 1)
+          path.write_text(text)
+      - name: Commit source fix
+        run: |
+          git config user.name "AahPlexX"
+          git config user.email "130876266+AahPlexX@users.noreply.github.com"
+          git add src/tools/typing/TypingWorkspace.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(typing): apply metadata to CSV exports [skip ci]"
+          git push origin HEAD:feature/typing-workstation
