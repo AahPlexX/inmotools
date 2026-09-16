@@ -1,6 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createStarterCrochetDocument, workNextCrochetStitch } from '../../src/tools/fiber-craft/crochet-document-engine';
+import { addCountedBackstitch, addCountedFrenchKnot, createStarterCountedThreadDocument, setCountedThreadStitch } from '../../src/tools/fiber-craft/engines/counted-thread-engine';
 import { crochetPngDimensions } from '../../src/tools/fiber-craft/engines/crochet-chart-renderer';
 import { crochetGlyphPrimitives } from '../../src/tools/fiber-craft/engines/crochet-glyph-engine';
 import { CROCHET_SYMBOLS } from '../../src/tools/fiber-craft/engines/symbol-library';
@@ -51,6 +52,18 @@ describe('portable Fiber Craft project bundle', () => {
     };
     const restored = parseFiberCraftProject(serializeFiberCraftProject(document));
     expect(restored).toEqual(document);
+  });
+
+  it('round-trips counted-thread stitches, knots, and backstitch lines without losing chart data', () => {
+    let document = createStarterCountedThreadDocument('2026-09-16T18:00:00.000Z');
+    document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-16T18:01:00.000Z');
+    document = setCountedThreadStitch(document, 0, 1, 'quarter-ne', 'accent', '2026-09-16T18:02:00.000Z');
+    document = addCountedFrenchKnot(document, { row: 1.5, col: 1.5 }, 'contrast', '2026-09-16T18:03:00.000Z');
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', '2026-09-16T18:04:00.000Z');
+    const restored = parseFiberCraftProject(serializeFiberCraftProject(document));
+    expect(restored).toEqual(document);
+    expect(restored.metadata.discipline).toBe('cross-stitch');
+    expect(restored.chart.kind).toBe('counted-thread');
   });
 
   it('rejects unrelated envelopes and invalid project data', () => {

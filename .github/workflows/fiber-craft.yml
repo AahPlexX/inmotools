@@ -8,7 +8,6 @@ on:
       - 'tests/unit/fiber-craft-geometry.test.ts'
       - 'tests/unit/fiber-craft-state.test.ts'
       - 'tests/unit/fiber-craft-crochet-pattern.test.ts'
-      - 'tests/unit/fiber-craft-cross-stitch.test.ts'
       - 'tests/unit/fiber-craft-project.test.ts'
       - 'tests/e2e/fiber-craft.spec.ts'
       - 'scripts/select-e2e-specs.mjs'
@@ -40,7 +39,6 @@ jobs:
           tests/unit/fiber-craft-geometry.test.ts
           tests/unit/fiber-craft-state.test.ts
           tests/unit/fiber-craft-crochet-pattern.test.ts
-          tests/unit/fiber-craft-cross-stitch.test.ts
           tests/unit/fiber-craft-project.test.ts
           tests/unit/e2e-spec-selection.test.mjs
       - name: Production build
@@ -48,7 +46,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Fiber Craft browser workflow
-        run: pnpm exec playwright test tests/e2e/fiber-craft.spec.ts
+        run: pnpm exec playwright test tests/e2e/fiber-craft.spec.ts --workers=1
       - name: Upload Fiber Craft failure evidence
         if: failure()
         uses: actions/upload-artifact@v7

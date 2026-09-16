@@ -14,6 +14,7 @@ import {
   COUNTED_STITCH_KINDS,
   createStarterCountedThreadDocument,
   generateCountedThreadLegend,
+  setCountedThreadPaletteIdentity,
   setCountedThreadStitch,
 } from '../../src/tools/fiber-craft/engines/counted-thread-engine';
 import {
@@ -174,10 +175,11 @@ describe('counted-thread precision grid and generated legend', () => {
     expect(document.chart.knots).toHaveLength(1);
     expect(document.chart.backstitches).toHaveLength(1);
 
+    document = setCountedThreadPaletteIdentity(document, 'primary', 'Project floss', 'P-01', FIXED_TIME);
     const legend = generateCountedThreadLegend(document);
     expect(legend.map((entry) => entry.colorId)).toEqual(['primary', 'accent', 'contrast']);
     expect(new Set(legend.map((entry) => entry.symbol)).size).toBe(legend.length);
-    expect(legend.find((entry) => entry.colorId === 'primary')?.usageCount).toBe(2);
+    expect(legend.find((entry) => entry.colorId === 'primary')).toMatchObject({ usageCount: 2, paletteName: 'Project floss', code: 'P-01' });
     expect(legend.find((entry) => entry.colorId === 'accent')?.usageCount).toBe(1);
     expect(legend.find((entry) => entry.colorId === 'contrast')?.usageCount).toBe(1);
   });

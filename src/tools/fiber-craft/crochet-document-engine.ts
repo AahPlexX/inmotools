@@ -133,12 +133,13 @@ export const switchCrochetChartMode = (
   mode: 'round' | 'grid',
   now = new Date().toISOString(),
 ): FiberCraftDocument => {
-  if (mode === 'round') {
-    if (document.chart.kind === 'polar') return document;
-    return withUpdatedChart(document, createEmptyPolarChart([STARTER_CROCHET_STITCHES]), now);
-  }
-  if (document.chart.kind === 'grid') return document;
-  return withUpdatedChart(document, createEmptyGridChart(STARTER_CROCHET_GRID_SIZE, STARTER_CROCHET_GRID_SIZE), now);
+  if (mode === 'round' && document.chart.kind === 'polar' && document.metadata.discipline === 'crochet') return document;
+  if (mode === 'grid' && document.chart.kind === 'grid' && document.metadata.discipline === 'crochet') return document;
+  const chart = mode === 'round'
+    ? createEmptyPolarChart([STARTER_CROCHET_STITCHES])
+    : createEmptyGridChart(STARTER_CROCHET_GRID_SIZE, STARTER_CROCHET_GRID_SIZE);
+  const next = withUpdatedChart(document, chart, now);
+  return { ...next, metadata: { ...next.metadata, discipline: 'crochet', updatedAt: now } };
 };
 
 export const toggleCrochetGridCell = (

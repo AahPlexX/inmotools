@@ -87,3 +87,47 @@
 @media (prefers-reduced-motion: reduce) {
   .fiber-craft-workspace *, .fiber-craft-workspace *::before, .fiber-craft-workspace *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Counted-thread precision chart */
+.fiber-counted-panel { min-width: 0; }
+.fiber-counted-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 12px; align-items: end; margin: 14px 0; }
+.fiber-counted-tools .fiber-craft-muted { grid-column: 1 / -1; margin: 0; }
+.fiber-counted-scroll { overflow: auto; max-width: 100%; padding: 4px; overscroll-behavior: contain; }
+.fiber-counted-board { position: relative; width: calc(var(--fiber-counted-cols) * 44px); height: calc(var(--fiber-counted-rows) * 44px); isolation: isolate; }
+.fiber-counted-grid { position: relative; z-index: 2; display: grid; grid-template-rows: repeat(var(--fiber-counted-rows), 44px); width: 100%; height: 100%; }
+.fiber-counted-row { display: grid; grid-template-columns: repeat(var(--fiber-counted-cols), 44px); }
+.fiber-counted-row > [role='gridcell'] { width: 44px; height: 44px; }
+.fiber-counted-cell { position: relative; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--fiber-counted-mark-color, var(--ink)); cursor: crosshair; }
+.fiber-counted-cell:hover { background: var(--surface-soft); }
+.fiber-counted-cell:focus-visible { z-index: 6; outline: 3px solid var(--focus); outline-offset: -3px; }
+.fiber-counted-mark { position: absolute; inset: 2px; display: grid; place-items: center; font-size: 1.35rem; font-weight: 800; line-height: 1; }
+.fiber-counted-mark > small { position: absolute; top: 1px; right: 2px; padding: 1px 2px; border-radius: 2px; background: var(--surface); color: var(--ink); font-size: .58rem; font-weight: 900; line-height: 1; }
+.fiber-counted-overlay { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.fiber-counted-overlay line { stroke-width: 3px; stroke-linecap: round; }
+.fiber-counted-summary { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: .9rem; font-weight: 700; }
+.fiber-counted-removals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.fiber-counted-legend { display: grid; gap: 10px; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.fiber-counted-legend h4, .fiber-counted-legend p { margin: 0; }
+.fiber-counted-legend > div > p { margin-top: 4px; color: var(--muted); font-size: .88rem; }
+.fiber-counted-legend ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.fiber-counted-legend li { display: grid; grid-template-columns: 28px 18px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 44px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.fiber-counted-legend li > b { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 6px; font-size: .85rem; }
+.fiber-counted-legend li > i { width: 18px; height: 18px; border: 1px solid var(--line); border-radius: 4px; }
+.fiber-counted-legend li > span { min-width: 0; display: grid; gap: 2px; }
+.fiber-counted-legend li small { color: var(--muted); overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .fiber-counted-tools { grid-template-columns: 1fr; }
+  .fiber-counted-board { width: calc(var(--fiber-counted-cols) * 40px); height: calc(var(--fiber-counted-rows) * 40px); }
+  .fiber-counted-grid { grid-template-rows: repeat(var(--fiber-counted-rows), 40px); }
+  .fiber-counted-row { grid-template-columns: repeat(var(--fiber-counted-cols), 40px); }
+  .fiber-counted-row > [role='gridcell'], .fiber-counted-cell { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+  .fiber-counted-mark { font-size: 1.15rem; }
+}
+
+@media print {
+  .fiber-counted-tools, .fiber-counted-removals { display: none !important; }
+  .fiber-counted-scroll { overflow: visible; max-width: none; }
+  .fiber-counted-legend { break-inside: avoid; }
+}
