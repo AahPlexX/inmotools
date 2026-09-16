@@ -78,12 +78,35 @@ describe('typing storage', () => {
     expect(filtered.length).toBe(1);
   });
 
-  it('finds the personal best per mode + duration', async () => {
-    await saveTest(makeTest({ netWpm: 60, durationValue: 30 }));
-    await saveTest(makeTest({ netWpm: 90, durationValue: 30 }));
-    await saveTest(makeTest({ netWpm: 200, durationValue: 60 }));
-    const pb = await findPersonalBest('words-1000', 30);
+  it('finds a personal best only inside the same test family', async () => {
+    await saveTest(makeTest({ netWpm: 90, durationMode: 'time', durationValue: 30, language: 'english', layout: 'qwerty' }));
+    await saveTest(makeTest({ netWpm: 140, durationMode: 'time', durationValue: 30, language: 'spanish', layout: 'qwerty' }));
+    await saveTest(makeTest({ netWpm: 150, durationMode: 'time', durationValue: 30, language: 'english', layout: 'azerty' }));
+    await saveTest(makeTest({ netWpm: 160, durationMode: 'words', durationValue: 30, language: 'english', layout: 'qwerty' }));
+
+    const pb = await findPersonalBest({
+      mode: 'words-1000',
+      durationMode: 'time',
+      durationValue: 30,
+      language: 'english',
+      layout: 'qwerty',
+    });
     expect(pb?.netWpm).toBe(90);
+  });
+
+  it('keeps personal-best quote lengths isolated', async () => {
+    await saveTest(makeTest({ mode: 'quote', durationMode: 'quote', durationValue: 30, quoteLength: 'short', netWpm: 80 }));
+    await saveTest(makeTest({ mode: 'quote', durationMode: 'quote', durationValue: 30, quoteLength: 'long', netWpm: 130 }));
+
+    const pb = await findPersonalBest({
+      mode: 'quote',
+      durationMode: 'quote',
+      durationValue: 30,
+      language: 'english',
+      layout: 'qwerty',
+      quoteLength: 'short',
+    });
+    expect(pb?.netWpm).toBe(80);
   });
 
   it('persists preferences', async () => {
