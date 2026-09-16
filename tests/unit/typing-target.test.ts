@@ -74,6 +74,13 @@ describe('typing target duration contracts', () => {
     expect(countWords(target)).toBe(10);
   });
 
+  it('normalizes pasted tab characters into typeable spaces', () => {
+    const target = buildTargetText({ ...BASE, mode: 'custom', durationMode: 'words', durationValue: 4, customText: 'alpha\tbeta gamma\tdelta' }, 1);
+    expect(target).not.toContain('\t');
+    expect(target).toContain('alpha    beta');
+    expect(countWords(target)).toBe(4);
+  });
+
   it('creates deterministic replenishment chunks for Zen mode', () => {
     const a = buildZenChunk('english', 9, 160);
     const b = buildZenChunk('english', 9, 160);
