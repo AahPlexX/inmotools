@@ -4,7 +4,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { KeystrokeEvent } from './typing-engine';
-import type { CorpusMode, Language, LayoutId } from './typing-corpora';
+import type { CorpusMode, Language, LayoutId, Quote } from './typing-corpora';
 
 export interface StoredTest {
   id?: number;
@@ -12,6 +12,7 @@ export interface StoredTest {
   mode: CorpusMode;
   durationMode: 'time' | 'words' | 'quote' | 'zen' | 'certification';
   durationValue: number;
+  quoteLength?: Quote['length'];
   language: Language;
   layout: LayoutId;
   targetText: string;
@@ -51,6 +52,15 @@ export interface StoredDrill {
   weakKeys: string[];
   text: string;
   createdAt: number;
+}
+
+export interface PersonalBestQuery {
+  mode: CorpusMode;
+  durationMode: StoredTest['durationMode'];
+  durationValue: number;
+  language: Language;
+  layout: LayoutId;
+  quoteLength?: Quote['length'];
 }
 
 class TypingDb extends Dexie {
@@ -122,10 +132,17 @@ export async function filterTests(opts: {
   });
 }
 
-export async function findPersonalBest(mode: CorpusMode, durationValue: number): Promise<StoredTest | undefined> {
+export async function findPersonalBest(query: PersonalBestQuery): Promise<StoredTest | undefined> {
   const rows = await getDb().tests
-    .where('mode').equals(mode)
-    .filter((t) => t.durationValue === durationValue && t.finishReason === 'completed')
+    .where('mode').equals(query.mode)
+    .filter((t) => (
+      t.durationMode === query.durationMode
+      && t.durationValue === query.durationValue
+      && t.language === query.language
+      && t.layout === query.layout
+      && t.finishReason === 'completed'
+      && (query.durationMode !== 'quote' || t.quoteLength === query.quoteLength)
+    ))
     .toArray();
   if (rows.length === 0) return undefined;
   rows.sort((a, b) => b.netWpm - a.netWpm);
