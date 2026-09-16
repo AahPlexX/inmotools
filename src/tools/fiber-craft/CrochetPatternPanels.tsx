@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   analyzeAmigurumiGrowth,
   compileC2CRows,
@@ -34,12 +34,24 @@ export function CrochetGridPanel({
   onToggleCell: (row: number, col: number) => void;
   onToggleRowComplete: (row: number) => void;
 }) {
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const activeRowRef = useRef<HTMLDivElement>(null);
   const c2c = useMemo(() => compileC2CRows(chart), [chart]);
   const filet = useMemo(() => compileFiletRows(chart), [chart]);
   const filledBlocks = c2c.reduce((sum, row) => sum + row.filledBlocks, 0);
   const activeFilet = filet[activeRow] ?? filet[0];
   const paletteById = useMemo(() => new Map(palette.map((color) => [color.id, color])), [palette]);
   const activeComplete = completedSteps.includes(`row:${activeRow}`);
+
+  const centerActiveRow = () => {
+    const scroller = gridScrollRef.current;
+    const row = activeRowRef.current;
+    if (!scroller || !row) return;
+    const top = row.offsetTop - Math.max(0, (scroller.clientHeight - row.clientHeight) / 2);
+    const left = row.offsetLeft - Math.max(0, (scroller.clientWidth - row.clientWidth) / 2);
+    scroller.scrollTo({ top: Math.max(0, top), left: Math.max(0, left), behavior: 'auto' });
+    row.focus({ preventScroll: true });
+  };
 
   return (
     <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-grid-heading">
@@ -55,6 +67,7 @@ export function CrochetGridPanel({
               {Array.from({ length: chart.rows }, (_, row) => <option key={row} value={row}>Row {row + 1}</option>)}
             </select>
           </label>
+          <button className="action-button secondary" type="button" onClick={centerActiveRow}>Center active row</button>
           <button
             className="action-button secondary"
             type="button"
@@ -66,17 +79,19 @@ export function CrochetGridPanel({
         </div>
       </div>
 
-      <div className="fiber-craft-grid-scroll" tabIndex={0} aria-label="Scrollable crochet chart grid">
+      <div ref={gridScrollRef} className="fiber-craft-grid-scroll" tabIndex={0} aria-label="Scrollable crochet chart grid">
         <div className="fiber-craft-grid" role="group" aria-label={`${chart.rows} by ${chart.cols} crochet grid`}>
           {Array.from({ length: chart.rows }, (_, row) => {
             const cells = chart.cells.filter((cell) => cell.row === row).toSorted((a, b) => a.col - b.col);
             const rowComplete = completedSteps.includes(`row:${row}`);
             return (
               <div
+                ref={row === activeRow ? activeRowRef : undefined}
                 className="fiber-craft-grid-row"
                 data-active={row === activeRow ? 'true' : 'false'}
                 data-complete={rowComplete ? 'true' : 'false'}
                 key={row}
+                tabIndex={row === activeRow ? -1 : undefined}
                 aria-label={`Row ${row + 1}${rowComplete ? ', complete' : ''}`}
               >
                 <span className="fiber-craft-grid-row-label" aria-hidden="true">{row + 1}</span>

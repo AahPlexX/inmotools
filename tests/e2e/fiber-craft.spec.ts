@@ -38,6 +38,8 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('filet-summary')).toContainText('1 filled mesh');
     await page.getByText('C2C row-by-row counts', { exact: true }).click();
     await expect(page.getByTestId('c2c-row-counts')).toContainText('C2C row 1: 1 filled of 1 block.');
+    await page.getByRole('button', { name: 'Center active row' }).click();
+    await expect(page.getByLabel('Row 1')).toBeFocused();
     await page.getByRole('button', { name: 'Mark row complete' }).click();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
