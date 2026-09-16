@@ -66,7 +66,7 @@ import {
   type ExportMetadata,
 } from './typing-export';
 import { createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
-import { buildTargetText, buildZenChunk, type DurationMode } from './typing-target';
+import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
 
 // -------------------- reducer wiring --------------------
 
@@ -275,7 +275,11 @@ export default function TypingWorkspace() {
       try {
         const saved = await readPreference<Partial<Config> | null>('config', null);
         if (saved) {
-          const restored = { ...DEFAULT_CONFIG, ...saved };
+          const restoredBase = { ...DEFAULT_CONFIG, ...saved };
+          const restored = {
+            ...restoredBase,
+            durationValue: normalizeDurationValue(restoredBase.durationMode, restoredBase.durationValue),
+          };
           const restoredTarget = buildTargetText(restored, seed);
           setConfig(restored);
           setTarget(restoredTarget);
@@ -500,6 +504,9 @@ export default function TypingWorkspace() {
 
   const applyConfig = useCallback((patch: Partial<Config>) => {
     const normalized: Partial<Config> = { ...patch };
+    if (patch.durationMode !== undefined) {
+      normalized.durationValue = normalizeDurationValue(patch.durationMode, patch.durationValue ?? config.durationValue);
+    }
     if (patch.durationMode === 'quote') normalized.mode = 'quote';
     if (patch.durationMode === 'zen') normalized.mode = 'zen';
     if (patch.mode === 'quote' && patch.durationMode === undefined) normalized.durationMode = 'quote';
@@ -507,6 +514,7 @@ export default function TypingWorkspace() {
     if (patch.mode && patch.mode !== 'quote' && patch.mode !== 'zen' && patch.durationMode === undefined
         && (config.durationMode === 'quote' || config.durationMode === 'zen')) {
       normalized.durationMode = 'time';
+      normalized.durationValue = normalizeDurationValue('time', patch.durationValue ?? config.durationValue);
     }
     setConfig((c) => ({ ...c, ...normalized }));
     if ('mode' in normalized || 'durationMode' in normalized || 'durationValue' in normalized || 'quoteLength' in normalized || 'language' in normalized || 'codeIndex' in normalized || 'customText' in normalized) {
@@ -538,7 +546,8 @@ export default function TypingWorkspace() {
     }
     if (engine.finished) return;
     const t = performance.now();
-    if (!running && e.key.length === 1) {
+    const commitsExpectedCharacter = e.key.length === 1 || (e.key === 'Enter' && engine.targetText[engine.cursor] === '\n');
+    if (!running && commitsExpectedCharacter) {
       setRunning(true);
       setStatusText('Test started.');
     }
@@ -548,7 +557,7 @@ export default function TypingWorkspace() {
       const kind = e.key === 'Backspace' ? 'backspace' : e.key === 'Enter' ? 'enter' : e.key === ' ' ? 'space' : 'correct';
       audioRef.current?.playKeystroke(kind);
     }
-  }, [engine.finished, rebuildTarget, running, config.audioProfile]);
+  }, [engine.finished, engine.targetText, engine.cursor, rebuildTarget, running, config.audioProfile]);
 
   const restart = useCallback(() => {
     rebuildTarget();

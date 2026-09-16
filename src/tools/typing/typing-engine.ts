@@ -150,8 +150,11 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
     return next;
   }
 
-  if (key === 'Enter') {
-    // Enter finishes a quote-mode test if we are at the end.
+  const expectedBeforeInput = state.cells[state.cursor]?.expected;
+  const committedKey = key === 'Enter' && expectedBeforeInput === '\n' ? '\n' : key;
+
+  if (key === 'Enter' && committedKey !== '\n') {
+    // Enter finishes a finite target if the cursor is already at its end.
     if (state.cursor >= state.cells.length && !state.finished) {
       return finish(state, 'completed', t);
     }
@@ -159,7 +162,7 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
   }
 
   // Ignore modifier / non-character keys.
-  if (key.length !== 1) return state;
+  if (committedKey.length !== 1) return state;
 
   const startedAt = state.startedAt ?? t;
   const events = state.events.slice();
@@ -176,7 +179,7 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
     // Beyond the visible cells — treat as extra beyond target completion.
     const extraIndex = cursor;
     if (opts.allowExtraChars) {
-      cells.push({ expected: '', typed: key, state: 'extra', t });
+      cells.push({ expected: '', typed: committedKey, state: 'extra', t });
       extraKeystrokes += 1;
       cursor += 1;
     }
@@ -185,17 +188,17 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
   }
 
   const expected = targetCell.expected;
-  const match = normalize(key, opts.caseSensitive) === normalize(expected, opts.caseSensitive);
+  const match = normalize(committedKey, opts.caseSensitive) === normalize(expected, opts.caseSensitive);
   events.push({ t, key, code, correct: match, index: cursor, expected });
 
   if (match) {
-    cells[cursor] = { ...targetCell, typed: key, state: 'correct', t };
+    cells[cursor] = { ...targetCell, typed: committedKey, state: 'correct', t };
     correctKeystrokes += 1;
     cursor += 1;
   } else {
     // Master mode fails the whole test on any wrong keystroke.
     if (opts.errorMode === 'master') {
-      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
+      cells[cursor] = { ...targetCell, typed: committedKey, state: 'incorrect', t };
       incorrectKeystrokes += 1;
       return finish(
         { ...state, startedAt, events, cells, cursor, incorrectKeystrokes, totalKeystrokes },
@@ -206,17 +209,17 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
 
     if (opts.freeMovement) {
       // Missed the expected char and moved forward.
-      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
+      cells[cursor] = { ...targetCell, typed: committedKey, state: 'incorrect', t };
       incorrectKeystrokes += 1;
       missedChars += 1;
       cursor += 1;
     } else if (opts.errorMode === 'strict') {
       // Strict mode records the error at the current character and waits for correction.
-      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
+      cells[cursor] = { ...targetCell, typed: committedKey, state: 'incorrect', t };
       incorrectKeystrokes += 1;
     } else {
       // Confidence mode advances but intentionally does not allow Backspace.
-      cells[cursor] = { ...targetCell, typed: key, state: 'incorrect', t };
+      cells[cursor] = { ...targetCell, typed: committedKey, state: 'incorrect', t };
       incorrectKeystrokes += 1;
       cursor += 1;
     }
