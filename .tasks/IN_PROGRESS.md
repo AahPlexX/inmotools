@@ -1,43 +1,43 @@
 # In Progress
 
-- **Web Layout Studio** â€” local responsive layout, design-token and frontend component workstation.
+- **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
   - Current milestone: Sass token map export integrated at 3ec9e435; dedicated Web Layout run 34853354606 passed frozen install, 20 units, build and desktop/mobile browser tests. Pages deployed and the live export control was inspected. Shared Web Layout accessibility timeouts remain unresolved; current repository-wide gates fail in Crystal/Vector unit tests. Full 60-feature ledger remains active with no scope reduction.
   - Completion: every ledger item implemented and verified through reachable UI, validated exports/persistence, script isolation, responsive keyboard access, exact-main checks and Pages deployment. Partial features remain open.
   - Scope: `src/tools/web-layout/`, tool-specific tests, additive catalog/loader integration. Other workstreams and branches are preserved.
 
-- **Catalog-wide audit remediation (TASK-014)** â€” resolve every accepted finding from the verified catalog audit without silently dropping, weakening, or reclassifying known work.
-  - Queue/source: `.tasks/NEXT.md` â†’ `TASK-014: Work through the verified catalog-wide audit backlog`.
+- **Catalog-wide audit remediation (TASK-014)** — resolve every accepted finding from the verified catalog audit without silently dropping, weakening, or reclassifying known work.
+  - Queue/source: `.tasks/NEXT.md` → `TASK-014: Work through the verified catalog-wide audit backlog`.
   - Current milestone: reconcile the live audit queue against merged fixes, then continue only with still-outstanding verified findings using tool-scoped regression evidence.
   - Latest integrated evidence: Tool 17 / GLSL Sandbox lifecycle and paused-redraw remediation merged through PR #25 at `68accf37f1cc744644e6639f9ff8c102952a7426`; Tool 16 / Convolution Room Profiler findings were verified already resolved on `main` and removed from the outstanding queue rather than reimplemented.
   - Completion gate: every accepted audit finding is either fixed with fresh focused evidence, explicitly rejected with evidence, or deliberately deferred with rationale; no accepted finding is untracked; required validation is green on the exact integrated `origin/main` revision; applicable Pages deployment is green; and the audit entry is moved to `DONE.md`/`WORK_LOG.md` only after those conditions are simultaneously true.
 
-- **Vector Studio** â€” standards-native local vector illustration workspace with 30+ functional creation/editing capabilities, professional export/metadata workflows, responsive accessibility, focused validation, and Pages verification.
+- **Vector Studio** — standards-native local vector illustration workspace with 30+ functional creation/editing capabilities, professional export/metadata workflows, responsive accessibility, focused validation, and Pages verification.
   - Design: `docs/superpowers/specs/2026-09-11-vector-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-11-vector-studio.md`
-  - Current milestone: F â€” browser validation, adversarial review, integration, and Pages verification
+  - Current milestone: F — browser validation, adversarial review, integration, and Pages verification
   - Current gate: the pan interaction defect is fixed by capturing the custom pan gesture on the stationary scroll viewport instead of the moving SVG document. Isolated focused validation run `34705678053` passed unit tests, production build, and the full SVG browser spec on desktop and mobile Chromium at `30e1fd78fcb94c1ec3130b639ca9c9f7d5034fae`; the identical Vector source blob is integrated on `main` at `a83e5f96cdf5511ab8397ebc12d5e29b13b4522a` and now requires green focused validation plus the repository Pages workflow on the exact integrated main revision before the milestone can close.
   - Integration gate: exact dependency-policy pins `@playwright/test@1.63.0` and `pnpm@12.3.4` are already integrated on `main` through `fbfade09aec3f73eb70a4d202949329036883947`. The disposable `fix/vector-pan-validation` branch exists only to preserve the isolated browser proof and must not be merged; it can be removed once the exact-main validation evidence is green and branch containment is verified.
 
-- **Photo Studio** â€” local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
+- **Photo Studio** — local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
   - Design: `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
-  - Current milestone: A â€” foundation and global editor
+  - Current milestone: A — foundation and global editor
 
-- **Sightline Velocity Studio** â€” local-first universal document reader, paced speed-reading workstation, comprehension/retention toolkit, and export studio governed by the F1â€“F35 feature ledger.
+- **Sightline Velocity Studio** — local-first universal document reader, paced speed-reading workstation, comprehension/retention toolkit, and export studio governed by the F1–F35 feature ledger.
   - Design: `docs/superpowers/specs/2026-09-15-sightline-velocity-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
   - Branch: `feat/sightline-velocity` is the single active development branch for this workstream; no further Sightline writes belong on the prior arena branch.
-  - Current milestone: M5 â€” focused verification, task-state reconciliation, responsive/accessibility acceptance, and integration hand-off. M1â€“M4 implementation is present but is not accepted as complete until every deterministic completion gate in the plan has fresh evidence.
+  - Current milestone: M5 — focused verification, task-state reconciliation, responsive/accessibility acceptance, and integration hand-off. M1–M4 implementation is present but is not accepted as complete until every deterministic completion gate in the plan has fresh evidence.
   - Latest evidence: dedicated run `35118094022` at `3e4bee27607baf9eae4a77e162a341966a49ae72` passed 407/407 Sightline unit assertions across 16 files, production build, and 40/40 desktop/mobile Chromium cases. F6 multi-file, full-workspace drop, and three-item sample-library acceptance cases also pass locally after a fresh build and await the next branch CI run. The repository-wide Pages gate remains mandatory before integration.
-  - Completion gate: all F1â€“F35 items reachable and functional; focused units, production build, Sightline browser spec, accessibility/keyboard, narrow/medium/wide reflow, export round trips, synchronized `.tasks`, integration to `origin/main`, and applicable Pages deployment all verified from fresh evidence.
+  - Completion gate: all F1–F35 items reachable and functional; focused units, production build, Sightline browser spec, accessibility/keyboard, narrow/medium/wide reflow, export round trips, synchronized `.tasks`, integration to `origin/main`, and applicable Pages deployment all verified from fresh evidence.
   - Scope: `src/tools/sightline/`, Sightline-specific unit/e2e tests, its design/plan, dedicated validation workflow, and additive catalog/loader/PWA integration. Unrelated workstreams remain untouched.
 
-- **Crystal Lattice Studio** â€” local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
+- **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
   - Phase 1 completion: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1-completion.md`.
-  - Current milestone: Phase 2 â€” symmetry, local environments, validation, and model building. Phase 1 document/import/export core, interactive structure editing, periodic geometry, project history, publication graphics, and acceptance baseline are integrated.
+  - Current milestone: Phase 2 — symmetry, local environments, validation, and model building. Phase 1 document/import/export core, interactive structure editing, periodic geometry, project history, publication graphics, and acceptance baseline are integrated.
   - Latest Phase 1 acceptance evidence: all Crystal functional and Task 12 reflow/Axe/keyboard/dialog checks passed in Pages run `34729051007`, job `103648349176`, at `495ee945d60965b7e7e46bd6ed296e9b0fa8bb8d`. That repository-wide job remained red only because three later Web Layout tests failed; no Crystal failure was present.
   - Completion gate: all five master-design phases must be implemented and verified, with every numbered capability accounted for as implemented or explicitly approved under the master scope policy; Phase 1 completion alone is not project completion.
   - Browser observation (2026-09-15): focused Crystal run `34980066943` failed 1 of 28 mobile cases (supercell apply did not update the site count); local mobile reproduction passed 3/3, so treat it as environment-sensitive and re-check on the next Crystal browser run before acceptance.

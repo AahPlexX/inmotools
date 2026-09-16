@@ -110,7 +110,6 @@ test('source ingestion supports multiple files and full-workspace drops', async 
     { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('Second local document becomes the active reader.') },
   ]);
   await expect(page.getByTestId('sightline-status')).toContainText(/2 documents|second\.txt/i);
-
   const dataTransfer = await page.evaluateHandle(() => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['Dropped from the whole workspace.'], 'dropped.txt', { type: 'text/plain' }));
@@ -296,7 +295,7 @@ test('metadata, tags, and social fields are edited at export time', async ({ pag
   await page.getByTestId('sightline-tag-input').press('Enter');
 
   await expect(page.getByTestId('sightline-file-preview')).toHaveText('paced-reading-study-weighted.pdf');
-  await expect(page.getByRole('button', { name: 'reading Ã—' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'reading ×' })).toBeVisible();
   await page.getByRole('button', { name: 'Use measured reading level' }).click();
   await expect(page.locator('table').filter({ hasText: 'og:title' }).first()).toBeVisible();
 });
