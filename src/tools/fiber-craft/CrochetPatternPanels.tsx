@@ -107,6 +107,16 @@ export function CrochetGridPanel({
       <div className="fiber-craft-compiler-summary">
         <p data-testid="c2c-summary"><strong>C2C:</strong> {c2c.length} diagonal rows · {filledBlocks} filled blocks.</p>
         <p data-testid="filet-summary"><strong>Filet:</strong> {activeFilet?.text ?? 'No active row.'}</p>
+        <details className="fiber-craft-compiler-details">
+          <summary>C2C row-by-row counts</summary>
+          <ol className="fiber-craft-plain-list" data-testid="c2c-row-counts">
+            {c2c.map((row) => (
+              <li key={row.index}>
+                C2C row {row.index + 1}: {row.filledBlocks} filled of {row.totalBlocks} {row.totalBlocks === 1 ? 'block' : 'blocks'}.
+              </li>
+            ))}
+          </ol>
+        </details>
         <p className="fiber-craft-muted">Paint color: {paletteById.get(selectedColor)?.label ?? selectedColor}. Select any cell to toggle it.</p>
       </div>
     </section>

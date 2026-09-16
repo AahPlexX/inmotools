@@ -41,6 +41,10 @@
 .fiber-craft-grid-cell:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
 .fiber-craft-compiler-summary { display: grid; gap: 6px; padding: 14px 16px; border-top: 1px solid var(--line); }
 .fiber-craft-compiler-summary p { margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.fiber-craft-compiler-details { border-top: 1px solid var(--line); padding-top: 4px; }
+.fiber-craft-compiler-details summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 13px; font-weight: 700; }
+.fiber-craft-compiler-details summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.fiber-craft-compiler-details .fiber-craft-plain-list { max-height: 220px; overflow: auto; padding-bottom: 6px; }
 
 .fiber-craft-analysis-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 18px; align-items: start; min-width: 0; }
 .fiber-craft-analysis-card { display: grid; gap: 14px; padding: 16px; }

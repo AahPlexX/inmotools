@@ -36,10 +36,12 @@ test.describe('Fiber Craft Workstation', () => {
     await firstCell.click();
     await expect(page.getByTestId('c2c-summary')).toContainText('1 filled block');
     await expect(page.getByTestId('filet-summary')).toContainText('1 filled mesh');
+    await page.getByText('C2C row-by-row counts', { exact: true }).click();
+    await expect(page.getByTestId('c2c-row-counts')).toContainText('C2C row 1: 1 filled of 1 block.');
     await page.getByRole('button', { name: 'Mark row complete' }).click();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
-    await expect(page.getByRole('status')).toContainText('Saved locally', { timeout: 3_000 });
+    await expect(page.locator('p.fiber-craft-status')).toContainText('Saved locally', { timeout: 3_000 });
     await page.reload();
     const restore = page.getByRole('button', { name: 'Restore last session' });
     await expect(restore).toBeVisible();
