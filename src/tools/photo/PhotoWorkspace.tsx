@@ -266,6 +266,7 @@ export default function PhotoWorkspace() {
   const [history, setHistory] = useState<PhotoHistory>(() => createHistory(DEFAULT_RECIPE));
   const [panel, setPanel] = useState<InspectorPanel>('edit');
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [embeddedPreview, setEmbeddedPreview] = useState<{ url: string; name: string } | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [compare, setCompare] = useState(false);
   const [zoom, setZoom] = useState(0.75);
@@ -300,6 +301,7 @@ export default function PhotoWorkspace() {
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
   const sourceUrlRef = useRef<string | null>(null);
+  const embeddedPreviewUrlRef = useRef<string | null>(null);
   const sourceRef = useRef<SourcePhoto | null>(null);
   const importRevisionRef = useRef(0);
   const projectStoreRef = useRef<PhotoProjectStore | null>(null);
@@ -359,6 +361,25 @@ export default function PhotoWorkspace() {
     return () => { active = false; };
   }, []);
 
+  const releaseEmbeddedPreview = useCallback((updateState = true) => {
+    if (embeddedPreviewUrlRef.current) URL.revokeObjectURL(embeddedPreviewUrlRef.current);
+    embeddedPreviewUrlRef.current = null;
+    if (updateState) setEmbeddedPreview(null);
+  }, []);
+
+  const beginImport = useCallback(() => {
+    releaseEmbeddedPreview();
+    return ++importRevisionRef.current;
+  }, [releaseEmbeddedPreview]);
+
+  const receiveEmbeddedPreview = useCallback((blob: Blob, name: string, revision: number) => {
+    if (revision !== importRevisionRef.current) return;
+    releaseEmbeddedPreview();
+    const url = URL.createObjectURL(blob);
+    embeddedPreviewUrlRef.current = url;
+    setEmbeddedPreview({ url, name });
+  }, [releaseEmbeddedPreview]);
+
   useEffect(() => {
     let active = true;
     void createBrowserPhotoProjectStore().then(async (store) => {
@@ -389,8 +410,9 @@ export default function PhotoWorkspace() {
     renderRevisionRef.current += 1;
     releasePreviewUrl();
     releaseSourceUrl();
+    releaseEmbeddedPreview(false);
     disposePhotoRenderer();
-  }, [releasePreviewUrl, releaseSourceUrl]);
+  }, [releasePreviewUrl, releaseSourceUrl, releaseEmbeddedPreview]);
 
   useEffect(() => {
     if (!source) {
@@ -472,7 +494,7 @@ export default function PhotoWorkspace() {
   const openStoredProject = useCallback(async (loaded: LoadedPhotoProject, importRevision: number) => {
     let nextSourceUrl: string | null = null;
     try {
-      const raster = await preparePhotoRaster(loaded.sourceFile);
+      const raster = await preparePhotoRaster(loaded.sourceFile, undefined, (blob) => receiveEmbeddedPreview(blob, loaded.project.source.name, importRevision));
       const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
       const width = bitmap.width;
       const height = bitmap.height;
@@ -507,13 +529,15 @@ export default function PhotoWorkspace() {
         setStatus(`Could not recover that project: ${error instanceof Error ? error.message : 'unsupported image data'}`);
       }
       return false;
+    } finally {
+      if (importRevision === importRevisionRef.current) releaseEmbeddedPreview();
     }
-  }, [releasePreviewUrl, releaseSourceUrl]);
+  }, [releasePreviewUrl, releaseSourceUrl, receiveEmbeddedPreview, releaseEmbeddedPreview]);
 
   async function loadLocalProject(id: string, nextPanel: InspectorPanel = 'inspect') {
     const store = projectStoreRef.current;
     if (!store) return;
-    const importRevision = ++importRevisionRef.current;
+    const importRevision = beginImport();
     try {
       const loaded = await store.load(id);
       if (importRevision !== importRevisionRef.current) return;
@@ -529,7 +553,7 @@ export default function PhotoWorkspace() {
     if (!store || projectBeingDeletedRef.current) return;
     projectBeingDeletedRef.current = project.id;
     setProjectBeingDeletedId(project.id);
-    const deletionRevision = ++importRevisionRef.current;
+    const deletionRevision = beginImport();
     const deletingCurrentProject = projectId === project.id;
     if (deletingCurrentProject) {
       setAutosaveEnabled(false);
@@ -602,7 +626,7 @@ export default function PhotoWorkspace() {
     if (importRevision !== importRevisionRef.current) return;
     let nextSourceUrl: string | null = null;
     try {
-      const raster = await preparePhotoRaster(file);
+      const raster = await preparePhotoRaster(file, undefined, (blob) => receiveEmbeddedPreview(blob, file.name, importRevision));
       const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
       const width = bitmap.width;
       const height = bitmap.height;
@@ -641,8 +665,10 @@ export default function PhotoWorkspace() {
       if (importRevision === importRevisionRef.current) {
         setStatus(`Could not decode ${file.name}: ${error instanceof Error ? error.message : 'unsupported image data'}`);
       }
+    } finally {
+      if (importRevision === importRevisionRef.current) releaseEmbeddedPreview();
     }
-  }, [releasePreviewUrl, releaseSourceUrl]);
+  }, [releasePreviewUrl, releaseSourceUrl, receiveEmbeddedPreview, releaseEmbeddedPreview]);
 
   const persistCurrentProject = useCallback((reason: 'auto' | 'manual' = 'auto') => {
     const store = projectStoreRef.current;
@@ -704,7 +730,7 @@ export default function PhotoWorkspace() {
     files: Iterable<File> | ArrayLike<File>,
     source: PhotoImportSource,
   ) => {
-    const importRevision = ++importRevisionRef.current;
+    const importRevision = beginImport();
     try {
       await openPhoto(normalizePhotoImport(files, source), importRevision);
     } catch (error) {
@@ -712,10 +738,10 @@ export default function PhotoWorkspace() {
         setStatus(photoImportErrorMessage(error));
       }
     }
-  }, [openPhoto]);
+  }, [openPhoto, beginImport]);
 
   async function pastePhotoFromClipboard() {
-    const importRevision = ++importRevisionRef.current;
+    const importRevision = beginImport();
     try {
       const candidate = await readPhotoClipboard(navigator.clipboard);
       if (importRevision !== importRevisionRef.current) return;
@@ -1042,7 +1068,7 @@ export default function PhotoWorkspace() {
     // Copy is a newer user-visible action than any preview already in flight.
     // Advancing the operation revision keeps an older preview completion from
     // immediately replacing the confirmation message under a busy renderer.
-    importRevisionRef.current += 1;
+    beginImport();
     setEditClipboard(normalizeRecipe(recipe));
     setCanvasInteraction(null);
     setStatus('Edits copied. Open another photo or paste them here.');
@@ -1618,6 +1644,11 @@ export default function PhotoWorkspace() {
       </p>
 
       {source?.codecNotice ? <p className="photo-import-hint" data-testid="photo-codec-notice">{source.codecNotice}</p> : null}
+
+      {embeddedPreview ? <aside className="photo-import-hint" data-testid="photo-embedded-preview" role="status">
+        <img src={embeddedPreview.url} alt={`Embedded camera preview of ${embeddedPreview.name}`} style={{ display: 'block', maxWidth: '100%', maxHeight: 140 }} />
+        <span>Embedded camera preview · developing {embeddedPreview.name} · not editable. Camera rendering may differ from the developed photo.</span>
+      </aside> : null}
 
       {recoveryProject ? (
         <section className="photo-recovery-banner" aria-labelledby="photo-recovery-title" data-testid="photo-recovery-prompt">

@@ -38,7 +38,34 @@ function checkGeometry(width: number, height: number): void {
   }
 }
 
-export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: PhotoRawSettings): Promise<{ width: number; height: number; samples: Uint16Array; rgba: Uint8ClampedArray<ArrayBuffer>; notice: string; rawSource: PhotoRawSource }> {
+export type RawEmbeddedPreview = { width: number; height: number } & (
+  { rgba: Uint8ClampedArray<ArrayBuffer>; flip: number; jpeg?: never } | { jpeg: Uint8Array<ArrayBuffer>; rgba?: never; flip?: never }
+);
+
+/** Validate JPEG SOF geometry before asking the browser to allocate decoded pixels. */
+export function rawPreviewJpegGeometry(bytes: Uint8Array): { width: number; height: number } {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new Error('Invalid RAW preview JPEG.');
+  let at = 2;
+  while (at + 4 <= bytes.length) {
+    if (bytes[at++] !== 0xff) break;
+    while (bytes[at] === 0xff) at++;
+    const marker = bytes[at++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const length = (bytes[at] << 8) | bytes[at + 1];
+    if (length < 2 || at + length > bytes.length) break;
+    if ([0xc0, 0xc1, 0xc2].includes(marker) && length >= 8) {
+      const height = (bytes[at + 3] << 8) | bytes[at + 4];
+      const width = (bytes[at + 5] << 8) | bytes[at + 6];
+      checkGeometry(width, height);
+      return { width, height };
+    }
+    at += length;
+  }
+  throw new Error('Unsupported RAW preview JPEG header.');
+}
+
+export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: PhotoRawSettings, onPreview?: (preview: RawEmbeddedPreview) => Promise<void>): Promise<{ width: number; height: number; samples: Uint16Array; rgba: Uint8ClampedArray<ArrayBuffer>; notice: string; rawSource: PhotoRawSource }> {
   if (!buffer.byteLength || buffer.byteLength > 64 * 1024 * 1024) throw new Error('RAW input must be nonempty and no larger than 64 MiB.');
   const { LibRaw } = await import('@colorhythm/libraw-wasm');
   await LibRaw.initialize();
@@ -54,6 +81,33 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
       Math.ceil(decoder.getActiveWidth() * Math.max(1, aspect)),
       Math.ceil(decoder.getActiveHeight() / Math.min(1, aspect)),
     );
+    if (onPreview) {
+      // Optional camera previews never replace sensor development or abort it.
+      try {
+        const thumbnail = decoder.getThumbnail();
+        // LibRaw reports UNKNOWN/zero colors until unpackThumb; do not gate on those lazy facts.
+        if (thumbnail.twidth > 0 && thumbnail.theight > 0 && thumbnail.tlength > 0) {
+          checkGeometry(thumbnail.twidth, thumbnail.theight);
+          if (thumbnail.tlength < 1 || thumbnail.tlength > 8 * 1024 * 1024
+            || thumbnail.twidth * thumbnail.theight * 6 > 8 * 1024 * 1024) throw new Error('RAW preview exceeds its byte limit.');
+          decoder.unpackThumb();
+          const image = decoder.dcrawMakeMemThumb();
+          if (image.data_size < 1 || image.data_size > 8 * 1024 * 1024 || image.data.byteLength !== image.data_size) throw new Error('Invalid RAW preview size.');
+          if (image.type_ === 'LIBRAW_IMAGE_JPEG') {
+            const geometry = rawPreviewJpegGeometry(image.data);
+            await onPreview({ ...geometry, jpeg: image.data });
+          } else if (image.type_ === 'LIBRAW_IMAGE_BITMAP' && image.bits === 8 && image.colors === 3) {
+            checkGeometry(image.width, image.height);
+            if (image.data_size !== image.width * image.height * 3) throw new Error('Invalid RAW preview bitmap.');
+            const rgba = new Uint8ClampedArray(image.width * image.height * 4);
+            for (let pixel = 0; pixel < image.width * image.height; pixel++) {
+              rgba.set(image.data.subarray(pixel * 3, pixel * 3 + 3), pixel * 4); rgba[pixel * 4 + 3] = 255;
+            }
+            await onPreview({ width: image.width, height: image.height, rgba, flip: decoder.getFlip() & 7 });
+          }
+        }
+      } catch { /* Missing, damaged, oversized or unsupported optional previews fall back to full development. */ }
+    }
     const camera = decoder.getIParams();
     const cleanText = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 64);
     const channels = Array.from({ length: 4 }, (_, index) => String.fromCharCode(decoder.getCdesc(index))).join('');
@@ -107,7 +161,7 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
     }
     return {
       width: image.width, height: image.height, samples, rgba, rawSource,
-      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. RAW exposure baseline and embedded-preview extraction are not yet available.',
+      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. Bounded embedded camera previews appear during import when available; they are not editing or export sources. RAW exposure baseline is not yet available.',
     };
   } catch (error) {
     throw new Error(`RAW decoding failed: ${error instanceof Error ? error.message : 'unsupported or damaged source'}. Convert the source to TIFF or PNG if this camera/variant is unsupported.`);

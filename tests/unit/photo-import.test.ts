@@ -18,6 +18,82 @@ function file(name: string, type: string, contents = 'pixels') {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Photo Studio import contract', () => {
+  test.each([
+    { name: 'invalid.tif', bytes: makePhotoTiff(), response: 7 },
+    { name: 'invalid.dng', bytes: makePhotoDng(), response: 'damaged message' },
+  ])('non-object .$name responses reject cleanly and release the decoder queue', async ({ name, bytes, response }) => {
+    let worker: InvalidWorker | undefined;
+    class InvalidWorker {
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminate = vi.fn();
+      constructor() { worker = this; }
+      postMessage() {}
+    }
+    vi.stubGlobal('Worker', InvalidWorker); vi.stubGlobal('OffscreenCanvas', class {});
+    const task = preparePhotoRaster(new File([bytes], name)); void task.catch(() => undefined);
+    await vi.waitFor(() => expect(worker?.onmessage).toBeTypeOf('function'));
+    let protocolError: unknown;
+    try { worker!.onmessage?.({ data: response }); }
+    catch (error) { protocolError = error; worker!.onerror?.(); }
+    const reason = await task.then(() => 'unexpected success', (error: Error) => error.message);
+    expect(protocolError).toBeUndefined(); expect(reason).toMatch(/invalid raster/);
+    expect(worker!.terminate).toHaveBeenCalledTimes(1);
+  });
+  test('RAW progress cannot reset its deadline, including malformed previews and throwing consumers', async () => {
+    vi.useFakeTimers();
+    let worker: { onmessage?: (event: { data: { preview: Blob } }) => void; terminate: () => void; started: boolean };
+    vi.stubGlobal('Worker', class {
+      started = false; terminate = vi.fn();
+      constructor() { worker = this; }
+      postMessage() { this.started = true; }
+    });
+    vi.stubGlobal('OffscreenCanvas', class {});
+    const consumer = vi.fn(() => { throw new Error('optional consumer failure'); });
+    const input = new File([makePhotoDng()], 'progress-deadline.dng');
+    const task = preparePhotoRaster(input, undefined, consumer);
+    const rejection = expect(task).rejects.toThrow(/30-second time limit/);
+    await vi.waitFor(() => expect(worker.started).toBe(true));
+    await vi.advanceTimersByTimeAsync(29000);
+    worker!.onmessage?.({ data: { preview: new Blob(['invalid'], { type: 'text/plain' }) } });
+    expect(consumer).not.toHaveBeenCalled();
+    worker!.onmessage?.({ data: { preview: new Blob(['preview'], { type: 'image/png' }) } });
+    await vi.advanceTimersByTimeAsync(1000); await rejection;
+    expect(consumer).toHaveBeenCalledTimes(1); expect(worker!.terminate).toHaveBeenCalledTimes(1);
+  });
+  test('RAW progress notifies pending cache subscribers without completing or releasing the shared queue', async () => {
+    const workers: ProgressWorker[] = [];
+    class ProgressWorker {
+      onmessage: ((event: { data: { blob?: Blob; preview?: Blob } }) => void) | null = null;
+      started = false; terminated = false;
+      constructor() { workers.push(this); }
+      postMessage() { this.started = true; }
+      terminate() { this.terminated = true; }
+    }
+    vi.stubGlobal('Worker', ProgressWorker); vi.stubGlobal('OffscreenCanvas', class {});
+    const input = new File([makePhotoDng()], 'progress.dng');
+    const consumer = vi.fn(); const secondConsumer = vi.fn();
+    const prepare = preparePhotoRaster as (file: Blob, settings: undefined, onPreview: typeof consumer) => ReturnType<typeof preparePhotoRaster>;
+    const task = prepare(input, undefined, consumer);
+    void task.catch(() => undefined);
+    const cached = prepare(input, undefined, secondConsumer);
+    await vi.waitFor(() => expect(workers[0]?.started).toBe(true));
+    const next = preparePhotoRaster(new File([makePhotoTiff()], 'next.tif'));
+    const preview = new Blob(['preview'], { type: 'image/png' });
+    workers[0].onmessage?.({ data: { preview } });
+    const observed = { consumers: [consumer.mock.calls.length, secondConsumer.mock.calls.length], count: workers.length, terminated: workers[0].terminated };
+    // Drain real queue promises before assertions, including the intentional RED run.
+    workers[0].onmessage?.({ data: { blob: preview } }); await task.catch(() => undefined);
+    const lateConsumer = vi.fn();
+    prepare(input, undefined, lateConsumer);
+    workers[0].onmessage?.({ data: { preview } });
+    await vi.waitFor(() => expect(workers[1]?.started).toBe(true));
+    workers[1].onmessage?.({ data: { blob: preview } }); await next;
+    expect(cached).toBe(task);
+    expect(observed).toEqual({ consumers: [1, 1], count: 1, terminated: false });
+    expect(consumer).toHaveBeenCalledWith(preview);
+    expect(lateConsumer).not.toHaveBeenCalled();
+  });
   test('RAW variants use normalized cache keys and an old failure cannot evict a newer queued variant', async () => {
     const workers: VariantWorker[] = [];
     const bytes = makePhotoDng();

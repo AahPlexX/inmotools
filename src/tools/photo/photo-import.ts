@@ -23,22 +23,28 @@ export interface PhotoImportRaster {
   rawSource?: PhotoRawSource;
 }
 
-const rasterCache = new WeakMap<Blob, { key: string; task: Promise<PhotoImportRaster> }>();
+const rasterCache = new WeakMap<Blob, { key: string; task: Promise<PhotoImportRaster>; listeners: Set<(blob: Blob) => void>; pending: boolean }>();
 
 export function releasePhotoRaster(file: Blob): void {
   rasterCache.delete(file);
 }
 
 /** Preserve the source; all consumers share one lazy codec raster. */
-export function preparePhotoRaster(file: Blob, raw?: PhotoRawSettings): Promise<PhotoImportRaster> {
+export function preparePhotoRaster(file: Blob, raw?: PhotoRawSettings, onPreview?: (blob: Blob) => void): Promise<PhotoImportRaster> {
   const settings = normalizeRawSettings(raw);
   const key = JSON.stringify(settings);
   const existing = rasterCache.get(file);
-  if (existing?.key === key) return existing.task;
+  if (existing?.key === key) {
+    if (onPreview && existing.pending) existing.listeners.add(onPreview);
+    return existing.task;
+  }
+  const listeners = new Set<(blob: Blob) => void>(onPreview ? [onPreview] : []);
   const task = (async () => {
     if (await detectRawSource(file)) {
       const { prepareRawSource } = await import('./codecs/raw-source');
-      return prepareRawSource(file, settings);
+      return prepareRawSource(file, settings, onPreview ? (blob) => {
+        for (const listener of listeners) { try { listener(blob); } catch { /* Other subscribers still receive progress. */ } }
+      } : undefined);
     }
     const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
     const hasTiffSignature = signature.length === 4 && (
@@ -55,8 +61,12 @@ export function preparePhotoRaster(file: Blob, raw?: PhotoRawSettings): Promise<
     return { blob: file };
   })();
   // Retain only the latest variant, not a full-resolution raster per edit.
-  rasterCache.set(file, { key, task });
-  void task.catch(() => { if (rasterCache.get(file)?.task === task) rasterCache.delete(file); });
+  const entry = { key, task, listeners, pending: true };
+  rasterCache.set(file, entry);
+  void task.then(() => { entry.pending = false; listeners.clear(); }, () => {
+    entry.pending = false;
+    listeners.clear(); if (rasterCache.get(file)?.task === task) rasterCache.delete(file);
+  });
   return task;
 }
 

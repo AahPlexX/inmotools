@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { makePhotoDng } from '../fixtures/photo-dng';
-import { decodeRawPixels, detectRawSource } from '../../src/tools/photo/codecs/raw-decoder';
+import { decodeRawPixels, detectRawSource, rawPreviewJpegGeometry } from '../../src/tools/photo/codecs/raw-decoder';
 import { normalizePhotoImport } from '../../src/tools/photo/photo-import';
 import { DEFAULT_RECIPE, commitHistory, createHistory, normalizeRecipe, undoHistory } from '../../src/tools/photo/photo-engine';
 import type { PhotoRecipe } from '../../src/tools/photo/photo-types';
@@ -9,6 +9,57 @@ const rawDefaults = { whiteBalance: 'camera', redMultiplier: 1, blueMultiplier: 
 const develop = decodeRawPixels as (buffer: ArrayBuffer, settings?: unknown) => ReturnType<typeof decodeRawPixels>;
 
 describe('Photo Studio RAW acquisition', () => {
+  test('embedded RGB previews retain the source orientation needed for display', async () => {
+    const consumer = vi.fn(async () => undefined);
+    await decodeRawPixels(makePhotoDng({ thumbnail: true, orientation: 6 }).buffer, undefined, consumer);
+    expect(consumer).toHaveBeenCalledTimes(1);
+    const preview = consumer.mock.calls[0] as unknown as [{ width: number; height: number; flip: number }];
+    expect({ width: preview[0].width, height: preview[0].height, flip: preview[0].flip }).toEqual({ width: 16, height: 8, flip: 6 });
+  });
+  test.each([0xc0, 0xc1, 0xc2])('bounds supported JPEG SOF %i geometry before browser decoding', (marker) => {
+    const header = new Uint8Array([255, 216, 255, 224, 0, 4, 0, 0, 255, marker, 0, 11, 8, 0, 8, 0, 16, 1, 1, 17, 0]);
+    expect(rawPreviewJpegGeometry(header)).toEqual({ width: 16, height: 8 });
+    header[15] = 255; header[16] = 255;
+    expect(() => rawPreviewJpegGeometry(header)).toThrow(/dimensions/);
+    expect(() => rawPreviewJpegGeometry(header.slice(0, 16))).toThrow(/header/);
+  });
+  test.each([new Uint8Array([255, 216, 255, 224, 0, 0]), new Uint8Array([255, 216, 255, 218, 0, 2]), new Uint8Array([1, 2, 3])])('rejects malformed optional JPEG headers: %j', (header) => {
+    expect(() => rawPreviewJpegGeometry(header)).toThrow(/preview JPEG/);
+  });
+  test('oversized thumbnail geometry is skipped before extraction while full RAW development still succeeds', async () => {
+    const { LibRaw } = await import('@colorhythm/libraw-wasm');
+    const unpack = vi.spyOn(LibRaw.prototype, 'unpackThumb'); const consumer = vi.fn(async () => undefined);
+    try {
+      const result = await decodeRawPixels(makePhotoDng({ thumbnail: true, thumbnailWidth: 5000 }).buffer, undefined, consumer);
+      expect(consumer).not.toHaveBeenCalled(); expect(unpack).not.toHaveBeenCalled();
+      expect([...result.samples.slice(0, 3)]).toEqual([35200, 35201, 35201]);
+    } finally { unpack.mockRestore(); }
+  });
+  test('emits an owned embedded RGB preview before sensor unpack without changing developed pixels', async () => {
+    const { LibRaw } = await import('@colorhythm/libraw-wasm');
+    const unpack = vi.spyOn(LibRaw.prototype, 'unpack');
+    const previews: unknown[] = [];
+    const decode = decodeRawPixels as (buffer: ArrayBuffer, settings: undefined, onPreview: (preview: unknown) => Promise<void>) => ReturnType<typeof decodeRawPixels>;
+    try {
+      const result = await decode(makePhotoDng({ thumbnail: true }).buffer, undefined, async (preview) => {
+        expect(unpack).not.toHaveBeenCalled(); previews.push(preview);
+      });
+      expect(previews).toHaveLength(1);
+      const preview = previews[0] as { width: number; height: number; rgba: Uint8ClampedArray };
+      expect([preview.width, preview.height]).toEqual([16, 8]);
+      expect([...preview.rgba.slice(0, 4)]).toEqual([230, 40, 90, 255]);
+      expect([...result.samples.slice(0, 3)]).toEqual([35200, 35201, 35201]);
+      await decodeRawPixels(makePhotoDng().buffer);
+      expect([...preview.rgba.slice(0, 4)]).toEqual([230, 40, 90, 255]);
+    } finally { unpack.mockRestore(); }
+  });
+  test.each(['missing', 'consumer failure'])('optional preview %s does not prevent full RAW development', async (mode) => {
+    const consumer = vi.fn(async () => { throw new Error('preview display unavailable'); });
+    const decode = decodeRawPixels as (buffer: ArrayBuffer, settings: undefined, onPreview: typeof consumer) => ReturnType<typeof decodeRawPixels>;
+    const result = await decode(makePhotoDng({ thumbnail: mode !== 'missing' }).buffer, undefined, consumer);
+    expect(consumer).toHaveBeenCalledTimes(mode === 'missing' ? 0 : 1);
+    expect([...result.samples.slice(0, 3)]).toEqual([35200, 35201, 35201]);
+  });
   test.each([
     { input: undefined, expected: rawDefaults },
     { input: { whiteBalance: 'custom', redMultiplier: 20, blueMultiplier: -4, highlight: 'blend', demosaic: 'bilinear' }, expected: { whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 0.25, highlight: 'blend', demosaic: 'bilinear' } },

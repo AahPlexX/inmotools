@@ -23,6 +23,79 @@ async function openNamedFixture(page: Page, name: string) {
   await expect(page.getByTestId('photo-preview')).toBeVisible();
 }
 
+for (const { terminal, format } of [
+  { terminal: 'complete', format: 'RGB' }, { terminal: 'superseded', format: 'RGB' },
+  { terminal: 'failure', format: 'RGB' }, { terminal: 'unmount', format: 'RGB' },
+  { terminal: 'complete', format: 'JPEG' }, { terminal: 'complete', format: 'rotated RGB' },
+]) {
+  test(`embedded RAW preview (${format}) is temporary and preserves the document until ${terminal}`, async ({ page }) => {
+    await openStudio(page); await openNamedFixture(page, 'preserved.png');
+    await page.getByLabel('Exposure value').fill('1');
+    await page.getByLabel('Exposure value').press('Enter');
+    await page.evaluate(() => {
+      const NativeWorker = window.Worker;
+      const state = window as unknown as { finishRaw?: (fail?: boolean) => void; replayRawPreview?: () => void; heldRaw?: boolean; previewUrl?: string; revokedPreview?: boolean };
+      const revoke = URL.revokeObjectURL.bind(URL);
+      URL.revokeObjectURL = (url) => { if (url === state.previewUrl) state.revokedPreview = true; revoke(url); };
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          if (!String(url).includes('raw.worker')) return;
+          let released = false;
+          this.addEventListener('message', (event) => {
+            if (event.data?.preview) { state.replayRawPreview = () => this.dispatchEvent(new MessageEvent('message', { data: event.data })); return; }
+            if (released) return;
+            event.stopImmediatePropagation(); state.heldRaw = true;
+            state.finishRaw = (fail = false) => {
+              released = true;
+              this.dispatchEvent(new MessageEvent('message', { data: fail ? { error: 'simulated development failure' } : event.data }));
+            };
+          });
+        }
+      };
+    });
+    const jpeg = format === 'JPEG' ? new Uint8Array(await page.evaluate(async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 8;
+      const context = canvas.getContext('2d')!; context.fillStyle = 'rgb(230,40,90)'; context.fillRect(0, 0, 16, 8);
+      const blob = await new Promise<Blob>((resolve) => canvas.toBlob((value) => resolve(value!), 'image/jpeg', 1));
+      return [...new Uint8Array(await blob.arrayBuffer())];
+    })) : undefined;
+    await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'embedded.dng', mimeType: 'image/x-adobe-dng', buffer: Buffer.from(makePhotoDng({ thumbnail: true, thumbnailJpeg: jpeg, orientation: format === 'rotated RGB' ? 6 : 1 })) });
+    const preview = page.getByTestId('photo-embedded-preview');
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('not editable');
+    const pixel = await preview.locator('img').evaluate((image) => {
+      const state = window as unknown as { previewUrl?: string }; state.previewUrl = (image as HTMLImageElement).src;
+      const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 4;
+      const context = canvas.getContext('2d')!; context.drawImage(image as HTMLImageElement, 0, 0);
+      return { rgba: [...context.getImageData(0, 0, 1, 1).data], width: (image as HTMLImageElement).naturalWidth, height: (image as HTMLImageElement).naturalHeight };
+    });
+    expect([pixel.width, pixel.height]).toEqual(format === 'rotated RGB' ? [8, 16] : [16, 8]);
+    if (format === 'JPEG') {
+      [230, 40, 90].forEach((value, channel) => expect(Math.abs(pixel.rgba[channel] - value)).toBeLessThanOrEqual(3));
+      expect(pixel.rgba[3]).toBe(255);
+    } else expect(pixel.rgba).toEqual([230, 40, 90, 255]);
+    await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
+    await expect(page.getByLabel('Exposure value')).toHaveValue('1');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { heldRaw?: boolean }).heldRaw)).toBe(true);
+    if (terminal === 'superseded') await openNamedFixture(page, 'newer.png');
+    if (terminal === 'unmount') await page.goto('/inmotools/#/');
+    if (terminal === 'superseded' || terminal === 'unmount') await page.evaluate(() => (window as unknown as { replayRawPreview: () => void }).replayRawPreview());
+    await page.evaluate((fail) => (window as unknown as { finishRaw: (fail: boolean) => void }).finishRaw(fail), terminal === 'failure');
+    await expect(preview).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { revokedPreview?: boolean }).revokedPreview)).toBe(true);
+    if (terminal === 'complete') {
+      await expect(page.getByTestId('photo-source-dimensions')).toContainText('32 × 32');
+      await expect(page.getByLabel('Exposure value')).toHaveValue('0');
+      await expect(page.getByTestId('photo-preview')).toBeVisible();
+    } else if (terminal !== 'unmount') {
+      await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
+      await expect(page.getByLabel('Exposure value')).toHaveValue(terminal === 'failure' ? '1' : '0');
+      if (terminal === 'failure') await expect(page.locator('.photo-status-strip')).toContainText('simulated development failure');
+    }
+  });
+}
+
 test('RAW DNG imports through the actual worker and retains its original source through recovery and export', async ({ page }) => {
   await openStudio(page);
   await page.setInputFiles('[data-testid="photo-file-input"]', {
