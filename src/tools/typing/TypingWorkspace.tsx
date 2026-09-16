@@ -18,7 +18,7 @@ import {
   generateDrill,
   ghostSeries,
   initState,
-  isCleanlyCompleted,
+  isTargetCompleted,
   ngramLatencies,
   perKeyStats,
   pressKey,
@@ -342,7 +342,7 @@ export default function TypingWorkspace() {
   // Finite non-timed modes finish as soon as the target is cleanly completed.
   useEffect(() => {
     if (!running || engine.finished || totalDurationMs !== 0 || config.durationMode === 'zen') return;
-    if (!isCleanlyCompleted(engine)) return;
+    if (!isTargetCompleted(engine)) return;
     const lastEvent = engine.events[engine.events.length - 1];
     dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });
   }, [running, engine, totalDurationMs, config.durationMode]);

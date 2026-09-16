@@ -249,6 +249,18 @@ export function isCleanlyCompleted(state: EngineState): boolean {
   return state.cells.slice(0, original).every((c) => c.state === 'correct');
 }
 
+/**
+ * Returns true once a finite target has been completed according to the active
+ * correction mode. Strict mode requires a clean target; modes that explicitly
+ * allow forward movement complete once the original target has been traversed.
+ */
+export function isTargetCompleted(state: EngineState): boolean {
+  const original = state.targetText.length;
+  if (state.cursor < original) return false;
+  if (state.options.errorMode === 'strict') return isCleanlyCompleted(state);
+  return true;
+}
+
 export function finish(state: EngineState, reason: 'completed' | 'failed' | 'aborted', t: number): EngineState {
   if (state.finished) return state;
   return { ...state, finished: true, finishReason: reason, endedAt: t };
@@ -403,7 +415,10 @@ export function ngramLatencies(events: KeystrokeEvent[], n: 2 | 3 | 4 = 2): Ngra
   for (const [gram, data] of map) {
     const sorted = data.latencies.slice().sort((a, b) => a - b);
     const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
-    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+    const middle = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 === 0
+      ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+      : (sorted[middle] ?? 0);
     out.push({
       gram,
       count: data.hits,
