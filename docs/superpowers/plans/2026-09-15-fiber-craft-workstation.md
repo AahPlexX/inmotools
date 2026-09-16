@@ -3,7 +3,7 @@
 **Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **13/65 complete**
+**Function progress:** **17/65 complete**
 
 ## Goal
 
@@ -57,6 +57,7 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-02** layered undo/redo history.
 - **FC-03** browser-local autosave and explicit recovery.
 - **FC-04** portable `.craftproj` save/load with validated local import and lossless project-state round trip.
+- **FC-07** light, dark-room, high-contrast screen modes plus dedicated high-contrast print styling; Canvas pixels use matching display palettes.
 - **FC-09** concentric crochet round canvas.
 - **FC-10** US/UK crochet symbol library rendered as reusable vector glyph geometry on the chart.
 - **FC-11** C2C compiler with diagonal row-by-row block counts.
@@ -67,13 +68,16 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-16** yarn-weight / hook / gauge reference guidance with editable project values.
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
+- **FC-52** bidirectional physical-dimension and gauge scaling for grid and round crochet charts.
+- **FC-54** editable CYC project-level difficulty plus persisted technique tags.
+- **FC-55** structured accessible chart description generated from the same canonical round/grid data as the visual chart.
 
-Acceptance milestone: focused Fiber run `35118429046` at code head `eafbbdd5` passed all 47
-focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
-and mobile Chromium workflow. The browser scenario covers vector symbol rendering plus an actual
-`.craftproj` save → mutate → re-import → autosave → reload/recovery path. Imported project data is
-validated at the file boundary for metadata, gauge, palette, embedded swatches, chart structure,
-settings, and progress data before it can replace the live document.
+Latest acceptance milestone: focused Fiber run `35119952007` at code head `d03ba45b` passed all
+52 focused unit/selector checks, the production TypeScript/Vite build, and the consolidated desktop
+and mobile Chromium workflow. The browser scenario covers themes, accessible round/grid chart
+summaries, vector symbol rendering, gauge and classification persistence, plus the real `.craftproj`
+save → mutate → re-import → autosave → reload/recovery path. Imported project data remains validated
+at the file boundary before it can replace the live document.
 
 ## Delivery slices
 
@@ -82,10 +86,11 @@ settings, and progress data before it can replace the live document.
 - [ ] **Slice 1 — Shared workspace shell.** Canvas host, tool/mode switcher, palette/inspector
       panels, undo/redo history, autosave, catalog/route registration behind a working landing view.
       **In progress:** crochet Canvas/grid hosts, palette/inspector, reversible history, IndexedDB
-      draft restore for round and grid documents, catalog entry, lazy loader, canonical alias,
-      portable `.craftproj`, progress tracking, and one-action active-row recenter are accepted.
-      Cross-discipline mode switching, shared zoom/pan/rulers, transforms, screen/print themes, and
-      complete keyboard/touch authoring remain open.
+      draft restore, catalog entry, lazy loader, canonical alias, portable `.craftproj`, progress
+      tracking, one-action active-row recenter, screen/print themes, gauge scaling, project
+      classification, and accessible chart descriptions are accepted. Cross-discipline mode
+      switching, shared zoom/pan/rulers, selection transforms, metric/imperial switching across all
+      measurement-bearing disciplines, and complete keyboard/touch authoring remain open.
 - [x] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
       vector symbol set, C2C/filet compiler, written-pattern compiler, stitch-count validator,
       amigurumi shaping, and yarn/hook reference guidance are implemented and accepted through the
@@ -116,11 +121,11 @@ settings, and progress data before it can replace the live document.
   milestone rather than after every helper/function. A second spot-check is warranted when a change
   crosses engine/state/UI/persistence boundaries or when the previous check exposed a defect.
 - **Dedicated Fiber gate:** `.github/workflows/fiber-craft.yml` runs on Fiber-relevant paths only:
-  frozen install → 47 focused unit/selector checks → production TypeScript/Vite build → one
+  frozen install → 52 focused unit/selector checks → production TypeScript/Vite build → one
   consolidated Playwright workflow on desktop and mobile Chromium.
-- **Avoid no-value reruns:** documentation-only commits and unrelated Crystal-only upstream changes
-  do not invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at
-  integration and merge-readiness boundaries.
+- **Avoid no-value reruns:** documentation-only commits and unrelated upstream changes do not
+  invalidate accepted Fiber evidence. Whole-repository/Pages gates remain required at integration
+  and merge-readiness boundaries.
 - **Property-based escalation:** add exactly pinned `fast-check` and `@fast-check/vitest` only when
   generated cases and shrinking materially reduce maintenance for high-dimensional logic. Do not
   add a dependency merely to replace a small, readable invariant table.
