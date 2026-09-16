@@ -39,7 +39,7 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByText('C2C row-by-row counts', { exact: true }).click();
     await expect(page.getByTestId('c2c-row-counts')).toContainText('C2C row 1: 1 filled of 1 block.');
     await page.getByRole('button', { name: 'Center active row' }).click();
-    await expect(page.getByLabel('Row 1')).toBeFocused();
+    await expect(page.getByLabel('Row 1', { exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Mark row complete' }).click();
     await expect(page.getByRole('button', { name: 'Mark row unfinished' })).toBeVisible();
 
