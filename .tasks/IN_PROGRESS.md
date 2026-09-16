@@ -30,6 +30,15 @@
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
   - Current milestone: A — foundation and global editor
 
+- **Sightline Velocity Studio** — local-first universal document reader, paced speed-reading workstation, comprehension/retention toolkit, and export studio governed by the F1–F35 feature ledger.
+  - Design: `docs/superpowers/specs/2026-09-15-sightline-velocity-design.md`.
+  - Plan: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
+  - Branch: `feat/sightline-velocity` is the single active development branch for this workstream; no further Sightline writes belong on the prior arena branch.
+  - Current milestone: M5 — focused verification, task-state reconciliation, responsive/accessibility acceptance, and integration hand-off. M1–M4 implementation is present but is not accepted as complete until every deterministic completion gate in the plan has fresh evidence.
+  - Latest evidence: dedicated run `35118094022` at `3e4bee27607baf9eae4a77e162a341966a49ae72` passed 407/407 Sightline unit assertions across 16 files, production build, and 40/40 desktop/mobile Chromium cases. F6 multi-file, full-workspace drop, and three-item sample-library acceptance is now included in green dedicated run `35122984076` at `1d28b12b911f5a60b3f8ffe543466b4b1aa02c63`, which passed the focused unit/build lane and all 44 desktop/mobile Chromium cases. The repository-wide Pages gate remains mandatory before integration.
+  - Completion gate: all F1–F35 items reachable and functional; focused units, production build, Sightline browser spec, accessibility/keyboard, narrow/medium/wide reflow, export round trips, synchronized `.tasks`, integration to `origin/main`, and applicable Pages deployment all verified from fresh evidence.
+  - Scope: `src/tools/sightline/`, Sightline-specific unit/e2e tests, its design/plan, dedicated validation workflow, and additive catalog/loader/PWA integration. Unrelated workstreams remain untouched.
+
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
