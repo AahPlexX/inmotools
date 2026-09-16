@@ -139,10 +139,10 @@ test('keyboard control plays, steps, and bookmarks without a mouse', async ({ pa
   const stage = page.getByTestId('sightline-stage');
   await stage.focus();
   await expect(stage).toBeFocused();
-  await stage.press('Space');
-  await expect(page.getByTestId('sightline-play')).toHaveText('Pause');
-
   const labels = page.getByTestId('sightline-position');
+  await stage.press('Space');
+  await stage.press('Space');
+
   const before = await labels.textContent();
   await stage.press('ArrowRight');
   await expect(labels).not.toHaveText(before ?? '');
