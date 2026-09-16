@@ -1,0 +1,78 @@
+name: Typing analytics one-shot maintenance
+
+on:
+  push:
+    branches: [feature/typing-workstation]
+    paths:
+      - '.github/workflows/typing-analytics-maintenance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.ref_name == 'feature/typing-workstation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/typing-workstation
+          fetch-depth: 0
+      - name: Correct completion and median contracts
+        shell: python
+        run: |
+          from pathlib import Path
+
+          engine_path = Path('src/tools/typing/typing-engine.ts')
+          engine = engine_path.read_text()
+
+          old_median = "    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;"
+          new_median = "    const middle = Math.floor(sorted.length / 2);\n    const median = sorted.length % 2 === 0\n      ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2\n      : (sorted[middle] ?? 0);"
+          if engine.count(old_median) != 1:
+              raise SystemExit(f'median guard expected 1 match, found {engine.count(old_median)}')
+          engine = engine.replace(old_median, new_median, 1)
+
+          clean_block = """export function isCleanlyCompleted(state: EngineState): boolean {
+  const original = state.targetText.length;
+  if (state.cursor < original) return false;
+  return state.cells.slice(0, original).every((c) => c.state === 'correct');
+}
+"""
+          completion_block = clean_block + """
+/**
+ * Returns true once a finite target has been completed according to the active
+ * correction mode. Strict mode requires a clean target; modes that explicitly
+ * allow forward movement complete once the original target has been traversed.
+ */
+export function isTargetCompleted(state: EngineState): boolean {
+  const original = state.targetText.length;
+  if (state.cursor < original) return false;
+  if (state.options.errorMode === 'strict') return isCleanlyCompleted(state);
+  return true;
+}
+"""
+          if engine.count(clean_block) != 1:
+              raise SystemExit(f'completion guard expected 1 match, found {engine.count(clean_block)}')
+          engine = engine.replace(clean_block, completion_block, 1)
+          engine_path.write_text(engine)
+
+          workspace_path = Path('src/tools/typing/TypingWorkspace.tsx')
+          workspace = workspace_path.read_text()
+          replacements = {
+              "  isCleanlyCompleted,\n": "  isTargetCompleted,\n",
+              "    if (!isCleanlyCompleted(engine)) return;": "    if (!isTargetCompleted(engine)) return;",
+          }
+          for old, new in replacements.items():
+              count = workspace.count(old)
+              if count != 1:
+                  raise SystemExit(f'workspace guard expected 1 match for {old!r}, found {count}')
+              workspace = workspace.replace(old, new, 1)
+          workspace_path.write_text(workspace)
+      - name: Commit source correction
+        run: |
+          git config user.name "AahPlexX"
+          git config user.email "130876266+AahPlexX@users.noreply.github.com"
+          git add src/tools/typing/typing-engine.ts src/tools/typing/TypingWorkspace.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(typing): complete forgiving targets and correct medians [skip ci]"
+          git push origin HEAD:feature/typing-workstation
