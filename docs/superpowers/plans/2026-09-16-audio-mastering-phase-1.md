@@ -63,4 +63,4 @@
 - [x] Record the 81-function completion contract and current Phase 1 milestone in `IN_PROGRESS.md`.
 - [x] Run focused Mastering + Harmony units, production build, and focused desktop/mobile browser specs.
 - [x] Because MediaBunny is shared with the video slicer, run its focused unit/browser coverage or build-level integration check before committing the dependency bump.
-- [ ] Review the final diff for unrelated changes and commit/push only the dedicated branch.
+- [x] Review the final diff for unrelated changes and commit/push only the dedicated branch.
