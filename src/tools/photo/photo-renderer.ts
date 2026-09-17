@@ -1,4 +1,4 @@
-import { applyPixelAdjustments, normalizeRecipe, sampleHistogram } from './photo-engine';
+import { normalizeRecipe, sampleHistogram } from './photo-engine';
 import { warpPhotoGeometryPixels } from './photo-geometry';
 import { preparePhotoRaster } from './photo-import';
 import type {
@@ -37,6 +37,8 @@ export interface PhotoRenderResult {
   scaledForSafety: boolean;
   histogram: PhotoHistogram;
   outputMime: string;
+  proofBaseBlob?: Blob;
+  gamutWarningPixels: number;
 }
 
 interface RenderWorkerResponse {
@@ -45,11 +47,19 @@ interface RenderWorkerResponse {
   width: number;
   height: number;
   buffer?: ArrayBuffer;
+  proofBaseBuffer?: ArrayBuffer;
+  gamutWarningPixels?: number;
   message?: string;
 }
 
+interface ProcessedPixelBuffers {
+  pixels: Uint8ClampedArray;
+  proofBasePixels?: Uint8ClampedArray;
+  gamutWarningPixels: number;
+}
+
 interface PendingWorkerRequest {
-  resolve: (pixels: Uint8ClampedArray) => void;
+  resolve: (result: ProcessedPixelBuffers) => void;
   reject: (error: Error) => void;
 }
 
@@ -192,7 +202,11 @@ function ensureWorker(): Worker | null {
         pending.reject(new Error(message.message || 'Photo render worker failed.'));
         return;
       }
-      pending.resolve(new Uint8ClampedArray(message.buffer));
+      pending.resolve({
+        pixels: new Uint8ClampedArray(message.buffer),
+        proofBasePixels: message.proofBaseBuffer ? new Uint8ClampedArray(message.proofBaseBuffer) : undefined,
+        gamutWarningPixels: message.gamutWarningPixels ?? 0,
+      });
     });
     worker.addEventListener('error', () => {
       // Intentionally permanent: once broken, fall back to main-thread processing
@@ -215,17 +229,19 @@ async function processPixels(
   width: number,
   height: number,
   recipe: PhotoRecipe,
-): Promise<Uint8ClampedArray> {
+  mode: 'preview' | 'export',
+  jpegBackground?: readonly [number, number, number],
+): Promise<ProcessedPixelBuffers> {
   const activeWorker = ensureWorker();
   if (!activeWorker) {
-    applyPixelAdjustments(pixels, width, height, recipe);
-    return pixels;
+    const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground);
   }
 
   const requestId = nextWorkerRequestId++;
   const transferable = new Uint8ClampedArray(pixels);
   try {
-    const result = await new Promise<Uint8ClampedArray>((resolve, reject) => {
+    const result = await new Promise<ProcessedPixelBuffers>((resolve, reject) => {
       pendingWorkerRequests.set(requestId, { resolve, reject });
       activeWorker.postMessage({
         type: 'process',
@@ -234,13 +250,23 @@ async function processPixels(
         height,
         buffer: transferable.buffer,
         recipe,
+        mode,
+        jpegBackground,
       }, [transferable.buffer]);
     });
     return result;
-  } catch {
+  } catch (error) {
     pendingWorkerRequests.delete(requestId);
-    applyPixelAdjustments(pixels, width, height, recipe);
-    return pixels;
+    const color = recipe.colorManagement;
+    const colorManaged = Boolean(color?.assignedProfile
+      || (mode === 'export' && color?.outputProfile)
+      || (mode === 'preview' && color?.softProof && color.proofProfile));
+    if (colorManaged) {
+      const message = error instanceof Error ? error.message : 'unknown worker error';
+      throw new Error(`Color-managed render failed without a main-thread retry: ${message}`);
+    }
+    const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground);
   }
 }
 
@@ -322,23 +348,24 @@ function drawGeometry(
   return canvas;
 }
 
-function fillJpegBackground(
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-  background: string,
-): HTMLCanvasElement | OffscreenCanvas {
-  const output = createCanvas(canvas.width, canvas.height);
+function resolveJpegBackground(background: string): readonly [number, number, number] {
+  const output = createCanvas(1, 1);
   const context = getContext2d(output);
+  context.fillStyle = '#ffffff';
   context.fillStyle = background;
-  context.fillRect(0, 0, output.width, output.height);
-  context.drawImage(canvas, 0, 0);
-  return output;
+  context.fillRect(0, 0, 1, 1);
+  const pixel = context.getImageData(0, 0, 1, 1).data;
+  return [pixel[0], pixel[1], pixel[2]];
 }
 
 export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult> {
   if (typeof createImageBitmap !== 'function') throw new Error('This browser cannot decode images for Photo Studio.');
   const recipe = normalizeRecipe(request.recipe);
   const raster = await preparePhotoRaster(request.file, recipe.raw);
-  const bitmap = await createImageBitmap(raster.blob, { imageOrientation: 'from-image' });
+  const bitmap = await createImageBitmap(raster.blob, {
+    imageOrientation: 'from-image',
+    colorSpaceConversion: recipe.colorManagement?.assignedProfile ? 'none' : 'default',
+  });
   try {
     const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);
     const desired = requestedDimensions(natural.width, natural.height, request);
@@ -362,17 +389,33 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       recipe.perspectiveHorizontal,
       recipe.perspectiveVertical,
     );
-    const processed = await processPixels(geometryPixels, target.width, target.height, recipe);
-    const ownedPixels = new Uint8ClampedArray(processed.length);
-    ownedPixels.set(processed);
+    const mime = request.outputMime ?? 'image/png';
+    const jpegBackground = request.mode === 'export' && mime === 'image/jpeg'
+      ? resolveJpegBackground(request.jpegBackground ?? '#ffffff')
+      : undefined;
+    const processed = await processPixels(
+      geometryPixels,
+      target.width,
+      target.height,
+      recipe,
+      request.mode === 'export' ? 'export' : 'preview',
+      jpegBackground,
+    );
+    const ownedPixels = new Uint8ClampedArray(processed.pixels.length);
+    ownedPixels.set(processed.pixels);
     const processedImage = new ImageData(ownedPixels, target.width, target.height);
     context.putImageData(processedImage, 0, 0);
     const histogram = sampleHistogram(ownedPixels);
+    let proofBaseBlob: Blob | undefined;
+    if (processed.proofBasePixels) {
+      const proofCanvas = createCanvas(target.width, target.height);
+      const proofContext = getContext2d(proofCanvas);
+      const proofOwned = new Uint8ClampedArray(processed.proofBasePixels);
+      proofContext.putImageData(new ImageData(proofOwned, target.width, target.height), 0, 0);
+      proofBaseBlob = await canvasToBlob(proofCanvas, 'image/png', 1);
+    }
 
-    const mime = request.outputMime ?? 'image/png';
-    const outputCanvas = mime === 'image/jpeg'
-      ? fillJpegBackground(canvas, request.jpegBackground ?? '#ffffff')
-      : canvas;
+    const outputCanvas = canvas;
     const quality = Math.min(1, Math.max(0.01, request.quality ?? 0.92));
     let blob = await canvasToBlob(outputCanvas, mime, quality);
     if (blob.type !== mime) {
@@ -390,6 +433,8 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       scaledForSafety: target.scaled || target.width !== desired.width || target.height !== desired.height,
       histogram,
       outputMime: blob.type,
+      proofBaseBlob,
+      gamutWarningPixels: processed.gamutWarningPixels,
     };
   } finally {
     bitmap.close();

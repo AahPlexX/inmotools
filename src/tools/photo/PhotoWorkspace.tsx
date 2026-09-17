@@ -31,6 +31,10 @@ import {
   suggestPhotoLutFilename,
 } from './photo-lut';
 import {
+  MAX_ICC_PROFILE_BYTES,
+  parsePhotoIccProfile,
+} from './color/photo-color-management';
+import {
   PHOTO_FILE_ACCEPT,
   isPhotoImportFile,
   normalizePhotoImport,
@@ -68,6 +72,7 @@ import {
 import type {
   LocalAdjustment,
   PhotoCapabilities,
+  PhotoColorManagement,
   PhotoHistogram,
   PhotoHistory,
   PhotoRecipe,
@@ -94,6 +99,7 @@ interface SourcePhoto {
 
 interface PreviewState {
   url: string;
+  proofBaseUrl?: string;
   result: PhotoRenderResult;
 }
 
@@ -316,9 +322,13 @@ export default function PhotoWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
   const lutInputRef = useRef<HTMLInputElement | null>(null);
+  const assignedProfileInputRef = useRef<HTMLInputElement | null>(null);
+  const outputProfileInputRef = useRef<HTMLInputElement | null>(null);
+  const proofProfileInputRef = useRef<HTMLInputElement | null>(null);
   const userPresetInputRef = useRef<HTMLInputElement | null>(null);
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
+  const proofBaseUrlRef = useRef<string | null>(null);
   const sourceUrlRef = useRef<string | null>(null);
   const embeddedPreviewUrlRef = useRef<string | null>(null);
   const sourceRef = useRef<SourcePhoto | null>(null);
@@ -373,9 +383,10 @@ export default function PhotoWorkspace() {
   }, []);
 
   const releasePreviewUrl = useCallback(() => {
-    if (!previewUrlRef.current) return;
-    URL.revokeObjectURL(previewUrlRef.current);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (proofBaseUrlRef.current) URL.revokeObjectURL(proofBaseUrlRef.current);
     previewUrlRef.current = null;
+    proofBaseUrlRef.current = null;
   }, []);
 
   const releaseSourceUrl = useCallback(() => {
@@ -470,14 +481,17 @@ export default function PhotoWorkspace() {
         if (cancelled || !isRenderResultCurrent(renderRevisionRef.current, result)) return;
         releasePreviewUrl();
         const url = URL.createObjectURL(result.blob);
+        const proofBaseUrl = result.proofBaseBlob ? URL.createObjectURL(result.proofBaseBlob) : undefined;
         previewUrlRef.current = url;
-        setPreview({ url, result });
+        proofBaseUrlRef.current = proofBaseUrl ?? null;
+        setPreview({ url, proofBaseUrl, result });
         setPreviewBusy(false);
         if (importRevisionAtStart === importRevisionRef.current) {
           if (result.scaledForSafety) {
             setStatus(`Preview rendered at ${result.width} × ${result.height} for responsive editing; full export remains available within device limits.`);
           } else {
-            setStatus(`Preview updated · ${result.width} × ${result.height}`);
+            const gamut = result.gamutWarningPixels > 0 ? ` · ${result.gamutWarningPixels.toLocaleString()} out-of-gamut pixels marked` : '';
+            setStatus(`Preview updated · ${result.width} × ${result.height}${gamut}`);
           }
         }
       }).catch((error) => {
@@ -1236,6 +1250,35 @@ export default function PhotoWorkspace() {
     setStatus(`${recipe.lut.title} exported with ${Math.round(recipe.lut.strength * 100)}% strength baked into the Cube grid.`);
   }
 
+  function patchColorManagement(patch: Partial<PhotoColorManagement>) {
+    const current = recipe.colorManagement ?? DEFAULT_RECIPE.colorManagement!;
+    patchRecipe({ colorManagement: { ...current, ...patch } });
+  }
+
+  async function importIccProfile(
+    event: ChangeEvent<HTMLInputElement>,
+    role: 'assigned' | 'output' | 'proof',
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      if (!/\.(icc|icm)$/i.test(file.name)) throw new Error('Choose an .icc or .icm profile.');
+      if (file.size > MAX_ICC_PROFILE_BYTES) throw new Error('ICC profiles must be 2 MiB or smaller.');
+      const profile = await parsePhotoIccProfile(file);
+      if (role !== 'proof' && profile.colorSpace !== 'RGB') {
+        throw new Error(`${role === 'assigned' ? 'Assigned source' : 'Output'} profiles must use RGB because Photo Studio exports RGB pixels.`);
+      }
+      if (role === 'assigned') patchColorManagement({ assignedProfile: profile });
+      else if (role === 'output') patchColorManagement({ outputProfile: profile });
+      else patchColorManagement({ proofProfile: profile, softProof: true });
+      const action = role === 'assigned' ? 'assigned to source samples' : role === 'output' ? 'selected for output conversion' : 'selected for soft proof';
+      setStatus(`${profile.description} (${profile.colorSpace}) ${action}.`);
+    } catch (error) {
+      setStatus(`ICC profile import failed: ${error instanceof Error ? error.message : 'invalid profile'}`);
+    }
+  }
+
   function renderEditPanel() {
     return (
       <>
@@ -1376,6 +1419,50 @@ export default function PhotoWorkspace() {
             </div>
             <p className="photo-export-note">Export active LUT bakes this strength into a portable Cube grid. Other Photo Studio adjustments are intentionally not included.</p>
           </div> : <p className="photo-export-note">No LUT is active. Cube files with a 2³–65³ 3D grid are supported; 1D and combined files are rejected explicitly.</p>}
+        </details>
+        <details className="photo-section" data-testid="photo-color-management-panel">
+          <summary>ICC color management</summary>
+          <p className="photo-export-note">Assign interprets unconverted source RGB numbers before editing. Output conversion preserves the working appearance for export and embeds the selected RGB profile. These are intentionally separate operations.</p>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => assignedProfileInputRef.current?.click()}>{recipe.colorManagement?.assignedProfile ? 'Replace assigned profile' : 'Assign source profile'}</button>
+            <input ref={assignedProfileInputRef} data-testid="photo-assigned-profile-input" type="file" accept=".icc,.icm,application/vnd.iccprofile" hidden onChange={(event) => void importIccProfile(event, 'assigned')} />
+            {recipe.colorManagement?.assignedProfile ? <button type="button" onClick={() => patchColorManagement({ assignedProfile: null })}>Remove assignment</button> : null}
+          </div>
+          <p className="photo-export-note" data-testid="photo-assigned-profile">{recipe.colorManagement?.assignedProfile ? `${recipe.colorManagement.assignedProfile.description} · ${recipe.colorManagement.assignedProfile.colorSpace} · assigned before edits` : 'No source profile assigned; browser-decoded sRGB working values are used.'}</p>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => outputProfileInputRef.current?.click()}>{recipe.colorManagement?.outputProfile ? 'Replace output profile' : 'Choose output profile'}</button>
+            <input ref={outputProfileInputRef} data-testid="photo-output-profile-input" type="file" accept=".icc,.icm,application/vnd.iccprofile" hidden onChange={(event) => void importIccProfile(event, 'output')} />
+            {recipe.colorManagement?.outputProfile ? <button type="button" onClick={() => patchColorManagement({ outputProfile: null })}>Use standard sRGB export</button> : null}
+          </div>
+          <p className="photo-export-note" data-testid="photo-output-profile">{recipe.colorManagement?.outputProfile ? `${recipe.colorManagement.outputProfile.description} · converted and embedded during export` : 'Output remains standard browser sRGB.'}</p>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => proofProfileInputRef.current?.click()}>{recipe.colorManagement?.proofProfile ? 'Replace proof profile' : 'Choose proof profile'}</button>
+            <input ref={proofProfileInputRef} data-testid="photo-proof-profile-input" type="file" accept=".icc,.icm,application/vnd.iccprofile" hidden onChange={(event) => void importIccProfile(event, 'proof')} />
+            {recipe.colorManagement?.proofProfile ? <button type="button" onClick={() => patchColorManagement({ proofProfile: null, softProof: false, gamutWarning: false })}>Remove proof profile</button> : null}
+          </div>
+          <p className="photo-export-note">{recipe.colorManagement?.proofProfile ? `${recipe.colorManagement.proofProfile.description} · ${recipe.colorManagement.proofProfile.colorSpace}` : 'No proof profile selected.'}</p>
+          <div className="photo-metadata-grid">
+            <label>Rendering intent
+              <select aria-label="ICC rendering intent" value={recipe.colorManagement?.renderingIntent ?? 'relative-colorimetric'} onChange={(event) => patchColorManagement({ renderingIntent: event.target.value as PhotoColorManagement['renderingIntent'] })}>
+                <option value="perceptual">Perceptual</option>
+                <option value="relative-colorimetric">Relative colorimetric</option>
+                <option value="saturation">Saturation</option>
+                <option value="absolute-colorimetric">Absolute colorimetric</option>
+              </select>
+            </label>
+            <label>Proof intent
+              <select aria-label="ICC proof intent" value={recipe.colorManagement?.proofIntent ?? 'relative-colorimetric'} disabled={!recipe.colorManagement?.proofProfile} onChange={(event) => patchColorManagement({ proofIntent: event.target.value as PhotoColorManagement['proofIntent'] })}>
+                <option value="perceptual">Perceptual</option>
+                <option value="relative-colorimetric">Relative colorimetric</option>
+                <option value="saturation">Saturation</option>
+                <option value="absolute-colorimetric">Absolute colorimetric</option>
+              </select>
+            </label>
+          </div>
+          <label className="photo-check-row"><input type="checkbox" checked={recipe.colorManagement?.blackPointCompensation ?? true} onChange={(event) => patchColorManagement({ blackPointCompensation: event.target.checked })} />Black-point compensation</label>
+          <label className="photo-check-row"><input type="checkbox" aria-label="Soft proof" checked={recipe.colorManagement?.softProof ?? false} disabled={!recipe.colorManagement?.proofProfile} onChange={(event) => patchColorManagement({ softProof: event.target.checked, gamutWarning: event.target.checked ? recipe.colorManagement?.gamutWarning ?? false : false })} />Soft proof preview</label>
+          <label className="photo-check-row"><input type="checkbox" aria-label="Output gamut warning" checked={recipe.colorManagement?.gamutWarning ?? false} disabled={!recipe.colorManagement?.softProof} onChange={(event) => patchColorManagement({ gamutWarning: event.target.checked })} />Mark out-of-gamut proof pixels in magenta</label>
+          <p className="photo-export-note">Soft proof and gamut warning affect preview only. They simulate the selected profile through LittleCMS; they do not calibrate or characterize this display.</p>
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>
@@ -1989,6 +2076,7 @@ export default function PhotoWorkspace() {
 
         <PhotoCanvas
           previewUrl={preview?.url ?? null}
+          proofBaseUrl={preview?.proofBaseUrl ?? null}
           originalUrl={source?.originalUrl ?? null}
           compare={compare}
           zoom={zoom}

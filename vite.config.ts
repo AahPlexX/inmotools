@@ -48,6 +48,8 @@ export default defineConfig({
           // Camera RAW decoding is optional; do not download its WASM for every visitor.
           'assets/libraw-*.wasm',
           'assets/raw.worker-*.js',
+          // ICC transforms are optional; cache LittleCMS only after a profile workflow is used.
+          'assets/lcms-*.wasm',
           'assets/diagram.worker-*.js',
           'assets/mermaid-parser.core-*.js',
           'assets/cytoscape.esm-*.js',
@@ -70,6 +72,15 @@ export default defineConfig({
               cacheName: 'photo-raw-codecs',
               cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 4, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/assets\/lcms-[^/]+\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'photo-color-management',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 2, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },
           {

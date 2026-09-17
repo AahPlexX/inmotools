@@ -21,6 +21,7 @@ export interface PhotoCanvasGesture {
 
 interface PhotoCanvasProps {
   previewUrl: string | null;
+  proofBaseUrl?: string | null;
   originalUrl: string | null;
   compare: boolean;
   zoom: number;
@@ -125,6 +126,7 @@ function PhotoOverlays({
 
 export default function PhotoCanvas({
   previewUrl,
+  proofBaseUrl,
   originalUrl,
   compare,
   zoom,
@@ -147,10 +149,11 @@ export default function PhotoCanvas({
   const [straightenGesture, setStraightenGesture] = useState<StraightenGesture | null>(null);
   const [clippingVisible, setClippingVisible] = useState(false);
   const [samplerActive, setSamplerActive] = useState(false);
-  const [sample, setSample] = useState<PhotoColorReadout | null>(null);
+  const [sample, setSample] = useState<{ after: PhotoColorReadout; beforeProof?: PhotoColorReadout } | null>(null);
   const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
   const [compareSplit, setCompareSplit] = useState(50);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const proofBaseImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -160,7 +163,7 @@ export default function PhotoCanvas({
 
   useEffect(() => {
     setSample(null);
-  }, [previewUrl]);
+  }, [previewUrl, proofBaseUrl]);
 
   useEffect(() => {
     if (geometryMode !== 'straighten') setStraightenGesture(null);
@@ -221,17 +224,26 @@ export default function PhotoCanvas({
     if (!rect.width || !rect.height) return;
     const nx = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const ny = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
-    const sx = Math.min(image.naturalWidth - 1, Math.max(0, Math.floor(nx * image.naturalWidth)));
-    const sy = Math.min(image.naturalHeight - 1, Math.max(0, Math.floor(ny * image.naturalHeight)));
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
-    if (!context) return;
-    context.drawImage(image, sx, sy, 1, 1, 0, 0, 1, 1);
-    try {
+    function readPixel(sampleImage: HTMLImageElement): PhotoColorReadout | null {
+      if (!sampleImage.naturalWidth || !sampleImage.naturalHeight) return null;
+      const sx = Math.min(sampleImage.naturalWidth - 1, Math.max(0, Math.floor(nx * sampleImage.naturalWidth)));
+      const sy = Math.min(sampleImage.naturalHeight - 1, Math.max(0, Math.floor(ny * sampleImage.naturalHeight)));
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+      if (!context) return null;
+      context.drawImage(sampleImage, sx, sy, 1, 1, 0, 0, 1, 1);
       const pixel = context.getImageData(0, 0, 1, 1).data;
-      setSample(photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]));
+      return photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]);
+    }
+    try {
+      const after = readPixel(image);
+      if (!after) return;
+      const beforeProof = proofBaseUrl && proofBaseImageRef.current
+        ? readPixel(proofBaseImageRef.current) ?? undefined
+        : undefined;
+      setSample({ after, beforeProof });
     } catch {
       // Ignore canvas security errors from unexpected non-local image sources.
     }
@@ -441,12 +453,20 @@ export default function PhotoCanvas({
       {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
       {sample ? (
         <div className="photo-color-readout" role="status" aria-label="Sampled color readout">
-          <strong>{sample.hex}</strong>
-          <span>RGB {sample.r}, {sample.g}, {sample.b}</span>
-          <span>HSL {sample.hue}°, {sample.saturation}%, {sample.lightness}%</span>
-          {sample.a < 255 ? <span>Alpha {Math.round(sample.a / 255 * 100)}%</span> : null}
+          {sample.beforeProof ? <>
+            <strong>Before proof {sample.beforeProof.hex} → after proof {sample.after.hex}</strong>
+            <span>Before proof RGB {sample.beforeProof.r}, {sample.beforeProof.g}, {sample.beforeProof.b}</span>
+            <span>After proof RGB {sample.after.r}, {sample.after.g}, {sample.after.b}</span>
+          </> : <>
+            <strong>{sample.after.hex}</strong>
+            <span>RGB {sample.after.r}, {sample.after.g}, {sample.after.b}</span>
+            <span>HSL {sample.after.hue}°, {sample.after.saturation}%, {sample.after.lightness}%</span>
+            {sample.after.a < 255 ? <span>Alpha {Math.round(sample.after.a / 255 * 100)}%</span> : null}
+          </>}
         </div>
       ) : null}
+
+      {proofBaseUrl ? <img ref={proofBaseImageRef} data-testid="photo-proof-base" src={proofBaseUrl} alt="" hidden aria-hidden="true" /> : null}
 
       <div className="photo-canvas-scroller" data-photo-canvas>
         {!previewUrl ? (

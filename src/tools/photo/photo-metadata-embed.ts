@@ -1,8 +1,10 @@
-import type { PhotoOutputMime } from './photo-types';
+import type { PhotoIccProfile, PhotoOutputMime } from './photo-types';
+import { photoIccProfileBytes } from './color/photo-color-management';
 
 const encoder = new TextEncoder();
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 const JPEG_XMP_IDENTIFIER = encoder.encode('http://ns.adobe.com/xap/1.0/\0');
+const JPEG_ICC_IDENTIFIER = encoder.encode('ICC_PROFILE\0');
 const PNG_XMP_KEYWORD = encoder.encode('XML:com.adobe.xmp');
 
 export interface PhotoMetadataEmbeddingOptions {
@@ -119,6 +121,54 @@ function embedJpegXmp(bytes: Uint8Array, xmp: Uint8Array): Uint8Array {
   return concatBytes([source.slice(0, 2), segment, source.slice(2)]);
 }
 
+function jpegWithoutIcc(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new Error('ICC embedding received invalid JPEG data.');
+  const parts: Uint8Array[] = [bytes.slice(0, 2)];
+  let offset = 2;
+  while (offset < bytes.length) {
+    if (bytes[offset] !== 0xff || offset + 1 >= bytes.length) {
+      parts.push(bytes.slice(offset));
+      break;
+    }
+    const marker = bytes[offset + 1];
+    if (marker === 0xda || marker === 0xd9) {
+      parts.push(bytes.slice(offset));
+      break;
+    }
+    if (marker === 0x00 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      parts.push(bytes.slice(offset, offset + 2));
+      offset += 2;
+      continue;
+    }
+    if (offset + 4 > bytes.length) throw new Error('ICC embedding found a truncated JPEG segment header.');
+    const segmentLength = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (segmentLength < 2 || offset + 2 + segmentLength > bytes.length) throw new Error('ICC embedding found a truncated JPEG segment.');
+    const segmentEnd = offset + 2 + segmentLength;
+    const isIcc = marker === 0xe2 && bytesEqualAt(bytes, JPEG_ICC_IDENTIFIER, offset + 4);
+    if (!isIcc) parts.push(bytes.slice(offset, segmentEnd));
+    offset = segmentEnd;
+  }
+  return concatBytes(parts);
+}
+
+function embedJpegIcc(bytes: Uint8Array, profile: Uint8Array): Uint8Array {
+  const source = jpegWithoutIcc(bytes);
+  const maxPartBytes = 0xffff - 2 - JPEG_ICC_IDENTIFIER.length - 2;
+  const count = Math.ceil(profile.length / maxPartBytes);
+  if (count < 1 || count > 255) throw new Error('The ICC profile requires too many JPEG APP2 segments.');
+  const segments: Uint8Array[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const part = profile.slice(index * maxPartBytes, (index + 1) * maxPartBytes);
+    const payload = concatBytes([JPEG_ICC_IDENTIFIER, new Uint8Array([index + 1, count]), part]);
+    const segmentLength = payload.length + 2;
+    segments.push(concatBytes([
+      new Uint8Array([0xff, 0xe2, (segmentLength >>> 8) & 0xff, segmentLength & 0xff]),
+      payload,
+    ]));
+  }
+  return concatBytes([source.slice(0, 2), ...segments, source.slice(2)]);
+}
+
 let crcTable: Uint32Array | null = null;
 
 function pngCrc32(bytes: Uint8Array): number {
@@ -180,6 +230,42 @@ function embedPngXmp(bytes: Uint8Array, xmp: Uint8Array): Uint8Array {
   }
 
   if (!foundIend) throw new Error('PNG metadata embedding could not find IEND.');
+  if (offset < bytes.length) parts.push(bytes.slice(offset));
+  return concatBytes(parts);
+}
+
+async function compressZlib(bytes: Uint8Array): Promise<Uint8Array> {
+  if (typeof CompressionStream === 'undefined') {
+    throw new Error('This browser cannot compress an ICC profile for PNG export. Choose JPEG/WebP or use a browser with CompressionStream support.');
+  }
+  const owned = new Uint8Array(bytes);
+  const stream = new Blob([owned.buffer]).stream().pipeThrough(new CompressionStream('deflate'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function embedPngIcc(bytes: Uint8Array, profile: Uint8Array, description: string): Promise<Uint8Array> {
+  if (!bytesEqualAt(bytes, PNG_SIGNATURE, 0)) throw new Error('ICC embedding received invalid PNG data.');
+  const profileName = description.replace(/[^\x20-\x7e]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 79) || 'ICC profile';
+  const compressed = await compressZlib(profile);
+  const iccpChunk = pngChunk('iCCP', concatBytes([encoder.encode(profileName), new Uint8Array([0, 0]), compressed]));
+  const parts: Uint8Array[] = [PNG_SIGNATURE];
+  let offset = PNG_SIGNATURE.length;
+  let foundIend = false;
+  while (offset + 12 <= bytes.length) {
+    const length = readUint32Be(bytes, offset);
+    const end = offset + 12 + length;
+    if (end > bytes.length) throw new Error('ICC embedding found a truncated PNG chunk.');
+    const type = ascii(bytes, offset + 4, 4);
+    if (type === 'IEND') {
+      parts.push(iccpChunk, bytes.slice(offset, end));
+      foundIend = true;
+      offset = end;
+      break;
+    }
+    if (type !== 'iCCP') parts.push(bytes.slice(offset, end));
+    offset = end;
+  }
+  if (!foundIend) throw new Error('ICC embedding could not find PNG IEND.');
   if (offset < bytes.length) parts.push(bytes.slice(offset));
   return concatBytes(parts);
 }
@@ -257,6 +343,22 @@ function embedWebpXmp(bytes: Uint8Array, xmp: Uint8Array, options: PhotoMetadata
   return concatBytes([encoder.encode('RIFF'), uint32Le(body.length + 4), encoder.encode('WEBP'), body]);
 }
 
+function embedWebpIcc(bytes: Uint8Array, profile: Uint8Array, options: PhotoMetadataEmbeddingOptions): Uint8Array {
+  let chunks = parseWebpChunks(bytes).filter((chunk) => chunk.type !== 'ICCP');
+  const vp8xIndex = chunks.findIndex((chunk) => chunk.type === 'VP8X');
+  if (vp8xIndex >= 0) {
+    if (chunks[vp8xIndex].data.length < 10) throw new Error('ICC embedding found an invalid WebP VP8X chunk.');
+    const data = new Uint8Array(chunks[vp8xIndex].data);
+    data[0] |= 0x20;
+    chunks = chunks.map((chunk, index) => index === vp8xIndex ? { type: 'VP8X', data } : chunk);
+  } else {
+    chunks = [makeVp8x([...chunks, { type: 'ICCP', data: profile }], options.width, options.height), ...chunks];
+  }
+  chunks.push({ type: 'ICCP', data: profile });
+  const body = concatBytes(chunks.map((chunk) => webpChunk(chunk.type, chunk.data)));
+  return concatBytes([encoder.encode('RIFF'), uint32Le(body.length + 4), encoder.encode('WEBP'), body]);
+}
+
 export function embedPhotoXmpBytes(
   source: Uint8Array,
   mime: PhotoOutputMime,
@@ -281,5 +383,25 @@ export async function embedPhotoXmp(
   const embedded = embedPhotoXmpBytes(input, mime, xmp, options);
   const owned = new Uint8Array(embedded.length);
   owned.set(embedded);
+  return new Blob([owned.buffer], { type: mime });
+}
+
+export async function embedPhotoIcc(
+  source: Blob,
+  mime: PhotoOutputMime,
+  profile: PhotoIccProfile,
+  options: PhotoMetadataEmbeddingOptions,
+): Promise<Blob> {
+  const input = new Uint8Array(await source.arrayBuffer());
+  const profileBytes = photoIccProfileBytes(profile);
+  let embedded: Uint8Array;
+  if (mime === 'image/jpeg') embedded = embedJpegIcc(input, profileBytes);
+  else if (mime === 'image/png') embedded = await embedPngIcc(input, profileBytes, profile.description);
+  else if (mime === 'image/webp') embedded = embedWebpIcc(input, profileBytes, options);
+  else {
+    const unsupported: never = mime;
+    throw new Error(`Unsupported ICC container: ${String(unsupported)}`);
+  }
+  const owned = new Uint8Array(embedded);
   return new Blob([owned.buffer], { type: mime });
 }

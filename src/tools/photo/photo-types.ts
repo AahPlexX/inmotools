@@ -50,6 +50,38 @@ export interface PhotoLut {
   strength: number;
 }
 
+export type PhotoRenderingIntent =
+  | 'perceptual'
+  | 'relative-colorimetric'
+  | 'saturation'
+  | 'absolute-colorimetric';
+
+export type PhotoIccColorSpace = 'RGB' | 'CMYK' | 'GRAY';
+
+export interface PhotoIccProfile {
+  fileName: string;
+  description: string;
+  colorSpace: PhotoIccColorSpace;
+  /** Base64-encoded, bounded original ICC/ICM profile bytes. */
+  data: string;
+  size: number;
+  fingerprint: string;
+}
+
+export interface PhotoColorManagement {
+  /** Interprets source RGB samples before the ordinary edit pipeline. */
+  assignedProfile: PhotoIccProfile | null;
+  /** Converts edited sRGB samples during export and is embedded in the output. */
+  outputProfile: PhotoIccProfile | null;
+  /** Simulates this device/profile in the preview only. */
+  proofProfile: PhotoIccProfile | null;
+  renderingIntent: PhotoRenderingIntent;
+  proofIntent: PhotoRenderingIntent;
+  blackPointCompensation: boolean;
+  softProof: boolean;
+  gamutWarning: boolean;
+}
+
 export interface HslAdjustment {
   hue: number;
   saturation: number;
@@ -115,6 +147,8 @@ export interface PhotoRecipe {
   channelMixer: PhotoChannelMixer;
   /** Optional on older version-1 recipes; normalized to null. */
   lut?: PhotoLut | null;
+  /** Optional on older version-1 recipes; normalized to explicit defaults. */
+  colorManagement?: PhotoColorManagement;
 
   temperature: number;
   tint: number;

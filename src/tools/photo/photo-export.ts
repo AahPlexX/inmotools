@@ -1,5 +1,5 @@
 import { normalizeRecipe } from './photo-engine';
-import { embedPhotoXmp } from './photo-metadata-embed';
+import { embedPhotoIcc, embedPhotoXmp } from './photo-metadata-embed';
 import {
   safeRequestedPhotoFilename,
   serializePhotoXmp,
@@ -19,6 +19,7 @@ export interface PhotoExportServices {
     xmp: string,
     options: { width: number; height: number },
   ) => Promise<Blob>;
+  embedIcc?: typeof embedPhotoIcc;
 }
 
 export interface CreatePhotoExportOptions {
@@ -47,11 +48,13 @@ export interface CreatedPhotoExport {
   scaledForSafety: boolean;
   metadataEmbedded: boolean;
   metadataError?: string;
+  colorProfileEmbedded: boolean;
 }
 
 const DEFAULT_SERVICES: PhotoExportServices = {
   render: renderPhoto,
   embed: embedPhotoXmp,
+  embedIcc: embedPhotoIcc,
 };
 
 export function recipeWithOutputSharpening(recipe: PhotoRecipe, level: PhotoOutputSharpening): PhotoRecipe {
@@ -105,6 +108,17 @@ export async function createPhotoExport(
   let blob = rendered.blob;
   let metadataEmbedded = false;
   let metadataError: string | undefined;
+  let colorProfileEmbedded = false;
+
+  const outputProfile = exportRecipe.colorManagement?.outputProfile;
+  if (outputProfile) {
+    const embedIcc = services.embedIcc ?? embedPhotoIcc;
+    blob = await embedIcc(blob, options.outputMime, outputProfile, {
+      width: rendered.width,
+      height: rendered.height,
+    });
+    colorProfileEmbedded = true;
+  }
 
   if (options.metadataPolicy !== 'strip') {
     try {
@@ -126,5 +140,6 @@ export async function createPhotoExport(
     scaledForSafety: rendered.scaledForSafety,
     metadataEmbedded,
     metadataError,
+    colorProfileEmbedded,
   };
 }

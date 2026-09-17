@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { photoSrgbProfileBytes } from '../fixtures/photo-srgb-profile';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -361,4 +362,58 @@ test('3D Cube LUT import, strength, faithful export, errors, and history stay ex
   const exported = Buffer.concat(chunks).toString('utf8');
   expect(exported).toContain('TITLE "Browser invert (50% strength)"');
   expect(exported).toContain('LUT_3D_SIZE 2');
+});
+
+test('ICC assign, convert, proof, gamut, and proof-aware sampling stay distinct', async ({ page, isMobile }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'ICC color management' }).click();
+  const profile = {
+    name: 'browser-srgb.icc',
+    mimeType: 'application/vnd.iccprofile',
+    buffer: Buffer.from(photoSrgbProfileBytes()),
+  };
+
+  await page.setInputFiles('[data-testid="photo-assigned-profile-input"]', profile);
+  await expect(page.getByTestId('photo-assigned-profile')).toContainText('assigned before edits');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-assigned-profile')).toContainText('No source profile assigned');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+
+  await page.setInputFiles('[data-testid="photo-output-profile-input"]', profile);
+  await expect(page.getByTestId('photo-output-profile')).toContainText('converted and embedded during export');
+  await page.getByLabel('ICC rendering intent').selectOption('perceptual');
+  await page.getByLabel('Black-point compensation').uncheck();
+
+  await page.setInputFiles('[data-testid="photo-proof-profile-input"]', profile);
+  await expect(page.getByLabel('Soft proof')).toBeChecked();
+  await page.getByLabel('ICC proof intent').selectOption('absolute-colorimetric');
+  await page.getByLabel('Output gamut warning').check();
+  await expect(page.getByTestId('photo-proof-base')).toBeAttached({ timeout: 15_000 });
+  await expect.poll(() => page.getByTestId('photo-proof-base').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+
+  await page.setInputFiles('[data-testid="photo-proof-profile-input"]', {
+    name: 'broken.icc', mimeType: 'application/vnd.iccprofile', buffer: Buffer.from('not a profile'),
+  });
+  await expect(page.getByRole('status').filter({ hasText: 'ICC profile import failed' })).toBeVisible();
+  await expect(page.getByLabel('Soft proof')).toBeChecked();
+
+  await page.getByRole('button', { name: 'Color sampler', exact: true }).click();
+  const image = page.getByTestId('photo-preview');
+  const box = (await image.boundingBox())!;
+  if (isMobile) await image.tap({ position: { x: box.width / 2, y: box.height / 2 } });
+  else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByLabel('Sampled color readout')).toContainText('Before proof');
+  await expect(page.getByLabel('Sampled color readout')).toContainText('After proof RGB');
+
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(page.getByTestId('photo-export-profile')).toContainText('convert to and embed');
+  await dialog.getByLabel('File format').selectOption('image/png');
+  const downloadStarted = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download photo', exact: true }).click();
+  const download = await downloadStarted;
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  expect(Buffer.concat(chunks).toString('latin1')).toContain('iCCP');
 });

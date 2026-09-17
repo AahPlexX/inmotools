@@ -4,6 +4,7 @@ import type {
   LocalAdjustment,
   PhotoChannelMixer,
   PhotoChannelMixerRow,
+  PhotoColorManagement,
   PhotoHistogram,
   PhotoHistory,
   PhotoLevels,
@@ -16,6 +17,7 @@ import type {
 } from './photo-types';
 import { normalizeRawSettings } from './photo-raw-settings';
 import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './photo-lut';
+import { normalizePhotoColorManagement } from './color/photo-color-management';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -47,6 +49,12 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
       domainMin: [...recipe.lut.domainMin],
       domainMax: [...recipe.lut.domainMax],
     } : null,
+    colorManagement: recipe.colorManagement ? {
+      ...recipe.colorManagement,
+      assignedProfile: recipe.colorManagement.assignedProfile ? { ...recipe.colorManagement.assignedProfile } : null,
+      outputProfile: recipe.colorManagement.outputProfile ? { ...recipe.colorManagement.outputProfile } : null,
+      proofProfile: recipe.colorManagement.proofProfile ? { ...recipe.colorManagement.proofProfile } : null,
+    } : undefined,
     hsl: recipe.hsl.map((entry) => ({ ...entry })),
     shadowGrade: { ...recipe.shadowGrade },
     midtoneGrade: { ...recipe.midtoneGrade },
@@ -88,6 +96,16 @@ const neutralChannelMixer = (): PhotoChannelMixer => ({
   green: { red: 0, green: 1, blue: 0, constant: 0 },
   blue: { red: 0, green: 0, blue: 1, constant: 0 },
 });
+const neutralColorManagement = (): PhotoColorManagement => ({
+  assignedProfile: null,
+  outputProfile: null,
+  proofProfile: null,
+  renderingIntent: 'relative-colorimetric',
+  proofIntent: 'relative-colorimetric',
+  blackPointCompensation: true,
+  softProof: false,
+  gamutWarning: false,
+});
 export const DEFAULT_RECIPE: PhotoRecipe = {
   version: 1,
   raw: normalizeRawSettings(undefined),
@@ -111,6 +129,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   rgbToneCurves: neutralRgbToneCurves(),
   levels: neutralLevels(),
   channelMixer: neutralChannelMixer(),
+  colorManagement: neutralColorManagement(),
   lut: null,
 
   temperature: 0,
@@ -341,6 +360,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     levels: normalizeLevels(source.levels),
     channelMixer: normalizeChannelMixer(source.channelMixer),
     lut: normalizePhotoLut(source.lut as PhotoLut | null | undefined),
+    colorManagement: normalizePhotoColorManagement(source.colorManagement),
 
     temperature: clamp(source.temperature, -1, 1),
     tint: clamp(source.tint, -1, 1),

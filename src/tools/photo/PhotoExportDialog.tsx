@@ -163,7 +163,10 @@ export default function PhotoExportDialog({
         : result.metadataEmbedded
           ? ' Reviewed XMP embedded in the exported image.'
           : ` Pixel export succeeded, but XMP embedding failed${result.metadataError ? `: ${result.metadataError}` : ''}. Use the XMP sidecar if metadata must travel separately.`;
-      onStatus(`Photo exported locally as ${result.width} × ${result.height}.${safety}${metadataMessage}`);
+      const profileMessage = result.colorProfileEmbedded && recipe.colorManagement?.outputProfile
+        ? ` Converted to and embedded ${recipe.colorManagement.outputProfile.description}.`
+        : ' Exported as standard browser sRGB.';
+      onStatus(`Photo exported locally as ${result.width} × ${result.height}.${safety}${profileMessage}${metadataMessage}`);
     } catch (error) {
       onStatus(`Export failed: ${error instanceof Error ? error.message : 'unknown encoding error'}`);
     } finally {
@@ -263,6 +266,11 @@ export default function PhotoExportDialog({
         </header>
 
         <div className="photo-export-grid">
+          <p className="photo-wide photo-export-note" data-testid="photo-export-profile">
+            {recipe.colorManagement?.outputProfile
+              ? `ICC output: convert to and embed ${recipe.colorManagement.outputProfile.description} (${recipe.colorManagement.outputProfile.colorSpace}).`
+              : 'ICC output: standard browser sRGB. Choose a different output profile in the Edit panel.'}
+          </p>
           <label className="photo-wide">File name
             <input aria-label="File name" value={requestedName} onChange={(event) => setRequestedName(event.target.value)} />
           </label>

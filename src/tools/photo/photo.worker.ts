@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { applyPixelAdjustments } from './photo-engine';
+import { processPhotoColorPipeline } from './color/photo-color-pipeline';
 import type { PhotoRecipe } from './photo-types';
 
 interface ProcessMessage {
@@ -10,6 +10,8 @@ interface ProcessMessage {
   height: number;
   buffer: ArrayBuffer;
   recipe: PhotoRecipe;
+  mode: 'preview' | 'export';
+  jpegBackground?: readonly [number, number, number];
 }
 
 interface ProcessedMessage {
@@ -18,6 +20,8 @@ interface ProcessedMessage {
   width: number;
   height: number;
   buffer: ArrayBuffer;
+  proofBaseBuffer?: ArrayBuffer;
+  gamutWarningPixels: number;
 }
 
 interface ErrorMessage {
@@ -30,21 +34,32 @@ interface ErrorMessage {
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
-scope.addEventListener('message', (event: MessageEvent<ProcessMessage>) => {
+scope.addEventListener('message', async (event: MessageEvent<ProcessMessage>) => {
   const request = event.data;
   if (!request || request.type !== 'process') return;
 
   try {
     const pixels = new Uint8ClampedArray(request.buffer);
-    applyPixelAdjustments(pixels, request.width, request.height, request.recipe);
+    const processed = await processPhotoColorPipeline(
+      pixels,
+      request.width,
+      request.height,
+      request.recipe,
+      request.mode,
+      request.jpegBackground,
+    );
     const response: ProcessedMessage = {
       type: 'processed',
       revision: request.revision,
       width: request.width,
       height: request.height,
-      buffer: pixels.buffer as ArrayBuffer,
+      buffer: processed.pixels.buffer as ArrayBuffer,
+      proofBaseBuffer: processed.proofBasePixels?.buffer as ArrayBuffer | undefined,
+      gamutWarningPixels: processed.gamutWarningPixels,
     };
-    scope.postMessage(response, [response.buffer]);
+    const transfers: Transferable[] = [response.buffer];
+    if (response.proofBaseBuffer) transfers.push(response.proofBaseBuffer);
+    scope.postMessage(response, transfers);
   } catch (error) {
     const response: ErrorMessage = {
       type: 'error',

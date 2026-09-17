@@ -6,7 +6,16 @@ import {
   recipeWithOutputSharpening,
   type PhotoExportServices,
 } from '../../src/tools/photo/photo-export';
-import type { PhotoExportMetadata } from '../../src/tools/photo/photo-types';
+import type { PhotoExportMetadata, PhotoIccProfile } from '../../src/tools/photo/photo-types';
+
+const outputProfile: PhotoIccProfile = {
+  fileName: 'output.icc',
+  description: 'Output RGB',
+  colorSpace: 'RGB',
+  data: 'AAAA',
+  size: 128,
+  fingerprint: '12345678',
+};
 
 function services(options?: { embedFails?: boolean }): PhotoExportServices {
   return {
@@ -20,6 +29,7 @@ function services(options?: { embedFails?: boolean }): PhotoExportServices {
       scaledForSafety: false,
       histogram: { red: [], green: [], blue: [], luminance: [] },
       outputMime: request.outputMime ?? 'image/png',
+      gamutWarningPixels: 0,
     }),
     embed: async (blob, _mime, xmp) => {
       if (options?.embedFails) throw new Error('metadata too large');
@@ -83,6 +93,48 @@ describe('Photo Studio export orchestration', () => {
     expect(result.metadataEmbedded).toBe(false);
     expect(result.metadataError).toBe('metadata too large');
     expect(await result.blob.text()).toBe('pixels');
+  });
+
+  test('output conversion requires successful ICC embedding and reports the tagged export', async () => {
+    const base = services();
+    const result = await createPhotoExport({
+      file: new Blob(['source'], { type: 'image/jpeg' }),
+      sourceName: 'source.jpg',
+      requestedName: 'converted',
+      recipe: {
+        ...DEFAULT_RECIPE,
+        colorManagement: { ...DEFAULT_RECIPE.colorManagement!, outputProfile },
+      },
+      outputMime: 'image/jpeg',
+      quality: 0.9,
+      metadataPolicy: 'strip',
+      metadata: {},
+      revision: 4,
+    }, {
+      ...base,
+      embedIcc: async (blob, _mime, profile) => new Blob([await blob.arrayBuffer(), `icc:${profile.description}`], { type: blob.type }),
+    });
+
+    expect(result.colorProfileEmbedded).toBe(true);
+    expect(await result.blob.text()).toBe('pixelsicc:Output RGB');
+
+    await expect(createPhotoExport({
+      file: new Blob(['source'], { type: 'image/jpeg' }),
+      sourceName: 'source.jpg',
+      requestedName: 'converted',
+      recipe: {
+        ...DEFAULT_RECIPE,
+        colorManagement: { ...DEFAULT_RECIPE.colorManagement!, outputProfile },
+      },
+      outputMime: 'image/jpeg',
+      quality: 0.9,
+      metadataPolicy: 'strip',
+      metadata: {},
+      revision: 5,
+    }, {
+      ...base,
+      embedIcc: async () => { throw new Error('ICC packaging failed'); },
+    })).rejects.toThrow(/ICC packaging failed/);
   });
 
   test('rights policy excludes location while custom policy retains explicit location', () => {
