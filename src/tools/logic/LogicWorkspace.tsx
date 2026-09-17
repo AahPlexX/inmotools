@@ -208,11 +208,20 @@ export default function LogicWorkspace() {
   const expressions = useMemo(() => (truthTable ? extractBooleanExpressions(truthTable) : []), [truthTable]);
   const ercFindings: ErcFinding[] = useMemo(() => (activeDock === 'erc' ? runElectricalRuleCheck(doc) : []), [activeDock, doc]);
 
+  // Replacing the live document without also dropping these would let a
+  // held button or a queued switch toggle from the old circuit apply to
+  // the new one if it happens to reuse a component id.
+  const resetLiveInteractions = () => {
+    liveButtonLevelsRef.current = {};
+    pendingSwitchOverrideRef.current = {};
+  };
+
   const handleNewProject = () => {
     if (!window.confirm('Start a new blank circuit? This replaces the one on screen, including its autosave and undo history, and cannot be undone. Use Save project first if you want to keep it.')) return;
     const fresh = createInitialDocument();
     setHistory(createHistory(fresh));
     frameRef.current = createInitialFrame(fresh);
+    resetLiveInteractions();
     bumpFrame();
     setPlacingType(null);
   };
@@ -229,6 +238,7 @@ export default function LogicWorkspace() {
         const parsed = parseProject(text);
         setHistory(loadDocument(parsed));
         frameRef.current = createInitialFrame(parsed);
+        resetLiveInteractions();
         bumpFrame();
       } catch (error) {
         window.alert(error instanceof Error ? error.message : 'Could not open this project file.');
