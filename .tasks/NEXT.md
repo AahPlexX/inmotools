@@ -20,7 +20,7 @@ The two crash-class defects and the cross-cutting file-input defect are fixed un
 - HAR already has method/domain/status filter fields wired into `filteredRows`.
 - The shader workspace already has a pause/resume toggle, a "Reset time" control, an active compiler-diagnostics panel parsed from `gl.getShaderInfoLog`, and a working line-jump (clicking a diagnostic's line sets `focusLine` and switches to the editor view).
 
-The three-item TASK-016 carryover below was re-checked at the same time and remains genuinely outstanding - none of it is duplicated by the above.
+The three-item TASK-016 carryover below was re-checked at the same time; two remain genuinely outstanding, and the third ("column kind in the header's accessible name") is fixed alongside this reconciliation - `PagedTableColumn` gained an `ariaLabel` override (`aria-label` on an element replaces its computed accessible name entirely, independent of visual content) and Regex Log Structurer's kind-annotated headers now use it, verified by a new regression test in `tests/e2e/audit-hardening.spec.ts`.
 
 ### Carried over from the TASK-016 review
 
@@ -28,7 +28,6 @@ An independent design review of the log-structurer work raised twenty points; th
 
 - **One worker per run.** `log-runner.ts` constructs a worker, clones the whole input in, and clones the whole row set back, on every debounced keystroke. A single long-lived worker, replaced only when a deadline is missed, removes the construction and module-load cost; `cancel()` then means "ignore the response" for the common supersede case. Worth doing before the same runner is reused for GeoJSON and dedupe.
 - **Coarse pager navigation.** `PagedTable` has no page-size select, first/last buttons, or page input, so a million-row result is five thousand single steps from its end. DuckDB Workbench has since adopted the component (2026-09-17) and is exactly the case this matters for, since its result sets are largest.
-- **Column kind in the header's accessible name.** The inferred kind sits inside the `<th>`, so screen-reader cell navigation repeats it on every cell. Move it out of the labelling path, for example with `aria-describedby`.
 
 ### Verified and outstanding
 
