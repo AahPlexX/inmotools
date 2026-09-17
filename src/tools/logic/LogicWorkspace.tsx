@@ -236,7 +236,7 @@ export default function LogicWorkspace() {
   };
 
   return (
-    <div className={`logic-workspace ${mobilePanel !== 'none' ? 'mobile-panel-open' : ''}`} data-testid="logic-workspace">
+    <div className={`logic-workspace ${mobilePanel !== 'none' ? 'mobile-panel-open' : ''}`} data-theme={doc.theme} data-testid="logic-workspace">
       <div className="logic-toolbar" role="toolbar" aria-label="Circuit toolbar">
         <button type="button" onClick={handleNewProject}>New</button>
         <button type="button" onClick={handleOpenClick}>Open</button>

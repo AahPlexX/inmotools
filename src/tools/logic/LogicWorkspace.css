@@ -232,25 +232,52 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .logic-toolbar,
-  .logic-palette,
-  .logic-inspector-shell,
-  .logic-dock {
-    background: #111827;
-    border-color: #1e293b;
-    color: #e2e8f0;
-  }
+/*
+ * The surrounding chrome follows the workstation's own theme picker
+ * (data-theme, set from LogicDocument.theme) rather than the OS color
+ * scheme, so it always matches the canvas rendered by THEME_PALETTES in
+ * render-engine.ts. Falling back to prefers-color-scheme here would let a
+ * user's explicit "Light" choice look dark (or vice versa) whenever it
+ * disagreed with the OS setting.
+ */
+.logic-workspace[data-theme="dark"] .logic-toolbar,
+.logic-workspace[data-theme="dark"] .logic-palette,
+.logic-workspace[data-theme="dark"] .logic-inspector-shell,
+.logic-workspace[data-theme="dark"] .logic-dock,
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar,
+.logic-workspace[data-theme="high-contrast"] .logic-palette,
+.logic-workspace[data-theme="high-contrast"] .logic-inspector-shell,
+.logic-workspace[data-theme="high-contrast"] .logic-dock {
+  background: #111827;
+  border-color: #1e293b;
+  color: #e2e8f0;
+}
 
-  .logic-toolbar button {
-    background: #1e293b;
-    border-color: #334155;
-    color: #e2e8f0;
-  }
+.logic-workspace[data-theme="dark"] .logic-toolbar button,
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
 
-  .logic-palette-button {
-    background: #1e293b;
-    border-color: #334155;
-    color: #e2e8f0;
-  }
+.logic-workspace[data-theme="dark"] .logic-palette-button,
+.logic-workspace[data-theme="high-contrast"] .logic-palette-button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar,
+.logic-workspace[data-theme="high-contrast"] .logic-palette,
+.logic-workspace[data-theme="high-contrast"] .logic-inspector-shell,
+.logic-workspace[data-theme="high-contrast"] .logic-dock {
+  background: #000000;
+  border-color: #333333;
+}
+
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar button,
+.logic-workspace[data-theme="high-contrast"] .logic-palette-button {
+  background: #000000;
+  border-color: #ffff00;
+  color: #ffffff;
 }
