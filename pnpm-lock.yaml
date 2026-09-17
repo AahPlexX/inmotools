@@ -224,8 +224,8 @@ importers:
         specifier: 1.5.0
         version: 1.5.0
       mediabunny:
-        specifier: 1.55.4
-        version: 1.55.4
+        specifier: 1.57.0
+        version: 1.57.0
       mermaid:
         specifier: 12.0.0
         version: 12.0.0
@@ -3363,8 +3363,8 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mediabunny@1.55.4:
-    resolution: {integrity: sha512-dJDE7ScjKlt21ZA3wS0xWQtgXjoUBEkWzjbnTVX5/BdN88C4QMdQu1u+K13vPHbuEbvjKbsXdYy38M3JTtPRHw==}
+  mediabunny@1.57.0:
+    resolution: {integrity: sha512-j6L4DutGEcb5DQkWshZjJk6cP7bfmFXfIP6URTRXExMM2WSEQjQxWEV+U+PmYjLFyjRLymNGHWllg2OjHVbdog==}
 
   mermaid@12.0.0:
     resolution: {integrity: sha512-/wQXC9iBxoGV8p3erbvaXs9h77VyLDBH6GdayVjj3hEcSQhFU4N1WUhUppotCEqlIxI2pRMwjwBSwTB1MfZBgQ==}
@@ -7451,7 +7451,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mediabunny@1.55.4:
+  mediabunny@1.57.0:
     dependencies:
       '@types/dom-mediacapture-transform': 0.1.12
       '@types/dom-webcodecs': 0.1.13

@@ -1,5 +1,13 @@
 # In Progress
 
+- **Audio Mastering Workstation** ? local-first audio editing, restoration, mastering, metering, metadata, and export workstream governed by an 81-function completion ledger.
+  - Branch: `feature/audio-mastering-workstation`; development remains isolated here until the full completion gate is verified and then merges non-destructively into `origin/main`.
+  - Design: `docs/superpowers/specs/2026-09-16-audio-mastering-workstation-design.md`. Phase 1 plan: `docs/superpowers/plans/2026-09-16-audio-mastering-phase-1.md`. Research: `docs/research/audio-mastering-web-platform-2026-09-16.md`.
+  - Current milestone: Phase 1 foundation accepted locally ? Mastering is the primary music surface while the existing Harmony/MIDI lab remains intact as a secondary tab. MediaBunny is pinned exactly at 1.57.0.
+  - Completion: **6/81 functions fully complete** (1 import boundary, 2 source inspector, 3 metadata reader, 8 numeric range selection, 12 zero-crossing snap, 23 peak normalization). Functions 5, 7, 9, 11, and 17 have usable Phase 1 foundations but remain partial and are not counted complete.
+  - Fresh evidence: 20/20 focused Music/Mastering units pass; production build passes; 10/10 pre-existing Harmony desktop/mobile browser cases passed in the combined run; the new Mastering workflow passes 2/2 desktop/mobile Chromium; MediaBunny-sharing video units pass 7/7.
+  - Completion gate: all 81 ledger functions implemented or evidence-backed rejected, responsive/keyboard/accessibility acceptance green, export/project round trips green, tracking current, exact finished branch integrated into `origin/main`, and applicable Pages deployment green.
+
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
