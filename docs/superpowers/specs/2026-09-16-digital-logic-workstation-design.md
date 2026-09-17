@@ -100,10 +100,10 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 18. Priority encoders and binary decoders with valid-output flags. *(Phase 2)*
 
 ### Automated analysis
-19. Automated truth-table generator for any selected combinational subcircuit (walks every input permutation), sortable and interactive. *(Phase 1)*
+19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4.)*
 20. Boolean expression extractor: canonical SOP and POS from the drawn circuit or its truth table. *(Phase 1)*
 21. Karnaugh-map solver and Quine–McCluskey minimizer for 2–5 variables with visual grouping loops and one-click minimized-schematic generation. *(Phase 3)*
-22. Electrical rule check (ERC): floating inputs, output-to-output contention, undriven nets, unbuffered combinational loops — one click, itemized results with jump-to-node. *(Phase 1)*
+22. Electrical rule check (ERC): floating/undriven input nets, output-to-output contention, unbuffered combinational loops — one click, itemized results naming the affected components. *(Phase 1: an undriven net is reported as a floating-input finding on whichever input pins it feeds, rather than as its own separate category.)*
 
 ### Educational & accessible modes
 23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3)*

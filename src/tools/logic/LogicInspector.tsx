@@ -96,6 +96,16 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
           </select>
         </label>
       ) : null}
+
+      {component.type === 'D_FLIP_FLOP' || component.type === 'JK_FLIP_FLOP' || component.type === 'T_FLIP_FLOP' || component.type === 'SR_LATCH' ? (
+        <label className="logic-field">
+          <span>{component.type === 'SR_LATCH' ? 'S / R polarity' : 'SET / RST polarity'}</span>
+          <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+            <option value="high">Active high</option>
+            <option value="low">Active low</option>
+          </select>
+        </label>
+      ) : null}
     </div>
   );
 }

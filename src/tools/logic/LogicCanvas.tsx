@@ -9,10 +9,22 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { getComponentPorts } from './component-library';
-import { componentBoundingBox, findPortAt, GRID_SIZE } from './geometry';
+import { componentBoundingBox, findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
 import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
-import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName } from './logic-types';
+import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
+
+/**
+ * A single L-bend between two absolute pixel positions, matching the
+ * "orthogonal wire routing" the schematic canvas promises: horizontal
+ * first when the endpoints are farther apart on that axis, vertical first
+ * otherwise, so the bend reads naturally instead of a diagonal segment.
+ */
+const orthogonalWaypoints = (start: WirePoint, end: WirePoint): WirePoint[] => {
+  if (start.x === end.x || start.y === end.y) return [];
+  const horizontalFirst = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
+  return horizontalFirst ? [{ x: end.x, y: start.y }] : [{ x: start.x, y: end.y }];
+};
 
 const CLICK_MOVEMENT_THRESHOLD = 6;
 const LONG_PRESS_MS = 550;
@@ -30,12 +42,14 @@ export interface LogicCanvasProps {
   readonly placingType: ComponentType | null;
   readonly onMoveComponent: (id: string, x: number, y: number, final: boolean) => void;
   readonly onSelect: (ids: string[]) => void;
-  readonly onAddWire: (from: PortRef, to: PortRef) => void;
+  readonly onAddWire: (from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => void;
   readonly onToggleSwitch: (id: string) => void;
   readonly onPressButton: (id: string, pressed: boolean) => void;
   readonly onViewportChange: (viewport: Partial<LogicDocument['viewport']>) => void;
   readonly onDropComponent: (type: ComponentType, worldX: number, worldY: number) => void;
   readonly buildContextActions: (componentId: string) => readonly MenuAction[];
+  /** Bumped by the workspace's Escape handler to cancel an in-progress wire from outside this component. */
+  readonly cancelDraftWireToken: number;
 }
 
 interface ScreenPoint { readonly x: number; readonly y: number; }
@@ -43,7 +57,7 @@ interface ScreenPoint { readonly x: number; readonly y: number; }
 const isCoarsePointer = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 export function LogicCanvas(props: LogicCanvasProps) {
-  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onPressButton, onViewportChange, onDropComponent, buildContextActions } = props;
+  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onPressButton, onViewportChange, onDropComponent, buildContextActions, cancelDraftWireToken } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -58,6 +72,10 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const marqueeStartRef = useRef<ScreenPoint | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
+
+  useEffect(() => {
+    setDraftWire(null);
+  }, [cancelDraftWireToken]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -130,6 +148,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
     }
 
     if (event.button === 2) {
+      if (draftWire) { setDraftWire(null); return; }
       const component = componentAt(worldPoint);
       if (component) openMenuFor(component.id, screenPoint, false);
       return;
@@ -144,7 +163,10 @@ export function LogicCanvas(props: LogicCanvasProps) {
     if (port) {
       if (draftWire) {
         if (draftWire.from.componentId !== port.componentId || draftWire.from.portId !== port.portId) {
-          onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId });
+          const targetComponent = doc.components.find((candidate) => candidate.id === port.componentId);
+          const targetPort = targetComponent ? getComponentPorts(targetComponent.type, targetComponent.params).find((candidate) => candidate.id === port.portId) : undefined;
+          const endPosition = targetComponent && targetPort ? portAbsolutePosition(targetComponent, targetPort) : worldPoint;
+          onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId }, orthogonalWaypoints(draftWire.fromPosition, endPosition));
         }
         setDraftWire(null);
       } else {
@@ -159,8 +181,11 @@ export function LogicCanvas(props: LogicCanvasProps) {
         longPressTimerRef.current = window.setTimeout(() => {
           longPressFiredRef.current = true;
           // The long press opens a context menu; undo the provisional press
-          // this same gesture started so releasing it doesn't also fire the button.
+          // this same gesture started so releasing it doesn't also fire the
+          // button, and drop the drag so continued finger movement while the
+          // menu is open can't drag the component underneath it.
           if (component.type === 'PUSH_BUTTON') onPressButton(component.id, false);
+          dragRef.current = null;
           openMenuFor(component.id, screenPoint, true);
         }, LONG_PRESS_MS);
       }

@@ -69,7 +69,7 @@ test('builds a two-switch AND circuit and verifies it through the truth table an
   expect(download.suggestedFilename()).toMatch(/\.svg$/);
 });
 
-test('undo removes the last placed component and Escape clears an in-progress wire', async ({ page }) => {
+test('undo removes the last placed component', async ({ page }) => {
   await page.goto('./#/tools/digital-logic-workstation');
   await placeAt(page, 'SWITCH', 2, 2);
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
@@ -77,10 +77,30 @@ test('undo removes the last placed component and Escape clears an in-progress wi
   await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled();
 });
 
+test('Escape cancels an in-progress wire instead of silently completing it on the next click', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 1, 1);
+  await placeAt(page, 'LED', 5, 1);
+  const canvas = page.getByTestId('logic-canvas');
+
+  // Start a wire from the switch's output pin, then cancel it.
+  await canvas.click({ position: { x: (1 + 1) * GRID, y: 1 * GRID } });
+  await page.keyboard.press('Escape');
+  // If Escape had not cancelled the draft, this click on the LED's input pin
+  // would silently complete the switch -> LED wire it started.
+  await canvas.click({ position: { x: 5 * GRID, y: 1 * GRID } });
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toContainText('floating');
+});
+
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/tools/digital-logic-workstation');
   const componentsToggle = page.getByRole('button', { name: 'Components' });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect' });
   await expect(componentsToggle).toBeVisible();
 
   const palette = page.getByTestId('logic-palette');
@@ -89,4 +109,11 @@ test('collapses the palette and inspector into slide-over sheets on a narrow vie
   await expect(palette).toHaveClass(/sheet-open/);
   await page.getByLabel('Close panel').click();
   await expect(palette).not.toHaveClass(/sheet-open/);
+
+  const inspector = page.locator('.logic-inspector-shell');
+  await expect(inspector).not.toHaveClass(/sheet-open/);
+  await inspectToggle.click();
+  await expect(inspector).toHaveClass(/sheet-open/);
+  await page.getByLabel('Close panel').click();
+  await expect(inspector).not.toHaveClass(/sheet-open/);
 });

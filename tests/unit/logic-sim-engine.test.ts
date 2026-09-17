@@ -115,6 +115,22 @@ describe('sim-engine sequential elements', () => {
     expect(readLevel(frame, flipFlop, 'Q')).toBe(0);
   });
 
+  it('latches a floating D input as an indeterminate X on both Q and QN, not a floating Z with a false determinate complement', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'SWITCH', 0, 3);
+    const clockSwitch = doc.components[0]!.id;
+    doc = addComponent(doc, 'D_FLIP_FLOP', 3, 0);
+    const flipFlop = doc.components[1]!.id;
+    doc = addWire(doc, { componentId: clockSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'CLK' });
+    // D is left unconnected (floating / Z) on purpose.
+
+    let frame = createInitialFrame(doc);
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [clockSwitch]: 0 } });
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [clockSwitch]: 1 } });
+    expect(readLevel(frame, flipFlop, 'Q')).toBe('X');
+    expect(readLevel(frame, flipFlop, 'QN')).toBe('X');
+  });
+
   it('resolves an SR latch and reports the invalid S=1,R=1 state as X', () => {
     let doc = createInitialDocument();
     doc = addComponent(doc, 'SWITCH', 0, 0);

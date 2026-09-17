@@ -341,7 +341,10 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
       const edge = component.params.edge === 'falling' ? isFallingEdge(state.lastClockLevel, clockLevel) : isRisingEdge(state.lastClockLevel, clockLevel);
       lastClockLevel = clockLevel;
       if (edge) {
-        if (component.type === 'D_FLIP_FLOP') nextQ = readInput('D');
+        // A stored bit is a determinate 0/1 or an indeterminate X; it is
+        // never "high-Z" (that describes a disconnected output driver, not
+        // internal storage), so a floating D input latches as X, not Z.
+        if (component.type === 'D_FLIP_FLOP') nextQ = readInput('D') === 'Z' ? 'X' : readInput('D');
         else if (component.type === 'T_FLIP_FLOP') {
           const t = toBit(readInput('T'));
           nextQ = t === 1 ? (toBit(previousQ) === 1 ? 0 : 1) : previousQ;
@@ -358,9 +361,10 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
     }
     if (setAsserted) nextQ = 1;
     else if (resetAsserted) nextQ = 0;
+    const storedBit = toBit(nextQ);
     nextState[component.id] = { ...state, lastClockLevel, storedLevel: nextQ };
     levels.set(portKey(component.id, 'Q'), nextQ);
-    levels.set(portKey(component.id, 'QN'), nextQ === 'X' ? 'X' : (toBit(nextQ) === 1 ? 0 : 1));
+    levels.set(portKey(component.id, 'QN'), storedBit === undefined ? 'X' : storedBit === 1 ? 0 : 1);
   }
 
   // Re-resolve nets once more so anything wired directly to a Q/QN output

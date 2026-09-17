@@ -40,7 +40,7 @@ import {
 import { parseProject, projectFileName, renderSchematicSvg, serializeProject } from './export-engine';
 import { LogicCanvas, type MenuAction } from './LogicCanvas';
 import { LogicInspector } from './LogicInspector';
-import type { ComponentType, DocumentHistory, LogicDocument, LogicLevel, PortRef, ThemeName } from './logic-types';
+import type { ComponentType, DocumentHistory, LogicDocument, LogicLevel, PortRef, ThemeName, WirePoint } from './logic-types';
 import { createInitialFrame, migrateFrame, readLevel, step } from './sim-engine';
 import './LogicWorkspace.css';
 
@@ -106,19 +106,26 @@ export default function LogicWorkspace() {
     const loop = (now: number) => {
       const elapsed = Math.min(250, now - last);
       last = now;
-      runStep(elapsed);
+      // Nothing changes state on its own unless a clock is ticking or a
+      // realistic-delay update is still pending, so skip the net rebuild and
+      // React re-render on every idle frame instead of animating forever.
+      const hasClock = documentRef.current.components.some((component) => component.type === 'CLOCK');
+      if (hasClock || frameRef.current.pendingUpdates.length > 0) runStep(elapsed);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [history.present.simulation.running, runStep]);
 
+  const [cancelDraftWireToken, setCancelDraftWireToken] = useState(0);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
       if (event.key === 'Escape') {
         setPlacingType(null);
-        setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Clear selection', (doc) => setSelection(doc, [])) : prev));
+        setCancelDraftWireToken((token) => token + 1);
+        setHistory((prev) => (prev.present.selectedIds.length ? { ...prev, present: setSelection(prev.present, []) } : prev));
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
@@ -160,11 +167,13 @@ export default function LogicWorkspace() {
   }, []);
 
   const handleSelect = useCallback((ids: string[]) => {
-    setHistory((prev) => commit(prev, 'Select', (doc) => setSelection(doc, ids)));
+    // Selection is UI state, not a circuit edit; committing it would make
+    // every click its own undo step ahead of the edit the user actually cares about.
+    setHistory((prev) => ({ ...prev, present: setSelection(prev.present, ids) }));
   }, []);
 
-  const handleAddWire = useCallback((from: PortRef, to: PortRef) => {
-    setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to)));
+  const handleAddWire = useCallback((from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => {
+    setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
   }, []);
 
   const handleToggleSwitch = useCallback((id: string) => {
@@ -309,6 +318,7 @@ export default function LogicWorkspace() {
           onViewportChange={handleViewportChange}
           onDropComponent={handleDropComponent}
           buildContextActions={buildContextActions}
+          cancelDraftWireToken={cancelDraftWireToken}
         />
 
         <div className={`logic-inspector-shell ${mobilePanel === 'inspector' ? 'sheet-open' : ''}`}>

@@ -45,6 +45,7 @@ Delivers ledger items 9 (deferred to Phase 3 — memory needs the bus work first
 - 7-segment (single + multiplexed) and 16-segment display components, with an optional BCD-to-7-segment decoder component.
 - MUX/DEMUX (2:1/4:1/8:1/16:1) and priority-encoder/decoder components.
 - Multi-channel logic analyzer/oscilloscope dock: rolling sample buffer keyed to sim ticks, up to 16 probes, edge markers, cursor delta measurement; full-screen toggle on narrow viewports.
+- Phase 1 UX follow-ups identified during PR review, confirmed real and deferred rather than fixed in Phase 1: touch two-finger pan and pinch-zoom on the schematic canvas (touch currently supports drag-to-place/select/wire but not panning or zooming the viewport by touch; desktop mouse-drag pan and wheel zoom are unaffected), and clamping the hover tooltip layer to the canvas viewport bounds (a tooltip near the right or bottom edge can currently be clipped).
 
 **Gate:** same shape as Phase 1 (unit + build + a focused Playwright interaction/accessibility spec for the analyzer dock and new components), plus regression confirmation that Phase 1 capabilities are unaffected.
 
