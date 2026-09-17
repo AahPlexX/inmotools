@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
-import type { LocalAdjustment, PhotoHistogram, RetouchOperation } from './photo-types';
+import PhotoCropOverlay from './PhotoCropOverlay';
+import PhotoCompositionOverlay, { type PhotoCompositionMode } from './PhotoCompositionOverlay';
+import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
 
@@ -30,6 +32,10 @@ interface PhotoCanvasProps {
   interaction?: PhotoCanvasInteraction | null;
   onGesture?: (gesture: PhotoCanvasGesture) => void;
   onZoomChange: (zoom: number) => void;
+  cropEditing?: boolean;
+  crop?: NormalizedCrop;
+  sourceWidth?: number;
+  onCropCommit?: (crop: NormalizedCrop) => void;
 }
 
 interface GestureState {
@@ -121,6 +127,10 @@ export default function PhotoCanvas({
   interaction = null,
   onGesture,
   onZoomChange,
+  cropEditing = false,
+  crop,
+  sourceWidth = 800,
+  onCropCommit,
 }: PhotoCanvasProps) {
   const [gesture, setGesture] = useState<GestureState | null>(null);
   const [clippingVisible, setClippingVisible] = useState(false);
@@ -128,6 +138,8 @@ export default function PhotoCanvas({
   const [sample, setSample] = useState<PhotoColorReadout | null>(null);
   const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
   const [compareSplit, setCompareSplit] = useState(50);
+  const [composition, setComposition] = useState<PhotoCompositionMode>('none');
+  const [gridDivisions, setGridDivisions] = useState(4);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -247,7 +259,8 @@ export default function PhotoCanvas({
   }
 
   const canvasInteractive = Boolean(interaction || samplerActive);
-  const comparisonActive = Boolean(compare && originalUrl && previewUrl);
+  const cropActive = Boolean(cropEditing && originalUrl && crop && onCropCommit);
+  const comparisonActive = Boolean(!cropActive && compare && originalUrl && previewUrl);
 
   function editedSurface(className: string, testId?: string) {
     return (
@@ -269,6 +282,7 @@ export default function PhotoCanvas({
         />
         {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
         <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
+        <PhotoCompositionOverlay mode={composition} divisions={gridDivisions} />
         {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
       </div>
     );
@@ -315,9 +329,22 @@ export default function PhotoCanvas({
           <button
             type="button"
             aria-pressed={samplerActive}
-            disabled={!previewUrl || Boolean(interaction)}
+            disabled={!previewUrl || Boolean(interaction) || cropActive}
             onClick={() => setSamplerActive((value) => !value)}
           >Color sampler</button>
+        </div>
+        <div className="photo-composition-controls">
+          <label>Composition overlay
+            <select aria-label="Composition overlay" value={composition} onChange={(event) => setComposition(event.target.value as PhotoCompositionMode)}>
+              <option value="none">None</option><option value="thirds">Rule of thirds</option><option value="golden">Golden ratio</option>
+              <option value="diagonals">Diagonals</option><option value="grid">Grid</option>
+            </select>
+          </label>
+          {composition === 'grid' ? <label>Grid divisions
+            <select aria-label="Grid divisions" value={gridDivisions} onChange={(event) => setGridDivisions(Number(event.target.value))}>
+              {[2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label> : null}
         </div>
         {histogram ? (
           <svg className="photo-mini-histogram" viewBox="0 0 256 56" role="img" aria-label="Live RGB and luminance histogram">
@@ -330,7 +357,8 @@ export default function PhotoCanvas({
       </div>
 
       {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · drag on the photo to place it</div> : null}
-      {samplerActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
+      {samplerActive && !cropActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
+      {cropActive ? <div className="photo-tool-hint" id="photo-crop-help">Crop uses the full, unedited source before rotation/corrections. Drag handles or the frame; arrow keys adjust 1%, Shift adjusts 10%. Escape cancels a drag. Resizing is freeform; ratio buttons remain available.</div> : null}
       {sample ? (
         <div className="photo-color-readout" role="status" aria-label="Sampled color readout">
           <strong>{sample.hex}</strong>
@@ -341,7 +369,8 @@ export default function PhotoCanvas({
       ) : null}
 
       <div className="photo-canvas-scroller" data-photo-canvas>
-        {!previewUrl ? (
+        {cropActive ? <PhotoCropOverlay key={`${originalUrl}:${zoom}`} sourceUrl={originalUrl!} sourceName={sourceName} sourceWidth={sourceWidth}
+          crop={crop!} zoom={zoom} composition={composition} divisions={gridDivisions} onCommit={onCropCommit!} /> : !previewUrl ? (
           <div className="photo-empty-state">
             <div className="photo-empty-icon" aria-hidden="true">▧</div>
             <h3>Open a photo to begin</h3>
@@ -391,6 +420,7 @@ export default function PhotoCanvas({
             ) : null}
             {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
             <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
+            <PhotoCompositionOverlay mode={composition} divisions={gridDivisions} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
         )}

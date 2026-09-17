@@ -279,6 +279,7 @@ export default function PhotoWorkspace() {
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
+  const [cropEditing, setCropEditing] = useState(false);
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState('');
@@ -1224,6 +1225,7 @@ export default function PhotoWorkspace() {
         </div>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => applyCropRatio(null)}>Original</button>
+          <button type="button" disabled={!source} aria-pressed={cropEditing} onClick={() => setCropEditing((value) => !value)}>{cropEditing ? 'Finish crop editing' : 'Edit crop on photo'}</button>
           <button type="button" onClick={() => applyCropRatio(1)}>1:1</button>
           <button type="button" onClick={() => applyCropRatio(4 / 3)}>4:3</button>
           <button type="button" onClick={() => applyCropRatio(3 / 2)}>3:2</button>
@@ -1692,6 +1694,10 @@ export default function PhotoWorkspace() {
           interaction={canvasInteraction}
           onGesture={handleCanvasGesture}
           onZoomChange={setZoom}
+          cropEditing={cropEditing && panel === 'geometry'}
+          crop={recipe.crop}
+          sourceWidth={source?.width}
+          onCropCommit={(crop) => patchRecipe({ crop })}
         />
 
         <aside className="photo-inspector" aria-label="Photo controls">
