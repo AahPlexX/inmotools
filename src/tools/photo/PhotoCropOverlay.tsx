@@ -1,79 +1,218 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import PhotoCompositionOverlay, { type PhotoCompositionMode } from './PhotoCompositionOverlay';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { adjustPhotoCrop, type PhotoCropHandle } from './photo-crop';
 import type { NormalizedCrop } from './photo-types';
-import './photo-crop.css';
 
-const HANDLES = [
-  ['nw', 'top left', 0, 0], ['n', 'top', 50, 0], ['ne', 'top right', 100, 0],
-  ['w', 'left', 0, 50], ['e', 'right', 100, 50],
-  ['sw', 'bottom left', 0, 100], ['s', 'bottom', 50, 100], ['se', 'bottom right', 100, 100],
-] as const;
+export type PhotoCompositionOverlay = 'none' | 'thirds' | 'grid' | 'diagonal' | 'golden';
 
-export default function PhotoCropOverlay({ sourceUrl, sourceName, sourceWidth, crop, zoom, composition, divisions, onCommit }: {
-  sourceUrl: string; sourceName?: string; sourceWidth: number; crop: NormalizedCrop; zoom: number;
-  composition: PhotoCompositionMode; divisions: number; onCommit: (crop: NormalizedCrop) => void;
-}) {
-  const surface = useRef<HTMLDivElement>(null);
-  const gesture = useRef<{ pointerId: number; handle: PhotoCropHandle; crop: NormalizedCrop; x: number; y: number; width: number; height: number; target: HTMLButtonElement } | null>(null);
-  const [draft, setDraft] = useState<NormalizedCrop | null>(null);
-  const displayed = draft ?? crop;
+interface PhotoCropOverlayProps {
+  crop: NormalizedCrop;
+  compositionOverlay: PhotoCompositionOverlay;
+  gridDivisions: number;
+  interactive: boolean;
+  onCommit: (crop: NormalizedCrop) => void;
+}
 
-  const cancel = useCallback(() => {
-    const active = gesture.current;
-    gesture.current = null;
-    setDraft(null);
-    if (active?.target.hasPointerCapture(active.pointerId)) active.target.releasePointerCapture(active.pointerId);
-  }, []);
-  useEffect(() => { cancel(); }, [crop, cancel]);
+interface CropGesture {
+  pointerId: number;
+  handle: PhotoCropHandle;
+  startX: number;
+  startY: number;
+  crop: NormalizedCrop;
+}
 
-  function begin(event: PointerEvent<HTMLButtonElement>, handle: PhotoCropHandle) {
-    if (gesture.current || event.button !== 0 || !event.isPrimary) return;
-    const rect = surface.current?.getBoundingClientRect();
-    if (!rect?.width || !rect.height) return;
+const HANDLE_LABELS: Record<PhotoCropHandle, string> = {
+  move: 'Move crop frame',
+  n: 'Crop top edge',
+  s: 'Crop bottom edge',
+  e: 'Crop right edge',
+  w: 'Crop left edge',
+  ne: 'Crop top right corner',
+  nw: 'Crop top left corner',
+  se: 'Crop bottom right corner',
+  sw: 'Crop bottom left corner',
+};
+
+const RESIZE_HANDLES: PhotoCropHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+function cropStyle(crop: NormalizedCrop): CSSProperties {
+  return {
+    left: `${crop.x * 100}%`,
+    top: `${crop.y * 100}%`,
+    width: `${crop.width * 100}%`,
+    height: `${crop.height * 100}%`,
+  };
+}
+
+function handleStyle(crop: NormalizedCrop, handle: PhotoCropHandle): CSSProperties {
+  const left = handle.includes('w') ? crop.x : handle.includes('e') ? crop.x + crop.width : crop.x + crop.width / 2;
+  const top = handle.includes('n') ? crop.y : handle.includes('s') ? crop.y + crop.height : crop.y + crop.height / 2;
+  return { left: `${left * 100}%`, top: `${top * 100}%` };
+}
+
+function CompositionGuides({ mode, gridDivisions }: { mode: PhotoCompositionOverlay; gridDivisions: number }) {
+  if (mode === 'none') return null;
+  const label = { thirds: 'Rule of thirds', grid: 'Grid', diagonal: 'Diagonal', golden: 'Golden ratio' }[mode];
+  if (mode === 'diagonal') {
+    return (
+      <svg className="photo-composition-guides" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${label} composition guides`}>
+        <line x1="0" y1="0" x2="100" y2="100" />
+        <line x1="100" y1="0" x2="0" y2="100" />
+      </svg>
+    );
+  }
+
+  const gridDivisionsCount = Math.max(2, Math.min(10, Math.round(gridDivisions)));
+  const positions = mode === 'thirds'
+    ? [100 / 3, 200 / 3]
+    : mode === 'golden'
+      ? [38.196601125, 61.803398875]
+      : Array.from({ length: gridDivisionsCount - 1 }, (_, index) => (index + 1) * 100 / gridDivisionsCount);
+  return (
+    <svg className="photo-composition-guides" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${label} composition guides`}>
+      {positions.map((position) => (
+        <g key={position}>
+          <line data-guide="vertical" x1={position} y1="0" x2={position} y2="100" />
+          <line data-guide="horizontal" x1="0" y1={position} x2="100" y2={position} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export default function PhotoCropOverlay({ crop, compositionOverlay, gridDivisions, interactive, onCommit }: PhotoCropOverlayProps) {
+  const [draft, setDraft] = useState(crop);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const gestureRef = useRef<CropGesture | null>(null);
+
+  useEffect(() => {
+    if (!gestureRef.current) setDraft(crop);
+  }, [crop]);
+
+  function beginGesture(handle: PhotoCropHandle, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!interactive || !rootRef.current) return;
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
-    gesture.current = { pointerId: event.pointerId, handle, crop, x: event.clientX, y: event.clientY, width: rect.width, height: rect.height, target: event.currentTarget };
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      crop: draft,
+    };
   }
-  function result(event: PointerEvent<HTMLDivElement>) {
-    const active = gesture.current;
-    return active && active.pointerId === event.pointerId && active.crop === crop
-      ? adjustPhotoCrop(crop, active.handle, (event.clientX - active.x) / active.width, (event.clientY - active.y) / active.height) : null;
+
+  function cropFromPointer(event: ReactPointerEvent<HTMLButtonElement>): NormalizedCrop | null {
+    const gesture = gestureRef.current;
+    const root = rootRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId || !root) return null;
+    const rect = root.getBoundingClientRect();
+    if (!rect.width || !rect.height) return gesture.crop;
+    return adjustPhotoCrop(
+      gesture.crop,
+      gesture.handle,
+      (event.clientX - gesture.startX) / rect.width,
+      (event.clientY - gesture.startY) / rect.height,
+    );
   }
-  function finish(event: PointerEvent<HTMLDivElement>) {
-    const next = result(event);
+
+  function moveGesture(event: ReactPointerEvent<HTMLButtonElement>) {
+    const next = cropFromPointer(event);
     if (!next) return;
     event.preventDefault();
-    cancel();
-    onCommit(next);
+    event.stopPropagation();
+    setDraft(next);
   }
-  function keyboard(event: KeyboardEvent<HTMLButtonElement>, handle: PhotoCropHandle) {
-    if (event.key === 'Escape') { event.preventDefault(); cancel(); return; }
-    if (gesture.current || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+
+  function endGesture(event: ReactPointerEvent<HTMLButtonElement>) {
+    const next = cropFromPointer(event);
+    if (!next) return;
     event.preventDefault();
     event.stopPropagation();
-    const step = event.shiftKey ? 0.1 : 0.01;
-    onCommit(adjustPhotoCrop(crop, handle, event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0,
-      event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0));
+    gestureRef.current = null;
+    setDraft(next);
+    onCommit(next);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
-  return <div ref={surface} className="photo-crop-surface" data-testid="photo-crop-surface"
-    style={{ width: Math.min(800, sourceWidth), transform: `scale(${zoom})` }}
-    onPointerMove={(event) => { const next = result(event); if (next) setDraft(next); }}
-    onPointerUp={finish} onPointerCancel={(event) => { if (gesture.current?.pointerId === event.pointerId) cancel(); }}
-    onLostPointerCapture={(event) => { if (gesture.current?.pointerId === event.pointerId) cancel(); }}>
-    <img src={sourceUrl} alt={`Crop source of ${sourceName || 'selected photo'}`} data-testid="photo-crop-source" draggable={false} />
-    <svg className="photo-crop-shade" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <path fillRule="evenodd" d={`M0,0H100V100H0Z M${displayed.x * 100},${displayed.y * 100}h${displayed.width * 100}v${displayed.height * 100}h${-displayed.width * 100}Z`} />
-    </svg>
-    <div className="photo-crop-frame" style={{ left: `${displayed.x * 100}%`, top: `${displayed.y * 100}%`, width: `${displayed.width * 100}%`, height: `${displayed.height * 100}%` }}>
-      <PhotoCompositionOverlay mode={composition} divisions={divisions} />
-      <button type="button" className="photo-crop-move" aria-label="Move crop frame" aria-describedby="photo-crop-help"
-        onPointerDown={(event) => begin(event, 'move')} onKeyDown={(event) => keyboard(event, 'move')} />
-      {HANDLES.map(([handle, label, x, y]) => <button key={handle} type="button" className={`photo-crop-handle photo-crop-${handle}`}
-        style={{ left: `${x}%`, top: `${y}%` }} aria-label={`Resize crop ${label}`} aria-describedby="photo-crop-help"
-        onPointerDown={(event) => begin(event, handle)} onKeyDown={(event) => keyboard(event, handle)} />)}
+
+  function cancelGesture(event: ReactPointerEvent<HTMLButtonElement>) {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    gestureRef.current = null;
+    setDraft(crop);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function keyboardAdjust(handle: PhotoCropHandle, event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const step = event.shiftKey ? 0.05 : 0.01;
+    const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+    const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+    if (!dx && !dy) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const next = adjustPhotoCrop(draft, handle, dx, dy);
+    setDraft(next);
+    onCommit(next);
+  }
+
+  function interactionProps(handle: PhotoCropHandle) {
+    return {
+      onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => beginGesture(handle, event),
+      onPointerMove: moveGesture,
+      onPointerUp: endGesture,
+      onPointerCancel: cancelGesture,
+      onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => keyboardAdjust(handle, event),
+    };
+  }
+
+  return (
+    <div
+      ref={rootRef}
+      className={`photo-crop-overlay${interactive ? ' is-interactive' : ''}`}
+      data-testid="photo-crop-overlay"
+      data-composition-overlay={compositionOverlay}
+      aria-hidden={interactive ? undefined : true}
+    >
+      <span className="photo-crop-dim photo-crop-dim-top" style={{ height: `${draft.y * 100}%` }} />
+      <span className="photo-crop-dim photo-crop-dim-left" style={{ top: `${draft.y * 100}%`, width: `${draft.x * 100}%`, height: `${draft.height * 100}%` }} />
+      <span className="photo-crop-dim photo-crop-dim-right" style={{ top: `${draft.y * 100}%`, left: `${(draft.x + draft.width) * 100}%`, right: 0, height: `${draft.height * 100}%` }} />
+      <span className="photo-crop-dim photo-crop-dim-bottom" style={{ top: `${(draft.y + draft.height) * 100}%`, bottom: 0 }} />
+      <span className="photo-crop-frame" style={cropStyle(draft)}>
+        <CompositionGuides mode={compositionOverlay} gridDivisions={gridDivisions} />
+      </span>
+      {interactive ? (
+        <>
+          <button
+            type="button"
+            className="photo-crop-move-target"
+            aria-label={HANDLE_LABELS.move}
+            style={cropStyle(draft)}
+            {...interactionProps('move')}
+          />
+          {RESIZE_HANDLES.map((handle) => (
+            <button
+              type="button"
+              key={handle}
+              className={`photo-crop-handle photo-crop-handle-${handle}`}
+              aria-label={HANDLE_LABELS[handle]}
+              style={handleStyle(draft, handle)}
+              {...interactionProps(handle)}
+            />
+          ))}
+          <output className="photo-crop-readout" aria-live="polite">
+            {Math.round(draft.width * 1000) / 10}% × {Math.round(draft.height * 1000) / 10}%
+          </output>
+        </>
+      ) : null}
     </div>
-  </div>;
+  );
 }

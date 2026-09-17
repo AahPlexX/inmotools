@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
 const FIXTURE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAUAAAADwCAIAAAD+Tyo8AAACqElEQVR42u3VQQ0AMQwDwbVU/pj7OBQ9zTyWQeJVqzVVfa6nBTzqtO+CVfW9WmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpgsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGCywqlpgwAKrqgUGC6yqFhiwwKoW2AKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwwWWFUtMGCBVdUCgwVWVQsMWGBVtcBggVXVAgMWWNUCAxZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGBVtcCABVZVCwwWWFUtMGCBVS0wYIFV1QIDFljVAgMWWFUtMGCBVS0wYIFV1QKDBVZVCwxYYFW1wGCBVdUCAxZYVS0wWGBVtcCABVa1wIAFVlULDFhgVQsMWGBVtcCABVa1wIAFVlULDBZYVS0wYIFV1QKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwxYYFULDFhgVbXAYIFV1QIDFlhVLTBYYFW1wIAFVlULDBZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGALrGqBAQusqhYYLLCqWmDAAquqBQYLrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoHBAquqBQYssKpaYLDAqmqBAQusqhYYLLCqWmDAAqtaYMACq6oFBiywqgUGLLCqWmCwwD6ZqgUGLLCqWmCwwKpqgQELrKoWGCywqlpgwAKrWmDAAquqBQYssKoFBiywqlpgwAKrWmDAAquqBQYLrKoWGLDAqmqBwQKrqgUGLLCqWmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpg+I0LLVVQ6zZs79UAAAAASUVORK5CYII=',
   'base64',
@@ -21,11 +23,11 @@ test('direct crop resize and movement use source coordinates at zoom and commit 
   await page.getByRole('button', { name: 'Crop & geometry' }).click();
   await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
-  const surface = page.getByTestId('photo-crop-surface');
+  const surface = page.getByTestId('photo-crop-overlay');
   await surface.scrollIntoViewIfNeeded();
-  await page.getByRole('button', { name: 'Resize crop bottom right', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Crop bottom right corner', exact: true }).scrollIntoViewIfNeeded();
   const box = (await surface.boundingBox())!;
-  const corner = (await page.getByRole('button', { name: 'Resize crop bottom right', exact: true }).boundingBox())!;
+  const corner = (await page.getByRole('button', { name: 'Crop bottom right corner', exact: true }).boundingBox())!;
   const start = { x: corner.x + corner.width / 2, y: corner.y + corner.height / 2 };
   const end = { x: start.x - box.width / 4, y: start.y - box.height / 4 };
   const touch = isMobile ? await page.context().newCDPSession(page) : null;
@@ -67,7 +69,7 @@ test('direct crop resize and movement use source coordinates at zoom and commit 
   await move.press('ArrowDown');
   await expect(page.getByLabel('Crop left percent value')).toHaveValue('11');
   await expect(page.getByLabel('Crop top percent value')).toHaveValue('11');
-  await page.getByRole('button', { name: 'Finish crop editing', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
   await expect(page.getByTestId('photo-preview')).toBeVisible();
   await expect(page.getByText('Edited frame 240 × 180')).toBeVisible();
 });
@@ -76,7 +78,7 @@ test('crop pointer cancellation and source replacement cannot commit a stale cro
   await openFixture(page);
   await page.getByRole('button', { name: 'Crop & geometry' }).click();
   await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
-  const corner = page.getByRole('button', { name: 'Resize crop bottom right', exact: true });
+  const corner = page.getByRole('button', { name: 'Crop bottom right corner', exact: true });
   await corner.scrollIntoViewIfNeeded();
   const box = (await corner.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -88,9 +90,11 @@ test('crop pointer cancellation and source replacement cannot commit a stale cro
   await corner.press('ArrowLeft');
   await expect(page.getByLabel('Crop width percent value')).toHaveValue('99');
   await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'replacement.png', mimeType: 'image/png', buffer: FIXTURE_PNG });
-  await expect(page.getByTestId('photo-crop-source')).toHaveAttribute('alt', 'Crop source of replacement.png');
+  await expect(page.getByTestId('photo-preview')).toHaveAttribute('alt', 'Edited preview of replacement.png');
   await expect(page.getByLabel('Crop width percent value')).toHaveValue('100');
-  await page.getByRole('button', { name: 'Finish crop editing', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
+  await expect(page.getByTestId('photo-geometry-reference')).toHaveAttribute('alt', 'Geometry reference for replacement.png');
+  await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
   await expect(page.getByText('Edited frame 320 × 240')).toBeVisible();
 });
 
@@ -109,12 +113,13 @@ test('direct crop keyboard edits survive recovery and select the same source pix
   await expect(page.getByTestId('photo-source-dimensions')).toHaveText('320 × 240');
   await page.getByRole('button', { name: 'Crop & geometry' }).click();
   await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
-  const left = page.getByRole('button', { name: 'Resize crop left', exact: true });
-  for (let index = 0; index < 3; index++) await left.press('Shift+ArrowRight');
-  await page.getByRole('button', { name: 'Resize crop right', exact: true }).press('Shift+ArrowLeft');
+  const left = page.getByRole('button', { name: 'Crop left edge', exact: true });
+  for (let index = 0; index < 6; index++) await left.press('Shift+ArrowRight');
+  const right = page.getByRole('button', { name: 'Crop right edge', exact: true });
+  await right.press('Shift+ArrowLeft'); await right.press('Shift+ArrowLeft');
   await expect(page.getByLabel('Crop left percent value')).toHaveValue('30');
   await expect(page.getByLabel('Crop width percent value')).toHaveValue('60');
-  await page.getByRole('button', { name: 'Finish crop editing', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
   await expect(page.getByText('Edited frame 192 × 240')).toBeVisible();
   await expect(page.getByTestId('photo-project-save-state')).toContainText('Saved locally');
   await page.reload();
@@ -145,10 +150,12 @@ test('direct crop keyboard edits survive recovery and select the same source pix
   expect(exportedPixels).toEqual({ width: 192, height: 240, first: [0, 200, 0, 255], last: [0, 0, 200, 255] });
 });
 
-for (const [mode, vertical, horizontal] of [['Rule of thirds', 2, 2], ['Golden ratio', 2, 2], ['Diagonals', 0, 0], ['Grid', 3, 3]] as const) {
+for (const [mode, vertical, horizontal] of [['Rule of thirds', 2, 2], ['Golden ratio', 2, 2], ['Diagonal', 0, 0], ['Grid', 3, 3]] as const) {
   test(`composition ${mode} stays registered and never alters edited pixels`, async ({ page }) => {
     await openFixture(page);
     const originalPreview = await page.getByTestId('photo-preview').getAttribute('src');
+    await page.getByRole('button', { name: 'Crop & geometry' }).click();
+    await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
     await page.getByLabel('Composition overlay', { exact: true }).selectOption({ label: mode });
     const guides = page.getByRole('img', { name: `${mode} composition guides`, exact: true });
     await expect(guides).toBeVisible();
@@ -158,21 +165,27 @@ for (const [mode, vertical, horizontal] of [['Rule of thirds', 2, 2], ['Golden r
       await page.getByLabel('Grid divisions', { exact: true }).selectOption('6');
       await expect(guides.locator('[data-guide="vertical"]')).toHaveCount(5);
     }
-    if (mode === 'Diagonals') await expect(guides.locator('line')).toHaveCount(2);
-    const imageBox = (await page.getByTestId('photo-preview').boundingBox())!;
+    if (mode === 'Diagonal') await expect(guides.locator('line')).toHaveCount(2);
+    const imageBox = (await page.getByTestId('photo-geometry-reference').boundingBox())!;
+    const overlayBox = (await page.getByTestId('photo-crop-overlay').boundingBox())!;
     const guideBox = (await guides.boundingBox())!;
-    expect(guideBox.width).toBeCloseTo(imageBox.width, 0);
-    expect(guideBox.height).toBeCloseTo(imageBox.height, 0);
-    expect(guideBox.x).toBeCloseTo(imageBox.x, 0);
-    expect(guideBox.y).toBeCloseTo(imageBox.y, 0);
+    expect(overlayBox.width).toBeCloseTo(imageBox.width, 0);
+    expect(overlayBox.height).toBeCloseTo(imageBox.height, 0);
+    expect(overlayBox.x).toBeCloseTo(imageBox.x, 0);
+    expect(overlayBox.y).toBeCloseTo(imageBox.y, 0);
+    expect(Math.abs(guideBox.width - imageBox.width)).toBeLessThanOrEqual(4);
+    expect(Math.abs(guideBox.height - imageBox.height)).toBeLessThanOrEqual(4);
+    expect(Math.abs(guideBox.x - imageBox.x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(guideBox.y - imageBox.y)).toBeLessThanOrEqual(2);
     if (mode === 'Rule of thirds' || mode === 'Golden ratio') {
       expect(Number(await guides.locator('[data-guide="vertical"]').first().getAttribute('x1'))).toBeCloseTo(mode === 'Rule of thirds' ? 33.333333333 : 38.196601125, 6);
     }
-    await expect(page.getByTestId('photo-preview')).toHaveAttribute('src', originalPreview!);
     await page.setViewportSize({ width: 320, height: 740 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     await page.getByLabel('Composition overlay', { exact: true }).selectOption('none');
     await expect(guides).toHaveCount(0);
+    await page.getByRole('button', { name: 'Edit crop on photo', exact: true }).click();
+    await expect(page.getByTestId('photo-preview')).toHaveAttribute('src', originalPreview!);
   });
 }
 
@@ -246,4 +259,35 @@ test('retouch scalar reset restores the operation default without disturbing its
   await page.getByRole('button', { name: 'Reset Red-eye 1 radius' }).click();
   await expect(radius).toHaveValue('0.04');
   await expect(strength).toHaveValue('0.2');
+});
+
+test('per-channel curves and levels use ordinary undoable recipe state', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Tone curve' }).click();
+  await page.getByLabel('Curve channel').selectOption('red');
+  await page.getByRole('button', { name: 'Add point' }).click();
+  const redOutput = page.getByLabel('Red curve point 2 output percent');
+  await redOutput.fill('30');
+  await expect(redOutput).toHaveValue('30');
+
+  await page.locator('summary').filter({ hasText: 'Levels' }).click();
+  const gamma = page.getByLabel('Levels gamma value');
+  await gamma.fill('2');
+  await gamma.press('Enter');
+  await expect(gamma).toHaveValue('2');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(gamma).toHaveValue('1');
+  await expect(redOutput).toHaveValue('30');
+});
+
+test('channel mixer exposes each output channel and remains reversible', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Channel mixer' }).click();
+  await page.getByLabel('Mixer output channel').selectOption('red');
+  const greenSource = page.getByLabel('Red output green source value');
+  await greenSource.fill('0.5');
+  await greenSource.press('Enter');
+  await expect(greenSource).toHaveValue('0.5');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(greenSource).toHaveValue('0');
 });

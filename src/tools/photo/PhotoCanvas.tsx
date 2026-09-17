@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
-import PhotoCropOverlay from './PhotoCropOverlay';
-import PhotoCompositionOverlay, { type PhotoCompositionMode } from './PhotoCompositionOverlay';
+import PhotoCropOverlay, { type PhotoCompositionOverlay } from './PhotoCropOverlay';
+import { photoStraightenFromGuide } from './photo-crop';
 import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
@@ -30,18 +30,27 @@ interface PhotoCanvasProps {
   localAdjustments?: LocalAdjustment[];
   retouch?: RetouchOperation[];
   interaction?: PhotoCanvasInteraction | null;
-  onGesture?: (gesture: PhotoCanvasGesture) => void;
-  onZoomChange: (zoom: number) => void;
-  cropEditing?: boolean;
   crop?: NormalizedCrop;
-  sourceWidth?: number;
+  geometryMode?: 'crop' | 'straighten' | null;
+  compositionOverlay?: PhotoCompositionOverlay;
+  gridDivisions?: number;
+  onGesture?: (gesture: PhotoCanvasGesture) => void;
   onCropCommit?: (crop: NormalizedCrop) => void;
+  onStraightenCommit?: (degrees: number) => void;
+  onZoomChange: (zoom: number) => void;
 }
 
 interface GestureState {
   pointerId: number;
   start: PhotoCanvasGesture['start'];
   path: PhotoCanvasGesture['path'];
+}
+
+interface StraightenGesture {
+  pointerId: number;
+  startClient: { x: number; y: number };
+  startNormalized: { x: number; y: number };
+  endNormalized: { x: number; y: number };
 }
 
 type PhotoCompareMode = 'split' | 'side-by-side';
@@ -125,21 +134,22 @@ export default function PhotoCanvas({
   localAdjustments = [],
   retouch = [],
   interaction = null,
+  crop = { x: 0, y: 0, width: 1, height: 1 },
+  geometryMode = null,
+  compositionOverlay = 'none',
+  gridDivisions = 4,
   onGesture,
-  onZoomChange,
-  cropEditing = false,
-  crop,
-  sourceWidth = 800,
   onCropCommit,
+  onStraightenCommit,
+  onZoomChange,
 }: PhotoCanvasProps) {
   const [gesture, setGesture] = useState<GestureState | null>(null);
+  const [straightenGesture, setStraightenGesture] = useState<StraightenGesture | null>(null);
   const [clippingVisible, setClippingVisible] = useState(false);
   const [samplerActive, setSamplerActive] = useState(false);
   const [sample, setSample] = useState<PhotoColorReadout | null>(null);
   const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
   const [compareSplit, setCompareSplit] = useState(50);
-  const [composition, setComposition] = useState<PhotoCompositionMode>('none');
-  const [gridDivisions, setGridDivisions] = useState(4);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -151,6 +161,10 @@ export default function PhotoCanvas({
   useEffect(() => {
     setSample(null);
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (geometryMode !== 'straighten') setStraightenGesture(null);
+  }, [geometryMode]);
 
   useEffect(() => {
     if (!clippingVisible || !previewUrl) return;
@@ -258,9 +272,48 @@ export default function PhotoCanvas({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
+  function beginStraightenGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (geometryMode !== 'straighten' || !onStraightenCommit || !originalUrl) return;
+    event.preventDefault();
+    const point = pointerPoint(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setStraightenGesture({
+      pointerId: event.pointerId,
+      startClient: { x: event.clientX, y: event.clientY },
+      startNormalized: { x: point.x, y: point.y },
+      endNormalized: { x: point.x, y: point.y },
+    });
+  }
+
+  function moveStraightenGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!straightenGesture || straightenGesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const point = pointerPoint(event);
+    setStraightenGesture((current) => current
+      ? { ...current, endNormalized: { x: point.x, y: point.y } }
+      : current);
+  }
+
+  function endStraightenGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!straightenGesture || straightenGesture.pointerId !== event.pointerId || !onStraightenCommit) return;
+    event.preventDefault();
+    const correction = photoStraightenFromGuide(
+      straightenGesture.startClient,
+      { x: event.clientX, y: event.clientY },
+    );
+    setStraightenGesture(null);
+    if (correction !== null) onStraightenCommit(correction);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function cancelStraightenGesture(event: ReactPointerEvent<HTMLDivElement>) {
+    if (straightenGesture?.pointerId === event.pointerId) setStraightenGesture(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
   const canvasInteractive = Boolean(interaction || samplerActive);
-  const cropActive = Boolean(cropEditing && originalUrl && crop && onCropCommit);
-  const comparisonActive = Boolean(!cropActive && compare && originalUrl && previewUrl);
+  const geometryActive = Boolean(geometryMode && originalUrl);
+  const comparisonActive = Boolean(!geometryActive && compare && originalUrl && previewUrl);
 
   function editedSurface(className: string, testId?: string) {
     return (
@@ -282,8 +335,47 @@ export default function PhotoCanvas({
         />
         {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
         <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
-        <PhotoCompositionOverlay mode={composition} divisions={gridDivisions} />
         {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
+      </div>
+    );
+  }
+
+  function geometrySurface() {
+    if (!originalUrl) return null;
+    return (
+      <div
+        className="photo-image-frame photo-geometry-frame is-interactive"
+        style={{ '--photo-zoom': zoom, '--photo-inverse-zoom': 1 / Math.max(zoom, 0.01) } as React.CSSProperties}
+        data-testid="photo-image-frame"
+        onPointerDown={geometryMode === 'straighten' ? beginStraightenGesture : undefined}
+        onPointerMove={geometryMode === 'straighten' ? moveStraightenGesture : undefined}
+        onPointerUp={geometryMode === 'straighten' ? endStraightenGesture : undefined}
+        onPointerCancel={geometryMode === 'straighten' ? cancelStraightenGesture : undefined}
+      >
+        <img
+          src={originalUrl}
+          alt={`Geometry reference for ${sourceName || 'selected photo'}`}
+          className="photo-preview-image"
+          data-testid="photo-geometry-reference"
+          draggable={false}
+        />
+        <PhotoCropOverlay
+          crop={crop}
+          compositionOverlay={compositionOverlay}
+          gridDivisions={gridDivisions}
+          interactive={geometryMode === 'crop' && Boolean(onCropCommit)}
+          onCommit={(nextCrop) => onCropCommit?.(nextCrop)}
+        />
+        {straightenGesture ? (
+          <svg className="photo-straighten-guide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <line
+              x1={straightenGesture.startNormalized.x * 100}
+              y1={straightenGesture.startNormalized.y * 100}
+              x2={straightenGesture.endNormalized.x * 100}
+              y2={straightenGesture.endNormalized.y * 100}
+            />
+          </svg>
+        ) : null}
       </div>
     );
   }
@@ -329,22 +421,9 @@ export default function PhotoCanvas({
           <button
             type="button"
             aria-pressed={samplerActive}
-            disabled={!previewUrl || Boolean(interaction) || cropActive}
+            disabled={!previewUrl || Boolean(interaction) || geometryActive}
             onClick={() => setSamplerActive((value) => !value)}
           >Color sampler</button>
-        </div>
-        <div className="photo-composition-controls">
-          <label>Composition overlay
-            <select aria-label="Composition overlay" value={composition} onChange={(event) => setComposition(event.target.value as PhotoCompositionMode)}>
-              <option value="none">None</option><option value="thirds">Rule of thirds</option><option value="golden">Golden ratio</option>
-              <option value="diagonals">Diagonals</option><option value="grid">Grid</option>
-            </select>
-          </label>
-          {composition === 'grid' ? <label>Grid divisions
-            <select aria-label="Grid divisions" value={gridDivisions} onChange={(event) => setGridDivisions(Number(event.target.value))}>
-              {[2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
-            </select>
-          </label> : null}
         </div>
         {histogram ? (
           <svg className="photo-mini-histogram" viewBox="0 0 256 56" role="img" aria-label="Live RGB and luminance histogram">
@@ -357,8 +436,9 @@ export default function PhotoCanvas({
       </div>
 
       {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · drag on the photo to place it</div> : null}
-      {samplerActive && !cropActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
-      {cropActive ? <div className="photo-tool-hint" id="photo-crop-help">Crop uses the full, unedited source before rotation/corrections. Drag handles or the frame; arrow keys adjust 1%, Shift adjusts 10%. Escape cancels a drag. Resizing is freeform; ratio buttons remain available.</div> : null}
+      {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry.</div> : null}
+      {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below.</div> : null}
+      {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
       {sample ? (
         <div className="photo-color-readout" role="status" aria-label="Sampled color readout">
           <strong>{sample.hex}</strong>
@@ -369,13 +449,14 @@ export default function PhotoCanvas({
       ) : null}
 
       <div className="photo-canvas-scroller" data-photo-canvas>
-        {cropActive ? <PhotoCropOverlay key={`${originalUrl}:${zoom}`} sourceUrl={originalUrl!} sourceName={sourceName} sourceWidth={sourceWidth}
-          crop={crop!} zoom={zoom} composition={composition} divisions={gridDivisions} onCommit={onCropCommit!} /> : !previewUrl ? (
+        {!previewUrl ? (
           <div className="photo-empty-state">
             <div className="photo-empty-icon" aria-hidden="true">▧</div>
             <h3>Open a photo to begin</h3>
             <p>Your source stays on this device. Every adjustment remains reversible until you export a new copy.</p>
           </div>
+        ) : geometryActive ? (
+          geometrySurface()
         ) : comparisonActive && compareMode === 'side-by-side' ? (
           <div
             className="photo-compare-side-by-side"
@@ -420,7 +501,6 @@ export default function PhotoCanvas({
             ) : null}
             {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
             <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
-            <PhotoCompositionOverlay mode={composition} divisions={gridDivisions} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
         )}

@@ -12,6 +12,32 @@ export interface TonePoint {
   y: number;
 }
 
+export interface PhotoRgbToneCurves {
+  red: TonePoint[];
+  green: TonePoint[];
+  blue: TonePoint[];
+}
+
+export interface PhotoLevels {
+  inputBlack: number;
+  gamma: number;
+  inputWhite: number;
+  outputBlack: number;
+  outputWhite: number;
+}
+
+export interface PhotoChannelMixerRow {
+  red: number;
+  green: number;
+  blue: number;
+  constant: number;
+}
+
+export interface PhotoChannelMixer {
+  red: PhotoChannelMixerRow;
+  green: PhotoChannelMixerRow;
+  blue: PhotoChannelMixerRow;
+}
 export interface HslAdjustment {
   hue: number;
   saturation: number;
@@ -72,6 +98,9 @@ export interface PhotoRecipe {
   blacks: number;
   midtone: number;
   toneCurve: TonePoint[];
+  rgbToneCurves: PhotoRgbToneCurves;
+  levels: PhotoLevels;
+  channelMixer: PhotoChannelMixer;
 
   temperature: number;
   tint: number;
