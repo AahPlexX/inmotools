@@ -60,7 +60,7 @@ const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
 
 const DEFAULT_SOURCE = `# Untitled document
 
-Start writing here. This workbench supports **GFM** tables, math like $E = mc^2$, diagrams, and citations.
+Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, and citations.
 
 | Item | Qty | Price | Total |
 | - | - | - | - |
@@ -77,6 +77,9 @@ export default function MarkdownWorkspace() {
   const [view, setView] = useState<ViewMode>('split');
   const [history, setHistory] = useState<ProjectHistory<string>>(() => createHistory(DEFAULT_SOURCE));
   const source = history.present;
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+  const fileReadRef = useRef(0);
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
@@ -124,7 +127,7 @@ export default function MarkdownWorkspace() {
 
   const persistDraft = useCallback((text: string, name?: string) => {
     const store = draftStoreRef.current;
-    if (!store) return Promise.resolve();
+    if (!store) return Promise.resolve(false);
     const now = Date.now();
     const draft = draftIdRef.current
       ? updateDraftRecord(
@@ -136,14 +139,17 @@ export default function MarkdownWorkspace() {
     draftIdRef.current = draft.id;
     return saveDraft(store, draft)
       .then(() => {
-        persistedTextRef.current = text;
-        setIsDirty(false);
-        setLastSavedAt(now);
+        if (draftIdRef.current === draft.id) {
+          persistedTextRef.current = text;
+          setIsDirty(sourceRef.current !== text);
+          setLastSavedAt(now);
+        }
         return listDrafts(store);
       })
       .then(setDrafts)
       .then(refreshStorageEstimate)
-      .catch(() => setStatus('Local autosave failed; your work is still in the editor.'));
+      .then(() => true)
+      .catch(() => { setStatus('Local autosave failed; your work is still in the editor.'); return false; });
   }, [refreshStorageEstimate]);
 
   useEffect(() => {
@@ -261,8 +267,15 @@ export default function MarkdownWorkspace() {
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
+    const request = ++fileReadRef.current;
+    const original = sourceRef.current;
     try {
       const text = await file.text();
+      if (request !== fileReadRef.current) return;
+      if (sourceRef.current !== original) {
+        setStatus('File opening cancelled because the document changed. Open the file again when ready.');
+        return;
+      }
       setSource(text);
       setDocumentName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
       setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
@@ -423,10 +436,22 @@ export default function MarkdownWorkspace() {
       setStatus('Local draft storage is unavailable in this browser.');
       return;
     }
-    void persistDraft(source, effectiveTitleRef.current).then(() => setStatus('Saved a local draft.'));
+    void persistDraft(source, effectiveTitleRef.current).then((saved) => { if (saved) setStatus('Saved a local draft.'); });
   }, [persistDraft, source]);
 
-  const startNewDraft = () => {
+  const startNewDraft = async () => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before starting a new document.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose New again when ready.');
+      return;
+    }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
     setHistory(createHistory(DEFAULT_SOURCE));
@@ -435,7 +460,19 @@ export default function MarkdownWorkspace() {
     setStatus('Started a new document. The previous draft is still listed below.');
   };
 
-  const loadDraft = (draft: DraftRecord) => {
+  const loadDraft = async (draft: DraftRecord) => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before switching drafts.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose the draft again when ready.');
+      return;
+    }
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
     setSource(draft.text);
