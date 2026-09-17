@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { classifyPhotoClipping, photoColorReadout, type PhotoColorReadout } from './photo-color-readout';
 import PhotoCropOverlay, { type PhotoCompositionOverlay } from './PhotoCropOverlay';
+import PhotoScopes from './PhotoScopes';
 import { photoStraightenFromGuide } from './photo-crop';
+import { createPhotoInspectionOverlay } from './photo-scopes';
 import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
@@ -27,6 +29,7 @@ interface PhotoCanvasProps {
   zoom: number;
   sourceName?: string;
   histogram?: PhotoHistogram | null;
+  colorManaged?: boolean;
   busy?: boolean;
   localAdjustments?: LocalAdjustment[];
   retouch?: RetouchOperation[];
@@ -55,6 +58,18 @@ interface StraightenGesture {
 }
 
 type PhotoCompareMode = 'split' | 'side-by-side';
+type PhotoOverlayMode = 'clipping' | 'focus' | 'exposure-zones' | null;
+type PhotoCanvasBackground = 'checkerboard' | 'dark' | 'light' | 'black';
+
+interface PinnedPhotoSample {
+  id: number;
+  x: number;
+  y: number;
+  pixelX: number;
+  pixelY: number;
+  after: PhotoColorReadout;
+  beforeProof?: PhotoColorReadout;
+}
 
 function histogramPath(values: number[], width = 256, height = 56): string {
   const max = Math.max(1, ...values);
@@ -132,6 +147,7 @@ export default function PhotoCanvas({
   zoom,
   sourceName,
   histogram,
+  colorManaged = false,
   busy,
   localAdjustments = [],
   retouch = [],
@@ -147,14 +163,19 @@ export default function PhotoCanvas({
 }: PhotoCanvasProps) {
   const [gesture, setGesture] = useState<GestureState | null>(null);
   const [straightenGesture, setStraightenGesture] = useState<StraightenGesture | null>(null);
-  const [clippingVisible, setClippingVisible] = useState(false);
+  const [overlayMode, setOverlayMode] = useState<PhotoOverlayMode>(null);
+  const [scopesVisible, setScopesVisible] = useState(false);
   const [samplerActive, setSamplerActive] = useState(false);
-  const [sample, setSample] = useState<{ after: PhotoColorReadout; beforeProof?: PhotoColorReadout } | null>(null);
+  const [samples, setSamples] = useState<PinnedPhotoSample[]>([]);
+  const [background, setBackground] = useState<PhotoCanvasBackground>('checkerboard');
+  const [navigatorViewport, setNavigatorViewport] = useState({ left: 0, top: 0, width: 100, height: 100 });
   const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
   const [compareSplit, setCompareSplit] = useState(50);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const proofBaseImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const nextSampleIdRef = useRef(1);
 
   useEffect(() => {
     setCompareMode('split');
@@ -162,7 +183,37 @@ export default function PhotoCanvas({
   }, [originalUrl]);
 
   useEffect(() => {
-    setSample(null);
+    setSamples([]);
+  }, [originalUrl]);
+
+  useEffect(() => {
+    const previewImage = previewImageRef.current;
+    if (!previewImage) return;
+    const proofImage = proofBaseImageRef.current;
+    const refresh = () => {
+      if (!previewImage.naturalWidth || !previewImage.naturalHeight) return;
+      setSamples((current) => current.map((sample) => {
+        const after = readPixelAtNormalized(previewImage, sample.x, sample.y);
+        if (!after) return sample;
+        const beforeProof = proofBaseUrl && proofImage
+          ? readPixelAtNormalized(proofImage, sample.x, sample.y) ?? undefined
+          : undefined;
+        return {
+          ...sample,
+          pixelX: Math.min(previewImage.naturalWidth - 1, Math.max(0, Math.floor(sample.x * previewImage.naturalWidth))),
+          pixelY: Math.min(previewImage.naturalHeight - 1, Math.max(0, Math.floor(sample.y * previewImage.naturalHeight))),
+          after,
+          beforeProof,
+        };
+      }));
+    };
+    if (previewImage.complete && (!proofImage || proofImage.complete)) refresh();
+    previewImage.addEventListener('load', refresh);
+    proofImage?.addEventListener('load', refresh);
+    return () => {
+      previewImage.removeEventListener('load', refresh);
+      proofImage?.removeEventListener('load', refresh);
+    };
   }, [previewUrl, proofBaseUrl]);
 
   useEffect(() => {
@@ -170,7 +221,7 @@ export default function PhotoCanvas({
   }, [geometryMode]);
 
   useEffect(() => {
-    if (!clippingVisible || !previewUrl) return;
+    if (!overlayMode || !previewUrl) return;
     const image = previewImageRef.current;
     const canvas = clippingCanvasRef.current;
     if (!image || !canvas) return;
@@ -189,25 +240,36 @@ export default function PhotoCanvas({
       } catch {
         return;
       }
-      const data = imageData.data;
-      for (let offset = 0; offset < data.length; offset += 4) {
-        const clipping = classifyPhotoClipping(data[offset], data[offset + 1], data[offset + 2]);
-        if (clipping === 'highlight') {
-          data[offset] = 255;
-          data[offset + 1] = 64;
-          data[offset + 2] = 64;
-          data[offset + 3] = 210;
-        } else if (clipping === 'shadow') {
-          data[offset] = 59;
-          data[offset + 1] = 130;
-          data[offset + 2] = 246;
-          data[offset + 3] = 210;
-        } else {
-          data[offset] = 0;
-          data[offset + 1] = 0;
-          data[offset + 2] = 0;
-          data[offset + 3] = 0;
+      if (overlayMode === 'clipping') {
+        const data = imageData.data;
+        for (let offset = 0; offset < data.length; offset += 4) {
+          const clipping = classifyPhotoClipping(data[offset], data[offset + 1], data[offset + 2]);
+          if (clipping === 'highlight') {
+            data[offset] = 255;
+            data[offset + 1] = 64;
+            data[offset + 2] = 64;
+            data[offset + 3] = 210;
+          } else if (clipping === 'shadow') {
+            data[offset] = 59;
+            data[offset + 1] = 130;
+            data[offset + 2] = 246;
+            data[offset + 3] = 210;
+          } else {
+            data[offset] = 0;
+            data[offset + 1] = 0;
+            data[offset + 2] = 0;
+            data[offset + 3] = 0;
+          }
         }
+      } else {
+        const overlayPixels = createPhotoInspectionOverlay(imageData.data, canvas.width, canvas.height, overlayMode);
+        const ownedOverlayPixels = new Uint8ClampedArray(overlayPixels.length);
+        ownedOverlayPixels.set(overlayPixels);
+        imageData = new ImageData(
+          ownedOverlayPixels,
+          canvas.width,
+          canvas.height,
+        );
       }
       context.putImageData(imageData, 0, 0);
     };
@@ -215,7 +277,30 @@ export default function PhotoCanvas({
     if (image.complete) draw();
     else image.addEventListener('load', draw, { once: true });
     return () => image.removeEventListener('load', draw);
-  }, [clippingVisible, compareMode, previewUrl]);
+  }, [overlayMode, compareMode, previewUrl]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !previewUrl) return;
+    const update = () => {
+      const scrollWidth = Math.max(scroller.clientWidth, scroller.scrollWidth);
+      const scrollHeight = Math.max(scroller.clientHeight, scroller.scrollHeight);
+      setNavigatorViewport({
+        left: scroller.scrollLeft / scrollWidth * 100,
+        top: scroller.scrollTop / scrollHeight * 100,
+        width: Math.min(100, scroller.clientWidth / scrollWidth * 100),
+        height: Math.min(100, scroller.clientHeight / scrollHeight * 100),
+      });
+    };
+    const frame = requestAnimationFrame(update);
+    scroller.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [previewUrl, zoom, compareMode]);
 
   function sampleAtPointer(event: ReactPointerEvent<HTMLDivElement>) {
     const image = previewImageRef.current;
@@ -224,29 +309,38 @@ export default function PhotoCanvas({
     if (!rect.width || !rect.height) return;
     const nx = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const ny = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
-    function readPixel(sampleImage: HTMLImageElement): PhotoColorReadout | null {
-      if (!sampleImage.naturalWidth || !sampleImage.naturalHeight) return null;
-      const sx = Math.min(sampleImage.naturalWidth - 1, Math.max(0, Math.floor(nx * sampleImage.naturalWidth)));
-      const sy = Math.min(sampleImage.naturalHeight - 1, Math.max(0, Math.floor(ny * sampleImage.naturalHeight)));
-      const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
-      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
-      if (!context) return null;
-      context.drawImage(sampleImage, sx, sy, 1, 1, 0, 0, 1, 1);
-      const pixel = context.getImageData(0, 0, 1, 1).data;
-      return photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]);
-    }
     try {
-      const after = readPixel(image);
+      const after = readPixelAtNormalized(image, nx, ny);
       if (!after) return;
       const beforeProof = proofBaseUrl && proofBaseImageRef.current
-        ? readPixel(proofBaseImageRef.current) ?? undefined
+        ? readPixelAtNormalized(proofBaseImageRef.current, nx, ny) ?? undefined
         : undefined;
-      setSample({ after, beforeProof });
+      setSamples((current) => [...current, {
+        id: nextSampleIdRef.current++,
+        x: nx,
+        y: ny,
+        pixelX: Math.min(image.naturalWidth - 1, Math.max(0, Math.floor(nx * image.naturalWidth))),
+        pixelY: Math.min(image.naturalHeight - 1, Math.max(0, Math.floor(ny * image.naturalHeight))),
+        after,
+        beforeProof,
+      }].slice(-8));
     } catch {
       // Ignore canvas security errors from unexpected non-local image sources.
     }
+  }
+
+  function readPixelAtNormalized(sampleImage: HTMLImageElement, x: number, y: number): PhotoColorReadout | null {
+    if (!sampleImage.naturalWidth || !sampleImage.naturalHeight) return null;
+    const sx = Math.min(sampleImage.naturalWidth - 1, Math.max(0, Math.floor(x * sampleImage.naturalWidth)));
+    const sy = Math.min(sampleImage.naturalHeight - 1, Math.max(0, Math.floor(y * sampleImage.naturalHeight)));
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+    if (!context) return null;
+    context.drawImage(sampleImage, sx, sy, 1, 1, 0, 0, 1, 1);
+    const pixel = context.getImageData(0, 0, 1, 1).data;
+    return photoColorReadout(pixel[0], pixel[1], pixel[2], pixel[3]);
   }
 
   function beginGesture(event: ReactPointerEvent<HTMLDivElement>) {
@@ -327,6 +421,20 @@ export default function PhotoCanvas({
   const geometryActive = Boolean(geometryMode && originalUrl);
   const comparisonActive = Boolean(!geometryActive && compare && originalUrl && previewUrl);
 
+  function inspectionLayers() {
+    return <>
+      {overlayMode ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid={`photo-${overlayMode}-overlay`} aria-hidden="true" /> : null}
+      {samples.length ? (
+        <svg className="photo-sampler-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {samples.map((sample, index) => <g key={sample.id} transform={`translate(${sample.x * 100} ${sample.y * 100})`}>
+            <circle r="2.25" />
+            <text x="3" y="-3">{index + 1}</text>
+          </g>)}
+        </svg>
+      ) : null}
+    </>;
+  }
+
   function editedSurface(className: string, testId?: string) {
     return (
       <div
@@ -345,7 +453,7 @@ export default function PhotoCanvas({
           data-testid="photo-preview"
           draggable={false}
         />
-        {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
+        {inspectionLayers()}
         <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
         {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
       </div>
@@ -426,16 +534,43 @@ export default function PhotoCanvas({
         <div className="photo-observation-controls" role="group" aria-label="Image inspection controls">
           <button
             type="button"
-            aria-pressed={clippingVisible}
+            aria-pressed={overlayMode === 'clipping'}
             disabled={!previewUrl}
-            onClick={() => setClippingVisible((value) => !value)}
+            onClick={() => setOverlayMode((value) => value === 'clipping' ? null : 'clipping')}
           >Clipping warnings</button>
+          <button
+            type="button"
+            aria-pressed={overlayMode === 'focus'}
+            disabled={!previewUrl}
+            onClick={() => setOverlayMode((value) => value === 'focus' ? null : 'focus')}
+          >Focus map</button>
+          <button
+            type="button"
+            aria-pressed={overlayMode === 'exposure-zones'}
+            disabled={!previewUrl}
+            onClick={() => setOverlayMode((value) => value === 'exposure-zones' ? null : 'exposure-zones')}
+          >Exposure zones</button>
           <button
             type="button"
             aria-pressed={samplerActive}
             disabled={!previewUrl || Boolean(interaction) || geometryActive}
             onClick={() => setSamplerActive((value) => !value)}
           >Color sampler</button>
+          <button
+            type="button"
+            aria-pressed={scopesVisible}
+            disabled={!previewUrl}
+            onClick={() => setScopesVisible((value) => !value)}
+          >Scopes</button>
+          <label className="photo-canvas-background-control">
+            <span>Background</span>
+            <select aria-label="Canvas background" value={background} onChange={(event) => setBackground(event.target.value as PhotoCanvasBackground)}>
+              <option value="checkerboard">Checkerboard</option>
+              <option value="dark">Dark gray</option>
+              <option value="light">Light gray</option>
+              <option value="black">Black</option>
+            </select>
+          </label>
         </div>
         {histogram ? (
           <svg className="photo-mini-histogram" viewBox="0 0 256 56" role="img" aria-label="Live RGB and luminance histogram">
@@ -450,25 +585,27 @@ export default function PhotoCanvas({
       {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · drag on the photo to place it</div> : null}
       {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry.</div> : null}
       {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below.</div> : null}
-      {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to inspect one rendered pixel</div> : null}
-      {sample ? (
-        <div className="photo-color-readout" role="status" aria-label="Sampled color readout">
-          {sample.beforeProof ? <>
-            <strong>Before proof {sample.beforeProof.hex} → after proof {sample.after.hex}</strong>
-            <span>Before proof RGB {sample.beforeProof.r}, {sample.beforeProof.g}, {sample.beforeProof.b}</span>
-            <span>After proof RGB {sample.after.r}, {sample.after.g}, {sample.after.b}</span>
-          </> : <>
-            <strong>{sample.after.hex}</strong>
-            <span>RGB {sample.after.r}, {sample.after.g}, {sample.after.b}</span>
-            <span>HSL {sample.after.hue}°, {sample.after.saturation}%, {sample.after.lightness}%</span>
-            {sample.after.a < 255 ? <span>Alpha {Math.round(sample.after.a / 255 * 100)}%</span> : null}
-          </>}
-        </div>
+      {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to pin up to eight rendered pixels</div> : null}
+      {samples.length ? (
+        <section className="photo-color-readout" role="status" aria-label="Sampled color readout">
+          <header><strong>{samples.length} pinned sample{samples.length === 1 ? '' : 's'}</strong><button type="button" onClick={() => setSamples([])}>Clear samples</button></header>
+          <ol>
+            {samples.map((sample, index) => <li key={sample.id}>
+              <strong>#{index + 1} · pixel {sample.pixelX}, {sample.pixelY} · {sample.after.hex}</strong>
+              {sample.beforeProof ? <span>Before proof {sample.beforeProof.hex} RGB {sample.beforeProof.r}, {sample.beforeProof.g}, {sample.beforeProof.b} → After proof RGB {sample.after.r}, {sample.after.g}, {sample.after.b}</span> : <span>RGB {sample.after.r}, {sample.after.g}, {sample.after.b} · HSL {sample.after.hue}°, {sample.after.saturation}%, {sample.after.lightness}%</span>}
+              {colorManaged ? <span>XYZ D65 {sample.after.xyz.x}, {sample.after.xyz.y}, {sample.after.xyz.z} · Lab D65 {sample.after.lab.l}, {sample.after.lab.a}, {sample.after.lab.b}</span> : null}
+              {sample.after.a < 255 ? <span>Alpha {Math.round(sample.after.a / 255 * 100)}%</span> : null}
+              <button type="button" aria-label={`Remove pinned sample ${index + 1}`} onClick={() => setSamples((current) => current.filter((item) => item.id !== sample.id))}>Remove</button>
+            </li>)}
+          </ol>
+        </section>
       ) : null}
+
+      {scopesVisible && previewUrl ? <PhotoScopes previewUrl={previewUrl} /> : null}
 
       {proofBaseUrl ? <img ref={proofBaseImageRef} data-testid="photo-proof-base" src={proofBaseUrl} alt="" hidden aria-hidden="true" /> : null}
 
-      <div className="photo-canvas-scroller" data-photo-canvas>
+      <div ref={scrollerRef} className={`photo-canvas-scroller photo-canvas-background-${background}`} data-photo-canvas>
         {!previewUrl ? (
           <div className="photo-empty-state">
             <div className="photo-empty-icon" aria-hidden="true">▧</div>
@@ -519,12 +656,38 @@ export default function PhotoCanvas({
                 <span className="photo-compare-divider" aria-hidden="true" />
               </>
             ) : null}
-            {clippingVisible ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid="photo-clipping-overlay" aria-hidden="true" /> : null}
+            {inspectionLayers()}
             <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
         )}
       </div>
+      {previewUrl && zoom > 1 ? (
+        <button
+          type="button"
+          className="photo-navigator"
+          aria-label="Navigator minimap"
+          onClick={(event) => {
+            const scroller = scrollerRef.current;
+            if (!scroller) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+            scroller.scrollTo({
+              left: x * scroller.scrollWidth - scroller.clientWidth / 2,
+              top: y * scroller.scrollHeight - scroller.clientHeight / 2,
+            });
+          }}
+        >
+          <img src={previewUrl} alt="" aria-hidden="true" />
+          <span aria-hidden="true" style={{
+            left: `${navigatorViewport.left}%`,
+            top: `${navigatorViewport.top}%`,
+            width: `${navigatorViewport.width}%`,
+            height: `${navigatorViewport.height}%`,
+          }} />
+        </button>
+      ) : null}
     </section>
   );
 }

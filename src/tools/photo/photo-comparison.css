@@ -47,8 +47,12 @@
 .photo-studio .photo-image-frame .photo-preview-image,
 .photo-studio .photo-image-frame .photo-before-overlay img,
 .photo-studio .photo-image-frame .photo-edit-overlay,
+.photo-studio .photo-image-frame .photo-clipping-overlay,
+.photo-studio .photo-image-frame .photo-sampler-overlay,
 .photo-studio .photo-compare-pane .photo-preview-image,
-.photo-studio .photo-compare-pane .photo-edit-overlay {
+.photo-studio .photo-compare-pane .photo-edit-overlay,
+.photo-studio .photo-compare-pane .photo-clipping-overlay,
+.photo-studio .photo-compare-pane .photo-sampler-overlay {
   transform: none;
 }
 

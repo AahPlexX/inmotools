@@ -404,6 +404,7 @@ test('ICC assign, convert, proof, gamut, and proof-aware sampling stay distinct'
   else await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.getByLabel('Sampled color readout')).toContainText('Before proof');
   await expect(page.getByLabel('Sampled color readout')).toContainText('After proof RGB');
+  await expect(page.getByLabel('Sampled color readout')).toContainText('Lab D65');
 
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -416,4 +417,51 @@ test('ICC assign, convert, proof, gamut, and proof-aware sampling stay distinct'
   const chunks: Buffer[] = [];
   for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
   expect(Buffer.concat(chunks).toString('latin1')).toContain('iCCP');
+});
+
+test('inspection scopes, overlays, pinned samples, background, and navigator use the rendered preview', async ({ page, isMobile }) => {
+  await openFixture(page);
+
+  await page.getByRole('button', { name: 'Scopes', exact: true }).click();
+  await expect(page.getByTestId('photo-scopes')).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Luminance waveform scope' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'RGB parade scope' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'YCbCr vectorscope' })).toBeVisible();
+  await expect(page.getByLabel('Exposure zone distribution')).toContainText('0 EV');
+
+  await page.getByRole('button', { name: 'Focus map', exact: true }).click();
+  await expect(page.getByTestId('photo-focus-overlay')).toBeAttached();
+  await expect.poll(() => page.getByTestId('photo-focus-overlay').evaluate((canvas: HTMLCanvasElement) => canvas.width)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Exposure zones', exact: true }).click();
+  await expect(page.getByTestId('photo-focus-overlay')).toHaveCount(0);
+  await expect(page.getByTestId('photo-exposure-zones-overlay')).toBeAttached();
+
+  await page.getByLabel('Canvas background').selectOption('light');
+  await expect(page.locator('[data-photo-canvas]')).toHaveClass(/photo-canvas-background-light/);
+
+  await page.getByRole('button', { name: 'Color sampler', exact: true }).click();
+  const image = page.getByTestId('photo-preview');
+  const box = (await image.boundingBox())!;
+  const first = { x: box.width * 0.25, y: box.height * 0.35 };
+  const second = { x: box.width * 0.75, y: box.height * 0.65 };
+  if (isMobile) {
+    await image.tap({ position: first });
+    await image.tap({ position: second });
+  } else {
+    await image.click({ position: first });
+    await image.click({ position: second });
+  }
+  await expect(page.getByLabel('Sampled color readout')).toContainText('2 pinned samples');
+  await expect(page.getByLabel('Sampled color readout')).toContainText('pixel');
+  await expect(page.getByLabel('Remove pinned sample 2')).toBeVisible();
+  const samplesBeforeEdit = await page.getByLabel('Sampled color readout').textContent();
+  const exposure = page.getByLabel('Exposure value');
+  await exposure.fill('1');
+  await exposure.press('Enter');
+  await expect(page.getByLabel('Sampled color readout')).toContainText('2 pinned samples');
+  await expect.poll(() => page.getByLabel('Sampled color readout').textContent()).not.toBe(samplesBeforeEdit);
+
+  await page.getByRole('button', { name: 'Actual size' }).click();
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.getByRole('button', { name: 'Navigator minimap' })).toBeVisible();
 });

@@ -7,6 +7,8 @@ export interface PhotoColorReadout {
   saturation: number;
   lightness: number;
   hex: string;
+  xyz: { x: number; y: number; z: number };
+  lab: { l: number; a: number; b: number };
 }
 
 export type PhotoClippingKind = 'shadow' | 'highlight' | null;
@@ -36,12 +38,41 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [hue * 60, saturation, lightness];
 }
 
+function roundTwo(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function rgbToXyzLab(r: number, g: number, b: number): Pick<PhotoColorReadout, 'xyz' | 'lab'> {
+  const linear = [r, g, b].map((value) => {
+    const channel = clampByte(value) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const x = (linear[0] * 0.4124564 + linear[1] * 0.3575761 + linear[2] * 0.1804375) * 100;
+  const y = (linear[0] * 0.2126729 + linear[1] * 0.7151522 + linear[2] * 0.072175) * 100;
+  const z = (linear[0] * 0.0193339 + linear[1] * 0.119192 + linear[2] * 0.9503041) * 100;
+  const labCurve = (value: number) => value > 216 / 24389
+    ? Math.cbrt(value)
+    : (24389 / 27 * value + 16) / 116;
+  const fx = labCurve(x / 95.047);
+  const fy = labCurve(y / 100);
+  const fz = labCurve(z / 108.883);
+  return {
+    xyz: { x: roundTwo(x), y: roundTwo(y), z: roundTwo(z) },
+    lab: {
+      l: roundTwo(116 * fy - 16),
+      a: roundTwo(500 * (fx - fy)),
+      b: roundTwo(200 * (fy - fz)),
+    },
+  };
+}
+
 export function photoColorReadout(r: number, g: number, b: number, a = 255): PhotoColorReadout {
   const red = clampByte(r);
   const green = clampByte(g);
   const blue = clampByte(b);
   const alpha = clampByte(a);
   const [hue, saturation, lightness] = rgbToHsl(red, green, blue);
+  const colorimetric = rgbToXyzLab(red, green, blue);
   const hex = `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
   return {
     r: red,
@@ -52,6 +83,7 @@ export function photoColorReadout(r: number, g: number, b: number, a = 255): Pho
     saturation: Math.round(saturation * 100),
     lightness: Math.round(lightness * 100),
     hex,
+    ...colorimetric,
   };
 }
 

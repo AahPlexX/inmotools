@@ -2082,6 +2082,8 @@ export default function PhotoWorkspace() {
           zoom={zoom}
           sourceName={source?.name}
           histogram={preview?.result.histogram ?? null}
+          colorManaged={Boolean(recipe.colorManagement?.assignedProfile
+            || (recipe.colorManagement?.softProof && recipe.colorManagement.proofProfile))}
           busy={previewBusy}
           localAdjustments={recipe.localAdjustments}
           retouch={recipe.retouch}

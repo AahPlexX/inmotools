@@ -12,6 +12,8 @@ describe('Photo Studio color readout', () => {
       saturation: 100,
       lightness: 50,
       hex: '#FF0000',
+      xyz: { x: 41.25, y: 21.27, z: 1.93 },
+      lab: { l: 53.24, a: 80.09, b: 67.2 },
     });
   });
 
@@ -22,6 +24,8 @@ describe('Photo Studio color readout', () => {
     expect(readout.b).toBe(128);
     expect(readout.a).toBe(255);
     expect(readout.hex).toBe('#FF0080');
+    expect(readout.lab.l).toBeGreaterThan(0);
+    expect(readout.xyz.y).toBeGreaterThan(0);
   });
 
   test('classifies deep shadows when every channel is near black', () => {
