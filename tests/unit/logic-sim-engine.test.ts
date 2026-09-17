@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addComponent, addWire, createInitialDocument, setDelayMode } from '../../src/tools/logic/circuit-model';
+import { addComponent, addWire, createInitialDocument, setDelayMode, updateComponentParams } from '../../src/tools/logic/circuit-model';
 import { createInitialFrame, readLevel, step } from '../../src/tools/logic/sim-engine';
 import type { LogicDocument, LogicLevel } from '../../src/tools/logic/logic-types';
 
@@ -131,6 +131,89 @@ describe('sim-engine sequential elements', () => {
     expect(readLevel(frame, latch, 'Q')).toBe(1);
     frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [setSwitch]: 1, [resetSwitch]: 1 } });
     expect(readLevel(frame, latch, 'Q')).toBe('X');
+  });
+
+  it('honors an active-low asynchronous reset instead of always treating logic 1 as asserted', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'SWITCH', 0, 0);
+    const dataSwitch = doc.components[0]!.id;
+    doc = addComponent(doc, 'SWITCH', 0, 1);
+    const clockSwitch = doc.components[1]!.id;
+    doc = addComponent(doc, 'SWITCH', 0, 4);
+    const rstSwitch = doc.components[2]!.id;
+    doc = addComponent(doc, 'D_FLIP_FLOP', 3, 0);
+    const flipFlop = doc.components[3]!.id;
+    doc = updateComponentParams(doc, flipFlop, { activeHigh: false });
+    doc = addWire(doc, { componentId: dataSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'D' });
+    doc = addWire(doc, { componentId: clockSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'CLK' });
+    doc = addWire(doc, { componentId: rstSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'RST' });
+
+    // Latch Q to 1 first, with RST held at 1 -- inactive for an active-low reset.
+    let frame = createInitialFrame(doc);
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [dataSwitch]: 1, [clockSwitch]: 0, [rstSwitch]: 1 } });
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [clockSwitch]: 1 } });
+    expect(readLevel(frame, flipFlop, 'Q')).toBe(1);
+
+    // RST staying at 1 (still inactive) must not force Q low.
+    frame = step({ document: doc, previous: frame, elapsedMs: 16 });
+    expect(readLevel(frame, flipFlop, 'Q')).toBe(1);
+
+    // Driving RST to 0 is the asserted level for active-low and must reset Q.
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [rstSwitch]: 0 } });
+    expect(readLevel(frame, flipFlop, 'Q')).toBe(0);
+  });
+
+  it('propagates a flip-flop output to a directly wired LED within the same simulation step', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'SWITCH', 0, 0);
+    const dataSwitch = doc.components[0]!.id;
+    doc = addComponent(doc, 'SWITCH', 0, 3);
+    const clockSwitch = doc.components[1]!.id;
+    doc = addComponent(doc, 'D_FLIP_FLOP', 3, 0);
+    const flipFlop = doc.components[2]!.id;
+    doc = addComponent(doc, 'LED', 6, 0);
+    const led = doc.components[3]!.id;
+    doc = addWire(doc, { componentId: dataSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'D' });
+    doc = addWire(doc, { componentId: clockSwitch, portId: 'Y' }, { componentId: flipFlop, portId: 'CLK' });
+    doc = addWire(doc, { componentId: flipFlop, portId: 'Q' }, { componentId: led, portId: 'A' });
+
+    let frame = createInitialFrame(doc);
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [dataSwitch]: 1, [clockSwitch]: 0 } });
+    frame = step({ document: doc, previous: frame, elapsedMs: 16, interactions: { [clockSwitch]: 1 } });
+    expect(readLevel(frame, flipFlop, 'Q')).toBe(1);
+    expect(readLevel(frame, led, 'A')).toBe(1);
+  });
+});
+
+describe('sim-engine clock generator', () => {
+  it('crosses multiple half-periods in one step without losing cycles or drifting', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'CLOCK', 0, 0);
+    const clock = doc.components[0]!.id;
+    doc = updateComponentParams(doc, clock, { frequencyHz: 1000 });
+
+    // At 1000 Hz the half-period is 0.5 ms, so a 16 ms step crosses 32
+    // half-periods (even) and must land back on the level it started from (0).
+    let frame = createInitialFrame(doc);
+    frame = step({ document: doc, previous: frame, elapsedMs: 16 });
+    expect(readLevel(frame, clock, 'Y')).toBe(0);
+
+    // One more 0.5 ms crosses a 33rd half-period (odd) and must flip to 1.
+    frame = step({ document: doc, previous: frame, elapsedMs: 0.5 });
+    expect(readLevel(frame, clock, 'Y')).toBe(1);
+  });
+
+  it('advances exactly one half-period on a manual forced clock step regardless of configured frequency', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'CLOCK', 0, 0);
+    const clock = doc.components[0]!.id;
+    doc = updateComponentParams(doc, clock, { frequencyHz: 0.5 });
+
+    let frame = createInitialFrame(doc);
+    frame = step({ document: doc, previous: frame, elapsedMs: 0, forceClockStep: true });
+    expect(readLevel(frame, clock, 'Y')).toBe(1);
+    frame = step({ document: doc, previous: frame, elapsedMs: 0, forceClockStep: true });
+    expect(readLevel(frame, clock, 'Y')).toBe(0);
   });
 });
 

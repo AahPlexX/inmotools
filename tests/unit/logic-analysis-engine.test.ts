@@ -7,7 +7,7 @@ import {
   runElectricalRuleCheck,
   truthTableToCsv,
 } from '../../src/tools/logic/analysis-engine';
-import { addComponent, addWire, createInitialDocument, relabelComponent } from '../../src/tools/logic/circuit-model';
+import { addComponent, addWire, createInitialDocument, relabelComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
 
 const buildAndCircuit = () => {
   let doc = createInitialDocument();
@@ -56,6 +56,53 @@ describe('analysis-engine truth table generation', () => {
     let doc = buildAndCircuit();
     doc = addComponent(doc, 'D_FLIP_FLOP', 9, 0);
     expect(() => generateTruthTable(doc)).toThrow();
+  });
+
+  it('reads the stable requested level for a bouncing push button instead of its transient first-tick bounce', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'PUSH_BUTTON', 0, 0);
+    const button = doc.components[0]!.id;
+    doc = relabelComponent(doc, button, 'A');
+    doc = updateComponentParams(doc, button, { bounce: true });
+    doc = addComponent(doc, 'BUFFER', 3, 0);
+    const gate = doc.components[1]!.id;
+    doc = addComponent(doc, 'LED', 6, 0);
+    const led = doc.components[2]!.id;
+    doc = relabelComponent(doc, led, 'Y');
+    doc = addWire(doc, { componentId: button, portId: 'Y' }, { componentId: gate, portId: 'A' });
+    doc = addWire(doc, { componentId: gate, portId: 'Y' }, { componentId: led, portId: 'A' });
+
+    const table = generateTruthTable(doc);
+    const pressedRow = table.rows.find((row) => Object.values(row.inputs)[0] === 1);
+    expect(pressedRow?.outputs[led]).toBe(1);
+  });
+
+  it('marks an output unresolved rather than presenting a floating/contended value as a constant Boolean expression', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'SWITCH', 0, 0);
+    const switchA = doc.components[0]!.id;
+    doc = relabelComponent(doc, switchA, 'A');
+    doc = addComponent(doc, 'LED', 3, 0);
+    const led = doc.components[1]!.id;
+    doc = relabelComponent(doc, led, 'Y');
+    // The LED's input is left unwired, so every row reads Z (floating).
+    const table = generateTruthTable(doc);
+    const [expression] = extractBooleanExpressions(table);
+    expect(expression!.hasUnresolvedRows).toBe(true);
+    expect(formatSop(expression!)).toContain('unresolved');
+    expect(formatPos(expression!)).toContain('unresolved');
+  });
+});
+
+describe('analysis-engine CSV export', () => {
+  it('quotes a signal label containing a comma so the exported CSV stays well-formed', () => {
+    let doc = buildAndCircuit();
+    const outputComponent = doc.components.find((component) => component.label === 'Y')!;
+    doc = relabelComponent(doc, outputComponent.id, 'Output, Final');
+    const table = generateTruthTable(doc);
+    const csv = truthTableToCsv(table);
+    const header = csv.split('\n')[0]!;
+    expect(header).toBe('A,B,"Output, Final"');
   });
 });
 

@@ -47,7 +47,15 @@ export const generateTruthTable = (document: LogicDocument): TruthTable => {
 
   const inputs: TruthTableSignal[] = document.components.filter(isInputSource).map((component) => ({ componentId: component.id, label: component.label || component.id }));
   const outputs: TruthTableSignal[] = document.components.filter(isObservableOutput).map((component) => ({ componentId: component.id, label: component.label || component.id }));
-  const idealDocument: LogicDocument = { ...document, simulation: { ...document.simulation, delayMode: 'ideal' } };
+  // Mechanical bounce is an interactive teaching aid; a truth table must read
+  // the stable logical value for each requested input combination, not the
+  // transient contact-bounce level a PUSH_BUTTON would emit on its first tick.
+  const idealDocument: LogicDocument = {
+    ...document,
+    simulation: { ...document.simulation, delayMode: 'ideal' },
+    components: document.components.map((component) =>
+      component.type === 'PUSH_BUTTON' ? { ...component, params: { ...component.params, bounce: false } } : component),
+  };
 
   const rows: TruthTableRow[] = [];
   const combinations = 1 << inputs.length;
@@ -68,14 +76,16 @@ export const generateTruthTable = (document: LogicDocument): TruthTable => {
   return { inputs, outputs, rows };
 };
 
+const escapeCsvCell = (value: string): string => (/[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+
 export const truthTableToCsv = (table: TruthTable): string => {
-  const header = [...table.inputs.map((input) => input.label), ...table.outputs.map((output) => output.label)];
+  const header = [...table.inputs.map((input) => input.label), ...table.outputs.map((output) => output.label)].map(escapeCsvCell);
   const lines = [header.join(',')];
   for (const row of table.rows) {
     const cells = [
       ...table.inputs.map((input) => String(row.inputs[input.componentId])),
       ...table.outputs.map((output) => String(row.outputs[output.componentId])),
-    ];
+    ].map(escapeCsvCell);
     lines.push(cells.join(','));
   }
   return lines.join('\n');
@@ -91,24 +101,32 @@ export interface BooleanExpression {
   readonly outputComponentId: string;
   readonly sopTerms: readonly (readonly BooleanLiteral[])[];
   readonly posTerms: readonly (readonly BooleanLiteral[])[];
+  /** True if at least one input combination left this output floating (Z) or contended (X). */
+  readonly hasUnresolvedRows: boolean;
 }
 
 export const extractBooleanExpressions = (table: TruthTable): BooleanExpression[] =>
   table.outputs.map((output) => {
     const sopTerms: BooleanLiteral[][] = [];
     const posTerms: BooleanLiteral[][] = [];
+    let hasUnresolvedRows = false;
     for (const row of table.rows) {
       const value = row.outputs[output.componentId];
       if (value === 1) {
         sopTerms.push(table.inputs.map((input) => ({ label: input.label, negated: row.inputs[input.componentId] === 0 })));
       } else if (value === 0) {
         posTerms.push(table.inputs.map((input) => ({ label: input.label, negated: row.inputs[input.componentId] === 1 })));
+      } else {
+        hasUnresolvedRows = true;
       }
     }
-    return { outputLabel: output.label, outputComponentId: output.componentId, sopTerms, posTerms };
+    return { outputLabel: output.label, outputComponentId: output.componentId, sopTerms, posTerms, hasUnresolvedRows };
   });
 
+const UNRESOLVED_MESSAGE = 'is unresolved for at least one input combination (floating or contended) and has no single Boolean expression';
+
 export const formatSop = (expression: BooleanExpression): string => {
+  if (expression.hasUnresolvedRows) return `${expression.outputLabel} ${UNRESOLVED_MESSAGE}`;
   if (expression.sopTerms.length === 0) return `${expression.outputLabel} = 0`;
   const body = expression.sopTerms
     .map((term) => term.map((literal) => (literal.negated ? `${literal.label}'` : literal.label)).join(''))
@@ -117,6 +135,7 @@ export const formatSop = (expression: BooleanExpression): string => {
 };
 
 export const formatPos = (expression: BooleanExpression): string => {
+  if (expression.hasUnresolvedRows) return `${expression.outputLabel} ${UNRESOLVED_MESSAGE}`;
   if (expression.posTerms.length === 0) return `${expression.outputLabel} = 1`;
   const body = expression.posTerms
     .map((term) => `(${term.map((literal) => (literal.negated ? `${literal.label}'` : literal.label)).join(' + ')})`)

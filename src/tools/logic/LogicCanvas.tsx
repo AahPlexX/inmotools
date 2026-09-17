@@ -28,7 +28,7 @@ export interface LogicCanvasProps {
   readonly frame: SimulationFrame;
   readonly theme: ThemeName;
   readonly placingType: ComponentType | null;
-  readonly onMoveComponent: (id: string, x: number, y: number) => void;
+  readonly onMoveComponent: (id: string, x: number, y: number, final: boolean) => void;
   readonly onSelect: (ids: string[]) => void;
   readonly onAddWire: (from: PortRef, to: PortRef) => void;
   readonly onToggleSwitch: (id: string) => void;
@@ -53,10 +53,11 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; radial: boolean; actions: readonly MenuAction[]; label: string } | null>(null);
 
-  const dragRef = useRef<{ ids: string[]; startWorld: ScreenPoint; originals: Record<string, ScreenPoint>; moved: boolean; clickTargetId?: string } | null>(null);
+  const dragRef = useRef<{ ids: string[]; startWorld: ScreenPoint; originals: Record<string, ScreenPoint>; moved: boolean; clickTargetId?: string; lastDx: number; lastDy: number } | null>(null);
   const panRef = useRef<{ startScreen: ScreenPoint; startPan: ScreenPoint } | null>(null);
   const marqueeStartRef = useRef<ScreenPoint | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -119,6 +120,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     setMenu(null);
+    longPressFiredRef.current = false;
     const screenPoint = getScreenPoint(event);
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
 
@@ -154,7 +156,13 @@ export function LogicCanvas(props: LogicCanvasProps) {
     const component = componentAt(worldPoint);
     if (component) {
       if (event.pointerType === 'touch') {
-        longPressTimerRef.current = window.setTimeout(() => openMenuFor(component.id, screenPoint, true), LONG_PRESS_MS);
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressFiredRef.current = true;
+          // The long press opens a context menu; undo the provisional press
+          // this same gesture started so releasing it doesn't also fire the button.
+          if (component.type === 'PUSH_BUTTON') onPressButton(component.id, false);
+          openMenuFor(component.id, screenPoint, true);
+        }, LONG_PRESS_MS);
       }
       if (component.type === 'PUSH_BUTTON') onPressButton(component.id, true);
       const alreadySelected = doc.selectedIds.includes(component.id);
@@ -166,7 +174,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
         const target = doc.components.find((candidate) => candidate.id === id);
         if (target) originals[id] = { x: target.x, y: target.y };
       }
-      dragRef.current = { ids: targets, startWorld: worldPoint, originals, moved: false, clickTargetId: component.id };
+      dragRef.current = { ids: targets, startWorld: worldPoint, originals, moved: false, clickTargetId: component.id, lastDx: 0, lastDy: 0 };
       return;
     }
 
@@ -193,10 +201,15 @@ export function LogicCanvas(props: LogicCanvasProps) {
         clearLongPress();
       }
       if (dragRef.current.moved) {
+        dragRef.current.lastDx = dx;
+        dragRef.current.lastDy = dy;
+        // Live-preview the drag without committing undo history on every
+        // pointer event; handlePointerUp commits the final positions once,
+        // as a single undoable move.
         for (const id of dragRef.current.ids) {
           const origin = dragRef.current.originals[id];
           if (!origin) continue;
-          onMoveComponent(id, snapToGrid(origin.x * GRID_SIZE + dx) / GRID_SIZE, snapToGrid(origin.y * GRID_SIZE + dy) / GRID_SIZE);
+          onMoveComponent(id, snapToGrid(origin.x * GRID_SIZE + dx) / GRID_SIZE, snapToGrid(origin.y * GRID_SIZE + dy) / GRID_SIZE, false);
         }
       }
       return;
@@ -234,13 +247,21 @@ export function LogicCanvas(props: LogicCanvasProps) {
     if (panRef.current) { panRef.current = null; return; }
 
     if (dragRef.current) {
-      const { moved, clickTargetId } = dragRef.current;
-      if (!moved && clickTargetId) {
-        const component = doc.components.find((candidate) => candidate.id === clickTargetId);
-        if (component?.type === 'SWITCH') onToggleSwitch(component.id);
+      const { moved, clickTargetId, ids, originals, lastDx, lastDy } = dragRef.current;
+      const longPressTriggered = longPressFiredRef.current;
+      if (moved) {
+        for (const id of ids) {
+          const origin = originals[id];
+          if (!origin) continue;
+          onMoveComponent(id, snapToGrid(origin.x * GRID_SIZE + lastDx) / GRID_SIZE, snapToGrid(origin.y * GRID_SIZE + lastDy) / GRID_SIZE, true);
+        }
       }
-      if (dragRef.current.ids.some((id) => doc.components.find((c) => c.id === id)?.type === 'PUSH_BUTTON')) {
-        for (const id of dragRef.current.ids) {
+      if (!longPressTriggered) {
+        if (!moved && clickTargetId) {
+          const component = doc.components.find((candidate) => candidate.id === clickTargetId);
+          if (component?.type === 'SWITCH') onToggleSwitch(component.id);
+        }
+        for (const id of ids) {
           const component = doc.components.find((candidate) => candidate.id === id);
           if (component?.type === 'PUSH_BUTTON') onPressButton(id, false);
         }

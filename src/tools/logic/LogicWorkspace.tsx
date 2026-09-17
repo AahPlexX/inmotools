@@ -92,10 +92,10 @@ export default function LogicWorkspace() {
     }
   }, [history.present]);
 
-  const runStep = useCallback((elapsedMs: number) => {
+  const runStep = useCallback((elapsedMs: number, forceClockStep = false) => {
     const interactions = { ...liveButtonLevelsRef.current, ...pendingSwitchOverrideRef.current };
     pendingSwitchOverrideRef.current = {};
-    frameRef.current = step({ document: documentRef.current, previous: frameRef.current, elapsedMs, interactions });
+    frameRef.current = step({ document: documentRef.current, previous: frameRef.current, elapsedMs, interactions, forceClockStep });
     bumpFrame();
   }, []);
 
@@ -152,8 +152,11 @@ export default function LogicWorkspace() {
     setHistory((prev) => commit(prev, `Add ${type}`, (doc) => addComponent(doc, type, Math.round(worldX), Math.round(worldY))));
   }, []);
 
-  const handleMoveComponent = useCallback((id: string, x: number, y: number) => {
-    setHistory((prev) => commit(prev, 'Move', (doc) => moveComponent(doc, id, x, y)));
+  const handleMoveComponent = useCallback((id: string, x: number, y: number, final: boolean) => {
+    // Only the final position of a drag becomes an undo step; intermediate
+    // pointer-move updates preview the move live without touching history,
+    // so dragging one component across the canvas is one undo, not hundreds.
+    setHistory((prev) => (final ? commit(prev, 'Move', (doc) => moveComponent(doc, id, x, y)) : { ...prev, present: moveComponent(prev.present, id, x, y) }));
   }, []);
 
   const handleSelect = useCallback((ids: string[]) => {
@@ -197,7 +200,7 @@ export default function LogicWorkspace() {
   const ercFindings: ErcFinding[] = useMemo(() => (activeDock === 'erc' ? runElectricalRuleCheck(doc) : []), [activeDock, doc]);
 
   const handleNewProject = () => {
-    if (!window.confirm('Start a new blank circuit? The current one stays in this browser’s autosave until you overwrite it.')) return;
+    if (!window.confirm('Start a new blank circuit? This replaces the one on screen, including its autosave and undo history, and cannot be undone. Use Save project first if you want to keep it.')) return;
     const fresh = createInitialDocument();
     setHistory(createHistory(fresh));
     frameRef.current = createInitialFrame(fresh);
@@ -249,7 +252,7 @@ export default function LogicWorkspace() {
         <button type="button" onClick={() => setHistory((prev) => commit(prev, 'Toggle run', (d) => setRunning(d, !d.simulation.running)))} title="Play/pause (Space)">
           {doc.simulation.running ? 'Pause' : 'Run'}
         </button>
-        <button type="button" onClick={() => runStep(120000)} title="Advance one manual tick, including any clock">Step</button>
+        <button type="button" onClick={() => runStep(0, true)} title="Advance one manual tick, including any clock">Step</button>
         <button type="button" onClick={() => setHistory((prev) => commit(prev, 'Delay mode', (d) => setDelayMode(d, d.simulation.delayMode === 'ideal' ? 'realistic' : 'ideal')))}>
           {doc.simulation.delayMode === 'ideal' ? 'Ideal delay' : 'Realistic delay'}
         </button>

@@ -19,6 +19,25 @@ describe('export-engine project bundle', () => {
     expect(validateProjectJson(JSON.stringify(createInitialDocument())).ok).toBe(true);
   });
 
+  it('rejects a structurally incomplete document that only claims schemaVersion 1', () => {
+    expect(validateProjectJson(JSON.stringify({ schemaVersion: 1 })).ok).toBe(false);
+  });
+
+  it('rejects a document whose wire references a component or port that does not exist', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'LED', 0, 0);
+    const led = doc.components[0]!.id;
+    const withBadWire = { ...doc, wires: [{ id: 'w1', from: { componentId: 'missing', portId: 'Y' }, to: { componentId: led, portId: 'A' }, waypoints: [] }] };
+    expect(validateProjectJson(JSON.stringify(withBadWire)).ok).toBe(false);
+  });
+
+  it('rejects a document with a non-finite coordinate, which would otherwise reach SVG export unescaped', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'LED', 0, 0);
+    const corrupted = { ...doc, components: [{ ...doc.components[0]!, x: '10" /><script>alert(1)</script>' }] };
+    expect(validateProjectJson(JSON.stringify(corrupted)).ok).toBe(false);
+  });
+
   it('slugifies the metadata title into a safe file name', () => {
     let doc = createInitialDocument('My Cool Circuit!! 2026');
     doc = updateMetadata(doc, { title: 'My Cool Circuit!! 2026' });

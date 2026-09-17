@@ -149,8 +149,26 @@ export const relabelComponent = (document: LogicDocument, componentId: string, l
   components: document.components.map((component) => (component.id === componentId ? { ...component, label } : component)),
 });
 
+const findPort = (document: LogicDocument, ref: PortRef) => {
+  const component = document.components.find((candidate) => candidate.id === ref.componentId);
+  if (!component) return undefined;
+  return getComponentPorts(component.type, component.params).find((port) => port.id === ref.portId);
+};
+
+/**
+ * Rejects wires that could never carry a real signal: a reference to a port
+ * that does not exist (stale selection, or a hand-edited/corrupted project),
+ * and input-to-input connections, which have no possible driver and would
+ * only ever read back as floating. Output-to-output wiring is intentionally
+ * allowed — sharing a net between two outputs is normal tri-state bus usage,
+ * and the simulator already reports a genuine level disagreement as contention.
+ */
 export const addWire = (document: LogicDocument, from: PortRef, to: PortRef, waypoints: readonly WirePoint[] = []): LogicDocument => {
   if (from.componentId === to.componentId && from.portId === to.portId) return document;
+  const fromPort = findPort(document, from);
+  const toPort = findPort(document, to);
+  if (!fromPort || !toPort) return document;
+  if (fromPort.direction === 'input' && toPort.direction === 'input') return document;
   const wire: Wire = { id: nextId('wire'), from, to, waypoints };
   return { ...document, wires: [...document.wires, wire] };
 };

@@ -26,6 +26,13 @@ const MAX_SETTLE_ITERATIONS_PER_COMPONENT = 64;
 
 const toBit = (level: LogicLevel): 0 | 1 | undefined => (level === 0 || level === 1 ? level : undefined);
 
+/** Whether a control input (SET/RST/S/R) is asserted, honoring the component's configured active-high/low polarity. */
+const isAsserted = (level: LogicLevel, activeHigh: boolean | undefined): boolean => {
+  const bit = toBit(level);
+  if (bit === undefined) return false;
+  return activeHigh === false ? bit === 0 : bit === 1;
+};
+
 const delayTicksFor = (delayNs: number | undefined): number => Math.max(1, Math.round((delayNs ?? 0) / DELAY_SCALE_NS));
 
 export interface NetIndex {
@@ -160,6 +167,8 @@ export interface StepInput {
   readonly elapsedMs: number;
   /** componentId -> forced output level, applied to SWITCH/PUSH_BUTTON sources this tick. */
   readonly interactions?: Readonly<Record<string, LogicLevel>>;
+  /** Advances every CLOCK component by exactly one half-period transition, ignoring elapsedMs, for the manual single-step control. */
+  readonly forceClockStep?: boolean;
 }
 
 export const createInitialFrame = (document: LogicDocument): SimulationFrame => {
@@ -176,7 +185,7 @@ export const createInitialFrame = (document: LogicDocument): SimulationFrame => 
   return { tick: 0, portLevels: levels, componentState: state, pendingUpdates: [], hazards: [] };
 };
 
-export const step = ({ document, previous, elapsedMs, interactions = {} }: StepInput): SimulationFrame => {
+export const step = ({ document, previous, elapsedMs, interactions = {}, forceClockStep = false }: StepInput): SimulationFrame => {
   const tick = previous.tick + 1;
   const net = buildNetIndex(document.components, document.wires);
   const portMap = buildComponentPortMap(document.components);
@@ -219,14 +228,26 @@ export const step = ({ document, previous, elapsedMs, interactions = {} }: StepI
       const halfPeriodMs = 500 / frequencyHz;
       const state = nextState[component.id] ?? {};
       const previousLevel = toBit(levels.get(outKey) ?? 0) ?? 0;
-      const accumulatedMs = (state.clockNextToggleTick ?? 0) + elapsedMs;
-      if (accumulatedMs >= halfPeriodMs) {
-        const toggled: 0 | 1 = previousLevel === 1 ? 0 : 1;
-        levels.set(outKey, toggled);
+      if (forceClockStep) {
+        levels.set(outKey, previousLevel === 1 ? 0 : 1);
         nextState[component.id] = { ...state, clockNextToggleTick: 0 };
       } else {
-        levels.set(outKey, previousLevel);
-        nextState[component.id] = { ...state, clockNextToggleTick: accumulatedMs };
+        const accumulatedMs = (state.clockNextToggleTick ?? 0) + elapsedMs;
+        // A slow frame can cross more than one half-period at once (routine
+        // for configured frequencies above a few hundred Hz). Toggling only
+        // once and dropping the remainder would make high-frequency clocks
+        // run at the render cadence instead of their configured rate, so the
+        // crossed-boundary count decides the final level and the leftover
+        // phase time is carried forward exactly.
+        const halfPeriodsCrossed = Math.floor(accumulatedMs / halfPeriodMs);
+        if (halfPeriodsCrossed > 0) {
+          const toggled: 0 | 1 = halfPeriodsCrossed % 2 === 1 ? (previousLevel === 1 ? 0 : 1) : previousLevel;
+          levels.set(outKey, toggled);
+          nextState[component.id] = { ...state, clockNextToggleTick: accumulatedMs - halfPeriodsCrossed * halfPeriodMs };
+        } else {
+          levels.set(outKey, previousLevel);
+          nextState[component.id] = { ...state, clockNextToggleTick: accumulatedMs };
+        }
       }
     }
   }
@@ -278,7 +299,8 @@ export const step = ({ document, previous, elapsedMs, interactions = {} }: StepI
     return changed;
   };
 
-  if (delayMode === 'ideal') {
+  const settleIdealIfNeeded = (): void => {
+    if (delayMode !== 'ideal') return;
     let iterations = 0;
     const bound = document.components.length * MAX_SETTLE_ITERATIONS_PER_COMPONENT + 8;
     while (applyCombinationalPass(false)) {
@@ -288,9 +310,10 @@ export const step = ({ document, previous, elapsedMs, interactions = {} }: StepI
         break;
       }
     }
-  } else {
-    applyCombinationalPass(true);
-  }
+  };
+
+  if (delayMode === 'ideal') settleIdealIfNeeded();
+  else applyCombinationalPass(true);
 
   const finalNets = resolveAllNets();
   for (const [key, value] of finalNets) levels.set(key, value);
@@ -301,20 +324,22 @@ export const step = ({ document, previous, elapsedMs, interactions = {} }: StepI
     const readInput = (portId: string): LogicLevel => finalNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
     const state = nextState[component.id] ?? {};
     const previousQ = state.storedLevel ?? 0;
-    const setAsserted = toBit(readInput('SET')) === 1;
-    const resetAsserted = toBit(readInput('RST')) === 1;
+    const setAsserted = isAsserted(readInput('SET'), component.params.activeHigh);
+    const resetAsserted = isAsserted(readInput('RST'), component.params.activeHigh);
 
     let nextQ: LogicLevel = previousQ;
+    let lastClockLevel = state.lastClockLevel;
     if (component.type === 'SR_LATCH') {
-      const s = toBit(readInput('S'));
-      const r = toBit(readInput('R'));
-      if (s === 1 && r === 1) nextQ = 'X';
-      else if (s === 1) nextQ = 1;
-      else if (r === 1) nextQ = 0;
+      const s = isAsserted(readInput('S'), component.params.activeHigh);
+      const r = isAsserted(readInput('R'), component.params.activeHigh);
+      if (s && r) nextQ = 'X';
+      else if (s) nextQ = 1;
+      else if (r) nextQ = 0;
       else nextQ = previousQ;
     } else {
       const clockLevel = readInput('CLK');
       const edge = component.params.edge === 'falling' ? isFallingEdge(state.lastClockLevel, clockLevel) : isRisingEdge(state.lastClockLevel, clockLevel);
+      lastClockLevel = clockLevel;
       if (edge) {
         if (component.type === 'D_FLIP_FLOP') nextQ = readInput('D');
         else if (component.type === 'T_FLIP_FLOP') {
@@ -330,19 +355,21 @@ export const step = ({ document, previous, elapsedMs, interactions = {} }: StepI
           else nextQ = previousQ;
         }
       }
-      if (setAsserted) nextQ = 1;
-      else if (resetAsserted) nextQ = 0;
-      nextState[component.id] = { ...state, lastClockLevel: clockLevel, storedLevel: nextQ };
-      levels.set(portKey(component.id, 'Q'), nextQ);
-      levels.set(portKey(component.id, 'QN'), nextQ === 'X' ? 'X' : (toBit(nextQ) === 1 ? 0 : 1));
-      continue;
     }
     if (setAsserted) nextQ = 1;
     else if (resetAsserted) nextQ = 0;
-    nextState[component.id] = { ...state, storedLevel: nextQ };
+    nextState[component.id] = { ...state, lastClockLevel, storedLevel: nextQ };
     levels.set(portKey(component.id, 'Q'), nextQ);
     levels.set(portKey(component.id, 'QN'), nextQ === 'X' ? 'X' : (toBit(nextQ) === 1 ? 0 : 1));
   }
+
+  // Re-resolve nets once more so anything wired directly to a Q/QN output
+  // (an LED, a probe, another flip-flop's D/CLK, or a downstream gate) reads
+  // the new value this same tick instead of one tick later, and let ideal
+  // mode settle any combinational logic fed by the updated sequential state.
+  const postSequentialNets = resolveAllNets();
+  for (const [key, value] of postSequentialNets) levels.set(key, value);
+  settleIdealIfNeeded();
 
   const hazards: Hazard[] = [];
   for (const root of oscillatingNets) {

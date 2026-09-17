@@ -75,6 +75,37 @@ describe('circuit-model component lifecycle', () => {
     doc = updateComponentParams(doc, gate, { inputCount: 0 });
     expect(doc.components[0]!.params.inputCount).toBe(2);
   });
+
+  it('rejects a wire between two input ports, which could never have a driver', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'AND', 0, 0);
+    const gateA = doc.components[0]!.id;
+    doc = addComponent(doc, 'AND', 4, 0);
+    const gateB = doc.components[1]!.id;
+    doc = addWire(doc, { componentId: gateA, portId: 'A' }, { componentId: gateB, portId: 'A' });
+    expect(doc.wires).toHaveLength(0);
+  });
+
+  it('rejects a wire referencing a port that does not exist on the component', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'LED', 0, 0);
+    const led = doc.components[0]!.id;
+    doc = addWire(doc, { componentId: led, portId: 'DOES_NOT_EXIST' }, { componentId: led, portId: 'A' });
+    expect(doc.wires).toHaveLength(0);
+  });
+
+  it('still allows two outputs wired together for tri-state bus sharing', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'SWITCH', 0, 0);
+    const switchA = doc.components[0]!.id;
+    doc = addComponent(doc, 'SWITCH', 0, 2);
+    const switchB = doc.components[1]!.id;
+    doc = addComponent(doc, 'LED', 4, 1);
+    const led = doc.components[2]!.id;
+    doc = addWire(doc, { componentId: switchA, portId: 'Y' }, { componentId: led, portId: 'A' });
+    doc = addWire(doc, { componentId: switchB, portId: 'Y' }, { componentId: led, portId: 'A' });
+    expect(doc.wires).toHaveLength(2);
+  });
 });
 
 describe('circuit-model undo/redo history', () => {
