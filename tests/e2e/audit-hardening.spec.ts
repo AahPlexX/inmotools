@@ -158,6 +158,22 @@ test('Regex Log Structurer reads a log file and reports inferred column kinds', 
   expect((await download).suggestedFilename()).toBe('service.json');
 });
 
+test('Regex Log Structurer keeps the inferred kind out of a column header\'s accessible name', async ({ page }) => {
+  // The kind badge ("timestamp", "text") is useful sighted context, but it sat
+  // inside the <th>'s accessible name, so screen-reader cell navigation
+  // repeated it on every cell down the column instead of announcing it once.
+  await page.goto('./#/tools/regex-log-structurer');
+  await page.locator('#log-input').fill('2026-08-29 INFO started');
+  await page.locator('#log-pattern').fill('^(?<date>\\d{4}-\\d{2}-\\d{2})\\s+(?<level>INFO|WARN|ERROR)\\s+(?<message>.+)$');
+  await expect(page.getByTestId('log-status')).toContainText('1 matched line', { timeout: 20_000 });
+
+  const header = page.locator('[data-testid="log-table"] thead');
+  await expect(header).toContainText('date');
+  await expect(header).toContainText('timestamp');
+  await expect(page.getByRole('columnheader', { name: 'date', exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'date timestamp' })).toHaveCount(0);
+});
+
 test('Regex Log Structurer only offers the flags that can actually apply', async ({ page }) => {
   await page.goto('./#/tools/regex-log-structurer');
 

@@ -18,6 +18,12 @@ import { useMemo, useState, type ReactNode } from 'react';
 export interface PagedTableColumn {
   readonly key: string;
   readonly label: ReactNode;
+  // Overrides the header cell's accessible name when `label` carries visual
+  // content beyond the column's actual name (a status badge, an inferred
+  // type) that would otherwise be read out on every cell during
+  // screen-reader table navigation, since that content repeats unchanged
+  // down the whole column.
+  readonly ariaLabel?: string;
 }
 
 export interface PagedTableProps<Row> {
@@ -79,7 +85,7 @@ export function PagedTable<Row>({
               : `, ${rows.length} ${rows.length === 1 ? 'row' : 'rows'}`}
           </caption>
           <thead>
-            <tr>{columns.map((column) => <th scope="col" key={column.key}>{column.label}</th>)}</tr>
+            <tr>{columns.map((column) => <th scope="col" key={column.key} aria-label={column.ariaLabel}>{column.label}</th>)}</tr>
           </thead>
           <tbody>
             {visible.map((row, index) => (
