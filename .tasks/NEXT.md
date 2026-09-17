@@ -9,6 +9,8 @@ The two crash-class defects and the cross-cutting file-input defect are fixed un
 
 **2026-09-11 reconciliation:** the Convolution Room Profiler findings previously listed here are already resolved on `main`. The live graph now retains and updates its control nodes, playback cleanup disconnects the graph, unsupported impulse-response channel counts are rejected before assignment, render generations invalidate stale offline output, and active pre-delay changes reschedule tail cleanup. Those fixes are covered by current audio unit/browser tests and were integrated through `dfadd170de204e73aee8e3a329a85c7d764f670b`, `6b9feff695b1b997f866307027174dbbf8d156ec`, and `6d38cd60eeca7ac6ddf9a7eccf5bf1a551cadb7a`; stale audio bullets were removed instead of reimplemented. The Hardware Packet Inspector disconnect lifecycle is already recorded complete under TASK-018.
 
+**2026-09-17 reconciliation:** all three remaining Dedupe findings are fixed on `feat/dedupe-audit-features`. Export now sets a "Preparing reconciled export…" status and yields a tick before building the reconciled rows, so a large export shows feedback instead of looking hung. A CSV text-encoding selector (UTF-8 / Windows-1252) replaces the always-UTF-8 `File.text()` read, decoding the file as bytes through `TextDecoder` instead. Every cluster's review table now has a per-column visibility checkbox mirroring the existing "use for matching" pattern, defaulting to the first 8 columns visible. A fourth, previously uncatalogued issue was fixed alongside these: the cluster heading showed a bare percentage with no indication of what it measured, even though `findDuplicateClusters` already computes the weakest pairwise link across a transitively-formed cluster (see its own code comment) - the label now says "weakest pair" instead of just a number. All four verified with `tests/e2e/dedupe.spec.ts`, 12/12 passing across desktop and mobile Chromium.
+
 ### Verified and confirmed by the TASK-019 sweep, not yet fixed
 
 These reproduce in the code and are worth doing; they were left out of TASK-019 because that change was scoped to output correctness.
@@ -20,9 +22,6 @@ These reproduce in the code and are worth doing; they were left out of TASK-019 
 - **The HAR waterfall clips beyond its height clamp.** Canvas height is capped at 440px while the draw loop still positions every row by index, so rows past roughly the twelfth are painted outside the bitmap; arrow-key navigation selects rows that can never be seen, and the wrapper has no scroll container.
 - **HAR has no filtering.** No way to narrow entries by status, domain or method, which the trace explorer does provide.
 - **The shader render loop never idles.** A static shader still redraws at full refresh rate with no pause, no time freeze or reset, and no visibility-based suspension; compiler diagnostics are also inert, and jumping to a line would need an imperative handle on the editor, which it does not currently expose.
-- **Dedupe cannot read non-UTF-8 CSV.** `File.text()` is UTF-8 only, so a Windows-1252 export arrives with replacement characters and no encoding control exists.
-- **Dedupe export has no progress signal.** It builds the whole reconciled set synchronously on the main thread and only then reports, so there is no way to tell a large export from a hang.
-- **Wide dedupe datasets have no column controls.** Every cluster table renders every column; the existing checkboxes control match participation, not visibility.
 
 ### Carried over from the TASK-016 review
 
