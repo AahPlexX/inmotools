@@ -47,7 +47,7 @@ test('geometry and local tools produce reversible recipe state', async ({ page }
   await page.getByRole('button', { name: 'Rotate right' }).click();
   await page.getByRole('button', { name: 'Local adjustments' }).click();
   await page.getByRole('button', { name: 'Add radial mask' }).click();
-  await expect(page.getByText('Radial adjustment 1')).toBeVisible();
+  await expect(page.getByText('Radial adjustment 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 });
 
