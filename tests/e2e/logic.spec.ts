@@ -1,0 +1,92 @@
+import { expect, test, type Page } from '@playwright/test';
+
+// Matches GRID_SIZE in src/tools/logic/geometry.ts. The canvas starts at pan
+// (0,0) and zoom 1, so a grid coordinate (gx, gy) sits at pixel (gx*GRID, gy*GRID)
+// relative to the canvas element, and this suite places/wires components at
+// exact multiples of GRID to land precisely on ports and pass through no drag.
+const GRID = 24;
+
+// On a narrow viewport the palette lives in a slide-over sheet toggled by the
+// "Components" button; open it first so its buttons are actually reachable.
+const ensurePaletteOpen = async (page: Page) => {
+  const toggle = page.getByRole('button', { name: 'Components' });
+  const palette = page.getByTestId('logic-palette');
+  if ((await toggle.isVisible()) && !(await palette.evaluate((element) => element.classList.contains('sheet-open')))) {
+    await toggle.click();
+  }
+};
+
+const placeAt = async (page: Page, paletteLabel: string, gx: number, gy: number) => {
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  const palette = page.getByTestId('logic-palette');
+  await palette.getByRole('button', { name: paletteLabel, exact: true }).click();
+  await page.getByTestId('logic-canvas').click({ position: { x: gx * GRID, y: gy * GRID } });
+  await page.keyboard.press('Escape');
+};
+
+const wire = async (page: Page, from: { x: number; y: number }, to: { x: number; y: number }) => {
+  const canvas = page.getByTestId('logic-canvas');
+  await canvas.click({ position: from });
+  await canvas.click({ position: to });
+};
+
+test('builds a two-switch AND circuit and verifies it through the truth table and electrical rule check', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('suite-title')).toContainText('Digital Logic Workstation');
+  await expect(page.getByTestId('logic-canvas')).toBeVisible();
+
+  await placeAt(page, 'SWITCH', 1, 1);
+  await placeAt(page, 'SWITCH', 1, 4);
+  await placeAt(page, 'AND', 5, 2);
+  await placeAt(page, 'LED', 9, 2);
+
+  // Switch A (grid 1,1) output pin -> AND gate (grid 5,2) input A
+  await wire(page, { x: (1 + 1) * GRID, y: 1 * GRID }, { x: 5 * GRID, y: 2 * GRID });
+  // Switch B (grid 1,4) output pin -> AND gate input B
+  await wire(page, { x: (1 + 1) * GRID, y: 4 * GRID }, { x: 5 * GRID, y: 3 * GRID });
+  // AND gate output Y -> LED (grid 9,2) input
+  await wire(page, { x: (5 + 2) * GRID, y: 2.5 * GRID }, { x: 9 * GRID, y: 2 * GRID });
+
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toBeVisible();
+  await expect(ercDock).toContainText('No floating inputs');
+
+  await page.getByRole('button', { name: 'Truth table' }).click();
+  const truthDock = page.getByTestId('logic-truth-table-dock');
+  await expect(truthDock).toBeVisible();
+  const rows = truthDock.locator('tbody tr');
+  await expect(rows).toHaveCount(4);
+  const rowTexts = await rows.allTextContents();
+  const onlyTrueRow = rowTexts.filter((text) => text.trim().endsWith('1'));
+  expect(onlyTrueRow).toHaveLength(1);
+  expect(onlyTrueRow[0]!.trim()).toBe('111');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.svg$/);
+});
+
+test('undo removes the last placed component and Escape clears an in-progress wire', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 2, 2);
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled();
+});
+
+test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#/tools/digital-logic-workstation');
+  const componentsToggle = page.getByRole('button', { name: 'Components' });
+  await expect(componentsToggle).toBeVisible();
+
+  const palette = page.getByTestId('logic-palette');
+  await expect(palette).not.toHaveClass(/sheet-open/);
+  await componentsToggle.click();
+  await expect(palette).toHaveClass(/sheet-open/);
+  await page.getByLabel('Close panel').click();
+  await expect(palette).not.toHaveClass(/sheet-open/);
+});
