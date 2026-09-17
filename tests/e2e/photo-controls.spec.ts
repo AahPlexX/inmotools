@@ -87,3 +87,34 @@ test('retouch scalar reset restores the operation default without disturbing its
   await expect(radius).toHaveValue('0.04');
   await expect(strength).toHaveValue('0.2');
 });
+
+test('per-channel curves and levels use ordinary undoable recipe state', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Tone curve' }).click();
+  await page.getByLabel('Curve channel').selectOption('red');
+  await page.getByRole('button', { name: 'Add point' }).click();
+  const redOutput = page.getByLabel('Red curve point 2 output percent');
+  await redOutput.fill('30');
+  await expect(redOutput).toHaveValue('30');
+
+  await page.locator('summary').filter({ hasText: 'Levels' }).click();
+  const gamma = page.getByLabel('Levels gamma value');
+  await gamma.fill('2');
+  await gamma.press('Enter');
+  await expect(gamma).toHaveValue('2');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(gamma).toHaveValue('1');
+  await expect(redOutput).toHaveValue('30');
+});
+
+test('channel mixer exposes each output channel and remains reversible', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Channel mixer' }).click();
+  await page.getByLabel('Mixer output channel').selectOption('red');
+  const greenSource = page.getByLabel('Red output green source value');
+  await greenSource.fill('0.5');
+  await greenSource.press('Enter');
+  await expect(greenSource).toHaveValue('0.5');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(greenSource).toHaveValue('0');
+});

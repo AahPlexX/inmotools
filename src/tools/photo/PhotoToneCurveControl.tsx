@@ -13,6 +13,9 @@ import './photo-tone-curve.css';
 interface PhotoToneCurveControlProps {
   points: TonePoint[];
   onChange: (points: TonePoint[]) => void;
+  title?: string;
+  description?: string;
+  ariaPrefix?: string;
 }
 
 function curvePath(points: readonly TonePoint[]): string {
@@ -30,7 +33,13 @@ function normalizedPercent(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed / 100)) : fallback;
 }
 
-export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCurveControlProps) {
+export default function PhotoToneCurveControl({
+  points,
+  onChange,
+  title = 'Tone curve',
+  description = 'Input → output luminance',
+  ariaPrefix = 'Tone',
+}: PhotoToneCurveControlProps) {
   const curve = canonicalToneCurve(points);
 
   function addFromPointer(event: ReactPointerEvent<SVGSVGElement>) {
@@ -46,8 +55,8 @@ export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCur
     <div className="photo-tone-curve" data-testid="photo-tone-curve">
       <div className="photo-tone-curve-header">
         <div>
-          <strong>Tone curve</strong>
-          <span>Input → output luminance</span>
+          <strong>{title}</strong>
+          <span>{description}</span>
         </div>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => onChange(addTonePointInLargestGap(curve))}>Add point</button>
@@ -59,7 +68,7 @@ export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCur
         className="photo-tone-curve-graph"
         viewBox="0 0 100 100"
         role="img"
-        aria-label="Tone curve graph. Click the graph to add a point."
+        aria-label={`${title} graph. Click the graph to add a point.`}
         onPointerDown={addFromPointer}
       >
         {[25, 50, 75].map((position) => (
@@ -96,7 +105,7 @@ export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCur
                   step={0.1}
                   value={percent(point.x)}
                   disabled={endpoint}
-                  aria-label={`Tone point ${index + 1} input percent`}
+                  aria-label={`${ariaPrefix} point ${index + 1} input percent`}
                   onChange={(event) => onChange(updateTonePoint(curve, index, { x: normalizedPercent(event.target.value, point.x) }))}
                 />
               </label>
@@ -108,11 +117,11 @@ export default function PhotoToneCurveControl({ points, onChange }: PhotoToneCur
                   max={100}
                   step={0.1}
                   value={percent(point.y)}
-                  aria-label={`Tone point ${index + 1} output percent`}
+                  aria-label={`${ariaPrefix} point ${index + 1} output percent`}
                   onChange={(event) => onChange(updateTonePoint(curve, index, { y: normalizedPercent(event.target.value, point.y) }))}
                 />
               </label>
-              <button type="button" disabled={endpoint} onClick={() => onChange(removeTonePoint(curve, index))} aria-label={`Remove tone point ${index + 1}`}>Remove</button>
+              <button type="button" disabled={endpoint} onClick={() => onChange(removeTonePoint(curve, index))} aria-label={`Remove ${ariaPrefix.toLowerCase()} point ${index + 1}`}>Remove</button>
             </div>
           );
         })}

@@ -2,10 +2,14 @@ import type {
   ColorGrade,
   HslAdjustment,
   LocalAdjustment,
+  PhotoChannelMixer,
+  PhotoChannelMixerRow,
   PhotoHistogram,
   PhotoHistory,
+  PhotoLevels,
   PhotoMask,
   PhotoRecipe,
+  PhotoRgbToneCurves,
   RetouchOperation,
   TonePoint,
 } from './photo-types';
@@ -25,6 +29,17 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
     raw: recipe.raw ? { ...recipe.raw } : undefined,
     crop: { ...recipe.crop },
     toneCurve: recipe.toneCurve.map((point) => ({ ...point })),
+    rgbToneCurves: {
+      red: recipe.rgbToneCurves.red.map((point) => ({ ...point })),
+      green: recipe.rgbToneCurves.green.map((point) => ({ ...point })),
+      blue: recipe.rgbToneCurves.blue.map((point) => ({ ...point })),
+    },
+    levels: { ...recipe.levels },
+    channelMixer: {
+      red: { ...recipe.channelMixer.red },
+      green: { ...recipe.channelMixer.green },
+      blue: { ...recipe.channelMixer.blue },
+    },
     hsl: recipe.hsl.map((entry) => ({ ...entry })),
     shadowGrade: { ...recipe.shadowGrade },
     midtoneGrade: { ...recipe.midtoneGrade },
@@ -48,7 +63,24 @@ const neutralHsl = (): HslAdjustment[] => Array.from({ length: HSL_SECTORS }, ()
 }));
 
 const neutralGrade = (): ColorGrade => ({ hue: 0, saturation: 0, luminance: 0 });
-
+const identityToneCurve = (): TonePoint[] => [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+const neutralRgbToneCurves = (): PhotoRgbToneCurves => ({
+  red: identityToneCurve(),
+  green: identityToneCurve(),
+  blue: identityToneCurve(),
+});
+const neutralLevels = (): PhotoLevels => ({
+  inputBlack: 0,
+  gamma: 1,
+  inputWhite: 1,
+  outputBlack: 0,
+  outputWhite: 1,
+});
+const neutralChannelMixer = (): PhotoChannelMixer => ({
+  red: { red: 1, green: 0, blue: 0, constant: 0 },
+  green: { red: 0, green: 1, blue: 0, constant: 0 },
+  blue: { red: 0, green: 0, blue: 1, constant: 0 },
+});
 export const DEFAULT_RECIPE: PhotoRecipe = {
   version: 1,
   raw: normalizeRawSettings(undefined),
@@ -68,7 +100,10 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   whites: 0,
   blacks: 0,
   midtone: 0,
-  toneCurve: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  toneCurve: identityToneCurve(),
+  rgbToneCurves: neutralRgbToneCurves(),
+  levels: neutralLevels(),
+  channelMixer: neutralChannelMixer(),
 
   temperature: 0,
   tint: 0,
@@ -115,6 +150,50 @@ function normalizeToneCurve(points: TonePoint[]): TonePoint[] {
   return normalized;
 }
 
+function normalizeRgbToneCurves(curves: PhotoRgbToneCurves | undefined): PhotoRgbToneCurves {
+  const source = curves ?? neutralRgbToneCurves();
+  return {
+    red: normalizeToneCurve(source.red ?? identityToneCurve()),
+    green: normalizeToneCurve(source.green ?? identityToneCurve()),
+    blue: normalizeToneCurve(source.blue ?? identityToneCurve()),
+  };
+}
+
+function normalizeLevels(levels: PhotoLevels | undefined): PhotoLevels {
+  const source = levels ?? neutralLevels();
+  const rawBlack = clamp(source.inputBlack, 0, 0.999);
+  const rawWhite = clamp(source.inputWhite, 0.001, 1);
+  const inputBlack = Math.min(rawBlack, rawWhite - 0.001);
+  const inputWhite = Math.max(rawWhite, inputBlack + 0.001);
+  const rawOutputBlack = clamp(source.outputBlack, 0, 1);
+  const rawOutputWhite = clamp(source.outputWhite, 0, 1);
+  return {
+    inputBlack,
+    gamma: clamp(source.gamma, 0.1, 10),
+    inputWhite,
+    outputBlack: Math.min(rawOutputBlack, rawOutputWhite),
+    outputWhite: Math.max(rawOutputBlack, rawOutputWhite),
+  };
+}
+
+function normalizeMixerRow(row: PhotoChannelMixerRow | undefined, fallback: PhotoChannelMixerRow): PhotoChannelMixerRow {
+  const source = row ?? fallback;
+  return {
+    red: clamp(source.red, -2, 2),
+    green: clamp(source.green, -2, 2),
+    blue: clamp(source.blue, -2, 2),
+    constant: clamp(source.constant, -2, 2),
+  };
+}
+
+function normalizeChannelMixer(mixer: PhotoChannelMixer | undefined): PhotoChannelMixer {
+  const fallback = neutralChannelMixer();
+  return {
+    red: normalizeMixerRow(mixer?.red, fallback.red),
+    green: normalizeMixerRow(mixer?.green, fallback.green),
+    blue: normalizeMixerRow(mixer?.blue, fallback.blue),
+  };
+}
 function normalizeHsl(entries: HslAdjustment[]): HslAdjustment[] {
   return Array.from({ length: HSL_SECTORS }, (_, index) => {
     const entry = entries[index] ?? DEFAULT_RECIPE.hsl[index];
@@ -250,6 +329,9 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     blacks: clamp(source.blacks, -1, 1),
     midtone: clamp(source.midtone, -1, 1),
     toneCurve: normalizeToneCurve(source.toneCurve),
+    rgbToneCurves: normalizeRgbToneCurves(source.rgbToneCurves),
+    levels: normalizeLevels(source.levels),
+    channelMixer: normalizeChannelMixer(source.channelMixer),
 
     temperature: clamp(source.temperature, -1, 1),
     tint: clamp(source.tint, -1, 1),
@@ -393,6 +475,42 @@ function isIdentityCurve(points: TonePoint[]): boolean {
     && Math.abs(points[1].y - 1) < EPSILON;
 }
 
+function isNeutralLevels(levels: PhotoLevels): boolean {
+  return levels.inputBlack === 0
+    && levels.gamma === 1
+    && levels.inputWhite === 1
+    && levels.outputBlack === 0
+    && levels.outputWhite === 1;
+}
+
+function isNeutralChannelMixer(mixer: PhotoChannelMixer): boolean {
+  const identity = neutralChannelMixer();
+  return (['red', 'green', 'blue'] as const).every((channel) => {
+    const row = mixer[channel];
+    const expected = identity[channel];
+    return row.red === expected.red
+      && row.green === expected.green
+      && row.blue === expected.blue
+      && row.constant === expected.constant;
+  });
+}
+
+function applyLevelsValue(value: number, levels: PhotoLevels): number {
+  const span = Math.max(EPSILON, levels.inputWhite - levels.inputBlack);
+  const normalized = clamp((value - levels.inputBlack) / span, 0, 1);
+  const gammaAdjusted = normalized ** (1 / levels.gamma);
+  return levels.outputBlack + gammaAdjusted * (levels.outputWhite - levels.outputBlack);
+}
+
+function applyChannelMixer(rgb: [number, number, number], mixer: PhotoChannelMixer): [number, number, number] {
+  const [red, green, blue] = rgb;
+  const mix = (row: PhotoChannelMixerRow) => clamp(
+    red * row.red + green * row.green + blue * row.blue + row.constant,
+    0,
+    1,
+  );
+  return [mix(mixer.red), mix(mixer.green), mix(mixer.blue)];
+}
 function isNeutralGlobal(recipe: PhotoRecipe): boolean {
   return recipe.exposure === 0
     && recipe.contrast === 0
@@ -402,6 +520,11 @@ function isNeutralGlobal(recipe: PhotoRecipe): boolean {
     && recipe.blacks === 0
     && recipe.midtone === 0
     && isIdentityCurve(recipe.toneCurve)
+    && isIdentityCurve(recipe.rgbToneCurves.red)
+    && isIdentityCurve(recipe.rgbToneCurves.green)
+    && isIdentityCurve(recipe.rgbToneCurves.blue)
+    && isNeutralLevels(recipe.levels)
+    && isNeutralChannelMixer(recipe.channelMixer)
     && recipe.temperature === 0
     && recipe.tint === 0
     && recipe.saturation === 0
@@ -502,9 +625,13 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
       sb = gray;
     }
 
-    sr = interpolateCurve(sr, recipe.toneCurve);
-    sg = interpolateCurve(sg, recipe.toneCurve);
-    sb = interpolateCurve(sb, recipe.toneCurve);
+    sr = applyLevelsValue(sr, recipe.levels);
+    sg = applyLevelsValue(sg, recipe.levels);
+    sb = applyLevelsValue(sb, recipe.levels);
+    sr = interpolateCurve(interpolateCurve(sr, recipe.toneCurve), recipe.rgbToneCurves.red);
+    sg = interpolateCurve(interpolateCurve(sg, recipe.toneCurve), recipe.rgbToneCurves.green);
+    sb = interpolateCurve(interpolateCurve(sb, recipe.toneCurve), recipe.rgbToneCurves.blue);
+    [sr, sg, sb] = applyChannelMixer([sr, sg, sb], recipe.channelMixer);
 
     const pixelIndex = offset / 4;
     const x = pixelIndex % width;

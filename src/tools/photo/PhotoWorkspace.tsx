@@ -66,10 +66,13 @@ import type {
   PhotoRawSource,
   PhotoSnapshot,
   RetouchOperation,
+  TonePoint,
 } from './photo-types';
 import './photo.css';
 
 type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'inspect';
+type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
+type MixerOutputChannel = 'red' | 'green' | 'blue';
 
 interface SourcePhoto {
   file: File;
@@ -280,6 +283,8 @@ export default function PhotoWorkspace() {
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
+  const [toneCurveChannel, setToneCurveChannel] = useState<ToneCurveChannel>('master');
+  const [mixerOutputChannel, setMixerOutputChannel] = useState<MixerOutputChannel>('red');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const [geometryInteraction, setGeometryInteraction] = useState<'crop' | 'straighten' | null>(null);
   const [compositionOverlay, setCompositionOverlay] = useState<PhotoCompositionOverlay>('thirds');
@@ -796,6 +801,34 @@ export default function PhotoWorkspace() {
     setStatus('All editing adjustments reset.');
   }
 
+  function updateToneCurveChannel(points: TonePoint[]) {
+    if (toneCurveChannel === 'master') {
+      patchRecipe({ toneCurve: points });
+      return;
+    }
+    patchRecipe({
+      rgbToneCurves: {
+        ...recipe.rgbToneCurves,
+        [toneCurveChannel]: points,
+      },
+    });
+  }
+
+  function updateLevels(field: keyof PhotoRecipe['levels'], value: number) {
+    patchRecipe({ levels: { ...recipe.levels, [field]: value } });
+  }
+
+  function updateChannelMixer(field: keyof PhotoRecipe['channelMixer']['red'], value: number) {
+    patchRecipe({
+      channelMixer: {
+        ...recipe.channelMixer,
+        [mixerOutputChannel]: {
+          ...recipe.channelMixer[mixerOutputChannel],
+          [field]: value,
+        },
+      },
+    });
+  }
   function updateHsl(index: number, field: 'hue' | 'saturation' | 'luminance', value: number) {
     const next = recipe.hsl.map((entry, entryIndex) => entryIndex === index ? { ...entry, [field]: value } : { ...entry });
     patchRecipe({ hsl: next });
@@ -1134,7 +1167,75 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section">
           <summary>Tone curve</summary>
-          <PhotoToneCurveControl points={recipe.toneCurve} onChange={(toneCurve) => patchRecipe({ toneCurve })} />
+          <label className="photo-control photo-select-control">
+            <span>Curve channel</span>
+            <select
+              aria-label="Curve channel"
+              value={toneCurveChannel}
+              onChange={(event) => setToneCurveChannel(event.target.value as ToneCurveChannel)}
+            >
+              <option value="master">Master RGB</option>
+              <option value="red">Red</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+            </select>
+          </label>
+          <PhotoToneCurveControl
+            points={toneCurveChannel === 'master' ? recipe.toneCurve : recipe.rgbToneCurves[toneCurveChannel]}
+            title={toneCurveChannel === 'master' ? 'Tone curve' : `${toneCurveChannel[0].toUpperCase()}${toneCurveChannel.slice(1)} curve`}
+            description={toneCurveChannel === 'master' ? 'Input → output RGB tone' : `Input → output ${toneCurveChannel} channel`}
+            ariaPrefix={toneCurveChannel === 'master' ? 'Tone' : `${toneCurveChannel[0].toUpperCase()}${toneCurveChannel.slice(1)} curve`}
+            onChange={updateToneCurveChannel}
+          />
+        </details>
+        <details className="photo-section">
+          <summary>Levels</summary>
+          <p className="photo-export-note">Set input black/white points, midtone gamma, and output endpoints. Values remain reversible in the edit recipe.</p>
+          <div className="photo-control-list">
+            <SimpleControl label="Levels black input" value={recipe.levels.inputBlack} min={0} max={0.99} step={0.01} onChange={(value) => updateLevels('inputBlack', value)} />
+            <SimpleControl label="Levels gamma" value={recipe.levels.gamma} min={0.1} max={10} step={0.05} neutral={1} onChange={(value) => updateLevels('gamma', value)} />
+            <SimpleControl label="Levels white input" value={recipe.levels.inputWhite} min={0.01} max={1} step={0.01} neutral={1} onChange={(value) => updateLevels('inputWhite', value)} />
+            <SimpleControl label="Levels black output" value={recipe.levels.outputBlack} min={0} max={1} step={0.01} onChange={(value) => updateLevels('outputBlack', value)} />
+            <SimpleControl label="Levels white output" value={recipe.levels.outputWhite} min={0} max={1} step={0.01} neutral={1} onChange={(value) => updateLevels('outputWhite', value)} />
+          </div>
+        </details>
+        <details className="photo-section">
+          <summary>Channel mixer</summary>
+          <label className="photo-control photo-select-control">
+            <span>Output channel</span>
+            <select
+              aria-label="Mixer output channel"
+              value={mixerOutputChannel}
+              onChange={(event) => setMixerOutputChannel(event.target.value as MixerOutputChannel)}
+            >
+              <option value="red">Red output</option>
+              <option value="green">Green output</option>
+              <option value="blue">Blue output</option>
+            </select>
+          </label>
+          <div className="photo-control-list">
+            {(['red', 'green', 'blue'] as const).map((sourceChannel) => (
+              <SimpleControl
+                key={sourceChannel}
+                label={`${mixerOutputChannel[0].toUpperCase()}${mixerOutputChannel.slice(1)} output ${sourceChannel} source`}
+                value={recipe.channelMixer[mixerOutputChannel][sourceChannel]}
+                min={-2}
+                max={2}
+                step={0.01}
+                neutral={mixerOutputChannel === sourceChannel ? 1 : 0}
+                onChange={(value) => updateChannelMixer(sourceChannel, value)}
+              />
+            ))}
+            <SimpleControl
+              label={`${mixerOutputChannel[0].toUpperCase()}${mixerOutputChannel.slice(1)} output constant`}
+              value={recipe.channelMixer[mixerOutputChannel].constant}
+              min={-2}
+              max={2}
+              step={0.01}
+              onChange={(value) => updateChannelMixer('constant', value)}
+            />
+          </div>
+          <p className="photo-export-note">Source total {Math.round((recipe.channelMixer[mixerOutputChannel].red + recipe.channelMixer[mixerOutputChannel].green + recipe.channelMixer[mixerOutputChannel].blue) * 100)}% · negative source values invert that channel before mixing.</p>
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>
