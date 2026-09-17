@@ -121,6 +121,13 @@ test('auto-finishes a forgiving target after an error and preserves the error in
   expect(exported.test.incorrectChars).toBe(1);
   expect(exported.test.missedChars).toBe(1);
   expect(exported.test.accuracy).toBeLessThan(100);
+
+  await expect(resultDialog).toBeHidden();
+  await workspace.getByLabel('Errors').selectOption('master');
+  await canvas.focus();
+  await page.keyboard.type('x');
+  await expect(resultDialog).toBeVisible();
+  await expect(resultDialog.getByRole('button', { name: 'PDF certificate' })).toHaveCount(0);
 });
 
 test('exports history metadata across formats and re-imports a bundle without id collisions', async ({ page }) => {
@@ -196,8 +203,32 @@ test('exports history metadata across formats and re-imports a bundle without id
   await expect(exportDialog).toBeHidden();
 
   const importInput = workspace.locator('label').filter({ hasText: /Import JSON/ }).locator('input[type="file"]');
-  await importInput.setInputFiles({ name: 'typing-history.json', mimeType: 'application/json', buffer: jsonBuffer });
-  await expect(workspace).toContainText('Imported 1 test.');
+  const importBundle = {
+    ...bundle,
+    tests: [
+      { ...bundle.tests[0], id: 77, tags: ['legal'] },
+      { ...bundle.tests[0], id: 78, tags: 'not-an-array' },
+    ],
+  };
+  await importInput.setInputFiles({ name: 'typing-history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(importBundle)) });
+  await expect(workspace).toContainText('Imported 1 test. Skipped 1 invalid record.');
+  await expect(totalTests).toContainText('2');
+
+  const filterInput = history.getByLabel('Filter by tag');
+  await filterInput.fill('legal');
+  const matchingTests = history.locator('.tw-stat').filter({ hasText: 'Matching tests' });
+  await expect(matchingTests).toContainText('1');
+  await expect(history.locator('tbody tr')).toHaveCount(1);
+
+  await workspace.getByRole('button', { name: 'Export…' }).click();
+  const filteredExportDialog = workspace.getByRole('dialog', { name: 'Export history' });
+  const filteredJsonPromise = page.waitForEvent('download');
+  await filteredExportDialog.getByRole('button', { name: 'Export JSON' }).click();
+  const filteredBundle = JSON.parse((await downloadBuffer(await filteredJsonPromise)).toString('utf8'));
+  expect(filteredBundle.tests).toHaveLength(1);
+  expect(filteredBundle.tests[0].tags).toContain('legal');
+  await page.keyboard.press('Escape');
+  await filterInput.fill('');
   await expect(totalTests).toContainText('2');
 });
 
@@ -292,13 +323,15 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
 });
 
 test('has no serious or critical automated accessibility violations at rest', async ({ page }) => {
-  await openWorkspace(page);
+  const workspace = await openWorkspace(page);
   const results = await new AxeBuilder({ page })
     .include('.tw-root')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
   const serious = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
   expect(serious).toEqual([]);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(workspace.locator('.tw-caret').first()).toHaveCSS('animation-name', 'none');
 });
 
 test('reflows without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {

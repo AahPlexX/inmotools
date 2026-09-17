@@ -6,7 +6,6 @@ import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/opendyslexic/400.css';
 import Chart from 'chart.js/auto';
 import confetti from 'canvas-confetti';
-import { diffChars } from 'diff';
 import Papa from 'papaparse';
 import { downloadBlob, downloadText } from '../../lib/download';
 import './typing-styles.css';
@@ -35,6 +34,7 @@ import {
   LANGUAGE_POOLS,
   LAYOUTS,
   findLayout,
+  homeRowAnchors,
   type CorpusMode,
   type Language,
   type LayoutId,
@@ -44,7 +44,7 @@ import {
   clearAllTests,
   dailyActivity,
   deleteTest,
-  filterTests,
+  filterStoredTests,
   findPersonalBest,
   listTests,
   readPreference,
@@ -58,6 +58,7 @@ import {
   certificatePdf,
   EMPTY_EXPORT_METADATA,
   keystrokesToCsv,
+  parseImportedTests,
   sessionMarkdown,
   suggestFilename,
   testToJson,
@@ -65,7 +66,7 @@ import {
   testsToJson,
   type ExportMetadata,
 } from './typing-export';
-import { createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
+import { classifyKeystrokeSound, createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
 import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
 
 // -------------------- reducer wiring --------------------
@@ -244,6 +245,8 @@ export default function TypingWorkspace() {
   const [now, setNow] = useState<number>(performance.now());
   const [history, setHistory] = useState<StoredTest[]>([]);
   const [filterTagText, setFilterTagText] = useState('');
+  const filterTags = useMemo(() => filterTagText.split(',').map((tag) => tag.trim()).filter(Boolean), [filterTagText]);
+  const visibleHistory = useMemo(() => filterStoredTests(history, filterTags.length > 0 ? { tags: filterTags } : {}), [history, filterTags]);
   const [personalBest, setPersonalBest] = useState<StoredTest | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -389,7 +392,8 @@ export default function TypingWorkspace() {
         if (engine.finishReason === 'failed') audioRef.current?.playFail();
         else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
       }
-      if (metrics.netWpm > 0 && engine.finishReason === 'completed') {
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      if (!reducedMotion && metrics.netWpm > 0 && engine.finishReason === 'completed') {
         confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
       }
       setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${metrics.netWpm} WPM, ${metrics.accuracy}% accuracy.`);
@@ -397,31 +401,12 @@ export default function TypingWorkspace() {
     }
   }, [engine.finished, engine.finishReason, running, config.audioProfile]);
 
-  // Live WPM chart.
+  // Live WPM chart: create once, then update data in place on each sample tick.
   useEffect(() => {
     if (!wpmChartRef.current) return;
-    const samples = wpmSeries(engine, now);
-    const ghost = config.ghostEnabled && personalBest?.keystrokes ? ghostSeries(personalBest.keystrokes) : [];
-    if (chartRef.current) chartRef.current.destroy();
-    const labels = samples.map((s) => `${s.seconds}s`);
-    const datasets: Chart['data']['datasets'] = [
-      { label: 'WPM', data: samples.map((s) => s.wpm), borderColor: '#2a3d63', backgroundColor: 'rgba(42,61,99,0.15)', tension: 0.25, fill: true, pointRadius: 0 },
-      { label: 'Raw WPM', data: samples.map((s) => s.rawWpm), borderColor: '#8892a6', backgroundColor: 'transparent', borderDash: [4, 4], tension: 0.15, pointRadius: 0 },
-    ];
-    if (ghost.length > 0) {
-      const g = ghost.map((p) => {
-        const minutes = p.seconds / 60;
-        return minutes > 0 ? round((p.correctChars / 5) / minutes) : 0;
-      });
-      datasets.push({ label: 'Personal Best (ghost)', data: g, borderColor: '#7dd39b', backgroundColor: 'transparent', tension: 0.15, pointRadius: 0 });
-    }
-    if (config.pacerEnabled) {
-      const pacer = samples.map(() => config.pacerWpm);
-      datasets.push({ label: `Pacer ${config.pacerWpm} WPM`, data: pacer, borderColor: '#d97706', backgroundColor: 'transparent', borderDash: [2, 4], tension: 0, pointRadius: 0 });
-    }
     chartRef.current = new Chart(wpmChartRef.current, {
       type: 'line',
-      data: { labels, datasets },
+      data: { labels: [], datasets: [] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -438,12 +423,36 @@ export default function TypingWorkspace() {
       chartRef.current?.destroy();
       chartRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const samples = wpmSeries(engine, now);
+    const ghost = config.ghostEnabled && personalBest?.keystrokes ? ghostSeries(personalBest.keystrokes) : [];
+    const datasets: Chart['data']['datasets'] = [
+      { label: 'WPM', data: samples.map((s) => s.wpm), borderColor: '#2a3d63', backgroundColor: 'rgba(42,61,99,0.15)', tension: 0.25, fill: true, pointRadius: 0 },
+      { label: 'Raw WPM', data: samples.map((s) => s.rawWpm), borderColor: '#8892a6', backgroundColor: 'transparent', borderDash: [4, 4], tension: 0.15, pointRadius: 0 },
+    ];
+    if (ghost.length > 0) {
+      const g = ghost.map((p) => {
+        const minutes = p.seconds / 60;
+        return minutes > 0 ? round((p.correctChars / 5) / minutes) : 0;
+      });
+      datasets.push({ label: 'Personal Best (ghost)', data: g, borderColor: '#7dd39b', backgroundColor: 'transparent', tension: 0.15, pointRadius: 0 });
+    }
+    if (config.pacerEnabled) {
+      datasets.push({ label: `Pacer ${config.pacerWpm} WPM`, data: samples.map(() => config.pacerWpm), borderColor: '#d97706', backgroundColor: 'transparent', borderDash: [2, 4], tension: 0, pointRadius: 0 });
+    }
+    chart.data.labels = samples.map((s) => `${s.seconds}s`);
+    chart.data.datasets = datasets;
+    chart.update('none');
   }, [engine, now, personalBest, config.ghostEnabled, config.pacerEnabled, config.pacerWpm]);
 
   // Historical trend chart.
   useEffect(() => {
     if (!historyChartRef.current) return;
-    const sorted = history.slice().sort((a, b) => a.savedAt - b.savedAt);
+    const sorted = visibleHistory.slice().sort((a, b) => a.savedAt - b.savedAt);
     const labels = sorted.map((t, i) => (t.savedAt ? new Date(t.savedAt).toLocaleDateString() : String(i + 1)));
     const wpm = sorted.map((t) => t.netWpm);
     const acc = sorted.map((t) => t.accuracy);
@@ -482,10 +491,11 @@ export default function TypingWorkspace() {
       histChartRef.current?.destroy();
       histChartRef.current = null;
     };
-  }, [history]);
+  }, [visibleHistory]);
 
   const metrics = useMemo(() => computeMetrics(engine, now), [engine, now]);
   const layoutDef = useMemo(() => findLayout(config.layout), [config.layout]);
+  const homeAnchors = useMemo(() => homeRowAnchors(layoutDef), [layoutDef]);
   const keyStats = useMemo(() => perKeyStats(engine.events), [engine.events]);
   const bigrams = useMemo(() => ngramLatencies(engine.events, 2).slice(0, 12), [engine.events]);
   const trigrams = useMemo(() => ngramLatencies(engine.events, 3).slice(0, 12), [engine.events]);
@@ -559,12 +569,10 @@ export default function TypingWorkspace() {
       setStatusText('Test started.');
     }
     e.preventDefault();
+    const sound = classifyKeystrokeSound(e.key, engine.targetText[engine.cursor], config.caseSensitive);
     dispatch({ type: 'press', key: e.key, code: e.code, t });
-    if (config.audioProfile !== 'off') {
-      const kind = e.key === 'Backspace' ? 'backspace' : e.key === 'Enter' ? 'enter' : e.key === ' ' ? 'space' : 'correct';
-      audioRef.current?.playKeystroke(kind);
-    }
-  }, [engine.finished, engine.targetText, engine.cursor, rebuildTarget, running, config.audioProfile]);
+    if (config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
+  }, [engine.finished, engine.targetText, engine.cursor, rebuildTarget, running, config.audioProfile, config.caseSensitive]);
 
   const restart = useCallback(() => {
     rebuildTarget();
@@ -685,29 +693,23 @@ export default function TypingWorkspace() {
   }, [config, engine, history, metrics, savedTestId, target, handleSave]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
-    const filtered = await filterTests(filterTagText ? { tags: filterTagText.split(',').map((s) => s.trim()).filter(Boolean) } : {});
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
-    if (format === 'csv') downloadText(testsToCsv(filtered, meta), stamp, 'text/csv;charset=utf-8');
-    if (format === 'json') downloadText(testsToJson(filtered, meta), stamp, 'application/json');
-    if (format === 'md') downloadText(sessionMarkdown(filtered, meta), stamp, 'text/markdown;charset=utf-8');
+    if (format === 'csv') downloadText(testsToCsv(visibleHistory, meta), stamp, 'text/csv;charset=utf-8');
+    if (format === 'json') downloadText(testsToJson(visibleHistory, meta), stamp, 'application/json');
+    if (format === 'md') downloadText(sessionMarkdown(visibleHistory, meta), stamp, 'text/markdown;charset=utf-8');
     setStatusText(`Exported ${format === 'md' ? 'Markdown' : format.toUpperCase()} history.`);
-  }, [filterTagText]);
+  }, [visibleHistory]);
 
   // Import handlers.
   const importJson = useCallback(async (file: File) => {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const items: StoredTest[] = Array.isArray(parsed?.tests) ? parsed.tests : parsed?.test ? [parsed.test] : [];
-      let imported = 0;
-      for (const rec of items) {
-        if (typeof rec?.netWpm === 'number' && typeof rec?.mode === 'string') {
-          await saveTest({ ...rec, savedAt: rec.savedAt ?? Date.now(), tags: rec.tags ?? [], notes: rec.notes ?? '' });
-          imported += 1;
-        }
-      }
+      const { tests, skipped } = parseImportedTests(parsed);
+      for (const record of tests) await saveTest(record);
       setHistory(await listTests());
-      setStatusText(`Imported ${imported} test${imported === 1 ? '' : 's'}.`);
+      const skippedText = skipped > 0 ? ` Skipped ${skipped} invalid record${skipped === 1 ? '' : 's'}.` : '';
+      setStatusText(`Imported ${tests.length} test${tests.length === 1 ? '' : 's'}.${skippedText}`);
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
@@ -746,9 +748,9 @@ export default function TypingWorkspace() {
 
   const heatmap = useMemo(() => buildHeatmap(keyStats, layoutDef.rows), [keyStats, layoutDef.rows]);
 
-  // Rolling averages panel.
-  const rolling = useMemo(() => rollingWpm(history), [history]);
-  const daily = useMemo(() => dailyActivity(history).slice(-30), [history]);
+  // Rolling averages and activity reflect the same visible tag-filtered history used for exports.
+  const rolling = useMemo(() => rollingWpm(visibleHistory), [visibleHistory]);
+  const daily = useMemo(() => dailyActivity(visibleHistory).slice(-30), [visibleHistory]);
   const durationRemainingMs = totalDurationMs && engine.startedAt != null ? Math.max(0, totalDurationMs - (now - engine.startedAt)) : totalDurationMs;
 
   // Blur-until-focus effect handler.
@@ -901,7 +903,7 @@ export default function TypingWorkspace() {
           <VirtualKeyboard layout={layoutDef} heat={heatmap.heat} errors={heatmap.errors} />
           <div className="tw-ergo-hint" aria-label="Finger discipline reminder">
             <span>⌂</span>
-            <span>Anchor left index on <strong>F</strong>, right index on <strong>J</strong>. Weak keys this session: <strong>{weak.length > 0 ? weak.join(', ') : '—'}</strong>.</span>
+            <span>Anchor left index on <strong>{homeAnchors.left}</strong>, right index on <strong>{homeAnchors.right}</strong>. Weak keys this session: <strong>{weak.length > 0 ? weak.join(', ') : '—'}</strong>.</span>
           </div>
         </div>
         <div className="tw-panel">
@@ -1029,7 +1031,7 @@ export default function TypingWorkspace() {
           <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Clear history…</button>
         </div>
         <div className="tw-stats-strip">
-          <div className="tw-stat"><h3>Total tests</h3><p>{history.length}</p></div>
+          <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
           <div className="tw-stat"><h3>10-test avg</h3><p>{round(rolling.last10)}</p></div>
           <div className="tw-stat"><h3>50-test avg</h3><p>{round(rolling.last50)}</p></div>
           <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
@@ -1038,7 +1040,7 @@ export default function TypingWorkspace() {
         <table>
           <thead><tr><th>Saved</th><th>Mode</th><th>WPM</th><th>Acc</th><th>Cons</th><th>Tags</th><th>Actions</th></tr></thead>
           <tbody>
-            {history.slice(0, 24).map((t) => (
+            {visibleHistory.slice(0, 24).map((t) => (
               <tr key={t.id}>
                 <td>{new Date(t.savedAt).toLocaleString()}</td>
                 <td>{t.mode}</td>
@@ -1068,6 +1070,7 @@ export default function TypingWorkspace() {
           onSave={handleSave}
           onExport={handleExportSingle}
           summary={metrics}
+          canCertificate={engine.finishReason === 'completed'}
         />
       )}
 
@@ -1195,11 +1198,12 @@ function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
 
 // -------------------- modals --------------------
 
-function SaveTestModal({ onCancel, onSave, onExport, summary }: {
+function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: {
   onCancel: () => void;
   onSave: (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => void | Promise<void>;
   onExport: (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => void | Promise<void>;
   summary: ReturnType<typeof computeMetrics>;
+  canCertificate: boolean;
 }) {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
@@ -1250,7 +1254,7 @@ function SaveTestModal({ onCancel, onSave, onExport, summary }: {
           <button type="button" className="subtle" onClick={() => void onExport('csv', meta)}>Export CSV</button>
           <button type="button" className="subtle" onClick={() => void onExport('json', meta)}>Export JSON</button>
           <button type="button" className="subtle" onClick={() => void onExport('keystrokes', meta)}>Export keystrokes</button>
-          <button type="button" className="subtle" onClick={() => void onExport('pdf', meta)}>PDF certificate</button>
+          {canCertificate ? <button type="button" className="subtle" onClick={() => void onExport('pdf', meta)}>PDF certificate</button> : null}
           <button type="button" onClick={() => void onSave(meta, { includeKeystrokes: meta.includeKeystrokes })}>Save</button>
         </div>
       </div>
@@ -1332,6 +1336,3 @@ function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel
 
 // Utility export for tests.
 export const __internal = { buildTargetText, buildHeatmap };
-
-// (diffChars import kept for future transcription-scoring extension.)
-void diffChars;

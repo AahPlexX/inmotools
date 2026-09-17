@@ -411,3 +411,15 @@
   gap: 0.75rem;
   margin-top: 0.75rem;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-root *,
+  .tw-root *::before,
+  .tw-root *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .tw-caret { animation: none !important; }
+}

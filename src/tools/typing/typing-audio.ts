@@ -1,7 +1,6 @@
 // Mechanical switch synthesizer, metronome, and cue sounds.
-// Uses the browser's Web Audio API directly (howler is available as a
-// transport for future sample-based profiles). Every sound is generated on
-// the fly so the tool ships offline with zero audio assets.
+// Uses the browser's Web Audio API directly. Every sound is generated on
+// the fly so the tool ships offline with zero audio assets or transport dependencies.
 
 export type SwitchProfile = 'off' | 'mx-blue' | 'mx-red' | 'mx-brown' | 'holy-panda' | 'topre' | 'typewriter';
 
