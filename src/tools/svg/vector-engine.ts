@@ -103,6 +103,56 @@ export function removeSelection(document: VectorDocument, selection: readonly st
   return { ...document, elements: document.elements.filter((element) => !selected.has(element.id)) };
 }
 
+const PATH_COMMAND_ARITY: Record<string, number> = { m: 2, l: 2, t: 2, h: 1, v: 1, c: 6, s: 4, q: 4, a: 7, z: 0 };
+
+function translatePathCoordGroup(lower: string, group: number[], dx: number, dy: number): number[] {
+  if (lower === 'h') return [group[0]! + dx];
+  if (lower === 'v') return [group[0]! + dy];
+  if (lower === 'a') return [group[0]!, group[1]!, group[2]!, group[3]!, group[4]!, group[5]! + dx, group[6]! + dy];
+  const translated = group.slice();
+  for (let i = 0; i < translated.length; i += 2) {
+    translated[i] = translated[i]! + dx;
+    translated[i + 1] = translated[i + 1]! + dy;
+  }
+  return translated;
+}
+
+/**
+ * Translates the absolute coordinates embedded in an SVG path `d` string by
+ * (dx, dy), leaving relative commands untouched. A path's rendered geometry
+ * comes entirely from `d` (it has no x/y SVG attribute), so moving a path
+ * element requires transforming `d` itself, not just its cached x/y bounds.
+ * The very first moveto's coordinates are always treated as absolute per the
+ * SVG spec, even when written lowercase, since there is no prior point yet.
+ */
+function translatePathData(d: string, dx: number, dy: number): string {
+  const tokens = d.match(/[MLHVCSQTAZmlhvcsqtaz][^MLHVCSQTAZmlhvcsqtaz]*/g);
+  if (!tokens) return d;
+  let isFirst = true;
+  const out: string[] = [];
+  for (const token of tokens) {
+    const letter = token[0]!;
+    const lower = letter.toLowerCase();
+    if (lower === 'z') {
+      out.push(letter);
+      isFirst = false;
+      continue;
+    }
+    const isAbsolute = letter !== lower;
+    const arity = PATH_COMMAND_ARITY[lower]!;
+    const nums = (token.slice(1).match(/-?\d*\.?\d+(?:[eE][-+]?\d+)?/g) ?? []).map(Number);
+    const groups: number[][] = [];
+    for (let i = 0; i < nums.length; i += arity) groups.push(nums.slice(i, i + arity));
+    const transformed = groups.map((group, groupIndex) => {
+      const treatAsAbsolute = isAbsolute || (isFirst && groupIndex === 0 && lower === 'm');
+      return treatAsAbsolute ? translatePathCoordGroup(lower, group, dx, dy) : group;
+    });
+    out.push(`${letter} ${transformed.map((group) => group.join(' ')).join(' ')}`);
+    isFirst = false;
+  }
+  return out.join(' ');
+}
+
 function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
   if (element.type === 'group') {
     return {
@@ -117,6 +167,9 @@ function moveElement(element: VectorElement, dx: number, dy: number): VectorElem
   }
   if (element.type === 'line') {
     return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
+  }
+  if (element.type === 'path') {
+    return { ...element, x: element.x + dx, y: element.y + dy, d: translatePathData(element.d, dx, dy) };
   }
   return { ...element, x: element.x + dx, y: element.y + dy };
 }
