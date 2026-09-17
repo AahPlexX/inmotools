@@ -94,12 +94,36 @@ export interface ColorGrade {
   luminance: number;
 }
 
+export type PhotoSelectionCombineMode = 'replace' | 'add' | 'subtract' | 'intersect';
+
+export type PhotoSelectionSource =
+  | { type: 'rectangle'; x: number; y: number; width: number; height: number }
+  | { type: 'ellipse'; cx: number; cy: number; rx: number; ry: number }
+  | { type: 'polygon'; points: Array<{ x: number; y: number }> }
+  | { type: 'color'; red: number; green: number; blue: number; tolerance: number }
+  | { type: 'luminance'; min: number; max: number };
+
+export interface PhotoSelectionOperation {
+  mode: PhotoSelectionCombineMode;
+  source: PhotoSelectionSource;
+}
+
+export interface PhotoSelection {
+  operations: PhotoSelectionOperation[];
+  /** Normalized image-space transition width. */
+  feather: number;
+  /** Positive values grow the boundary; negative values shrink it. */
+  expansion: number;
+  inverted: boolean;
+}
+
 export type PhotoMask =
   | { type: 'brush'; points: Array<{ x: number; y: number; pressure: number }>; radius: number; feather: number; opacity: number; invert: boolean }
   | { type: 'radial'; cx: number; cy: number; rx: number; ry: number; feather: number; opacity: number; invert: boolean }
   | { type: 'linear'; x1: number; y1: number; x2: number; y2: number; feather: number; opacity: number; invert: boolean }
   | { type: 'luminance'; min: number; max: number; feather: number; opacity: number; invert: boolean }
-  | { type: 'hue'; center: number; range: number; feather: number; opacity: number; invert: boolean };
+  | { type: 'hue'; center: number; range: number; feather: number; opacity: number; invert: boolean }
+  | { type: 'selection'; selection: PhotoSelection; feather: number; opacity: number; invert: boolean };
 
 export interface LocalEffect {
   exposure: number;
@@ -178,6 +202,8 @@ export interface PhotoRecipe {
   grainSize: number;
   grainColor: number;
 
+  /** Optional on older version-1 recipes; normalized to null. */
+  selection?: PhotoSelection | null;
   localAdjustments: LocalAdjustment[];
   retouch: RetouchOperation[];
 }

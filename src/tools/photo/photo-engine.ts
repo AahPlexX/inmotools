@@ -18,6 +18,7 @@ import type {
 import { normalizeRawSettings } from './photo-raw-settings';
 import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './photo-lut';
 import { normalizePhotoColorManagement } from './color/photo-color-management';
+import { clonePhotoSelection, normalizePhotoSelection, photoSelectionWeight } from './photo-selection';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -60,10 +61,13 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
     midtoneGrade: { ...recipe.midtoneGrade },
     highlightGrade: { ...recipe.highlightGrade },
     blackAndWhiteMix: [...recipe.blackAndWhiteMix],
+    selection: clonePhotoSelection(recipe.selection),
     localAdjustments: recipe.localAdjustments.map((adjustment) => ({
       ...adjustment,
       mask: adjustment.mask.type === 'brush'
         ? { ...adjustment.mask, points: adjustment.mask.points.map((point) => ({ ...point })) }
+        : adjustment.mask.type === 'selection'
+          ? { ...adjustment.mask, selection: clonePhotoSelection(adjustment.mask.selection)! }
         : { ...adjustment.mask },
       effect: { ...adjustment.effect },
     })),
@@ -160,6 +164,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   grainSize: 1,
   grainColor: 0,
 
+  selection: null,
   localAdjustments: [],
   retouch: [],
 };
@@ -288,6 +293,21 @@ function normalizeMask(mask: PhotoMask): PhotoMask {
         range: clamp(mask.range, 0, 180),
         ...base,
       };
+    case 'selection': {
+      const selection = normalizePhotoSelection(mask.selection);
+      return {
+        type: 'selection',
+        selection: selection ?? {
+          operations: [{ mode: 'replace', source: { type: 'rectangle', x: 0, y: 0, width: 0.001, height: 0.001 } }],
+          feather: 0,
+          expansion: 0,
+          inverted: false,
+        },
+        ...base,
+        feather: clamp(mask.feather, 0, 0.25),
+        opacity: selection ? base.opacity : 0,
+      };
+    }
   }
 }
 
@@ -389,6 +409,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     grainSize: clamp(source.grainSize, 0.5, 3),
     grainColor: clamp(source.grainColor, 0, 1),
 
+    selection: normalizePhotoSelection(source.selection),
     localAdjustments: source.localAdjustments.map(normalizeLocalAdjustment),
     retouch: source.retouch.map(normalizeRetouch),
   };
@@ -854,8 +875,18 @@ function maskWeight(mask: PhotoMask, x: number, y: number, red: number, green: n
     const distance = circularHueDistance(hue, mask.center);
     const featherDegrees = Math.max(1, mask.feather * 60);
     weight = 1 - smoothstep(mask.range, mask.range + featherDegrees, distance);
-  } else {
+  } else if (mask.type === 'brush') {
     weight = brushWeight(mask, x, y);
+  } else {
+    weight = photoSelectionWeight(
+      mask.selection,
+      x,
+      y,
+      red,
+      green,
+      blue,
+      mask.feather,
+    );
   }
   const resolved = mask.invert ? 1 - weight : weight;
   return clamp(resolved * mask.opacity, 0, 1);

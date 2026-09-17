@@ -56,6 +56,12 @@ import {
   serializePhotoPreset,
   suggestPhotoPresetFilename,
 } from './photo-preset-transfer';
+import {
+  appendPhotoSelection,
+  clonePhotoSelection,
+  normalizePhotoSelection,
+  photoSelectionMask,
+} from './photo-selection';
 import type {
   LoadedPhotoProject,
   PhotoProjectRecord,
@@ -77,6 +83,8 @@ import type {
   PhotoHistory,
   PhotoRecipe,
   PhotoRawSource,
+  PhotoSelectionCombineMode,
+  PhotoSelectionSource,
   PhotoSnapshot,
   RetouchOperation,
   TonePoint,
@@ -274,6 +282,8 @@ function cloneLocalAdjustment(adjustment: LocalAdjustment): LocalAdjustment {
     ...adjustment,
     mask: adjustment.mask.type === 'brush'
       ? { ...adjustment.mask, points: adjustment.mask.points.map((point) => ({ ...point })) }
+      : adjustment.mask.type === 'selection'
+        ? { ...adjustment.mask, selection: clonePhotoSelection(adjustment.mask.selection)! }
       : { ...adjustment.mask },
     effect: { ...adjustment.effect },
   };
@@ -301,6 +311,10 @@ export default function PhotoWorkspace() {
   const [toneCurveChannel, setToneCurveChannel] = useState<ToneCurveChannel>('master');
   const [mixerOutputChannel, setMixerOutputChannel] = useState<MixerOutputChannel>('red');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
+  const [selectionCombineMode, setSelectionCombineMode] = useState<PhotoSelectionCombineMode>('replace');
+  const [selectionColorTolerance, setSelectionColorTolerance] = useState(0.12);
+  const [selectionLuminanceMin, setSelectionLuminanceMin] = useState(0.2);
+  const [selectionLuminanceMax, setSelectionLuminanceMax] = useState(0.8);
   const [geometryInteraction, setGeometryInteraction] = useState<'crop' | 'straighten' | null>(null);
   const [compositionOverlay, setCompositionOverlay] = useState<PhotoCompositionOverlay>('thirds');
   const [gridDivisions, setGridDivisions] = useState(4);
@@ -970,7 +984,7 @@ export default function PhotoWorkspace() {
     return null;
   }
 
-  function addLocalAdjustment(type: LocalAdjustment['mask']['type']) {
+  function addLocalAdjustment(type: Exclude<LocalAdjustment['mask']['type'], 'selection'>) {
     const id = crypto.randomUUID?.() ?? `local-${Date.now()}-${recipe.localAdjustments.length}`;
     const index = recipe.localAdjustments.length + 1;
     const base = { feather: 0.45, opacity: 1, invert: false };
@@ -1040,20 +1054,94 @@ export default function PhotoWorkspace() {
     if (canvasInteraction?.id === id) setCanvasInteraction(null);
   }
 
+  function setSelectionSource(source: PhotoSelectionSource) {
+    patchRecipe({ selection: appendPhotoSelection(recipe.selection, source, selectionCombineMode) });
+  }
+
+  function startSelection(mode: Extract<PhotoCanvasInteraction['mode'], `selection-${string}`>, label: string) {
+    setCanvasInteraction({ kind: 'selection', id: 'active-selection', mode, label });
+    setPanel('local');
+    setStatus(`${label} on the photo.`);
+  }
+
+  function updateSelection(patch: Partial<NonNullable<PhotoRecipe['selection']>>) {
+    const selection = clonePhotoSelection(recipe.selection);
+    if (!selection) return;
+    patchRecipe({ selection: normalizePhotoSelection({ ...selection, ...patch }) });
+  }
+
+  function convertSelectionToMask() {
+    const selection = clonePhotoSelection(recipe.selection);
+    if (!selection) return;
+    const adjustment: LocalAdjustment = {
+      id: crypto.randomUUID?.() ?? `selection-mask-${Date.now()}`,
+      label: `Selection mask ${recipe.localAdjustments.length + 1}`,
+      enabled: true,
+      mask: photoSelectionMask(selection),
+      effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+    };
+    commitRecipe(normalizeRecipe({
+      ...recipe,
+      selection: null,
+      localAdjustments: [...recipe.localAdjustments.map(cloneLocalAdjustment), adjustment],
+    }));
+    setCanvasInteraction(null);
+    setStatus('Selection converted to an editable local mask as one undo step.');
+  }
+
   function handleCanvasGesture(gesture: PhotoCanvasGesture) {
     if (!canvasInteraction) return;
     const interaction = canvasInteraction;
     setHistory((current) => {
-      const next = interaction.kind === 'local'
-        ? applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path)
-        : placeRetouchPoint(
+      let next: PhotoRecipe;
+      if (interaction.kind === 'local') {
+        next = applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path);
+      } else if (interaction.kind === 'retouch') {
+        next = placeRetouchPoint(
           current.present,
           interaction.id,
           gesture.end,
           interaction.mode === 'retouch-source' ? 'source' : 'target',
         );
+      } else {
+        let source: PhotoSelectionSource | null = null;
+        if (interaction.mode === 'selection-rectangle') {
+          source = {
+            type: 'rectangle',
+            x: Math.min(gesture.start.x, gesture.end.x),
+            y: Math.min(gesture.start.y, gesture.end.y),
+            width: Math.abs(gesture.end.x - gesture.start.x),
+            height: Math.abs(gesture.end.y - gesture.start.y),
+          };
+        } else if (interaction.mode === 'selection-ellipse') {
+          source = {
+            type: 'ellipse',
+            cx: (gesture.start.x + gesture.end.x) / 2,
+            cy: (gesture.start.y + gesture.end.y) / 2,
+            rx: Math.abs(gesture.end.x - gesture.start.x) / 2,
+            ry: Math.abs(gesture.end.y - gesture.start.y) / 2,
+          };
+        } else if (interaction.mode === 'selection-lasso' && gesture.path.length >= 3) {
+          source = { type: 'polygon', points: gesture.path.map(({ x, y }) => ({ x, y })) };
+        } else if (interaction.mode === 'selection-color' && gesture.sampledColor) {
+          source = { type: 'color', ...gesture.sampledColor, tolerance: selectionColorTolerance };
+        }
+        next = source
+          ? normalizeRecipe({
+            ...current.present,
+            selection: appendPhotoSelection(current.present.selection, source, selectionCombineMode),
+          })
+          : current.present;
+        if (!source) return current;
+      }
       return commitHistory(current, next);
     });
+
+    if (interaction.kind === 'selection') {
+      setCanvasInteraction(null);
+      setStatus(`${interaction.label} completed as one undo step.`);
+      return;
+    }
 
     if (interaction.kind === 'local') {
       if (interaction.mode !== 'brush') setCanvasInteraction(null);
@@ -1671,6 +1759,46 @@ export default function PhotoWorkspace() {
           <h2>Local adjustments</h2>
           <p>Target a region, brightness range, or color range without changing the rest of the photograph.</p>
         </div>
+        <details className="photo-section" open data-testid="photo-selection-controls">
+          <summary>Selection</summary>
+          <p className="photo-export-note">Build one reversible selection, combine regions, then convert it to an ordinary local mask.</p>
+          <label>
+            Combine next region
+            <select aria-label="Selection combine mode" value={selectionCombineMode} onChange={(event) => setSelectionCombineMode(event.target.value as PhotoSelectionCombineMode)}>
+              <option value="replace">Replace</option>
+              <option value="add">Add</option>
+              <option value="subtract">Subtract</option>
+              <option value="intersect">Intersect</option>
+            </select>
+          </label>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={!source} aria-pressed={canvasInteraction?.mode === 'selection-rectangle'} onClick={() => startSelection('selection-rectangle', 'Drag a rectangular selection')}>Draw rectangle</button>
+            <button type="button" disabled={!source} aria-pressed={canvasInteraction?.mode === 'selection-ellipse'} onClick={() => startSelection('selection-ellipse', 'Drag an elliptical selection')}>Draw ellipse</button>
+            <button type="button" disabled={!source} aria-pressed={canvasInteraction?.mode === 'selection-lasso'} onClick={() => startSelection('selection-lasso', 'Trace a lasso selection')}>Trace lasso</button>
+            <button type="button" disabled={!source} aria-pressed={canvasInteraction?.mode === 'selection-color'} onClick={() => startSelection('selection-color', 'Sample a selection color')}>Sample color</button>
+          </div>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={!source} onClick={() => setSelectionSource({ type: 'rectangle', x: 0.2, y: 0.2, width: 0.6, height: 0.6 })}>Add centered rectangle</button>
+            <button type="button" disabled={!source} onClick={() => setSelectionSource({ type: 'ellipse', cx: 0.5, cy: 0.5, rx: 0.3, ry: 0.3 })}>Add centered ellipse</button>
+            <button type="button" disabled={!source} onClick={() => setSelectionSource({ type: 'polygon', points: [{ x: 0.5, y: 0.18 }, { x: 0.82, y: 0.5 }, { x: 0.5, y: 0.82 }, { x: 0.18, y: 0.5 }] })}>Add centered polygon</button>
+          </div>
+          <SimpleControl label="Color selection tolerance" value={selectionColorTolerance} min={0} max={1} step={0.01} neutral={0.12} onChange={setSelectionColorTolerance} />
+          <SimpleControl label="Luminance selection minimum" value={selectionLuminanceMin} min={0} max={1} step={0.01} neutral={0.2} onChange={setSelectionLuminanceMin} />
+          <SimpleControl label="Luminance selection maximum" value={selectionLuminanceMax} min={0} max={1} step={0.01} neutral={0.8} onChange={setSelectionLuminanceMax} />
+          <button type="button" disabled={!source} onClick={() => setSelectionSource({ type: 'luminance', min: selectionLuminanceMin, max: selectionLuminanceMax })}>Apply luminance selection</button>
+          {recipe.selection ? (
+            <div data-testid="photo-active-selection">
+              <p className="photo-export-note">{recipe.selection.operations.length} combined region{recipe.selection.operations.length === 1 ? '' : 's'}</p>
+              <SimpleControl label="Selection feather" value={recipe.selection.feather} min={0} max={0.25} step={0.005} onChange={(feather) => updateSelection({ feather })} />
+              <SimpleControl label="Selection grow or shrink" value={recipe.selection.expansion} min={-0.25} max={0.25} step={0.005} onChange={(expansion) => updateSelection({ expansion })} />
+              <div className="photo-inline-actions">
+                <button type="button" onClick={() => updateSelection({ inverted: !recipe.selection?.inverted })}>{recipe.selection.inverted ? 'Use normal selection' : 'Invert selection'}</button>
+                <button type="button" onClick={convertSelectionToMask}>Convert selection to mask</button>
+                <button type="button" onClick={() => { patchRecipe({ selection: null }); setCanvasInteraction(null); }}>Clear selection</button>
+              </div>
+            </div>
+          ) : <p className="photo-export-note">No active selection.</p>}
+        </details>
         <div className="photo-inline-actions">
           <button type="button" onClick={() => addLocalAdjustment('radial')}>Add radial mask</button>
           <button type="button" onClick={() => addLocalAdjustment('linear')}>Add linear mask</button>
@@ -1697,7 +1825,7 @@ export default function PhotoWorkspace() {
             <SimpleControl label={`${adjustment.label} sharpness`} value={adjustment.effect.sharpness} min={-1} max={2} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, sharpness: value } }))} />
             <SimpleControl label={`${adjustment.label} blur`} value={adjustment.effect.blur} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, blur: value } }))} />
             <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
-            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={1} step={0.02} neutral={0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
+            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={adjustment.mask.type === 'selection' ? 0.25 : 1} step={adjustment.mask.type === 'selection' ? 0.005 : 0.02} neutral={adjustment.mask.type === 'selection' ? adjustment.mask.selection.feather : 0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
             {adjustment.mask.type === 'brush' ? (
               <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
             ) : null}
@@ -2087,6 +2215,7 @@ export default function PhotoWorkspace() {
           busy={previewBusy}
           localAdjustments={recipe.localAdjustments}
           retouch={recipe.retouch}
+          selection={recipe.selection}
           interaction={canvasInteraction}
           crop={recipe.crop}
           geometryMode={geometryInteraction}

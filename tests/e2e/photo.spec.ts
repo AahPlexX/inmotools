@@ -144,6 +144,59 @@ test('geometry, detail, and local tools produce reversible recipe state', async 
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
 });
 
+test('selection geometry, combinations, refinement, clear, and mask conversion share one reversible workflow', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+
+  // Keyboard-operable defaults cover non-canvas access to geometry selection.
+  await page.getByRole('button', { name: 'Add centered rectangle' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('photo-active-selection')).toContainText('1 combined region');
+  await expect(page.getByTestId('photo-selection-overlay')).toBeVisible();
+  await page.getByLabel('Selection combine mode').selectOption('add');
+  await page.getByRole('button', { name: 'Add centered ellipse' }).click();
+  await expect(page.getByTestId('photo-active-selection')).toContainText('2 combined regions');
+
+  await page.getByLabel('Selection feather value').fill('0.04');
+  await page.getByLabel('Selection feather value').press('Enter');
+  await page.getByLabel('Selection grow or shrink value').fill('-0.03');
+  await page.getByLabel('Selection grow or shrink value').press('Enter');
+  await page.getByRole('button', { name: 'Invert selection' }).click();
+  await expect(page.getByRole('button', { name: 'Use normal selection' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+
+  // Direct manipulation replaces the restored selection, then lasso/color/luminance add to it.
+  await page.getByLabel('Selection combine mode').selectOption('replace');
+  await page.getByRole('button', { name: 'Draw rectangle' }).click();
+  await dragOnPhoto(page, 0.15, 0.2, 0.65, 0.7);
+  await expect(page.getByTestId('photo-active-selection')).toContainText('1 combined region');
+  await page.getByLabel('Selection combine mode').selectOption('add');
+  await page.getByRole('button', { name: 'Trace lasso' }).click();
+  const box = await photoBox(page);
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.25);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.3, { steps: 3 });
+  await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.7, { steps: 3 });
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.25, { steps: 3 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Sample color' }).click();
+  await clickPhoto(page, 0.5, 0.5);
+  await page.getByRole('button', { name: 'Apply luminance selection' }).click();
+  await expect(page.getByTestId('photo-active-selection')).toContainText('4 combined regions');
+
+  await page.getByRole('button', { name: 'Convert selection to mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await expect(page.getByText('Selection mask 1', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(0);
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+});
+
 test('tone curve points are user-editable and reversible through normal history', async ({ page }) => {
   await openFixture(page);
   await page.locator('summary').filter({ hasText: 'Tone curve' }).click();

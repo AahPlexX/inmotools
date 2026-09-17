@@ -4,21 +4,24 @@ import PhotoCropOverlay, { type PhotoCompositionOverlay } from './PhotoCropOverl
 import PhotoScopes from './PhotoScopes';
 import { photoStraightenFromGuide } from './photo-crop';
 import { createPhotoInspectionOverlay } from './photo-scopes';
-import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, RetouchOperation } from './photo-types';
+import { photoSelectionWeight } from './photo-selection';
+import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, PhotoSelection, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
 
 export interface PhotoCanvasInteraction {
-  kind: 'local' | 'retouch';
+  kind: 'local' | 'retouch' | 'selection';
   id: string;
   label: string;
-  mode: 'radial' | 'linear' | 'brush' | 'red-eye' | 'retouch-source' | 'retouch-target';
+  mode: 'radial' | 'linear' | 'brush' | 'red-eye' | 'retouch-source' | 'retouch-target'
+    | 'selection-rectangle' | 'selection-ellipse' | 'selection-lasso' | 'selection-color';
 }
 
 export interface PhotoCanvasGesture {
   start: { x: number; y: number; pressure: number };
   end: { x: number; y: number; pressure: number };
   path: Array<{ x: number; y: number; pressure: number }>;
+  sampledColor?: { red: number; green: number; blue: number };
 }
 
 interface PhotoCanvasProps {
@@ -33,6 +36,7 @@ interface PhotoCanvasProps {
   busy?: boolean;
   localAdjustments?: LocalAdjustment[];
   retouch?: RetouchOperation[];
+  selection?: PhotoSelection | null;
   interaction?: PhotoCanvasInteraction | null;
   crop?: NormalizedCrop;
   geometryMode?: 'crop' | 'straighten' | null;
@@ -151,6 +155,7 @@ export default function PhotoCanvas({
   busy,
   localAdjustments = [],
   retouch = [],
+  selection = null,
   interaction = null,
   crop = { x: 0, y: 0, width: 1, height: 1 },
   geometryMode = null,
@@ -174,6 +179,7 @@ export default function PhotoCanvas({
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const proofBaseImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const nextSampleIdRef = useRef(1);
 
@@ -280,6 +286,46 @@ export default function PhotoCanvas({
   }, [overlayMode, compareMode, previewUrl]);
 
   useEffect(() => {
+    const image = previewImageRef.current;
+    const canvas = selectionCanvasRef.current;
+    if (!image || !canvas || !selection || !previewUrl) return;
+    const draw = () => {
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      const scale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let pixels: ImageData;
+      try {
+        pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      } catch {
+        return;
+      }
+      for (let pixel = 0; pixel < canvas.width * canvas.height; pixel += 1) {
+        const offset = pixel * 4;
+        const weight = photoSelectionWeight(
+          selection,
+          (pixel % canvas.width + 0.5) / canvas.width,
+          (Math.floor(pixel / canvas.width) + 0.5) / canvas.height,
+          pixels.data[offset],
+          pixels.data[offset + 1],
+          pixels.data[offset + 2],
+        );
+        pixels.data[offset] = 34;
+        pixels.data[offset + 1] = 211;
+        pixels.data[offset + 2] = 238;
+        pixels.data[offset + 3] = Math.round(weight * 105);
+      }
+      context.putImageData(pixels, 0, 0);
+    };
+    if (image.complete) draw();
+    else image.addEventListener('load', draw, { once: true });
+    return () => image.removeEventListener('load', draw);
+  }, [selection, previewUrl]);
+
+  useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller || !previewUrl) return;
     const update = () => {
@@ -368,7 +414,15 @@ export default function PhotoCanvas({
     event.preventDefault();
     const end = pointerPoint(event);
     const path = gesture.path.length ? [...gesture.path, end] : [gesture.start, end];
-    onGesture({ start: gesture.start, end, path });
+    const sample = interaction.mode === 'selection-color' && previewImageRef.current
+      ? readPixelAtNormalized(previewImageRef.current, end.x, end.y)
+      : null;
+    onGesture({
+      start: gesture.start,
+      end,
+      path,
+      sampledColor: sample ? { red: sample.r, green: sample.g, blue: sample.b } : undefined,
+    });
     setGesture(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
@@ -424,6 +478,7 @@ export default function PhotoCanvas({
   function inspectionLayers() {
     return <>
       {overlayMode ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid={`photo-${overlayMode}-overlay`} aria-hidden="true" /> : null}
+      {selection ? <canvas ref={selectionCanvasRef} className="photo-selection-overlay" data-testid="photo-selection-overlay" aria-hidden="true" /> : null}
       {samples.length ? (
         <svg className="photo-sampler-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {samples.map((sample, index) => <g key={sample.id} transform={`translate(${sample.x * 100} ${sample.y * 100})`}>
@@ -582,7 +637,7 @@ export default function PhotoCanvas({
         ) : null}
       </div>
 
-      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · drag on the photo to place it</div> : null}
+      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · {interaction.mode === 'selection-color' || interaction.mode === 'red-eye' || interaction.mode.startsWith('retouch-') ? 'click or tap the photo to place it' : 'drag on the photo to place it'}</div> : null}
       {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry.</div> : null}
       {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below.</div> : null}
       {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to pin up to eight rendered pixels</div> : null}
