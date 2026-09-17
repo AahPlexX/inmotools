@@ -291,3 +291,30 @@ test('channel mixer exposes each output channel and remains reversible', async (
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(greenSource).toHaveValue('0');
 });
+
+test('automatic tone and white balance write visible numeric recipe values and undo as one step', async ({ page }) => {
+  await openFixture(page);
+  const toneValues = [
+    page.getByLabel('Exposure value'),
+    page.getByLabel('Contrast value'),
+    page.getByLabel('Highlights value'),
+    page.getByLabel('Shadows value'),
+    page.getByLabel('White point value'),
+    page.getByLabel('Black point value'),
+  ];
+
+  await page.getByRole('button', { name: 'Suggest automatic tone', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Auto tone applied' })).toBeVisible();
+  expect((await Promise.all(toneValues.map((control) => control.inputValue()))).some((value) => value !== '0')).toBe(true);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  for (const control of toneValues) await expect(control).toHaveValue('0');
+
+  const temperature = page.getByLabel('Temperature value');
+  const tint = page.getByLabel('Tint value');
+  await page.getByRole('button', { name: 'Suggest automatic white balance', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Auto white balance applied' })).toBeVisible();
+  expect([await temperature.inputValue(), await tint.inputValue()]).not.toEqual(['0', '0']);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(temperature).toHaveValue('0');
+  await expect(tint).toHaveValue('0');
+});

@@ -13,6 +13,7 @@ import type { PhotoCompositionOverlay } from './PhotoCropOverlay';
 import PhotoExportDialog from './PhotoExportDialog';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
 import PhotoRawControls from './PhotoRawControls';
+import { suggestAutoTone, suggestAutoWhiteBalance } from './photo-analysis';
 import {
   DEFAULT_RECIPE,
   commitHistory,
@@ -61,6 +62,7 @@ import {
 import type {
   LocalAdjustment,
   PhotoCapabilities,
+  PhotoHistogram,
   PhotoHistory,
   PhotoRecipe,
   PhotoRawSource,
@@ -272,6 +274,7 @@ export default function PhotoWorkspace() {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [embeddedPreview, setEmbeddedPreview] = useState<{ url: string; name: string } | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [autoAnalysisBusy, setAutoAnalysisBusy] = useState<'tone' | 'white-balance' | null>(null);
   const [compare, setCompare] = useState(false);
   const [zoom, setZoom] = useState(0.75);
   const [status, setStatus] = useState('Open a photo to begin editing locally.');
@@ -318,8 +321,12 @@ export default function PhotoWorkspace() {
   const projectSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const projectBeingDeletedRef = useRef<string | null>(null);
   const userPresetMutationRef = useRef(false);
+  const autoAnalysisRevisionRef = useRef(0);
+  const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
 
   const recipe = history.present;
+  const recipeRef = useRef(recipe);
+  recipeRef.current = recipe;
   const parsedCustomRatioWidth = Number(customRatioWidth);
   const parsedCustomRatioHeight = Number(customRatioHeight);
   const customRatioIsValid = Number.isFinite(parsedCustomRatioWidth)
@@ -332,6 +339,12 @@ export default function PhotoWorkspace() {
   useEffect(() => {
     setGeometryInteraction(null);
   }, [source?.originalUrl]);
+
+  useEffect(() => {
+    autoAnalysisRevisionRef.current += 1;
+    analysisHistogramCacheRef.current = null;
+    setAutoAnalysisBusy(null);
+  }, [source?.file]);
 
   const refreshLocalProjects = useCallback(async (store = projectStoreRef.current) => {
     if (!store) return;
@@ -421,6 +434,7 @@ export default function PhotoWorkspace() {
   useEffect(() => () => {
     importRevisionRef.current += 1;
     renderRevisionRef.current += 1;
+    autoAnalysisRevisionRef.current += 1;
     releasePreviewUrl();
     releaseSourceUrl();
     releaseEmbeddedPreview(false);
@@ -480,6 +494,55 @@ export default function PhotoWorkspace() {
   const patchRecipe = useCallback((patch: Partial<PhotoRecipe>) => {
     setHistory((current) => commitHistory(current, recipeWithPatch(current.present, patch)));
   }, []);
+
+  async function applyAutomaticSuggestion(kind: 'tone' | 'white-balance') {
+    if (!source || autoAnalysisBusy) return;
+    const sourceAtStart = source;
+    const recipeAtStart = recipeRef.current;
+    const requestRevision = ++autoAnalysisRevisionRef.current;
+    setAutoAnalysisBusy(kind);
+    setStatus(kind === 'tone' ? 'Analyzing the neutral source for automatic tone…' : 'Analyzing the neutral source for automatic white balance…');
+
+    try {
+      let histogram = analysisHistogramCacheRef.current?.file === sourceAtStart.file
+        ? analysisHistogramCacheRef.current.histogram
+        : null;
+      if (!histogram) {
+        const result = await renderPhoto({
+          file: sourceAtStart.file,
+          recipe: DEFAULT_RECIPE,
+          revision: requestRevision,
+          mode: 'preview',
+          outputMime: 'image/png',
+        });
+        if (requestRevision !== autoAnalysisRevisionRef.current || sourceRef.current?.file !== sourceAtStart.file) return;
+        histogram = result.histogram;
+        analysisHistogramCacheRef.current = { file: sourceAtStart.file, histogram };
+      }
+
+      if (requestRevision !== autoAnalysisRevisionRef.current || sourceRef.current?.file !== sourceAtStart.file) return;
+      if (recipeRef.current !== recipeAtStart) {
+        setStatus('Automatic suggestion was not applied because the edit recipe changed during analysis.');
+        return;
+      }
+
+      if (kind === 'tone') {
+        const suggestion = suggestAutoTone(histogram);
+        patchRecipe(suggestion);
+        setStatus(`Auto tone applied · exposure ${suggestion.exposure.toFixed(2)} EV · contrast ${suggestion.contrast.toFixed(2)}. All values remain editable.`);
+      } else {
+        const suggestion = suggestAutoWhiteBalance(histogram);
+        patchRecipe(suggestion);
+        setStatus(`Auto white balance applied · temperature ${suggestion.temperature.toFixed(2)} · tint ${suggestion.tint.toFixed(2)}. Both values remain editable.`);
+      }
+    } catch (error) {
+      if (requestRevision === autoAnalysisRevisionRef.current) {
+        setStatus(`Automatic ${kind === 'tone' ? 'tone' : 'white balance'} analysis failed: ${error instanceof Error ? error.message : 'unknown analysis error'}`);
+      }
+    } finally {
+      if (requestRevision === autoAnalysisRevisionRef.current) setAutoAnalysisBusy(null);
+    }
+  }
 
   const undo = useCallback(() => {
     setHistory((current) => undoHistory(current));
@@ -1154,6 +1217,15 @@ export default function PhotoWorkspace() {
         {source?.rawSource ? <PhotoRawControls value={recipe.raw} source={source.rawSource} onChange={(raw) => patchRecipe({ raw })} /> : null}
         <details className="photo-section" open>
           <summary>Light & tone</summary>
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              aria-label="Suggest automatic tone"
+              disabled={!source || autoAnalysisBusy !== null}
+              onClick={() => void applyAutomaticSuggestion('tone')}
+            >{autoAnalysisBusy === 'tone' ? 'Analyzing tone…' : 'Auto tone'}</button>
+          </div>
+          <p className="photo-export-note">Analyzes the neutral source and writes ordinary visible controls as one undoable edit.</p>
           <div className="photo-control-list">
             {LIGHT_CONTROLS.map((spec) => (
               <AdjustmentControl
@@ -1240,6 +1312,15 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              aria-label="Suggest automatic white balance"
+              disabled={!source || autoAnalysisBusy !== null}
+              onClick={() => void applyAutomaticSuggestion('white-balance')}
+            >{autoAnalysisBusy === 'white-balance' ? 'Analyzing white balance…' : 'Auto white balance'}</button>
+          </div>
+          <p className="photo-export-note">Uses deterministic gray-world analysis of the neutral source; temperature and tint remain editable.</p>
           <div className="photo-control-list">
             {COLOR_CONTROLS.map((spec) => (
               <AdjustmentControl
