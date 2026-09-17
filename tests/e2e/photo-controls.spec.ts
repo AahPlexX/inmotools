@@ -318,3 +318,47 @@ test('automatic tone and white balance write visible numeric recipe values and u
   await expect(temperature).toHaveValue('0');
   await expect(tint).toHaveValue('0');
 });
+
+test('3D Cube LUT import, strength, faithful export, errors, and history stay explicit', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: '3D LUT' }).click();
+  const invertCube = `TITLE "Browser invert"\nLUT_3D_SIZE 2\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n1 1 1\n0 1 1\n1 0 1\n0 0 1\n1 1 0\n0 1 0\n1 0 0\n0 0 0\n`;
+
+  await page.setInputFiles('[data-testid="photo-lut-input"]', {
+    name: 'browser-invert.cube',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(invertCube),
+  });
+  await expect(page.getByTestId('photo-active-lut')).toContainText('Browser invert · 2³ grid · browser-invert.cube');
+  await expect(page.getByLabel('LUT strength value')).toHaveValue('1');
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-lut')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-lut')).toBeVisible();
+
+  const strength = page.getByLabel('LUT strength value');
+  await strength.fill('0.5');
+  await strength.press('Enter');
+  await expect(strength).toHaveValue('0.5');
+
+  await page.setInputFiles('[data-testid="photo-lut-input"]', {
+    name: 'broken.cube',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('LUT_3D_SIZE 2\n0 0 0\n'),
+  });
+  await expect(page.getByRole('status').filter({ hasText: 'LUT import failed' })).toBeVisible();
+  await expect(page.getByTestId('photo-active-lut')).toContainText('Browser invert');
+  await expect(strength).toHaveValue('0.5');
+
+  const downloadStarted = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export active LUT', exact: true }).click();
+  const download = await downloadStarted;
+  expect(download.suggestedFilename()).toBe('browser-invert-50pct.cube');
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  const exported = Buffer.concat(chunks).toString('utf8');
+  expect(exported).toContain('TITLE "Browser invert (50% strength)"');
+  expect(exported).toContain('LUT_3D_SIZE 2');
+});

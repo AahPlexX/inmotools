@@ -7,6 +7,7 @@ import type {
   PhotoHistogram,
   PhotoHistory,
   PhotoLevels,
+  PhotoLut,
   PhotoMask,
   PhotoRecipe,
   PhotoRgbToneCurves,
@@ -14,6 +15,7 @@ import type {
   TonePoint,
 } from './photo-types';
 import { normalizeRawSettings } from './photo-raw-settings';
+import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './photo-lut';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -40,6 +42,11 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
       green: { ...recipe.channelMixer.green },
       blue: { ...recipe.channelMixer.blue },
     },
+    lut: recipe.lut ? {
+      ...recipe.lut,
+      domainMin: [...recipe.lut.domainMin],
+      domainMax: [...recipe.lut.domainMax],
+    } : null,
     hsl: recipe.hsl.map((entry) => ({ ...entry })),
     shadowGrade: { ...recipe.shadowGrade },
     midtoneGrade: { ...recipe.midtoneGrade },
@@ -104,6 +111,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   rgbToneCurves: neutralRgbToneCurves(),
   levels: neutralLevels(),
   channelMixer: neutralChannelMixer(),
+  lut: null,
 
   temperature: 0,
   tint: 0,
@@ -332,6 +340,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     rgbToneCurves: normalizeRgbToneCurves(source.rgbToneCurves),
     levels: normalizeLevels(source.levels),
     channelMixer: normalizeChannelMixer(source.channelMixer),
+    lut: normalizePhotoLut(source.lut as PhotoLut | null | undefined),
 
     temperature: clamp(source.temperature, -1, 1),
     tint: clamp(source.tint, -1, 1),
@@ -525,6 +534,7 @@ function isNeutralGlobal(recipe: PhotoRecipe): boolean {
     && isIdentityCurve(recipe.rgbToneCurves.blue)
     && isNeutralLevels(recipe.levels)
     && isNeutralChannelMixer(recipe.channelMixer)
+    && (!recipe.lut || recipe.lut.strength === 0)
     && recipe.temperature === 0
     && recipe.tint === 0
     && recipe.saturation === 0
@@ -564,6 +574,7 @@ function seededNoise(x: number, y: number): number {
 
 function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
   if (isNeutralGlobal(recipe)) return;
+  const preparedLut = preparePhotoLut(recipe.lut);
   const exposureScale = 2 ** recipe.exposure;
   const temperature = recipe.temperature;
   const tint = recipe.tint;
@@ -632,6 +643,7 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
     sg = interpolateCurve(interpolateCurve(sg, recipe.toneCurve), recipe.rgbToneCurves.green);
     sb = interpolateCurve(interpolateCurve(sb, recipe.toneCurve), recipe.rgbToneCurves.blue);
     [sr, sg, sb] = applyChannelMixer([sr, sg, sb], recipe.channelMixer);
+    if (preparedLut) [sr, sg, sb] = samplePreparedPhotoLut(preparedLut, [sr, sg, sb]);
 
     const pixelIndex = offset / 4;
     const x = pixelIndex % width;

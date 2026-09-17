@@ -25,6 +25,12 @@ import {
 import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
 import {
+  MAX_CUBE_FILE_BYTES,
+  parseCubeLut,
+  serializeCubeLut,
+  suggestPhotoLutFilename,
+} from './photo-lut';
+import {
   PHOTO_FILE_ACCEPT,
   isPhotoImportFile,
   normalizePhotoImport,
@@ -309,6 +315,7 @@ export default function PhotoWorkspace() {
   const [storageStatus, setStorageStatus] = useState<PhotoStorageStatus | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recipeInputRef = useRef<HTMLInputElement | null>(null);
+  const lutInputRef = useRef<HTMLInputElement | null>(null);
   const userPresetInputRef = useRef<HTMLInputElement | null>(null);
   const renderRevisionRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
@@ -1207,6 +1214,28 @@ export default function PhotoWorkspace() {
     }
   }
 
+  async function importLut(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      if (!file.name.toLowerCase().endsWith('.cube')) throw new Error('Choose a .cube 3D LUT file.');
+      if (file.size > MAX_CUBE_FILE_BYTES) throw new Error('Cube files must be 16 MiB or smaller.');
+      const lut = parseCubeLut(await file.text(), file.name);
+      patchRecipe({ lut });
+      setStatus(`${file.name} imported · ${lut.size}³ 3D LUT · strength 100%.`);
+    } catch (error) {
+      setStatus(`LUT import failed: ${error instanceof Error ? error.message : 'invalid Cube file'}`);
+    }
+  }
+
+  function exportActiveLut() {
+    if (!recipe.lut) return;
+    const blob = new Blob([serializeCubeLut(recipe.lut)], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, suggestPhotoLutFilename(recipe.lut));
+    setStatus(`${recipe.lut.title} exported with ${Math.round(recipe.lut.strength * 100)}% strength baked into the Cube grid.`);
+  }
+
   function renderEditPanel() {
     return (
       <>
@@ -1309,6 +1338,44 @@ export default function PhotoWorkspace() {
             />
           </div>
           <p className="photo-export-note">Source total {Math.round((recipe.channelMixer[mixerOutputChannel].red + recipe.channelMixer[mixerOutputChannel].green + recipe.channelMixer[mixerOutputChannel].blue) * 100)}% · negative source values invert that channel before mixing.</p>
+        </details>
+        <details className="photo-section" data-testid="photo-lut-panel">
+          <summary>3D LUT</summary>
+          <p className="photo-export-note">Import a common 3D <code>.cube</code> look. The transform is applied locally by the same engine used for preview and full-resolution export.</p>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => lutInputRef.current?.click()}>{recipe.lut ? 'Replace LUT' : 'Import LUT'}</button>
+            <input
+              ref={lutInputRef}
+              data-testid="photo-lut-input"
+              type="file"
+              accept=".cube,text/plain"
+              hidden
+              onChange={(event) => void importLut(event)}
+            />
+            {recipe.lut ? <>
+              <button type="button" onClick={exportActiveLut}>Export active LUT</button>
+              <button type="button" onClick={() => {
+                patchRecipe({ lut: null });
+                setStatus('3D LUT removed.');
+              }}>Remove LUT</button>
+            </> : null}
+          </div>
+          {recipe.lut ? <div data-testid="photo-active-lut">
+            <p><strong>{recipe.lut.title}</strong> · {recipe.lut.size}³ grid · {recipe.lut.fileName}</p>
+            <p className="photo-export-note">Input domain {recipe.lut.domainMin.join(', ')} → {recipe.lut.domainMax.join(', ')}.</p>
+            <div className="photo-control-list">
+              <SimpleControl
+                label="LUT strength"
+                value={recipe.lut.strength}
+                min={0}
+                max={1}
+                step={0.01}
+                neutral={1}
+                onChange={(strength) => patchRecipe({ lut: { ...recipe.lut!, strength } })}
+              />
+            </div>
+            <p className="photo-export-note">Export active LUT bakes this strength into a portable Cube grid. Other Photo Studio adjustments are intentionally not included.</p>
+          </div> : <p className="photo-export-note">No LUT is active. Cube files with a 2³–65³ 3D grid are supported; 1D and combined files are rejected explicitly.</p>}
         </details>
         <details className="photo-section" open>
           <summary>White balance & color</summary>

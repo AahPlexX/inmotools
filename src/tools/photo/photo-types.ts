@@ -38,6 +38,18 @@ export interface PhotoChannelMixer {
   green: PhotoChannelMixerRow;
   blue: PhotoChannelMixerRow;
 }
+
+export interface PhotoLut {
+  fileName: string;
+  title: string;
+  size: number;
+  domainMin: [number, number, number];
+  domainMax: [number, number, number];
+  /** Base64-encoded little-endian Float32 RGB rows in Cube red-fastest order. */
+  data: string;
+  strength: number;
+}
+
 export interface HslAdjustment {
   hue: number;
   saturation: number;
@@ -101,6 +113,8 @@ export interface PhotoRecipe {
   rgbToneCurves: PhotoRgbToneCurves;
   levels: PhotoLevels;
   channelMixer: PhotoChannelMixer;
+  /** Optional on older version-1 recipes; normalized to null. */
+  lut?: PhotoLut | null;
 
   temperature: number;
   tint: number;
