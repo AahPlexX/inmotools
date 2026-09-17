@@ -134,7 +134,7 @@ export function buildTargetText(cfg: TargetConfig, seed?: number): string {
       source = generateWords(poolForMode('words-1000', cfg.language), capacity, seed);
       break;
     case 'custom':
-      source = cfg.customText.trim();
+      source = cfg.customText.replace(/\t/g, '    ').trim();
       break;
     default:
       source = '';

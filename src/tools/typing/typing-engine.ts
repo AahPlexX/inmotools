@@ -126,26 +126,45 @@ export function pressKey(state: EngineState, key: string, code: string, t: numbe
   if (state.finished) return state;
   const opts = state.options;
 
-  // Backspace handling.
+  // Backspace handling. Backspace remains outside the accuracy denominator, but
+  // once a test has started it is retained in the raw event log so ghost replay
+  // can reverse progress that was actually erased.
   if (key === 'Backspace') {
-    if (!opts.allowBackspace) return { ...state, backspaces: state.backspaces + 1 };
+    const appendBackspace = (index: number, expected: string): KeystrokeEvent[] => (
+      state.startedAt == null
+        ? state.events
+        : [...state.events, { t, key, code, correct: false, index, expected }]
+    );
+    if (!opts.allowBackspace) {
+      return { ...state, events: appendBackspace(-1, ''), backspaces: state.backspaces + 1 };
+    }
     const current = state.cells[state.cursor];
     if (current?.state === 'incorrect' && current.expected !== '') {
       const cells = state.cells.slice();
       cells[state.cursor] = { ...current, typed: '', state: 'pending', t: undefined };
-      return { ...state, cells, backspaces: state.backspaces + 1 };
+      return {
+        ...state,
+        cells,
+        events: appendBackspace(state.cursor, current.expected),
+        backspaces: state.backspaces + 1,
+      };
     }
-    if (state.cursor === 0) return state;
-    const next = { ...state, cells: state.cells.slice(), cursor: state.cursor - 1, backspaces: state.backspaces + 1 };
-    const idx = next.cursor;
-    const cell = next.cells[idx];
+    if (state.cursor === 0) {
+      return { ...state, events: appendBackspace(-1, ''), backspaces: state.backspaces + 1 };
+    }
+    const erasedIndex = state.cursor - 1;
+    const erased = state.cells[erasedIndex];
+    const next = {
+      ...state,
+      events: appendBackspace(erasedIndex, erased?.expected ?? ''),
+      cells: state.cells.slice(),
+      cursor: erasedIndex,
+      backspaces: state.backspaces + 1,
+    };
+    const cell = next.cells[erasedIndex];
     if (cell) {
-      // If this is a synthetic "extra" cell, drop it entirely.
-      if (cell.expected === '' && cell.state === 'extra') {
-        next.cells.splice(idx, 1);
-      } else {
-        next.cells[idx] = { ...cell, typed: '', state: 'pending', t: undefined };
-      }
+      if (cell.expected === '' && cell.state === 'extra') next.cells.splice(erasedIndex, 1);
+      else next.cells[erasedIndex] = { ...cell, typed: '', state: 'pending', t: undefined };
     }
     return next;
   }
@@ -332,33 +351,45 @@ export interface WpmSample {
   errorsInWindow: number;
 }
 
+function isCommittedTextEvent(event: KeystrokeEvent): boolean {
+  return event.key.length === 1 || (event.key === 'Enter' && event.expected === '\n');
+}
+
 export function wpmSeries(state: EngineState, endT?: number): WpmSample[] {
   const start = state.startedAt;
   if (start == null) return [];
   const end = state.endedAt ?? endT ?? start;
   const totalSecs = Math.max(1, Math.ceil((end - start) / 1000));
-  const buckets: { correct: number; total: number; errors: number }[] = [];
-  for (let i = 0; i < totalSecs; i += 1) buckets.push({ correct: 0, total: 0, errors: 0 });
-  for (const e of state.events) {
-    if (e.key.length !== 1) continue;
-    const s = Math.min(totalSecs - 1, Math.max(0, Math.floor((e.t - start) / 1000)));
-    const b = buckets[s]!;
-    b.total += 1;
-    if (e.correct) b.correct += 1;
-    else b.errors += 1;
+  const errorsBySecond = Array.from({ length: totalSecs }, () => 0);
+  for (const event of state.events) {
+    if (!isCommittedTextEvent(event) || event.correct) continue;
+    const bucket = Math.min(totalSecs - 1, Math.max(0, Math.floor((event.t - start) / 1000)));
+    errorsBySecond[bucket] = (errorsBySecond[bucket] ?? 0) + 1;
   }
+
   const samples: WpmSample[] = [];
-  let cumulativeCorrect = 0;
+  const correctIndexes = new Set<number>();
   let cumulativeTotal = 0;
-  for (let i = 0; i < buckets.length; i += 1) {
-    const b = buckets[i]!;
-    cumulativeCorrect += b.correct;
-    cumulativeTotal += b.total;
-    const seconds = i + 1;
-    const minutes = seconds / 60;
-    const wpm = (cumulativeCorrect / STANDARD_WORD) / minutes;
-    const rawWpm = (cumulativeTotal / STANDARD_WORD) / minutes;
-    samples.push({ seconds, wpm: round(wpm), rawWpm: round(rawWpm), errorsInWindow: b.errors });
+  let cursor = 0;
+  for (let second = 1; second <= totalSecs; second += 1) {
+    const cutoff = start + second * 1000;
+    while (cursor < state.events.length && state.events[cursor]!.t <= cutoff) {
+      const event = state.events[cursor]!;
+      if (event.key === 'Backspace') {
+        if (event.index >= 0) correctIndexes.delete(event.index);
+      } else if (isCommittedTextEvent(event)) {
+        cumulativeTotal += 1;
+        if (event.correct) correctIndexes.add(event.index);
+      }
+      cursor += 1;
+    }
+    const minutes = second / 60;
+    samples.push({
+      seconds: second,
+      wpm: round((correctIndexes.size / STANDARD_WORD) / minutes),
+      rawWpm: round((cumulativeTotal / STANDARD_WORD) / minutes),
+      errorsInWindow: errorsBySecond[second - 1] ?? 0,
+    });
   }
   return samples;
 }
@@ -573,16 +604,20 @@ export function ghostSeries(events: KeystrokeEvent[]): GhostSample[] {
   const end = events[events.length - 1]!.t;
   const totalSecs = Math.max(1, Math.ceil((end - start) / 1000));
   const samples: GhostSample[] = [];
-  let correct = 0;
+  const correctIndexes = new Set<number>();
   let cursor = 0;
   for (let s = 1; s <= totalSecs; s += 1) {
     const cutoff = start + s * 1000;
     while (cursor < events.length && events[cursor]!.t <= cutoff) {
-      const ev = events[cursor]!;
-      if (ev.key.length === 1 && ev.correct) correct += 1;
+      const event = events[cursor]!;
+      if (event.key === 'Backspace') {
+        if (event.index >= 0) correctIndexes.delete(event.index);
+      } else if (isCommittedTextEvent(event) && event.correct) {
+        correctIndexes.add(event.index);
+      }
       cursor += 1;
     }
-    samples.push({ seconds: s, correctChars: correct });
+    samples.push({ seconds: s, correctChars: correctIndexes.size });
   }
   return samples;
 }

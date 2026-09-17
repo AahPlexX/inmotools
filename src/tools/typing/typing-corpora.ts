@@ -175,6 +175,13 @@ export function findLayout(id: LayoutId): LayoutDefinition {
   return { ...found, fingers: fingersForRows(found.rows) };
 }
 
+export function homeRowAnchors(layout: LayoutDefinition): { left: string; right: string } {
+  const homeRow = layout.rows[2]?.keys ?? [];
+  const left = homeRow.find((key) => layout.fingers[key] === 'l2') ?? 'f';
+  const right = homeRow.slice().reverse().find((key) => layout.fingers[key] === 'r2') ?? 'j';
+  return { left, right };
+}
+
 // --------------------------------------------------------------------
 // Punctuation and number pools.
 // --------------------------------------------------------------------

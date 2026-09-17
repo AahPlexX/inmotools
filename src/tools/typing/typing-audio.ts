@@ -5,6 +5,22 @@
 
 export type SwitchProfile = 'off' | 'mx-blue' | 'mx-red' | 'mx-brown' | 'holy-panda' | 'topre' | 'typewriter';
 
+export type KeystrokeSound = 'correct' | 'incorrect' | 'space' | 'enter' | 'backspace';
+
+export function classifyKeystrokeSound(
+  key: string,
+  expected: string | undefined,
+  caseSensitive: boolean,
+): KeystrokeSound | null {
+  if (key === 'Backspace') return 'backspace';
+  if (key === 'Enter') return expected === '\n' ? 'enter' : null;
+  if (key.length !== 1 || expected === undefined) return null;
+  const actualValue = caseSensitive ? key : key.toLocaleLowerCase();
+  const expectedValue = caseSensitive ? expected : expected.toLocaleLowerCase();
+  if (actualValue !== expectedValue) return 'incorrect';
+  return key === ' ' ? 'space' : 'correct';
+}
+
 export interface AudioController {
   playKeystroke(kind: 'correct' | 'incorrect' | 'space' | 'enter' | 'backspace'): void;
   playMilestone(): void;

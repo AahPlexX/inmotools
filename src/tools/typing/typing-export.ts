@@ -3,7 +3,7 @@
 
 import Papa from 'papaparse';
 import { jsPDF } from 'jspdf';
-import type { StoredTest } from './typing-storage';
+import { normalizeStoredTest, type StoredTest } from './typing-storage';
 import type { KeystrokeEvent } from './typing-engine';
 
 export interface ExportMetadata {
@@ -57,7 +57,7 @@ export function testsToCsv(tests: StoredTest[], meta?: ExportMetadata): string {
       export_notes: meta.notes,
     } : {}),
   }));
-  return Papa.unparse(rows, { header: true, newline: '\n' });
+  return Papa.unparse(rows, { header: true, newline: '\n', escapeFormulae: true });
 }
 
 export function keystrokesToCsv(keystrokes: KeystrokeEvent[]): string {
@@ -71,7 +71,7 @@ export function keystrokesToCsv(keystrokes: KeystrokeEvent[]): string {
       index: k.index,
       correct: k.correct ? 1 : 0,
     })),
-    { header: true, newline: '\n' },
+    { header: true, newline: '\n', escapeFormulae: true },
   );
 }
 
@@ -93,6 +93,22 @@ export function testToJson(test: StoredTest, meta: ExportMetadata): string {
     test: merged,
   };
   return JSON.stringify(envelope, null, 2);
+}
+
+export function parseImportedTests(value: unknown, now = Date.now()): { tests: StoredTest[]; skipped: number } {
+  if (value == null || typeof value !== 'object') return { tests: [], skipped: 0 };
+  const envelope = value as { tool?: unknown; schemaVersion?: unknown; tests?: unknown; test?: unknown };
+  if (envelope.tool !== undefined && envelope.tool !== 'inmotools-typing-workstation') return { tests: [], skipped: 0 };
+  if (envelope.schemaVersion !== undefined && envelope.schemaVersion !== 1) return { tests: [], skipped: 0 };
+  const candidates = Array.isArray(envelope.tests) ? envelope.tests : envelope.test !== undefined ? [envelope.test] : [];
+  const tests: StoredTest[] = [];
+  let skipped = 0;
+  for (const candidate of candidates) {
+    const normalized = normalizeStoredTest(candidate, now);
+    if (normalized) tests.push(normalized);
+    else skipped += 1;
+  }
+  return { tests, skipped };
 }
 
 export function testsToJson(tests: StoredTest[], meta: ExportMetadata): string {
@@ -118,6 +134,7 @@ export function testsToJson(tests: StoredTest[], meta: ExportMetadata): string {
 // PDF certificate
 // --------------------------------------------------------------------
 export function certificatePdf(test: StoredTest, meta: ExportMetadata): Blob {
+  if (test.finishReason !== 'completed') throw new Error('Proficiency certificates require a completed test.');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

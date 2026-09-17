@@ -4,7 +4,7 @@
 
 import Dexie, { type Table } from 'dexie';
 import type { KeystrokeEvent } from './typing-engine';
-import type { CorpusMode, Language, LayoutId, Quote } from './typing-corpora';
+import { LANGUAGE_POOLS, LAYOUTS, type CorpusMode, type Language, type LayoutId, type Quote } from './typing-corpora';
 
 export interface StoredTest {
   id?: number;
@@ -90,8 +90,58 @@ function getDb(): TypingDb {
 // --------------------------------------------------------------------
 // Tests
 // --------------------------------------------------------------------
+const CORPUS_MODES = new Set<CorpusMode>([
+  'words-200', 'words-1000', 'words-5000', 'punctuation', 'numbers', 'code',
+  'medical', 'legal', 'kids', 'quote', 'zen', 'custom',
+]);
+const DURATION_MODES = new Set<StoredTest['durationMode']>(['time', 'words', 'quote', 'zen', 'certification']);
+const FINISH_REASONS = new Set<StoredTest['finishReason']>(['completed', 'failed', 'aborted']);
+const QUOTE_LENGTHS = new Set<Quote['length']>(['short', 'medium', 'long', 'thicc']);
+const LANGUAGES = new Set<Language>(Object.keys(LANGUAGE_POOLS) as Language[]);
+const LAYOUT_IDS = new Set<LayoutId>(LAYOUTS.map((layout) => layout.id));
+
+function finiteNumber(value: unknown, min = 0, max = Number.POSITIVE_INFINITY): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+}
+function validKeystrokes(value: unknown): value is KeystrokeEvent[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((event) => {
+    if (event == null || typeof event !== 'object') return false;
+    const record = event as Partial<KeystrokeEvent>;
+    return finiteNumber(record.t)
+      && typeof record.key === 'string'
+      && typeof record.code === 'string'
+      && typeof record.correct === 'boolean'
+      && Number.isInteger(record.index)
+      && typeof record.expected === 'string';
+  });
+}
+export function normalizeStoredTest(value: unknown, fallbackSavedAt = Date.now()): StoredTest | null {
+  if (value == null || typeof value !== 'object') return null;
+  const record = value as Partial<StoredTest>;
+  if (!CORPUS_MODES.has(record.mode as CorpusMode)) return null;
+  if (!DURATION_MODES.has(record.durationMode as StoredTest['durationMode'])) return null;
+  if (!LANGUAGES.has(record.language as Language) || !LAYOUT_IDS.has(record.layout as LayoutId)) return null;
+  if (!FINISH_REASONS.has(record.finishReason as StoredTest['finishReason'])) return null;
+  if (record.quoteLength !== undefined && !QUOTE_LENGTHS.has(record.quoteLength)) return null;
+  if (typeof record.targetText !== 'string' || !finiteNumber(record.durationValue)) return null;
+  if (!finiteNumber(record.netWpm) || !finiteNumber(record.grossWpm) || !finiteNumber(record.rawCpm)) return null;
+  if (!finiteNumber(record.accuracy, 0, 100) || !finiteNumber(record.consistency, 0, 100)) return null;
+  if (!finiteNumber(record.elapsedMs) || !finiteNumber(record.correctChars) || !finiteNumber(record.incorrectChars)
+      || !finiteNumber(record.missedChars) || !finiteNumber(record.extraChars)) return null;
+  if (record.tags !== undefined && (!Array.isArray(record.tags) || !record.tags.every((tag) => typeof tag === 'string'))) return null;
+  if (record.notes !== undefined && typeof record.notes !== 'string') return null;
+  if (record.keystrokes !== undefined && !validKeystrokes(record.keystrokes)) return null;
+  const savedAt = record.savedAt === undefined ? fallbackSavedAt : record.savedAt;
+  if (!finiteNumber(savedAt)) return null;
+  if (record.id !== undefined && (!Number.isInteger(record.id) || record.id <= 0)) return null;
+  return { ...(record as StoredTest), savedAt, tags: record.tags ?? [], notes: record.notes ?? '' };
+}
+
 export async function saveTest(test: StoredTest): Promise<number> {
-  const localTest = { ...test };
+  const normalized = normalizeStoredTest(test);
+  if (!normalized) throw new Error('Invalid typing test record.');
+  const localTest = { ...normalized };
   delete localTest.id;
   return getDb().tests.add(localTest);
 }
@@ -110,26 +160,27 @@ export async function listTests(): Promise<StoredTest[]> {
   return getDb().tests.orderBy('savedAt').reverse().toArray();
 }
 
-export async function filterTests(opts: {
+export interface TestFilterOptions {
   tags?: string[];
   mode?: CorpusMode;
   language?: Language;
   layout?: LayoutId;
   since?: number;
   until?: number;
-}): Promise<StoredTest[]> {
-  const all = await listTests();
-  return all.filter((t) => {
-    if (opts.mode && t.mode !== opts.mode) return false;
-    if (opts.language && t.language !== opts.language) return false;
-    if (opts.layout && t.layout !== opts.layout) return false;
-    if (opts.since && t.savedAt < opts.since) return false;
-    if (opts.until && t.savedAt > opts.until) return false;
-    if (opts.tags && opts.tags.length > 0) {
-      if (!opts.tags.every((tag) => t.tags.includes(tag))) return false;
-    }
+}
+export function filterStoredTests(tests: StoredTest[], opts: TestFilterOptions): StoredTest[] {
+  return tests.filter((test) => {
+    if (opts.mode && test.mode !== opts.mode) return false;
+    if (opts.language && test.language !== opts.language) return false;
+    if (opts.layout && test.layout !== opts.layout) return false;
+    if (opts.since && test.savedAt < opts.since) return false;
+    if (opts.until && test.savedAt > opts.until) return false;
+    if (opts.tags && opts.tags.length > 0 && !opts.tags.every((tag) => test.tags.includes(tag))) return false;
     return true;
   });
+}
+export async function filterTests(opts: TestFilterOptions): Promise<StoredTest[]> {
+  return filterStoredTests(await listTests(), opts);
 }
 
 export async function findPersonalBest(query: PersonalBestQuery): Promise<StoredTest | undefined> {
@@ -137,7 +188,7 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
     .where('mode').equals(query.mode)
     .filter((t) => (
       t.durationMode === query.durationMode
-      && t.durationValue === query.durationValue
+      && (query.durationMode === 'quote' || t.durationValue === query.durationValue)
       && t.language === query.language
       && t.layout === query.layout
       && t.finishReason === 'completed'
