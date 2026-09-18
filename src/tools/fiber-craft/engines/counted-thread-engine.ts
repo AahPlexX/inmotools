@@ -49,7 +49,15 @@ export interface CountedThreadLegendEntry {
 }
 
 const STARTER_SIZE = 12;
-const LEGEND_SYMBOLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'] as const;
+const legendSymbol = (index: number): string => {
+  let value = index;
+  let symbol = '';
+  do {
+    symbol = String.fromCharCode(65 + (value % 26)) + symbol;
+    value = Math.floor(value / 26) - 1;
+  } while (value >= 0);
+  return symbol;
+};
 const STARTER_PALETTE: readonly ColorSlot[] = [
   { id: 'primary', label: 'Primary', hex: '#205bd6' },
   { id: 'accent', label: 'Accent', hex: '#087a55' },
@@ -295,7 +303,7 @@ export const generateCountedThreadLegend = (
       label: color.label,
       code: color.paletteCode,
       paletteName: color.paletteName,
-      symbol: LEGEND_SYMBOLS[index % LEGEND_SYMBOLS.length],
+      symbol: legendSymbol(index),
       usageCount: usage.get(color.id)!,
     }]
     : []);

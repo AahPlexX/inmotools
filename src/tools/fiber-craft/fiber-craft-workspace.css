@@ -131,3 +131,11 @@
   .fiber-counted-scroll { overflow: visible; max-width: none; }
   .fiber-counted-legend { break-inside: avoid; }
 }
+
+.fiber-counted-import { padding: 0 16px 14px; border-top: 1px solid var(--line); }
+.fiber-counted-import > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 13px; font-weight: 700; }
+.fiber-counted-import > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.fiber-counted-import-controls { margin: 0; }
+.fiber-counted-checkbox { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; font-weight: 700; }
+.fiber-counted-checkbox input { width: 20px; height: 20px; margin: 0; }
+.fiber-counted-import-controls .fiber-craft-muted { grid-column: 1 / -1; }

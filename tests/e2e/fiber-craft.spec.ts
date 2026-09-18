@@ -202,6 +202,23 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ })).toBeVisible();
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 French knot');
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 backstitch line');
+    await page.getByText('Import image to counted chart', { exact: true }).click();
+    const pngBytes = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2;
+      const context = canvas.getContext('2d')!; context.fillStyle = '#d22f27'; context.fillRect(0, 0, 1, 2); context.fillStyle = '#2459c4'; context.fillRect(1, 0, 1, 2);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG fixture encoding failed.')), 'image/png'));
+      return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    });
+    const png = Buffer.from(pngBytes);
+    await page.getByLabel('Import image').setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer: png });
+    await page.getByLabel('Chart rows').fill('3');
+    await page.getByLabel('Chart columns').fill('4');
+    await page.getByLabel('Color limit').fill('1');
+    await page.getByLabel('Dither colors').check();
+    await page.getByRole('button', { name: 'Generate counted chart' }).click();
+    await expect(page.getByRole('grid', { name: 'Counted-thread grid, 3 rows by 4 columns' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Full cross, Image color 1/ })).toHaveCount(12);
+    await expect(page.getByTestId('counted-thread-legend')).toContainText('Image color 1');
   });
 
   test('reopens the Fiber workspace while offline after the PWA is installed', async ({ page, context }) => {

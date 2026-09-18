@@ -18,6 +18,8 @@ import {
   setCountedThreadStitch,
   type CountedStitchKind,
 } from './engines/counted-thread-engine';
+import { applyCountedImageResult } from './engines/counted-image-engine';
+import { quantizeCountedImageFile } from './counted-image-worker-client';
 import type {
   CountedThreadChart,
   FiberCraftDocument,
@@ -78,6 +80,12 @@ export function CountedThreadPanel({
   const [backstitchStart, setBackstitchStart] = useState<{ row: number; col: number } | null>(null);
   const [flossBrand, setFlossBrand] = useState(() => document.palette.find((color) => color.id === selectedColor)?.paletteName ?? '');
   const [flossCode, setFlossCode] = useState(() => document.palette.find((color) => color.id === selectedColor)?.paletteCode ?? '');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageRows, setImageRows] = useState(chart.rows);
+  const [imageCols, setImageCols] = useState(chart.cols);
+  const [imageColorLimit, setImageColorLimit] = useState(12);
+  const [imageDither, setImageDither] = useState(true);
+  const [imageBusy, setImageBusy] = useState(false);
   const cellRefs = useRef(new Map<string, HTMLButtonElement>());
   const legend = useMemo(() => generateCountedThreadLegend(document), [document]);
   const legendByColor = useMemo(
@@ -105,6 +113,18 @@ export function CountedThreadPanel({
     } catch (error) {
       onStatus(error instanceof Error ? error.message : 'Could not save this floss identity.');
     }
+  };
+
+  const generateImageChart = async () => {
+    if (!imageFile) { onStatus('Choose a PNG, JPEG, or WebP image first.'); return; }
+    setImageBusy(true);
+    try {
+      const result = await quantizeCountedImageFile(imageFile, { rows: imageRows, cols: imageCols, maxColors: imageColorLimit, dither: imageDither });
+      if (result.palette[0]) onSelectedColorChange(result.palette[0].id);
+      onCommit(applyCountedImageResult(document, result), `Generated a ${result.rows} × ${result.cols} counted chart with ${result.palette.length} colors.`);
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : 'Could not generate a counted chart from this image.');
+    } finally { setImageBusy(false); }
   };
 
   const focusCell = (row: number, col: number) => {
@@ -255,6 +275,19 @@ export function CountedThreadPanel({
             : 'Arrow keys move one cell. Home and End move across a row; Ctrl/⌘ + Home or End jumps to a grid corner.'}
         </p>
       </div>
+
+      <details className="fiber-counted-import">
+        <summary>Import image to counted chart</summary>
+        <div className="fiber-counted-tools fiber-counted-import-controls">
+          <label className="fiber-craft-field" htmlFor="fiber-counted-image"><span>Import image</span><input id="fiber-counted-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} /></label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-image-rows"><span>Chart rows</span><input id="fiber-counted-image-rows" type="number" min="1" max="300" value={imageRows} onChange={(event) => setImageRows(Number(event.target.value))} /></label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-image-cols"><span>Chart columns</span><input id="fiber-counted-image-cols" type="number" min="1" max="300" value={imageCols} onChange={(event) => setImageCols(Number(event.target.value))} /></label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-image-colors"><span>Color limit</span><input id="fiber-counted-image-colors" type="number" min="1" max="64" value={imageColorLimit} onChange={(event) => setImageColorLimit(Number(event.target.value))} /></label>
+          <label className="fiber-counted-checkbox" htmlFor="fiber-counted-image-dither"><input id="fiber-counted-image-dither" type="checkbox" checked={imageDither} onChange={(event) => setImageDither(event.target.checked)} /><span>Dither colors</span></label>
+          <button className="action-button secondary" type="button" disabled={imageBusy || !imageFile} onClick={generateImageChart}>{imageBusy ? 'Generating…' : 'Generate counted chart'}</button>
+          <p className="fiber-craft-muted">Creates full-cross stitches from the image using the chosen grid size and color limit. Generating replaces the current counted grid, palette, knots, and backstitches but keeps shared project metadata.</p>
+        </div>
+      </details>
 
       <div className="fiber-craft-grid-scroll fiber-counted-scroll" tabIndex={-1}>
         <div className="fiber-counted-board" style={boardStyle}>

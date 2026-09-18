@@ -32,6 +32,9 @@ import {
   getYarnWeightStandard,
 } from '../../src/tools/fiber-craft/engines/yarn-standard-library';
 
+import { applyCountedImageResult, quantizeCountedImage } from '../../src/tools/fiber-craft/engines/counted-image-engine';
+import { matchNearestFloss } from '../../src/tools/fiber-craft/engines/floss-matcher-engine';
+
 const FIXED_TIME = '2026-09-15T00:00:00.000Z';
 
 describe('crochet pattern compilers and references', () => {
@@ -190,5 +193,59 @@ describe('counted-thread precision grid and generated legend', () => {
     expect(() => setCountedThreadStitch(document, 0, 0, 'full-cross', 'missing', FIXED_TIME)).toThrow(/palette/i);
     expect(() => addCountedFrenchKnot(document, { row: 0.25, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/half-grid/i);
     expect(() => addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 0.5, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/different/i);
+  });
+});
+
+
+describe('counted-thread image quantization and floss matching', () => {
+  test('quantizes image pixels into a bounded counted-thread palette and full-cross grid', () => {
+    const pixels = new Uint8ClampedArray([255,0,0,255, 255,0,0,255, 0,0,255,255, 0,0,255,255]);
+    const result = quantizeCountedImage({ width: 2, height: 2, pixels, rows: 2, cols: 2, maxColors: 2, dither: false });
+    expect(result.palette).toHaveLength(2);
+    expect(result.cells).toHaveLength(4);
+    expect(new Set(result.cells.map((cell) => cell.colorId)).size).toBe(2);
+    expect(result.cells.every((cell) => cell.stitchKind === 'full-cross')).toBe(true);
+  });
+
+  test('honors the color-count limit with and without dithering', () => {
+    const pixels = new Uint8ClampedArray([0,0,0,255, 64,64,64,255, 128,128,128,255, 192,192,192,255, 255,255,255,255]);
+    const plain = quantizeCountedImage({ width: 5, height: 1, pixels, rows: 1, cols: 5, maxColors: 2, dither: false });
+    const dithered = quantizeCountedImage({ width: 5, height: 1, pixels, rows: 1, cols: 5, maxColors: 2, dither: true });
+    expect(plain.palette.length).toBeLessThanOrEqual(2);
+    expect(dithered.palette.length).toBeLessThanOrEqual(2);
+    expect(dithered.cells).toHaveLength(5);
+    expect(dithered.cells.every((cell) => cell.stitchKind === 'full-cross')).toBe(true);
+  });
+
+  test('keeps generated legend symbols unique beyond twelve imported colors', () => {
+    const pixels = new Uint8ClampedArray(Array.from({ length: 20 }, (_, index) => [index * 12, 255 - index * 10, index * 7, 255]).flat());
+    const result = quantizeCountedImage({ width: 20, height: 1, pixels, rows: 1, cols: 20, maxColors: 20, dither: false });
+    const document = applyCountedImageResult(createStarterCountedThreadDocument(FIXED_TIME), result, FIXED_TIME);
+    const legend = generateCountedThreadLegend(document);
+    expect(legend).toHaveLength(20);
+    expect(new Set(legend.map((entry) => entry.symbol)).size).toBe(20);
+  });
+
+  test('applies an imported chart without discarding shared project metadata', () => {
+    const source = createStarterCountedThreadDocument(FIXED_TIME);
+    source.metadata.author = 'Maker';
+    const result = quantizeCountedImage({ width: 1, height: 1, pixels: new Uint8ClampedArray([12,34,56,255]), rows: 3, cols: 4, maxColors: 1, dither: false });
+    const next = applyCountedImageResult(source, result, FIXED_TIME);
+    expect(next.metadata.author).toBe('Maker');
+    expect(next.metadata.discipline).toBe('cross-stitch');
+    expect(next.palette).toEqual(result.palette);
+    if (next.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
+    expect(next.chart).toMatchObject({ rows: 3, cols: 4, knots: [], backstitches: [] });
+  });
+
+  test('matches a target to the nearest supplied floss using CIEDE2000', () => {
+    const catalog = [{ brand: 'Fixture', code: 'R', name: 'Red', hex: '#ff0000' }, { brand: 'Fixture', code: 'B', name: 'Blue', hex: '#0000ff' }] as const;
+    expect(matchNearestFloss('#f90008', catalog)).toMatchObject({ brand: 'Fixture', code: 'R', name: 'Red' });
+    expect(matchNearestFloss('#ff0000', catalog)?.deltaE).toBe(0);
+  });
+
+  test('rejects malformed image buffers and empty floss catalogs', () => {
+    expect(() => quantizeCountedImage({ width: 2, height: 2, pixels: new Uint8ClampedArray(4), rows: 2, cols: 2, maxColors: 2, dither: false })).toThrow(/pixel buffer/i);
+    expect(() => matchNearestFloss('#ffffff', [])).toThrow(/catalog/i);
   });
 });

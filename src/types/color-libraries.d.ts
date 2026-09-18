@@ -19,7 +19,11 @@ declare module 'culori' {
     b: number;
   };
 
+  export type CuloriColorInput = CuloriColor | string;
   export function parse(value: string): CuloriColor | undefined;
   export function formatHex(color: CuloriColor): string;
-  export function converter(mode: 'rgb'): (color: CuloriColor | string) => RgbColor | undefined;
+  export function converter(mode: 'rgb'): (color: CuloriColorInput) => RgbColor | undefined;
+  export function differenceCiede2000(
+    Kl?: number, Kc?: number, Kh?: number,
+  ): (color1: CuloriColorInput, color2: CuloriColorInput) => number;
 }
