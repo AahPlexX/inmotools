@@ -38,4 +38,4 @@
 ### Task 5 — Lean acceptance and tracking
 - [x] Extend the existing focused Mastering browser workflow rather than creating one test per utility.
 - [x] Run Mastering/Music units, production type/build gate, and desktop/mobile Mastering browser acceptance.
-- [ ] Update the 81-function completion count only for fully satisfied ledger items, then commit/push the dedicated branch.
+- [x] Update the 81-function completion count only for fully satisfied ledger items, then commit/push the dedicated branch.
