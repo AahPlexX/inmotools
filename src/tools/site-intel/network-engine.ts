@@ -50,11 +50,6 @@ export async function lookupIpIntel(ip: string): Promise<IpIntel> {
   }
 }
 
-export async function lookupIpIntelBatch(ips: string[]): Promise<IpIntel[]> {
-  const unique = [...new Set(ips)];
-  return Promise.all(unique.map((ip) => lookupIpIntel(ip)));
-}
-
 /** Feature 13 — flags anycast distribution when multiple IPs map to distinct countries. */
 export function detectAnycast(intel: IpIntel[]): Finding {
   const countries = new Set(intel.map((i) => i.country).filter(Boolean));
@@ -98,7 +93,7 @@ export async function checkNameserverRedundancy(nameservers: string[]): Promise<
 
 /** Feature 12 — ASN & hosting-tier profiler for the domain's primary A-record IPs. */
 export async function profileHosting(ips: string[]): Promise<{ intel: IpIntel[]; findings: Finding[] }> {
-  const intel = await lookupIpIntelBatch(ips);
+  const intel = await Promise.all([...new Set(ips)].map((ip) => lookupIpIntel(ip)));
   const findings: Finding[] = intel
     .filter((i) => i.asn)
     .map((i) => ({

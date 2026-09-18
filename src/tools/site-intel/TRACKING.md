@@ -214,6 +214,15 @@ user-supplied credential).
   This run had real outbound internet access, so it also incidentally
   exercised live Cloudflare DoH, rdap.org, web.archive.org, hstspreload.org,
   and ipapi.co responses end-to-end without a documented format mismatch.
+- **ponytail-review pass (2026-09-18):** three cuts applied and re-verified
+  green (tsc + unit + e2e): inlined the single-caller `lookupIpIntelBatch`
+  wrapper into `profileHosting`; dropped a speculative regex-based JSON
+  repair in `ct-engine.ts` for an unverified crt.sh quirk (plain `res.json()`
+  now, existing try/catch already degrades gracefully); deleted a dead
+  `v6`-destructured-then-voided placeholder in `SiteIntelWorkspace.tsx`.
+  `ScoreRadar.tsx`'s custom SVG (vs. the already-installed `chart.js`) was
+  considered and deliberately kept — chart.js's canvas radar has no built-in
+  per-vertex click-to-navigate, which this tool needs.
 - **Reminder for future runs:** `pnpm build` must be re-run before `playwright
   test` whenever source changed since the last build — `vite preview` only
   serves the existing `dist/` folder and will silently serve stale UI

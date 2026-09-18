@@ -36,9 +36,7 @@ export async function fetchCtLog(domain: string): Promise<AsyncTaskState<CtRepor
   try {
     const res = await fetch(`https://crt.sh/?q=${encodeURIComponent(domain)}&output=json`, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    // crt.sh occasionally emits back-to-back JSON objects without array commas; normalize defensively.
-    const rows = JSON.parse(text.trim().startsWith('[') ? text : `[${text.trim().replace(/}\s*{/g, '},{')}]`) as CrtShRow[];
+    const rows = await res.json() as CrtShRow[];
     const certMap = new Map<string, CtCertificate>();
     for (const row of rows) {
       const key = `${row.common_name}|${row.not_before}|${row.not_after}|${row.serial_number}`;

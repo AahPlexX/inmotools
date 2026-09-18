@@ -179,7 +179,7 @@ export default function SiteIntelWorkspace() {
     setDnssec({ status: 'ready', data: { finding: dnssecRes.finding }, fetchedAt: Date.now() });
     setDnsbl({ status: 'ready', data: { finding: dnsblRes.finding, results: dnsblRes.results }, fetchedAt: Date.now() });
 
-    const { v4, v6 } = extractIps(dnsRes);
+    const { v4 } = extractIps(dnsRes);
     const nameservers = extractNameservers(dnsRes);
     const [ptrs, hostingRes, nsRedundancyRes] = await Promise.all([
       resolvePtrRecords(v4),
@@ -201,7 +201,6 @@ export default function SiteIntelWorkspace() {
     else setCrux({ status: cruxRes.status, error: cruxRes.error, blockedReason: cruxRes.blockedReason });
 
     setBusy(false);
-    void v6; // reserved for future dual-stack detail panel
   }
 
   async function persistCruxKey(key: string) {
