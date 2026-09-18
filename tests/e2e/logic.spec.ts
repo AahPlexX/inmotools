@@ -99,21 +99,24 @@ test('Escape cancels an in-progress wire instead of silently completing it on th
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/tools/digital-logic-workstation');
-  const componentsToggle = page.getByRole('button', { name: 'Components' });
-  const inspectToggle = page.getByRole('button', { name: 'Inspect' });
+  const componentsToggle = page.getByRole('button', { name: 'Components', exact: true });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
   await expect(componentsToggle).toBeVisible();
 
   const palette = page.getByTestId('logic-palette');
   await expect(palette).not.toHaveClass(/sheet-open/);
   await componentsToggle.click();
   await expect(palette).toHaveClass(/sheet-open/);
-  await page.getByLabel('Close panel').click();
+  // The sheet's own header close button, not the full-screen backdrop: a
+  // tall open sheet can cover most of the backdrop's bounding box, leaving
+  // too little of it reliably tappable (or automatable) to dismiss by.
+  await page.getByLabel('Close component palette').click();
   await expect(palette).not.toHaveClass(/sheet-open/);
 
   const inspector = page.locator('.logic-inspector-shell');
   await expect(inspector).not.toHaveClass(/sheet-open/);
   await inspectToggle.click();
   await expect(inspector).toHaveClass(/sheet-open/);
-  await page.getByLabel('Close panel').click();
+  await page.getByLabel('Close inspector').click();
   await expect(inspector).not.toHaveClass(/sheet-open/);
 });

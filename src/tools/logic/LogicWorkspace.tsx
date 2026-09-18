@@ -292,6 +292,10 @@ export default function LogicWorkspace() {
 
       <div className="logic-workspace-body">
         <nav className={`logic-palette ${mobilePanel === 'palette' ? 'sheet-open' : ''}`} aria-label="Component palette" data-testid="logic-palette">
+          <div className="logic-sheet-header">
+            <span>Components</span>
+            <button type="button" className="logic-sheet-close" aria-label="Close component palette" onClick={() => setMobilePanel('none')}>Close</button>
+          </div>
           {placingType ? (
             <p className="logic-palette-hint">Placing {placingType.replace(/_/g, ' ')} — click the canvas, or press Escape to stop.</p>
           ) : null}
@@ -332,6 +336,10 @@ export default function LogicWorkspace() {
         />
 
         <div className={`logic-inspector-shell ${mobilePanel === 'inspector' ? 'sheet-open' : ''}`}>
+          <div className="logic-sheet-header">
+            <span>Inspector</span>
+            <button type="button" className="logic-sheet-close" aria-label="Close inspector" onClick={() => setMobilePanel('none')}>Close</button>
+          </div>
           <LogicInspector
             document={doc}
             onRelabel={(id, label) => setHistory((prev) => commit(prev, 'Rename', (d) => relabelComponent(d, id, label)))}
