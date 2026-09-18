@@ -10,8 +10,8 @@ test('parses a bare domain into a lexical breadcrumb and renders the composite s
   // Group 1 lexical forensics render synchronously, before any network telemetry resolves.
   await expect(page.locator('.url-token-tld')).toHaveText('TLD: com');
   await expect(page.locator('.url-token-sld')).toHaveText('SLD: paypa1');
-  await expect(page.getByText(/Possible typosquat of paypal\.com/i)).toBeVisible();
-  await expect(page.getByText(/utm_source/)).toBeVisible();
+  await expect(page.getByText(/paypa1\.com vs paypal\.com/i)).toBeVisible();
+  await expect(page.locator('.lexical-card li', { hasText: 'utm_source' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Scorecard & Export' }).click();
   await expect(page.locator('svg.score-radar')).toBeVisible();
