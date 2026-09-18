@@ -1,6 +1,6 @@
 # In Progress
 
-- **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
+- **Markdown audit (2026-09-16, follow-ups closed 2026-09-18)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented and integrated on `main` (1e9bef1). The two items left open at that point — preview fenced-code language coloring, and dedicated browser regression coverage for the delayed file-read/save-during-typing race guards — are now both implemented and verified on `fix/markdown-audit-followups`, branched from `main` at `2fb4937`: `tsc` clean, full Markdown unit suite (19 files, 202 tests, plus the pre-existing unrelated citation-test flake) and full Markdown e2e suite (86/86 desktop+mobile) pass, production build passes. Not yet merged to `main`. Details: `docs/markdown-audit-2026-09-16.md`.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.

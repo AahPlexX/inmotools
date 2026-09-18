@@ -60,6 +60,35 @@
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
 
+/* Fenced code blocks share the source editor's own background (var(--surface))
+   rather than the app's usual dark .code-output convention, because
+   code-highlight-engine.ts colors tokens with the editor's own
+   defaultHighlightStyle palette — a light-background style, tuned to read
+   correctly only on the same background the editor itself uses. */
+.markdown-workbench-preview pre {
+  overflow: auto;
+  max-width: 100%;
+  padding: 12px 14px;
+  margin: .75em 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.markdown-workbench-preview pre > code {
+  display: block;
+  color: var(--ink);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+
+.markdown-workbench-preview :not(pre) > code {
+  padding: .1em .35em;
+  border-radius: 5px;
+  background: var(--surface-strong);
+  font-size: .9em;
+}
+
 .markdown-workbench-diagram-error-message {
   max-width: 100%;
   margin: .5rem 0 1rem;
