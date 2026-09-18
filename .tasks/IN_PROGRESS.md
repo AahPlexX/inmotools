@@ -30,7 +30,9 @@
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
   - Phase 1 completion: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1-completion.md`.
-  - Current milestone: Phase 2 — symmetry, local environments, validation, and model building. Phase 1 document/import/export core, interactive structure editing, periodic geometry, project history, publication graphics, and acceptance baseline are integrated.
+  - Phase 2 completion: `docs/superpowers/plans/2026-09-13-crystal-lattice-studio-phase-2-completion.md`.
+  - Current milestone: Phase 2 complete; next milestone Phase 3 — reciprocal space, diffraction, and reflection/powder import. Local-environment/health analysis, constrained cell and advanced site editing, reversible model building, symmetry detection with stability and standardization diagnostics, advanced structure visualization, and reachable Phase 2 task areas are integrated.
+  - Phase 2 evidence: 12 Crystal unit files / 91 tests pass, `tsc` and production build clean, and focused Crystal validation run `35045893285` passed the full Crystal browser spec on desktop and mobile. The focused Crystal lane now selects both `crystal-lattice-studio.spec.ts` and `crystal-lattice-studio-phase2.spec.ts`.
   - Latest Phase 1 acceptance evidence: all Crystal functional and Task 12 reflow/Axe/keyboard/dialog checks passed in Pages run `34729051007`, job `103648349176`, at `495ee945d60965b7e7e46bd6ed296e9b0fa8bb8d`. That repository-wide job remained red only because three later Web Layout tests failed; no Crystal failure was present.
   - Completion gate: all five master-design phases must be implemented and verified, with every numbered capability accounted for as implemented or explicitly approved under the master scope policy; Phase 1 completion alone is not project completion.
   - Browser note (2026-09-15): one focused Crystal run failed a single mobile supercell case, but the next focused run `35036412161` passed the full Crystal spec, so it was transient and needs no action.
