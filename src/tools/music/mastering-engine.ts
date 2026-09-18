@@ -106,6 +106,95 @@ export function applyGain(audio: PcmAudio, gainDb: number): PcmAudio {
   };
 }
 
+export function measureDcOffset(audio: PcmAudio): number[] {
+  validatePcm(audio);
+  return audio.channels.map((channel) => {
+    if (!channel.length) return 0;
+    let sum = 0;
+    for (const sample of channel) sum += sample;
+    return sum / channel.length;
+  });
+}
+
+export function removeDcOffset(audio: PcmAudio): PcmAudio {
+  validatePcm(audio);
+  const offsets = measureDcOffset(audio);
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel, index) => Float32Array.from(channel, (sample) => sample - offsets[index])),
+  };
+}
+
+export function invertPolarity(audio: PcmAudio): PcmAudio {
+  validatePcm(audio);
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel) => Float32Array.from(channel, (sample) => -sample)),
+  };
+}
+
+export function reverseRange(audio: PcmAudio, startSeconds: number, endSeconds: number): PcmAudio {
+  const sampleCount = validatePcm(audio);
+  const duration = sampleCount / audio.sampleRate;
+  const selection = clampSelection({ startSeconds, endSeconds }, duration);
+  const start = Math.max(0, Math.min(sampleCount, Math.round(selection.startSeconds * audio.sampleRate)));
+  const end = Math.max(start, Math.min(sampleCount, Math.round(selection.endSeconds * audio.sampleRate)));
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel) => {
+      const next = channel.slice();
+      for (let left = start, right = end - 1; left < right; left += 1, right -= 1) {
+        const temp = next[left]; next[left] = next[right]; next[right] = temp;
+      }
+      return next;
+    }),
+  };
+}
+
+export function insertSilence(audio: PcmAudio, atSeconds: number, durationSeconds: number): PcmAudio {
+  const sampleCount = validatePcm(audio);
+  const at = Math.max(0, Math.min(sampleCount, Math.round(finite(atSeconds) * audio.sampleRate)));
+  const silenceSamples = Math.max(0, Math.round(finite(durationSeconds) * audio.sampleRate));
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel) => {
+      const next = new Float32Array(channel.length + silenceSamples);
+      next.set(channel.subarray(0, at), 0);
+      next.set(channel.subarray(at), at + silenceSamples);
+      return next;
+    }),
+  };
+}
+
+export function swapStereoChannels(audio: PcmAudio): PcmAudio {
+  validatePcm(audio);
+  if (audio.channels.length !== 2) throw new Error('Swapping stereo channels requires exactly two channels.');
+  return { sampleRate: audio.sampleRate, channels: [audio.channels[1].slice(), audio.channels[0].slice()] };
+}
+
+export function foldDownMono(audio: PcmAudio): PcmAudio {
+  const sampleCount = validatePcm(audio);
+  const mono = new Float32Array(sampleCount);
+  for (let index = 0; index < sampleCount; index += 1) {
+    let sum = 0;
+    for (const channel of audio.channels) sum += channel[index];
+    mono[index] = sum / audio.channels.length;
+  }
+  return { sampleRate: audio.sampleRate, channels: [mono] };
+}
+
+export function extractChannel(audio: PcmAudio, channelIndex: number): PcmAudio {
+  validatePcm(audio);
+  const index = Math.trunc(finite(channelIndex, 0));
+  if (index < 0 || index >= audio.channels.length) throw new Error('Channel index is out of range.');
+  return { sampleRate: audio.sampleRate, channels: [audio.channels[index].slice()] };
+}
+
+export function dualMonoFromChannel(audio: PcmAudio, channelIndex: number): PcmAudio {
+  const source = extractChannel(audio, channelIndex).channels[0];
+  return { sampleRate: audio.sampleRate, channels: [source, source.slice()] };
+}
+
 export function normalizePeak(audio: PcmAudio, targetDbfs = -1): PcmAudio {
   validatePcm(audio);
   let peak = 0;
