@@ -115,6 +115,20 @@ describe('typing storage', () => {
     expect(pb?.netWpm).toBe(80);
   });
 
+  it('keeps Zen personal bests in one family regardless of legacy numeric duration values', async () => {
+    await saveTest(makeTest({ mode: 'zen', durationMode: 'zen', durationValue: 25, netWpm: 82 }));
+    await saveTest(makeTest({ mode: 'zen', durationMode: 'zen', durationValue: 30, netWpm: 91 }));
+
+    const pb = await findPersonalBest({
+      mode: 'zen',
+      durationMode: 'zen',
+      durationValue: 0,
+      language: 'english',
+      layout: 'qwerty',
+    });
+    expect(pb?.netWpm).toBe(91);
+  });
+
   it('persists preferences', async () => {
     await writePreference('config', { theme: 'nord' });
     const value = await readPreference<{ theme: string }>('config', { theme: 'light' });

@@ -26,6 +26,9 @@ describe('typing target duration contracts', () => {
     expect(normalizeDurationValue('time', 25)).toBe(30);
     expect(normalizeDurationValue('words', 50)).toBe(50);
     expect(normalizeDurationValue('time', 60)).toBe(60);
+    expect(normalizeDurationValue('quote', 120)).toBe(0);
+    expect(normalizeDurationValue('zen', 25)).toBe(0);
+    expect(normalizeDurationValue('certification', 15)).toBe(300);
   });
 
   it('builds exactly the selected number of words for word-count tests', () => {

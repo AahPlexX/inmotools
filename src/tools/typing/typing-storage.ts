@@ -169,13 +169,17 @@ export interface TestFilterOptions {
   until?: number;
 }
 export function filterStoredTests(tests: StoredTest[], opts: TestFilterOptions): StoredTest[] {
+  const wantedTags = (opts.tags ?? []).map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean);
   return tests.filter((test) => {
     if (opts.mode && test.mode !== opts.mode) return false;
     if (opts.language && test.language !== opts.language) return false;
     if (opts.layout && test.layout !== opts.layout) return false;
     if (opts.since && test.savedAt < opts.since) return false;
     if (opts.until && test.savedAt > opts.until) return false;
-    if (opts.tags && opts.tags.length > 0 && !opts.tags.every((tag) => test.tags.includes(tag))) return false;
+    if (wantedTags.length > 0) {
+      const storedTags = new Set(test.tags.map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean));
+      if (!wantedTags.every((tag) => storedTags.has(tag))) return false;
+    }
     return true;
   });
 }
@@ -188,7 +192,7 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
     .where('mode').equals(query.mode)
     .filter((t) => (
       t.durationMode === query.durationMode
-      && (query.durationMode === 'quote' || t.durationValue === query.durationValue)
+      && (query.durationMode === 'quote' || query.durationMode === 'zen' || t.durationValue === query.durationValue)
       && t.language === query.language
       && t.layout === query.layout
       && t.finishReason === 'completed'
