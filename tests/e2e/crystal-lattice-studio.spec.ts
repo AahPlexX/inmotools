@@ -475,3 +475,66 @@ test('renders a coordination polyhedron for the selected site', async ({ page })
   await expect(page.getByTestId('crystal-polyhedron-status')).toContainText('8 vertices');
   await expect(page.getByRole('img', { name: /interactive crystal structure/i })).toBeVisible();
 });
+
+test('Phase 2 acceptance detects high- and lower-symmetry structures', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('graphite');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).not.toContainText('Im-3m');
+});
+
+test('Phase 2 acceptance surfaces partial occupancy as a limitation', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Fe1 occupancy').fill('0.5');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-status')).toContainText(/occupancy|disorder/i);
+  await expect(page.getByTestId('crystal-symmetry-result')).toHaveCount(0);
+});
+
+test('Phase 2 acceptance invalidates a symmetry result after an edit', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  await page.getByLabel(/Fe2 fractional x/).fill('0.51');
+  await page.getByLabel(/Fe2 fractional x/).press('Tab');
+  await expect(page.getByTestId('crystal-symmetry-status')).toContainText(/changed|re-run/i);
+});
+
+test('Phase 2 acceptance reflows the new panels without overflow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One reflow pass covers the shared panel DOM.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await expect(page.getByTestId('crystal-symmetry-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-environment-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-model-builder-panel')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('Phase 2 acceptance passes Axe and keyboard operation for the new panels', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe/keyboard pass covers the shared panel DOM.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await expect(page.getByTestId('crystal-environment-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-model-builder-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-symmetry-panel')).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="crystal-environment-panel"]')
+    .include('[data-testid="crystal-model-builder-panel"]')
+    .include('[data-testid="crystal-symmetry-panel"]')
+    .analyze();
+  const severe = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+  expect(severe).toEqual([]);
+
+  const detect = page.getByRole('button', { name: 'Detect symmetry' });
+  await detect.focus();
+  await detect.press('Enter');
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+});
