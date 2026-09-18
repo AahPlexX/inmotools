@@ -10,5 +10,7 @@ export function normalizeRawSettings(value: unknown): PhotoRawSettings {
     blueMultiplier: multiplier(source.blueMultiplier),
     highlight: source.highlight === 'unclip' || source.highlight === 'blend' ? source.highlight : 'clip',
     demosaic: source.demosaic === 'bilinear' || source.demosaic === 'vng' || source.demosaic === 'ppg' ? source.demosaic : 'ahd',
+    exposureEv: typeof source.exposureEv === 'number' && Number.isFinite(source.exposureEv)
+      ? Math.min(5, Math.max(-5, source.exposureEv)) : 0,
   };
 }

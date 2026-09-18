@@ -5,6 +5,8 @@ import PhotoScopes from './PhotoScopes';
 import { photoStraightenFromGuide } from './photo-crop';
 import { createPhotoInspectionOverlay } from './photo-scopes';
 import { photoSelectionWeight } from './photo-selection';
+import { photoMaskWeight } from './photo-engine';
+import { normalizePhotoMaskOverlay } from './photo-mask';
 import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, PhotoSelection, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
@@ -180,6 +182,7 @@ export default function PhotoCanvas({
   const proofBaseImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const localMaskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const nextSampleIdRef = useRef(1);
 
@@ -324,6 +327,70 @@ export default function PhotoCanvas({
     else image.addEventListener('load', draw, { once: true });
     return () => image.removeEventListener('load', draw);
   }, [selection, previewUrl]);
+
+  useEffect(() => {
+    const visibleMasks = localAdjustments
+      .map((adjustment) => ({ adjustment, overlay: normalizePhotoMaskOverlay(adjustment.overlay) }))
+      .filter(({ overlay }) => overlay.visible)
+      .slice(0, 8)
+      .map(({ adjustment, overlay }) => ({
+        mask: adjustment.mask,
+        opacity: overlay.opacity,
+        red: Number.parseInt(overlay.color.slice(1, 3), 16),
+        green: Number.parseInt(overlay.color.slice(3, 5), 16),
+        blue: Number.parseInt(overlay.color.slice(5, 7), 16),
+      }));
+    const image = previewImageRef.current;
+    const canvas = localMaskCanvasRef.current;
+    if (!image || !canvas || !visibleMasks.length || !previewUrl) return;
+    const draw = () => {
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let source: Uint8ClampedArray;
+      try {
+        source = new Uint8ClampedArray(context.getImageData(0, 0, canvas.width, canvas.height).data);
+      } catch {
+        return;
+      }
+      const output = context.createImageData(canvas.width, canvas.height);
+      for (let pixel = 0; pixel < canvas.width * canvas.height; pixel += 1) {
+        const offset = pixel * 4;
+        let alpha = 0;
+        let outRed = 0;
+        let outGreen = 0;
+        let outBlue = 0;
+        for (const overlay of visibleMasks) {
+          const weight = photoMaskWeight(
+            overlay.mask,
+            (pixel % canvas.width + 0.5) / canvas.width,
+            (Math.floor(pixel / canvas.width) + 0.5) / canvas.height,
+            source[offset],
+            source[offset + 1],
+            source[offset + 2],
+          ) * overlay.opacity;
+          if (weight <= 0) continue;
+          const nextAlpha = alpha + weight * (1 - alpha);
+          outRed = (outRed * alpha * (1 - weight) + overlay.red * weight) / nextAlpha;
+          outGreen = (outGreen * alpha * (1 - weight) + overlay.green * weight) / nextAlpha;
+          outBlue = (outBlue * alpha * (1 - weight) + overlay.blue * weight) / nextAlpha;
+          alpha = nextAlpha;
+        }
+        output.data[offset] = Math.round(outRed);
+        output.data[offset + 1] = Math.round(outGreen);
+        output.data[offset + 2] = Math.round(outBlue);
+        output.data[offset + 3] = Math.round(alpha * 255);
+      }
+      context.putImageData(output, 0, 0);
+    };
+    if (image.complete) draw();
+    else image.addEventListener('load', draw, { once: true });
+    return () => image.removeEventListener('load', draw);
+  }, [localAdjustments, previewUrl]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -479,6 +546,7 @@ export default function PhotoCanvas({
     return <>
       {overlayMode ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid={`photo-${overlayMode}-overlay`} aria-hidden="true" /> : null}
       {selection ? <canvas ref={selectionCanvasRef} className="photo-selection-overlay" data-testid="photo-selection-overlay" aria-hidden="true" /> : null}
+      {localAdjustments.some((adjustment) => normalizePhotoMaskOverlay(adjustment.overlay).visible) ? <canvas ref={localMaskCanvasRef} className="photo-mask-overlay" data-testid="photo-mask-overlay" aria-hidden="true" /> : null}
       {samples.length ? (
         <svg className="photo-sampler-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {samples.map((sample, index) => <g key={sample.id} transform={`translate(${sample.x * 100} ${sample.y * 100})`}>

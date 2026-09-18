@@ -49,11 +49,13 @@
 .photo-studio .photo-image-frame .photo-edit-overlay,
 .photo-studio .photo-image-frame .photo-clipping-overlay,
 .photo-studio .photo-image-frame .photo-selection-overlay,
+.photo-studio .photo-image-frame .photo-mask-overlay,
 .photo-studio .photo-image-frame .photo-sampler-overlay,
 .photo-studio .photo-compare-pane .photo-preview-image,
 .photo-studio .photo-compare-pane .photo-edit-overlay,
 .photo-studio .photo-compare-pane .photo-clipping-overlay,
 .photo-studio .photo-compare-pane .photo-selection-overlay,
+.photo-studio .photo-compare-pane .photo-mask-overlay,
 .photo-studio .photo-compare-pane .photo-sampler-overlay {
   transform: none;
 }
@@ -84,7 +86,8 @@
 }
 
 .photo-clipping-overlay,
-.photo-selection-overlay {
+.photo-selection-overlay,
+.photo-mask-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -97,6 +100,11 @@
 }
 
 .photo-selection-overlay {
+  z-index: 3;
+  image-rendering: auto;
+}
+
+.photo-mask-overlay {
   z-index: 3;
   image-rendering: auto;
 }

@@ -11,8 +11,22 @@ export default function PhotoRawControls({ value, source, onChange }: {
   return (
     <details className="photo-section" open data-testid="photo-raw-controls">
       <summary>RAW development</summary>
-      <p className="photo-export-note">These settings develop the original RAW before ordinary raster adjustments. Exposure baseline is not available from this decoder binding.</p>
+      <p className="photo-export-note">These settings develop the original RAW before ordinary raster adjustments.</p>
       <div className="photo-control-list">
+        <label className="photo-control photo-raw-control">
+          <span className="photo-inline-actions">
+            <span>RAW exposure (EV)</span>
+            <button type="button" disabled={settings.exposureEv === 0} aria-label="Reset RAW exposure"
+              onClick={(event) => { event.preventDefault(); patch({ exposureEv: 0 }); }}>Reset</button>
+          </span>
+          <input key={`exposureEv:${settings.exposureEv}`} type="number" min="-5" max="5" step="0.1" aria-label="RAW exposure (EV)" defaultValue={settings.exposureEv}
+            onBlur={(event) => {
+              const input = event.currentTarget;
+              if (input.value !== '' && Number.isFinite(input.valueAsNumber)) patch({ exposureEv: input.valueAsNumber });
+              input.value = String(normalizeRawSettings({ ...settings, exposureEv: input.value !== '' && Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : settings.exposureEv }).exposureEv);
+            }}
+            onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+        </label>
         {source.colorControls ? <>
           <label className="photo-control photo-raw-control">
             <span>RAW white balance</span>

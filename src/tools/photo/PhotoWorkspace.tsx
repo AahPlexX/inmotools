@@ -62,6 +62,11 @@ import {
   normalizePhotoSelection,
   photoSelectionMask,
 } from './photo-selection';
+import {
+  clonePhotoMask,
+  combinePhotoMasks,
+  normalizePhotoMaskOverlay,
+} from './photo-mask';
 import type {
   LoadedPhotoProject,
   PhotoProjectRecord,
@@ -280,12 +285,9 @@ function recipeWithPatch(recipe: PhotoRecipe, patch: Partial<PhotoRecipe>): Phot
 function cloneLocalAdjustment(adjustment: LocalAdjustment): LocalAdjustment {
   return {
     ...adjustment,
-    mask: adjustment.mask.type === 'brush'
-      ? { ...adjustment.mask, points: adjustment.mask.points.map((point) => ({ ...point })) }
-      : adjustment.mask.type === 'selection'
-        ? { ...adjustment.mask, selection: clonePhotoSelection(adjustment.mask.selection)! }
-      : { ...adjustment.mask },
+    mask: clonePhotoMask(adjustment.mask),
     effect: { ...adjustment.effect },
+    overlay: normalizePhotoMaskOverlay(adjustment.overlay),
   };
 }
 
@@ -984,7 +986,7 @@ export default function PhotoWorkspace() {
     return null;
   }
 
-  function addLocalAdjustment(type: Exclude<LocalAdjustment['mask']['type'], 'selection'>) {
+  function addLocalAdjustment(type: Exclude<LocalAdjustment['mask']['type'], 'selection' | 'composite'>) {
     const id = crypto.randomUUID?.() ?? `local-${Date.now()}-${recipe.localAdjustments.length}`;
     const index = recipe.localAdjustments.length + 1;
     const base = { feather: 0.45, opacity: 1, invert: false };
@@ -1004,6 +1006,7 @@ export default function PhotoWorkspace() {
       enabled: true,
       mask,
       effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+      overlay: normalizePhotoMaskOverlay(undefined),
     };
     patchRecipe({ localAdjustments: [...recipe.localAdjustments.map(cloneLocalAdjustment), adjustment] });
     setPanel('local');
@@ -1054,6 +1057,38 @@ export default function PhotoWorkspace() {
     if (canvasInteraction?.id === id) setCanvasInteraction(null);
   }
 
+  function duplicateLocal(id: string) {
+    const index = recipe.localAdjustments.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const sourceAdjustment = cloneLocalAdjustment(recipe.localAdjustments[index]);
+    const duplicate: LocalAdjustment = {
+      ...sourceAdjustment,
+      id: crypto.randomUUID?.() ?? `local-copy-${Date.now()}`,
+      label: `${sourceAdjustment.label} copy`.slice(0, 80),
+    };
+    const localAdjustments = recipe.localAdjustments.map(cloneLocalAdjustment);
+    localAdjustments.splice(index + 1, 0, duplicate);
+    patchRecipe({ localAdjustments });
+    setStatus(`${duplicate.label} created as an independent mask.`);
+  }
+
+  function combineSelectionIntoLocal(id: string, mode: 'add' | 'subtract' | 'intersect') {
+    const selection = clonePhotoSelection(recipe.selection);
+    if (!selection) return;
+    const localAdjustments = recipe.localAdjustments.map((item) => {
+      const copy = cloneLocalAdjustment(item);
+      if (copy.id !== id) return copy;
+      return {
+        ...copy,
+        mask: combinePhotoMasks(copy.mask, photoSelectionMask(selection), mode),
+        overlay: { ...normalizePhotoMaskOverlay(copy.overlay), visible: true },
+      };
+    });
+    commitRecipe(normalizeRecipe({ ...recipe, selection: null, localAdjustments }));
+    setCanvasInteraction(null);
+    setStatus(`Selection ${mode === 'add' ? 'added to' : mode === 'subtract' ? 'subtracted from' : 'intersected with'} the local mask as one undo step.`);
+  }
+
   function setSelectionSource(source: PhotoSelectionSource) {
     patchRecipe({ selection: appendPhotoSelection(recipe.selection, source, selectionCombineMode) });
   }
@@ -1079,6 +1114,7 @@ export default function PhotoWorkspace() {
       enabled: true,
       mask: photoSelectionMask(selection),
       effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+      overlay: normalizePhotoMaskOverlay(undefined),
     };
     commitRecipe(normalizeRecipe({
       ...recipe,
@@ -1808,11 +1844,46 @@ export default function PhotoWorkspace() {
         </div>
         {recipe.localAdjustments.length ? recipe.localAdjustments.map((adjustment) => (
           <article className="photo-local-card" key={adjustment.id} data-testid="photo-local-adjustment">
-            <header><strong>{adjustment.label}</strong></header>
+            <header>
+              <strong>{adjustment.label}</strong>
+              <label>
+                Mask name
+                <input
+                  type="text"
+                  aria-label={`Rename ${adjustment.label}`}
+                  defaultValue={adjustment.label}
+                  maxLength={80}
+                  onKeyDown={inputCommit}
+                  onBlur={(event) => {
+                    const label = event.currentTarget.value.trim().slice(0, 80) || adjustment.label;
+                    event.currentTarget.value = label;
+                    if (label !== adjustment.label) updateLocal(adjustment.id, (item) => ({ ...item, label }));
+                  }}
+                />
+              </label>
+            </header>
             <label className="photo-check">
               <input type="checkbox" checked={adjustment.enabled} onChange={(event) => updateLocal(adjustment.id, (item) => ({ ...item, enabled: event.target.checked }))} />
               Enabled
             </label>
+            <label className="photo-check">
+              <input
+                type="checkbox"
+                checked={normalizePhotoMaskOverlay(adjustment.overlay).visible}
+                onChange={(event) => updateLocal(adjustment.id, (item) => ({ ...item, overlay: { ...normalizePhotoMaskOverlay(item.overlay), visible: event.target.checked } }))}
+              />
+              Show mask overlay
+            </label>
+            <label>
+              Mask overlay color
+              <input
+                type="color"
+                aria-label={`${adjustment.label} overlay color`}
+                value={normalizePhotoMaskOverlay(adjustment.overlay).color}
+                onChange={(event) => updateLocal(adjustment.id, (item) => ({ ...item, overlay: { ...normalizePhotoMaskOverlay(item.overlay), color: event.target.value } }))}
+              />
+            </label>
+            <SimpleControl label={`${adjustment.label} overlay opacity`} value={normalizePhotoMaskOverlay(adjustment.overlay).opacity} min={0} max={1} step={0.05} neutral={0.35} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, overlay: { ...normalizePhotoMaskOverlay(item.overlay), opacity: value } }))} />
             {localInteraction(adjustment) ? (
               <button
                 type="button"
@@ -1825,7 +1896,7 @@ export default function PhotoWorkspace() {
             <SimpleControl label={`${adjustment.label} sharpness`} value={adjustment.effect.sharpness} min={-1} max={2} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, sharpness: value } }))} />
             <SimpleControl label={`${adjustment.label} blur`} value={adjustment.effect.blur} min={0} max={1} step={0.02} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, effect: { ...item.effect, blur: value } }))} />
             <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
-            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={adjustment.mask.type === 'selection' ? 0.25 : 1} step={adjustment.mask.type === 'selection' ? 0.005 : 0.02} neutral={adjustment.mask.type === 'selection' ? adjustment.mask.selection.feather : 0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
+            <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={adjustment.mask.type === 'selection' ? 0.25 : 1} step={adjustment.mask.type === 'selection' ? 0.005 : 0.02} neutral={adjustment.mask.type === 'selection' ? adjustment.mask.selection.feather : adjustment.mask.type === 'composite' ? 0 : 0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
             {adjustment.mask.type === 'brush' ? (
               <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
             ) : null}
@@ -1844,8 +1915,16 @@ export default function PhotoWorkspace() {
             <div className="photo-inline-actions">
               <button type="button" onClick={() => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, invert: !item.mask.invert } }))}>{adjustment.mask.invert ? 'Use normal mask' : 'Invert mask'}</button>
               {adjustment.mask.type === 'brush' && adjustment.mask.points.length ? <button type="button" onClick={() => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, points: [] } }) : item)}>Clear brush</button> : null}
+              <button type="button" onClick={() => duplicateLocal(adjustment.id)}>Duplicate mask</button>
               <button type="button" onClick={() => removeLocal(adjustment.id)}>Remove</button>
             </div>
+            {recipe.selection ? (
+              <div className="photo-inline-actions" role="group" aria-label={`Combine active selection with ${adjustment.label}`}>
+                <button type="button" onClick={() => combineSelectionIntoLocal(adjustment.id, 'add')}>Add selection to mask</button>
+                <button type="button" onClick={() => combineSelectionIntoLocal(adjustment.id, 'subtract')}>Subtract selection from mask</button>
+                <button type="button" onClick={() => combineSelectionIntoLocal(adjustment.id, 'intersect')}>Intersect mask with selection</button>
+              </div>
+            ) : null}
           </article>
         )) : <p className="photo-export-note">Add a mask to make targeted edits. Spatial masks can be placed directly on the photo; each mask remains editable and removable.</p>}
       </>

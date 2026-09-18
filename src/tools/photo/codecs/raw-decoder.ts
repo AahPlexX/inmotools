@@ -140,6 +140,7 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
     }
     if (bayer) decoder.setDemosaic({ bilinear: 0, vng: 1, ppg: 2, ahd: 3 }[settings.demosaic]);
     decoder.setNoAutoBright(1);
+    decoder.setBright(2 ** settings.exposureEv);
     decoder.unpack();
     decoder.dcrawProcess();
     const image = decoder.dcrawMakeMemImage();
@@ -161,7 +162,7 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
     }
     return {
       width: image.width, height: image.height, samples, rgba, rawSource,
-      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. Bounded embedded camera previews appear during import when available; they are not editing or export sources. RAW exposure baseline is not yet available.',
+      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling, exposure baseline and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. Bounded embedded camera previews appear during import when available; they are not editing or export sources.',
     };
   } catch (error) {
     throw new Error(`RAW decoding failed: ${error instanceof Error ? error.message : 'unsupported or damaged source'}. Convert the source to TIFF or PNG if this camera/variant is unsupported.`);

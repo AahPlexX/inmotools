@@ -197,6 +197,43 @@ test('selection geometry, combinations, refinement, clear, and mask conversion s
   await expect(page.getByTestId('photo-active-selection')).toBeVisible();
 });
 
+test('local masks rename, duplicate, bypass, visualize, and compose with an active selection', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+  await page.getByRole('button', { name: 'Add radial mask' }).click();
+  const firstMask = page.getByTestId('photo-local-adjustment').first();
+  const rename = firstMask.getByLabel('Rename Radial adjustment 1');
+  await rename.fill('Portrait mask');
+  await rename.press('Enter');
+  await expect(firstMask.locator('strong')).toHaveText('Portrait mask');
+
+  await firstMask.getByLabel('Show mask overlay').check();
+  await expect(page.getByTestId('photo-mask-overlay')).toBeVisible();
+  await firstMask.getByLabel('Portrait mask overlay color').fill('#ff0000');
+  await firstMask.getByLabel('Portrait mask overlay opacity value').fill('0.6');
+  await firstMask.getByLabel('Portrait mask overlay opacity value').press('Enter');
+  await firstMask.getByLabel('Enabled').uncheck();
+  await expect(firstMask.getByLabel('Enabled')).not.toBeChecked();
+
+  await firstMask.getByRole('button', { name: 'Duplicate mask' }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(2);
+  await expect(page.getByTestId('photo-local-adjustment').nth(1).locator('strong')).toHaveText('Portrait mask copy');
+
+  await page.getByRole('button', { name: 'Add centered rectangle' }).click();
+  await firstMask.getByRole('button', { name: 'Add selection to mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+  await firstMask.getByRole('button', { name: 'Subtract selection from mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await firstMask.getByRole('button', { name: 'Intersect mask with selection' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+
+  await page.getByTestId('photo-local-adjustment').nth(1).getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(1);
+});
+
 test('tone curve points are user-editable and reversible through normal history', async ({ page }) => {
   await openFixture(page);
   await page.locator('summary').filter({ hasText: 'Tone curve' }).click();

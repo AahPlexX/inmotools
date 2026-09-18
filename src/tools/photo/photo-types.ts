@@ -117,13 +117,29 @@ export interface PhotoSelection {
   inverted: boolean;
 }
 
-export type PhotoMask =
+export type PhotoPrimitiveMask =
   | { type: 'brush'; points: Array<{ x: number; y: number; pressure: number }>; radius: number; feather: number; opacity: number; invert: boolean }
   | { type: 'radial'; cx: number; cy: number; rx: number; ry: number; feather: number; opacity: number; invert: boolean }
   | { type: 'linear'; x1: number; y1: number; x2: number; y2: number; feather: number; opacity: number; invert: boolean }
   | { type: 'luminance'; min: number; max: number; feather: number; opacity: number; invert: boolean }
   | { type: 'hue'; center: number; range: number; feather: number; opacity: number; invert: boolean }
   | { type: 'selection'; selection: PhotoSelection; feather: number; opacity: number; invert: boolean };
+
+export interface PhotoCompositeMask {
+  type: 'composite';
+  operations: Array<{ mode: PhotoSelectionCombineMode; mask: PhotoMask }>;
+  feather: number;
+  opacity: number;
+  invert: boolean;
+}
+
+export type PhotoMask = PhotoPrimitiveMask | PhotoCompositeMask;
+
+export interface PhotoMaskOverlay {
+  visible: boolean;
+  color: string;
+  opacity: number;
+}
 
 export interface LocalEffect {
   exposure: number;
@@ -138,6 +154,8 @@ export interface LocalAdjustment {
   enabled: boolean;
   mask: PhotoMask;
   effect: LocalEffect;
+  /** Optional on older version-1 recipes; normalized to view-only defaults. */
+  overlay?: PhotoMaskOverlay;
 }
 
 export type RetouchOperation =
@@ -221,6 +239,8 @@ export interface PhotoRawSettings {
   blueMultiplier: number;
   highlight: 'clip' | 'unclip' | 'blend';
   demosaic: 'ahd' | 'bilinear' | 'vng' | 'ppg';
+  /** Stops applied as LibRaw's dcraw brightness multiplier (2^EV) before raster editing. */
+  exposureEv: number;
 }
 
 export interface PhotoRawSource {

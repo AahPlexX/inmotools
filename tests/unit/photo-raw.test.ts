@@ -5,7 +5,7 @@ import { normalizePhotoImport } from '../../src/tools/photo/photo-import';
 import { DEFAULT_RECIPE, commitHistory, createHistory, normalizeRecipe, undoHistory } from '../../src/tools/photo/photo-engine';
 import type { PhotoRecipe } from '../../src/tools/photo/photo-types';
 
-const rawDefaults = { whiteBalance: 'camera', redMultiplier: 1, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd' };
+const rawDefaults = { whiteBalance: 'camera', redMultiplier: 1, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd', exposureEv: 0 };
 const develop = decodeRawPixels as (buffer: ArrayBuffer, settings?: unknown) => ReturnType<typeof decodeRawPixels>;
 
 describe('Photo Studio RAW acquisition', () => {
@@ -62,7 +62,7 @@ describe('Photo Studio RAW acquisition', () => {
   });
   test.each([
     { input: undefined, expected: rawDefaults },
-    { input: { whiteBalance: 'custom', redMultiplier: 20, blueMultiplier: -4, highlight: 'blend', demosaic: 'bilinear' }, expected: { whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 0.25, highlight: 'blend', demosaic: 'bilinear' } },
+    { input: { whiteBalance: 'custom', redMultiplier: 20, blueMultiplier: -4, highlight: 'blend', demosaic: 'bilinear', exposureEv: 12 }, expected: { whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 0.25, highlight: 'blend', demosaic: 'bilinear', exposureEv: 5 } },
     { input: { whiteBalance: 'bad', redMultiplier: NaN, blueMultiplier: Infinity, highlight: 9, demosaic: 'uncompiled' }, expected: rawDefaults },
   ])('normalizes durable RAW options without trusting imported values: $input', ({ input, expected }) => {
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, raw: input } as unknown as PhotoRecipe);
@@ -82,6 +82,14 @@ describe('Photo Studio RAW acquisition', () => {
       model: 'Synthetic Bayer', rawWidth: 32, rawHeight: 32, activeWidth: 32, activeHeight: 32,
       layout: 'Bayer CFA', cameraWhiteBalance: true, colorControls: true, demosaicControl: true,
     });
+  });
+  test('RAW exposure EV changes LibRaw development without changing input bytes', async () => {
+    const source = makePhotoDng(); const original = source.slice();
+    const neutral = await develop(source.buffer, { ...rawDefaults, exposureEv: 0 });
+    const raised = await develop(source.buffer, { ...rawDefaults, exposureEv: 1 });
+    expect(raised.samples).not.toEqual(neutral.samples);
+    expect(raised.samples[1]).toBeGreaterThan(neutral.samples[1]);
+    expect(source).toEqual(original);
   });
   test.each([{ key: 'redMultiplier', channel: 0 }, { key: 'blueMultiplier', channel: 2 }])('custom RAW $key changes sensor development without changing input bytes', async ({ key, channel }) => {
     const source = makePhotoDng(); const original = source.slice();

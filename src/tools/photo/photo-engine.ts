@@ -19,6 +19,7 @@ import { normalizeRawSettings } from './photo-raw-settings';
 import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './photo-lut';
 import { normalizePhotoColorManagement } from './color/photo-color-management';
 import { clonePhotoSelection, normalizePhotoSelection, photoSelectionWeight } from './photo-selection';
+import { clonePhotoMask, normalizePhotoMaskOverlay } from './photo-mask';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -64,12 +65,9 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
     selection: clonePhotoSelection(recipe.selection),
     localAdjustments: recipe.localAdjustments.map((adjustment) => ({
       ...adjustment,
-      mask: adjustment.mask.type === 'brush'
-        ? { ...adjustment.mask, points: adjustment.mask.points.map((point) => ({ ...point })) }
-        : adjustment.mask.type === 'selection'
-          ? { ...adjustment.mask, selection: clonePhotoSelection(adjustment.mask.selection)! }
-        : { ...adjustment.mask },
+      mask: clonePhotoMask(adjustment.mask),
       effect: { ...adjustment.effect },
+      overlay: normalizePhotoMaskOverlay(adjustment.overlay),
     })),
     retouch: recipe.retouch.map((operation) => ({ ...operation })),
   };
@@ -245,12 +243,13 @@ function normalizeGrade(grade: ColorGrade): ColorGrade {
   };
 }
 
-function normalizeMask(mask: PhotoMask): PhotoMask {
+function normalizeMask(mask: PhotoMask, depth = 0): PhotoMask {
   const base = {
     feather: clamp(mask.feather, 0, 1),
     opacity: clamp(mask.opacity, 0, 1),
     invert: Boolean(mask.invert),
   };
+  if (depth >= 8) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false };
   switch (mask.type) {
     case 'brush':
       return {
@@ -308,6 +307,18 @@ function normalizeMask(mask: PhotoMask): PhotoMask {
         opacity: selection ? base.opacity : 0,
       };
     }
+    case 'composite': {
+      const operations = mask.operations.slice(0, 64).map((operation, index) => ({
+        mode: index === 0
+          ? 'replace' as const
+          : operation.mode === 'add' || operation.mode === 'subtract' || operation.mode === 'intersect'
+            ? operation.mode
+            : 'replace' as const,
+        mask: normalizeMask(operation.mask, depth + 1),
+      }));
+      if (!operations.length) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false };
+      return { type: 'composite', operations, ...base };
+    }
   }
 }
 
@@ -323,6 +334,7 @@ function normalizeLocalAdjustment(adjustment: LocalAdjustment): LocalAdjustment 
       sharpness: clamp(adjustment.effect.sharpness, -1, 2),
       blur: clamp(adjustment.effect.blur, 0, 1),
     },
+    overlay: normalizePhotoMaskOverlay(adjustment.overlay),
   };
 }
 
@@ -848,9 +860,21 @@ function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: 
   return best;
 }
 
-function maskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
+export function photoMaskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
   let weight = 0;
-  if (mask.type === 'radial') {
+  if (mask.type === 'composite') {
+    for (const operation of mask.operations) {
+      const incoming = photoMaskWeight(operation.mask, x, y, red, green, blue);
+      if (operation.mode === 'replace') weight = incoming;
+      else if (operation.mode === 'add') weight = Math.max(weight, incoming);
+      else if (operation.mode === 'subtract') weight *= 1 - incoming;
+      else weight = Math.min(weight, incoming);
+    }
+    if (mask.feather > EPSILON) {
+      const halfFeather = mask.feather * 0.5;
+      weight = smoothstep(0.5 - halfFeather, 0.5 + halfFeather, weight);
+    }
+  } else if (mask.type === 'radial') {
     const dx = (x - mask.cx) / Math.max(EPSILON, mask.rx);
     const dy = (y - mask.cy) / Math.max(EPSILON, mask.ry);
     const distance = Math.hypot(dx, dy);
@@ -904,7 +928,7 @@ function applyLocalColorEffect(
     if (data[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = maskWeight(adjustment.mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
+    const weight = photoMaskWeight(adjustment.mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
     if (weight <= EPSILON) continue;
 
     if (adjustment.effect.exposure !== 0) {
@@ -941,7 +965,7 @@ function applyLocalSpatialEffect(
     if (source[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = maskWeight(adjustment.mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
+    const weight = photoMaskWeight(adjustment.mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
     if (weight <= EPSILON) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const difference = source[offset + channel] - blurred[offset + channel];
