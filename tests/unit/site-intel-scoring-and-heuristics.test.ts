@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeScorecard, letterGrade, type ScoreVector } from '../../src/tools/site-intel/scoring-engine';
-import { analyzeSchemeSecurity } from '../../src/tools/site-intel/mixed-content-engine';
 import { classifyCdn, fingerprintCms } from '../../src/tools/site-intel/fingerprint-engine';
-import { parseUrl } from '../../src/tools/site-intel/url-forensics';
+import { analyzeSchemeSecurity, parseUrl } from '../../src/tools/site-intel/url-forensics';
 import type { Finding } from '../../src/tools/site-intel/site-intel-types';
 
 describe('scoring-engine (Feature 32)', () => {

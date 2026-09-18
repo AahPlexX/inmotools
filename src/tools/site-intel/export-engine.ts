@@ -5,7 +5,6 @@
 
 import Papa from 'papaparse';
 import { jsPDF } from 'jspdf';
-import type { Finding } from './site-intel-types';
 import type { Scorecard } from './scoring-engine';
 
 export interface ReportMetadata {
@@ -19,7 +18,6 @@ export interface ExportBundle {
   url: string;
   metadata: ReportMetadata;
   scorecard: Scorecard;
-  findingsByVector: Record<string, Finding[]>;
 }
 
 export function exportJson(bundle: ExportBundle): string {

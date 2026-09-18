@@ -79,7 +79,7 @@ user-supplied credential).
 | 20 | SAN subdomain discovery | Done | `ct-engine.ts:summarizeSanSubdomains` (depends on #19 succeeding) |
 | 21 | Certificate expiration & automated-renewal sentinel | Done | `ct-engine.ts:assessCertificateExpiry` (depends on #19 succeeding) |
 | 22 | Chromium HSTS preload list status checker | Done | `hsts-engine.ts` via hstspreload.org status API |
-| 23 | Mixed content risk & default scheme security analyzer | Done | `mixed-content-engine.ts:analyzeSchemeSecurity` |
+| 23 | Mixed content risk & default scheme security analyzer | Done | `url-forensics.ts:analyzeSchemeSecurity` (merged from a standalone file 2026-09-18, see ponytail-audit note below) |
 
 ### Group 5 — Email Deliverability & Domain Authentication
 | # | Feature | Status | Implementation |
@@ -223,6 +223,21 @@ user-supplied credential).
   `ScoreRadar.tsx`'s custom SVG (vs. the already-installed `chart.js`) was
   considered and deliberately kept — chart.js's canvas radar has no built-in
   per-vertex click-to-navigate, which this tool needs.
+- **ponytail-audit pass (2026-09-18, whole-tool scan):** three more cuts,
+  re-verified green: deleted `CruxReport.collectionPeriod` (declared and
+  parsed for, never assigned or read anywhere); deleted
+  `ExportBundle.findingsByVector` (computed on every render, never read by
+  `exportJson`/`Markdown`/`Csv`/`Pdf` — they all read `scorecard.vectors`
+  directly; JSON export still contains the same data via `scorecard`, just
+  without the redundant reshaped copy); merged `mixed-content-engine.ts`
+  (Feature 23, a 22-line file exporting exactly one pure/sync function with
+  no network dependency) into `url-forensics.ts` alongside every other
+  Group 1 function, then deleted the standalone file. `social-card-engine.ts`
+  and `shortener-resolver.ts` were also single-export files but were kept
+  separate — `social-card-engine.ts` isolates canvas-only rendering from
+  React component code, and `shortener-resolver.ts` isolates async/network
+  code from `url-forensics.ts`'s deliberately pure/sync contract, both real
+  boundaries rather than arbitrary splits.
 - **Reminder for future runs:** `pnpm build` must be re-run before `playwright
   test` whenever source changed since the last build — `vite preview` only
   serves the existing `dist/` folder and will silently serve stale UI

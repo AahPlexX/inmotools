@@ -13,7 +13,7 @@ import { NodeGraph, type NodeGraphData } from './components/NodeGraph';
 import { GeoMinimap } from './components/GeoMinimap';
 import {
   buildSanitizedUrl, classifyQueryParams, detectHomoglyphs, detectShortener,
-  findTyposquatMatches, parseUrl, shannonEntropy,
+  findTyposquatMatches, parseUrl, shannonEntropy, analyzeSchemeSecurity,
 } from './url-forensics';
 import { resolveShortenedUrl, type ShortenerResolution } from './shortener-resolver';
 import { fetchDnsTable, auditIpv6Readiness, validateCaaRecords, checkDnssecSignals, extractIps, extractNameservers, resolvePtrRecords } from './dns-engine';
@@ -23,7 +23,6 @@ import { fetchWaybackTimeline, waybackCaptureUrl, type WaybackTimeline } from '.
 import { scanDnsbl } from './blacklist-engine';
 import { fetchCtLog, summarizeSanSubdomains, assessCertificateExpiry, type CtReport } from './ct-engine';
 import { checkHstsPreload, describeHstsPreload } from './hsts-engine';
-import { analyzeSchemeSecurity } from './mixed-content-engine';
 import { fetchMxRecords, validateSpf, inspectDmarc, checkBimi } from './email-auth-engine';
 import { fetchCruxReport, summarizeCrux } from './crux-engine';
 import { classifyCdn, fingerprintCms } from './fingerprint-engine';
@@ -286,7 +285,6 @@ export default function SiteIntelWorkspace() {
     url: parsed?.normalized ?? rawInput,
     metadata,
     scorecard,
-    findingsByVector: Object.fromEntries(scorecard.vectors.map((v) => [v.vector, v.findings])),
   }), [parsed, rawInput, metadata, scorecard]);
 
   return (

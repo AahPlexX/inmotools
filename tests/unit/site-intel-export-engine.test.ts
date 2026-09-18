@@ -17,7 +17,6 @@ function sampleBundle(): ExportBundle {
     url: 'https://example.com/',
     metadata: { auditorName: 'Ada Lovelace', organization: 'InMo Tools', notes: 'Routine quarterly audit.', auditTimestamp: Date.parse('2026-09-18T00:00:00Z') },
     scorecard,
-    findingsByVector: Object.fromEntries(scorecard.vectors.map((v) => [v.vector, v.findings])),
   };
 }
 

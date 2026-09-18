@@ -17,7 +17,7 @@
 import type { AsyncTaskState, Finding, Severity } from './site-intel-types';
 
 export interface CruxMetric { p75: number | null; category: 'FAST' | 'AVERAGE' | 'SLOW' | 'UNKNOWN' }
-export interface CruxReport { lcp: CruxMetric; cls: CruxMetric; inp: CruxMetric; collectionPeriod?: string }
+export interface CruxReport { lcp: CruxMetric; cls: CruxMetric; inp: CruxMetric }
 
 const CRUX_TIMEOUT_MS = 8000;
 
@@ -45,7 +45,7 @@ export async function fetchCruxReport(origin: string, apiKey: string | null): Pr
     });
     if (res.status === 404) return { status: 'blocked', blockedReason: 'No Chrome UX Report data exists for this origin (insufficient real-world Chrome traffic volume).' };
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json() as { record?: { metrics?: Record<string, { histogram?: Array<{ start: number; end?: number; density?: number }>; percentiles?: Record<string, number> }>; collectionPeriod?: { firstDate?: unknown; lastDate?: unknown } } };
+    const body = await res.json() as { record?: { metrics?: Record<string, { histogram?: Array<{ start: number; end?: number; density?: number }>; percentiles?: Record<string, number> }> } };
     const metrics = body.record?.metrics ?? {};
     const report: CruxReport = {
       lcp: summarizeMetric(metrics.largest_contentful_paint?.histogram, metrics.largest_contentful_paint?.percentiles as Record<string, number> | undefined, 'p75'),
