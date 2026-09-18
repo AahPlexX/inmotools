@@ -531,7 +531,7 @@ export default function HardwareWorkspace() {
 
       <div className="code-output" data-testid="packet-stream" role="log" aria-live={displayPaused ? 'off' : 'polite'} aria-label="Received packet stream" tabIndex={0} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
         {displayedCapture.length
-          ? displayedCapture.map((entry) => `${entry.timestamp} · ${entry.direction}${entry.ruleLabel ? ` · [${entry.ruleLabel}]` : ''} · ${entry.hex || '(no bytes)'}${entry.text ? ` · ${entry.text}` : ''}`).join('\n')
+          ? displayedCapture.map((entry) => `${entry.timestamp} · ${entry.direction}${entry.ruleLabel ? ` [${entry.ruleLabel}]` : ''} ${entry.hex || '(no bytes)'}${entry.text ? ` · ${entry.text}` : ''}`).join('\n')
           : 'Capture is empty for the current filters. Run a simulator scenario, transmit a packet, or connect a device.'}
       </div>
       <div className="button-row" aria-label="Capture pages">
