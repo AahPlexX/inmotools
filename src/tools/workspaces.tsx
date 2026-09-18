@@ -34,6 +34,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
   'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
+  'site-intelligence-analyzer': () => import('./site-intel/SiteIntelWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

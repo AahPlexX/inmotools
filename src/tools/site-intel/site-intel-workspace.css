@@ -1,0 +1,272 @@
+/* Feature 34 — responsive, device-agnostic layout for the Site Intelligence
+   Analyzer. Mobile-first: a sticky horizontal tab bar plus stacked
+   accordion-style cards. From tablet width upward the tab bar stays but
+   sections gain a dense multi-column internal grid; from laptop width
+   upward all sections render simultaneously in a wide reading column. */
+
+.site-intel-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 2vw, 20px);
+  container-type: inline-size;
+}
+
+.site-intel-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.site-intel-input-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.site-intel-input-controls input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  font-size: 1rem;
+}
+
+.site-intel-input-controls button {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--signal);
+  background: var(--signal);
+  color: #fff;
+  font-weight: 600;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.site-intel-input-controls button:hover {
+  background: var(--signal-strong);
+  border-color: var(--signal-strong);
+}
+
+.site-intel-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.site-intel-tabs button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.site-intel-tabs button.active {
+  background: var(--signal-soft);
+  border-color: var(--signal);
+  color: var(--signal-strong);
+}
+
+.site-intel-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.site-intel-section {
+  display: none;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.site-intel-section.open {
+  display: block;
+}
+
+/* From tablet width, show every section stacked (accordion becomes a scroll list). */
+@container (min-width: 768px) {
+  .site-intel-section {
+    display: block;
+  }
+  .site-intel-tabs button {
+    scroll-snap-align: start;
+  }
+}
+
+/* From laptop width, use a dense two-column grid for section internals. */
+@container (min-width: 1024px) {
+  .dns-table,
+  .lexical-card + .lexical-card {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@container (min-width: 1440px) {
+  .site-intel-sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .site-intel-section {
+    display: block !important;
+  }
+}
+
+.url-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.url-token {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--signal-soft);
+  color: var(--signal-strong);
+  font-size: 0.85rem;
+  cursor: default;
+}
+
+.finding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finding-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.finding-label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.finding-detail {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.severity-chip {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.severity-good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); }
+.severity-info { background: var(--signal-soft); color: var(--signal-strong); }
+.severity-warn { background: color-mix(in srgb, var(--warning) 14%, var(--surface)); color: var(--warning); }
+.severity-risk { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
+
+.task-loading, .task-idle, .task-error, .task-blocked, .site-intel-placeholder {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.task-error { color: var(--danger); }
+.task-blocked { color: var(--warning); }
+
+.info-badge-wrap { position: relative; display: inline-block; margin-left: 4px; }
+
+.info-badge {
+  width: 18px;
+  height: 18px;
+  min-height: unset;
+  border-radius: 50%;
+  border: 1px solid var(--signal);
+  background: transparent;
+  color: var(--signal);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.info-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(260px, 70vw);
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 10px 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.info-tooltip-top { bottom: 26px; }
+.info-tooltip-bottom { top: 26px; }
+
+.score-radar { width: 100%; max-width: 360px; }
+.score-radar-ring { fill: none; stroke: var(--line); }
+.score-radar-axis { stroke: var(--line-strong); }
+.score-radar-shape { fill: color-mix(in srgb, var(--signal) 35%, transparent); stroke: var(--signal); stroke-width: 2; }
+.score-radar-dot { fill: #fff; }
+.score-radar-label { fill: var(--muted); font-size: 10px; cursor: pointer; }
+.score-radar-overall-grade { fill: var(--ink); font-size: 26px; font-weight: 700; }
+.score-radar-overall-score { fill: var(--muted); font-size: 12px; }
+
+.node-graph-container { position: relative; touch-action: none; }
+.node-graph-canvas { width: 100%; display: block; border-radius: 10px; background: #0b1220; cursor: grab; }
+.node-graph-inspector, .node-graph-hint {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.metadata-editor, .vault-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.metadata-editor input, .metadata-editor textarea { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
+
+.export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.export-actions button { min-height: 44px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: inherit; cursor: pointer; }
+.export-actions button:hover { background: var(--surface-strong); }
+
+.vault-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vault-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: var(--surface-strong); }
+
+.wellknown-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wellknown-preview { max-height: 220px; overflow: auto; background: #0b1220; color: #e2e8f0; padding: 8px; border-radius: 6px; font-size: 0.75rem; }
+
+@media (max-width: 480px) {
+  .site-intel-tabs { font-size: 0.85rem; }
+  .info-tooltip { width: 80vw; }
+}
