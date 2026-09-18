@@ -112,6 +112,13 @@ describe('workspace first render', () => {
     expect(lower).not.toContain('beeline');
   });
 
+  it('avoids audio allocation for a visual-only metronome and releases browser resources', () => {
+    const source = readFileSync('src/tools/sightline/SightlineWorkspace.tsx', 'utf8');
+    expect(source).toContain("if (!settings.metronomeEnabled || settings.metronome.channel === 'visual') return undefined;");
+    expect(source).toContain('dbRef.current?.close()');
+    expect(source).toContain('void audio.close()');
+  });
+
   it('uses the theme variables the theme engine writes', () => {
     const css = readFileSync('src/tools/sightline/sightline-workspace.css', 'utf8');
     const written = new Set(Object.keys(themeVariables(DEFAULT_SETTINGS.appearance)));

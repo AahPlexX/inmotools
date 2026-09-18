@@ -224,7 +224,6 @@ export default function SightlineWorkspace() {
   const [highlightColor, setHighlightColor] = useState<HighlightColor>('amber');
   const [noteText, setNoteText] = useState('');
   const [bankMessage, setBankMessage] = useState('');
-  const [copied] = useState(false);
 
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -327,6 +326,8 @@ export default function SightlineWorkspace() {
       const batch = Array.from(files);
       if (batch.length === 0) return;
       let loaded = 0;
+      let failed = 0;
+      let activeFileName = '';
       for (const file of batch) {
         setStatus({ phase: 'working', message: `Reading ${file.name}…` });
         try {
@@ -337,10 +338,21 @@ export default function SightlineWorkspace() {
           const dependencies: IngestDependencies = { onProgress: (message) => setStatus({ phase: 'working', message }), ...(pdfModule ? { pdf: pdfModule.createPdfJsExtractor() } : {}) };
           const result = await ingestDocument(bytes, file.name, { proseOnly: settings.proseOnly, includeNotes: settings.includeNotes }, dependencies);
           applyResult(result);
-          if (result.ok) loaded += 1;
-        } catch (error) { setStatus({ phase: 'error', message: error instanceof Error ? error.message : `${file.name} could not be read.` }); }
+          if (result.ok) {
+            loaded += 1;
+            activeFileName = file.name;
+          } else {
+            failed += 1;
+          }
+        } catch (error) {
+          failed += 1;
+          setStatus({ phase: 'error', message: error instanceof Error ? error.message : `${file.name} could not be read.` });
+        }
       }
-      if (batch.length > 1 && loaded > 0) setStatus({ phase: 'ready', message: `${loaded} of ${batch.length} documents opened. ${batch.at(-1)?.name ?? ''} is active.` });
+      if (batch.length > 1 && loaded > 0) {
+        const failureNote = failed > 0 ? ` ${failed} failed.` : '';
+        setStatus({ phase: 'ready', message: `${loaded} of ${batch.length} documents opened. ${activeFileName} is active.${failureNote}` });
+      }
     },
     [applyResult, settings.includeNotes, settings.proseOnly],
   );
@@ -665,6 +677,14 @@ export default function SightlineWorkspace() {
 
   useEffect(() => {
     void refreshWarehouse();
+    return () => {
+      dbRef.current?.close();
+      dbRef.current = null;
+      const audio = audioRef.current;
+      audioRef.current = null;
+      if (audio && audio.state !== 'closed') void audio.close();
+      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+    };
   }, [refreshWarehouse]);
 
   useEffect(() => {
@@ -688,7 +708,7 @@ export default function SightlineWorkspace() {
   /* ------------------------------------------------------------- metronome */
 
   useEffect(() => {
-    if (!settings.metronomeEnabled) return undefined;
+    if (!settings.metronomeEnabled || settings.metronome.channel === 'visual') return undefined;
     const AudioContextCtor = window.AudioContext
       ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextCtor) return undefined;
@@ -1278,12 +1298,18 @@ export default function SightlineWorkspace() {
             storageNote={warehouseNote}
             onClear={() => {
               void (async () => {
-                if (dbRef.current) await clearWarehouse(dbRef.current);
+                if (dbRef.current) {
+                  const result = await clearWarehouse(dbRef.current);
+                  if (!result.ok) {
+                    setWarehouseNote(result.message ?? 'The local reading history could not be cleared.');
+                    return;
+                  }
+                }
                 setSessions([]);
                 setDocuments([]);
                 setBank([]);
                 setCloze([]);
-                setWarehouseNote('The local reading history was cleared. Nothing was uploaded at any point.');
+                setWarehouseNote('The saved session history, document history, and word bank were cleared from this browser.');
               })();
             }}
           />
