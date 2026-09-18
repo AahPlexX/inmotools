@@ -253,6 +253,25 @@
   font-size: 0.85rem;
 }
 
+.geo-minimap-container { position: relative; }
+.geo-minimap { width: 100%; max-width: 480px; display: block; border-radius: 10px; border: 1px solid var(--line); }
+.geo-minimap-ocean { fill: var(--surface-strong); }
+.geo-minimap-graticule { stroke: var(--line); stroke-width: 0.5; }
+.geo-minimap-equator, .geo-minimap-meridian { stroke: var(--line-strong); stroke-width: 0.75; stroke-dasharray: 2 2; }
+.geo-minimap-marker-group { cursor: pointer; }
+.geo-minimap-marker { fill: var(--signal); stroke: var(--surface); stroke-width: 1.5; }
+.geo-minimap-marker-group:focus .geo-minimap-marker,
+.geo-minimap-marker-group:hover .geo-minimap-marker { fill: var(--signal-strong); }
+.geo-minimap-inspector, .geo-minimap-hint, .geo-minimap-empty {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+.geo-minimap-inspector p { margin: 2px 0; }
+
 .metadata-editor, .vault-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .metadata-editor input, .metadata-editor textarea { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
 

@@ -8,9 +8,9 @@ for this workstream.
 
 - Branch: `feature/site-analysis-workstation` (this worktree is
   `inmotools-site-analysis`, checked out from `origin/main` at the time this
-  branch was created; the branch has **not** been merged and must not be
-  merged until every item below is either Done or explicitly accepted as
-  Rejected/Deferred with rationale).
+  branch was created; it has since been pushed to `origin/feature/site-analysis-workstation`
+  but has **not** been merged and must not be merged until every item below is
+  either Done or explicitly accepted as Rejected/Deferred with rationale).
 - Tool slug: `site-intelligence-analyzer` (registered in `src/catalog.ts` and
   `src/tools/workspaces.tsx`).
 - No "AI" branding anywhere in this tool's copy, feature names, or docs. Every
@@ -22,9 +22,14 @@ for this workstream.
 1. Read this file top to bottom before changing anything.
 2. Re-run `pnpm exec tsc --noEmit -p tsconfig.app.json`, the `site-intel-*`
    unit tests, and `tests/e2e/site-intel.spec.ts` before and after your change.
-3. Update the status table and the "Known blockers / explicit substitutions"
+3. **Run `pnpm build` before running e2e tests whenever source has changed.**
+   `playwright.config.ts`'s `webServer` runs `vite preview`, which only serves
+   the existing `dist/` folder — it does not rebuild. Testing against a stale
+   build looks like passing-but-wrong or mysteriously-timing-out assertions
+   for newly added UI, not a build error (learned the hard way on 2026-09-18).
+4. Update the status table and the "Known blockers / explicit substitutions"
    section in the same commit as any implementation change.
-4. Do not merge to `main` until Section "Definition of done" is fully satisfied.
+5. Do not merge to `main` until Section "Definition of done" is fully satisfied.
 
 ## Status legend
 
@@ -43,9 +48,9 @@ user-supplied credential).
 | 1 | RFC 3986 canonical URL decomposition engine | Done | `url-forensics.ts:parseUrl`, breadcrumb UI in `SiteIntelWorkspace.tsx` |
 | 2 | Homoglyph & Punycode (IDN) spoofing detector | Done | `url-forensics.ts:detectHomoglyphs`, curated confusable map in `reference-data.ts` |
 | 3 | Lexical Shannon entropy & DGA analyzer | Done | `url-forensics.ts:shannonEntropy` |
-| 4 | Typosquatting & Levenshtein brand-distance calculator | Done | `url-forensics.ts:findTyposquatMatches` against curated `BRAND_REFERENCE_DOMAINS` (not a live Tranco fetch — see substitutions) |
+| 4 | Typosquatting & Levenshtein brand-distance calculator | Done | `url-forensics.ts:findTyposquatMatches` against curated `BRAND_REFERENCE_DOMAINS` (~175 domains as of 2026-09-18, not a live Tranco fetch — see substitutions) |
 | 5 | Query parameter & privacy tracking profiler | Done | `url-forensics.ts:classifyQueryParams` / `buildSanitizedUrl` |
-| 6 | Deep URL shortener & vanity link detector | Done | `url-forensics.ts:detectShortener`; redirect-unwrapping is a documented UI affordance, not implemented (see substitutions) |
+| 6 | Deep URL shortener & vanity link detector | Done | `url-forensics.ts:detectShortener` (detection) + `shortener-resolver.ts:resolveShortenedUrl` (best-effort client-side redirect resolution, wired to a "Resolve destination" button; degrades to an honest CORS-blocked explanation when a service does not allow it — see substitutions) |
 
 ### Group 2 — DNS Architecture, Infrastructure & Network Routing
 | # | Feature | Status | Implementation |
@@ -56,7 +61,7 @@ user-supplied credential).
 | 10 | CAA record validator | Done | `dns-engine.ts:validateCaaRecords` |
 | 11 | DNSSEC cryptographic chain verification | Partial | `dns-engine.ts:checkDnssecSignals` reports DNSKEY/DS/RRSIG presence plus the resolver's authenticated-data (AD) bit rather than re-deriving the full root-to-zone signature chain client-side (see substitutions) |
 | 12 | BGP ASN & hosting profiler | Done | `network-engine.ts:profileHosting` via ipapi.co |
-| 13 | GeoIP server location & Anycast detector | Done | `network-engine.ts:detectAnycast`; minimap visualization not yet built (coordinates are fetched and available, only the map UI is outstanding) |
+| 13 | GeoIP server location & Anycast detector | Done | `network-engine.ts:detectAnycast`, `components/GeoMinimap.tsx` (interactive equirectangular lat/long minimap with click-to-inspect markers — see substitutions for why it draws a graticule instead of coastlines) |
 
 ### Group 3 — Domain Registration, Lifecycles & Historical Records
 | # | Feature | Status | Implementation |
@@ -126,17 +131,22 @@ user-supplied credential).
    diffing (which would need dozens of extra, CORS-uncertain fetches of
    archived HTML) with the CDX API's own `digest` content-hash field to
    detect meaningful content changes over time.
-5. **Feature 6 (shortener redirect-unwrapping)** — detection is fully
-   implemented; a client-side "follow the redirect chain" resolver is not
-   implemented yet because most shorteners do not send CORS headers on their
-   redirect response, so a generic client-side unwrapper would silently fail
-   for most targets. Flagged here as "other" for a judgment call: either (a)
-   leave as detection-only (current state), or (b) add a best-effort
-   `fetch(..., { redirect: 'follow' })` attempt that only succeeds for
-   shorteners that do happen to allow it, clearly labeled as unreliable.
-6. **Feature 13 (GeoIP minimap)** — coordinate data is fetched and available
-   on every hosting/ASN finding; the interactive minimap visualization
-   component itself has not been built yet (listed as outstanding work below).
+5. **Feature 6 (shortener redirect-unwrapping)** — resolved per option (b) in
+   the original judgment-call note: `shortener-resolver.ts` makes a bounded,
+   honestly-labeled best-effort `fetch(..., { redirect: 'follow' })` attempt.
+   It reads `response.url` when the browser discloses a different final URL,
+   and otherwise shows a plain-language explanation that the shortener does
+   not allow cross-origin resolution rather than pretending to have resolved
+   it. Verified end-to-end against a real `bit.ly` URL in
+   `tests/e2e/site-intel.spec.ts` (asserts one of the two honest outcomes,
+   not a specific one, since success is inherently target-dependent).
+6. **Feature 13 (GeoIP minimap)** — no world-map/coastline dataset exists
+   anywhere in this repository to reuse (verified by search), and bundling an
+   unverified third-party coastline dataset was rejected rather than
+   fabricated. `GeoMinimap.tsx` instead draws an honest equirectangular
+   lat/long graticule (30° meridians/parallels) with clickable markers at
+   each resolved IP's coordinates — accurate, verifiable, and needs no new
+   dependency or bundled asset.
 7. **ipapi.co dependency (Features 9, 12, 13)** — free-tier rate limits and
    CORS terms should be re-verified from https://ipapi.co/api/ in a
    network-enabled environment before this ships to real production traffic
@@ -144,24 +154,38 @@ user-supplied credential).
 
 ## Outstanding work (not yet started / not yet complete)
 
-- [ ] GeoIP interactive minimap UI for Feature 13 (data plumbing is done; map
-      rendering is not).
-- [ ] Decide and implement the Feature 6 substitution judgment call above.
-- [ ] Broaden `BRAND_REFERENCE_DOMAINS` beyond the current curated ~100-domain
-      list if a larger, still-offline-friendly reference set is wanted.
-- [ ] Add focused unit coverage for `export-engine.ts` (JSON/Markdown/CSV/PDF
-      byte-for-byte shape) and `social-card-engine.ts` (canvas rendering is
-      hard to unit-test headlessly; currently only exercised manually/via e2e).
+- [x] ~~GeoIP interactive minimap UI for Feature 13~~ — done 2026-09-18
+      (`components/GeoMinimap.tsx`).
+- [x] ~~Decide and implement the Feature 6 substitution judgment call~~ — done
+      2026-09-18 (`shortener-resolver.ts`, option (b): best-effort resolve).
+- [x] ~~Broaden `BRAND_REFERENCE_DOMAINS`~~ — done 2026-09-18, ~175 curated
+      domains across finance, retail, airlines, government, education,
+      streaming, crypto/fintech, and telecom.
+- [x] ~~Add focused unit coverage for `export-engine.ts`~~ — done 2026-09-18
+      (`tests/unit/site-intel-export-engine.test.ts`, 5 tests covering
+      JSON/Markdown/CSV/PDF output shape).
+- [ ] `social-card-engine.ts` still has no headless unit test — it needs a
+      real `<canvas>` (no `document` in this repo's Node/vitest environment,
+      and adding jsdom/node-canvas just for this one function would be new
+      dependency bloat for marginal value). It is instead exercised by the
+      real-browser e2e test ("renders a GeoIP minimap panel and generates a
+      downloadable social card"), which is arguably more faithful anyway.
+      Revisit only if jsdom becomes a repo-wide dependency for other reasons.
 - [ ] Add an e2e assertion that actually exercises a real DNS/RDAP/CT round
-      trip end-to-end (current `tests/e2e/site-intel.spec.ts` intentionally
-      only asserts on the network-independent Group 1 + UI-shell behavior to
-      avoid flakiness when run without outbound internet access).
+      trip end-to-end with asserted *content* (current spec intentionally
+      only asserts UI-shell/best-effort-outcome behavior so it does not
+      become flaky when run without outbound internet access; both e2e runs
+      so far happened to have real internet access and passed against live
+      Cloudflare DoH/RDAP/Wayback/HSTS/ipapi.co responses, but that is not
+      guaranteed in every environment this suite might run in).
 - [ ] Content-Security-Policy / `connect-src` allowlist review for every
       external host this tool calls (Cloudflare/Google DoH, rdap.org,
       web.archive.org, crt.sh, hstspreload.org, ipapi.co, chromeuxreport
-      googleapis.com) if/when this repository adopts a CSP meta tag.
-- [ ] Visual polish pass (spacing, empty states, dark/light theme parity with
-      the rest of InMo Tools) once functional scope is accepted.
+      googleapis.com) if/when this repository adopts a CSP meta tag. This is
+      deliberately left to a maintainer decision since a document-level CSP
+      would affect every other tool in this shared app, not just this one.
+- [ ] Visual polish pass (spacing, empty states) beyond the light-theme-token
+      fix already applied to `site-intel-workspace.css` on 2026-09-18.
 
 ## Verified/implemented so far (what a resuming agent can trust as tested)
 
@@ -170,16 +194,30 @@ user-supplied credential).
   (`tests/unit/site-intel-scoring-and-heuristics.test.ts`).
 - DoH/DNS/email-auth/DNSBL/RDAP/Wayback/HSTS engines: unit tested against
   mocked `fetch` (`tests/unit/site-intel-network-engines.test.ts`).
+- Export pipeline (JSON/Markdown/CSV/PDF byte-for-byte shape): unit tested
+  (`tests/unit/site-intel-export-engine.test.ts`, 5 tests).
+- Best-effort shortener resolution (resolved / not-disclosed / CORS-blocked
+  paths): unit tested against mocked `fetch`
+  (`tests/unit/site-intel-shortener-resolver.test.ts`, 3 tests).
 - Full app type-check (`tsc --noEmit -p tsconfig.app.json`) is clean.
 - Full production build (`pnpm build`) succeeds; the tool lazy-loads as its
   own chunk (`SiteIntelWorkspace-*.js`).
-- `pnpm vitest run tests/unit` — 1264/1266 passing; the 2 failures are
-  pre-existing, unrelated `markdown-citation.test.ts` timeouts in a different
-  tool, not caused by this work.
-- `tests/e2e/site-intel.spec.ts` passes on both `desktop-chromium` and
-  `mobile-chromium` Playwright projects (tab navigation, lexical breadcrumb,
-  typosquat/tracking-param detection, scorecard rendering, export buttons
-  present).
+- `pnpm vitest run tests/unit` — 1273/1274 passing (as of 2026-09-18); the 1
+  failure is a pre-existing, unrelated `markdown-citation.test.ts` timeout in
+  a different tool, not caused by this work (it is flaky in isolation too —
+  observed 2 failures in one run and 1 in the next, same test, same file).
+- `tests/e2e/site-intel.spec.ts` (8 tests) passes on both `desktop-chromium`
+  and `mobile-chromium` Playwright projects as of 2026-09-18: tab navigation,
+  lexical breadcrumb, typosquat/tracking-param detection, scorecard
+  rendering, export buttons present, shortener detection + best-effort
+  resolve action, GeoIP minimap rendering, and social-card PNG download.
+  This run had real outbound internet access, so it also incidentally
+  exercised live Cloudflare DoH, rdap.org, web.archive.org, hstspreload.org,
+  and ipapi.co responses end-to-end without a documented format mismatch.
+- **Reminder for future runs:** `pnpm build` must be re-run before `playwright
+  test` whenever source changed since the last build — `vite preview` only
+  serves the existing `dist/` folder and will silently serve stale UI
+  otherwise (see "How to resume this work" above).
 
 ## Definition of done (required before proposing a merge to `main`)
 

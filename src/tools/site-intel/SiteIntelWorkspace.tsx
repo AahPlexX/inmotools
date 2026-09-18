@@ -10,10 +10,12 @@ import './site-intel-workspace.css';
 import { InfoBadge } from './components/InfoBadge';
 import { ScoreRadar } from './components/ScoreRadar';
 import { NodeGraph, type NodeGraphData } from './components/NodeGraph';
+import { GeoMinimap } from './components/GeoMinimap';
 import {
   buildSanitizedUrl, classifyQueryParams, detectHomoglyphs, detectShortener,
   findTyposquatMatches, parseUrl, shannonEntropy,
 } from './url-forensics';
+import { resolveShortenedUrl, type ShortenerResolution } from './shortener-resolver';
 import { fetchDnsTable, auditIpv6Readiness, validateCaaRecords, checkDnssecSignals, extractIps, extractNameservers, resolvePtrRecords } from './dns-engine';
 import { profileHosting, checkNameserverRedundancy, detectAnycast } from './network-engine';
 import { fetchRdap, assessDomainAge, assessExpiration, type RdapRecord } from './rdap-engine';
@@ -107,6 +109,8 @@ export default function SiteIntelWorkspace() {
   const [metadata, setMetadata] = useState<ReportMetadata>({ auditorName: '', organization: '', notes: '', auditTimestamp: Date.now() });
   const [vault, setVault] = useState<AuditRecord[]>([]);
   const [busy, setBusy] = useState(false);
+  const [shortenerResolution, setShortenerResolution] = useState<ShortenerResolution | null>(null);
+  const [resolvingShortener, setResolvingShortener] = useState(false);
 
   const sanitizedUrl = useMemo(() => (parsed ? buildSanitizedUrl(parsed) : ''), [parsed]);
   const homoglyphs = useMemo(() => (parsed ? detectHomoglyphs(parsed.hostnameUnicode) : null), [parsed]);
@@ -114,6 +118,13 @@ export default function SiteIntelWorkspace() {
   const typosquats = useMemo(() => (parsed ? findTyposquatMatches(parsed.registrableDomain) : []), [parsed]);
   const trackingParams = useMemo(() => (parsed ? classifyQueryParams(parsed.queryParams) : []), [parsed]);
   const shortener = useMemo(() => (parsed ? detectShortener(parsed.host, parsed.normalized) : null), [parsed]);
+
+  async function handleResolveShortener() {
+    if (!parsed) return;
+    setResolvingShortener(true);
+    setShortenerResolution(await resolveShortenedUrl(parsed.normalized));
+    setResolvingShortener(false);
+  }
   const schemeFindings = useMemo(() => (parsed ? analyzeSchemeSecurity(parsed) : []), [parsed]);
 
   async function runAnalysis() {
@@ -339,7 +350,16 @@ export default function SiteIntelWorkspace() {
               <ul>{trackingParams.map((p) => <li key={p.key}>{p.key} — {p.category}{p.service ? ` (${p.service})` : ''}</li>)}</ul>
               {sanitizedUrl ? <p>Sanitized: <code>{sanitizedUrl}</code> <button type="button" onClick={() => navigator.clipboard.writeText(sanitizedUrl)}>Copy</button></p> : null}
             </div>
-            {shortener?.isShortener ? <p className="finding-row finding-warn"><Severity level="warn" /> {shortener.note}</p> : null}
+            {shortener?.isShortener ? (
+              <div className="lexical-card">
+                <p className="finding-row finding-warn"><Severity level="warn" /> {shortener.note}</p>
+                <button type="button" onClick={() => void handleResolveShortener()} disabled={resolvingShortener}>
+                  {resolvingShortener ? 'Resolving…' : 'Resolve destination'}
+                </button>
+                {shortenerResolution?.resolved ? <p data-testid="shortener-resolved">Resolved destination: <code>{shortenerResolution.finalUrl}</code></p> : null}
+                {shortenerResolution && !shortenerResolution.resolved ? <p className="task-error" data-testid="shortener-resolve-error">{shortenerResolution.error}</p> : null}
+              </div>
+            ) : null}
             <ul className="finding-list">{schemeFindings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>
           </section>
 
@@ -368,6 +388,8 @@ export default function SiteIntelWorkspace() {
             <h3>Hosting / ASN profile</h3>
             <TaskPanel state={hosting} render={(d) => <ul className="finding-list">{d.findings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>} />
             {anycast ? <FindingRow finding={anycast} /> : null}
+            <h3>GeoIP minimap <InfoBadge term="geoip" /></h3>
+            <TaskPanel state={hosting} render={(d) => <GeoMinimap points={d.intel} />} />
             <h3>DNSBL reputation <InfoBadge term="dnsbl" /></h3>
             <TaskPanel state={dnsbl} render={(d) => <FindingRow finding={d.finding} />} />
             <h3>Network graph</h3>

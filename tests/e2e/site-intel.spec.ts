@@ -35,3 +35,32 @@ test('every tab in the sticky section nav is reachable and shows its heading', a
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
   }
 });
+
+test('detects a known shortener and offers best-effort destination resolution', async ({ page }) => {
+  await page.goto('./#/tools/site-intelligence-analyzer');
+  await page.getByLabel('URL, domain, or partial address').fill('https://bit.ly/3xamPle');
+  await page.getByRole('button', { name: 'Analyze' }).click();
+
+  await expect(page.getByText(/Bitly masks its true destination/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Resolve destination' }).click();
+  await expect(page.locator('[data-testid="shortener-resolved"], [data-testid="shortener-resolve-error"]')).toBeVisible({ timeout: 15000 });
+});
+
+test('renders a GeoIP minimap panel and generates a downloadable social card', async ({ page }) => {
+  await page.goto('./#/tools/site-intelligence-analyzer');
+  await page.getByLabel('URL, domain, or partial address').fill('example.com');
+  await page.getByRole('button', { name: 'Analyze' }).click();
+
+  await page.getByRole('button', { name: 'DNS & Network' }).click();
+  await expect(page.locator('.geo-minimap, .geo-minimap-empty')).toBeVisible({ timeout: 15000 });
+
+  await page.getByRole('button', { name: 'Scorecard & Export' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Generate social card' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('site-intelligence-card.png');
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  expect(Buffer.concat(chunks).length).toBeGreaterThan(1000);
+});
