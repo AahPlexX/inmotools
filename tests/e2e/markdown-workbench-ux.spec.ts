@@ -222,3 +222,145 @@ test('starting a new document while its save is still pending is cancelled inste
   await expect(page.getByTestId('markdown-status')).toContainText('Document changed while saving');
   await expect(editor).toContainText('Content before starting a new document. Typed while New was still saving.');
 });
+
+test('the formatting toolbar covers heading, blockquote, code, lists, rule and image insertion', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '');
+  const editor = editorLocator(page);
+
+  await page.getByRole('button', { name: 'Heading', exact: true }).click();
+  await expect(editor).toContainText('# ');
+  await page.getByRole('button', { name: 'Heading', exact: true }).click();
+  await expect(editor).toContainText('## ');
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Blockquote', exact: true }).click();
+  await expect(editor).toContainText('> ');
+  // Toggles back off when the line is already prefixed.
+  await page.getByRole('button', { name: 'Blockquote', exact: true }).click();
+  await expect(editor).not.toContainText('>');
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Inline code', exact: true }).click();
+  await expect(editor).toContainText('`code`');
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Code block', exact: true }).click();
+  // CodeMirror renders each line as its own block element, so a plain
+  // toContainText check across a newline loses the separator; read each
+  // rendered line's text directly instead.
+  await expect.poll(() => editor.locator('.cm-line').allTextContents()).toEqual(['```', 'code block', '```']);
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Bullet list', exact: true }).click();
+  await expect(editor).toContainText('- ');
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Numbered list', exact: true }).click();
+  await expect(editor).toContainText('1. ');
+
+  await setSource(page, 'Paragraph text.');
+  await page.getByRole('button', { name: 'Horizontal rule', exact: true }).click();
+  await expect.poll(() => editor.locator('.cm-line').allTextContents()).toEqual(['Paragraph text.', '', '---', '', '']);
+
+  await setSource(page, '');
+  await page.getByRole('button', { name: 'Image', exact: true }).click();
+  await expect(editor).toContainText('![alt text](https://example.com/image.png)');
+  await expect(page.locator('.markdown-workbench-preview img')).toHaveAttribute('alt', 'alt text');
+});
+
+test('a pasted or dropped image is embedded locally as a data URI without uploading anything', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '');
+  const editor = editorLocator(page);
+
+  const pngBytes = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2;
+    const context = canvas.getContext('2d')!; context.fillStyle = '#3366cc'; context.fillRect(0, 0, 2, 2);
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG fixture encoding failed.')), 'image/png'));
+    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+  });
+
+  await editor.click();
+  await page.evaluate(({ bytes, name }) => {
+    const file = new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    document.activeElement?.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dataTransfer }));
+  }, { bytes: pngBytes, name: 'pasted.png' });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Embedded "pasted.png"');
+  await expect(editor).toContainText('![pasted](data:image/png;base64,');
+  await expect(page.locator('.markdown-workbench-preview img[alt="pasted"]')).toBeVisible();
+
+  await setSource(page, '');
+  const box = (await editor.boundingBox())!;
+  await page.evaluate(({ bytes, name, x, y }) => {
+    const file = new File([new Uint8Array(bytes)], name, { type: 'image/png' });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const target = document.elementFromPoint(x, y) ?? document.body;
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer }));
+  }, { bytes: pngBytes, name: 'dropped.png', x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Embedded "dropped.png"');
+  await expect(editor).toContainText('![dropped](data:image/png;base64,');
+});
+
+test('dropping a .md file over the editor still opens it as a whole new document', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'Existing content.');
+  const editor = editorLocator(page);
+  const box = (await editor.boundingBox())!;
+
+  await page.evaluate(({ x, y }) => {
+    const file = new File(['# Dropped document'], 'dropped-doc.md', { type: 'text/markdown' });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const target = document.elementFromPoint(x, y) ?? document.body;
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer }));
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('dropped-doc.md');
+  await expect(page.locator('.markdown-workbench-preview h1')).toContainText('Dropped document');
+});
+
+test('GitHub-style alert blockquotes render as styled callouts instead of plain quotes', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const editor = editorLocator(page);
+  await expect(editor).toBeVisible();
+  await editor.click();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
+  await page.keyboard.press('Backspace');
+  // insertText (not pressSequentially / setSource) inserts the whole string
+  // as one input event with no discrete Enter keydown, so CodeMirror's
+  // markdown auto-continue-blockquote-on-Enter feature never fires and
+  // cannot inject an extra "> " before the second line.
+  await page.keyboard.insertText('> [!WARNING]\n> Handle with care.');
+  const alert = page.locator('.markdown-workbench-preview .markdown-alert-warning');
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('Warning');
+  await expect(alert).toContainText('Handle with care.');
+  await expect(page.locator('.markdown-workbench-preview blockquote')).toHaveCount(0);
+});
+
+test('a recognized emoji shortcode renders as its emoji in the live preview', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'Ship it :rocket:');
+  await expect(page.locator('.markdown-workbench-preview p')).toContainText('Ship it 🚀');
+});
+
+test('inserting a table of contents links to and lands on the actual rendered heading', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Intro\n\nHello.\n\n## Details\n\nMore.');
+  await page.keyboard.press('ControlOrMeta+Home');
+  await page.getByRole('button', { name: 'Table of contents', exact: true }).click();
+
+  const editor = editorLocator(page);
+  await expect(editor).toContainText('[Intro](#user-content-intro)');
+  await expect(editor).toContainText('[Details](#user-content-details)');
+
+  const tocLink = page.locator('.markdown-workbench-preview a', { hasText: 'Details' });
+  await expect(tocLink).toHaveAttribute('href', '#user-content-details');
+  await expect(page.locator('.markdown-workbench-preview h2#user-content-details')).toContainText('Details');
+});

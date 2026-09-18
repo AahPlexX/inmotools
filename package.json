@@ -92,6 +92,7 @@
     "topojson-server": "3.0.1",
     "topojson-simplify": "3.0.3",
     "unified": "11.0.5",
+    "unist-util-visit": "5.1.0",
     "vscode-oniguruma": "2.0.1",
     "web-layout-zip": "npm:jszip@3.10.2",
     "woff2-encoder": "2.0.0",
