@@ -1,5 +1,5 @@
 ﻿import { useMemo, useRef, type PointerEvent } from 'react';
-import type { MasteringMarker, PeakBucket, TimeSelection } from './mastering-engine';
+import type { MasteringMarker, MasteringRegion, PeakBucket, TimeSelection } from './mastering-engine';
 
 interface Props {
   peaks: PeakBucket[];
@@ -7,6 +7,7 @@ interface Props {
   playhead: number;
   selection: TimeSelection;
   markers: MasteringMarker[];
+  regions: MasteringRegion[];
   onSeek: (seconds: number) => void;
   onSelect: (selection: TimeSelection) => void;
 }
@@ -14,7 +15,7 @@ interface Props {
 const WIDTH = 1000;
 const HEIGHT = 220;
 
-export default function MasteringWaveform({ peaks, duration, playhead, selection, markers, onSeek, onSelect }: Props) {
+export default function MasteringWaveform({ peaks, duration, playhead, selection, markers, regions, onSeek, onSelect }: Props) {
   const dragStart = useRef<number | null>(null);
   const path = useMemo(() => peaks.map((peak, index) => {
     const x = peaks.length <= 1 ? 0 : index / (peaks.length - 1) * WIDTH;
@@ -67,6 +68,11 @@ export default function MasteringWaveform({ peaks, duration, playhead, selection
       onPointerCancel={() => { dragStart.current = null; }}
     >
       <line className="mastering-waveform-center" x1="0" x2={WIDTH} y1={HEIGHT / 2} y2={HEIGHT / 2} />
+      {regions.map((region) => {
+        const start = xAt(region.startSeconds);
+        const end = xAt(region.endSeconds);
+        return <rect key={region.id} className="mastering-waveform-region" x={start} y="0" width={Math.max(1, end - start)} height={HEIGHT} aria-hidden="true" />;
+      })}
       {selectionEnd > selectionStart && <rect className="mastering-waveform-selection" x={selectionStart} y="0" width={selectionEnd - selectionStart} height={HEIGHT} />}
       <path className="mastering-waveform-peaks" d={path} />
       {markers.map((marker) => <g key={marker.id}>

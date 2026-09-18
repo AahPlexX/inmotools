@@ -14,6 +14,13 @@ export interface MasteringMarker {
   seconds: number;
 }
 
+export interface MasteringRegion {
+  id: string;
+  label: string;
+  startSeconds: number;
+  endSeconds: number;
+}
+
 export interface MasteringTrack {
   id: string;
   name: string;
@@ -30,6 +37,7 @@ export interface MasteringProject {
   tracks: MasteringTrack[];
   selection: TimeSelection;
   markers: MasteringMarker[];
+  regions: MasteringRegion[];
   loopEnabled: boolean;
 }
 
@@ -40,6 +48,7 @@ export const createProject = (): MasteringProject => ({
   tracks: [],
   selection: { startSeconds: 0, endSeconds: 0 },
   markers: [],
+  regions: [],
   loopEnabled: false,
 });
 
@@ -216,14 +225,32 @@ export function slicePcm(audio: PcmAudio, startSeconds: number, endSeconds: numb
 export type AudioEdit =
   | { type: 'crop'; startSeconds: number; endSeconds: number }
   | { type: 'gain'; gainDb: number }
-  | { type: 'normalizePeak'; targetDbfs: number };
+  | { type: 'normalizePeak'; targetDbfs: number }
+  | { type: 'removeDc' }
+  | { type: 'invertPolarity' }
+  | { type: 'reverse'; startSeconds: number; endSeconds: number }
+  | { type: 'insertSilence'; atSeconds: number; durationSeconds: number }
+  | { type: 'swapStereo' }
+  | { type: 'foldDownMono' }
+  | { type: 'extractChannel'; channelIndex: number }
+  | { type: 'dualMono'; channelIndex: number };
 
 export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAudio {
   let current: PcmAudio = { sampleRate: source.sampleRate, channels: source.channels.map((channel) => channel.slice()) };
   for (const edit of edits) {
-    if (edit.type === 'crop') current = slicePcm(current, edit.startSeconds, edit.endSeconds);
-    else if (edit.type === 'gain') current = applyGain(current, edit.gainDb);
-    else current = normalizePeak(current, edit.targetDbfs);
+    switch (edit.type) {
+      case 'crop': current = slicePcm(current, edit.startSeconds, edit.endSeconds); break;
+      case 'gain': current = applyGain(current, edit.gainDb); break;
+      case 'normalizePeak': current = normalizePeak(current, edit.targetDbfs); break;
+      case 'removeDc': current = removeDcOffset(current); break;
+      case 'invertPolarity': current = invertPolarity(current); break;
+      case 'reverse': current = reverseRange(current, edit.startSeconds, edit.endSeconds); break;
+      case 'insertSilence': current = insertSilence(current, edit.atSeconds, edit.durationSeconds); break;
+      case 'swapStereo': current = swapStereoChannels(current); break;
+      case 'foldDownMono': current = foldDownMono(current); break;
+      case 'extractChannel': current = extractChannel(current, edit.channelIndex); break;
+      case 'dualMono': current = dualMonoFromChannel(current, edit.channelIndex); break;
+    }
   }
   return current;
 }

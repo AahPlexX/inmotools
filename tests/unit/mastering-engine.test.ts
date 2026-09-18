@@ -133,3 +133,32 @@ describe('restoration and utility PCM transforms', () => {
     expect(dualMono.channels[0]).not.toBe(dualMono.channels[1]);
   });
 });
+
+
+describe('Phase 2 edit replay', () => {
+  it('replays utility transforms through the same immutable edit stack', async () => {
+    const { applyEdits } = await import('../../src/tools/music/mastering-engine');
+    const source: PcmAudio = {
+      sampleRate: 4,
+      channels: [Float32Array.from([1, 3, 5, 7]), Float32Array.from([2, 4, 6, 8])],
+    };
+    const result = applyEdits(source, [
+      { type: 'removeDc' },
+      { type: 'foldDownMono' },
+      { type: 'invertPolarity' },
+      { type: 'reverse', startSeconds: 0.25, endSeconds: 0.75 },
+      { type: 'insertSilence', atSeconds: 0.5, durationSeconds: 0.25 },
+    ]);
+    expect(result.channels).toHaveLength(1);
+    expect(Array.from(result.channels[0])).toEqual([3, -1, 0, 1, -3]);
+    expect(Array.from(source.channels[0])).toEqual([1, 3, 5, 7]);
+  });
+
+  it('replays channel-routing utilities without aliasing source channels', async () => {
+    const { applyEdits } = await import('../../src/tools/music/mastering-engine');
+    const source = pcm([0.25, 0.5], [-0.25, -0.5]);
+    expect(applyEdits(source, [{ type: 'swapStereo' }]).channels.map((channel) => Array.from(channel))).toEqual([[-0.25, -0.5], [0.25, 0.5]]);
+    expect(applyEdits(source, [{ type: 'extractChannel', channelIndex: 1 }]).channels.map((channel) => Array.from(channel))).toEqual([[-0.25, -0.5]]);
+    expect(applyEdits(source, [{ type: 'dualMono', channelIndex: 0 }]).channels.map((channel) => Array.from(channel))).toEqual([[0.25, 0.5], [0.25, 0.5]]);
+  });
+});

@@ -843,3 +843,20 @@ tr:last-child td { border-bottom: 0; }
   .mastering-panel { padding:14px; }
   .mastering-marker-list > div { grid-template-columns:1fr; }
 }
+
+/* Music / mastering Phase 2 utility and navigation surfaces */
+.mastering-shortcuts { margin:-8px 2px 0; color:var(--muted); font-size:12px; line-height:1.45; }
+.mastering-waveform-region { fill:#f2b84b; opacity:.11; stroke:#f2b84b; stroke-width:1; vector-effect:non-scaling-stroke; }
+.mastering-readout-wrap { white-space:normal; overflow-wrap:anywhere; }
+.mastering-marker-list, .mastering-region-list { display:grid; gap:8px; }
+.mastering-marker-list > div, .mastering-region-list > div {
+  display:grid;
+  grid-template-columns:minmax(140px,1fr) auto auto;
+  gap:8px;
+  align-items:center;
+}
+.mastering-marker-list input, .mastering-region-list input { min-width:0; }
+@media (max-width:600px) {
+  .mastering-marker-list > div, .mastering-region-list > div { grid-template-columns:1fr; }
+  .mastering-marker-list > div button, .mastering-region-list > div button { width:100%; }
+}

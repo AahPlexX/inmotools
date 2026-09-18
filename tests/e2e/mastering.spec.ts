@@ -43,9 +43,18 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   const pause = page.getByRole('button', { name: 'Pause', exact: true });
   await play.click();
   await expect(pause).toBeEnabled();
-  await pause.click();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Space');
   await expect(page.locator('.status-line')).toContainText(/Paused at/i);
-  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await page.keyboard.press('l');
+  await expect(page.getByLabel('Loop')).toBeChecked();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByLabel('Playhead time')).toHaveText('0:01.000');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByLabel('Playhead time')).toHaveText('0:00.000');
+  await page.keyboard.press('Space');
+  await expect(pause).toBeEnabled();
+  await page.keyboard.press('Escape');
   await expect(page.getByLabel('Playhead time')).toHaveText('0:00.000');
 
   await page.getByLabel('Start (seconds)').fill('0.25');
@@ -53,22 +62,55 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await page.getByRole('button', { name: 'Snap to zero crossings' }).click();
   await expect(page.locator('.status-line')).toContainText(/snapped to nearby zero crossings/i);
 
+  await page.getByLabel('Marker name').fill('Intro point');
+  await page.getByLabel('Region name').fill('Verse A');
   await page.getByRole('button', { name: 'Add marker at playhead' }).click();
+  await page.getByRole('button', { name: 'Add region from selection' }).click();
   await expect(page.getByRole('heading', { name: 'Markers' })).toBeVisible();
-  await expect(page.locator('.mastering-marker-list')).toContainText('Marker 1');
+  await expect(page.getByLabel('Marker 1 name')).toHaveValue('Intro point');
+  await expect(page.getByRole('heading', { name: 'Regions' })).toBeVisible();
+  await expect(page.getByLabel('Region 1 name')).toHaveValue('Verse A');
 
   await page.getByLabel('Gain (dB)').fill('6');
   await page.getByRole('button', { name: 'Apply gain' }).click();
   const levelPanel = page.locator('.mastering-panel').filter({ hasText: 'Level operations' });
-  await expect(levelPanel.locator('.mastering-readout')).toHaveText('1');
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('1');
 
   await page.getByRole('button', { name: 'Crop to selection' }).click();
-  await expect(levelPanel.locator('.mastering-readout')).toHaveText('2');
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('2');
   const selectionPanel = page.locator('.mastering-panel').filter({ hasText: 'Selection & precision edits' });
   await expect(selectionPanel.locator('.mastering-readout')).toContainText(/0\.5\d* s/);
 
   await page.getByRole('button', { name: 'Undo edit' }).click();
-  await expect(levelPanel.locator('.mastering-readout')).toHaveText('1');
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('1');
+  await expect(levelPanel.getByLabel('Redo available')).toHaveText('1');
+  await page.getByRole('button', { name: 'Redo edit' }).click();
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('2');
+  await expect(levelPanel.getByLabel('Redo available')).toHaveText('0');
   await page.getByRole('button', { name: 'Reset audio edits' }).click();
-  await expect(levelPanel.locator('.mastering-readout')).toHaveText('0');
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('0');
+
+  const utilityPanel = page.locator('.mastering-panel').filter({ hasText: 'Repair & channel utilities' });
+  await expect(utilityPanel.getByLabel('Working channels')).toHaveText('1');
+  await page.getByRole('button', { name: 'Remove DC offset' }).click();
+  await page.getByRole('button', { name: 'Invert polarity' }).click();
+  await page.getByRole('button', { name: 'Reverse selection' }).click();
+  await page.getByLabel('Silence duration (seconds)').fill('0.1');
+  await page.getByRole('button', { name: 'Insert silence at playhead' }).click();
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('4');
+  await expect(page.getByLabel('Playhead time')).toHaveText('0:00.100');
+
+  await page.getByRole('button', { name: 'Create dual mono' }).click();
+  await expect(utilityPanel.getByLabel('Working channels')).toHaveText('2');
+  await page.getByRole('button', { name: 'Swap L/R' }).click();
+  await page.getByRole('button', { name: 'Fold down to mono' }).click();
+  await expect(utilityPanel.getByLabel('Working channels')).toHaveText('1');
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('7');
+
+  await page.getByRole('button', { name: 'Undo edit' }).click();
+  await expect(utilityPanel.getByLabel('Working channels')).toHaveText('2');
+  await page.getByRole('button', { name: 'Redo edit' }).click();
+  await expect(utilityPanel.getByLabel('Working channels')).toHaveText('1');
+  await page.getByRole('button', { name: 'Reset audio edits' }).click();
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('0');
 });

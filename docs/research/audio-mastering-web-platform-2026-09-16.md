@@ -41,3 +41,11 @@ The architecture should not attempt native VST/AU/AAX hosting, ASIO/kernel devic
 - Context7's current first-party MediaBunny documentation confirms the chosen read path: `Input` + `BlobSource` + `ALL_FORMATS`, primary audio-track selection, `canDecode()`, metadata tags, and `AudioBufferSink` for Web Audio-ready PCM buffers.
 - Current MDN documentation continues to define `AudioBuffer` channel PCM as `Float32Array` data and `copyToChannel()` as the supported copy boundary. TypeScript 7's stricter typed-array generics therefore remain handled by copying into owned `Float32Array<ArrayBuffer>` storage at Web Audio boundaries rather than weakening types.
 - No architectural change is required from the 2026-09-16 research baseline.
+
+## 2026-09-18 dependency revalidation
+
+- MediaBunny stable advanced to **1.58.0**. The first-party GitHub latest release is v1.58.0 (published 2026-09-17), and npm independently reports `mediabunny@1.58.0` as `latest`.
+- The release notes are confined to Conversion API copy-boundary/error-handling and encoded HTTP range-response fixes; the workstation's `Input` / `BlobSource` / `AudioBufferSink` read path is unchanged.
+- The repo pin is therefore refreshed exactly from 1.57.0 to 1.58.0, including the minimum-release-age exception used by repository policy.
+- Fresh compatibility proof after the bump: 29/29 focused Mastering/Music unit assertions, 7/7 MediaBunny-sharing video unit assertions, supply-chain lockfile verification, production type/build, and 2/2 desktop/mobile Mastering acceptance are green.
+- No Web Audio, loudness-standard, or accessibility architecture change is required. Phase 3 can proceed from this dependency baseline without a codec-layer redesign.
