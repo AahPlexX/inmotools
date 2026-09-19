@@ -221,6 +221,33 @@ describe('CAD sketch-driven exact features', () => {
     expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'extrude-1', shape: result }]);
   });
 
+  it('extrudes a sketch placed on a mid-plane between an origin plane and a prior datum plane', () => {
+    const { kernel, result } = kernelFixture();
+    const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-mid', plane: { kind: 'datum', datumId: 'datum-mid' } };
+    const top = feature('datum-top', 'datum-plane', { kind: 'offset', basePlane: 'XY', distance: 10 });
+    const mid = feature('datum-mid', 'datum-plane', { kind: 'mid-plane', plane1: 'XY', plane2: 'datum-top' });
+    const extrude = feature('extrude-1', 'extrude', { sketchId: 'sketch-mid', profileEntityIds, distance: 5 });
+    const input: CadProject = {
+      ...createCadProject('Mid-plane fixture'),
+      sketches: [datumSketch],
+      features: [top, mid, extrude],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['extrude-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.profileFace).toHaveBeenCalledWith({
+      normal: [0, 0, 1],
+      edges: [
+        { kind: 'line', start: [5, 0, 5], end: [15, 0, 5] },
+        { kind: 'line', start: [15, 0, 5], end: [15, 10, 5] },
+        { kind: 'line', start: [15, 10, 5], end: [5, 10, 5] },
+        { kind: 'line', start: [5, 10, 5], end: [5, 0, 5] },
+      ],
+    });
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'extrude-1', shape: result }]);
+  });
+
   it('attributes an unresolved datum plane reference to the sketch-consuming feature', () => {
     const { kernel } = kernelFixture();
     const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-datum', plane: { kind: 'datum', datumId: 'missing-datum' } };
@@ -262,7 +289,7 @@ describe('CAD sketch-driven exact features', () => {
 
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'datum-1' });
-    expect((thrown as Error).message).toMatch(/only 'offset' and 'three-point' are implemented/i);
+    expect((thrown as Error).message).toMatch(/only 'offset', 'three-point', and 'mid-plane' are implemented/i);
   });
 
   it('rejects a three-point datum plane whose points are collinear instead of guessing an orientation', () => {
