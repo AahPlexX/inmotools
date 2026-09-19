@@ -103,6 +103,37 @@ describe('CAD pattern feature', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'pattern-1', shape: combined }]);
   });
 
+  it('uses a reusable datum axis for a circular pattern', () => {
+    const { kernel, box } = kernelFixture();
+    const r0 = token('r0');
+    const r1 = token('r1');
+    const combined = token('combined');
+    (kernel.rotateAroundAxis as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(r0)
+      .mockReturnValueOnce(r1);
+    (kernel.compound as ReturnType<typeof vi.fn>).mockReturnValue(combined);
+
+    const result = evaluateCadFeatures(project([
+      feature('axis-1', 'datum-axis', {
+        kind: 'two-point',
+        point1: [0, 0, 0],
+        point2: [0, 0, 10],
+      }),
+      feature('base', 'primitive', { kind: 'box', width: 2, depth: 2, height: 2 }),
+      feature('pattern-1', 'pattern', {
+        kind: 'circular',
+        count: 2,
+        axisFeatureId: 'axis-1',
+        angleStep: Math.PI / 2,
+      }, ['base']),
+    ]), kernel);
+
+    expect(kernel.rotateAroundAxis).toHaveBeenNthCalledWith(1, box, [0, 0, 0], [0, 0, 1], 0);
+    expect(kernel.rotateAroundAxis).toHaveBeenNthCalledWith(2, box, [0, 0, 0], [0, 0, 1], Math.PI / 2);
+    expect(kernel.compound).toHaveBeenCalledWith([r0, r1]);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'pattern-1', shape: combined }]);
+  });
+
   it('rejects a pattern with an unsupported kind', () => {
     const { kernel } = kernelFixture();
 
