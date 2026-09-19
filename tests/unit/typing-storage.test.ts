@@ -129,6 +129,14 @@ describe('typing storage', () => {
     expect(pb?.netWpm).toBe(91);
   });
 
+  it('rejects impossible quote and Zen mode/duration pairings', async () => {
+    await expect(saveTest(makeTest({ mode: 'quote', durationMode: 'time', quoteLength: 'short' }))).rejects.toThrow(/invalid typing test/i);
+    await expect(saveTest(makeTest({ mode: 'words-1000', durationMode: 'quote', quoteLength: 'short' }))).rejects.toThrow(/invalid typing test/i);
+    await expect(saveTest(makeTest({ mode: 'quote', durationMode: 'quote', quoteLength: undefined }))).rejects.toThrow(/invalid typing test/i);
+    await expect(saveTest(makeTest({ mode: 'zen', durationMode: 'time' }))).rejects.toThrow(/invalid typing test/i);
+    expect(await listTests()).toHaveLength(0);
+  });
+
   it('persists preferences', async () => {
     await writePreference('config', { theme: 'nord' });
     const value = await readPreference<{ theme: string }>('config', { theme: 'light' });
