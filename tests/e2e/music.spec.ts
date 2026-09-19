@@ -75,6 +75,12 @@ async function installAudioProbe(page: Page) {
   });
 }
 
+async function gotoHarmony(page: Page) {
+  await page.goto('./#/tools/midi-harmony-lab');
+  await page.getByRole('tab', { name: 'Harmony & MIDI' }).click();
+  await expect(page.getByRole('heading', { name: /Harmony and voice-leading lab/i })).toBeVisible();
+}
+
 async function audioProbe(page: Page) {
   return page.evaluate(() => {
     const probe = (window as unknown as { __audioProbe: { mode: string; starts: number; closes: number; resumeCalls: number } }).__audioProbe;
@@ -83,7 +89,7 @@ async function audioProbe(page: Page) {
 }
 
 test('starts and explicitly stops the local Web Audio progression', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await gotoHarmony(page);
   const play = page.getByRole('button', { name: 'Play progression' });
   const stop = page.getByRole('button', { name: 'Stop' });
   await expect(stop).toBeDisabled();
@@ -96,7 +102,7 @@ test('starts and explicitly stops the local Web Audio progression', async ({ pag
 
 test('owns a pending AudioContext before resume resolves and cannot schedule after Stop', async ({ page }) => {
   await installAudioProbe(page);
-  await page.goto('./#/tools/midi-harmony-lab');
+  await gotoHarmony(page);
   await page.evaluate(() => { (window as unknown as { __audioProbe: { mode: string } }).__audioProbe.mode = 'pending'; });
 
   await page.getByRole('button', { name: 'Play progression' }).click();
@@ -118,7 +124,7 @@ test('owns a pending AudioContext before resume resolves and cannot schedule aft
 
 test('surfaces resume and scheduling failures and releases failed contexts', async ({ page }) => {
   await installAudioProbe(page);
-  await page.goto('./#/tools/midi-harmony-lab');
+  await gotoHarmony(page);
 
   await page.evaluate(() => { (window as unknown as { __audioProbe: { mode: string } }).__audioProbe.mode = 'resume-error'; });
   await page.getByRole('button', { name: 'Play progression' }).click();
@@ -136,7 +142,7 @@ test('surfaces resume and scheduling failures and releases failed contexts', asy
 
 test('loops a snapshot, identifies the active chord, and applies edits on the next audition', async ({ page }) => {
   await installAudioProbe(page);
-  await page.goto('./#/tools/midi-harmony-lab');
+  await gotoHarmony(page);
 
   // Short one-chord cycle makes loop behavior fast and deterministic.
   for (const chord of [4, 3, 2]) await page.getByRole('button', { name: `Remove chord ${chord}` }).click();
@@ -159,7 +165,7 @@ test('loops a snapshot, identifies the active chord, and applies edits on the ne
 });
 
 test('saves and loads a versioned progression JSON document', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await gotoHarmony(page);
   await expect(page.getByText(/edits made during playback apply to the next audition/i)).toBeVisible();
 
   const imported = {
