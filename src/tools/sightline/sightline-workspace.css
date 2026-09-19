@@ -1099,3 +1099,8 @@
   .sightline-cockpit .sightline-button { flex: 1 1 auto; }
   .sightline-field--cockpit { flex: 1 1 100%; grid-template-columns: auto minmax(72px, 1fr); }
 }
+
+.sightline-cockpit-more { flex: 0 1 auto; }
+.sightline-cockpit-more > summary { display: flex; align-items: center; min-height: 40px; padding: 0 10px; cursor: pointer; font-weight: 700; }
+.sightline-cockpit-more[open] { flex-basis: 100%; }
+.sightline-cockpit-more[open] > .sightline-row { margin-top: 6px; }
