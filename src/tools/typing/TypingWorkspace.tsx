@@ -8,6 +8,7 @@ import Chart from 'chart.js/auto';
 import confetti from 'canvas-confetti';
 import Papa from 'papaparse';
 import { downloadBlob, downloadText } from '../../lib/download';
+import { PagedTable } from '../../components/PagedTable';
 import './typing-styles.css';
 
 import {
@@ -726,12 +727,13 @@ export default function TypingWorkspace() {
       const { tests, skipped } = parseImportedTests(parsed);
       for (const record of tests) await saveTest(record);
       setHistory(await listTests());
+      setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
       const skippedText = skipped > 0 ? ` Skipped ${skipped} invalid record${skipped === 1 ? '' : 's'}.` : '';
       setStatusText(`Imported ${tests.length} test${tests.length === 1 ? '' : 's'}.${skippedText}`);
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
-  }, []);
+  }, [personalBestQuery]);
 
   const importCsvDictionary = useCallback(async (file: File) => {
     try {
@@ -1063,31 +1065,42 @@ export default function TypingWorkspace() {
           <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
         </div>
         <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
-        <table>
-          <thead><tr><th>Saved</th><th>Mode</th><th>WPM</th><th>Acc</th><th>Cons</th><th>Tags</th><th>Actions</th></tr></thead>
-          <tbody>
-            {visibleHistory.slice(0, 24).map((t) => (
-              <tr key={t.id}>
-                <td>{new Date(t.savedAt).toLocaleString()}</td>
-                <td>{t.mode}</td>
-                <td>{t.netWpm}</td>
-                <td>{t.accuracy}%</td>
-                <td>{t.consistency}%</td>
-                <td>{t.tags.join(', ')}</td>
-                <td>
-                  <button type="button" className="subtle" onClick={async () => {
-                    if (t.id != null) {
-                      await deleteTest(t.id);
-                      setHistory(await listTests());
-                      setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
-                      setStatusText('Test deleted from local history.');
-                    }
-                  }}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <PagedTable
+          columns={[
+            { key: 'saved', label: 'Saved' },
+            { key: 'mode', label: 'Mode' },
+            { key: 'wpm', label: 'WPM' },
+            { key: 'accuracy', label: 'Acc' },
+            { key: 'consistency', label: 'Cons' },
+            { key: 'tags', label: 'Tags' },
+            { key: 'actions', label: 'Actions' },
+          ]}
+          rows={visibleHistory}
+          pageSize={24}
+          caption="Saved typing tests"
+          rowKey={(test, index) => String(test.id ?? (String(test.savedAt) + '-' + index))}
+          renderCell={(test, columnKey) => {
+            if (columnKey === 'saved') return new Date(test.savedAt).toLocaleString();
+            if (columnKey === 'mode') return test.mode;
+            if (columnKey === 'wpm') return test.netWpm;
+            if (columnKey === 'accuracy') return `${test.accuracy}%`;
+            if (columnKey === 'consistency') return `${test.consistency}%`;
+            if (columnKey === 'tags') return test.tags.join(', ');
+            if (columnKey === 'actions') {
+              return (
+                <button type="button" className="subtle" onClick={async () => {
+                  if (test.id != null) {
+                    await deleteTest(test.id);
+                    setHistory(await listTests());
+                    setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
+                    setStatusText('Test deleted from local history.');
+                  }
+                }}>Delete</button>
+              );
+            }
+            return null;
+          }}
+        />
         <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
       </section>
 
