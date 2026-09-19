@@ -5,6 +5,7 @@ import {
   buildSketchProfile3d,
   negate,
   perpendicularInPlane,
+  resolveAngleDatumPlaneFrame,
   resolveDatumPlaneFrame,
   resolveMidPlaneDatumPlaneFrame,
   resolveThreePointDatumPlaneFrame,
@@ -77,6 +78,14 @@ function parameterNonZeroNumber(feature: CadFeature, key: string): number {
   return value;
 }
 
+function parameterFiniteNumber(feature: CadFeature, key: string): number {
+  const value = feature.parameters[key];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter '${key}' must be a finite number.`);
+  }
+  return value;
+}
+
 function parameterPositiveInteger(feature: CadFeature, key: string): number {
   const value = feature.parameters[key];
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
@@ -115,75 +124,92 @@ function parameterPlaneReference(
   return frame;
 }
 
-/**
- * Resolves every non-suppressed 'datum-plane' feature into a 3D plane frame
- * before any sketch is placed. Supported variants are offset-from-origin,
- * three-point, and mid-plane. Mid-plane references may target an origin plane
- * or an earlier resolved datum plane; intersecting parents use flipAlignment
- * to select the alternate angle bisector.
- */
-function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
-  const frames = new Map<string, PlaneFrame>();
-  for (const feature of project.features) {
-    if (feature.type !== 'datum-plane' || feature.suppressed) continue;
-    const kind = feature.parameters.kind ?? 'offset';
-    if (kind === 'offset') {
-      const basePlane = parameterOriginPlane(feature, 'basePlane');
-      const distance = parameterNumber(feature, 'distance', { allowZero: true });
-      frames.set(feature.id, resolveDatumPlaneFrame(basePlane, distance));
-    } else if (kind === 'three-point') {
-      const point1 = parameterVector3(feature, 'point1');
-      const point2 = parameterVector3(feature, 'point2');
-      const point3 = parameterVector3(feature, 'point3');
-      try {
-        frames.set(feature.id, resolveThreePointDatumPlaneFrame(point1, point2, point3));
-      } catch (error) {
-        throw new CadFeatureEvaluationError(feature.id, `${feature.label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-      }
-    } else if (kind === 'mid-plane') {
-      const first = parameterPlaneReference(feature, 'plane1', frames);
-      const second = parameterPlaneReference(feature, 'plane2', frames);
-      const flipAlignment = feature.parameters.flipAlignment;
-      if (flipAlignment !== undefined && typeof flipAlignment !== 'boolean') {
-        throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'flipAlignment' must be a boolean when provided.`);
-      }
-      try {
-        frames.set(feature.id, resolveMidPlaneDatumPlaneFrame(first, second, flipAlignment === true));
-      } catch (error) {
-        throw new CadFeatureEvaluationError(feature.id, `${feature.label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-      }
-    } else {
-      throw new CadFeatureEvaluationError(
-        feature.id,
-        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset', 'three-point', and 'mid-plane' are implemented.`,
-      );
-    }
-  }
-  return frames;
-}
-
 type CadDatumAxes = ReadonlyMap<string, CadSketchAxis3d>;
 
-function resolveDatumAxes(project: CadProject, datumPlanes: CadDatumPlaneFrames): CadDatumAxes {
+interface CadDatumGeometry {
+  planes: CadDatumPlaneFrames;
+  axes: CadDatumAxes;
+}
+
+function resolveDatumAxisDefinition(
+  feature: CadFeature,
+  datumPlanes: CadDatumPlaneFrames,
+): CadSketchAxis3d {
+  const kind = feature.parameters.kind;
+  if (kind === 'two-point') {
+    return resolveTwoPointDatumAxis(
+      parameterVector3(feature, 'point1'),
+      parameterVector3(feature, 'point2'),
+    );
+  }
+  if (kind === 'two-plane') {
+    return resolveTwoPlaneDatumAxis(
+      parameterPlaneReference(feature, 'plane1', datumPlanes),
+      parameterPlaneReference(feature, 'plane2', datumPlanes),
+    );
+  }
+  throw new CadFeatureEvaluationError(
+    feature.id,
+    `${feature.label} datum axis kind '${String(kind)}' is not supported; use 'two-point' or 'two-plane'.`,
+  );
+}
+
+/**
+ * Resolves datum planes and axes in feature-history order. References therefore
+ * target only origin geometry or earlier resolved datum features; forward
+ * references fail explicitly instead of being guessed.
+ */
+function resolveDatumGeometry(project: CadProject): CadDatumGeometry {
+  const planes = new Map<string, PlaneFrame>();
   const axes = new Map<string, CadSketchAxis3d>();
+
   for (const feature of project.features) {
-    if (feature.type !== 'datum-axis' || feature.suppressed) continue;
-    const kind = feature.parameters.kind;
+    if (feature.suppressed) continue;
     try {
-      if (kind === 'two-point') {
-        axes.set(feature.id, resolveTwoPointDatumAxis(
+      if (feature.type === 'datum-axis') {
+        axes.set(feature.id, resolveDatumAxisDefinition(feature, planes));
+        continue;
+      }
+      if (feature.type !== 'datum-plane') continue;
+
+      const kind = feature.parameters.kind ?? 'offset';
+      if (kind === 'offset') {
+        const basePlane = parameterOriginPlane(feature, 'basePlane');
+        planes.set(feature.id, resolveDatumPlaneFrame(
+          basePlane,
+          parameterNumber(feature, 'distance', { allowZero: true }),
+        ));
+      } else if (kind === 'three-point') {
+        planes.set(feature.id, resolveThreePointDatumPlaneFrame(
           parameterVector3(feature, 'point1'),
           parameterVector3(feature, 'point2'),
+          parameterVector3(feature, 'point3'),
         ));
-      } else if (kind === 'two-plane') {
-        axes.set(feature.id, resolveTwoPlaneDatumAxis(
-          parameterPlaneReference(feature, 'plane1', datumPlanes),
-          parameterPlaneReference(feature, 'plane2', datumPlanes),
+      } else if (kind === 'mid-plane') {
+        const flipAlignment = feature.parameters.flipAlignment;
+        if (flipAlignment !== undefined && typeof flipAlignment !== 'boolean') {
+          throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'flipAlignment' must be a boolean when provided.`);
+        }
+        planes.set(feature.id, resolveMidPlaneDatumPlaneFrame(
+          parameterPlaneReference(feature, 'plane1', planes),
+          parameterPlaneReference(feature, 'plane2', planes),
+          flipAlignment === true,
+        ));
+      } else if (kind === 'angle') {
+        const axisFeatureId = parameterString(feature, 'axisFeatureId');
+        const axis = axes.get(axisFeatureId);
+        if (!axis) {
+          throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unresolved datum axis '${axisFeatureId}'.`);
+        }
+        planes.set(feature.id, resolveAngleDatumPlaneFrame(
+          parameterPlaneReference(feature, 'basePlane', planes),
+          axis,
+          parameterFiniteNumber(feature, 'angle'),
         ));
       } else {
         throw new CadFeatureEvaluationError(
           feature.id,
-          `${feature.label} datum axis kind '${String(kind)}' is not supported; use 'two-point' or 'two-plane'.`,
+          `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset', 'three-point', 'mid-plane', and 'angle' are implemented.`,
         );
       }
     } catch (error) {
@@ -195,7 +221,8 @@ function resolveDatumAxes(project: CadProject, datumPlanes: CadDatumPlaneFrames)
       );
     }
   }
-  return axes;
+
+  return { planes, axes };
 }
 
 function parameterDatumAxis(feature: CadFeature, datumAxes: CadDatumAxes): CadSketchAxis3d | null {
@@ -1231,8 +1258,7 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
   let activeFeature: CadFeature | null = null;
 
   try {
-    const datumPlanes = resolveDatumPlanes(project);
-    const datumAxes = resolveDatumAxes(project, datumPlanes);
+    const { planes: datumPlanes, axes: datumAxes } = resolveDatumGeometry(project);
     for (const feature of project.features) {
       activeFeature = feature;
       if (feature.suppressed) continue;
