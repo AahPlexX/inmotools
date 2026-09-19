@@ -35,6 +35,14 @@ import { powerShell } from '@codemirror/legacy-modes/mode/powershell';
 // the actual palette lives in markdown-workbench.css and can be themed
 // without touching this module.
 
+// json()/markdown() are LanguageSupport factories that allocate a new
+// instance per call; computed once here rather than per highlighted block,
+// the same way every StreamLanguage below is defined once at module scope.
+const jsonAndMarkdownLanguages: Readonly<Record<string, Language>> = {
+  json: jsonLanguageSupport().language,
+  markdown: markdownLanguageSupport().language,
+};
+
 const streamLanguages: Readonly<Record<string, Language>> = {
   javascript: StreamLanguage.define(javascript),
   typescript: StreamLanguage.define(typescript),
@@ -88,10 +96,8 @@ const LANGUAGE_ALIASES: Readonly<Record<string, string>> = {
 const DIAGRAM_LANGUAGE_TAGS = new Set(['mermaid', 'dot']);
 
 const resolveLanguage = (tag: string): Language | undefined => {
-  const normalized = LANGUAGE_ALIASES[tag] ?? tag;
-  if (normalized === 'json') return jsonLanguageSupport().language;
-  if (normalized === 'markdown' || normalized === 'md') return markdownLanguageSupport().language;
-  return streamLanguages[normalized];
+  const normalized = tag === 'md' ? 'markdown' : LANGUAGE_ALIASES[tag] ?? tag;
+  return jsonAndMarkdownLanguages[normalized] ?? streamLanguages[normalized];
 };
 
 export const isDiagramLanguageTag = (tag: string): boolean => DIAGRAM_LANGUAGE_TAGS.has(tag.trim().toLowerCase());
