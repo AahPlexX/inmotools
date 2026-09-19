@@ -173,8 +173,8 @@ importers:
         specifier: 4.4.2
         version: 4.4.2
       '@gltf-transform/functions':
-        specifier: 4.4.2
-        version: 4.4.2(@types/node@26.4.1)
+        specifier: 4.5.0
+        version: 4.5.0(@types/node@26.4.1)
       '@hpcc-js/wasm-graphviz':
         specifier: 1.28.0
         version: 1.28.0
@@ -1034,11 +1034,17 @@ packages:
   '@gltf-transform/core@4.4.2':
     resolution: {integrity: sha512-qsWKwNSwK+2s834Mt4xbYcyHqCrgNFP7hIv5s487JxebngRfDgelpghNF+kSswGb2/NuapasfK3UViFoSJJoMg==}
 
+  '@gltf-transform/core@4.5.0':
+    resolution: {integrity: sha512-JlvShvnB4AtfGZqjnESS/wfPJbpVnyHhTwJBbWN4qXqkB3C5HIoxxpu/orwGBge6Pc0zObeWj70lVf+4gbuu0A==}
+
   '@gltf-transform/extensions@4.4.2':
     resolution: {integrity: sha512-HJH1FM+edC5eNvl6xO0SOXJ/j/3oDoIpSu150OTdJaLBoM3TgCCGIfh4wyhgWAqZrkvgHKVGiZKxcKV5LkgPCQ==}
 
-  '@gltf-transform/functions@4.4.2':
-    resolution: {integrity: sha512-dclXgv9TshMaWBqPDUYd4xTwBQ2PpuR8p0Y9pokrRzGQDUPXRP6lTDzbqT0UmEmxFSvRyPJjvOWUmzeiRafpvw==}
+  '@gltf-transform/extensions@4.5.0':
+    resolution: {integrity: sha512-J4cKzrmEr75YkrtdI4cKosBg2vDC4rT56aq/QoijW7GT1Y9gSEMJbqyFO9xcFO3FNpZaZiDrHWUqE5Okrl5nOQ==}
+
+  '@gltf-transform/functions@4.5.0':
+    resolution: {integrity: sha512-7sMOuEfksMyF+/NTwUnEOgh7djohJ5XfeYg8rzXDG+9JIdbGVUpvJUY3XVBJCUJJ04dusDvcTHloOi1wfM8lnw==}
 
   '@hpcc-js/wasm-graphviz@1.28.0':
     resolution: {integrity: sha512-KqvPy7ckxPc1xv8Kt7H3bo9cj8U4gfOXxQ8grLZvDZxyQQjnXsKxrweJLLJtEoWWtQqAk4biUB0g2qsjkTiMVA==}
@@ -5312,15 +5318,24 @@ snapshots:
     dependencies:
       property-graph: 4.1.0
 
+  '@gltf-transform/core@4.5.0':
+    dependencies:
+      property-graph: 4.1.0
+
   '@gltf-transform/extensions@4.4.2':
     dependencies:
       '@gltf-transform/core': 4.4.2
       ktx-parse: 1.1.0
 
-  '@gltf-transform/functions@4.4.2(@types/node@26.4.1)':
+  '@gltf-transform/extensions@4.5.0':
     dependencies:
-      '@gltf-transform/core': 4.4.2
-      '@gltf-transform/extensions': 4.4.2
+      '@gltf-transform/core': 4.5.0
+      ktx-parse: 1.1.0
+
+  '@gltf-transform/functions@4.5.0(@types/node@26.4.1)':
+    dependencies:
+      '@gltf-transform/core': 4.5.0
+      '@gltf-transform/extensions': 4.5.0
       ktx-parse: 1.1.0
       ndarray: 1.1.1
       ndarray-lanczos: 0.3.0
