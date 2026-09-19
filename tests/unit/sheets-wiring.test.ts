@@ -27,9 +27,14 @@ describe('tabular sheet workstation wiring', () => {
     assertNoProImports(read('src/tools/sheets/SheetsWorkspace.tsx'));
     assertNoProImports(read('src/tools/sheets/sheets-formula.ts'));
     assertNoProImports(read('src/tools/sheets/sheets-io.ts'));
-    expect(read('package.json')).toContain('"@univerjs/presets": "0.25.1"');
-    expect(read('package.json')).toContain('cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz');
-    expect(read('package.json')).not.toMatch(/"chart\.js": "4\.5\.1".*"chart\.js"/s);
+    assertNoProImports(read('src/tools/sheets/sheets-univer.ts'));
+    const pkg = read('package.json');
+    expect(pkg).toContain('"@univerjs/presets": "0.25.1"');
+    expect(pkg).toContain('"@univerjs/preset-sheets-core": "0.25.1"');
+    expect(pkg).toContain('cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz');
+    expect(pkg).not.toMatch(/"chart\.js": "4\.5\.1".*"chart\.js"/s);
+    expect(pkg).not.toContain('@univerjs-pro/');
+    expect(pkg).not.toContain('hyperformula');
   });
 
   it('maps suite source to the shared app/accessibility specs until a dedicated browser spec exists', () => {
@@ -42,13 +47,14 @@ describe('tabular sheet workstation wiring', () => {
   it('keeps the 36-feature ledger complete with locked statuses', () => {
     expect(FEATURE_PROGRESS).toHaveLength(36);
     expect(FEATURE_PROGRESS.map((row) => row.id)).toEqual(Array.from({ length: 36 }, (_, index) => index + 1));
-    const allowed = new Set(['done', 'stub-stage2', 'evidence-cut']);
+    const allowed = new Set(['done', 'stub-stage2', 'in-progress']);
     expect(FEATURE_PROGRESS.every((row) => allowed.has(row.status))).toBe(true);
-    expect(FEATURE_PROGRESS.filter((row) => row.status === 'evidence-cut').every((row) => {
-      return row.status === 'evidence-cut' && Boolean(row.evidenceUrl) && Boolean(row.asOf);
-    })).toBe(true);
     const summary = progressSummary();
-    expect(summary.done + summary.stubStage2 + summary.evidenceCut).toBe(36);
+    expect(summary.done + summary.stubStage2 + summary.inProgress).toBe(36);
+    expect(FEATURE_PROGRESS.find((row) => row.id === 21)?.status).toBe('done');
+    expect(FEATURE_PROGRESS.find((row) => row.id === 21)?.note).toMatch(/OSS replacement/i);
+    expect(FEATURE_PROGRESS.find((row) => row.id === 22)?.status).toBe('done');
+    expect(FEATURE_PROGRESS.find((row) => row.id === 22)?.note).toMatch(/OSS replacement/i);
     expect(FEATURE_PROGRESS.find((row) => row.id === 24)?.status).toBe('stub-stage2');
   });
 

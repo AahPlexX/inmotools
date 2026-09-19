@@ -1,8 +1,8 @@
 # In Progress
 
 - **Tabular Sheet Workstation (TASK-022)** — Stage 1 local multi-sheet workbook on `feature/tabular-sheet-workstation`.
-  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` statuses `done` | `stub-stage2` | `evidence-cut` (official URL + as-of).
-  - Current milestone: Stage 1 vertical slice — catalog slug, lazy workspace, portable multi-sheet grid, formula DAG, IndexedDB/LocalStorage, SheetJS import, exceljs/CSV/bundle export, Chart.js selection charts, in-house pivot. Feature 24 is stub hooks only for Frontend Stage 2. Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` optional live engine (`contextMenu: false`). No Univer Pro, no HyperFormula.
+  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` statuses `done` | `stub-stage2` | `in-progress` (with notes).
+  - Current milestone: Stage 1 vertical slice — catalog slug `tabular-sheet-workstation`, suite `src/tools/sheets/`, portable multi-sheet grid, formula DAG, IndexedDB/LocalStorage, SheetJS import, exceljs/CSV/bundle export. Feature 21 reuses `chart.js@4.5.1` (OSS replacement, not a Pro cut). Feature 22 is in-house group-by (OSS replacement, not a Pro cut). Feature 24 is stub-stage2. Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` optional live engine (`contextMenu: false`). No Univer Pro, no preset-sheets-advanced, no preset-sheets-drawing, no HyperFormula.
   - Completion: vertical slice + focused units + build green, draft PR `feature/tabular-sheet-workstation` → `main` only, then stop commits. Do not merge to main. Do not touch PR #33 / transcode.
   - Scope: `src/tools/sheets/`, catalog/loader wiring, sheets unit tests, additive pins. Other workstreams remain untouched.
 

@@ -1,6 +1,6 @@
 # Tabular Sheet Workstation — locked Stage 1 feature matrix
 
-Suite path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
+Suite id: `sheets`. Suite path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation` (same `*-workstation` pattern as `typing-workstation`). Persistence tool id: `inmotools-tabular-sheet-workstation`.
 Local-first only. Workbooks stay in this browser (IndexedDB / LocalStorage). No uploads, analytics, auth, or remote database.
 
 ## Stack pins (exact; never `^`)
@@ -11,10 +11,10 @@ Local-first only. Workbooks stay in this browser (IndexedDB / LocalStorage). No 
 | `@univerjs/preset-sheets-core` | `0.25.1` | Sheets UI + `@univerjs/engine-formula` AST/DAG | npm dist-tag `latest` = `0.25.1`; https://docs.univer.ai/guides/sheets/features/core |
 | `exceljs` | `4.4.0` | XLSX export via `workbook.xlsx.writeBuffer()` | npm `exceljs@4.4.0` |
 | `xlsx` (SheetJS CE) | `0.20.3` from `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` | XLSX import | Official CE install path on cdn.sheetjs.com / docs.sheetjs.com |
-| `chart.js` | `4.5.1` **reuse from main** | Charts from selection (feature 21) | Already declared on `origin/main`; do not duplicate |
-| Pivot / group-by | in-house | Feature 22 open substitute | No `@univerjs-pro/*`, no HyperFormula (GPL) |
+| `chart.js` | `4.5.1` **reuse from main** | Feature 21 OSS replacement | Already declared on `origin/main`; do not duplicate |
+| Pivot / group-by | in-house | Feature 22 OSS replacement | In-house aggregation; not a Pro feature |
 
-Banned: Univer Pro packages (`@univerjs-pro/*`), HyperFormula, remote persistence, telemetry.
+Banned engines (not numbered-feature statuses): `@univerjs-pro/*`, `@univerjs/preset-sheets-advanced`, `@univerjs/preset-sheets-drawing`, HyperFormula, remote persistence, telemetry.
 
 `rxjs@7.8.2` is the documented peer of the Univer 0.25.1 presets (not a feature library). `protobufjs` postinstall is denied in `pnpm-workspace.yaml` (`allowBuilds.protobufjs: false`).
 
@@ -26,13 +26,13 @@ Only these three values are valid on the 1–36 checklist and the in-tool progre
 | --- | --- |
 | `done` | Stage 1 path is implemented and has focused evidence. |
 | `stub-stage2` | Hook, storage, or partial surface only. Frontend Stage 2 owns the remaining UI. |
-| `evidence-cut` | Will not be implemented on this path. Requires an official URL and an as-of date. |
+| `in-progress` | Stage 1 slice started; remaining work is still on this branch. |
 
-This file is the handoff ledger; the in-tool progress TODO must stay aligned.
+This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-tool progress TODO must stay aligned.
 
 ## Locked 1–36 checklist
 
-| # | Feature | Stage 1 plan | Status |
+| # | Feature | Notes | Status |
 | ---: | --- | --- | --- |
 | 1 | Multi-sheet workbook | Univer core preset + portable snapshot model | done |
 | 2 | Formula bar | Univer `formulaBar` in `UniverSheetsCorePreset` | done |
@@ -54,10 +54,10 @@ This file is the handoff ledger; the in-tool progress TODO must stay aligned.
 | 18 | Data validation | Portable rules stored; enforcement UI is Stage 2 | stub-stage2 |
 | 19 | Conditional formatting | Portable rules + fallback paint; rule editor is Stage 2 | stub-stage2 |
 | 20 | Status-bar aggregates | Count / sum / average / min / max of selection | done |
-| 21 | Charts via `chart.js@4.5.1` from selection | Reuse existing Chart.js; no second copy | done |
-| 22 | In-house pivot / group-by aggregation | Open substitute; no Univer Pro pivot | done |
+| 21 | Charts via `chart.js@4.5.1` from selection | OSS replacement: reuse existing Chart.js on main. Not a Pro evidence-cut. | done |
+| 22 | In-house pivot / group-by aggregation | OSS replacement: in-house group-by. Not a Pro evidence-cut. | done |
 | 23 | Keyboard shortcuts | Univer + workspace accelerators | done |
-| 24 | Context menu + long-press | Stub hooks only (`suppressNativeContextMenu`, `scheduleLongPressStub`). No live menu. Univer `contextMenu: false`. | stub-stage2 |
+| 24 | Context menu + long-press | stub-stage2 OK. Hooks only (`suppressNativeContextMenu`, `scheduleLongPressStub`). Univer `contextMenu: false`. | stub-stage2 |
 | 25 | Virtualized grid | Univer canvas grid; accessible fallback window | done |
 | 26 | Zoom | Univer zoom + workspace control | done |
 | 27 | Wrap / overflow | Wrap style flag persists; overflow chrome is Stage 2 | stub-stage2 |
@@ -71,17 +71,7 @@ This file is the handoff ledger; the in-tool progress TODO must stay aligned.
 | 35 | Export with editable tags / meta | Title, author, tags, notes on every export | done |
 | 36 | Portable workbook bundle import / export | Versioned JSON (and zip) round-trip | done |
 
-No `1–36` row is `evidence-cut`. Banned engine paths are recorded below so they cannot re-enter as silent substitutes.
-
-## Evidence cuts (official URL + as-of)
-
-These paths are cut from this workstream. They are not numbered features; the numbered substitutes stay `done`.
-
-| Cut path | Official URL | As of | Why |
-| --- | --- | --- | --- |
-| Univer Pro pivot (`@univerjs-pro/sheets-pivot`, `@univerjs/preset-sheets-advanced`) | https://docs.univer.ai/guides/sheets/features/pivot-table | 2026-09-19 | Docs mark `isPro: true`. Feature 22 is the in-house group-by substitute. |
-| Univer Pro charts (`@univerjs-pro/sheets-chart`) | https://docs.univer.ai/guides/sheets/features/charts | 2026-09-19 | Docs mark `isPro: true`. Feature 21 reuses `chart.js@4.5.1` already on main. |
-| HyperFormula | https://hyperformula.handsontable.com/guide/license-key.html | 2026-09-19 | GPL formula engine. Banned. Portable DAG + Univer OSS `engine-formula` only. |
+No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacements.
 
 ## Stage 1 done-when
 
@@ -93,4 +83,4 @@ These paths are cut from this workstream. They are not numbered features; the nu
 
 ## Handoff
 
-Keep this matrix and the in-tool progress TODO in the same cycle. Move a row to `done` only with focused evidence. `evidence-cut` rows must keep an official URL and as-of date. Newly discovered gaps stay listed here rather than disappearing.
+Keep this matrix, the in-tool progress TODO, and `.tasks/IN_PROGRESS.md` in the same cycle. Move a row to `done` only with focused evidence. Newly discovered gaps stay listed here rather than disappearing.

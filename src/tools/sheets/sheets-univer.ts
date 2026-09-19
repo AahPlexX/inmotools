@@ -64,7 +64,14 @@ export async function mountUniverSheets(container: HTMLElement, workbook: Portab
 
 export function assertNoProImports(source: string): void {
   const pro = ['@univerjs', 'pro/'].join('-');
-  if (source.includes(pro) || /from\s+['"]hyperformula['"]/.test(source)) {
+  const advanced = ['preset-sheets', 'advanced'].join('-');
+  const drawing = ['preset-sheets', 'drawing'].join('-');
+  if (
+    source.includes(pro) ||
+    source.includes(advanced) ||
+    source.includes(drawing) ||
+    /from\s+['"]hyperformula['"]/.test(source)
+  ) {
     throw new Error('Banned spreadsheet engines must not be imported.');
   }
 }

@@ -605,7 +605,7 @@ export default function SheetsWorkspace() {
 
         <section className="tsw-panel">
           <h3>Stage 1 progress TODO</h3>
-          <p>{summary.done} done · {summary.stubStage2} stub-stage2 · {summary.evidenceCut} evidence-cut. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
+          <p>{summary.done} done · {summary.stubStage2} stub-stage2 · {summary.inProgress} in-progress. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
           <ol className="tsw-progress">
             {FEATURE_PROGRESS.map((row) => (
               <li key={row.id}>

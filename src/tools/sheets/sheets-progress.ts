@@ -21,8 +21,8 @@ export const FEATURE_PROGRESS: FeatureStatus[] = [
   { id: 18, title: 'Data validation', status: 'stub-stage2', note: 'Portable rules stored. Stage 2 owns enforcement UI.' },
   { id: 19, title: 'Conditional formatting', status: 'stub-stage2', note: 'Portable rules + fallback paint. Stage 2 owns rule editor.' },
   { id: 20, title: 'Status-bar aggregates', status: 'done', note: 'Count/sum/avg/min/max' },
-  { id: 21, title: 'Charts via chart.js@4.5.1', status: 'done', note: 'Reuse main pin from selection. Univer Charts path is Pro and unused.' },
-  { id: 22, title: 'In-house pivot / group-by', status: 'done', note: 'Open substitute. Univer Pivot is Pro and unused.' },
+  { id: 21, title: 'Charts via chart.js@4.5.1', status: 'done', note: 'OSS replacement: reuse chart.js@4.5.1 already on main. Not a Pro evidence-cut.' },
+  { id: 22, title: 'In-house pivot / group-by', status: 'done', note: 'OSS replacement: in-house group-by aggregation. Not a Pro evidence-cut.' },
   { id: 23, title: 'Keyboard shortcuts', status: 'done', note: 'Arrows, Enter, Delete, Ctrl+Z/Y/F/C/X/V/S' },
   { id: 24, title: 'Context menu + long-press', status: 'stub-stage2', note: 'Stage 1 reserves suppressNativeContextMenu + scheduleLongPressStub only. No live menu surface. Univer contextMenu is false.' },
   { id: 25, title: 'Virtualized grid', status: 'done', note: 'Windowed fallback; Univer canvas when mounted' },
@@ -42,11 +42,11 @@ export const FEATURE_PROGRESS: FeatureStatus[] = [
 export function progressSummary(rows: FeatureStatus[] = FEATURE_PROGRESS): {
   done: number;
   stubStage2: number;
-  evidenceCut: number;
+  inProgress: number;
 } {
   return {
     done: rows.filter((row) => row.status === 'done').length,
     stubStage2: rows.filter((row) => row.status === 'stub-stage2').length,
-    evidenceCut: rows.filter((row) => row.status === 'evidence-cut').length,
+    inProgress: rows.filter((row) => row.status === 'in-progress').length,
   };
 }

@@ -204,7 +204,7 @@
 
 .tsw-progress strong[data-status='done'] { color: var(--good); }
 .tsw-progress strong[data-status='stub-stage2'] { color: var(--warning); }
-.tsw-progress strong[data-status='evidence-cut'] { color: var(--muted); }
+.tsw-progress strong[data-status='in-progress'] { color: var(--muted); }
 
 .tsw-chart {
   min-height: 14rem;
