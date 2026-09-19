@@ -1,0 +1,38 @@
+# Markdown audit — 2026-09-19
+
+Scope: Markdown Workbench only (`src/tools/markdown/`, its unit/e2e tests, this catalog's shared `.tasks` tracking). No dependencies or unrelated tools changed beyond the one new pinned package below. This is a follow-up to `docs/markdown-audit-2026-09-16.md`; findings from that audit are re-verified against current source rather than assumed still accurate.
+
+## Method
+
+Every engine module and component under `src/tools/markdown/` was read in full (4,000+ lines across 24 files) against the audit brief: bugs, missing features, missing QoL integrations, errors, broken/truncated code, unmaintained-sounding copy, and poorly implemented features. Each finding below was confirmed against the code before being accepted, then fixed and verified with fresh unit and browser evidence, following this repository's `TASK-014` plan ("verify each remaining finding against the code before acting on it... add a regression test with every fix").
+
+## Findings addressed
+
+1. **Fenced code blocks were never syntax-highlighted in the rendered preview or HTML-derived exports.** `render-engine.ts` sanitized and rendered fenced code as plain text; this was already tracked as open in the 2026-09-16 audit ("Preview fenced-code language coloring remains separate from the source highlighting fix and is not implemented") and confirmed still true by reading the current `render-engine.ts` and `MarkdownPreview.tsx`. Added `code-highlight-engine.ts`, which statically highlights a fenced block's text with `@lezer/highlight`'s `classHighlighter` using the same CodeMirror language grammars this catalog already depends on for other tools' editors (`StreamLanguage` + `@codemirror/legacy-modes`, the pattern `ShaderEditor.tsx` established), covering ~24 common fenced-code language tags and their common aliases (js/ts/jsx/tsx, python, shell/bash, css/scss/less, html/xml, yaml, sql, toml, dockerfile, diff, ruby, rust, go, swift, c/cpp/java/csharp, powershell, plus JSON and Markdown itself via their existing `@codemirror/lang-*` packages). An unrecognized language tag renders as plain escaped text, unchanged from before. Mermaid/Graphviz fenced blocks are explicitly excluded, since `diagram-renderer.ts` replaces their `pre` wholesale — highlighting their source would be discarded work. `tok-*` classes already pass the existing `rehype-sanitize` schema unmodified (`className` was already allow-listed on every element for KaTeX's own markup); this was verified directly against the schema before relying on it, not assumed. Styled with new theme-token-based CSS rules in `markdown-workbench.css`.
+2. **A dead, contradictory `ExportAsset` type in `markdown-types.ts`.** `markdown-types.ts` declared its own `ExportAsset { filename, mimeType }`, but every actual consumer (`export-assets.ts`, `export-engine.ts`) uses a locally-defined `ExportAsset { path, mediaType, data }` with a different, incompatible shape. The `markdown-types.ts` version was never imported anywhere. Removed it — a future reader searching for "the" `ExportAsset` type would otherwise find the wrong, unused definition first.
+
+## Findings re-verified as still open (not silently dropped)
+
+- **Markdown Workbench's table-formula evaluation still runs synchronously on the main thread on every keystroke** (`table-formula-engine.ts`'s `evaluateTableFormulas`, invoked from `document-pipeline.ts`'s `prepareDocument`, called from the `preparedSource` `useMemo` in `MarkdownWorkspace.tsx`). This is `TASK-014`'s recorded "Main-thread computation" item; its own recorded plan is to build a shared worker-backed execution primitive first ("so the same defect is not fixed four different ways") and adopt it per tool, rather than a one-off fix inside a single-tool audit. Left open, per that plan, rather than solved bespoke here.
+- **The two separate undo histories (`TASK-013`)** remain deliberately unreconciled; both obvious unifications were already found to regress real behavior (losing document-level steps, or losing the caret). No new information changes that judgment.
+- **Delayed file-read cancellation and save-completion-during-typing have source/build review but no dedicated browser regression test.** Confirmed by searching `tests/e2e/markdown-workbench*.spec.ts` for coverage of the `loadMarkdownFile`/`startNewDraft`/`loadDraft` staleness guards in `MarkdownWorkspace.tsx`: none exists yet. Not added in this pass — reliably simulating a slow `File.text()` or a slow IndexedDB write without introducing test flakiness needs more care than this pass's other findings, and the guards themselves are unchanged and already covered by the existing IndexedDB-failure test's adjacent assertions ("Could not save the current document...", "Document changed while saving...").
+
+## Verification
+
+- `npx tsc --noEmit -p tsconfig.app.json`: clean.
+- `npx vitest run tests/unit`: 1241 tests, 1240 passed. The one failure (`tests/unit/e2e-spec-selection.test.mjs`, a Crystal Lattice Studio spec-selection assertion) is confirmed pre-existing and unrelated to Markdown — reproduced identically with this change's files stashed out via `git stash -u`. Not touched, per this audit's Markdown-only scope; it is separately tracked under the active Crystal Lattice Studio Phase 3 work in `.tasks/IN_PROGRESS.md`.
+- All 34 pre-existing Markdown unit test files plus the new `tests/unit/markdown-code-highlight.test.ts` (12 tests) pass.
+- Production build (`pnpm build`): clean. The lazily-loaded Markdown Workbench chunk grew from 1,453,753 bytes to ~1,577,240 bytes (~+8.5%) for the added grammars and `@lezer/highlight`; only loaded when a user opens this tool.
+- Added three browser (Playwright, desktop Chromium) regression tests to `tests/e2e/markdown-workbench-ux.spec.ts` and ran them against the production build together with the full existing Markdown e2e suite (43 tests total across `markdown-workbench-ux.spec.ts`, `markdown-workbench.spec.ts`, `markdown-mermaid.spec.ts`): all 43 pass. Confirms, in an actual browser rather than only the render function's HTML string, that a recognized language's keyword token renders in a visibly different computed color than body text, an unrecognized language stays plain, and a Mermaid fence still renders as a diagram rather than highlighted source.
+
+## Dependency
+
+- `@lezer/highlight` pinned at `1.2.3`, added as a direct dependency. This is not a new package the project didn't already carry: every already-declared CodeMirror language package (`@codemirror/language`, `@codemirror/lang-json`, `@codemirror/lang-markdown`, `@codemirror/legacy-modes`) already depends on it transitively at this exact resolved version, confirmed by reading `pnpm-lock.yaml` before adding it — `pnpm install` made no lockfile changes to any other package's resolution.
+
+## Sources checked
+
+- `@lezer/highlight@1.2.3`'s own shipped `dist/index.d.ts` and `dist/index.js` (read directly from `node_modules/.pnpm`, not from memory) to confirm `highlightCode`'s exact `putText`/`putBreak` contract (line breaks are reported separately from surrounding text, never embedded in a `putText` call) before writing code that depends on it.
+- `rehype-sanitize`'s `defaultSchema`, checked directly via a standalone script against this tool's actual custom schema, to confirm `<span class="tok-...">` survives sanitization unmodified rather than assuming it from reading the schema object alone.
+- This repository's own established pattern for `StreamLanguage` + `@codemirror/legacy-modes` (`src/tools/shader/ShaderEditor.tsx`), followed rather than introducing a second, different highlighting mechanism.
+
+Research date: 2026-09-19. `GOVERNANCE.md` was read and not modified.

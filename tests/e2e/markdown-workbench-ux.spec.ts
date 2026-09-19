@@ -128,3 +128,32 @@ test('syntax suggestions are on by default, context-aware, and can be disabled',
   await page.keyboard.type('#');
   await expect(completion).toBeHidden();
 });
+
+test('a fenced code block in a recognized language is syntax-highlighted in the rendered preview', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, "```js\nconst total = 1 + 2;\n```");
+
+  const codeBlock = page.locator('.markdown-workbench-preview pre code.language-js');
+  await expect(codeBlock).toBeVisible();
+  const keyword = codeBlock.locator('.tok-keyword').first();
+  await expect(keyword).toHaveText('const');
+  await expect.poll(() => keyword.evaluate((node) => getComputedStyle(node).color))
+    .not.toBe(await codeBlock.evaluate((node) => getComputedStyle(node).color));
+});
+
+test('a fenced code block in an unrecognized language renders as plain, uncolored text', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, "```not-a-real-language\nfoo bar baz\n```");
+
+  const codeBlock = page.locator('.markdown-workbench-preview pre code');
+  await expect(codeBlock).toContainText('foo bar baz');
+  await expect(codeBlock.locator('[class*="tok-"]')).toHaveCount(0);
+});
+
+test('a mermaid code fence is rendered as a diagram, not highlighted as source text', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '```mermaid\nflowchart LR\nA-->B\n```');
+
+  await expect(page.locator('.markdown-workbench-preview .markdown-workbench-diagram svg')).toBeVisible();
+  await expect(page.locator('.markdown-workbench-preview [class*="tok-"]')).toHaveCount(0);
+});

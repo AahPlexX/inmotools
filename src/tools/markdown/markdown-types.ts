@@ -154,8 +154,3 @@ export interface DiagramRenderResponse {
   readonly svg?: string;
   readonly error?: string;
 }
-
-export interface ExportAsset {
-  readonly filename: string;
-  readonly mimeType: string;
-}
