@@ -247,16 +247,29 @@ test('exports history metadata across formats and re-imports a bundle without id
   await expect(exportDialog).toBeHidden();
 
   const importInput = workspace.locator('label').filter({ hasText: /Import JSON/ }).locator('input[type="file"]');
+  const importedBestWpm = Number(bundle.tests[0].netWpm) + 100;
+  const bulkTests = Array.from({ length: 25 }, (_, index) => ({
+    ...bundle.tests[0],
+    id: 100 + index,
+    savedAt: Number(bundle.tests[0].savedAt) + index + 1,
+    tags: ['bulk'],
+  }));
   const importBundle = {
     ...bundle,
     tests: [
-      { ...bundle.tests[0], id: 77, tags: ['legal'] },
+      { ...bundle.tests[0], id: 77, tags: ['legal'], netWpm: importedBestWpm },
+      ...bulkTests,
       { ...bundle.tests[0], id: 78, tags: 'not-an-array' },
     ],
   };
   await importInput.setInputFiles({ name: 'typing-history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(importBundle)) });
-  await expect(workspace).toContainText('Imported 1 test. Skipped 1 invalid record.');
-  await expect(totalTests).toContainText('2');
+  await expect(workspace).toContainText('Imported 26 tests. Skipped 1 invalid record.');
+  await expect(totalTests).toContainText('27');
+
+  const pbPanel = workspace.getByRole('heading', { name: 'Personal best / pacer' }).locator('..');
+  await expect(pbPanel).toContainText(`Best ${importedBestWpm} WPM`);
+  await expect(history.getByText('Rows 1–24 of 27')).toBeVisible();
+  await expect(history.getByRole('button', { name: 'Next' })).toBeVisible();
 
   const filterInput = history.getByLabel('Filter by tag');
   await filterInput.fill('legal');
