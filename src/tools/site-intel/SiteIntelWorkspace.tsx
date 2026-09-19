@@ -108,6 +108,7 @@ export default function SiteIntelWorkspace() {
   const [metadata, setMetadata] = useState<ReportMetadata>({ auditorName: '', organization: '', notes: '', auditTimestamp: Date.now() });
   const [vault, setVault] = useState<AuditRecord[]>([]);
   const [busy, setBusy] = useState(false);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
   const [shortenerResolution, setShortenerResolution] = useState<ShortenerResolution | null>(null);
   const [resolvingShortener, setResolvingShortener] = useState(false);
 
@@ -123,6 +124,12 @@ export default function SiteIntelWorkspace() {
     setResolvingShortener(true);
     setShortenerResolution(await resolveShortenedUrl(parsed.normalized));
     setResolvingShortener(false);
+  }
+
+  function copyToClipboard(text: string) {
+    void navigator.clipboard.writeText(text);
+    setCopiedValue(text);
+    window.setTimeout(() => setCopiedValue((v) => (v === text ? null : v)), 1500);
   }
   const schemeFindings = useMemo(() => (parsed ? analyzeSchemeSecurity(parsed) : []), [parsed]);
 
@@ -285,7 +292,22 @@ export default function SiteIntelWorkspace() {
     url: parsed?.normalized ?? rawInput,
     metadata,
     scorecard,
-  }), [parsed, rawInput, metadata, scorecard]);
+    rawTelemetry: {
+      parsedUrl: parsed,
+      dns: dnsTable.data ?? null,
+      reverseDns: ptrMap,
+      rdap: rdap.status === 'ready' ? rdap.data : null,
+      wayback: wayback.data ?? null,
+      certificateTransparency: ct.data ?? null,
+      hsts: hsts.data ?? null,
+      hosting: hosting.data ?? null,
+      nameserverRedundancy: nsRedundancy.data ?? null,
+      dnsbl: dnsbl.data ?? null,
+      email: { mx: mx.data ?? null, spf: spf.data ?? null, dmarc: dmarc.data ?? null, bimi: bimi.data ?? null },
+      coreWebVitals: crux.data ?? null,
+      cdnFindings, cmsFindings, wellKnown,
+    },
+  }), [parsed, rawInput, metadata, scorecard, dnsTable.data, ptrMap, rdap, wayback.data, ct.data, hsts.data, hosting.data, nsRedundancy.data, dnsbl.data, mx.data, spf.data, dmarc.data, bimi.data, crux.data, cdnFindings, cmsFindings, wellKnown]);
 
   return (
     <div className="site-intel-workspace">
@@ -319,7 +341,11 @@ export default function SiteIntelWorkspace() {
           <section className={`site-intel-section ${activeSection === 'lexical' ? 'open' : ''}`} aria-labelledby="sec-lexical">
             <h2 id="sec-lexical">URL Forensics</h2>
             <div className="url-breadcrumb">
-              {parsed.tokens.map((t, i) => <span key={i} className={`url-token url-token-${t.kind}`}>{t.label}: {t.value}</span>)}
+              {parsed.tokens.map((t, i) => (
+                <button key={i} type="button" className={`url-token url-token-${t.kind}`} onClick={() => copyToClipboard(t.value)} title="Tap to copy">
+                  {t.label}: {t.value}{copiedValue === t.value ? ' ✓' : ''}
+                </button>
+              ))}
             </div>
             {homoglyphs ? (
               <div className="lexical-card">
@@ -345,7 +371,7 @@ export default function SiteIntelWorkspace() {
             <div className="lexical-card">
               <h3>Query parameters <InfoBadge term="tracking-token" /></h3>
               <ul>{trackingParams.map((p) => <li key={p.key}>{p.key} — {p.category}{p.service ? ` (${p.service})` : ''}</li>)}</ul>
-              {sanitizedUrl ? <p>Sanitized: <code>{sanitizedUrl}</code> <button type="button" onClick={() => navigator.clipboard.writeText(sanitizedUrl)}>Copy</button></p> : null}
+              {sanitizedUrl ? <p>Sanitized: <code>{sanitizedUrl}</code> <button type="button" onClick={() => copyToClipboard(sanitizedUrl)}>{copiedValue === sanitizedUrl ? 'Copied ✓' : 'Copy'}</button></p> : null}
             </div>
             {shortener?.isShortener ? (
               <div className="lexical-card">
@@ -368,7 +394,11 @@ export default function SiteIntelWorkspace() {
                   <div key={type} className="dns-row">
                     <strong>{type}</strong>
                     <ul>{table[type].answers.map((a, i) => (
-                      <li key={i} title={ptrMap[a.data] ?? undefined}>{a.data} (TTL {a.ttl}s)</li>
+                      <li key={i}>
+                        <button type="button" className="dns-answer-copy" onClick={() => copyToClipboard(a.data)} title={ptrMap[a.data] ? `Reverse DNS: ${ptrMap[a.data]} — click to copy` : 'Click to copy'}>
+                          {a.data}{copiedValue === a.data ? ' ✓' : ''}
+                        </button> (TTL {a.ttl}s)
+                      </li>
                     ))}</ul>
                   </div>
                 ))}
@@ -408,6 +438,20 @@ export default function SiteIntelWorkspace() {
                 <p>{d.totalCaptures} capture(s){d.truncated ? ' (index truncated)' : ''}{d.earliest ? ` · earliest ${d.earliest.timestamp.slice(0, 8)}` : ''}</p>
                 {d.earliest ? <a href={waybackCaptureUrl(d.earliest)} target="_blank" rel="noreferrer">View earliest snapshot</a> : null}
                 {d.contentChangePoints.length ? <p>{d.contentChangePoints.length} detected content-change point(s).</p> : null}
+                {d.yearCounts.length ? (
+                  <ul className="wayback-year-counts">
+                    {d.yearCounts.map((y) => {
+                      const max = Math.max(...d.yearCounts.map((yc) => yc.count));
+                      return (
+                        <li key={y.year} title={`${y.count} capture(s) in ${y.year}`}>
+                          <span className="wayback-year-label">{y.year}</span>
+                          <span className="wayback-year-bar" style={{ width: `${Math.max(6, (y.count / max) * 100)}%` }} />
+                          <span className="wayback-year-count">{y.count}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
               </>
             )} />
           </section>

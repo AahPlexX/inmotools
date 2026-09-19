@@ -45,7 +45,7 @@ user-supplied credential).
 ### Group 1 — Core URL Parsing, Lexical Forensics & Syntactic Security
 | # | Feature | Status | Implementation |
 |---|---|---|---|
-| 1 | RFC 3986 canonical URL decomposition engine | Done | `url-forensics.ts:parseUrl`, breadcrumb UI in `SiteIntelWorkspace.tsx` |
+| 1 | RFC 3986 canonical URL decomposition engine | Done | `url-forensics.ts:parseUrl`, breadcrumb UI in `SiteIntelWorkspace.tsx`; tokens are tap/click-to-copy (fixed 2026-09-18 — this was spec'd but missing) |
 | 2 | Homoglyph & Punycode (IDN) spoofing detector | Done | `url-forensics.ts:detectHomoglyphs`, curated confusable map in `reference-data.ts` |
 | 3 | Lexical Shannon entropy & DGA analyzer | Done | `url-forensics.ts:shannonEntropy` |
 | 4 | Typosquatting & Levenshtein brand-distance calculator | Done | `url-forensics.ts:findTyposquatMatches` against curated `BRAND_REFERENCE_DOMAINS` (~175 domains as of 2026-09-18, not a live Tranco fetch — see substitutions) |
@@ -55,11 +55,11 @@ user-supplied credential).
 ### Group 2 — DNS Architecture, Infrastructure & Network Routing
 | # | Feature | Status | Implementation |
 |---|---|---|---|
-| 7 | DNS-over-HTTPS multi-record resolving engine | Done | `doh-client.ts`, `dns-engine.ts:fetchDnsTable` (Cloudflare primary, Google fallback), PTR hover via `resolvePtrRecords` |
-| 8 | IPv6 readiness & dual-stack auditor | Done | `dns-engine.ts:auditIpv6Readiness` |
+| 7 | DNS-over-HTTPS multi-record resolving engine | Done | `doh-client.ts`, `dns-engine.ts:fetchDnsTable` (Cloudflare primary, Google fallback); hover shows reverse-DNS, click copies the raw IP (`SiteIntelWorkspace.tsx` `copyToClipboard`, fixed 2026-09-18 — this was spec'd but missing) |
+| 8 | IPv6 readiness & dual-stack auditor | Done | `dns-engine.ts:auditIpv6Readiness` (now distinguishes a failed AAAA lookup from a confirmed-absent one, fixed 2026-09-18 — see audit notes) |
 | 9 | Nameserver geographic & ASN redundancy checker | Done | `network-engine.ts:checkNameserverRedundancy` |
-| 10 | CAA record validator | Done | `dns-engine.ts:validateCaaRecords` |
-| 11 | DNSSEC cryptographic chain verification | Partial | `dns-engine.ts:checkDnssecSignals` reports DNSKEY/DS/RRSIG presence plus the resolver's authenticated-data (AD) bit rather than re-deriving the full root-to-zone signature chain client-side (see substitutions) |
+| 10 | CAA record validator | Done | `dns-engine.ts:validateCaaRecords` (now distinguishes a failed lookup from a confirmed-absent record, fixed 2026-09-18) |
+| 11 | DNSSEC cryptographic chain verification | Partial | `dns-engine.ts:checkDnssecSignals` reports DNSKEY/DS/RRSIG presence plus the resolver's authenticated-data (AD) bit rather than re-deriving the full root-to-zone signature chain client-side (see substitutions); now distinguishes a failed lookup from a confirmed-unsigned zone, fixed 2026-09-18 |
 | 12 | BGP ASN & hosting profiler | Done | `network-engine.ts:profileHosting` via ipapi.co |
 | 13 | GeoIP server location & Anycast detector | Done | `network-engine.ts:detectAnycast`, `components/GeoMinimap.tsx` (interactive equirectangular lat/long minimap with click-to-inspect markers — see substitutions for why it draws a graticule instead of coastlines) |
 
@@ -69,14 +69,14 @@ user-supplied credential).
 | 14 | ICANN RDAP bootstrap registration profiler | Done | `rdap-engine.ts:fetchRdap` via rdap.org bootstrap redirector |
 | 15 | Domain age & longevity health index | Done | `rdap-engine.ts:assessDomainAge` |
 | 16 | Domain expiration countdown & renewal risk telemetry | Done | `rdap-engine.ts:assessExpiration` |
-| 17 | Wayback Machine historical snapshot timeline | Partial | `wayback-engine.ts:fetchWaybackTimeline`; title-change detection substituted with CDX `digest` content-hash change detection (see substitutions) |
-| 18 | DNSBL & IP/domain blacklist reputation multi-scanner | Done | `blacklist-engine.ts:scanDnsbl` against 6 zones via ordinary A-record DoH queries |
+| 17 | Wayback Machine historical snapshot timeline | Partial | `wayback-engine.ts:fetchWaybackTimeline`; title-change detection substituted with CDX `digest` content-hash change detection (see substitutions). Per-year capture counts (`yearCounts`) are now rendered as a compact bar list — previously computed but never shown in the UI (fixed 2026-09-18). |
+| 18 | DNSBL & IP/domain blacklist reputation multi-scanner | Done | `blacklist-engine.ts:scanDnsbl` against 6 zones via ordinary A-record DoH queries; now distinguishes "every zone lookup failed" from "confirmed clean" (fixed 2026-09-18) |
 
 ### Group 4 — SSL/TLS, Encryption & Security Posture
 | # | Feature | Status | Implementation |
 |---|---|---|---|
 | 19 | Public Certificate Transparency (CT) log ingestion | Partial | `ct-engine.ts:fetchCtLog` via crt.sh JSON; crt.sh does not guarantee CORS/uptime SLA — degrades to a reported "blocked" state (see substitutions) |
-| 20 | SAN subdomain discovery | Done | `ct-engine.ts:summarizeSanSubdomains` (depends on #19 succeeding) |
+| 20 | SAN subdomain discovery | Done | `ct-engine.ts:summarizeSanSubdomains` (depends on #19 succeeding); list beyond 50 entries now says "…and N more" instead of silently dropping them, and the full list is always in the JSON export's `rawTelemetry` (fixed 2026-09-18) |
 | 21 | Certificate expiration & automated-renewal sentinel | Done | `ct-engine.ts:assessCertificateExpiry` (depends on #19 succeeding) |
 | 22 | Chromium HSTS preload list status checker | Done | `hsts-engine.ts` via hstspreload.org status API |
 | 23 | Mixed content risk & default scheme security analyzer | Done | `url-forensics.ts:analyzeSchemeSecurity` (merged from a standalone file 2026-09-18, see ponytail-audit note below) |
@@ -84,10 +84,10 @@ user-supplied credential).
 ### Group 5 — Email Deliverability & Domain Authentication
 | # | Feature | Status | Implementation |
 |---|---|---|---|
-| 24 | MX priority & health evaluator | Done | `email-auth-engine.ts:fetchMxRecords` |
-| 25 | SPF syntax & rule validator (RFC 7208) | Done | `email-auth-engine.ts:validateSpf` (self-include loop + `+all` + include-count checks; does not recursively resolve every nested `include:` — see substitutions) |
-| 26 | DMARC policy & alignment enforcement inspector (RFC 7489) | Done | `email-auth-engine.ts:inspectDmarc` |
-| 27 | BIMI readiness checker | Done | `email-auth-engine.ts:checkBimi` |
+| 24 | MX priority & health evaluator | Done | `email-auth-engine.ts:fetchMxRecords` (now distinguishes a failed lookup from confirmed-absent MX, fixed 2026-09-18) |
+| 25 | SPF syntax & rule validator (RFC 7208) | Done | `email-auth-engine.ts:validateSpf` (self-include loop + `+all` + include-count checks; does not recursively resolve every nested `include:` — see substitutions; hostname is now regex-escaped before the self-include check and a failed lookup no longer reads as "no SPF", both fixed 2026-09-18) |
+| 26 | DMARC policy & alignment enforcement inspector (RFC 7489) | Done | `email-auth-engine.ts:inspectDmarc` (now distinguishes a failed lookup from confirmed-absent DMARC — a failed lookup was previously misreported as a spoofing risk, fixed 2026-09-18) |
+| 27 | BIMI readiness checker | Done | `email-auth-engine.ts:checkBimi` (now distinguishes a failed lookup from confirmed-absent BIMI, fixed 2026-09-18) |
 
 ### Group 6 — Performance Telemetry, Web Vitals & Technology Footprint
 | # | Feature | Status | Implementation |
@@ -101,10 +101,10 @@ user-supplied credential).
 | # | Feature | Status | Implementation |
 |---|---|---|---|
 | 32 | Unified composite domain health scorecard (radar matrix) | Done | `scoring-engine.ts`, `components/ScoreRadar.tsx` (click-to-jump wired to section tabs) |
-| 33 | Interactive visual DNS & network node graph | Done | `components/NodeGraph.tsx` — canvas node-link diagram, drag-to-inspect, wheel/pinch zoom, background-drag pan |
+| 33 | Interactive visual DNS & network node graph | Done | `components/NodeGraph.tsx` — canvas node-link diagram, drag-to-inspect, wheel/pinch zoom, background-drag pan; a keyboard-accessible node list (`<details>`) was added 2026-09-18 since the canvas itself has no keyboard path |
 | 34 | Device-agnostic responsive layout with fluid viewport calibrator | Done | `site-intel-workspace.css` — container-query breakpoints at 768/1024/1440px, sticky tab bar, accordion-on-mobile |
 | 35 | Non-intrusive context-aware tooltip & metric glossary | Done | `glossary.ts`, `components/InfoBadge.tsx` — hover tooltip desktop, tap-friendly on touch (same component, `onClick` toggle) |
-| 36 | Multi-format audit report exporter (PDF/JSON/Markdown/CSV) | Done | `export-engine.ts` |
+| 36 | Multi-format audit report exporter (PDF/JSON/Markdown/CSV) | Done | `export-engine.ts`; JSON export now includes `rawTelemetry` (full per-engine raw results: DNS table, RDAP record, CT certificates, Wayback timeline, email-auth records, hosting/ASN intel, DNSBL results, CrUX) so it is a genuine "full telemetry tree" per spec, not just scorecard-classified findings (fixed 2026-09-18 — this was a real gap, not merely a nice-to-have) |
 | 37 | Audit metadata & OpenGraph social card studio | Done | metadata editor in `SiteIntelWorkspace.tsx`, `social-card-engine.ts` (1200×630 canvas PNG) |
 | 38 | Zero-database offline report vault (IndexedDB, PWA) | Done | `vault-db.ts` (Dexie, scoped DB name `inmotools-site-intelligence`); the app's existing Vite PWA plugin already provides offline-shell support app-wide |
 
@@ -202,10 +202,12 @@ user-supplied credential).
 - Full app type-check (`tsc --noEmit -p tsconfig.app.json`) is clean.
 - Full production build (`pnpm build`) succeeds; the tool lazy-loads as its
   own chunk (`SiteIntelWorkspace-*.js`).
-- `pnpm vitest run tests/unit` — 1273/1274 passing (as of 2026-09-18); the 1
-  failure is a pre-existing, unrelated `markdown-citation.test.ts` timeout in
-  a different tool, not caused by this work (it is flaky in isolation too —
-  observed 2 failures in one run and 1 in the next, same test, same file).
+- `pnpm vitest run tests/unit` — 1252/1252 passing when the pre-existing,
+  unrelated `markdown-citation.test.ts` (a different tool) is excluded; that
+  file is independently flaky (observed 1-2 failures per run, same two tests,
+  timeout-based) regardless of any change made here, on every run this whole
+  workstream. Full run including it: 1252/1253 or 1252/1254 depending on that
+  file's mood (as of 2026-09-18, after the audit-fix pass added 10 tests).
 - `tests/e2e/site-intel.spec.ts` (8 tests) passes on both `desktop-chromium`
   and `mobile-chromium` Playwright projects as of 2026-09-18: tab navigation,
   lexical breadcrumb, typosquat/tracking-param detection, scorecard
@@ -242,6 +244,70 @@ user-supplied credential).
   test` whenever source changed since the last build — `vite preview` only
   serves the existing `dist/` folder and will silently serve stale UI
   otherwise (see "How to resume this work" above).
+- **Comprehensive bug/gap audit (2026-09-18):** systematic pass for bugs,
+  missing spec'd features, missing QoL, and incomplete features. All fixes
+  below are applied and re-verified green (tsc + 1252 unit tests + 8 e2e
+  tests on desktop/mobile Chromium).
+  - **Real correctness bug, widest-reaching finding:** every DNS-backed
+    "record absent" finding conflated a genuinely absent record with a
+    *failed* DoH lookup (network error/timeout). A failed query returns
+    `status: 'error'` with empty `answers`, which every consumer treated
+    identically to a confirmed-empty/NXDOMAIN response — e.g. a transient
+    network blip on the DMARC lookup was reported to the user as "No DMARC
+    record — spoofing/CEO-fraud risk", a false and alarming claim. Fixed by
+    adding `doh-client.ts:queryFailed()` and gating every affected function
+    on it, returning a distinct `severity: 'info'`, `*-unknown`-id finding
+    instead: `dns-engine.ts` (`auditIpv6Readiness`, `validateCaaRecords`,
+    `checkDnssecSignals`), `email-auth-engine.ts` (`fetchMxRecords`,
+    `validateSpf`, `inspectDmarc`, `checkBimi`), `blacklist-engine.ts`
+    (`scanDnsbl`'s aggregate finding, when every zone lookup failed). Covered
+    by 7 new regression tests in `tests/unit/site-intel-network-engines.test.ts`.
+  - **Real (minor) correctness bug:** `validateSpf`'s self-include loop check
+    built a `RegExp` directly from the unescaped hostname, so a hostname
+    containing regex metacharacters (most commonly `.`) could false-positive
+    against an unrelated include mechanism. Fixed by escaping the hostname
+    before constructing the pattern; covered by a new regression test.
+  - **Silent truncation bug:** `summarizeSanSubdomains` sliced the SAN list to
+    50 entries and joined it with no indication anything was cut. Fixed to
+    append "…and N more" and point at the JSON export's full list.
+  - **Missing spec'd feature:** Feature 1's spec explicitly calls for
+    tap/click-to-copy URL breadcrumb tokens, and Feature 7's spec explicitly
+    calls for click-to-copy DNS answer IPs (hover was already correct for
+    both). Neither was wired up. Fixed: both are now buttons calling a shared
+    `copyToClipboard` helper with a brief "✓" confirmation.
+  - **Incomplete feature:** `wayback-engine.ts` already computed `yearCounts`
+    (per-year capture distribution — the spec's "snapshot frequency
+    analysis") but the UI never rendered it. Fixed: a compact per-year bar
+    list now renders under the Wayback timeline.
+  - **Spec-completeness gap:** Feature 36's spec calls for JSON export to be
+    the "full telemetry tree", but `ExportBundle` only ever carried
+    scorecard-classified findings — raw engine output (DNS table, RDAP
+    record, CT certs, Wayback timeline, email-auth records, hosting/ASN
+    intel, DNSBL results, CrUX) was never exported at all. Fixed: added
+    `ExportBundle.rawTelemetry`, populated from workspace state, included
+    only in `exportJson` (Markdown/CSV/PDF intentionally stay curated
+    summaries, not raw dumps).
+  - **Untested algorithmic code, now verified correct:** the hand-rolled RFC
+    3492 punycode decoder (`url-forensics.ts:punycodeLabelToUnicode`) had
+    zero test coverage of an actual `xn--` input — every existing test fed it
+    raw Unicode directly, never exercising the decoder on Feature 2's actual
+    primary real-world case (a phishing link *is* punycode-encoded). Added a
+    round-trip test that ToASCII-encodes a known Cyrillic homograph via the
+    platform `URL` parser, then decodes it back and asserts equality. It
+    passed on the first run — the decoder was already correct, just unproven.
+  - **Accessibility gap:** `components/NodeGraph.tsx`'s canvas has no
+    keyboard path at all (pointer/touch events only), so keyboard and
+    screen-reader users could not inspect any node. Fixed: added a
+    `<details>`-collapsed, always-present keyboard-accessible node list
+    below the canvas that drives the same selection state.
+  - **AI-like copy check:** grepped the whole tool for common AI-tell phrases
+    ("seamless", "leverage", "empower", "cutting-edge", "unlock", etc.) —
+    none found. Catalog entry copy matches the terse, factual tone of every
+    sibling tool's `catalog.ts` entry.
+  - **Truncated/incomplete-code check:** grepped for `TODO`/`FIXME`/`XXX`/
+    "not implemented"/"coming soon" markers across the tool — none found
+    (one incidental match was the string `'mastodon.social'` in the brand
+    reference list, a false positive).
 
 ## Definition of done (required before proposing a merge to `main`)
 

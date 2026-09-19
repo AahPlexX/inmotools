@@ -197,6 +197,17 @@ export function NodeGraph({ data }: { data: NodeGraphData }) {
       ) : (
         <p className="node-graph-hint">Drag a node to inspect it, drag the background to pan, scroll or pinch to zoom.</p>
       )}
+      {/* The canvas above is pointer/touch-only; this list gives keyboard and screen-reader users the same inspection capability. */}
+      <details className="node-graph-list">
+        <summary>Node list (keyboard-accessible)</summary>
+        <ul>
+          {data.nodes.map((node) => (
+            <li key={node.id}>
+              <button type="button" onClick={() => setSelected(node)} aria-pressed={selected?.id === node.id}>{node.label}</button>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

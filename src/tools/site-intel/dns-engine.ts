@@ -4,7 +4,7 @@
 // Feature 12/13 (ASN + GeoIP) live in network-engine.ts because they compose
 // DNS answers with a third-party IP-intelligence lookup.
 
-import { queryDns, queryDnsMulti, reverseDnsName } from './doh-client';
+import { queryDns, queryDnsMulti, queryFailed, reverseDnsName } from './doh-client';
 import type { DnsAnswer, DnsQueryResult, Finding } from './site-intel-types';
 
 export interface DnsTable {
@@ -37,6 +37,13 @@ export async function resolvePtrRecords(ipAddresses: string[]): Promise<Record<s
 
 /** Feature 8 — IPv6 readiness & dual-stack connectivity auditor. */
 export function auditIpv6Readiness(aaaaResult: DnsQueryResult): Finding {
+  if (queryFailed(aaaaResult)) {
+    return {
+      id: 'ipv6-unknown', severity: 'info', label: 'IPv6 readiness could not be checked',
+      detail: `The AAAA lookup failed (${aaaaResult.error ?? 'unknown DNS error'}) rather than coming back empty, so this is not confirmed IPv4-only.`,
+      terms: ['ipv6', 'aaaa-record'],
+    };
+  }
   if (aaaaResult.status === 'ok' && aaaaResult.answers.length > 0) {
     return {
       id: 'ipv6-ready', severity: 'good', label: 'IPv6 dual-stack ready',
@@ -55,7 +62,13 @@ export function auditIpv6Readiness(aaaaResult: DnsQueryResult): Finding {
 export async function validateCaaRecords(hostname: string): Promise<{ result: DnsQueryResult; findings: Finding[] }> {
   const result = await queryDns(hostname, 'CAA');
   const findings: Finding[] = [];
-  if (result.status === 'ok' && result.answers.length > 0) {
+  if (queryFailed(result)) {
+    findings.push({
+      id: 'caa-unknown', severity: 'info', label: 'CAA records could not be checked',
+      detail: `The CAA lookup failed (${result.error ?? 'unknown DNS error'}). This is not confirmation that no CAA record exists.`,
+      terms: ['caa'],
+    });
+  } else if (result.status === 'ok' && result.answers.length > 0) {
     const issuers = result.answers
       .map((a) => parseCaaData(a.data))
       .filter((p): p is { flag: string; tag: string; value: string } => p !== null && p.tag === 'issue');
@@ -93,6 +106,12 @@ function parseCaaData(data: string): { flag: string; tag: string; value: string 
  */
 export async function checkDnssecSignals(hostname: string): Promise<{ dnskey: DnsQueryResult; ds: DnsQueryResult; rrsig: DnsQueryResult; finding: Finding }> {
   const [dnskey, ds, rrsig] = await queryDnsMulti(hostname, ['DNSKEY', 'DS', 'RRSIG']);
+  if (queryFailed(dnskey) && queryFailed(ds) && queryFailed(rrsig)) {
+    return {
+      dnskey, ds, rrsig,
+      finding: { id: 'dnssec-unknown', severity: 'info', label: 'DNSSEC status could not be checked', detail: 'The DNSKEY/DS/RRSIG lookups all failed, so signing status is unconfirmed rather than known-absent.', terms: ['dnssec'] },
+    };
+  }
   const signed = dnskey.answers.length > 0 || ds.answers.length > 0;
   const authenticated = dnskey.authenticatedData || ds.authenticatedData || rrsig.authenticatedData;
   const finding: Finding = signed

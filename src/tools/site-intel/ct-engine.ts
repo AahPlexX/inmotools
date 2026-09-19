@@ -62,9 +62,11 @@ export async function fetchCtLog(domain: string): Promise<AsyncTaskState<CtRepor
 
 /** Feature 20 — SAN subdomain discovery from ingested certificates (no brute-force scanning). */
 export function summarizeSanSubdomains(report: CtReport): Finding {
+  const shown = report.allSans.slice(0, 50);
+  const remainder = report.allSans.length - shown.length;
   return {
     id: 'san-subdomains', severity: 'info', label: `${report.allSans.length} hostname(s) observed in certificate SANs`,
-    detail: report.allSans.slice(0, 50).join(', ') || 'No Subject Alternative Names were found.',
+    detail: shown.join(', ') + (remainder > 0 ? ` … and ${remainder} more (the JSON export's rawTelemetry.certificateTransparency has the complete list).` : '') || 'No Subject Alternative Names were found.',
     terms: ['san', 'certificate-transparency'],
   };
 }

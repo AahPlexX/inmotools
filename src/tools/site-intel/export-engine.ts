@@ -18,6 +18,11 @@ export interface ExportBundle {
   url: string;
   metadata: ReportMetadata;
   scorecard: Scorecard;
+  /** Raw per-engine results (DNS table, RDAP record, CT certificates, Wayback
+   * timeline, etc.) so the JSON export is a genuine full telemetry tree, not
+   * just the scorecard's classified findings. Markdown/CSV/PDF intentionally
+   * ignore this and stay human-readable summaries. */
+  rawTelemetry?: Record<string, unknown>;
 }
 
 export function exportJson(bundle: ExportBundle): string {

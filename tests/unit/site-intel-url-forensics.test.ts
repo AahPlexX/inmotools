@@ -37,6 +37,18 @@ describe('parseUrl (Feature 1 — RFC 3986 decomposition)', () => {
     const result = parseUrl('http://user:pass@example.com/');
     expect(result.hasEmbeddedCredentials).toBe(true);
   });
+
+  it('round-trips a real punycode-encoded IDN homograph back to readable Unicode', () => {
+    // "\u0430pple.com" (Cyrillic а) ToASCII-encodes to a real xn-- label via the
+    // platform URL parser; parseUrl must decode that xn-- label back correctly,
+    // not just handle Unicode that was typed directly (Feature 2's primary
+    // real-world case IS an xn-- URL, since that's what a phishing link uses).
+    const punycodeHost = new URL('https://\u0430pple.com').hostname;
+    expect(punycodeHost.startsWith('xn--')).toBe(true);
+    const result = parseUrl(`https://${punycodeHost}/`);
+    expect(result.isPunycode).toBe(true);
+    expect(result.hostnameUnicode).toBe('\u0430pple.com');
+  });
 });
 
 describe('detectHomoglyphs (Feature 2)', () => {

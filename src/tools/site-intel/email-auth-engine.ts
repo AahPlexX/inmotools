@@ -3,7 +3,7 @@
 // Feature 27 (BIMI). All resolved via the same client-side DoH engine used
 // elsewhere in this tool — TXT/MX record lookups require no special API.
 
-import { queryDns } from './doh-client';
+import { queryDns, queryFailed } from './doh-client';
 import type { Finding } from './site-intel-types';
 
 export interface MxRecord { priority: number; host: string; provider?: string }
@@ -27,6 +27,9 @@ function identifyProvider(host: string): string | undefined {
 /** Feature 24 — MX priority & health evaluator. */
 export async function fetchMxRecords(hostname: string): Promise<{ records: MxRecord[]; finding: Finding }> {
   const res = await queryDns(hostname, 'MX');
+  if (queryFailed(res)) {
+    return { records: [], finding: { id: 'mx-unknown', severity: 'info', label: 'MX records could not be checked', detail: `The MX lookup failed (${res.error ?? 'unknown DNS error'}).`, terms: ['mx'] } };
+  }
   const records: MxRecord[] = res.answers
     .map((a) => {
       const match = /^(\d+)\s+(.+)$/.exec(a.data.trim());
@@ -43,6 +46,9 @@ export async function fetchMxRecords(hostname: string): Promise<{ records: MxRec
 /** Feature 25 — SPF syntax & rule validator (RFC 7208). */
 export async function validateSpf(hostname: string): Promise<{ record: string | null; findings: Finding[] }> {
   const res = await queryDns(hostname, 'TXT');
+  if (queryFailed(res)) {
+    return { record: null, findings: [{ id: 'spf-unknown', severity: 'info', label: 'SPF could not be checked', detail: `The TXT lookup failed (${res.error ?? 'unknown DNS error'}).`, terms: ['spf'] }] };
+  }
   const spfRaw = res.answers.map((a) => a.data.replace(/^"|"$/g, '')).find((t) => /^v=spf1/i.test(t)) ?? null;
   const findings: Finding[] = [];
   if (!spfRaw) {
@@ -51,7 +57,8 @@ export async function validateSpf(hostname: string): Promise<{ record: string | 
   }
   const mechanisms = spfRaw.split(/\s+/).slice(1);
   const includeCount = mechanisms.filter((m) => /^[+\-~?]?include:/i.test(m)).length;
-  const selfInclude = mechanisms.some((m) => new RegExp(`^[+\\-~?]?include:${hostname}$`, 'i').test(m));
+  const escapedHost = hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const selfInclude = mechanisms.some((m) => new RegExp(`^[+\\-~?]?include:${escapedHost}$`, 'i').test(m));
   const allMechanism = mechanisms.find((m) => /all$/i.test(m));
 
   findings.push({ id: 'spf-present', severity: 'good', label: 'SPF record found', detail: spfRaw, terms: ['spf'] });
@@ -66,6 +73,9 @@ export async function validateSpf(hostname: string): Promise<{ record: string | 
 /** Feature 26 — DMARC policy & alignment enforcement inspector (RFC 7489). */
 export async function inspectDmarc(hostname: string): Promise<{ record: string | null; findings: Finding[] }> {
   const res = await queryDns(`_dmarc.${hostname}`, 'TXT');
+  if (queryFailed(res)) {
+    return { record: null, findings: [{ id: 'dmarc-unknown', severity: 'info', label: 'DMARC could not be checked', detail: `The _dmarc TXT lookup failed (${res.error ?? 'unknown DNS error'}).`, terms: ['dmarc'] }] };
+  }
   const raw = res.answers.map((a) => a.data.replace(/^"|"$/g, '')).find((t) => /^v=DMARC1/i.test(t)) ?? null;
   const findings: Finding[] = [];
   if (!raw) {
@@ -86,6 +96,9 @@ export async function inspectDmarc(hostname: string): Promise<{ record: string |
 /** Feature 27 — BIMI readiness checker. */
 export async function checkBimi(hostname: string): Promise<{ record: string | null; finding: Finding }> {
   const res = await queryDns(`default._bimi.${hostname}`, 'TXT');
+  if (queryFailed(res)) {
+    return { record: null, finding: { id: 'bimi-unknown', severity: 'info', label: 'BIMI could not be checked', detail: `The default._bimi TXT lookup failed (${res.error ?? 'unknown DNS error'}).`, terms: ['bimi'] } };
+  }
   const raw = res.answers.map((a) => a.data.replace(/^"|"$/g, '')).find((t) => /^v=BIMI1/i.test(t)) ?? null;
   if (!raw) {
     return { record: null, finding: { id: 'bimi-missing', severity: 'info', label: 'No BIMI record', detail: 'BIMI is optional; without it, mailbox providers cannot display this domain\'s brand logo next to authenticated mail.', terms: ['bimi'] } };

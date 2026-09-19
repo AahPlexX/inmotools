@@ -27,8 +27,11 @@ export async function scanDnsbl(target: { ip?: string; domain?: string }): Promi
     return { zone: zoneDef.zone, label: zoneDef.label, listed: res.status === 'ok' && res.answers.length > 0, returnCodes: res.answers.map((a) => a.data) };
   }));
   const listedOn = results.filter((r) => r.listed);
+  const allFailed = results.length > 0 && results.every((r) => r.error);
   const finding: Finding = listedOn.length > 0
     ? { id: 'dnsbl-listed', severity: 'risk', label: `Listed on ${listedOn.length} blacklist source(s)`, detail: listedOn.map((r) => r.label).join(', '), terms: ['dnsbl'] }
-    : { id: 'dnsbl-clean', severity: 'good', label: 'Clean across all checked blacklist sources', detail: `No listings found across ${results.length} DNSBL source(s).`, terms: ['dnsbl'] };
+    : allFailed
+      ? { id: 'dnsbl-unknown', severity: 'info', label: 'Blacklist status could not be checked', detail: 'Every DNSBL zone lookup failed rather than coming back clean, so reputation is unconfirmed.', terms: ['dnsbl'] }
+      : { id: 'dnsbl-clean', severity: 'good', label: 'Clean across all checked blacklist sources', detail: `No listings found across ${results.length} DNSBL source(s).`, terms: ['dnsbl'] };
   return { results, finding };
 }

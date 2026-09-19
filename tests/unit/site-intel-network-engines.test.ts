@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryDns } from '../../src/tools/site-intel/doh-client';
-import { auditIpv6Readiness, validateCaaRecords } from '../../src/tools/site-intel/dns-engine';
+import { auditIpv6Readiness, validateCaaRecords, checkDnssecSignals } from '../../src/tools/site-intel/dns-engine';
 import { validateSpf, inspectDmarc, checkBimi, fetchMxRecords } from '../../src/tools/site-intel/email-auth-engine';
 import { scanDnsbl } from '../../src/tools/site-intel/blacklist-engine';
 import { fetchRdap, assessDomainAge, assessExpiration } from '../../src/tools/site-intel/rdap-engine';
@@ -150,5 +150,62 @@ describe('hsts-engine', () => {
     if (task.status === 'ready' && task.data) {
       expect(describeHstsPreload(task.data).severity).toBe('good');
     }
+  });
+});
+
+describe('DNS lookup failures must not be reported as confirmed absence', () => {
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down')))); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('auditIpv6Readiness reports "unknown", not "IPv4-only", when the AAAA query fails', () => {
+    const finding = auditIpv6Readiness({ recordType: 'AAAA', status: 'error', answers: [], authenticatedData: false, resolver: 'test', error: 'network down' });
+    expect(finding.id).toBe('ipv6-unknown');
+    expect(finding.severity).toBe('info');
+  });
+
+  it('validateCaaRecords reports "unknown", not "missing", when the CAA query fails', async () => {
+    const { findings } = await validateCaaRecords('example.com');
+    expect(findings[0].id).toBe('caa-unknown');
+  });
+
+  it('checkDnssecSignals reports "unknown", not "unsigned", when every query fails', async () => {
+    const { finding } = await checkDnssecSignals('example.com');
+    expect(finding.id).toBe('dnssec-unknown');
+  });
+
+  it('fetchMxRecords reports "unknown", not "none", when the MX query fails', async () => {
+    const { finding } = await fetchMxRecords('example.com');
+    expect(finding.id).toBe('mx-unknown');
+  });
+
+  it('validateSpf reports "unknown", not "missing", when the TXT query fails', async () => {
+    const { findings } = await validateSpf('example.com');
+    expect(findings[0].id).toBe('spf-unknown');
+  });
+
+  it('inspectDmarc reports "unknown", not "missing" (a false spoofing-risk claim), when the query fails', async () => {
+    const { findings } = await inspectDmarc('example.com');
+    expect(findings[0].id).toBe('dmarc-unknown');
+  });
+
+  it('checkBimi reports "unknown" when the query fails', async () => {
+    const { finding } = await checkBimi('example.com');
+    expect(finding.id).toBe('bimi-unknown');
+  });
+
+  it('scanDnsbl reports "unknown", not "clean", when every zone lookup fails', async () => {
+    const { finding } = await scanDnsbl({ ip: '1.2.3.4', domain: 'example.com' });
+    expect(finding.id).toBe('dnsbl-unknown');
+  });
+});
+
+describe('validateSpf self-include check escapes regex metacharacters in the hostname', () => {
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn()); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('does not false-positive when a dot-containing hostname is compared against an unrelated include', async () => {
+    vi.mocked(fetch).mockImplementation(() => jsonResponse({ Status: 0, Answer: [{ name: 'x', type: 16, TTL: 300, data: '"v=spf1 include:exampleXcom ~all"' }] }));
+    const { findings } = await validateSpf('example.com');
+    expect(findings.some((f) => f.id === 'spf-self-include')).toBe(false);
   });
 });

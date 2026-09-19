@@ -140,12 +140,51 @@
 
 .url-token {
   padding: 4px 10px;
+  min-height: 32px;
+  border: none;
   border-radius: 999px;
   background: var(--signal-soft);
   color: var(--signal-strong);
+  font: inherit;
   font-size: 0.85rem;
-  cursor: default;
+  cursor: pointer;
 }
+
+.url-token:hover, .url-token:focus-visible {
+  background: color-mix(in srgb, var(--signal) 25%, var(--signal-soft));
+}
+
+.dns-answer-copy {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.wayback-year-counts {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wayback-year-counts li {
+  display: grid;
+  grid-template-columns: 3.5em 1fr 2.5em;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.wayback-year-label { color: var(--muted); }
+.wayback-year-bar { height: 8px; border-radius: 4px; background: var(--signal); min-width: 4px; }
+.wayback-year-count { text-align: right; color: var(--muted); }
 
 .finding-list {
   list-style: none;
@@ -252,6 +291,12 @@
   color: var(--ink);
   font-size: 0.85rem;
 }
+
+.node-graph-list { margin-top: 8px; font-size: 0.85rem; }
+.node-graph-list summary { cursor: pointer; color: var(--muted); }
+.node-graph-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.node-graph-list button { min-height: 32px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: inherit; cursor: pointer; }
+.node-graph-list button[aria-pressed="true"] { background: var(--signal-soft); border-color: var(--signal); color: var(--signal-strong); }
 
 .geo-minimap-container { position: relative; }
 .geo-minimap { width: 100%; max-width: 480px; display: block; border-radius: 10px; border: 1px solid var(--line); }

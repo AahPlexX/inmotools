@@ -64,6 +64,13 @@ export async function queryDnsMulti(name: string, types: string[]): Promise<DnsQ
   return Promise.all(types.map((type) => queryDns(name, type)));
 }
 
+/** True only when a DoH query outright failed (network/timeout/HTTP error), not when it
+ * merely came back empty or NXDOMAIN. Callers must not treat a failed query as proof of
+ * absence — "the lookup broke" and "the record doesn't exist" are different findings. */
+export function queryFailed(result: DnsQueryResult): boolean {
+  return result.status === 'error';
+}
+
 /** Builds the reverse-lookup name for a PTR query (IPv4 only; IPv6 nibble form is rarely needed here). */
 export function reverseDnsName(ip: string): string | null {
   const parts = ip.split('.');
