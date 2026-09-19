@@ -10,6 +10,8 @@
 - Heavy processing: `docs/research/audio-mastering-worker-dsp-architecture-2026-09-19.md`. Main thread owns UI/orchestration only; one dedicated DSP worker is the default heavy-compute lane; AudioWorklet is for bounded realtime custom processing; OfflineAudioContext is for graph-native offline bounce; SharedArrayBuffer is optional only.
 - Export matrix: `docs/research/audio-mastering-export-codec-matrix-2026-09-19.md`. WAV uses built-in PCM; MP3/FLAC/AAC use native capability plus official Mediabunny extension fallback when needed; M4A uses AAC in ISOBMFF; all output capability is checked at runtime.
 - Ogg fallback: `docs/research/audio-mastering-ogg-encoder-fallback-2026-09-19.md`. Prefer native Opus; when unavailable, lazy-load an exact-pinned, then-current `@audio/encode-opus` and adapt its documented raw packet core through Mediabunny `CustomAudioEncoder`. Do not add that dependency until the export implementation reaches it, and revalidate official source + npm immediately before pinning.
+- Spectral edit model: `docs/research/audio-mastering-spectral-edit-model-2026-09-19.md`. Persist semantic clip-local operations in seconds/Hz; keep STFTs, spectrogram tiles, and render blocks derived/worker-owned; require invertible deterministic processing profiles.
+- Loudness/true peak: `docs/research/audio-mastering-loudness-true-peak-2026-09-19.md`. Target the in-force ITU-R BS.1770-5 and current EBU R128/Tech 3341/3342 definitions; official EBU/ITU reference vectors are mandatory acceptance evidence.
 - These are architecture decisions only. They do **not** advance the 13/81 implementation count or close any Phase 3 implementation checkbox.
 
 ## Resume point — read before editing
