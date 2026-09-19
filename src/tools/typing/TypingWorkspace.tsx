@@ -587,6 +587,10 @@ export default function TypingWorkspace() {
     }
     if (patch.durationMode === 'quote') normalized.mode = 'quote';
     if (patch.durationMode === 'zen') normalized.mode = 'zen';
+    if (patch.durationMode !== undefined && patch.durationMode !== 'quote' && patch.durationMode !== 'zen'
+        && patch.mode === undefined && (config.mode === 'quote' || config.mode === 'zen')) {
+      normalized.mode = DEFAULT_CONFIG.mode;
+    }
     if (patch.mode === 'quote' && patch.durationMode === undefined) normalized.durationMode = 'quote';
     if (patch.mode === 'zen' && patch.durationMode === undefined) normalized.durationMode = 'zen';
     if (patch.mode && patch.mode !== 'quote' && patch.mode !== 'zen' && patch.durationMode === undefined
