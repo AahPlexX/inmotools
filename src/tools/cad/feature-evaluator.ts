@@ -627,7 +627,6 @@ function mirrorFeature(
   feature: CadFeature,
   project: CadProject,
   datumPlanes: CadDatumPlaneFrames,
-  datumAxes: CadDatumAxes,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape {
@@ -1151,6 +1150,7 @@ function createFeatureShape(
   feature: CadFeature,
   project: CadProject,
   datumPlanes: CadDatumPlaneFrames,
+  datumAxes: CadDatumAxes,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
   warnings: string[],
