@@ -9,6 +9,7 @@ import {
   negateComponent,
   perpendicularInPlane,
   resolveDatumPlaneFrame,
+  resolveMidPlaneDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
   resolveThreePointDatumPlaneFrame,
@@ -108,6 +109,42 @@ describe('CAD sketch profile bridge', () => {
 
   it('rejects a non-finite datum plane offset', () => {
     expect(() => resolveDatumPlaneFrame('XZ', Number.NaN)).toThrow(/finite/i);
+  });
+
+  it('resolves the midplane halfway between two parallel plane frames', () => {
+    const lower = resolveDatumPlaneFrame('XY', 0);
+    const upper = resolveDatumPlaneFrame('XY', 10);
+    const frame = resolveMidPlaneDatumPlaneFrame(lower, upper);
+
+    expect(frame.normal).toEqual([0, 0, 1]);
+    expect(frame.point(3, 4)).toEqual([3, 4, 5]);
+    expect(frame.vector(1, 0)).toEqual([1, 0, 0]);
+  });
+
+  it('resolves both bisector alignments for intersecting parent planes', () => {
+    const xy = resolveDatumPlaneFrame('XY', 0);
+    const yz = resolveDatumPlaneFrame('YZ', 0);
+    const first = resolveMidPlaneDatumPlaneFrame(xy, yz);
+    const flipped = resolveMidPlaneDatumPlaneFrame(xy, yz, true);
+
+    expect(first.point(0, 0)).toEqual([0, 0, 0]);
+    expect(flipped.point(0, 0)).toEqual([0, 0, 0]);
+    expect(first.vector(1, 0)).toEqual([0, 1, 0]);
+    expect(flipped.vector(1, 0)).toEqual([0, 1, 0]);
+    expect(Math.abs(first.normal[0])).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(Math.abs(first.normal[2])).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(Math.abs(flipped.normal[0])).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(Math.abs(flipped.normal[2])).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(
+      first.normal[0] * flipped.normal[0]
+      + first.normal[1] * flipped.normal[1]
+      + first.normal[2] * flipped.normal[2],
+    ).toBeCloseTo(0, 8);
+  });
+
+  it('rejects coplanar parents because they do not define a distinct midplane', () => {
+    const xy = resolveDatumPlaneFrame('XY', 0);
+    expect(() => resolveMidPlaneDatumPlaneFrame(xy, xy)).toThrow(/coplanar/i);
   });
 
   it('resolves a three-point datum plane with the first point as origin and a right-handed in-plane frame', () => {
