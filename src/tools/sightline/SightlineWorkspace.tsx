@@ -1552,6 +1552,7 @@ export default function SightlineWorkspace() {
           </details>
         ) : null}
         {model ? (
+          <>
           <dl className="sightline-facts" data-testid="sightline-report">
 
             <div>
@@ -1580,6 +1581,7 @@ export default function SightlineWorkspace() {
               <div><dt>Decoded in</dt><dd>{model.ingestMs} ms</dd></div>
             </dl>
           </details>
+          </>
         ) : null}
       </section>
 
