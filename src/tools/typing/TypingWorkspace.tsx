@@ -940,7 +940,7 @@ export default function TypingWorkspace() {
         </div>
         <div className="tw-panel">
           <h3>Per-key summary</h3>
-          <KeyStatsTable rows={keyStats.slice(0, 12)} />
+          <KeyStatsTable rows={keyStats} />
         </div>
         <div className="tw-panel">
           <h3>Personal best / pacer</h3>
@@ -1222,28 +1222,54 @@ function VirtualKeyboard({ layout, heat, errors }: { layout: ReturnType<typeof f
 function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
   if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>Finish a test to see analytics.</p>;
   return (
-    <table>
-      <thead><tr><th>Gram</th><th>Mean</th><th>Median</th><th>Count</th><th>Acc</th></tr></thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.gram}><td><code>{r.gram.replace(/\s/g, '␠')}</code></td><td>{r.meanMs}</td><td>{r.medianMs}</td><td>{r.count}</td><td>{r.accuracy}%</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <PagedTable
+      columns={[
+        { key: 'gram', label: 'Gram' },
+        { key: 'mean', label: 'Mean' },
+        { key: 'median', label: 'Median' },
+        { key: 'count', label: 'Count' },
+        { key: 'accuracy', label: 'Acc' },
+      ]}
+      rows={rows}
+      pageSize={20}
+      caption="N-gram latency analytics"
+      rowKey={(row) => row.gram}
+      renderCell={(row, columnKey) => {
+        if (columnKey === 'gram') return <code>{row.gram.replace(/\s/g, '␠')}</code>;
+        if (columnKey === 'mean') return row.meanMs;
+        if (columnKey === 'median') return row.medianMs;
+        if (columnKey === 'count') return row.count;
+        if (columnKey === 'accuracy') return `${row.accuracy}%`;
+        return null;
+      }}
+    />
   );
 }
 
 function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
   if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>No data yet.</p>;
   return (
-    <table>
-      <thead><tr><th>Key</th><th>Presses</th><th>Errors</th><th>Interval</th><th>Acc</th></tr></thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.key}><td><code>{r.key === ' ' ? '␠' : r.key}</code></td><td>{r.presses}</td><td>{r.errors}</td><td>{r.meanIntervalMs}</td><td>{r.accuracy}%</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <PagedTable
+      columns={[
+        { key: 'key', label: 'Key' },
+        { key: 'presses', label: 'Presses' },
+        { key: 'errors', label: 'Errors' },
+        { key: 'interval', label: 'Interval' },
+        { key: 'accuracy', label: 'Acc' },
+      ]}
+      rows={rows}
+      pageSize={12}
+      caption="Per-key typing analytics, weakest keys first"
+      rowKey={(row) => row.key}
+      renderCell={(row, columnKey) => {
+        if (columnKey === 'key') return <code>{row.key === ' ' ? '␠' : row.key}</code>;
+        if (columnKey === 'presses') return row.presses;
+        if (columnKey === 'errors') return row.errors;
+        if (columnKey === 'interval') return row.meanIntervalMs;
+        if (columnKey === 'accuracy') return `${row.accuracy}%`;
+        return null;
+      }}
+    />
   );
 }
 
