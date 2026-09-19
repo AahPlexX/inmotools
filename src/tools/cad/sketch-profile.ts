@@ -83,9 +83,8 @@ function namedOriginFrame(plane: 'XY' | 'XZ' | 'YZ'): PlaneFrame {
  * its normal by `distance`. In-plane axis directions are inherited unchanged
  * from the base plane, since a pure offset cannot rotate them - this is what
  * keeps the "offset" variant unambiguous without picking an arbitrary
- * in-plane rotation. Angle, mid-plane, three-point, tangent, and
- * face-derived datum planes are not yet supported and are rejected rather
- * than approximated.
+ * in-plane rotation. Other datum-plane constructions have dedicated
+ * resolvers rather than being approximated here.
  */
 export function resolveDatumPlaneFrame(basePlane: 'XY' | 'XZ' | 'YZ', distance: number): PlaneFrame {
   if (!Number.isFinite(distance)) throw new Error('Datum plane offset distance must be finite.');
@@ -147,6 +146,65 @@ export function resolveThreePointDatumPlaneFrame(
   return {
     normal,
     point: (x, y) => vectorAdd(p1, vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y))),
+    vector: (x, y) => vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y)),
+  };
+}
+
+/**
+ * Resolves the construction plane equidistant from two parent planes.
+ * Parallel parents produce the unique halfway plane. Intersecting parents
+ * produce one of the two angle-bisector planes; `flipAlignment` selects the
+ * other bisector. Coplanar parents are rejected because they do not define a
+ * distinct mid-plane.
+ */
+export function resolveMidPlaneDatumPlaneFrame(
+  first: PlaneFrame,
+  second: PlaneFrame,
+  flipAlignment = false,
+): PlaneFrame {
+  const firstOrigin = first.point(0, 0);
+  const secondOrigin = second.point(0, 0);
+  const firstNormal = normalizeVector(first.normal);
+  const secondNormal = normalizeVector(second.normal);
+  const intersectionDirection = crossVector(firstNormal, secondNormal);
+  const intersectionLength = vectorLength(intersectionDirection);
+  const epsilon = 1e-9;
+
+  if (intersectionLength <= epsilon) {
+    const separation = dotVector(vectorSub(secondOrigin, firstOrigin), firstNormal);
+    if (Math.abs(separation) <= epsilon) {
+      throw new Error('Mid-plane parents are coplanar and do not define a distinct plane.');
+    }
+    const origin = vectorAdd(firstOrigin, vectorScale(firstNormal, separation / 2));
+    const xAxis = normalizeVector(first.vector(1, 0));
+    const yAxis = normalizeVector(first.vector(0, 1));
+    return {
+      normal: firstNormal,
+      point: (x, y) => vectorAdd(origin, vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y))),
+      vector: (x, y) => vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y)),
+    };
+  }
+
+  const directionSquared = dotVector(intersectionDirection, intersectionDirection);
+  const firstConstant = dotVector(firstNormal, firstOrigin);
+  const secondConstant = dotVector(secondNormal, secondOrigin);
+  const origin = vectorScale(
+    vectorAdd(
+      vectorScale(crossVector(secondNormal, intersectionDirection), firstConstant),
+      vectorScale(crossVector(intersectionDirection, firstNormal), secondConstant),
+    ),
+    1 / directionSquared,
+  );
+  const xAxis = normalizeVector(intersectionDirection);
+  const rawNormal = flipAlignment
+    ? vectorAdd(firstNormal, secondNormal)
+    : vectorSub(firstNormal, secondNormal);
+  const normal = normalizeVector(rawNormal);
+  const yAxis = normalizeVector(crossVector(normal, xAxis));
+
+  return {
+    normal,
+    point: (x, y) => vectorAdd(origin, vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y))),
     vector: (x, y) => vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y)),
   };
 }
