@@ -142,6 +142,8 @@ export interface CadExactKernel {
   thicken(shape: CadKernelShape, thickness: number): CadKernelShape;
   defeature(shape: CadKernelShape, faceIds: readonly string[]): CadKernelShape;
   heal(shape: CadKernelShape): CadKernelShape;
+  /** Runs OCCT's own shape-validity analysis (closed/connected topology, no self-intersection heuristics it detects). */
+  isValid(shape: CadKernelShape): boolean;
   unify(shape: CadKernelShape): CadKernelShape;
   sew(shapes: readonly CadKernelShape[]): CadKernelShape;
   tessellate(shape: CadKernelShape, options: CadKernelTessellationOptions): CadKernelMesh;

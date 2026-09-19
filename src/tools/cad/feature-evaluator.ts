@@ -374,13 +374,21 @@ function defeatureFeature(
   return kernel.defeature(shape, resolvedTopologyIds(feature, kernel, shape, 'face'));
 }
 
-/** Applies OCCT's general solid-healing pass. Reporting exactly what changed is not yet implemented. */
+/**
+ * Applies OCCT's general solid-healing pass and surfaces whether it actually
+ * produced a valid shape. Reporting exactly what changed is still out of
+ * scope (occt-wasm's isValid is a pass/fail check, not a change log) but a
+ * heal that silently leaves invalid geometry in the model is worth flagging.
+ */
 function healFeature(
   feature: CadFeature,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
+  warnings: string[],
 ): CadKernelShape {
-  return kernel.heal(singleDependencyShape(feature, featureShapes, 'heal'));
+  const healed = kernel.heal(singleDependencyShape(feature, featureShapes, 'heal'));
+  if (!kernel.isValid(healed)) warnings.push(`${feature.id}: shape is still invalid after healing.`);
+  return healed;
 }
 
 function unifyFeature(
@@ -1049,6 +1057,7 @@ function createFeatureShape(
   datumPlanes: CadDatumPlaneFrames,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
+  warnings: string[],
 ): CadKernelShape | null {
   switch (feature.type) {
     case 'primitive':
@@ -1072,7 +1081,7 @@ function createFeatureShape(
     case 'defeature':
       return defeatureFeature(feature, kernel, featureShapes);
     case 'heal':
-      return healFeature(feature, kernel, featureShapes);
+      return healFeature(feature, kernel, featureShapes, warnings);
     case 'unify':
       return unifyFeature(feature, kernel, featureShapes);
     case 'sew':
@@ -1122,6 +1131,7 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
   const featureShapes = new Map<string, CadKernelShape>();
   const finalBodies = new Map<string, CadEvaluatedBody>();
   const ownedShapes = new Set<CadKernelShape>();
+  const warnings: string[] = [];
   let activeFeature: CadFeature | null = null;
 
   try {
@@ -1130,7 +1140,7 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
       activeFeature = feature;
       if (feature.suppressed) continue;
 
-      const shape = createFeatureShape(feature, project, datumPlanes, kernel, featureShapes);
+      const shape = createFeatureShape(feature, project, datumPlanes, kernel, featureShapes, warnings);
       if (!shape) continue;
 
       if (!feature.bodyId) {
@@ -1158,7 +1168,7 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
         const evaluated = finalBodies.get(body.id);
         return evaluated ? [evaluated] : [];
       }),
-      warnings: [],
+      warnings,
     };
   } catch (error) {
     releaseShapes(kernel, ownedShapes, new Set());

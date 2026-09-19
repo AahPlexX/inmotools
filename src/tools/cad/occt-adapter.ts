@@ -409,6 +409,10 @@ export class OcctCadKernelAdapter implements CadExactKernel {
     return this.#wrap(this.#kernel.healSolid(this.#unwrap(shape)));
   }
 
+  isValid(shape: CadKernelShape): boolean {
+    return this.#kernel.isValid(this.#unwrap(shape));
+  }
+
   unify(shape: CadKernelShape): CadKernelShape {
     return this.#wrap(this.#kernel.unifySameDomain(this.#unwrap(shape)));
   }

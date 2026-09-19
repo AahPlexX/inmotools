@@ -68,6 +68,7 @@ function fakeKernel() {
     mirror: vi.fn(),
     thicken: vi.fn(),
     heal: vi.fn(),
+    isValid: vi.fn(() => true),
     unify: vi.fn(),
     sew: vi.fn(),
     split: vi.fn(),
@@ -177,6 +178,36 @@ describe('CAD exact feature evaluator', () => {
 
     expect(kernel.heal).toHaveBeenCalledWith(shapes.box);
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'heal-1', shape: healed }]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('warns with the feature id when a healed shape is still invalid afterward, without failing evaluation', () => {
+    const { kernel, shapes } = fakeKernel();
+    const healed = token('healed');
+    kernel.heal = vi.fn(() => healed);
+    kernel.isValid = vi.fn(() => false);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('heal-1', 'heal', {}, ['box-1']),
+    ]), kernel);
+
+    expect(kernel.isValid).toHaveBeenCalledWith(healed);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'heal-1', shape: healed }]);
+    expect(result.warnings).toEqual(['heal-1: shape is still invalid after healing.']);
+  });
+
+  it('does not warn when a healed shape is valid afterward', () => {
+    const { kernel } = fakeKernel();
+    kernel.heal = vi.fn(() => token('healed'));
+    kernel.isValid = vi.fn(() => true);
+
+    const result = evaluateCadFeatures(project([
+      feature('box-1', 'primitive', { kind: 'box', width: 20, depth: 10, height: 5 }),
+      feature('heal-1', 'heal', {}, ['box-1']),
+    ]), kernel);
+
+    expect(result.warnings).toEqual([]);
   });
 
   it('unifies same-domain faces on a dependency shape', () => {

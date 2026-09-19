@@ -138,6 +138,10 @@ describe('CAD exact OCCT adapter', () => {
     }
   });
 
+  it('reports a well-formed solid as valid', () => {
+    expect(kernel.isValid(box)).toBe(true);
+  });
+
   it('unifies same-domain faces on a solid without changing its volume', () => {
     const unified = kernel.unify(box);
     try {
