@@ -393,7 +393,7 @@ test('reader state survives an export and import round trip', async ({ page }) =
 
 test('highlights and margin notes are kept against the word', async ({ page }) => {
   await loadSample(page);
-  await openPanel(page, 'marks');
+  await page.locator('.sightline-cockpit-more').locator('summary').click();
   await page.getByRole('button', { name: 'Highlight this sentence' }).click();
   await expect(page.locator('.sightline-list').filter({ hasText: 'words' }).first()).toBeVisible();
 
