@@ -124,6 +124,9 @@ export function normalizeStoredTest(value: unknown, fallbackSavedAt = Date.now()
   if (!LANGUAGES.has(record.language as Language) || !LAYOUT_IDS.has(record.layout as LayoutId)) return null;
   if (!FINISH_REASONS.has(record.finishReason as StoredTest['finishReason'])) return null;
   if (record.quoteLength !== undefined && !QUOTE_LENGTHS.has(record.quoteLength)) return null;
+  if ((record.mode === 'quote') !== (record.durationMode === 'quote')) return null;
+  if ((record.mode === 'zen') !== (record.durationMode === 'zen')) return null;
+  if (record.durationMode === 'quote' && record.quoteLength === undefined) return null;
   if (typeof record.targetText !== 'string' || !finiteNumber(record.durationValue)) return null;
   if (!finiteNumber(record.netWpm) || !finiteNumber(record.grossWpm) || !finiteNumber(record.rawCpm)) return null;
   if (!finiteNumber(record.accuracy, 0, 100) || !finiteNumber(record.consistency, 0, 100)) return null;
