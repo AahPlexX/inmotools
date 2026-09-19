@@ -1,9 +1,9 @@
 # In Progress
 
 - **Tabular Sheet Workstation (TASK-022)** — Stage 1 local multi-sheet workbook on `feature/tabular-sheet-workstation`.
-  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md`.
-  - Current milestone: Stage 1 vertical slice — catalog slug, lazy workspace, portable multi-sheet grid, formula DAG, IndexedDB/LocalStorage, SheetJS import, exceljs/CSV/bundle export, Chart.js selection charts, in-house pivot. Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` optional live engine. No Univer Pro, no HyperFormula.
-  - Completion: all 36 ledger items implemented and verified, focused units + build green on the branch, draft PR only. Do not merge to main. Do not touch PR #33 / transcode.
+  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` statuses `done` | `stub-stage2` | `evidence-cut` (official URL + as-of).
+  - Current milestone: Stage 1 vertical slice — catalog slug, lazy workspace, portable multi-sheet grid, formula DAG, IndexedDB/LocalStorage, SheetJS import, exceljs/CSV/bundle export, Chart.js selection charts, in-house pivot. Feature 24 is stub hooks only for Frontend Stage 2. Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` optional live engine (`contextMenu: false`). No Univer Pro, no HyperFormula.
+  - Completion: vertical slice + focused units + build green, draft PR `feature/tabular-sheet-workstation` → `main` only, then stop commits. Do not merge to main. Do not touch PR #33 / transcode.
   - Scope: `src/tools/sheets/`, catalog/loader wiring, sheets unit tests, additive pins. Other workstreams remain untouched.
 
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
 import { consumeFileInput } from '../../lib/file-input';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { PagedTable } from '../../components/PagedTable';
+import { cancelLongPressStub, scheduleLongPressStub, suppressNativeContextMenu } from './sheets-context-menu';
 import { a1FromParts, displayCell, evaluateWorkbook, selectionAggregates } from './sheets-formula';
 import {
   addComment,
@@ -75,7 +76,6 @@ export default function SheetsWorkspace() {
   const [replace, setReplace] = useState('');
   const [selection, setSelection] = useState<Selection>({ sheetId: '', r1: 0, c1: 0, r2: 0, c2: 0 });
   const [scroll, setScroll] = useState({ row: 0, col: 0 });
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [engine, setEngine] = useState<'fallback' | 'univer'>('fallback');
   const [library, setLibrary] = useState<StoredWorkbook[]>([]);
   const [chartKind, setChartKind] = useState<ChartKind>('bar');
@@ -328,30 +328,20 @@ export default function SheetsWorkspace() {
     setStatus('Downloaded XLSX via exceljs 4.4.0.');
   };
 
-  const openMenu = (x: number, y: number) => {
-    setMenu({ x: Math.min(x, window.innerWidth - 220), y: Math.min(y, window.innerHeight - 220) });
-  };
-
-  const onPointerDown = (event: ReactPointerEvent<HTMLTableCellElement>, row: number, col: number) => {
+  const onPointerDown = (row: number, col: number) => {
     setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
-    if (longPress.current) window.clearTimeout(longPress.current);
-    longPress.current = window.setTimeout(() => openMenu(event.clientX, event.clientY), 500);
+    scheduleLongPressStub(longPress);
   };
 
   const onPointerUp = () => {
-    if (longPress.current) window.clearTimeout(longPress.current);
-    longPress.current = null;
+    cancelLongPressStub(longPress);
   };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.target instanceof HTMLElement)) return;
       const typing = event.target.closest('input, textarea, select');
-      if (event.key === 'Escape') {
-        setMenu(null);
-        return;
-      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void persist();
@@ -508,14 +498,11 @@ export default function SheetsWorkspace() {
                           textAlign: cell?.s?.align,
                           whiteSpace: cell?.s?.wrap ? 'normal' : 'nowrap',
                         }}
-                        onPointerDown={(event) => onPointerDown(event, row, col)}
+                        onPointerDown={() => onPointerDown(row, col)}
                         onPointerUp={onPointerUp}
                         onPointerLeave={onPointerUp}
                         onDoubleClick={() => document.getElementById('tsw-formula')?.focus()}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          openMenu(event.clientX, event.clientY);
-                        }}
+                        onContextMenu={(event) => suppressNativeContextMenu(event)}
                       >
                         {cell?.hyperlink ? <a href={cell.hyperlink} target="_blank" rel="noreferrer">{displayCell(cell)}</a> : displayCell(cell)}
                       </td>
@@ -618,7 +605,7 @@ export default function SheetsWorkspace() {
 
         <section className="tsw-panel">
           <h3>Stage 1 progress TODO</h3>
-          <p>{summary.done} done · {summary.inProgress} in progress · {summary.open} open. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
+          <p>{summary.done} done · {summary.stubStage2} stub-stage2 · {summary.evidenceCut} evidence-cut. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
           <ol className="tsw-progress">
             {FEATURE_PROGRESS.map((row) => (
               <li key={row.id}>
@@ -630,15 +617,6 @@ export default function SheetsWorkspace() {
         </section>
       </div>
 
-      {menu ? (
-        <div className="tsw-context" style={{ left: menu.x, top: menu.y }} role="menu">
-          <button type="button" onClick={() => { void copySelection(); setMenu(null); }}>Copy</button>
-          <button type="button" onClick={() => { void pasteSelection(); setMenu(null); }}>Paste</button>
-          <button type="button" onClick={() => { commit(setCell(book, sheetId, selection.r1, selection.c1, { s: { ...activeCell?.s, bold: true } }), 'Applied bold.'); setMenu(null); }}>Bold</button>
-          <button type="button" onClick={() => { commit(setCell(book, sheetId, selection.r1, selection.c1, { s: { ...activeCell?.s, wrap: true } }), 'Wrapped text.'); setMenu(null); }}>Wrap</button>
-          <button type="button" onClick={() => setMenu(null)}>Close</button>
-        </div>
-      ) : null}
     </div>
   );
 }

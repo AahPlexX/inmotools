@@ -28,8 +28,7 @@
 .tsw-formula,
 .tsw-status,
 .tsw-panel,
-.tsw-sheet-tabs,
-.tsw-context {
+.tsw-sheet-tabs {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -38,7 +37,6 @@
 
 .tsw-toolbar button,
 .tsw-sheet-tabs button,
-.tsw-context button,
 .tsw-panel button {
   min-height: 44px;
   min-width: 44px;
@@ -204,20 +202,13 @@
   font-size: 0.82rem;
 }
 
-.tsw-progress strong[data-status='DONE'] { color: var(--good); }
-.tsw-progress strong[data-status='IN_PROGRESS'] { color: var(--warning); }
-.tsw-progress strong[data-status='OPEN'] { color: var(--muted); }
+.tsw-progress strong[data-status='done'] { color: var(--good); }
+.tsw-progress strong[data-status='stub-stage2'] { color: var(--warning); }
+.tsw-progress strong[data-status='evidence-cut'] { color: var(--muted); }
 
 .tsw-chart {
   min-height: 14rem;
   position: relative;
-}
-
-.tsw-context {
-  position: fixed;
-  z-index: 20;
-  display: grid;
-  min-width: min(18rem, calc(100vw - 1.5rem));
 }
 
 .tsw-engine-note {

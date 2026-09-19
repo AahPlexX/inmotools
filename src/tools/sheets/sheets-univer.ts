@@ -41,7 +41,7 @@ export async function mountUniverSheets(container: HTMLElement, workbook: Portab
         header: true,
         toolbar: true,
         formulaBar: true,
-        contextMenu: true,
+        contextMenu: false,
         footer: { sheetBar: true, statisticBar: true, zoomSlider: true },
         statusBarStatistic: true,
       }),

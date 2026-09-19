@@ -111,12 +111,23 @@ export interface SheetPrefs {
   showProgress: boolean;
 }
 
-export interface FeatureStatus {
-  id: number;
-  title: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'DONE';
-  note: string;
-}
+export type LedgerStatus = 'done' | 'stub-stage2' | 'evidence-cut';
+
+export type FeatureStatus =
+  | {
+      id: number;
+      title: string;
+      status: 'done' | 'stub-stage2';
+      note: string;
+    }
+  | {
+      id: number;
+      title: string;
+      status: 'evidence-cut';
+      note: string;
+      evidenceUrl: string;
+      asOf: string;
+    };
 
 export function cellKey(row: number, col: number): string {
   return `${row},${col}`;

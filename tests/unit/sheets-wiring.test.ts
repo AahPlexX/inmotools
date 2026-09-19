@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { TOOLS, TOOL_BY_SLUG } from '../../src/catalog';
 import { selectE2eSpecs } from '../../scripts/select-e2e-specs.mjs';
 import { assertNoProImports } from '../../src/tools/sheets/sheets-univer';
+import { suppressNativeContextMenu } from '../../src/tools/sheets/sheets-context-menu';
 import { FEATURE_PROGRESS, progressSummary } from '../../src/tools/sheets/sheets-progress';
 import { pivotSheet } from '../../src/tools/sheets/sheets-pivot';
 import { importCsv, importXlsx, sheetToCsv } from '../../src/tools/sheets/sheets-io';
@@ -38,11 +39,29 @@ describe('tabular sheet workstation wiring', () => {
     ]);
   });
 
-  it('keeps the 36-feature ledger complete', () => {
+  it('keeps the 36-feature ledger complete with locked statuses', () => {
     expect(FEATURE_PROGRESS).toHaveLength(36);
     expect(FEATURE_PROGRESS.map((row) => row.id)).toEqual(Array.from({ length: 36 }, (_, index) => index + 1));
+    const allowed = new Set(['done', 'stub-stage2', 'evidence-cut']);
+    expect(FEATURE_PROGRESS.every((row) => allowed.has(row.status))).toBe(true);
+    expect(FEATURE_PROGRESS.filter((row) => row.status === 'evidence-cut').every((row) => {
+      return row.status === 'evidence-cut' && Boolean(row.evidenceUrl) && Boolean(row.asOf);
+    })).toBe(true);
     const summary = progressSummary();
-    expect(summary.done + summary.inProgress + summary.open).toBe(36);
+    expect(summary.done + summary.stubStage2 + summary.evidenceCut).toBe(36);
+    expect(FEATURE_PROGRESS.find((row) => row.id === 24)?.status).toBe('stub-stage2');
+  });
+
+  it('reserves Feature 24 as stub hooks only', () => {
+    const event = { prevented: false, preventDefault() { this.prevented = true; } };
+    suppressNativeContextMenu(event);
+    expect(event.prevented).toBe(true);
+    const workspace = read('src/tools/sheets/SheetsWorkspace.tsx');
+    expect(workspace).toContain('suppressNativeContextMenu');
+    expect(workspace).toContain('scheduleLongPressStub');
+    expect(workspace).not.toContain('openMenu');
+    expect(workspace).not.toContain('tsw-context');
+    expect(read('src/tools/sheets/sheets-univer.ts')).toContain('contextMenu: false');
   });
 
   it('imports CSV and XLSX and exports formula-safe CSV', () => {
