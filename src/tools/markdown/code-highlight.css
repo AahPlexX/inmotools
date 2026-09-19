@@ -1,0 +1,39 @@
+/* Fenced code block syntax coloring for `tok-*` spans (see
+   code-highlight-engine.ts). Kept in its own file, separate from
+   markdown-workbench.css, and using literal colors rather than this app's
+   `--muted`/`--signal`/etc. custom properties, because export-engine.ts
+   inlines this same file's raw text (via `?inline`) into standalone HTML
+   and EPUB exports, which are self-contained documents with no access to
+   this app's `:root` variable definitions. Selectors are `pre code .tok-*`
+   rather than scoped under `.markdown-workbench-preview`, since exported
+   documents never carry that wrapper class. */
+pre code .tok-comment { color: #59636e; font-style: italic; }
+pre code .tok-keyword,
+pre code .tok-operatorKeyword,
+pre code .tok-controlKeyword,
+pre code .tok-moduleKeyword,
+pre code .tok-definitionKeyword { color: #1546ad; font-weight: 700; }
+pre code .tok-string,
+pre code .tok-string2,
+pre code .tok-attributeValue { color: #1c7a4a; }
+pre code .tok-number,
+pre code .tok-atom,
+pre code .tok-bool { color: #a0521d; }
+pre code .tok-typeName,
+pre code .tok-className,
+pre code .tok-namespace { color: #6a3fb5; }
+pre code .tok-propertyName,
+pre code .tok-attributeName,
+pre code .tok-tagName { color: #1546ad; }
+pre code .tok-variableName2,
+pre code .tok-macroName { color: #a0521d; }
+pre code .tok-meta,
+pre code .tok-processingInstruction { color: #59636e; }
+pre code .tok-invalid { color: #b3261e; text-decoration: underline wavy; }
+pre code .tok-strong { font-weight: 700; }
+pre code .tok-emphasis { font-style: italic; }
+pre code .tok-heading { color: #1546ad; font-weight: 700; }
+pre code .tok-link,
+pre code .tok-url { color: #205bd6; }
+pre code .tok-inserted { color: #1c7a4a; }
+pre code .tok-deleted { color: #b3261e; }

@@ -37,6 +37,7 @@
     "@gltf-transform/extensions": "4.4.2",
     "@gltf-transform/functions": "4.4.2",
     "@hpcc-js/wasm-graphviz": "1.28.0",
+    "@lezer/highlight": "1.2.3",
     "@replit/codemirror-vim": "6.4.0",
     "@spglib/moyo-wasm": "0.16.0",
     "@tonejs/midi": "2.0.28",

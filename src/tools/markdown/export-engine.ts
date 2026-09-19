@@ -17,7 +17,17 @@ import {
 import JSZip from 'jszip';
 import type { Root as MdastRoot, RootContent as MdastRootContent, PhrasingContent, Nodes, Definition } from 'mdast';
 import katexExportCss from 'katex/dist/katex.css?inline';
+import codeHighlightCss from './code-highlight.css?inline';
 import { bundleStylesheetAssetsForEpub, type ExportAsset } from './export-assets';
+
+// Every HTML-derived export (standalone HTML, EPUB) is a self-contained
+// document assembled from the live preview's `innerHTML`, so it never
+// carries markdown-workbench.css. The `tok-*` classes render-engine.ts
+// attaches to highlighted fenced code (see code-highlight-engine.ts) would
+// otherwise reach these exports with no matching style at all - this is
+// the same raw-CSS-text-inlining approach already used for KaTeX's own
+// exported stylesheet below.
+const hasHighlightedCode = (bodyHtml: string): boolean => /class=(['"])[^'"]*\btok-[a-zA-Z]/.test(bodyHtml);
 
 const escapeHtml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -46,6 +56,7 @@ export const buildStandaloneMarkdownHtml = (
   img, svg { max-width: 100%; height: auto; }
   .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
   .katex-error { color: #b3261e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+${hasHighlightedCode(bodyHtml) ? codeHighlightCss : ''}
 ${options.additionalCss ?? ''}
 </style>
 </head>
@@ -411,15 +422,26 @@ export const buildEpubArchive = async (
   const packagedAssets: ExportAsset[] = [...assets];
   let stylesheetCss = options.stylesheetCss;
 
-  if (!stylesheetCss && hasKatexMarkup(bodyHtml)) {
-    const baseUrl = options.stylesheetBaseUrl ?? (typeof document !== 'undefined' ? document.baseURI : undefined);
-    if (!baseUrl) throw new Error('EPUB math styling could not resolve its local font resources.');
-    const bundledStylesheet = await bundleStylesheetAssetsForEpub(katexExportCss, baseUrl, options.fetcher ?? fetch);
-    if (bundledStylesheet.unresolved.length > 0) {
-      throw new Error(`EPUB math styling could not bundle ${bundledStylesheet.unresolved.length} referenced resource(s).`);
+  if (!stylesheetCss) {
+    // Both fragments are plain text with no external references of their
+    // own (codeHighlightCss uses literal colors, never `var(--*)`, for
+    // exactly this reason), so they can simply be concatenated ahead of
+    // KaTeX's own bundled stylesheet rather than one replacing the other.
+    const cssParts: string[] = [];
+    if (hasHighlightedCode(bodyHtml)) cssParts.push(codeHighlightCss);
+
+    if (hasKatexMarkup(bodyHtml)) {
+      const baseUrl = options.stylesheetBaseUrl ?? (typeof document !== 'undefined' ? document.baseURI : undefined);
+      if (!baseUrl) throw new Error('EPUB math styling could not resolve its local font resources.');
+      const bundledStylesheet = await bundleStylesheetAssetsForEpub(katexExportCss, baseUrl, options.fetcher ?? fetch);
+      if (bundledStylesheet.unresolved.length > 0) {
+        throw new Error(`EPUB math styling could not bundle ${bundledStylesheet.unresolved.length} referenced resource(s).`);
+      }
+      cssParts.push(bundledStylesheet.css);
+      packagedAssets.push(...bundledStylesheet.assets);
     }
-    stylesheetCss = bundledStylesheet.css;
-    packagedAssets.push(...bundledStylesheet.assets);
+
+    if (cssParts.length > 0) stylesheetCss = cssParts.join('\n');
   }
 
   const stylesheetPath = stylesheetCss ? 'styles/markdown.css' : undefined;

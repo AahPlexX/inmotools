@@ -6,8 +6,9 @@ import remarkRehype from 'remark-rehype';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { toHtml } from 'hast-util-to-html';
-import type { Element, Root as HastRoot, RootContent as HastRootContent } from 'hast';
+import type { Element, ElementContent, Root as HastRoot, RootContent as HastRootContent, Text as HastText } from 'hast';
 import type { RenderResult, ScrollAnchor } from './markdown-types';
+import { highlightFencedCode, isDiagramLanguageTag } from './code-highlight-engine';
 
 // Renders a markdown source string to sanitized HTML.
 //
@@ -55,10 +56,55 @@ const createProcessor = () =>
     .use(rehypeSanitize, sanitizeSchema);
 
 const isElement = (node: HastRootContent): node is Element => node.type === 'element';
+const isText = (node: HastRootContent): node is HastText => node.type === 'text';
+
+const languageTagOf = (codeElement: Element): string | undefined => {
+  const classNames = codeElement.properties?.className;
+  const classList = Array.isArray(classNames) ? classNames.map(String) : typeof classNames === 'string' ? [classNames] : [];
+  const languageClass = classList.find((name) => name.startsWith('language-'));
+  return languageClass?.slice('language-'.length);
+};
+
+// Replaces a fenced code block's plain-text children with `tok-*`-classed
+// spans wherever a grammar is registered for its language tag (see
+// code-highlight-engine.ts). Diagram code blocks are left untouched: their
+// `pre` is replaced wholesale by diagram-renderer.ts once Mermaid/Graphviz
+// has rendered it, so highlighting their source text would be discarded
+// work. Walks the whole tree, not just its root children - a fenced block
+// can appear nested inside a list item or blockquote, unlike the
+// root-only scope of the scroll-sync anchors below.
+const highlightCodeBlocks = (node: HastRoot | HastRootContent): void => {
+  if (!('children' in node)) return;
+  for (const child of node.children) {
+    if (
+      isElement(child)
+      && child.tagName === 'pre'
+      && child.children.length === 1
+      && isElement(child.children[0])
+      && child.children[0].tagName === 'code'
+    ) {
+      const codeElement = child.children[0];
+      const languageTag = languageTagOf(codeElement);
+      if (languageTag && !isDiagramLanguageTag(languageTag)) {
+        const raw = codeElement.children.filter(isText).map((text) => text.value).join('');
+        const tokens = highlightFencedCode(raw, languageTag);
+        if (tokens) {
+          codeElement.children = tokens.map((token): ElementContent =>
+            token.classes
+              ? { type: 'element', tagName: 'span', properties: { className: token.classes.split(' ') }, children: [{ type: 'text', value: token.text }] }
+              : { type: 'text', value: token.text },
+          );
+        }
+      }
+    }
+    highlightCodeBlocks(child);
+  }
+};
 
 export const renderMarkdown = (source: string): RenderResult => {
   const processor = createProcessor();
   const tree = processor.runSync(processor.parse(source)) as HastRoot;
+  highlightCodeBlocks(tree);
 
   const anchors: ScrollAnchor[] = [];
   tree.children.forEach((node, index) => {

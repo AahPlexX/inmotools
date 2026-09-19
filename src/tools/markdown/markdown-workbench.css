@@ -1,5 +1,9 @@
 /* Markdown Workbench-specific presentation. Kept with the lazy workspace so
-   these rules load only when the Markdown tool is opened. */
+   these rules load only when the Markdown tool is opened. Fenced-code
+   token colors live in code-highlight.css instead, since export-engine.ts
+   also needs that file's raw text to color exported code the same way. */
+@import './code-highlight.css';
+
 .markdown-workbench-toolbar {
   align-items: stretch;
   gap: 8px;
