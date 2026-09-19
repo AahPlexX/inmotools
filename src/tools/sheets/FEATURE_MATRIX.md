@@ -24,42 +24,42 @@ Status values used below: `OPEN` (not started), `IN_PROGRESS` (Stage 1 slice), `
 
 | # | Feature | Stage 1 plan | Status |
 | ---: | --- | --- | --- |
-| 1 | Multi-sheet workbook | Univer core preset + portable snapshot model | OPEN |
-| 2 | Formula bar | Univer `formulaBar` in `UniverSheetsCorePreset` | OPEN |
-| 3 | AST/DAG via Univer `engine-formula` in preset | Live grid uses preset formula engine; portable DAG tests cover refs/cycles | OPEN |
-| 4 | Relative / absolute refs | `$A$1` / `A$1` / `$A1` / `A1` parse + fill rewrite | OPEN |
-| 5 | Cross-sheet refs | `Sheet2!B3` / `'Sheet Name'!A1` | OPEN |
-| 6 | Named ranges | Portable named-range table synced into snapshot | OPEN |
-| 7 | Fill handle | Univer fill + portable relative rewrite | OPEN |
-| 8 | Undo / redo | Univer history + portable command stack fallback | OPEN |
-| 9 | Cut / copy / paste | Univer clipboard + portable range copy | OPEN |
-| 10 | Find / replace | Workspace find panel (core preset has no dedicated find-replace pin) | OPEN |
-| 11 | Number formats | Univer numfmt + portable `z` formats | OPEN |
-| 12 | Cell styles | Font / fill / align / border in snapshot | OPEN |
-| 13 | Merge cells | Univer merge + portable merge ranges | OPEN |
-| 14 | Freeze panes | Univer freeze + portable freeze | OPEN |
-| 15 | Row / col insert, delete, resize | Univer + portable structural edits | OPEN |
-| 16 | Sort | In-house range sort on portable model | OPEN |
-| 17 | Filter | In-house header-row filter | OPEN |
-| 18 | Data validation | In-house lists / numbers / custom formula | OPEN |
-| 19 | Conditional formatting | In-house rules on portable model | OPEN |
-| 20 | Status-bar aggregates | Count / sum / average / min / max of selection | OPEN |
-| 21 | Charts via `chart.js@4.5.1` from selection | Reuse existing Chart.js; no second copy | OPEN |
-| 22 | In-house pivot / group-by aggregation | Open substitute; no Univer Pro pivot | OPEN |
-| 23 | Keyboard shortcuts | Univer + workspace accelerators | OPEN |
-| 24 | Context menu + long-press | Univer context menu + 500 ms touch long-press | OPEN |
-| 25 | Virtualized grid | Univer canvas grid; accessible fallback window | OPEN |
-| 26 | Zoom | Univer zoom + workspace control | OPEN |
-| 27 | Wrap / overflow | Univer wrap + portable wrap flag | OPEN |
-| 28 | Hyperlinks | Portable per-cell links | OPEN |
-| 29 | Comments / notes | Portable notes (no Pro thread-comment) | OPEN |
-| 30 | IndexedDB persistence | Dexie database scoped to this tool | OPEN |
-| 31 | LocalStorage prefs | Theme / zoom / last workbook id | OPEN |
-| 32 | XLSX import (SheetJS CE 0.20.3) | Official CE tarball only | OPEN |
-| 33 | XLSX export (`exceljs@4.4.0`) | Browser `writeBuffer` download | OPEN |
-| 34 | CSV export | Current sheet, formula-safe | OPEN |
-| 35 | Export with editable tags / meta | Title, author, tags, notes on every export | OPEN |
-| 36 | Portable workbook bundle import / export | Versioned JSON (and zip) round-trip | OPEN |
+| 1 | Multi-sheet workbook | Univer core preset + portable snapshot model | DONE |
+| 2 | Formula bar | Univer `formulaBar` in `UniverSheetsCorePreset` | DONE |
+| 3 | AST/DAG via Univer `engine-formula` in preset | Live grid uses preset formula engine; portable DAG tests cover refs/cycles | IN_PROGRESS |
+| 4 | Relative / absolute refs | `$A$1` / `A$1` / `$A1` / `A1` parse + fill rewrite | DONE |
+| 5 | Cross-sheet refs | `Sheet2!B3` / `'Sheet Name'!A1` | DONE |
+| 6 | Named ranges | Portable named-range table synced into snapshot | DONE |
+| 7 | Fill handle | Univer fill + portable relative rewrite | DONE |
+| 8 | Undo / redo | Univer history + portable command stack fallback | DONE |
+| 9 | Cut / copy / paste | Univer clipboard + portable range copy | DONE |
+| 10 | Find / replace | Workspace find panel (core preset has no dedicated find-replace pin) | DONE |
+| 11 | Number formats | Univer numfmt + portable `z` formats | IN_PROGRESS |
+| 12 | Cell styles | Font / fill / align / border in snapshot | IN_PROGRESS |
+| 13 | Merge cells | Univer merge + portable merge ranges | DONE |
+| 14 | Freeze panes | Univer freeze + portable freeze | DONE |
+| 15 | Row / col insert, delete, resize | Univer + portable structural edits | DONE |
+| 16 | Sort | In-house range sort on portable model | DONE |
+| 17 | Filter | In-house header-row filter | IN_PROGRESS |
+| 18 | Data validation | In-house lists / numbers / custom formula | IN_PROGRESS |
+| 19 | Conditional formatting | In-house rules on portable model | IN_PROGRESS |
+| 20 | Status-bar aggregates | Count / sum / average / min / max of selection | DONE |
+| 21 | Charts via `chart.js@4.5.1` from selection | Reuse existing Chart.js; no second copy | DONE |
+| 22 | In-house pivot / group-by aggregation | Open substitute; no Univer Pro pivot | DONE |
+| 23 | Keyboard shortcuts | Univer + workspace accelerators | DONE |
+| 24 | Context menu + long-press | Univer context menu + 500 ms touch long-press | DONE |
+| 25 | Virtualized grid | Univer canvas grid; accessible fallback window | DONE |
+| 26 | Zoom | Univer zoom + workspace control | DONE |
+| 27 | Wrap / overflow | Univer wrap + portable wrap flag | IN_PROGRESS |
+| 28 | Hyperlinks | Portable per-cell links | DONE |
+| 29 | Comments / notes | Portable notes (no Pro thread-comment) | DONE |
+| 30 | IndexedDB persistence | Dexie database scoped to this tool | DONE |
+| 31 | LocalStorage prefs | Theme / zoom / last workbook id | DONE |
+| 32 | XLSX import (SheetJS CE 0.20.3) | Official CE tarball only | DONE |
+| 33 | XLSX export (`exceljs@4.4.0`) | Browser `writeBuffer` download | DONE |
+| 34 | CSV export | Current sheet, formula-safe | DONE |
+| 35 | Export with editable tags / meta | Title, author, tags, notes on every export | DONE |
+| 36 | Portable workbook bundle import / export | Versioned JSON (and zip) round-trip | DONE |
 
 ## Stage 1 done-when
 
