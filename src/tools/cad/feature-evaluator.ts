@@ -6,6 +6,7 @@ import {
   negate,
   perpendicularInPlane,
   resolveDatumPlaneFrame,
+  resolveMidPlaneDatumPlaneFrame,
   resolveThreePointDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
@@ -97,15 +98,26 @@ function parameterOriginPlane(feature: CadFeature, key: string): 'XY' | 'XZ' | '
   return value;
 }
 
+function parameterPlaneReference(
+  feature: CadFeature,
+  key: string,
+  frames: ReadonlyMap<string, PlaneFrame>,
+): PlaneFrame {
+  const value = parameterString(feature, key);
+  if (value === 'XY' || value === 'XZ' || value === 'YZ') return resolveDatumPlaneFrame(value, 0);
+  const frame = frames.get(value);
+  if (!frame) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unresolved plane '${value}' in parameter '${key}'.`);
+  }
+  return frame;
+}
+
 /**
  * Resolves every non-suppressed 'datum-plane' feature into a 3D plane frame
- * before any sketch is placed. Two variants are supported: the
- * offset-from-origin-plane (parameters: basePlane, distance) and the
- * three-point plane (parameters: point1, point2, point3), since each has an
- * unambiguous in-plane axis convention with no unstated design choice.
- * Angle, mid-plane, tangent, and face-derived datum planes are rejected
- * rather than approximated - each needs a convention decision this
- * evaluator does not yet make.
+ * before any sketch is placed. Supported variants are offset-from-origin,
+ * three-point, and mid-plane. Mid-plane references may target an origin plane
+ * or an earlier resolved datum plane; intersecting parents use flipAlignment
+ * to select the alternate angle bisector.
  */
 function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
   const frames = new Map<string, PlaneFrame>();
@@ -125,10 +137,22 @@ function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
       } catch (error) {
         throw new CadFeatureEvaluationError(feature.id, `${feature.label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
       }
+    } else if (kind === 'mid-plane') {
+      const first = parameterPlaneReference(feature, 'plane1', frames);
+      const second = parameterPlaneReference(feature, 'plane2', frames);
+      const flipAlignment = feature.parameters.flipAlignment;
+      if (flipAlignment !== undefined && typeof flipAlignment !== 'boolean') {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'flipAlignment' must be a boolean when provided.`);
+      }
+      try {
+        frames.set(feature.id, resolveMidPlaneDatumPlaneFrame(first, second, flipAlignment === true));
+      } catch (error) {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+      }
     } else {
       throw new CadFeatureEvaluationError(
         feature.id,
-        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset' and 'three-point' are implemented.`,
+        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset', 'three-point', and 'mid-plane' are implemented.`,
       );
     }
   }
