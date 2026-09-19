@@ -58,6 +58,14 @@ describe('tabular sheet workstation wiring', () => {
     expect([3, 11, 12, 17, 18, 19, 24, 27].every((id) => FEATURE_PROGRESS.find((row) => row.id === id)?.status === 'done')).toBe(true);
   });
 
+  it('makes the overflowing feature-progress list keyboard-focusable', () => {
+    const workspace = read('src/tools/sheets/SheetsWorkspace.tsx');
+    const css = read('src/tools/sheets/sheets.css');
+    expect(css).toMatch(/\.tsw-progress\s*\{[^}]*overflow:\s*auto/);
+    expect(workspace).toMatch(/<ol className="tsw-progress"[^>]*tabIndex=\{0\}/);
+    expect(workspace).toMatch(/<ol className="tsw-progress"[^>]*aria-label="Feature progress"/);
+  });
+
   it('wires Feature 24 reserved hooks to a real context-menu surface', () => {
     const event = { prevented: false, preventDefault() { this.prevented = true; } };
     suppressNativeContextMenu(event);
