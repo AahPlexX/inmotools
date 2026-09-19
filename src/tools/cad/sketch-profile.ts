@@ -114,12 +114,8 @@ const vectorAdd = (a: CadKernelVector3, b: CadKernelVector3): CadKernelVector3 =
  * Resolves a three-point datum plane: the first point becomes the frame's
  * local origin, the first-to-second edge becomes the local x-axis, and the
  * normal (hence the local y-axis, completing a right-handed frame) comes
- * from the two edges' cross product. This is the one remaining datum-plane
- * variant that has no arbitrary in-plane rotation to decide - three points
- * (unlike an angle or a face) fully determine both the plane and a natural
- * axis convention with no unstated design choice - so it is safe to
- * implement without the mid-plane/angle/tangent/face-derived variants,
- * which each need one.
+ * from the two edges' cross product. The three points fully determine both
+ * the plane and a natural in-plane axis convention.
  */
 export function resolveThreePointDatumPlaneFrame(
   p1: CadKernelVector3,
@@ -247,6 +243,47 @@ export function resolveTwoPlaneDatumAxis(
     1 / directionSquared,
   );
   return { origin, direction: normalizeVector(direction) };
+}
+
+/**
+ * Creates a plane through `axis` at an angle measured from `reference`.
+ * The axis must be parallel to the reference plane so it can lie in every
+ * rotated plane, matching the construction-plane-at-angle geometry.
+ */
+export function resolveAngleDatumPlaneFrame(
+  reference: PlaneFrame,
+  axis: CadSketchAxis3d,
+  angle: number,
+): PlaneFrame {
+  if (!Number.isFinite(angle)) throw new Error('Angle datum-plane angle must be finite.');
+  if (
+    axis.origin.some((component) => !Number.isFinite(component))
+    || axis.direction.some((component) => !Number.isFinite(component))
+  ) {
+    throw new Error('Angle datum-plane axis coordinates must be finite.');
+  }
+
+  const xAxis = normalizeVector(axis.direction);
+  const referenceNormal = normalizeVector(reference.normal);
+  if (Math.abs(dotVector(xAxis, referenceNormal)) > 1e-9) {
+    throw new Error('Angle datum-plane axis must be parallel to the reference plane.');
+  }
+
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const normal = normalizeVector(vectorAdd(
+    vectorAdd(
+      vectorScale(referenceNormal, cosine),
+      vectorScale(crossVector(xAxis, referenceNormal), sine),
+    ),
+    vectorScale(xAxis, dotVector(xAxis, referenceNormal) * (1 - cosine)),
+  ));
+  const yAxis = normalizeVector(crossVector(normal, xAxis));
+  return {
+    normal,
+    point: (x, y) => vectorAdd(axis.origin, vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y))),
+    vector: (x, y) => vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y)),
+  };
 }
 
 function originPlaneFrame(sketch: CadSketch, datumPlanes: CadDatumPlaneFrames): PlaneFrame {
