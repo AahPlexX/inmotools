@@ -8,6 +8,7 @@ import {
   negate,
   negateComponent,
   perpendicularInPlane,
+  resolveAngleDatumPlaneFrame,
   resolveDatumPlaneFrame,
   resolveMidPlaneDatumPlaneFrame,
   resolveSketchAxis3d,
@@ -196,6 +197,38 @@ describe('CAD sketch profile bridge', () => {
       resolveDatumPlaneFrame('XY', 0),
       resolveDatumPlaneFrame('XY', 10),
     )).toThrow(/parallel/i);
+  });
+
+  it('resolves a plane rotated around a reusable datum axis', () => {
+    const frame = resolveAngleDatumPlaneFrame(
+      resolveDatumPlaneFrame('XY', 0),
+      resolveTwoPointDatumAxis([0, 0, 0], [10, 0, 0]),
+      Math.PI / 2,
+    );
+
+    expect(frame.normal[0]).toBeCloseTo(0, 8);
+    expect(frame.normal[1]).toBeCloseTo(-1, 8);
+    expect(frame.normal[2]).toBeCloseTo(0, 8);
+    const point = frame.point(2, 3);
+    expect(point[0]).toBeCloseTo(2, 8);
+    expect(point[1]).toBeCloseTo(0, 8);
+    expect(point[2]).toBeCloseTo(3, 8);
+  });
+
+  it('rejects an angle-plane axis that is not parallel to the reference plane', () => {
+    expect(() => resolveAngleDatumPlaneFrame(
+      resolveDatumPlaneFrame('XY', 0),
+      resolveTwoPointDatumAxis([0, 0, 0], [0, 0, 10]),
+      Math.PI / 4,
+    )).toThrow(/parallel.*reference plane/i);
+  });
+
+  it('rejects a non-finite angle-plane value', () => {
+    expect(() => resolveAngleDatumPlaneFrame(
+      resolveDatumPlaneFrame('XY', 0),
+      resolveTwoPointDatumAxis([0, 0, 0], [10, 0, 0]),
+      Number.NaN,
+    )).toThrow(/finite/i);
   });
 
   it('places a profile on a resolved offset datum plane', () => {
