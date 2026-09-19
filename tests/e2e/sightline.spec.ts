@@ -93,9 +93,21 @@ test('pasted text is read through the chosen markup dialect', async ({ page }) =
   await expect(page.getByTestId('sightline-rsvp')).toBeVisible();
 });
 
+test('the first-run and loaded-document hierarchy keep reading controls reachable', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await expect(page.getByTestId('sightline-start-here')).toBeVisible();
+  await expect(page.getByTestId('sightline-settings-details')).not.toHaveAttribute('open', '');
+  await page.getByTestId('sightline-sample').click();
+  await expect(page.getByTestId('sightline-document-bar')).toBeVisible();
+  await expect(page.getByTestId('sightline-cockpit')).toBeVisible();
+  await expect(page.getByTestId('sightline-source-details')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('sightline-cockpit-wpm')).toBeEnabled();
+});
+
 test('the clipboard is offered as an ingestion path', async ({ page }) => {
   await page.goto('./#/tools/sightline-velocity');
   await page.getByTestId('sightline-clipboard').click();
+  await page.getByTestId('sightline-clipboard').getByRole('button', { name: 'Read clipboard text' }).click();
   // A browser that grants clipboard access ingests the text; one that refuses
   // says so rather than failing silently.
   await expect(page.getByTestId('sightline-status')).toContainText(/clipboard|words/i);
