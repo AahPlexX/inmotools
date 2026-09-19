@@ -40,13 +40,15 @@ const downloadFile = async (page: Page, exportId: string): Promise<Download> => 
 };
 
 const openPanel = async (page: Page, panel: string) => {
+  const advanced = page.getByTestId('sightline-settings-details');
+  if (!(await advanced.getAttribute('open'))) await advanced.locator('summary').click();
   await page.getByTestId(`sightline-panel-${panel}`).click();
   await expect(page.getByTestId(`sightline-panel-${panel}`)).toHaveAttribute('aria-selected', 'true');
 };
 
 /** Finish a short real session without waiting through the whole sample. */
 const readBriefly = async (page: Page) => {
-  await page.getByTestId('sightline-wpm-range').fill('900');
+  await page.getByTestId('sightline-cockpit-wpm').fill('900');
   const scrub = page.getByTestId('sightline-scrub');
   const last = Number(await scrub.getAttribute('max'));
   await scrub.fill(String(Math.max(0, last - 8)));
@@ -93,9 +95,21 @@ test('pasted text is read through the chosen markup dialect', async ({ page }) =
   await expect(page.getByTestId('sightline-rsvp')).toBeVisible();
 });
 
+test('the first-run and loaded-document hierarchy keep reading controls reachable', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await expect(page.getByTestId('sightline-start-here')).toBeVisible();
+  await expect(page.getByTestId('sightline-settings-details')).not.toHaveAttribute('open', '');
+  await page.getByTestId('sightline-sample').click();
+  await expect(page.getByTestId('sightline-document-bar')).toBeVisible();
+  await expect(page.getByTestId('sightline-cockpit')).toBeVisible();
+  await expect(page.getByTestId('sightline-source-details')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('sightline-cockpit-wpm')).toBeEnabled();
+});
+
 test('the clipboard is offered as an ingestion path', async ({ page }) => {
   await page.goto('./#/tools/sightline-velocity');
   await page.getByTestId('sightline-clipboard').click();
+  await page.getByTestId('sightline-clipboard').getByRole('button', { name: 'Read clipboard text' }).click();
   // A browser that grants clipboard access ingests the text; one that refuses
   // says so rather than failing silently.
   await expect(page.getByTestId('sightline-status')).toContainText(/clipboard|words/i);
@@ -293,7 +307,7 @@ test('a reading session is recorded and exported as analytics', async ({ page })
 
 test('clearing local data requires explicit confirmation and names everything it removes', async ({ page }) => {
   await page.goto('./#/tools/sightline-velocity');
-  await page.getByTestId('sightline-panel-data').click();
+  await openPanel(page, 'data');
   const clear = page.getByTestId('sightline-warehouse-clear');
   await expect(clear).toHaveText(/clear history and word bank/i);
   await clear.click();
