@@ -5,6 +5,13 @@
 **Goal:** Replace the current single-buffer/edit-stack state with an atomic project/timeline revision model, then build precise clip and multi-track editing without regressing the verified Phase 1–2 workflow.
 **Dependency baseline (2026-09-18):** MediaBunny 1.58.0 exact, React 19.2.8, TypeScript 7.0.2, Vitest 4.1.11, Playwright 1.63.0.
 
+## Research decisions resolved 2026-09-19
+- Durable project storage: `docs/research/audio-mastering-storage-policy-2026-09-19.md`. Use IndexedDB for versioned project/recovery state; reference/relink source media by default; optional explicit OPFS media copies; portable backups remain independent of browser-managed storage.
+- Heavy processing: `docs/research/audio-mastering-worker-dsp-architecture-2026-09-19.md`. Main thread owns UI/orchestration only; one dedicated DSP worker is the default heavy-compute lane; AudioWorklet is for bounded realtime custom processing; OfflineAudioContext is for graph-native offline bounce; SharedArrayBuffer is optional only.
+- Export matrix: `docs/research/audio-mastering-export-codec-matrix-2026-09-19.md`. WAV uses built-in PCM; MP3/FLAC/AAC use native capability plus official Mediabunny extension fallback when needed; M4A uses AAC in ISOBMFF; all output capability is checked at runtime.
+- Ogg fallback: `docs/research/audio-mastering-ogg-encoder-fallback-2026-09-19.md`. Prefer native Opus; when unavailable, lazy-load an exact-pinned, then-current `@audio/encode-opus` and adapt its documented raw packet core through Mediabunny `CustomAudioEncoder`. Do not add that dependency until the export implementation reaches it, and revalidate official source + npm immediately before pinning.
+- These are architecture decisions only. They do **not** advance the 13/81 implementation count or close any Phase 3 implementation checkbox.
+
 ## Resume point — read before editing
 - Phase 2 is green: 29/29 focused Mastering/Music units, 7/7 MediaBunny-sharing video units, production build, and 2/2 desktop/mobile Mastering browser cases.
 - The deterministic completion ledger is 13/81. Functions 5, 11, and 17 are explicitly partial.
