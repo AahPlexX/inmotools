@@ -335,7 +335,7 @@ describe('CAD sketch-driven exact features', () => {
     const input: CadProject = {
       ...createCadProject('Unsupported datum plane kind fixture'),
       sketches: [],
-      features: [feature('datum-1', 'datum-plane', { kind: 'angle', basePlane: 'XY', distance: 0 })],
+      features: [feature('datum-1', 'datum-plane', { kind: 'tangent', basePlane: 'XY' })],
       bodies: [],
     };
 
