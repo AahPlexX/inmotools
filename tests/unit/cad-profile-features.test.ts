@@ -262,7 +262,30 @@ describe('CAD sketch-driven exact features', () => {
 
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'datum-1' });
-    expect((thrown as Error).message).toMatch(/only 'offset' is implemented/i);
+    expect((thrown as Error).message).toMatch(/only 'offset' and 'three-point' are implemented/i);
+  });
+
+  it('rejects a three-point datum plane whose points are collinear instead of guessing an orientation', () => {
+    const { kernel } = kernelFixture();
+    const input: CadProject = {
+      ...createCadProject('Collinear three-point datum plane fixture'),
+      sketches: [],
+      features: [feature('datum-1', 'datum-plane', {
+        kind: 'three-point', point1: [0, 0, 0], point2: [1, 0, 0], point3: [2, 0, 0],
+      })],
+      bodies: [],
+    };
+
+    let thrown: unknown;
+    try {
+      evaluateCadFeatures(input, kernel);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
+    expect(thrown).toMatchObject({ featureId: 'datum-1' });
+    expect((thrown as Error).message).toMatch(/collinear/i);
   });
 
   it('cuts a blind hole by extruding its circular profile opposite the sketch normal', () => {

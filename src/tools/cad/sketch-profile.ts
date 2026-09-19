@@ -102,6 +102,55 @@ export function resolveDatumPlaneFrame(basePlane: 'XY' | 'XZ' | 'YZ', distance: 
   };
 }
 
+const vectorSub = (a: CadKernelVector3, b: CadKernelVector3): CadKernelVector3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vectorCross = (a: CadKernelVector3, b: CadKernelVector3): CadKernelVector3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const vectorScale = (v: CadKernelVector3, scale: number): CadKernelVector3 => [v[0] * scale, v[1] * scale, v[2] * scale];
+const vectorAdd = (a: CadKernelVector3, b: CadKernelVector3): CadKernelVector3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+
+/**
+ * Resolves a three-point datum plane: the first point becomes the frame's
+ * local origin, the first-to-second edge becomes the local x-axis, and the
+ * normal (hence the local y-axis, completing a right-handed frame) comes
+ * from the two edges' cross product. This is the one remaining datum-plane
+ * variant that has no arbitrary in-plane rotation to decide - three points
+ * (unlike an angle or a face) fully determine both the plane and a natural
+ * axis convention with no unstated design choice - so it is safe to
+ * implement without the mid-plane/angle/tangent/face-derived variants,
+ * which each need one.
+ */
+export function resolveThreePointDatumPlaneFrame(
+  p1: CadKernelVector3,
+  p2: CadKernelVector3,
+  p3: CadKernelVector3,
+): PlaneFrame {
+  for (const point of [p1, p2, p3]) {
+    if (point.some((component) => !Number.isFinite(component))) {
+      throw new Error('Three-point datum plane coordinates must all be finite.');
+    }
+  }
+  const edge1 = vectorSub(p2, p1);
+  const edge2 = vectorSub(p3, p1);
+  const rawNormal = vectorCross(edge1, edge2);
+  const normalLength = vectorLength(rawNormal);
+  if (normalLength < 1e-9) {
+    throw new Error('Three-point datum plane points are collinear and do not define a unique plane.');
+  }
+  const edge1Length = vectorLength(edge1);
+  if (edge1Length < 1e-9) throw new Error('Three-point datum plane points are collinear and do not define a unique plane.');
+  const xAxis = vectorScale(edge1, 1 / edge1Length);
+  const normal = vectorScale(rawNormal, 1 / normalLength);
+  const yAxis = vectorCross(normal, xAxis);
+  return {
+    normal,
+    point: (x, y) => vectorAdd(p1, vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y))),
+    vector: (x, y) => vectorAdd(vectorScale(xAxis, x), vectorScale(yAxis, y)),
+  };
+}
+
 function originPlaneFrame(sketch: CadSketch, datumPlanes: CadDatumPlaneFrames): PlaneFrame {
   if (sketch.plane.kind === 'datum') {
     const frame = datumPlanes.get(sketch.plane.datumId);

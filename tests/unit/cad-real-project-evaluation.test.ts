@@ -132,6 +132,75 @@ describe('CAD real project evaluation', () => {
     }
   });
 
+  it('cuts a hole from a sketch placed on a three-point datum plane', () => {
+    const plateSketch: CadSketch = {
+      id: 'plate',
+      label: 'Plate profile',
+      plane: { kind: 'origin', plane: 'XY' },
+      entities: [
+        { id: 'p1', type: 'point', x: 0, y: 0, construction: false },
+        { id: 'p2', type: 'point', x: 20, y: 0, construction: false },
+        { id: 'p3', type: 'point', x: 20, y: 10, construction: false },
+        { id: 'p4', type: 'point', x: 0, y: 10, construction: false },
+        { id: 'bottom', type: 'line', startPointId: 'p1', endPointId: 'p2', construction: false },
+        { id: 'right', type: 'line', startPointId: 'p2', endPointId: 'p3', construction: false },
+        { id: 'top', type: 'line', startPointId: 'p3', endPointId: 'p4', construction: false },
+        { id: 'left', type: 'line', startPointId: 'p4', endPointId: 'p1', construction: false },
+      ],
+      constraints: [],
+    };
+    const holeSketch: CadSketch = {
+      id: 'hole-sketch',
+      label: 'Hole position',
+      plane: { kind: 'datum', datumId: 'top-face' },
+      entities: [
+        { id: 'hole-center', type: 'point', x: 10, y: 5, construction: false },
+        { id: 'hole-circle', type: 'circle', centerPointId: 'hole-center', radius: 1, construction: false },
+      ],
+      constraints: [],
+    };
+
+    const project: CadProject = {
+      ...createCadProject('Three-point datum plane fixture'),
+      sketches: [plateSketch, holeSketch],
+      features: [
+        feature({
+          id: 'extrude-1',
+          type: 'extrude',
+          parameters: { sketchId: 'plate', profileEntityIds: ['bottom', 'right', 'top', 'left'], distance: 5 },
+        }),
+        feature({
+          // Three points on the plate's own top face (z=5), in the same
+          // orientation the offset-plane variant would produce, so this is
+          // directly comparable to that established case rather than an
+          // arbitrarily tilted plane whose hole-removal volume would need
+          // its own separate derivation.
+          id: 'top-face',
+          type: 'datum-plane',
+          parameters: { kind: 'three-point', point1: [0, 0, 5], point2: [1, 0, 5], point3: [0, 1, 5] },
+        }),
+        feature({
+          id: 'hole-1',
+          type: 'hole',
+          dependsOn: ['extrude-1'],
+          parameters: { sketchId: 'hole-sketch', profileEntityIds: ['hole-circle'], depth: 3 },
+        }),
+      ],
+      bodies: [{ id: 'body-main', label: 'Plate', featureIds: ['extrude-1', 'top-face', 'hole-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const finalBody = result.bodies[0]!;
+    try {
+      const holeRemovedVolume = Math.PI * 1 ** 2 * 3;
+      expect(kernel.volume(finalBody.shape)).toBeCloseTo(20 * 10 * 5 - holeRemovedVolume, 4);
+      const bounds = kernel.bounds(finalBody.shape);
+      expect(bounds.max[2]).toBeCloseTo(5, 6);
+    } finally {
+      kernel.release(finalBody.shape);
+    }
+  });
+
   it('cuts a through-all hole exactly through the body regardless of the oversized cut tool', () => {
     const holeSketch: CadSketch = {
       id: 'hole-sketch',

@@ -11,6 +11,7 @@ import {
   resolveDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
+  resolveThreePointDatumPlaneFrame,
 } from '../../src/tools/cad/sketch-profile';
 
 function rectangleSketch(plane: CadSketch['plane'] = { kind: 'origin', plane: 'XY' }): CadSketch {
@@ -107,6 +108,28 @@ describe('CAD sketch profile bridge', () => {
 
   it('rejects a non-finite datum plane offset', () => {
     expect(() => resolveDatumPlaneFrame('XZ', Number.NaN)).toThrow(/finite/i);
+  });
+
+  it('resolves a three-point datum plane with the first point as origin and a right-handed in-plane frame', () => {
+    const frame = resolveThreePointDatumPlaneFrame([1, 0, 0], [1, 1, 0], [1, 0, 1]);
+    expect(frame.normal).toEqual([1, 0, 0]);
+    // Local (2, 3) = origin + 2*xAxis + 3*yAxis = [1,0,0] + [0,2,0] + [0,0,3].
+    expect(frame.point(2, 3)).toEqual([1, 2, 3]);
+    expect(frame.vector(1, 0)).toEqual([0, 1, 0]);
+  });
+
+  it('reproduces the named XY origin frame from three points on it', () => {
+    const frame = resolveThreePointDatumPlaneFrame([0, 0, 0], [1, 0, 0], [0, 1, 0]);
+    expect(frame.normal).toEqual([0, 0, 1]);
+    expect(frame.point(3, 4)).toEqual([3, 4, 0]);
+  });
+
+  it('rejects three collinear points, which do not define a unique plane', () => {
+    expect(() => resolveThreePointDatumPlaneFrame([0, 0, 0], [1, 0, 0], [2, 0, 0])).toThrow(/collinear/i);
+  });
+
+  it('rejects a three-point datum plane with a non-finite coordinate', () => {
+    expect(() => resolveThreePointDatumPlaneFrame([0, 0, 0], [1, 0, 0], [0, Number.NaN, 0])).toThrow(/finite/i);
   });
 
   it('places a profile on a resolved offset datum plane', () => {

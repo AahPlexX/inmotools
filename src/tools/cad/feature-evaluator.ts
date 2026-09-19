@@ -6,6 +6,7 @@ import {
   negate,
   perpendicularInPlane,
   resolveDatumPlaneFrame,
+  resolveThreePointDatumPlaneFrame,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
   type CadDatumPlaneFrames,
@@ -98,26 +99,38 @@ function parameterOriginPlane(feature: CadFeature, key: string): 'XY' | 'XZ' | '
 
 /**
  * Resolves every non-suppressed 'datum-plane' feature into a 3D plane frame
- * before any sketch is placed. Only the offset-from-origin-plane variant is
- * supported today (parameters: basePlane, distance); angle, mid-plane,
- * three-point, tangent, and face-derived datum planes are rejected rather
- * than approximated, since none of those has an unambiguous in-plane axis
- * convention without a design decision this evaluator does not yet make.
+ * before any sketch is placed. Two variants are supported: the
+ * offset-from-origin-plane (parameters: basePlane, distance) and the
+ * three-point plane (parameters: point1, point2, point3), since each has an
+ * unambiguous in-plane axis convention with no unstated design choice.
+ * Angle, mid-plane, tangent, and face-derived datum planes are rejected
+ * rather than approximated - each needs a convention decision this
+ * evaluator does not yet make.
  */
 function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
   const frames = new Map<string, PlaneFrame>();
   for (const feature of project.features) {
     if (feature.type !== 'datum-plane' || feature.suppressed) continue;
-    const kind = feature.parameters.kind;
-    if (kind !== undefined && kind !== 'offset') {
+    const kind = feature.parameters.kind ?? 'offset';
+    if (kind === 'offset') {
+      const basePlane = parameterOriginPlane(feature, 'basePlane');
+      const distance = parameterNumber(feature, 'distance', { allowZero: true });
+      frames.set(feature.id, resolveDatumPlaneFrame(basePlane, distance));
+    } else if (kind === 'three-point') {
+      const point1 = parameterVector3(feature, 'point1');
+      const point2 = parameterVector3(feature, 'point2');
+      const point3 = parameterVector3(feature, 'point3');
+      try {
+        frames.set(feature.id, resolveThreePointDatumPlaneFrame(point1, point2, point3));
+      } catch (error) {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+      }
+    } else {
       throw new CadFeatureEvaluationError(
         feature.id,
-        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset' is implemented.`,
+        `${feature.label} datum plane kind '${String(kind)}' is not supported; only 'offset' and 'three-point' are implemented.`,
       );
     }
-    const basePlane = parameterOriginPlane(feature, 'basePlane');
-    const distance = parameterNumber(feature, 'distance', { allowZero: true });
-    frames.set(feature.id, resolveDatumPlaneFrame(basePlane, distance));
   }
   return frames;
 }
