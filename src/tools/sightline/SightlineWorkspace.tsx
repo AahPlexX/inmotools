@@ -1702,6 +1702,30 @@ export default function SightlineWorkspace() {
                 <span>Speed</span>
                 <input type="number" min={60} max={1200} step={10} value={settings.pacing.wpm} disabled={!model} data-testid="sightline-cockpit-wpm" onChange={(event) => patch({ pacing: { ...settings.pacing, ramp: null, wpm: clampWpm(Number(event.target.value)) } })} />
               </label>
+              <details className="sightline-cockpit-more">
+                <summary>More</summary>
+                <div className="sightline-row sightline-row--wrap">
+                  <button
+                    type="button"
+                    className="sightline-button"
+                    disabled={!model || !sentenceRange}
+                    data-testid="sightline-highlight"
+                    onClick={() => {
+                      if (!sentenceRange) return;
+                      setState((current) => addHighlight(current, {
+                        startToken: sentenceRange.start,
+                        endToken: sentenceRange.end,
+                        color: highlightColor,
+                      }));
+                    }}
+                  >
+                    Highlight this sentence
+                  </button>
+                  <button type="button" className="sightline-button" disabled={!model || !currentToken} data-testid="sightline-mark-word" onClick={() => bankActions.mark(currentToken?.text ?? '')}>
+                    Mark the word as unknown
+                  </button>
+                </div>
+              </details>
             </div>
           </div>
 
