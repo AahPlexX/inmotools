@@ -137,12 +137,12 @@ const ENGINES: readonly { readonly id: EngineId; readonly label: string; readonl
 ];
 
 const PANELS: readonly { readonly id: string; readonly label: string }[] = [
-  { id: 'pace', label: 'Pace' },
-  { id: 'look', label: 'Look' },
-  { id: 'drill', label: 'Drill' },
-  { id: 'bank', label: 'Words' },
-  { id: 'marks', label: 'Marks' },
-  { id: 'data', label: 'History' },
+  { id: 'pace', label: 'Reading' },
+  { id: 'look', label: 'Appearance' },
+  { id: 'drill', label: 'Training' },
+  { id: 'bank', label: 'Word bank' },
+  { id: 'marks', label: 'Library' },
+  { id: 'data', label: 'Stats' },
   { id: 'export', label: 'Export' },
 ];
 
@@ -214,6 +214,8 @@ export default function SightlineWorkspace() {
   const [model, setModel] = useState<DocumentModel | undefined>(undefined);
   const [status, setStatus] = useState<Status>({ phase: 'idle', message: 'Choose a document, paste text, or load the sample.' });
   const [diagnostics, setDiagnostics] = useState<readonly IngestDiagnostic[]>([]);
+  const [openDocuments, setOpenDocuments] = useState<readonly DocumentModel[]>([]);
+  const [batchResults, setBatchResults] = useState<readonly { readonly name: string; readonly ok: boolean; readonly message: string }[]>([]);
   const [resume, setResume] = useState<DocumentProgress | undefined>(undefined);
   const [pasteText, setPasteText] = useState('');
   const [pasteFormat, setPasteFormat] = useState<SourceFormat>('markdown');
@@ -300,6 +302,7 @@ export default function SightlineWorkspace() {
       }
       const loaded = result.model;
       setModel(loaded);
+      setOpenDocuments((current) => [loaded, ...current.filter((entry) => documentId(entry) !== documentId(loaded))]);
       setDiagnostics(result.diagnostics);
       setStatus({ phase: 'ready', message: `${loaded.fileName}: ${describeModel(loaded)}` });
       setDraft(draftFromModel(loaded));
@@ -328,27 +331,39 @@ export default function SightlineWorkspace() {
       let loaded = 0;
       let failed = 0;
       let activeFileName = '';
+      const results: { name: string; ok: boolean; message: string }[] = [];
       for (const file of batch) {
         setStatus({ phase: 'working', message: `Reading ${file.name}…` });
         try {
           const bytes = new Uint8Array(await file.arrayBuffer());
           const isPdf = extensionOf(file.name) === 'pdf';
           const pdfModule = isPdf ? await import('./pdfjs-extractor') : null;
-          if (pdfModule && !pdfModule.canDecodePdf()) { setStatus({ phase: 'error', message: `${file.name}: this browser cannot run the local PDF decoder.` }); continue; }
+          if (pdfModule && !pdfModule.canDecodePdf()) {
+            const message = 'This browser cannot run the local PDF decoder.';
+            failed += 1;
+            results.push({ name: file.name, ok: false, message });
+            setStatus({ phase: 'error', message: `${file.name}: ${message}` });
+            continue;
+          }
           const dependencies: IngestDependencies = { onProgress: (message) => setStatus({ phase: 'working', message }), ...(pdfModule ? { pdf: pdfModule.createPdfJsExtractor() } : {}) };
           const result = await ingestDocument(bytes, file.name, { proseOnly: settings.proseOnly, includeNotes: settings.includeNotes }, dependencies);
           applyResult(result);
           if (result.ok) {
             loaded += 1;
             activeFileName = file.name;
+            results.push({ name: file.name, ok: true, message: 'Ready' });
           } else {
             failed += 1;
+            results.push({ name: file.name, ok: false, message: result.message });
           }
         } catch (error) {
           failed += 1;
-          setStatus({ phase: 'error', message: error instanceof Error ? error.message : `${file.name} could not be read.` });
+          const message = error instanceof Error ? error.message : 'This document could not be read.';
+          results.push({ name: file.name, ok: false, message });
+          setStatus({ phase: 'error', message: `${file.name}: ${message}` });
         }
       }
+      setBatchResults(results);
       if (batch.length > 1 && loaded > 0) {
         const failureNote = failed > 0 ? ` ${failed} failed.` : '';
         setStatus({ phase: 'ready', message: `${loaded} of ${batch.length} documents opened. ${activeFileName} is active.${failureNote}` });
@@ -386,8 +401,8 @@ export default function SightlineWorkspace() {
     }
   }, [applyResult, pasteFormat]);
 
-  const loadSample = useCallback(async () => {
-    const sample = SAMPLE_LIBRARY.find((entry) => entry.id === sampleId) ?? SAMPLE_LIBRARY[0];
+  const loadSample = useCallback(async (requestedId: SampleId = sampleId) => {
+    const sample = SAMPLE_LIBRARY.find((entry) => entry.id === requestedId) ?? SAMPLE_LIBRARY[0];
     applyResult(await ingestPastedText(sample.text, { format: 'markdown', label: sample.label }));
   }, [applyResult, sampleId]);
 
@@ -1386,7 +1401,10 @@ export default function SightlineWorkspace() {
       className={`sightline${dragging ? ' sightline--dragging' : ''}`}
       data-testid="sightline-velocity"
       onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-      onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
+      onDragLeave={(event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) setDragging(false);
+      }}
       onDrop={onDrop}
     >
       <section
@@ -1394,7 +1412,35 @@ export default function SightlineWorkspace() {
         aria-labelledby="sightline-source-heading"
         data-testid="sightline-dropzone"
       >
-        <h2 id="sightline-source-heading">Source</h2>
+        <div className="sightline-row sightline-row--between">
+          <div>
+            <h2 id="sightline-source-heading">{model ? 'Document' : 'Start here'}</h2>
+            <p className="sightline-note">{model ? 'Reading is ready. Source and import options stay available when needed.' : 'Open, drop, paste, or choose a sample. Nothing is uploaded.'}</p>
+          </div>
+          {model ? <span className="sightline-badge">Drop documents here to add more</span> : null}
+        </div>
+        {model ? (
+          <div className="sightline-document-bar" data-testid="sightline-document-bar">
+            <div>
+              <strong data-testid="sightline-document-title">{model.metadata.title || model.fileName}</strong>
+              <span>{model.metrics.words.toLocaleString('en-US')} words · about {Math.max(1, Math.ceil(model.metrics.words / settings.pacing.wpm))} min at {settings.pacing.wpm} wpm</span>
+            </div>
+            {openDocuments.length > 1 ? (
+              <label className="sightline-field sightline-field--inline">
+                <span>Open document</span>
+                <select data-testid="sightline-document-switcher" value={documentKey} onChange={(event) => {
+                  const next = openDocuments.find((entry) => documentId(entry) === event.target.value);
+                  if (next) applyResult({ ok: true, model: next, diagnostics: next.diagnostics });
+                }}>
+                  {openDocuments.map((entry) => <option key={documentId(entry)} value={documentId(entry)}>{entry.fileName}</option>)}
+                </select>
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+        {!model ? <div className="sightline-drop sightline-start-here" data-testid="sightline-start-here"><strong>Drop documents here</strong><span>PDF, EPUB, DOCX, Markdown, HTML, RTF, or text</span></div> : null}
+        <details className="sightline-source-details" data-testid="sightline-source-details" open={!model}>
+          <summary>{model ? 'Source and import options' : 'Open or paste content'}</summary>
         <div className="sightline-row sightline-row--wrap">
           <label className="sightline-button sightline-button--file sightline-button--primary">
             <span>Open a document</span>
@@ -1408,16 +1454,17 @@ export default function SightlineWorkspace() {
           </label>
           <label className="sightline-field sightline-field--inline">
             <span>Sample</span>
-            <select value={sampleId} data-testid="sightline-sample-select" onChange={(event) => setSampleId(event.target.value as SampleId)}>
+            <select value={sampleId} data-testid="sightline-sample-select" onChange={(event) => { const next = event.target.value as SampleId; setSampleId(next); void loadSample(next); }}>
               {SAMPLE_LIBRARY.map((sample) => <option key={sample.id} value={sample.id}>{sample.label}</option>)}
             </select>
           </label>
           <button type="button" className="sightline-button" data-testid="sightline-sample" onClick={() => void loadSample()}>
             Load the sample passage
           </button>
-          <button type="button" className="sightline-button" data-testid="sightline-clipboard" onClick={() => void readClipboard()}>
-            Read the clipboard
-          </button>
+          <details className="sightline-inline-details" data-testid="sightline-clipboard">
+            <summary>Clipboard option</summary>
+            <button type="button" className="sightline-button sightline-button--small" onClick={() => void readClipboard()}>Read clipboard text</button>
+          </details>
           <label className="sightline-row sightline-row--inline">
             <input
               type="checkbox"
@@ -1468,9 +1515,15 @@ export default function SightlineWorkspace() {
             Read the pasted text
           </button>
         </div>
-        <p className="sightline-note" data-testid="sightline-status">
+        </details>
+        <p className="sightline-note" data-testid="sightline-status" role="status" aria-live="polite">
           {status.message}
         </p>
+        {batchResults.length > 1 ? (
+          <ul className="sightline-batch-results" data-testid="sightline-batch-results">
+            {batchResults.map((entry) => <li key={entry.name}><span><strong>{entry.name}</strong> — {entry.ok ? 'Ready' : entry.message}</span></li>)}
+          </ul>
+        ) : null}
         {resume ? (
           <div className="sightline-row" data-testid="sightline-resume">
             <span className="sightline-note">
@@ -1486,29 +1539,21 @@ export default function SightlineWorkspace() {
           </div>
         ) : null}
         {diagnostics.length > 0 ? (
-          <ul className="sightline-diagnostics" data-testid="sightline-diagnostics">
-            {diagnostics.slice(0, 8).map((entry, index) => (
-              <li key={`${entry.code}-${index}`} className={`sightline-diagnostic sightline-diagnostic--${entry.level}`}>
-                <strong>{entry.code}</strong> {entry.message}
-                {entry.detail ? <span className="sightline-note"> {entry.detail}</span> : null}
-              </li>
-            ))}
-          </ul>
+          <details className="sightline-diagnostic-details" data-testid="sightline-diagnostic-details">
+            <summary>{diagnostics.some((entry) => entry.level === 'error') ? 'Some content could not be read' : 'Import details'}</summary>
+            <ul className="sightline-diagnostics" data-testid="sightline-diagnostics">
+              {diagnostics.slice(0, 8).map((entry, index) => (
+                <li key={`${entry.code}-${index}`} className={`sightline-diagnostic sightline-diagnostic--${entry.level}`}>
+                  <span>{entry.message}</span>
+                  <span className="sightline-note">{entry.code}{entry.detail ? ` · ${entry.detail}` : ''}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         ) : null}
         {model ? (
           <dl className="sightline-facts" data-testid="sightline-report">
-            <div>
-              <dt>Format</dt>
-              <dd>{model.format}</dd>
-            </div>
-            <div>
-              <dt>Size</dt>
-              <dd>{model.byteLength.toLocaleString('en-US')} bytes</dd>
-            </div>
-            <div>
-              <dt>Encoding</dt>
-              <dd>{model.encoding}</dd>
-            </div>
+
             <div>
               <dt>Words</dt>
               <dd>{model.metrics.words.toLocaleString('en-US')}</dd>
@@ -1525,19 +1570,22 @@ export default function SightlineWorkspace() {
               <dt>Reading grade</dt>
               <dd>{Math.round(model.metrics.fleschKincaidGrade * 10) / 10} Flesch–Kincaid</dd>
             </div>
-            <div>
-              <dt>Decoded in</dt>
-              <dd>
-                {model.ingestMs} ms
-              </dd>
-            </div>
           </dl>
+          <details className="sightline-technical-details" data-testid="sightline-technical-details">
+            <summary>Technical document details</summary>
+            <dl className="sightline-facts">
+              <div><dt>Format</dt><dd>{model.format}</dd></div>
+              <div><dt>Size</dt><dd>{model.byteLength.toLocaleString('en-US')} bytes</dd></div>
+              <div><dt>Encoding</dt><dd>{model.encoding}</dd></div>
+              <div><dt>Decoded in</dt><dd>{model.ingestMs} ms</dd></div>
+            </dl>
+          </details>
         ) : null}
       </section>
 
       {model ? (
-        <section className="sightline-card" aria-labelledby="sightline-navigator-heading">
-          <h2 id="sightline-navigator-heading">Contents</h2>
+        <details className="sightline-card sightline-contents-details" data-testid="sightline-contents-details">
+          <summary id="sightline-navigator-heading">Contents · {model.chapters.length} sections</summary>
           <ol className="sightline-chapter-list" data-testid="sightline-chapters">
             {model.chapters.map((entry) => (
               <li key={entry.index} className={`sightline-chapter sightline-chapter--level-${entry.level}`}>
@@ -1586,7 +1634,7 @@ export default function SightlineWorkspace() {
               </ul>
             </details>
           ) : null}
-        </section>
+        </details>
       ) : null}
 
       <div className="sightline-main">
@@ -1615,7 +1663,7 @@ export default function SightlineWorkspace() {
                 </button>
               ))}
             </div>
-            <div className="sightline-row sightline-row--wrap">
+            <div className="sightline-row sightline-row--wrap sightline-cockpit" data-testid="sightline-cockpit">
               <button
                 type="button"
                 className="sightline-button sightline-button--primary"
@@ -1634,9 +1682,6 @@ export default function SightlineWorkspace() {
               <button type="button" className="sightline-button" disabled={!model} data-testid="sightline-step-forward" onClick={() => stepBy(1)}>
                 word ▶
               </button>
-              <button type="button" className="sightline-button" disabled={!model} data-testid="sightline-sentence-back" onClick={rewindSentence}>
-                Sentence ◀
-              </button>
               <button
                 type="button"
                 className="sightline-button"
@@ -1651,31 +1696,10 @@ export default function SightlineWorkspace() {
               >
                 Bookmark
               </button>
-              <button
-                type="button"
-                className="sightline-button"
-                disabled={!model || !sentenceRange}
-                data-testid="sightline-highlight"
-                onClick={() => {
-                  if (!sentenceRange) return;
-                  setState((current) => addHighlight(current, {
-                    startToken: sentenceRange.start,
-                    endToken: sentenceRange.end,
-                    color: highlightColor,
-                  }));
-                }}
-              >
-                Highlight this sentence
-              </button>
-              <button
-                type="button"
-                className="sightline-button"
-                disabled={!model || !currentToken}
-                data-testid="sightline-mark-word"
-                onClick={() => bankActions.mark(currentToken?.text ?? '')}
-              >
-                Mark the word as unknown
-              </button>
+              <label className="sightline-field sightline-field--cockpit">
+                <span>Speed</span>
+                <input type="number" min={60} max={1200} step={10} value={settings.pacing.wpm} disabled={!model} data-testid="sightline-cockpit-wpm" onChange={(event) => patch({ pacing: { ...settings.pacing, ramp: null, wpm: clampWpm(Number(event.target.value)) } })} />
+              </label>
             </div>
           </div>
 
@@ -1973,13 +1997,21 @@ export default function SightlineWorkspace() {
         </section>
 
         <aside className="sightline-panels" aria-label="Reading controls">
+          <div className="sightline-basic-controls" data-testid="sightline-basic-controls">
+            <strong>Basic controls</strong>
+            <span className="sightline-note">Use the reading cockpit for the actions needed during a session.</span>
+          </div>
+          <details className="sightline-settings-details" data-testid="sightline-settings-details">
+            <summary>Advanced controls</summary>
           <div className="sightline-tabs" role="tablist" aria-label="Control panel">
             {PANELS.map((entry) => (
               <button
                 key={entry.id}
                 type="button"
+                id={`sightline-control-tab-${entry.id}`}
                 role="tab"
                 aria-selected={panel === entry.id}
+                aria-controls="sightline-control-panel"
                 className={`sightline-tab${panel === entry.id ? ' sightline-tab--on' : ''}`}
                 data-testid={`sightline-panel-${entry.id}`}
                 onClick={() => setPanel(entry.id)}
@@ -1988,12 +2020,13 @@ export default function SightlineWorkspace() {
               </button>
             ))}
           </div>
-          <div className="sightline-panel-body">{panelContent}</div>
+          <div id="sightline-control-panel" role="tabpanel" aria-labelledby={`sightline-control-tab-${panel}`} className="sightline-panel-body">{panelContent}</div>
+          </details>
         </aside>
       </div>
 
-      <section className="sightline-card" aria-labelledby="sightline-evidence-heading">
-        <h2 id="sightline-evidence-heading">What this can and cannot do</h2>
+      <details className="sightline-card sightline-evidence-details" data-testid="sightline-evidence-details">
+        <summary id="sightline-evidence-heading">What this can and cannot do</summary>
         <ul className="sightline-limits">
           <li>Documents are decoded in this browser; a scanned PDF with no text layer needs OCR elsewhere first, and this tool does not do OCR.</li>
           <li>
@@ -2004,7 +2037,7 @@ export default function SightlineWorkspace() {
           <li>DOCX equations and images arrive as text placeholders, and EPUB structure is rebuilt from the package spine.</li>
           <li>Nothing here measures eye movement, and nothing is uploaded: sessions, notes, and vocabulary stay in this browser.</li>
         </ul>
-      </section>
+      </details>
     </div>
   );
 }
