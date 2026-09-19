@@ -411,6 +411,8 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await page.reload();
   await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('quote');
   await expect(restoredWorkspace.getByLabel('Duration')).toHaveValue('quote');
+  await restoredWorkspace.getByLabel('Duration').selectOption('time');
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('words-1000');
 
   await writeTypingConfigPreference(page, {
     mode: 'custom',
