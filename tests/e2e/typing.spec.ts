@@ -343,6 +343,10 @@ test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', 
   const pdfBuffer = await downloadBuffer(pdfDownload);
   expect(pdfBuffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   expect(pdfBuffer.length).toBeGreaterThan(500);
+  await expect(totalTests).toContainText('1');
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
   await expect(totalTests).toContainText('2');
 });
 
