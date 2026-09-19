@@ -286,7 +286,7 @@ test('exports history metadata across formats and re-imports a bundle without id
   expect(filteredBundle.tests[0].tags).toContain('legal');
   await page.keyboard.press('Escape');
   await filterInput.fill('');
-  await expect(totalTests).toContainText('2');
+  await expect(totalTests).toContainText('27');
 });
 
 test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', async ({ page }) => {
@@ -322,6 +322,10 @@ test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', 
 
   const history = workspace.getByRole('region', { name: 'Session history' });
   const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(totalTests).toContainText('0');
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
   await expect(totalTests).toContainText('1');
 
   await workspace.getByRole('button', { name: 'New text' }).click();
