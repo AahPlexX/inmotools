@@ -274,6 +274,39 @@ describe('CAD sketch-driven exact features', () => {
     expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'extrude-1', shape: result }]);
   });
 
+  it('extrudes a sketch placed on an angle datum plane around a reusable axis', () => {
+    const { kernel, result } = kernelFixture();
+    const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-angle', plane: { kind: 'datum', datumId: 'datum-angle' } };
+    const axis = feature('axis-1', 'datum-axis', {
+      kind: 'two-point',
+      point1: [0, 0, 0],
+      point2: [10, 0, 0],
+    });
+    const anglePlane = feature('datum-angle', 'datum-plane', {
+      kind: 'angle',
+      basePlane: 'XY',
+      axisFeatureId: 'axis-1',
+      angle: Math.PI / 2,
+    });
+    const extrude = feature('extrude-1', 'extrude', { sketchId: 'sketch-angle', profileEntityIds, distance: 5 });
+    const input: CadProject = {
+      ...createCadProject('Angle-plane fixture'),
+      sketches: [datumSketch],
+      features: [axis, anglePlane, extrude],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['extrude-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+    const profile = (kernel.profileFace as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(profile.normal[0]).toBeCloseTo(0, 8);
+    expect(profile.normal[1]).toBeCloseTo(-1, 8);
+    expect(profile.normal[2]).toBeCloseTo(0, 8);
+    expect(profile.edges[0].start[0]).toBeCloseTo(5, 8);
+    expect(profile.edges[0].start[1]).toBeCloseTo(0, 8);
+    expect(profile.edges[0].start[2]).toBeCloseTo(0, 8);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'extrude-1', shape: result }]);
+  });
+
   it('attributes an unresolved datum plane reference to the sketch-consuming feature', () => {
     const { kernel } = kernelFixture();
     const datumSketch: CadSketch = { ...rectangleSketch(), id: 'sketch-datum', plane: { kind: 'datum', datumId: 'missing-datum' } };
@@ -315,7 +348,7 @@ describe('CAD sketch-driven exact features', () => {
 
     expect(thrown).toBeInstanceOf(CadFeatureEvaluationError);
     expect(thrown).toMatchObject({ featureId: 'datum-1' });
-    expect((thrown as Error).message).toMatch(/only 'offset', 'three-point', and 'mid-plane' are implemented/i);
+    expect((thrown as Error).message).toMatch(/only 'offset', 'three-point', 'mid-plane', and 'angle' are implemented/i);
   });
 
   it('rejects a three-point datum plane whose points are collinear instead of guessing an orientation', () => {
