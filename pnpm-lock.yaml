@@ -167,8 +167,8 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
       '@gltf-transform/core':
-        specifier: 4.4.2
-        version: 4.4.2
+        specifier: 4.5.0
+        version: 4.5.0
       '@gltf-transform/extensions':
         specifier: 4.4.2
         version: 4.4.2
@@ -1031,8 +1031,8 @@ packages:
   '@fontsource/roboto-mono@5.3.0':
     resolution: {integrity: sha512-yhwplHMHW9dCk+1pZuERfcJe+K3rosGVZEoK0XktkxRSqQ9qsipSwwiuW2/8Qmtp9lzu3Ixa/ie4BMH3i8CkZQ==}
 
-  '@gltf-transform/core@4.4.2':
-    resolution: {integrity: sha512-qsWKwNSwK+2s834Mt4xbYcyHqCrgNFP7hIv5s487JxebngRfDgelpghNF+kSswGb2/NuapasfK3UViFoSJJoMg==}
+  '@gltf-transform/core@4.5.0':
+    resolution: {integrity: sha512-JlvShvnB4AtfGZqjnESS/wfPJbpVnyHhTwJBbWN4qXqkB3C5HIoxxpu/orwGBge6Pc0zObeWj70lVf+4gbuu0A==}
 
   '@gltf-transform/extensions@4.4.2':
     resolution: {integrity: sha512-HJH1FM+edC5eNvl6xO0SOXJ/j/3oDoIpSu150OTdJaLBoM3TgCCGIfh4wyhgWAqZrkvgHKVGiZKxcKV5LkgPCQ==}
@@ -5308,18 +5308,18 @@ snapshots:
 
   '@fontsource/roboto-mono@5.3.0': {}
 
-  '@gltf-transform/core@4.4.2':
+  '@gltf-transform/core@4.5.0':
     dependencies:
       property-graph: 4.1.0
 
   '@gltf-transform/extensions@4.4.2':
     dependencies:
-      '@gltf-transform/core': 4.4.2
+      '@gltf-transform/core': 4.5.0
       ktx-parse: 1.1.0
 
   '@gltf-transform/functions@4.4.2(@types/node@26.4.1)':
     dependencies:
-      '@gltf-transform/core': 4.4.2
+      '@gltf-transform/core': 4.5.0
       '@gltf-transform/extensions': 4.4.2
       ktx-parse: 1.1.0
       ndarray: 1.1.1
