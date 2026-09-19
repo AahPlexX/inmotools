@@ -1,5 +1,11 @@
 # Done
 
+## TASK-021: Close the Sightline Velocity Studio audit findings
+
+Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); this closes the remaining audit findings found against it. The dedicated validation workflow only triggered on pushes to `feat/sightline-velocity`, so it never validated `main` or any `fix/sightline-*` branch — widened to `[main, feat/sightline-velocity, 'fix/sightline-*']`. Clearing local reading history, document history, and the word bank was a single click with no confirmation and no way back; it now asks first and names exactly what it removes. Loading multiple files reported the *last selected* file as "active" even when that file failed to load and an earlier one succeeded instead; failures and successes are now tracked separately and the status names the file that is genuinely active. The workspace never released its IndexedDB handle, audio context, or an in-flight speech-synthesis utterance on unmount, and the metronome allocated a `AudioContext` even when set to a visual-only channel; both are fixed. `clearWarehouse`'s result was previously discarded, so a failed clear silently reported success — it's now surfaced to the user instead.
+
+Accepted revision `f0b6c0481c9e600ca6ec00284527216e00d433f9` on `fix/sightline-audit` (a clean descendant of `main`): `tsc --noEmit` clean, 408/408 focused unit tests across 16 `tests/unit/sightline-*.test.ts` files, production build passed, and Playwright `tests/e2e/sightline.spec.ts` 46/46 passed (one earlier run showed a single 5s-timeout flake on the catalog-navigation test, not reproducible across 6 repeated runs afterward).
+
 ## TASK-020: Add the Typing Workstation
 
 Implemented the Typing Workstation as a local speed-typing calculator and ergonomic touch-typing tester against its 38-item feature ledger (`docs/superpowers/plans/2026-09-15-typing-workstation.md`): the engine, exact ranked corpora, target generation, IndexedDB storage, audio, CSV/JSON/PDF/Markdown exports with a bundle re-import path, styles, workspace UI, and catalog/loader registration.

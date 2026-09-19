@@ -26,20 +26,13 @@
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
   - Current milestone: A — foundation and global editor
 
-- **Sightline Velocity Studio** — local-first universal document reader, paced speed-reading workstation, comprehension/retention toolkit, and export studio governed by the F1–F35 feature ledger.
-  - Design: `docs/superpowers/specs/2026-09-15-sightline-velocity-design.md`.
-  - Plan: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
-  - Branch: `feat/sightline-velocity` is the single active development branch for this workstream; no further Sightline writes belong on the prior arena branch.
-  - Current milestone: M5 — focused verification, task-state reconciliation, responsive/accessibility acceptance, and integration hand-off. M1–M4 implementation is present but is not accepted as complete until every deterministic completion gate in the plan has fresh evidence.
-  - Latest evidence: dedicated run `35118094022` at `3e4bee27607baf9eae4a77e162a341966a49ae72` passed 407/407 Sightline unit assertions across 16 files, production build, and 40/40 desktop/mobile Chromium cases. F6 multi-file, full-workspace drop, and three-item sample-library acceptance is now included in green dedicated run `35122984076` at `1d28b12b911f5a60b3f8ffe543466b4b1aa02c63`, which passed the focused unit/build lane and all 44 desktop/mobile Chromium cases. The repository-wide Pages gate remains mandatory before integration.
-  - Completion gate: all F1–F35 items reachable and functional; focused units, production build, Sightline browser spec, accessibility/keyboard, narrow/medium/wide reflow, export round trips, synchronized `.tasks`, integration to `origin/main`, and applicable Pages deployment all verified from fresh evidence.
-  - Scope: `src/tools/sightline/`, Sightline-specific unit/e2e tests, its design/plan, dedicated validation workflow, and additive catalog/loader/PWA integration. Unrelated workstreams remain untouched.
-
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
   - Phase 1 plan: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1.md`.
   - Phase 1 completion: `docs/superpowers/plans/2026-09-11-crystal-lattice-studio-phase-1-completion.md`.
-  - Current milestone: Phase 2 — symmetry, local environments, validation, and model building. Phase 1 document/import/export core, interactive structure editing, periodic geometry, project history, publication graphics, and acceptance baseline are integrated.
+  - Phase 2 completion: `docs/superpowers/plans/2026-09-13-crystal-lattice-studio-phase-2-completion.md`.
+  - Current milestone: Phase 2 complete; next milestone Phase 3 — reciprocal space, diffraction, and reflection/powder import. Local-environment/health analysis, constrained cell and advanced site editing, reversible model building, symmetry detection with stability and standardization diagnostics, advanced structure visualization, and reachable Phase 2 task areas are integrated.
+  - Phase 2 evidence: 12 Crystal unit files / 91 tests pass, `tsc` and production build clean, and focused Crystal validation run `35045893285` passed the full Crystal browser spec on desktop and mobile. The focused Crystal lane now selects both `crystal-lattice-studio.spec.ts` and `crystal-lattice-studio-phase2.spec.ts`.
   - Latest Phase 1 acceptance evidence: all Crystal functional and Task 12 reflow/Axe/keyboard/dialog checks passed in Pages run `34729051007`, job `103648349176`, at `495ee945d60965b7e7e46bd6ed296e9b0fa8bb8d`. That repository-wide job remained red only because three later Web Layout tests failed; no Crystal failure was present.
   - Completion gate: all five master-design phases must be implemented and verified, with every numbered capability accounted for as implemented or explicitly approved under the master scope policy; Phase 1 completion alone is not project completion.
   - Browser note (2026-09-15): one focused Crystal run failed a single mobile supercell case, but the next focused run `35036412161` passed the full Crystal spec, so it was transient and needs no action.

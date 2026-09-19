@@ -9,7 +9,7 @@ test('keeps reused span IDs isolated by trace and exposes searchable span naviga
  await expect(page.getByRole('button',{name:'first'})).toBeVisible();
  await page.locator('#otel-trace').selectOption('trace-b');
  await expect(page.getByRole('button',{name:'second'})).toBeVisible();
- await expect(page.getByText('svc-b').first()).toBeVisible();
+ await expect(page.getByRole('cell', { name: 'svc-b' })).toBeVisible();
  await page.locator('#otel-search').fill('does-not-exist');
  await expect(page.getByText(/No spans match/)).toBeVisible();
 });
