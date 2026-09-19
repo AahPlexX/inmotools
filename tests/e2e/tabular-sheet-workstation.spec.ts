@@ -9,15 +9,19 @@ async function openWorkspace(page: Page) {
   return workspace;
 }
 
+function gridCell(workspace: ReturnType<Page['getByTestId']>, name: string) {
+  return workspace.getByTestId('tsw-grid-scroll').getByRole('cell', { name, exact: true });
+}
+
 test('exposes Stage 2 formula SSOT, format, style, wrap, and tap-safe formula help', async ({ page }) => {
   const workspace = await openWorkspace(page);
 
   await expect(workspace.getByTestId('tsw-formula-ssot')).toHaveText('portable-dag');
-  await workspace.getByRole('cell', { name: '2.5' }).click();
+  await gridCell(workspace, '2.5').click();
   await workspace.getByTestId('tsw-number-format').selectOption('$#,##0.00');
-  await expect(workspace.getByRole('cell', { name: '$2.50' })).toBeVisible();
+  await expect(gridCell(workspace, '$2.50')).toBeVisible();
 
-  await workspace.getByRole('cell', { name: 'Paper' }).click();
+  await gridCell(workspace, 'Paper').click();
   await workspace.getByTestId('tsw-style-chrome').getByRole('button', { name: 'Bold' }).click();
   await expect(workspace.getByTestId('tsw-style-chrome').getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true');
   await workspace.getByTestId('tsw-wrap').click();
@@ -41,12 +45,12 @@ test('enforces column autofilter, validation, and conditional-format editor hook
   await expect(filter).toBeVisible();
   await filter.getByLabel('Contains').fill('paper');
   await filter.getByRole('button', { name: 'Apply filter' }).click();
-  await expect(workspace.getByRole('cell', { name: 'Paper' })).toBeVisible();
-  await expect(workspace.getByRole('cell', { name: 'Ink' })).toHaveCount(0);
+  await expect(gridCell(workspace, 'Paper')).toBeVisible();
+  await expect(gridCell(workspace, 'Ink')).toHaveCount(0);
 
   await workspace.getByRole('button', { name: 'Save validation' }).click();
   await expect(workspace.getByTestId('tsw-validation-editor')).toContainText('B2:B3');
-  await workspace.getByRole('cell', { name: '4' }).click();
+  await gridCell(workspace, '4').click();
   await workspace.locator('#tsw-formula').fill('8');
   await workspace.getByRole('button', { name: 'Enter', exact: true }).click();
   await expect(workspace.getByTestId('tsw-validation-status')).toContainText('Qty must be 2, 4, or 6.');
@@ -59,7 +63,7 @@ test('enforces column autofilter, validation, and conditional-format editor hook
 
 test('opens the reserved context menu from right-click and long-press', async ({ page }) => {
   const workspace = await openWorkspace(page);
-  const paper = workspace.getByRole('cell', { name: 'Paper' });
+  const paper = gridCell(workspace, 'Paper');
   await paper.click({ button: 'right' });
   const menu = workspace.getByTestId('tsw-context-menu');
   await expect(menu).toBeVisible();
