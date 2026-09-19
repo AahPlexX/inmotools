@@ -160,7 +160,11 @@ export async function deleteTest(id: number): Promise<void> {
 }
 
 export async function listTests(): Promise<StoredTest[]> {
-  return getDb().tests.orderBy('savedAt').reverse().toArray();
+  const rows = await getDb().tests.orderBy('savedAt').reverse().toArray();
+  return rows.flatMap((row) => {
+    const normalized = normalizeStoredTest(row, Number.NaN);
+    return normalized ? [normalized] : [];
+  });
 }
 
 export interface TestFilterOptions {
@@ -202,9 +206,13 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
       && (query.durationMode !== 'quote' || t.quoteLength === query.quoteLength)
     ))
     .toArray();
-  if (rows.length === 0) return undefined;
-  rows.sort((a, b) => b.netWpm - a.netWpm);
-  return rows[0];
+  const normalizedRows = rows.flatMap((row) => {
+    const normalized = normalizeStoredTest(row, Number.NaN);
+    return normalized ? [normalized] : [];
+  });
+  if (normalizedRows.length === 0) return undefined;
+  normalizedRows.sort((a, b) => b.netWpm - a.netWpm);
+  return normalizedRows[0];
 }
 
 export async function clearAllTests(): Promise<void> {
