@@ -13,6 +13,8 @@ import {
   resolveSketchAxis3d,
   resolveSketchPlane3d,
   resolveThreePointDatumPlaneFrame,
+  resolveTwoPlaneDatumAxis,
+  resolveTwoPointDatumAxis,
 } from '../../src/tools/cad/sketch-profile';
 
 function rectangleSketch(plane: CadSketch['plane'] = { kind: 'origin', plane: 'XY' }): CadSketch {
@@ -167,6 +169,33 @@ describe('CAD sketch profile bridge', () => {
 
   it('rejects a three-point datum plane with a non-finite coordinate', () => {
     expect(() => resolveThreePointDatumPlaneFrame([0, 0, 0], [1, 0, 0], [0, Number.NaN, 0])).toThrow(/finite/i);
+  });
+
+  it('resolves a datum axis through two distinct 3D points', () => {
+    expect(resolveTwoPointDatumAxis([1, 2, 3], [1, 7, 3])).toEqual({
+      origin: [1, 2, 3],
+      direction: [0, 1, 0],
+    });
+  });
+
+  it('rejects coincident two-point datum-axis inputs', () => {
+    expect(() => resolveTwoPointDatumAxis([1, 2, 3], [1, 2, 3])).toThrow(/coincident/i);
+  });
+
+  it('resolves the intersection axis of two nonparallel planes', () => {
+    const axis = resolveTwoPlaneDatumAxis(
+      resolveDatumPlaneFrame('XY', 0),
+      resolveDatumPlaneFrame('YZ', 0),
+    );
+    expect(axis.origin).toEqual([0, 0, 0]);
+    expect(axis.direction).toEqual([0, 1, 0]);
+  });
+
+  it('rejects parallel planes for a two-plane datum axis', () => {
+    expect(() => resolveTwoPlaneDatumAxis(
+      resolveDatumPlaneFrame('XY', 0),
+      resolveDatumPlaneFrame('XY', 10),
+    )).toThrow(/parallel/i);
   });
 
   it('places a profile on a resolved offset datum plane', () => {
