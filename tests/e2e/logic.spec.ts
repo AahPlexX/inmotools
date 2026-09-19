@@ -45,8 +45,10 @@ test('builds a two-switch AND circuit and verifies it through the truth table an
   await wire(page, { x: (1 + 1) * GRID, y: 1 * GRID }, { x: 5 * GRID, y: 2 * GRID });
   // Switch B (grid 1,4) output pin -> AND gate input B
   await wire(page, { x: (1 + 1) * GRID, y: 4 * GRID }, { x: 5 * GRID, y: 3 * GRID });
-  // AND gate output Y -> LED (grid 9,2) input
-  await wire(page, { x: (5 + 2) * GRID, y: 2.5 * GRID }, { x: 9 * GRID, y: 2 * GRID });
+  // AND gate output Y -> LED (grid 9,2) input. The 2-input AND's Y pin sits
+  // at grid y = component.y + inputCount/2 = 2 + 1 = 3 (centered on the
+  // gate's actual drawn tip, not the pre-fix (count-1)/2 = 2.5 offset).
+  await wire(page, { x: (5 + 2) * GRID, y: 3 * GRID }, { x: 9 * GRID, y: 2 * GRID });
 
   await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
   const ercDock = page.getByTestId('logic-erc-dock');
@@ -94,6 +96,32 @@ test('Escape cancels an in-progress wire instead of silently completing it on th
   await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
   const ercDock = page.getByTestId('logic-erc-dock');
   await expect(ercDock).toContainText('floating');
+});
+
+test('opens a keyboard shortcuts reference panel listing the functional default bindings', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-shortcuts-dock')).toBeHidden();
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  const dock = page.getByTestId('logic-shortcuts-dock');
+  await expect(dock).toBeVisible();
+  await expect(dock).toContainText('Space');
+  await expect(dock).toContainText('Play or pause the simulation');
+  await expect(dock).toContainText('Escape');
+  await expect(dock).toContainText('Right-click');
+});
+
+test('a right-click while placing a component cancels the drop instead of also placing one', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await page.getByTestId('logic-palette').getByRole('button', { name: 'SWITCH', exact: true }).click();
+  const canvas = page.getByTestId('logic-canvas');
+  await canvas.click({ button: 'right', position: { x: 3 * GRID, y: 3 * GRID } });
+  // A genuine placement always leaves the Undo button enabled; a right-click
+  // that only opened (or no-opped, since nothing is under the cursor yet)
+  // must not have committed a component-add to history.
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  await page.keyboard.press('Escape');
 });
 
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {

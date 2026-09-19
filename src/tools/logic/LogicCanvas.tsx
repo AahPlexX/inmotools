@@ -28,6 +28,15 @@ const orthogonalWaypoints = (start: WirePoint, end: WirePoint): WirePoint[] => {
 
 const CLICK_MOVEMENT_THRESHOLD = 6;
 const LONG_PRESS_MS = 550;
+const TOOLTIP_MAX_WIDTH = 220;
+const TOOLTIP_MAX_HEIGHT = 56;
+const TOOLTIP_EDGE_MARGIN = 8;
+
+/** Keeps the hover tooltip's estimated box fully inside the canvas viewport instead of clipping past its right/bottom edge. */
+const clampTooltipPosition = (x: number, y: number, containerWidth: number, containerHeight: number): ScreenPoint => ({
+  x: Math.min(x, Math.max(TOOLTIP_EDGE_MARGIN, containerWidth - TOOLTIP_MAX_WIDTH - TOOLTIP_EDGE_MARGIN)),
+  y: Math.min(y, Math.max(TOOLTIP_EDGE_MARGIN, containerHeight - TOOLTIP_MAX_HEIGHT - TOOLTIP_EDGE_MARGIN)),
+});
 
 export interface MenuAction {
   readonly key: string;
@@ -143,7 +152,10 @@ export function LogicCanvas(props: LogicCanvasProps) {
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
 
     if (placingType) {
-      onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
+      // Only the primary button places a component: a right-click would
+      // otherwise both open a wire-cancel/context-menu gesture AND drop a
+      // component, and a middle-click would drop one instead of panning.
+      if (event.button === 0) onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
       return;
     }
 
@@ -257,14 +269,17 @@ export function LogicCanvas(props: LogicCanvasProps) {
       if (!isCoarsePointer()) {
         const component = doc.components.find((candidate) => candidate.id === port.componentId);
         const portDef = component ? getComponentPorts(component.type, component.params).find((candidate) => candidate.id === port.portId) : undefined;
-        setTooltip({ x: screenPoint.x + 14, y: screenPoint.y + 14, text: `${component?.label ?? ''} · pin ${portDef?.label ?? port.portId}` });
+        const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y + 14, size.width, size.height);
+        setTooltip({ x: clamped.x, y: clamped.y, text: `${component?.label ?? ''} · pin ${portDef?.label ?? port.portId}` });
       }
       return;
     }
     setHoverPort(undefined);
     const hovered = componentAt(worldPoint);
-    if (hovered && !isCoarsePointer()) setTooltip({ x: screenPoint.x + 14, y: screenPoint.y + 14, text: `${hovered.label} (${hovered.type})` });
-    else setTooltip(null);
+    if (hovered && !isCoarsePointer()) {
+      const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y + 14, size.width, size.height);
+      setTooltip({ x: clamped.x, y: clamped.y, text: `${hovered.label} (${hovered.type})` });
+    } else setTooltip(null);
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {

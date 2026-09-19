@@ -63,6 +63,17 @@ const HAZARD_LABEL: Record<string, string> = {
   oscillation: 'This net is oscillating and could not settle under ideal zero-delay simulation.',
 };
 
+/** The functional default keyboard bindings, shown in the toolbar's reference panel. */
+const KEYBOARD_SHORTCUTS: ReadonlyArray<{ readonly keys: string; readonly action: string }> = [
+  { keys: 'Space', action: 'Play or pause the simulation' },
+  { keys: 'R', action: 'Rotate the current selection 90°' },
+  { keys: 'Delete / Backspace', action: 'Delete the current selection' },
+  { keys: 'Ctrl/Cmd + Z', action: 'Undo' },
+  { keys: 'Ctrl/Cmd + Shift + Z, or Ctrl/Cmd + Y', action: 'Redo' },
+  { keys: 'Escape', action: 'Cancel an in-progress wire or component placement, or clear the selection' },
+  { keys: 'Right-click (or long-press on touch)', action: 'Open a component’s rotate/flip/duplicate/delete menu' },
+];
+
 export default function LogicWorkspace() {
   const [history, setHistory] = useState<DocumentHistory>(loadInitialHistory);
   const documentRef = useRef<LogicDocument>(history.present);
@@ -74,7 +85,7 @@ export default function LogicWorkspace() {
   const pendingSwitchOverrideRef = useRef<Record<string, LogicLevel>>({});
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts'>('none');
   const [mobilePanel, setMobilePanel] = useState<'none' | 'palette' | 'inspector'>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -278,6 +289,7 @@ export default function LogicWorkspace() {
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
+        <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={handleExportSvg}>Export SVG</button>
         <button type="button" className="logic-mobile-only" onClick={() => setMobilePanel((current) => (current === 'palette' ? 'none' : 'palette'))}>Components</button>
@@ -397,6 +409,19 @@ export default function LogicWorkspace() {
               ))}
             </ul>
           )}
+        </section>
+      ) : null}
+
+      {activeDock === 'shortcuts' ? (
+        <section className="logic-dock" aria-label="Keyboard shortcuts" data-testid="logic-shortcuts-dock">
+          <dl className="logic-shortcut-list">
+            {KEYBOARD_SHORTCUTS.map((shortcut) => (
+              <div className="logic-shortcut-row" key={shortcut.keys}>
+                <dt>{shortcut.keys}</dt>
+                <dd>{shortcut.action}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
       ) : null}
 

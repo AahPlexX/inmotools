@@ -14,6 +14,16 @@ export interface ComponentDefinition {
 
 const inputLetter = (index: number): string => String.fromCharCode(65 + index);
 
+/**
+ * The renderer (Canvas2D and SVG alike) draws every gate body `Math.max(2,
+ * inputCount)` grid rows tall and always places the shape's single output
+ * tip at the vertical center of that body (`height / 2`), regardless of
+ * family. Output/single-input port y-offsets below are derived from that
+ * same `bodyRows / 2` center so the clickable/wired port position always
+ * lands exactly on the drawn tip instead of drifting off it.
+ */
+const gateBodyRows = (inputCount: number): number => Math.max(2, inputCount);
+
 const variadicGatePorts = (params: ComponentParams): PortDefinition[] => {
   const count = clampInputCount(params.inputCount);
   const inputs: PortDefinition[] = Array.from({ length: count }, (_, index) => ({
@@ -23,7 +33,7 @@ const variadicGatePorts = (params: ComponentParams): PortDefinition[] => {
     x: 0,
     y: index,
   }));
-  return [...inputs, { id: 'Y', direction: 'output', label: 'Y', x: 2, y: (count - 1) / 2 }];
+  return [...inputs, { id: 'Y', direction: 'output', label: 'Y', x: 2, y: gateBodyRows(count) / 2 }];
 };
 
 export const clampInputCount = (value: number | undefined): number => {
@@ -31,15 +41,18 @@ export const clampInputCount = (value: number | undefined): number => {
   return Math.min(8, Math.max(2, Math.round(raw)));
 };
 
-const singleInputGatePorts = (): PortDefinition[] => [
-  { id: 'A', direction: 'input', label: 'A', x: 0, y: 0 },
-  { id: 'Y', direction: 'output', label: 'Y', x: 2, y: 0 },
-];
+const singleInputGatePorts = (): PortDefinition[] => {
+  const center = gateBodyRows(1) / 2;
+  return [
+    { id: 'A', direction: 'input', label: 'A', x: 0, y: center },
+    { id: 'Y', direction: 'output', label: 'Y', x: 2, y: center },
+  ];
+};
 
 const triBufferPorts = (): PortDefinition[] => [
   { id: 'A', direction: 'input', label: 'A', x: 0, y: 0 },
   { id: 'EN', direction: 'input', label: 'EN', x: 1, y: 1 },
-  { id: 'Y', direction: 'output', label: 'Y', x: 2, y: 0 },
+  { id: 'Y', direction: 'output', label: 'Y', x: 2, y: gateBodyRows(2) / 2 },
 ];
 
 const sourcePorts = (): PortDefinition[] => [{ id: 'Y', direction: 'output', label: 'Y', x: 1, y: 0 }];

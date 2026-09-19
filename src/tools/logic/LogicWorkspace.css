@@ -200,6 +200,39 @@
   font-size: 0.82rem;
 }
 
+.logic-shortcut-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.logic-shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 260px) 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.logic-shortcut-row dt {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.logic-shortcut-row dd {
+  margin: 0;
+  color: #475569;
+}
+
+@media (max-width: 640px) {
+  .logic-shortcut-row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
+
 .logic-mobile-backdrop {
   display: none;
 }
@@ -314,4 +347,21 @@
   background: #000000;
   border-color: #ffff00;
   color: #ffffff;
+}
+
+/* .logic-dock-message and .logic-shortcut-row dd set their own muted-gray
+   text color for the light theme, which the dark/high-contrast overrides
+   above don't reach (a child's own color declaration wins over the
+   inherited one), leaving dark-on-dark text that is difficult or
+   impossible to read once the dock background switches to near-black. */
+.logic-workspace[data-theme="dark"] .logic-dock-message,
+.logic-workspace[data-theme="dark"] .logic-shortcut-row dd,
+.logic-workspace[data-theme="high-contrast"] .logic-dock-message,
+.logic-workspace[data-theme="high-contrast"] .logic-shortcut-row dd {
+  color: #94a3b8;
+}
+
+.logic-workspace[data-theme="dark"] .logic-shortcut-row dt,
+.logic-workspace[data-theme="high-contrast"] .logic-shortcut-row dt {
+  color: #e2e8f0;
 }
