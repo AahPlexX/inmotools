@@ -6,7 +6,27 @@
 
 ## Status
 
-In progress. Milestones M1–M4 are implemented on the dedicated `feat/sightline-velocity` branch; M5 verification is active. The ledger in the design document stays authoritative and no item may be dropped without an explicit recorded rejection. Implementation presence is not acceptance: the workstream remains open until the deterministic completion goal below has fresh evidence.
+Core delivery is complete and integrated on `main`. All F1–F35 capabilities are implemented; the original M5 acceptance was completed before PR #41 merged the first audit-remediation pass on 2026-09-17. A follow-up UX/real-world audit is active on `fix/sightline-ux-audit-2` because completion of the feature ledger does not waive usability, accessibility, responsiveness, or regression obligations.
+
+### Active follow-up — 2026-09-19
+
+The follow-up audit found that the underlying capability set is stronger than the current hierarchy communicates. The remediation is quality work, not feature-count inflation. Current scope is limited to Sightline source, Sightline tests, and this tracking record.
+
+Accepted findings being resolved:
+- multi-file ingestion needs a real in-session document switcher and accurate per-file failure accounting;
+- the loaded-document state leaves source/import machinery above the primary reading task;
+- frequent reading actions need a persistent cockpit and direct rate control;
+- specialist controls need progressive disclosure rather than appearing at the same priority as normal reading;
+- touch targets and typography need coarse-pointer/mobile ergonomics plus component-driven responsive reflow;
+- async ingestion status needs an explicit live region;
+- drag-leave state can remain visually active while moving across nested children;
+- diagnostics and technical metadata are too implementation-oriented for the default surface;
+- sample selection has an unnecessary second confirmation step;
+- clipboard access is less reliable than paste and should be secondary;
+- control-tab ARIA relationships need explicit tab/tabpanel wiring;
+- several labels use specialist language where plain task language is clearer.
+
+Verification gate for this follow-up: focused Sightline units, production build, the complete desktop/mobile Sightline browser spec, responsive overflow/touch acceptance, and exact-branch CI must all be green before this entry returns to completed status.
 
 ## Deterministic completion goal
 
@@ -60,3 +80,19 @@ Until item 1–7 hold, the workstream stays open in `IN_PROGRESS.md`.
 - M5 now uses `.github/workflows/sightline.yml` on the dedicated `feat/sightline-velocity` branch to run one bounded loop: frozen install, Sightline-only unit suites, production build, and the Sightline desktop/mobile browser spec. The repository-wide Pages gate remains unchanged and is still required before integration.
 - Dedicated validation run `35118094022` at `3e4bee27607baf9eae4a77e162a341966a49ae72` is green: 407/407 Sightline unit assertions across 16 files, production build, and 40/40 desktop/mobile Chromium browser cases passed.
 - F6 acceptance delta 2026-09-16: file input now accepts multi-file batches, the entire Sightline workspace accepts dropped files/text, and the built-in sample control exposes a three-item sample library. The four focused desktop/mobile F6 cases passed locally after a fresh production build and are now included in green dedicated run `35122984076` at `1d28b12b911f5a60b3f8ffe543466b4b1aa02c63`; that run passed all focused units, the production build, and 44/44 browser cases.
+
+
+## 2026-09-19 UX audit handoff
+
+Branch: `fix/sightline-ux-audit-2`.
+
+Implementation intent: preserve every F1–F35 behavior while simplifying the default journey to open/paste → read → control/resume. Source/import options, diagnostics, technical metadata, contents, and specialist controls remain available through disclosure rather than being removed.
+
+Next sequential actions after the current commit:
+1. Run the focused render/unit suite and repair any regression at the cause.
+2. Run the complete `tests/e2e/sightline.spec.ts` desktop and mobile Chromium suite once, not piecemeal loops.
+3. Run the production build and inspect responsive narrow/medium/wide behavior for horizontal overflow and clipped controls.
+4. Run the dedicated Sightline workflow on the exact branch revision.
+5. Record exact run/commit evidence here and in `.tasks`; only then merge and move the follow-up entry out of IN_PROGRESS.
+
+Do not re-open already accepted F1–F35 implementation work unless a fresh regression proves it necessary. Do not touch unrelated tool workstreams.
