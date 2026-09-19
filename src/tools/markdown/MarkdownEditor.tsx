@@ -8,6 +8,8 @@ import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { vim } from '@replit/codemirror-vim';
 import { markdownSyntaxCompletions } from './markdown-completions';
+import { buildOutline } from './outline-engine';
+import { HEADING_ID_PREFIX } from './heading-slug';
 
 // CodeMirror 6 markdown source editor, mirroring the wiring pattern already
 // used by this catalog's other CodeMirror-based tools (see LatticeEditor.tsx,
@@ -22,10 +24,25 @@ import { markdownSyntaxCompletions } from './markdown-completions';
 // and CodeMirror's own undo history - which made the font-size slider
 // unusable, since every step of a drag rebuilt the editor from scratch.
 
+// Local-only image embedding: a pasted or dropped image never leaves the
+// browser. Capped well under typical email/base64 bloat concerns so one
+// large screenshot cannot silently balloon the document; past this, point
+// people at the Image button's URL form instead of guessing at compression.
+const MAX_EMBEDDED_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const readImageAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
+
 export interface MarkdownEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onCursorLineChange?: (line: number) => void;
+  readonly onStatus?: (message: string) => void;
   readonly lineWrapping: boolean;
   readonly fontSize: number;
   readonly vimMode: boolean;
@@ -41,6 +58,7 @@ export default function MarkdownEditor({
   value,
   onChange,
   onCursorLineChange,
+  onStatus,
   lineWrapping,
   fontSize,
   vimMode,
@@ -52,6 +70,7 @@ export default function MarkdownEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorLineChangeRef = useRef(onCursorLineChange);
+  const onStatusRef = useRef(onStatus);
   // Set around a programmatic dispatch (the value-sync effect below, used
   // when an external change - undo/redo, restoring a draft, opening a file -
   // replaces the document from outside the editor). Without this guard, that
@@ -82,6 +101,31 @@ export default function MarkdownEditor({
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onCursorLineChangeRef.current = onCursorLineChange; }, [onCursorLineChange]);
+  useEffect(() => { onStatusRef.current = onStatus; }, [onStatus]);
+
+  const insertImageAtSelection = async (view: EditorView, file: File, at?: number) => {
+    if (file.size > MAX_EMBEDDED_IMAGE_BYTES) {
+      onStatusRef.current?.(`"${file.name}" is larger than 5 MB and was not embedded. Resize it first, or use the Image button for an external URL instead.`);
+      return;
+    }
+    let dataUrl: string;
+    try {
+      dataUrl = await readImageAsDataUrl(file);
+    } catch {
+      onStatusRef.current?.(`Could not read "${file.name}" as an image in this browser.`);
+      return;
+    }
+    const markdown = `![${file.name.replace(/\.[^.]+$/, '')}](${dataUrl})`;
+    const from = at ?? view.state.selection.main.from;
+    const to = at !== undefined ? at : view.state.selection.main.to;
+    view.dispatch({
+      changes: { from, to, insert: markdown },
+      selection: { anchor: from + markdown.length },
+      userEvent: 'input',
+    });
+    view.focus();
+    onStatusRef.current?.(`Embedded "${file.name}" as an inline image. Nothing was uploaded.`);
+  };
 
   // Built once per mount. `value`, `fontSize`, `spellcheck`, `lineWrapping`,
   // `vimMode`, and `syntaxSuggestions` are intentionally absent from the
@@ -121,6 +165,30 @@ export default function MarkdownEditor({
         suggestionsCompartment.of(buildSuggestions(syntaxSuggestionsRef.current)),
         keymap.of([...closeBracketsKeymap, ...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         attributesCompartment.of(buildAttributes(fontSizeRef.current, spellcheckRef.current)),
+        // Pasting or dropping an image embeds it as a data URI at the drop
+        // point/selection instead of falling through to CodeMirror's default
+        // (pasting nothing useful for a paste, or the browser navigating to
+        // the file for a drop). A non-image paste/drop returns false so the
+        // browser's normal text-paste, and the workspace's own outer
+        // file-drop handler (opening a dropped .md file), still run.
+        EditorView.domEventHandlers({
+          paste: (event, view) => {
+            const file = Array.from(event.clipboardData?.files ?? []).find((item) => item.type.startsWith('image/'));
+            if (!file) return false;
+            event.preventDefault();
+            void insertImageAtSelection(view, file);
+            return true;
+          },
+          drop: (event, view) => {
+            const file = Array.from(event.dataTransfer?.files ?? []).find((item) => item.type.startsWith('image/'));
+            if (!file) return false;
+            event.preventDefault();
+            event.stopPropagation();
+            const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head;
+            void insertImageAtSelection(view, file, at);
+            return true;
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !isExternalSyncRef.current) onChangeRef.current(update.state.doc.toString());
           if (update.selectionSet || update.docChanged) {
@@ -223,12 +291,126 @@ export default function MarkdownEditor({
     view.focus();
   };
 
+  // Lines touched by the current selection (or just the caret's line when
+  // nothing is selected), for prefix-style block formatting (blockquote,
+  // lists) that acts per-line rather than wrapping a single span.
+  const selectedLines = (view: EditorView) => {
+    const { from, to } = view.state.selection.main;
+    const startLine = view.state.doc.lineAt(from).number;
+    const endLine = view.state.doc.lineAt(to).number;
+    const lines = [];
+    for (let number = startLine; number <= endLine; number += 1) lines.push(view.state.doc.line(number));
+    return lines;
+  };
+
+  const toggleLinePrefix = (prefix: string) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const lines = selectedLines(view);
+    const allPrefixed = lines.every((line) => line.text.startsWith(prefix));
+    view.dispatch({
+      changes: lines.map((line) => allPrefixed
+        ? { from: line.from, to: line.from + prefix.length, insert: '' }
+        : { from: line.from, to: line.from, insert: prefix }),
+      userEvent: 'input',
+    });
+    view.focus();
+  };
+
+  const toggleOrderedList = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const lines = selectedLines(view);
+    const numbered = /^\d+\.\s/;
+    const allNumbered = lines.every((line) => numbered.test(line.text));
+    view.dispatch({
+      changes: lines.map((line, index) => {
+        const match = numbered.exec(line.text);
+        return allNumbered && match
+          ? { from: line.from, to: line.from + match[0].length, insert: '' }
+          : { from: line.from, to: line.from, insert: `${index + 1}. ` };
+      }),
+      userEvent: 'input',
+    });
+    view.focus();
+  };
+
+  // Cycles the caret's current line through H1 - H6, then back to a plain
+  // paragraph, rather than a controlled level picker: this stays stateless
+  // like every other formatting action here, with no extra render-tracked
+  // cursor-position state to keep in sync.
+  const cycleHeading = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    const match = /^(#{1,6})\s+/.exec(line.text);
+    const level = match ? match[1].length : 0;
+    const nextPrefix = level >= 6 ? '' : `${'#'.repeat(level + 1)} `;
+    const stripLength = match ? match[0].length : 0;
+    view.dispatch({
+      changes: { from: line.from, to: line.from + stripLength, insert: nextPrefix },
+      userEvent: 'input',
+    });
+    view.focus();
+  };
+
+  const insertHorizontalRule = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const { to } = view.state.selection.main;
+    const line = view.state.doc.lineAt(to);
+    const insert = `${line.text.length > 0 ? '\n\n' : ''}---\n\n`;
+    const at = line.to;
+    view.dispatch({
+      changes: { from: at, to: at, insert },
+      selection: { anchor: at + insert.length },
+      userEvent: 'input',
+    });
+    view.focus();
+  };
+
+  // Reuses the exact same GitHub-style slugs the rendered preview assigns to
+  // each heading (heading-id-plugin.ts) with the same user-content- clobber
+  // prefix rehype-sanitize applies, so every generated link actually lands
+  // on its heading instead of going nowhere.
+  const insertTableOfContents = () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const outline = buildOutline(view.state.doc.toString());
+    if (outline.length === 0) {
+      onStatusRef.current?.('Add at least one heading before inserting a table of contents.');
+      return;
+    }
+    const minDepth = Math.min(...outline.map((entry) => entry.depth));
+    const toc = outline
+      .map((entry) => `${'  '.repeat(entry.depth - minDepth)}- [${entry.text || '(untitled heading)'}](#${HEADING_ID_PREFIX}${entry.id})`)
+      .join('\n');
+    const { from, to } = view.state.selection.main;
+    const line = view.state.doc.lineAt(from);
+    const insert = `${line.text.length > 0 ? '\n\n' : ''}${toc}\n\n`;
+    view.dispatch({
+      changes: { from, to, insert },
+      selection: { anchor: from + insert.length },
+      userEvent: 'input',
+    });
+    view.focus();
+  };
+
   return <>
     <div className="markdown-workbench-format-actions" role="group" aria-label="Insert Markdown">
+      <button type="button" onClick={cycleHeading}>Heading</button>
+      <button type="button" onClick={insertTableOfContents}>Table of contents</button>
       <button type="button" onClick={() => insertPattern('**', '**', 'bold text')}>Bold</button>
       <button type="button" onClick={() => insertPattern('*', '*', 'italic text')}>Italic</button>
       <button type="button" onClick={() => insertPattern('~~', '~~', 'deleted text')}>Strikethrough</button>
+      <button type="button" onClick={() => insertPattern('`', '`', 'code')}>Inline code</button>
+      <button type="button" onClick={() => insertPattern('```\n', '\n```', 'code block', false)}>Code block</button>
+      <button type="button" onClick={() => toggleLinePrefix('> ')}>Blockquote</button>
+      <button type="button" onClick={() => toggleLinePrefix('- ')}>Bullet list</button>
+      <button type="button" onClick={toggleOrderedList}>Numbered list</button>
+      <button type="button" onClick={insertHorizontalRule}>Horizontal rule</button>
       <button type="button" onClick={() => insertPattern('[', '](https://example.com)', 'link text')}>Link</button>
+      <button type="button" onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')}>Image</button>
       <button type="button" onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')}>Task</button>
       <button type="button" onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)}>Table</button>
       <button type="button" onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }}>Find / replace</button>

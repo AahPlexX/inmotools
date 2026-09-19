@@ -10,12 +10,12 @@ const SYNTAX_GROUPS = [
     examples: ['**Bold text**', '*Italic text*', '~~Strikethrough~~', '`inline code`'],
   },
   {
-    title: 'Lists & quotes',
-    examples: ['- Bullet item', '1. Numbered item', '- [ ] Task', '> Blockquote'],
+    title: 'Lists, quotes & structure',
+    examples: ['- Bullet item', '1. Numbered item', '- [ ] Task', '> Blockquote', '---'],
   },
   {
     title: 'Links & images',
-    examples: ['[Link text](https://example.com)', '![Alt text](image.png)'],
+    examples: ['[Link text](https://example.com)', '![Alt text](image.png)', 'Paste or drop an image to embed it'],
   },
   {
     title: 'Code & tables',
@@ -24,6 +24,14 @@ const SYNTAX_GROUPS = [
   {
     title: 'Math, diagrams & citations',
     examples: ['$E = mc^2$', '$$\nx^2 + y^2 = z^2\n$$', '```mermaid\ngraph TD\nA --> B\n```', '[@citekey]'],
+  },
+  {
+    title: 'Alerts, footnotes & emoji',
+    examples: [
+      '> [!NOTE]\n> One of NOTE, TIP, IMPORTANT,\n> WARNING, or CAUTION',
+      'A claim needing a source.[^1]\n\n[^1]: The source.',
+      ':tada: :rocket: :bulb:',
+    ],
   },
 ] as const;
 

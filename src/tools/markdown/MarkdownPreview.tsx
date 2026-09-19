@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { renderMarkdown } from './render-engine';
 import { scheduleIdle } from './diagram-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
+import { highlightCodeBlocks } from './code-highlight-engine';
 import type { ScrollAnchor } from './markdown-types';
 
 export interface MarkdownPreviewProps {
@@ -49,15 +50,20 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
           onRenderStateChange?.(false);
           return;
         }
-        void renderDiagramBlocks(host, {
-          isCurrent,
-          trackCancel: (cancel) => cancels.push(cancel),
-          onLayoutChanged: () => {
-            if (isCurrent()) measureAnchors(host, anchors, onAnchorsMeasured);
-          },
-        }).finally(() => {
-          if (isCurrent()) onRenderStateChange?.(false);
-        });
+        void highlightCodeBlocks(host, { isCurrent })
+          .then((changed) => {
+            if (isCurrent() && changed) measureAnchors(host, anchors, onAnchorsMeasured);
+          })
+          .then(() => renderDiagramBlocks(host, {
+            isCurrent,
+            trackCancel: (cancel) => cancels.push(cancel),
+            onLayoutChanged: () => {
+              if (isCurrent()) measureAnchors(host, anchors, onAnchorsMeasured);
+            },
+          }))
+          .finally(() => {
+            if (isCurrent()) onRenderStateChange?.(false);
+          });
       });
       cancels.push(cancelIdle);
     }, DIAGRAM_DEBOUNCE_MS);
