@@ -37,10 +37,9 @@ describe('tabular sheet workstation wiring', () => {
     expect(pkg).not.toContain('hyperformula');
   });
 
-  it('maps suite source to the shared app/accessibility specs until a dedicated browser spec exists', () => {
+  it('maps suite source to the dedicated Stage 2 browser spec', () => {
     expect(selectE2eSpecs(['src/tools/sheets/SheetsWorkspace.tsx'])).toEqual([
-      'tests/e2e/app.spec.ts',
-      'tests/e2e/accessibility.spec.ts',
+      'tests/e2e/tabular-sheet-workstation.spec.ts',
     ]);
   });
 
@@ -55,18 +54,18 @@ describe('tabular sheet workstation wiring', () => {
     expect(FEATURE_PROGRESS.find((row) => row.id === 21)?.note).toMatch(/OSS replacement/i);
     expect(FEATURE_PROGRESS.find((row) => row.id === 22)?.status).toBe('done');
     expect(FEATURE_PROGRESS.find((row) => row.id === 22)?.note).toMatch(/OSS replacement/i);
-    expect(FEATURE_PROGRESS.find((row) => row.id === 24)?.status).toBe('stub-stage2');
+    expect(FEATURE_PROGRESS.find((row) => row.id === 24)?.status).toBe('done');
+    expect([3, 11, 12, 17, 18, 19, 24, 27].every((id) => FEATURE_PROGRESS.find((row) => row.id === id)?.status === 'done')).toBe(true);
   });
 
-  it('reserves Feature 24 as stub hooks only', () => {
+  it('wires Feature 24 reserved hooks to a real context-menu surface', () => {
     const event = { prevented: false, preventDefault() { this.prevented = true; } };
     suppressNativeContextMenu(event);
     expect(event.prevented).toBe(true);
     const workspace = read('src/tools/sheets/SheetsWorkspace.tsx');
     expect(workspace).toContain('suppressNativeContextMenu');
     expect(workspace).toContain('scheduleLongPressStub');
-    expect(workspace).not.toContain('openMenu');
-    expect(workspace).not.toContain('tsw-context');
+    expect(workspace).toContain('tsw-context-menu');
     expect(read('src/tools/sheets/sheets-univer.ts')).toContain('contextMenu: false');
   });
 

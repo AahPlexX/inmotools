@@ -27,7 +27,14 @@ export function setCell(book: PortableWorkbook, sheetId: string, row: number, co
   const key = cellKey(row, col);
   const current = sheet.cells[key] ?? {};
   const merged = { ...current, ...patch };
-  if ((merged.v === null || merged.v === undefined || merged.v === '') && !merged.f && !merged.note && !merged.hyperlink) {
+  if (
+    (merged.v === null || merged.v === undefined || merged.v === '')
+    && !merged.f
+    && !merged.note
+    && !merged.hyperlink
+    && !merged.z
+    && !merged.s
+  ) {
     delete sheet.cells[key];
   } else {
     sheet.cells[key] = merged;

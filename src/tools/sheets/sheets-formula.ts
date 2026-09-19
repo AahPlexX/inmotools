@@ -717,6 +717,26 @@ export function evaluateWorkbook(book: PortableWorkbook): PortableWorkbook {
   return next;
 }
 
+export function parseA1Range(a1: string): { r1: number; c1: number; r2: number; c2: number } | null {
+  const [startToken, endToken] = a1.trim().split(':');
+  const start = startToken ? parseA1Ref(startToken) : null;
+  if (!start) return null;
+  const end = endToken ? parseA1Ref(endToken) : start;
+  if (!end) return null;
+  return {
+    r1: Math.min(start.row, end.row),
+    c1: Math.min(start.col, end.col),
+    r2: Math.max(start.row, end.row),
+    c2: Math.max(start.col, end.col),
+  };
+}
+
+export function a1CoversCell(a1: string, row: number, col: number): boolean {
+  const range = parseA1Range(a1);
+  if (!range) return false;
+  return row >= range.r1 && row <= range.r2 && col >= range.c1 && col <= range.c2;
+}
+
 export function displayCell(cell: SheetCell | undefined): string {
   if (!cell) return '';
   if (cell.f && (cell.v === null || cell.v === undefined)) return cell.f;

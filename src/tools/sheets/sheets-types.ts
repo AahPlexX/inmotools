@@ -3,6 +3,8 @@ export const SCHEMA_VERSION = 1 as const;
 
 export type CellPrimitive = string | number | boolean;
 
+export type OverflowMode = 'clip' | 'ellipsis' | 'overflow';
+
 export interface CellStyle {
   bold?: boolean;
   italic?: boolean;
@@ -11,6 +13,12 @@ export interface CellStyle {
   fill?: string;
   align?: 'left' | 'center' | 'right';
   wrap?: boolean;
+  overflow?: OverflowMode;
+}
+
+export interface ColumnFilterState {
+  query: string;
+  hiddenValues: string[];
 }
 
 export interface SheetCell {
@@ -76,6 +84,7 @@ export interface PortableSheet {
   hiddenRows: number[];
   hiddenCols: number[];
   filterHeaderRow: number | null;
+  columnFilters?: Record<string, ColumnFilterState>;
 }
 
 export interface PortableWorkbook {

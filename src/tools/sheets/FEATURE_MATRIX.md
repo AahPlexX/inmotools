@@ -1,4 +1,4 @@
-# Tabular Sheet Workstation — locked Stage 1 feature matrix
+# Tabular Sheet Workstation — locked Stage 1 / Stage 2 feature matrix
 
 Suite id: `sheets`. Suite path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation` (same `*-workstation` pattern as `typing-workstation`). Persistence tool id: `inmotools-tabular-sheet-workstation`.
 Local-first only. Workbooks stay in this browser (IndexedDB / LocalStorage). No uploads, analytics, auth, or remote database.
@@ -36,7 +36,7 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | ---: | --- | --- | --- |
 | 1 | Multi-sheet workbook | Univer core preset + portable snapshot model | done |
 | 2 | Formula bar | Univer `formulaBar` in `UniverSheetsCorePreset` | done |
-| 3 | AST/DAG via Univer `engine-formula` in preset | Portable DAG/evaluator unit-covered; live Univer formula SSOT + browser proof is Stage 2 | stub-stage2 |
+| 3 | AST/DAG via Univer `engine-formula` in preset | Live Univer `engine-formula` is SSOT when the host is mounted (`data-testid=tsw-formula-ssot`, `univer-host[data-formula-ssot]`). Portable DAG remains the offline evaluator. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 4 | Relative / absolute refs | `$A$1` / `A$1` / `$A1` / `A1` parse + fill rewrite | done |
 | 5 | Cross-sheet refs | `Sheet2!B3` / `'Sheet Name'!A1` | done |
 | 6 | Named ranges | Portable named-range table synced into snapshot | done |
@@ -44,23 +44,23 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 8 | Undo / redo | Univer history + portable command stack fallback | done |
 | 9 | Cut / copy / paste | Univer clipboard + portable range copy | done |
 | 10 | Find / replace | Workspace find panel (core preset has no dedicated find-replace pin) | done |
-| 11 | Number formats | Portable `z` + exceljs `numFmt`; format picker is Stage 2 | stub-stage2 |
-| 12 | Cell styles | Font / fill / align flags persist; full style chrome is Stage 2 | stub-stage2 |
+| 11 | Number formats | Format picker writes portable `z`; `formatDisplay` paints the grid. Hook: `data-testid=tsw-number-format`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 12 | Cell styles | Full style chrome: bold / italic / underline / color / fill / align. Hook: `data-testid=tsw-style-chrome`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 13 | Merge cells | Univer merge + portable merge ranges | done |
 | 14 | Freeze panes | Univer freeze + portable freeze | done |
 | 15 | Row / col insert, delete, resize | Univer + portable structural edits | done |
 | 16 | Sort | In-house range sort on portable model | done |
-| 17 | Filter | Header-row text hide only; column autofilter is Stage 2 | stub-stage2 |
-| 18 | Data validation | Portable rules stored; enforcement UI is Stage 2 | stub-stage2 |
-| 19 | Conditional formatting | Portable rules + fallback paint; rule editor is Stage 2 | stub-stage2 |
+| 17 | Filter | Column autofilter UI writes `hiddenRows` + `columnFilters`. Hook: `data-testid=tsw-autofilter`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 18 | Data validation | Rule editor + Enter enforcement. Hook: `data-testid=tsw-validation-editor`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 19 | Conditional formatting | Rule editor + local-grid paint. Hook: `data-testid=tsw-cf-editor`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 20 | Status-bar aggregates | Count / sum / average / min / max of selection | done |
 | 21 | Charts via `chart.js@4.5.1` from selection | OSS replacement: reuse existing Chart.js on main. Not a Pro evidence-cut. | done |
 | 22 | In-house pivot / group-by aggregation | OSS replacement: in-house group-by. Not a Pro evidence-cut. | done |
 | 23 | Keyboard shortcuts | Univer + workspace accelerators | done |
-| 24 | Context menu + long-press | stub-stage2 OK. Hooks only (`suppressNativeContextMenu`, `scheduleLongPressStub`). Univer `contextMenu: false`. | stub-stage2 |
+| 24 | Context menu + long-press | Reserved hooks open a real menu (`data-testid=tsw-context-menu`). Long-press 500ms + right-click. Univer `contextMenu` stays false. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 25 | Virtualized grid | Univer canvas grid; accessible fallback window | done |
 | 26 | Zoom | Univer zoom + workspace control | done |
-| 27 | Wrap / overflow | Wrap style flag persists; overflow chrome is Stage 2 | stub-stage2 |
+| 27 | Wrap / overflow | Wrap toggle + overflow clip / ellipsis / overflow chrome. Hooks: `data-testid=tsw-wrap`, `data-testid=tsw-overflow`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 28 | Hyperlinks | Portable per-cell links | done |
 | 29 | Comments / notes | Portable notes (no Pro thread-comment) | done |
 | 30 | IndexedDB persistence | Dexie database scoped to this tool | done |
@@ -72,6 +72,13 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 36 | Portable workbook bundle import / export | Versioned JSON (and zip) round-trip | done |
 
 No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacements.
+
+## Stage 2 done-when
+
+- Features 3, 11, 12, 17, 18, 19, 24, 27 move from `stub-stage2` to `done` only with focused evidence.
+- Viewport / scroll chrome stays device-agnostic; formula help is tap/focus, never hover-only (`data-testid=tsw-formula-tooltip`).
+- `pnpm test:unit` and `pnpm build` pass. Playwright hooks live in `tests/e2e/tabular-sheet-workstation.spec.ts`.
+- Draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not touch PR #33 / transcode.
 
 ## Stage 1 done-when
 

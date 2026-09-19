@@ -214,17 +214,148 @@
 .tsw-engine-note {
   font-size: 0.8rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.tsw-chrome {
+  overflow-x: auto;
+  overscroll-behavior: contain;
+}
+
+.tsw-style-chrome,
+.tsw-autofilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(0.4rem, 1.2vw, 0.7rem);
+  align-items: center;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: clamp(0.55rem, 1.4vw, 0.85rem);
+}
+
+.tsw-style-chrome button[aria-pressed='true'] {
+  background: var(--signal);
+  color: #fff;
+  border-color: var(--signal-strong);
+}
+
+.tsw-grid thead th {
+  white-space: nowrap;
+}
+
+.tsw-filter-btn {
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: 0.15rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  vertical-align: middle;
+}
+
+.tsw-grid td[data-wrap='true'] {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: min(14rem, 42vw);
+}
+
+.tsw-grid td[data-overflow='clip'] {
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.tsw-grid td[data-overflow='ellipsis'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tsw-grid td[data-overflow='overflow'] {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.tsw-context,
+.tsw-formula-tooltip,
+.tsw-autofilter {
+  position: fixed;
+  z-index: 30;
+  max-width: min(22rem, calc(100vw - 1rem));
+  max-height: min(70vh, 28rem);
+  overflow: auto;
+  box-shadow: var(--shadow);
+}
+
+.tsw-context {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  display: grid;
+  gap: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+
+.tsw-context button,
+.tsw-formula-tooltip button,
+.tsw-autofilter button {
+  min-height: 44px;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.tsw-formula-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.tsw-formula-tooltip p,
+.tsw-autofilter p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.tsw-autofilter ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.tsw-formula output[data-testid='tsw-formula-ssot'],
+.tsw-formula output[data-testid='tsw-formula-proof'] {
+  font-size: clamp(0.72rem, 1.6vw, 0.84rem);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 860px) {
   .tsw-toolbar,
   .tsw-formula,
+  .tsw-style-chrome,
   .tsw-status {
     align-items: stretch;
   }
 
   .tsw-toolbar button,
-  .tsw-sheet-tabs button {
+  .tsw-sheet-tabs button,
+  .tsw-style-chrome button {
     flex: 1 1 calc(50% - 0.5rem);
   }
 
@@ -232,6 +363,14 @@
   .tsw-grid td {
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+
+  .tsw-context,
+  .tsw-formula-tooltip,
+  .tsw-autofilter {
+    left: 0.5rem !important;
+    right: 0.5rem;
+    max-width: calc(100vw - 1rem);
   }
 }
 

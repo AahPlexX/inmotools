@@ -10,6 +10,7 @@ import {
   createWorkbook,
   emptyMeta,
   parseCellKey,
+  type CellStyle,
   type ExportMeta,
   type PortableSheet,
   type PortableWorkbook,
@@ -246,7 +247,7 @@ export function univerLikeSnapshot(workbook: PortableWorkbook): Record<string, u
       row[parsed.col] = {
         v: cell.v ?? undefined,
         f: cell.f ?? undefined,
-        s: cell.s,
+        s: univerCellStyle(cell.s, cell.z),
       };
       cellData[parsed.row] = row;
     }
@@ -284,6 +285,20 @@ export function univerLikeSnapshot(workbook: PortableWorkbook): Record<string, u
       validations: workbook.validations,
       conditionalFormats: workbook.conditionalFormats,
     },
+  };
+}
+
+function univerCellStyle(style: CellStyle | undefined, z?: string): Record<string, unknown> | undefined {
+  if (!style && !z) return undefined;
+  return {
+    bl: style?.bold ? 1 : 0,
+    it: style?.italic ? 1 : 0,
+    ul: { s: style?.underline ? 1 : 0 },
+    cl: style?.color ? { rgb: style.color } : undefined,
+    bg: style?.fill ? { rgb: style.fill } : undefined,
+    ht: style?.align === 'center' ? 2 : style?.align === 'right' ? 3 : 1,
+    tb: style?.wrap ? 3 : style?.overflow === 'overflow' ? 1 : 2,
+    n: z && z !== 'General' ? { pattern: z } : undefined,
   };
 }
 

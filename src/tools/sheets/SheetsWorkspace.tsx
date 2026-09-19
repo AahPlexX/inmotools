@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import Chart from 'chart.js/auto';
 import { consumeFileInput } from '../../lib/file-input';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { PagedTable } from '../../components/PagedTable';
-import { cancelLongPressStub, scheduleLongPressStub, suppressNativeContextMenu } from './sheets-context-menu';
+import {
+  CONTEXT_MENU_ACTIONS,
+  cancelLongPressStub,
+  scheduleLongPressStub,
+  suppressNativeContextMenu,
+  type ContextMenuActionId,
+} from './sheets-context-menu';
 import { a1FromParts, displayCell, evaluateWorkbook, selectionAggregates } from './sheets-formula';
 import {
   addComment,
@@ -46,14 +52,23 @@ import {
 import { pivotSheet, type PivotAgg } from './sheets-pivot';
 import { chartConfigFromSelection, type ChartKind } from './sheets-charts';
 import { FEATURE_PROGRESS, progressSummary } from './sheets-progress';
-import { mountUniverSheets, type UniverHost } from './sheets-univer';
+import { mountUniverSheets, readUniverCalculated, type UniverHost } from './sheets-univer';
+import { NUMBER_FORMATS, applyNumberFormat, formatDisplay } from './sheets-format';
+import { applyStyleToRange, overflowCss, wrapCss } from './sheets-style';
+import { applyColumnAutofilter, distinctColumnValues } from './sheets-filter';
+import { enforceValidation, removeValidation, upsertValidation } from './sheets-validation';
+import { applyConditionalFormatPaint, removeConditionalFormat, upsertConditionalFormat } from './sheets-cf';
+import { clampPopupBox, describeFormula, resolveFormulaSsot } from './sheets-chrome';
 import {
   emptyMeta,
   starterWorkbook,
+  type ConditionalFormat,
   type ExportMeta,
   type MergeRange,
+  type OverflowMode,
   type PortableWorkbook,
   type SheetPrefs,
+  type ValidationRule,
 } from './sheets-types';
 import './sheets.css';
 
@@ -62,6 +77,12 @@ const WINDOW_COLS = 10;
 
 interface Selection extends MergeRange {
   sheetId: string;
+}
+
+function cellLabel(cell: ReturnType<typeof getCell>): string {
+  if (!cell) return '';
+  if (cell.z && cell.v !== null && cell.v !== undefined) return formatDisplay(cell.v, cell.z);
+  return displayCell(cell);
 }
 
 export default function SheetsWorkspace() {
@@ -77,6 +98,8 @@ export default function SheetsWorkspace() {
   const [selection, setSelection] = useState<Selection>({ sheetId: '', r1: 0, c1: 0, r2: 0, c2: 0 });
   const [scroll, setScroll] = useState({ row: 0, col: 0 });
   const [engine, setEngine] = useState<'fallback' | 'univer'>('fallback');
+  const [univerReady, setUniverReady] = useState(false);
+  const [univerProof, setUniverProof] = useState<{ a1: string; value: unknown; formula: string } | null>(null);
   const [library, setLibrary] = useState<StoredWorkbook[]>([]);
   const [chartKind, setChartKind] = useState<ChartKind>('bar');
   const [pivotAgg, setPivotAgg] = useState<PivotAgg>('sum');
@@ -85,7 +108,28 @@ export default function SheetsWorkspace() {
   const [note, setNote] = useState('');
   const [link, setLink] = useState('');
   const [filterText, setFilterText] = useState('');
-  const longPress = useRef<number | null>(null);
+  const [formatZ, setFormatZ] = useState('General');
+  const [overflowMode, setOverflowMode] = useState<OverflowMode>('ellipsis');
+  const [filterCol, setFilterCol] = useState<number | null>(null);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [formulaTipOpen, setFormulaTipOpen] = useState(false);
+  const [validationStatus, setValidationStatus] = useState('');
+  const [validationDraft, setValidationDraft] = useState<Omit<ValidationRule, 'id' | 'sheetId'>>({
+    a1: 'B2:B3',
+    kind: 'list',
+    argument: '2,4,6',
+    message: 'Qty must be 2, 4, or 6.',
+  });
+  const [cfDraft, setCfDraft] = useState<Omit<ConditionalFormat, 'id' | 'sheetId'>>({
+    a1: 'B2:B3',
+    kind: 'gt',
+    argument: '3',
+    fill: '#dcfce7',
+    color: '#14532d',
+  });
+  const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointer = useRef({ x: 0, y: 0 });
   const univerHost = useRef<UniverHost | null>(null);
   const univerNode = useRef<HTMLDivElement | null>(null);
   const chartNode = useRef<HTMLCanvasElement | null>(null);
@@ -94,6 +138,8 @@ export default function SheetsWorkspace() {
   const computed = useMemo(() => evaluateWorkbook(book), [book]);
   const sheet = computed.sheets.find((item) => item.id === (selection.sheetId || computed.activeSheetId)) ?? computed.sheets[0];
   const sheetId = sheet?.id ?? computed.activeSheetId;
+  const formulaSsot = resolveFormulaSsot(engine, univerReady);
+  const formulaHelp = useMemo(() => describeFormula(formula), [formula]);
 
   useEffect(() => {
     setSelection((current) => ({ ...current, sheetId: current.sheetId || book.activeSheetId }));
@@ -119,6 +165,8 @@ export default function SheetsWorkspace() {
     setFormula(activeCell?.f ?? displayCell(activeCell));
     setNote(activeCell?.note ?? '');
     setLink(activeCell?.hyperlink ?? '');
+    setFormatZ(activeCell?.z ?? 'General');
+    setOverflowMode(activeCell?.s?.overflow ?? 'ellipsis');
   }, [activeCell, selection.r1, selection.c1, sheetId]);
 
   const visibleRows = useMemo(() => {
@@ -127,7 +175,7 @@ export default function SheetsWorkspace() {
     for (let row = scroll.row; rows.length < WINDOW_ROWS && row < sheet.rowCount; row += 1) {
       if (sheet.hiddenRows.includes(row)) continue;
       if (filterText && row > 0) {
-        const hay = Array.from({ length: sheet.columnCount }, (_, col) => displayCell(sheet.cells[`${row},${col}`])).join(' ').toLocaleLowerCase();
+        const hay = Array.from({ length: sheet.columnCount }, (_, col) => cellLabel(sheet.cells[`${row},${col}`])).join(' ').toLocaleLowerCase();
         if (!hay.includes(filterText.toLocaleLowerCase())) continue;
       }
       rows.push(row);
@@ -167,17 +215,26 @@ export default function SheetsWorkspace() {
   }, [computed, sheet, selection, chartKind]);
 
   useEffect(() => {
-    if (engine !== 'univer' || !univerNode.current) return;
+    if (engine !== 'univer' || !univerNode.current) {
+      setUniverReady(false);
+      setUniverProof(null);
+      return;
+    }
     let cancelled = false;
+    setUniverReady(false);
     void mountUniverSheets(univerNode.current, book).then((host) => {
       if (cancelled) {
         host.dispose();
         return;
       }
       univerHost.current = host;
-      setStatus('Univer sheets-core 0.25.1 is driving the live grid and engine-formula.');
+      setUniverReady(true);
+      setUniverProof(readUniverCalculated(host, 'D2'));
+      setStatus('Univer sheets-core 0.25.1 engine-formula is the live formula SSOT.');
     }).catch((error: unknown) => {
       setEngine('fallback');
+      setUniverReady(false);
+      setUniverProof(null);
       setStatus(error instanceof Error ? `Univer unavailable, using local grid: ${error.message}` : 'Univer unavailable, using local grid.');
     });
     return () => {
@@ -187,9 +244,28 @@ export default function SheetsWorkspace() {
     };
   }, [engine, book.id]);
 
+  const openContextMenuAt = (x: number, y: number) => {
+    const box = clampPopupBox({ x, y, width: 228, height: 360 }, { width: window.innerWidth, height: window.innerHeight });
+    setContextMenu({ x: box.left, y: box.top });
+  };
+
   const applyFormula = () => {
     const value = formula.trim();
-    commit(setCell(book, sheetId, selection.r1, selection.c1, value.startsWith('=') ? { f: value, v: null } : { f: null, v: value === '' ? null : Number.isFinite(Number(value)) && value !== '' ? Number(value) : value }), 'Cell updated.');
+    const raw = value.startsWith('=')
+      ? value
+      : value === ''
+        ? null
+        : Number.isFinite(Number(value)) && value !== ''
+          ? Number(value)
+          : value;
+    const check = enforceValidation(book, sheetId, selection.r1, selection.c1, raw);
+    if (!check.ok) {
+      setValidationStatus(check.message);
+      setStatus(check.message);
+      return;
+    }
+    setValidationStatus('');
+    commit(setCell(book, sheetId, selection.r1, selection.c1, value.startsWith('=') ? { f: value, v: null } : { f: null, v: raw }), 'Cell updated.');
   };
 
   const undo = () => {
@@ -212,7 +288,7 @@ export default function SheetsWorkspace() {
 
   const copySelection = async () => {
     if (!sheet) return;
-    const text = collectRange(computed, sheet.id, selection).map((item) => displayCell(item.cell)).join('\t');
+    const text = collectRange(computed, sheet.id, selection).map((item) => cellLabel(item.cell)).join('\t');
     if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
     setStatus('Copied the current selection locally.');
   };
@@ -224,6 +300,12 @@ export default function SheetsWorkspace() {
     let next = book;
     rows.forEach((line, r) => {
       line.split('\t').forEach((value, c) => {
+        const check = enforceValidation(next, sheetId, selection.r1 + r, selection.c1 + c, value);
+        if (!check.ok) {
+          setValidationStatus(check.message);
+          setStatus(check.message);
+          return;
+        }
         next = setCell(next, sheetId, selection.r1 + r, selection.c1 + c, value.startsWith('=') ? { f: value } : { v: value });
       });
     });
@@ -328,20 +410,66 @@ export default function SheetsWorkspace() {
     setStatus('Downloaded XLSX via exceljs 4.4.0.');
   };
 
-  const onPointerDown = (row: number, col: number) => {
+  const onPointerDown = (event: ReactPointerEvent<HTMLTableCellElement>, row: number, col: number) => {
+    pointer.current = { x: event.clientX, y: event.clientY };
     setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
-    scheduleLongPressStub(longPress);
+    const cell = sheet?.cells[`${row},${col}`];
+    if (cell?.f) setFormulaTipOpen(true);
+    scheduleLongPressStub(longPress, () => openContextMenuAt(pointer.current.x, pointer.current.y));
   };
 
   const onPointerUp = () => {
     cancelLongPressStub(longPress);
   };
 
+  const runContextAction = (id: ContextMenuActionId) => {
+    setContextMenu(null);
+    if (id === 'cut') {
+      void copySelection();
+      commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cut the active cell.');
+      return;
+    }
+    if (id === 'copy') {
+      void copySelection();
+      return;
+    }
+    if (id === 'paste') {
+      void pasteSelection();
+      return;
+    }
+    if (id === 'insert-row') {
+      commit(insertRows(book, sheetId, selection.r1), 'Inserted a row.');
+      return;
+    }
+    if (id === 'insert-col') {
+      commit(insertCols(book, sheetId, selection.c1), 'Inserted a column.');
+      return;
+    }
+    if (id === 'delete-row') {
+      commit(deleteRows(book, sheetId, selection.r1), 'Deleted a row.');
+      return;
+    }
+    if (id === 'delete-col') {
+      commit(deleteCols(book, sheetId, selection.c1), 'Deleted a column.');
+      return;
+    }
+    if (id === 'wrap') {
+      commit(applyStyleToRange(book, sheetId, selection, { wrap: !activeCell?.s?.wrap }), 'Toggled wrap on the selection.');
+      return;
+    }
+    commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cleared the active cell.');
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.target instanceof HTMLElement)) return;
       const typing = event.target.closest('input, textarea, select');
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+        setFormulaTipOpen(false);
+        setFilterCol(null);
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void persist();
@@ -378,18 +506,22 @@ export default function SheetsWorkspace() {
   });
 
   const summary = progressSummary();
+  const tipBox = clampPopupBox(
+    { x: 12, y: 220, width: 280, height: 140 },
+    { width: typeof window === 'undefined' ? 360 : window.innerWidth, height: typeof window === 'undefined' ? 640 : window.innerHeight },
+  );
 
   return (
     <div className="workspace-body tsw-root" data-theme={prefs.theme} data-testid="tabular-sheet-workspace">
       <div className="workspace-header">
         <div>
           <h2>Tabular Sheet Workstation</h2>
-          <p>Local multi-sheet workbook. Univer engine-formula when the live engine is mounted; otherwise the portable DAG evaluator.</p>
+          <p>Local multi-sheet workbook. Univer engine-formula is the live formula SSOT when mounted; otherwise the portable DAG evaluator.</p>
         </div>
         <p className="tsw-engine-note" role="status">{status}</p>
       </div>
 
-      <div className="tsw-toolbar" role="toolbar" aria-label="Workbook actions">
+      <div className="tsw-toolbar tsw-chrome" role="toolbar" aria-label="Workbook actions">
         <button type="button" data-primary="true" onClick={() => void persist()}>Save locally</button>
         <button type="button" onClick={undo} disabled={history.length === 0}>Undo</button>
         <button type="button" onClick={redo} disabled={future.length === 0}>Redo</button>
@@ -431,12 +563,77 @@ export default function SheetsWorkspace() {
         <button type="button" onClick={() => void exportCurrent('zip')}>Export zip</button>
       </div>
 
-      <div className="tsw-formula">
+      <div className="tsw-formula tsw-chrome">
         <label htmlFor="tsw-cell">Active</label>
         <output id="tsw-cell">{a1FromParts(selection.r1, selection.c1)}</output>
         <label className="tsw-formula-input" htmlFor="tsw-formula">Formula bar</label>
-        <input id="tsw-formula" value={formula} onChange={(event) => setFormula(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') applyFormula(); }} />
+        <input
+          id="tsw-formula"
+          value={formula}
+          onChange={(event) => setFormula(event.target.value)}
+          onFocus={() => { if (formula.startsWith('=')) setFormulaTipOpen(true); }}
+          onKeyDown={(event) => { if (event.key === 'Enter') applyFormula(); }}
+        />
         <button type="button" onClick={applyFormula}>Enter</button>
+        <button type="button" data-testid="tsw-formula-help" onClick={() => setFormulaTipOpen(true)}>Formula help</button>
+        <output data-testid="tsw-formula-ssot" data-ssot={formulaSsot} aria-label="Formula source of truth">{formulaSsot}</output>
+        {univerProof ? <output data-testid="tsw-formula-proof">{univerProof.a1}={String(univerProof.value ?? '')}</output> : null}
+      </div>
+
+      <div className="tsw-style-chrome tsw-chrome" data-testid="tsw-style-chrome" role="toolbar" aria-label="Cell style chrome">
+        <label htmlFor="tsw-number-format">Number format</label>
+        <select
+          id="tsw-number-format"
+          data-testid="tsw-number-format"
+          value={formatZ}
+          onChange={(event) => {
+            const z = event.target.value;
+            setFormatZ(z);
+            commit(applyNumberFormat(book, sheetId, selection, z), `Applied ${z} to the selection.`);
+          }}
+        >
+          {NUMBER_FORMATS.map((item) => <option key={item.id} value={item.z}>{item.label}</option>)}
+        </select>
+        <button type="button" aria-pressed={Boolean(activeCell?.s?.bold)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { bold: !activeCell?.s?.bold }), 'Toggled bold.')}>Bold</button>
+        <button type="button" aria-pressed={Boolean(activeCell?.s?.italic)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { italic: !activeCell?.s?.italic }), 'Toggled italic.')}>Italic</button>
+        <button type="button" aria-pressed={Boolean(activeCell?.s?.underline)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { underline: !activeCell?.s?.underline }), 'Toggled underline.')}>Underline</button>
+        <label htmlFor="tsw-font-color">Font</label>
+        <input id="tsw-font-color" type="color" value={activeCell?.s?.color ?? '#111827'} onChange={(event) => commit(applyStyleToRange(book, sheetId, selection, { color: event.target.value }), 'Applied font color.')} />
+        <label htmlFor="tsw-fill-color">Fill</label>
+        <input id="tsw-fill-color" type="color" value={activeCell?.s?.fill ?? '#ffffff'} onChange={(event) => commit(applyStyleToRange(book, sheetId, selection, { fill: event.target.value }), 'Applied fill color.')} />
+        <label htmlFor="tsw-align">Align</label>
+        <select
+          id="tsw-align"
+          value={activeCell?.s?.align ?? 'left'}
+          onChange={(event) => commit(applyStyleToRange(book, sheetId, selection, { align: event.target.value as 'left' | 'center' | 'right' }), 'Applied alignment.')}
+        >
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+        <button
+          type="button"
+          data-testid="tsw-wrap"
+          aria-pressed={Boolean(activeCell?.s?.wrap)}
+          onClick={() => commit(applyStyleToRange(book, sheetId, selection, { wrap: !activeCell?.s?.wrap }), 'Toggled wrap.')}
+        >
+          Wrap
+        </button>
+        <label htmlFor="tsw-overflow">Overflow</label>
+        <select
+          id="tsw-overflow"
+          data-testid="tsw-overflow"
+          value={overflowMode}
+          onChange={(event) => {
+            const overflow = event.target.value as OverflowMode;
+            setOverflowMode(overflow);
+            commit(applyStyleToRange(book, sheetId, selection, { overflow }), `Set overflow to ${overflow}.`);
+          }}
+        >
+          <option value="ellipsis">Ellipsis</option>
+          <option value="clip">Clip</option>
+          <option value="overflow">Overflow</option>
+        </select>
       </div>
 
       <div className="tsw-sheet-tabs" role="tablist" aria-label="Sheets">
@@ -461,21 +658,47 @@ export default function SheetsWorkspace() {
       </div>
 
       {engine === 'univer' ? (
-        <div ref={univerNode} className="tsw-univer-host" data-testid="univer-host" aria-label="Univer spreadsheet engine" />
+        <div
+          ref={univerNode}
+          className="tsw-univer-host"
+          data-testid="univer-host"
+          data-formula-ssot={formulaSsot}
+          aria-label="Univer spreadsheet engine"
+        />
       ) : (
-        <div className="tsw-grid-wrap" onScroll={(event) => {
-          const node = event.currentTarget;
-          setScroll({
-            row: Math.floor(node.scrollTop / 28),
-            col: Math.floor(node.scrollLeft / 72),
-          });
-        }}>
+        <div
+          className="tsw-grid-wrap"
+          data-testid="tsw-grid-scroll"
+          onScroll={(event) => {
+            const node = event.currentTarget;
+            setScroll({
+              row: Math.floor(node.scrollTop / 28),
+              col: Math.floor(node.scrollLeft / 72),
+            });
+          }}
+        >
           <table className="tsw-grid" style={{ zoom: `${prefs.zoom}%` }}>
             <caption className="visually-hidden">Virtualized local spreadsheet grid</caption>
             <thead>
               <tr>
                 <th scope="col"> </th>
-                {visibleCols.map((col) => <th key={col} scope="col">{a1FromParts(0, col).replace('1', '')}</th>)}
+                {visibleCols.map((col) => (
+                  <th key={col} scope="col">
+                    <span>{a1FromParts(0, col).replace('1', '')}</span>
+                    <button
+                      type="button"
+                      className="tsw-filter-btn"
+                      aria-label={`Filter column ${a1FromParts(0, col).replace('1', '')}`}
+                      aria-expanded={filterCol === col}
+                      onClick={() => {
+                        setFilterCol((current) => current === col ? null : col);
+                        setFilterQuery(sheet?.columnFilters?.[String(col)]?.query ?? '');
+                      }}
+                    >
+                      ▾
+                    </button>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -485,26 +708,36 @@ export default function SheetsWorkspace() {
                   {visibleCols.map((col) => {
                     const cell = sheet?.cells[`${row},${col}`];
                     const selected = row >= selection.r1 && row <= selection.r2 && col >= selection.c1 && col <= selection.c2;
+                    const paint = sheet ? applyConditionalFormatPaint(computed, sheet.id, row, col, cell) : null;
+                    const style = {
+                      fontWeight: cell?.s?.bold ? 700 : undefined,
+                      fontStyle: cell?.s?.italic ? 'italic' : undefined,
+                      textDecoration: cell?.s?.underline ? 'underline' : undefined,
+                      color: paint?.color ?? cell?.s?.color,
+                      background: paint?.fill ?? cell?.s?.fill,
+                      textAlign: cell?.s?.align,
+                      ...wrapCss(cell?.s),
+                      ...overflowCss(cell?.s),
+                    } as const;
                     return (
                       <td
                         key={`${row},${col}`}
                         data-selected={selected}
                         data-note={Boolean(cell?.note)}
-                        style={{
-                          fontWeight: cell?.s?.bold ? 700 : undefined,
-                          fontStyle: cell?.s?.italic ? 'italic' : undefined,
-                          color: cell?.s?.color,
-                          background: cell?.s?.fill,
-                          textAlign: cell?.s?.align,
-                          whiteSpace: cell?.s?.wrap ? 'normal' : 'nowrap',
-                        }}
-                        onPointerDown={() => onPointerDown(row, col)}
+                        data-wrap={Boolean(cell?.s?.wrap)}
+                        data-overflow={cell?.s?.overflow ?? 'ellipsis'}
+                        style={style}
+                        onPointerDown={(event) => onPointerDown(event, row, col)}
                         onPointerUp={onPointerUp}
                         onPointerLeave={onPointerUp}
                         onDoubleClick={() => document.getElementById('tsw-formula')?.focus()}
-                        onContextMenu={(event) => suppressNativeContextMenu(event)}
+                        onContextMenu={(event) => {
+                          suppressNativeContextMenu(event);
+                          setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
+                          openContextMenuAt(event.clientX, event.clientY);
+                        }}
                       >
-                        {cell?.hyperlink ? <a href={cell.hyperlink} target="_blank" rel="noreferrer">{displayCell(cell)}</a> : displayCell(cell)}
+                        {cell?.hyperlink ? <a href={cell.hyperlink} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : cellLabel(cell)}
                       </td>
                     );
                   })}
@@ -515,12 +748,94 @@ export default function SheetsWorkspace() {
         </div>
       )}
 
+      {filterCol !== null && sheet ? (
+        <div className="tsw-autofilter" data-testid="tsw-autofilter" role="dialog" aria-label="Column autofilter">
+          <p>Filter {a1FromParts(0, filterCol).replace('1', '')}</p>
+          <label htmlFor="tsw-autofilter-query">Contains</label>
+          <input id="tsw-autofilter-query" value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} />
+          <ul>
+            {distinctColumnValues(sheet, filterCol, sheet.filterHeaderRow ?? 0).map((value) => (
+              <li key={value}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    commit(applyColumnAutofilter(book, sheetId, 0, {
+                      ...(sheet.columnFilters ?? {}),
+                      [filterCol]: { query: value, hiddenValues: [] },
+                    }), `Filtered column to ${value}.`);
+                    setFilterCol(null);
+                  }}
+                >
+                  {value}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              commit(applyColumnAutofilter(book, sheetId, 0, {
+                ...(sheet.columnFilters ?? {}),
+                [filterCol]: { query: filterQuery, hiddenValues: [] },
+              }), 'Applied column autofilter.');
+              setFilterCol(null);
+            }}
+          >
+            Apply filter
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = { ...(sheet.columnFilters ?? {}) };
+              delete next[String(filterCol)];
+              commit(applyColumnAutofilter(book, sheetId, 0, next), 'Cleared the column filter.');
+              setFilterCol(null);
+              setFilterQuery('');
+            }}
+          >
+            Clear filter
+          </button>
+        </div>
+      ) : null}
+
+      {contextMenu ? (
+        <ul
+          className="tsw-context"
+          data-testid="tsw-context-menu"
+          role="menu"
+          aria-label="Cell context menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          {CONTEXT_MENU_ACTIONS.map((action) => (
+            <li key={action.id} role="none">
+              <button type="button" role="menuitem" onClick={() => runContextAction(action.id)}>{action.label}</button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {formulaTipOpen ? (
+        <aside
+          className="tsw-formula-tooltip"
+          data-testid="tsw-formula-tooltip"
+          role="dialog"
+          aria-label="Formula help"
+          data-trigger={formulaHelp.trigger}
+          style={{ left: tipBox.left, top: tipBox.top, width: tipBox.width }}
+        >
+          <p>{formulaHelp.summary}</p>
+          {formulaHelp.refs.length ? <p>Refs: {formulaHelp.refs.join(', ')}</p> : null}
+          <button type="button" onClick={() => setFormulaTipOpen(false)}>Close formula help</button>
+        </aside>
+      ) : null}
+
       <div className="tsw-status" role="status">
         <output>Count {aggregates.count}</output>
         <output>Sum {aggregates.sum ?? '—'}</output>
         <output>Average {aggregates.average ?? '—'}</output>
         <output>Min {aggregates.min ?? '—'}</output>
         <output>Max {aggregates.max ?? '—'}</output>
+        {validationStatus ? <output data-testid="tsw-validation-status">{validationStatus}</output> : null}
       </div>
 
       <div className="tsw-panels">
@@ -534,6 +849,72 @@ export default function SheetsWorkspace() {
           <button type="button" onClick={() => findReplace(true)}>Replace</button>
           <label htmlFor="tsw-filter">Filter rows</label>
           <input id="tsw-filter" value={filterText} onChange={(event) => setFilterText(event.target.value)} />
+        </section>
+
+        <section className="tsw-panel" data-testid="tsw-validation-editor">
+          <h3>Data validation</h3>
+          <p>Rules stay on this workbook and block Enter when the active cell fails.</p>
+          <label htmlFor="tsw-val-a1">Range</label>
+          <input id="tsw-val-a1" value={validationDraft.a1} onChange={(event) => setValidationDraft((current) => ({ ...current, a1: event.target.value }))} />
+          <label htmlFor="tsw-val-kind">Kind</label>
+          <select id="tsw-val-kind" value={validationDraft.kind} onChange={(event) => setValidationDraft((current) => ({ ...current, kind: event.target.value as ValidationRule['kind'] }))}>
+            <option value="list">List</option>
+            <option value="number">Number</option>
+            <option value="text-length">Text length</option>
+            <option value="custom">Custom</option>
+          </select>
+          <label htmlFor="tsw-val-arg">Argument</label>
+          <input id="tsw-val-arg" value={validationDraft.argument} onChange={(event) => setValidationDraft((current) => ({ ...current, argument: event.target.value }))} />
+          <label htmlFor="tsw-val-msg">Message</label>
+          <input id="tsw-val-msg" value={validationDraft.message} onChange={(event) => setValidationDraft((current) => ({ ...current, message: event.target.value }))} />
+          <button
+            type="button"
+            onClick={() => commit(upsertValidation(book, { ...validationDraft, id: `val-${validationDraft.a1}`, sheetId }), 'Saved a validation rule.')}
+          >
+            Save validation
+          </button>
+          <ul>
+            {book.validations.filter((rule) => rule.sheetId === sheetId).map((rule) => (
+              <li key={rule.id}>
+                {rule.a1} {rule.kind} {rule.argument}
+                <button type="button" onClick={() => commit(removeValidation(book, rule.id), 'Removed a validation rule.')}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="tsw-panel" data-testid="tsw-cf-editor">
+          <h3>Conditional format</h3>
+          <p>Rules paint the local grid. No Univer Pro conditional-format package.</p>
+          <label htmlFor="tsw-cf-a1">Range</label>
+          <input id="tsw-cf-a1" value={cfDraft.a1} onChange={(event) => setCfDraft((current) => ({ ...current, a1: event.target.value }))} />
+          <label htmlFor="tsw-cf-kind">Kind</label>
+          <select id="tsw-cf-kind" value={cfDraft.kind} onChange={(event) => setCfDraft((current) => ({ ...current, kind: event.target.value as ConditionalFormat['kind'] }))}>
+            <option value="gt">Greater than</option>
+            <option value="lt">Less than</option>
+            <option value="eq">Equal</option>
+            <option value="contains">Contains</option>
+          </select>
+          <label htmlFor="tsw-cf-arg">Argument</label>
+          <input id="tsw-cf-arg" value={cfDraft.argument} onChange={(event) => setCfDraft((current) => ({ ...current, argument: event.target.value }))} />
+          <label htmlFor="tsw-cf-fill">Fill</label>
+          <input id="tsw-cf-fill" type="color" value={cfDraft.fill} onChange={(event) => setCfDraft((current) => ({ ...current, fill: event.target.value }))} />
+          <label htmlFor="tsw-cf-color">Text</label>
+          <input id="tsw-cf-color" type="color" value={cfDraft.color} onChange={(event) => setCfDraft((current) => ({ ...current, color: event.target.value }))} />
+          <button
+            type="button"
+            onClick={() => commit(upsertConditionalFormat(book, { ...cfDraft, id: `cf-${cfDraft.a1}`, sheetId }), 'Saved a conditional format rule.')}
+          >
+            Save CF rule
+          </button>
+          <ul>
+            {book.conditionalFormats.filter((rule) => rule.sheetId === sheetId).map((rule) => (
+              <li key={rule.id}>
+                {rule.a1} {rule.kind} {rule.argument}
+                <button type="button" onClick={() => commit(removeConditionalFormat(book, rule.id), 'Removed a CF rule.')}>Remove</button>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="tsw-panel">
@@ -604,7 +985,7 @@ export default function SheetsWorkspace() {
         </section>
 
         <section className="tsw-panel">
-          <h3>Stage 1 progress TODO</h3>
+          <h3>Feature progress</h3>
           <p>{summary.done} done · {summary.stubStage2} stub-stage2 · {summary.inProgress} in-progress. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
           <ol className="tsw-progress">
             {FEATURE_PROGRESS.map((row) => (

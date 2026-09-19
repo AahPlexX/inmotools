@@ -1,23 +1,64 @@
 import { univerLikeSnapshot } from './sheets-io';
 import type { PortableWorkbook } from './sheets-types';
 
+export const UNIVER_FORMULA_SSOT = 'univer-engine-formula' as const;
+export const PORTABLE_FORMULA_SSOT = 'portable-dag' as const;
+
+export interface UniverCalculated {
+  a1: string;
+  value: unknown;
+  formula: string;
+}
+
 export interface UniverHost {
   save(): Record<string, unknown> | null;
   dispose(): void;
+  formulaSsot: typeof UNIVER_FORMULA_SSOT;
+  readCalculated(a1: string): UniverCalculated | null;
+}
+
+interface UniverRange {
+  getValue?: () => unknown;
+  getDisplayValue?: () => unknown;
+  getFormula?: () => string;
+}
+
+interface UniverSheetApi {
+  getRange?: (a1: string) => UniverRange | null | undefined;
+}
+
+interface UniverWorkbookApi {
+  save?: () => Record<string, unknown>;
+  getId?: () => string;
+  getActiveSheet?: () => UniverSheetApi | null | undefined;
 }
 
 interface UniverApi {
-  createWorkbook: (data: Record<string, unknown>) => {
-    save?: () => Record<string, unknown>;
-    getId?: () => string;
-  };
-  getActiveWorkbook?: () => { save?: () => Record<string, unknown>; getId?: () => string } | null | undefined;
+  createWorkbook: (data: Record<string, unknown>) => UniverWorkbookApi;
+  getActiveWorkbook?: () => UniverWorkbookApi | null | undefined;
   dispose?: () => void;
 }
 
 interface UniverBundle {
   univer: { dispose: () => void };
   univerAPI: UniverApi;
+}
+
+export function readUniverCalculated(
+  host: Pick<UniverHost, 'readCalculated'>,
+  a1: string,
+): UniverCalculated | null {
+  return host.readCalculated(a1);
+}
+
+function readCalculatedFromApi(api: UniverApi, a1: string): UniverCalculated | null {
+  const workbook = api.getActiveWorkbook?.();
+  const sheet = workbook?.getActiveSheet?.();
+  const range = sheet?.getRange?.(a1);
+  if (!range) return null;
+  const formula = range.getFormula?.() ?? '';
+  const value = range.getValue?.() ?? range.getDisplayValue?.();
+  return { a1, value, formula };
 }
 
 export async function mountUniverSheets(container: HTMLElement, workbook: PortableWorkbook): Promise<UniverHost> {
@@ -49,12 +90,18 @@ export async function mountUniverSheets(container: HTMLElement, workbook: Portab
   }) as unknown as UniverBundle;
 
   created.univerAPI.createWorkbook(snapshot);
+  container.dataset.formulaSsot = UNIVER_FORMULA_SSOT;
+  container.setAttribute('data-formula-engine', 'engine-formula');
 
   return {
+    formulaSsot: UNIVER_FORMULA_SSOT,
     save() {
       const active = created.univerAPI.getActiveWorkbook?.();
       if (active?.save) return active.save();
       return snapshot;
+    },
+    readCalculated(a1: string) {
+      return readCalculatedFromApi(created.univerAPI, a1);
     },
     dispose() {
       created.univer.dispose();
