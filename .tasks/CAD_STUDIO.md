@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `63dc4e3f349ba361f8643549cb9b262ae66b11e3`
+**Last tracked implementation commit:** `5ef0e376ae4ba3583b9206622e8f28eb5161c62c`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -121,6 +121,8 @@ A capability counts only when production behavior exists, relevant validation pa
 
 - Session continuation (2026-09-18): fetched and rebased onto `origin/main`'s progress; the repository-wide pre-existing `vector-engine-path-motion.test.ts` failure this branch had been carrying (confirmed at the last Track 1 sync to be a `main` bug, not a CAD regression) is now fixed upstream on `main` and pulled in via cherry-pick at `08ae63faf47e188bbcba744e73b362ad179bb9f7`, restoring a clean unit-suite baseline before further G6 work.
 - `heal`'s documented reporting gap is now closed at `63dc4e3f349ba361f8643549cb9b262ae66b11e3` (RED, same commit): adds `isValid(shape): boolean` to the `CadExactKernel` contract and its `occt-adapter` implementation, wired into `healFeature` so a heal that leaves the shape invalid pushes a feature-id-prefixed message onto `CadFeatureEvaluationResult.warnings` — a channel the type already declared but nothing had ever populated. Scope stays exactly what was flagged as open (surfacing post-heal validity), not the larger "report what changed" question OCCT's own `isValid` can't answer. Verified against the real kernel that an already-valid solid reports valid; verified against a mocked kernel that the warning fires only when `isValid` reports false and never blocks evaluation either way.
+- The three-point datum-plane variant is now implemented at `5ef0e376ae4ba3583b9206622e8f28eb5161c62c` (RED, same commit), resolving one of the datum-plane variants left open at the offset-plane checkpoint: three points, unlike angle/mid-plane/tangent/face-derived, fully determine both the plane and a natural right-handed axis convention (first point as origin, first-to-second edge as the local x-axis, the two edges' cross product as the normal) with no unstated design choice. `resolveThreePointDatumPlaneFrame()` in `sketch-profile.ts` rejects collinear points and non-finite coordinates rather than producing a degenerate plane; `resolveDatumPlanes()` now branches on `kind: 'offset' | 'three-point'` and still rejects every other kind by name. Verified against the real kernel: a hole cut from a sketch placed on a three-point plane equal to a box's own top face produces exactly the same result volume as the already-established offset-plane hole case.
+- Remaining open datum-plane variants: angle, mid-plane, tangent, and face-derived, each still needing its own axis-convention decision before implementation. Datum axes remain pass-through only (not yet real placement). Thread, text, and a first-class reusable helix reference (currently inline-only within `sweep`) remain the other open G6 items.
 
 ## Freshness invariant
 
