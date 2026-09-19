@@ -102,6 +102,21 @@ test('completes a multiline word-count custom target, persists it, and exports t
   expect(exported.test.targetText).toContain('\n');
   expect(exported.test.tags).toContain('e2e');
 
+  // Export is side-effect-free: history changes only when Save is explicitly chosen.
+  await expect(resultDialog).toBeVisible();
+  const preSaveHistory = workspace.getByRole('region', { name: 'Session history' });
+  const preSaveTotal = preSaveHistory.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(preSaveTotal).toContainText('0');
+
+  const csvPromise = page.waitForEvent('download');
+  await resultDialog.getByRole('button', { name: 'Export CSV' }).click();
+  expect((await csvPromise).suggestedFilename()).toMatch(/^typing-test-.*\.csv$/);
+  await expect(resultDialog).toBeVisible();
+
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
+  await expect(preSaveTotal).toContainText('1');
+
   await page.reload();
   const reloadedWorkspace = page.getByTestId('suite-workspace');
   const history = page.getByRole('region', { name: 'Session history' });
@@ -149,6 +164,8 @@ test('auto-finishes a forgiving target after an error and preserves the error in
   expect(exported.test.missedChars).toBe(1);
   expect(exported.test.accuracy).toBeLessThan(100);
 
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Discard' }).click();
   await expect(resultDialog).toBeHidden();
   await workspace.getByLabel('Errors').selectOption('master');
   await canvas.focus();
@@ -365,6 +382,29 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await expect(restoredWorkspace.locator('label').filter({ hasText: /^\s*Seconds/ }).locator('select')).toHaveValue('30');
   await expect(restoredWorkspace.getByLabel('Font size')).toHaveValue('40');
   await expect(restoredWorkspace.getByLabel('Volume')).toHaveValue('1');
+
+  await writeTypingConfigPreference(page, {
+    mode: 'words-1000',
+    durationMode: 'quote',
+    durationValue: 120,
+    quoteLength: 'short',
+    language: 'english',
+    layout: 'qwerty',
+  });
+  await page.reload();
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('quote');
+  await expect(restoredWorkspace.getByLabel('Duration')).toHaveValue('quote');
+
+  await writeTypingConfigPreference(page, {
+    mode: 'custom',
+    customText: '   ',
+    durationMode: 'time',
+    durationValue: 30,
+    language: 'english',
+    layout: 'qwerty',
+  });
+  await page.reload();
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('words-1000');
 
   await restoredWorkspace.getByLabel('Mode').selectOption('custom');
   await restoredWorkspace.getByRole('button', { name: 'Paste text' }).click();
