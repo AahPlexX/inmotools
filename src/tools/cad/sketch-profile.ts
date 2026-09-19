@@ -209,6 +209,46 @@ export function resolveMidPlaneDatumPlaneFrame(
   };
 }
 
+export function resolveTwoPointDatumAxis(
+  first: CadKernelVector3,
+  second: CadKernelVector3,
+): CadSketchAxis3d {
+  for (const point of [first, second]) {
+    if (point.some((component) => !Number.isFinite(component))) {
+      throw new Error('Two-point datum-axis coordinates must all be finite.');
+    }
+  }
+  const direction = vectorSub(second, first);
+  if (vectorLength(direction) <= 1e-12) {
+    throw new Error('Two-point datum-axis points are coincident and do not define an axis.');
+  }
+  return { origin: first, direction: normalizeVector(direction) };
+}
+
+export function resolveTwoPlaneDatumAxis(
+  first: PlaneFrame,
+  second: PlaneFrame,
+): CadSketchAxis3d {
+  const firstNormal = normalizeVector(first.normal);
+  const secondNormal = normalizeVector(second.normal);
+  const direction = crossVector(firstNormal, secondNormal);
+  const directionSquared = dotVector(direction, direction);
+  if (directionSquared <= 1e-18) {
+    throw new Error('Two-plane datum-axis parents are parallel and do not define an intersection axis.');
+  }
+
+  const firstConstant = dotVector(firstNormal, first.point(0, 0));
+  const secondConstant = dotVector(secondNormal, second.point(0, 0));
+  const origin = vectorScale(
+    vectorAdd(
+      vectorScale(crossVector(secondNormal, direction), firstConstant),
+      vectorScale(crossVector(direction, firstNormal), secondConstant),
+    ),
+    1 / directionSquared,
+  );
+  return { origin, direction: normalizeVector(direction) };
+}
+
 function originPlaneFrame(sketch: CadSketch, datumPlanes: CadDatumPlaneFrames): PlaneFrame {
   if (sketch.plane.kind === 'datum') {
     const frame = datumPlanes.get(sketch.plane.datumId);
