@@ -50,7 +50,6 @@ import {
   readPreference,
   rollingWpm,
   saveTest,
-  updateTestTags,
   writePreference,
   type StoredTest,
 } from './typing-storage';
@@ -207,14 +206,23 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
 }
 function normalizeSavedConfig(value: unknown): Config {
   const saved = value != null && typeof value === 'object' ? value as Partial<Record<keyof Config, unknown>> : {};
-  const durationMode = oneOf(saved.durationMode, DURATION_MODE_VALUES, DEFAULT_CONFIG.durationMode);
+  let durationMode = oneOf(saved.durationMode, DURATION_MODE_VALUES, DEFAULT_CONFIG.durationMode);
+  let mode = oneOf(saved.mode, CORPUS_MODE_VALUES, DEFAULT_CONFIG.mode);
   const durationCandidate = typeof saved.durationValue === 'number' && Number.isFinite(saved.durationValue) ? saved.durationValue : DEFAULT_CONFIG.durationValue;
   const language = typeof saved.language === 'string' && Object.prototype.hasOwnProperty.call(LANGUAGE_POOLS, saved.language) ? saved.language as Language : DEFAULT_CONFIG.language;
   const layout = typeof saved.layout === 'string' && LAYOUTS.some((item) => item.id === saved.layout) ? saved.layout as LayoutId : DEFAULT_CONFIG.layout;
+  const customText = typeof saved.customText === 'string' ? saved.customText : DEFAULT_CONFIG.customText;
   const codeIndex = Math.trunc(boundedNumber(saved.codeIndex, DEFAULT_CONFIG.codeIndex, 0, Math.max(0, CODE_SNIPPETS.length - 1)));
+
+  if (durationMode === 'quote') mode = 'quote';
+  else if (durationMode === 'zen') mode = 'zen';
+  else if (mode === 'quote') durationMode = 'quote';
+  else if (mode === 'zen') durationMode = 'zen';
+  if (mode === 'custom' && !customText.replace(/\t/g, '    ').trim()) mode = DEFAULT_CONFIG.mode;
+
   return {
     language, layout,
-    mode: oneOf(saved.mode, CORPUS_MODE_VALUES, DEFAULT_CONFIG.mode),
+    mode,
     durationMode,
     durationValue: normalizeDurationValue(durationMode, durationCandidate),
     quoteLength: oneOf(saved.quoteLength, QUOTE_LENGTH_VALUES, DEFAULT_CONFIG.quoteLength),
@@ -235,7 +243,7 @@ function normalizeSavedConfig(value: unknown): Config {
     ghostEnabled: booleanValue(saved.ghostEnabled, DEFAULT_CONFIG.ghostEnabled),
     pacerWpm: Math.round(boundedNumber(saved.pacerWpm, DEFAULT_CONFIG.pacerWpm, 20, 220)),
     pacerEnabled: booleanValue(saved.pacerEnabled, DEFAULT_CONFIG.pacerEnabled),
-    customText: typeof saved.customText === 'string' ? saved.customText : DEFAULT_CONFIG.customText,
+    customText,
     codeIndex,
   };
 }
@@ -302,7 +310,6 @@ export default function TypingWorkspace() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [customTextModalOpen, setCustomTextModalOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [savedTestId, setSavedTestId] = useState<number | null>(null);
   const [configHydrated, setConfigHydrated] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [pauseUntilFocus, setPauseUntilFocus] = useState(false);
@@ -567,7 +574,6 @@ export default function TypingWorkspace() {
       caseSensitive: cfg.caseSensitive,
     }) });
     setRunning(false);
-    setSavedTestId(null);
     milestoneRef.current.clear();
     zenChunkRef.current = 0;
     setStatusText('New text ready.');
@@ -664,8 +670,7 @@ export default function TypingWorkspace() {
       notes: meta.notes,
       keystrokes: options.includeKeystrokes ? engine.events : undefined,
     };
-    const id = await saveTest(stored);
-    setSavedTestId(id);
+    await saveTest(stored);
     setHistory(await listTests());
     setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
     setSaveModalOpen(false);
@@ -673,71 +678,37 @@ export default function TypingWorkspace() {
   }, [config, engine, metrics, target, personalBestQuery]);
 
   const handleExportSingle = useCallback(async (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => {
-    if (savedTestId == null && engine.finished) {
-      // Save first if we haven't yet.
-      await handleSave(meta, { includeKeystrokes: meta.includeKeystrokes });
-    }
     const dur = classifyDuration(config);
-    const currentTest: StoredTest = savedTestId != null
-      ? (history.find((h) => h.id === savedTestId) ?? {
-          id: savedTestId,
-          savedAt: Date.now(),
-          mode: config.mode,
-          durationMode: dur.mode,
-          durationValue: dur.value,
-          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-          language: config.language,
-          layout: config.layout,
-          targetText: target,
-          finishReason: engine.finishReason ?? 'aborted',
-          netWpm: metrics.netWpm,
-          grossWpm: metrics.grossWpm,
-          rawCpm: metrics.rawCpm,
-          accuracy: metrics.accuracy,
-          consistency: metrics.consistency,
-          elapsedMs: metrics.elapsedMs,
-          correctChars: metrics.correctChars,
-          incorrectChars: metrics.incorrectChars,
-          missedChars: metrics.missedChars,
-          extraChars: metrics.extraChars,
-          tags: meta.tags,
-          notes: meta.notes,
-          keystrokes: engine.events,
-        })
-      : {
-          savedAt: Date.now(),
-          mode: config.mode,
-          durationMode: dur.mode,
-          durationValue: dur.value,
-          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-          language: config.language,
-          layout: config.layout,
-          targetText: target,
-          finishReason: engine.finishReason ?? 'aborted',
-          netWpm: metrics.netWpm,
-          grossWpm: metrics.grossWpm,
-          rawCpm: metrics.rawCpm,
-          accuracy: metrics.accuracy,
-          consistency: metrics.consistency,
-          elapsedMs: metrics.elapsedMs,
-          correctChars: metrics.correctChars,
-          incorrectChars: metrics.incorrectChars,
-          missedChars: metrics.missedChars,
-          extraChars: metrics.extraChars,
-          tags: meta.tags,
-          notes: meta.notes,
-          keystrokes: engine.events,
-        };
-    if (savedTestId != null) {
-      await updateTestTags(savedTestId, meta.tags, meta.notes);
-      setHistory(await listTests());
-    }
+    const currentTest: StoredTest = {
+      savedAt: Date.now(),
+      mode: config.mode,
+      durationMode: dur.mode,
+      durationValue: dur.value,
+      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
+      language: config.language,
+      layout: config.layout,
+      targetText: target,
+      finishReason: engine.finishReason ?? 'aborted',
+      netWpm: metrics.netWpm,
+      grossWpm: metrics.grossWpm,
+      rawCpm: metrics.rawCpm,
+      accuracy: metrics.accuracy,
+      consistency: metrics.consistency,
+      elapsedMs: metrics.elapsedMs,
+      correctChars: metrics.correctChars,
+      incorrectChars: metrics.incorrectChars,
+      missedChars: metrics.missedChars,
+      extraChars: metrics.extraChars,
+      tags: [],
+      notes: '',
+      keystrokes: engine.events,
+    };
     if (format === 'csv') downloadText(testsToCsv([currentTest], meta), suggestFilename('csv', 'test'), 'text/csv;charset=utf-8');
     if (format === 'json') downloadText(testToJson(currentTest, meta), suggestFilename('json', 'test'), 'application/json');
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
     setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);
-  }, [config, engine, history, metrics, savedTestId, target, handleSave]);
+  }, [config, engine, metrics, target]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
