@@ -1,5 +1,9 @@
 /* Markdown Workbench-specific presentation. Kept with the lazy workspace so
-   these rules load only when the Markdown tool is opened. */
+   these rules load only when the Markdown tool is opened. Fenced-code
+   token colors live in code-highlight.css instead, since export-engine.ts
+   also needs that file's raw text to color exported code the same way. */
+@import './code-highlight.css';
+
 .markdown-workbench-toolbar {
   align-items: stretch;
   gap: 8px;
@@ -59,42 +63,6 @@
 .markdown-workbench-preview h4 { font-size: 1.15rem; }
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
-
-/* Fenced code block syntax coloring. Classes are assigned by
-   `@lezer/highlight`'s `classHighlighter` (see code-highlight-engine.ts),
-   the same stable "tok-*" naming CodeMirror's own live editor uses, scoped
-   to the preview so it never bleeds into the source editor's own
-   `syntaxHighlighting` theme. */
-.markdown-workbench-preview pre code .tok-comment { color: var(--muted); font-style: italic; }
-.markdown-workbench-preview pre code .tok-keyword,
-.markdown-workbench-preview pre code .tok-operatorKeyword,
-.markdown-workbench-preview pre code .tok-controlKeyword,
-.markdown-workbench-preview pre code .tok-moduleKeyword,
-.markdown-workbench-preview pre code .tok-definitionKeyword { color: var(--signal-strong); font-weight: 700; }
-.markdown-workbench-preview pre code .tok-string,
-.markdown-workbench-preview pre code .tok-string2,
-.markdown-workbench-preview pre code .tok-attributeValue { color: #1c7a4a; }
-.markdown-workbench-preview pre code .tok-number,
-.markdown-workbench-preview pre code .tok-atom,
-.markdown-workbench-preview pre code .tok-bool { color: #a0521d; }
-.markdown-workbench-preview pre code .tok-typeName,
-.markdown-workbench-preview pre code .tok-className,
-.markdown-workbench-preview pre code .tok-namespace { color: #6a3fb5; }
-.markdown-workbench-preview pre code .tok-propertyName,
-.markdown-workbench-preview pre code .tok-attributeName,
-.markdown-workbench-preview pre code .tok-tagName { color: #1546ad; }
-.markdown-workbench-preview pre code .tok-variableName2,
-.markdown-workbench-preview pre code .tok-macroName { color: #a0521d; }
-.markdown-workbench-preview pre code .tok-meta,
-.markdown-workbench-preview pre code .tok-processingInstruction { color: var(--muted); }
-.markdown-workbench-preview pre code .tok-invalid { color: var(--danger); text-decoration: underline wavy; }
-.markdown-workbench-preview pre code .tok-strong { font-weight: 700; }
-.markdown-workbench-preview pre code .tok-emphasis { font-style: italic; }
-.markdown-workbench-preview pre code .tok-heading { color: var(--signal-strong); font-weight: 700; }
-.markdown-workbench-preview pre code .tok-link,
-.markdown-workbench-preview pre code .tok-url { color: var(--signal); }
-.markdown-workbench-preview pre code .tok-inserted { color: #1c7a4a; }
-.markdown-workbench-preview pre code .tok-deleted { color: var(--danger); }
 
 .markdown-workbench-diagram-error-message {
   max-width: 100%;

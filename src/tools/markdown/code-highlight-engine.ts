@@ -96,6 +96,15 @@ const resolveLanguage = (tag: string): Language | undefined => {
 
 export const isDiagramLanguageTag = (tag: string): boolean => DIAGRAM_LANGUAGE_TAGS.has(tag.trim().toLowerCase());
 
+// Highlighting reruns on every keystroke (render-engine.ts re-highlights
+// every fenced block whenever the document's preparedSource changes, with
+// no cache), so an unbounded fence would let one large pasted or imported
+// code block stall typing on every edit anywhere else in the document.
+// Beyond this length a fence falls back to plain, unhighlighted text -
+// the same fallback already used for an unrecognized language - rather
+// than skipping highlighting silently or throwing.
+export const MAX_HIGHLIGHT_SOURCE_CHARS = 20_000;
+
 export interface HighlightedToken {
   // A run of source text. `classes` is empty for unstyled text (including
   // the "\n" tokens standing in for the line breaks `@lezer/highlight`
@@ -120,6 +129,7 @@ export interface HighlightedToken {
 export const highlightFencedCode = (code: string, languageTag: string): HighlightedToken[] | undefined => {
   const language = resolveLanguage(languageTag.trim().toLowerCase());
   if (!language) return undefined;
+  if (code.length > MAX_HIGHLIGHT_SOURCE_CHARS) return undefined;
 
   try {
     const tree = language.parser.parse(code);

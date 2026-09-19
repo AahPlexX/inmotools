@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import JSZip from 'jszip';
 
 const editorLocator = (page: import('@playwright/test').Page) =>
   page.locator('[aria-label="Markdown source"]');
@@ -9,7 +10,20 @@ const setSource = async (page: import('@playwright/test').Page, value: string) =
   await editor.click();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
   await page.keyboard.press('Backspace');
-  if (value) await editor.pressSequentially(value);
+  if (!value) return;
+  // A large payload typed key-by-key is unreasonably slow and risks a test
+  // timeout; insertText delivers it as a single input event instead,
+  // matching the same size-based branch markdown-mermaid.spec.ts already
+  // uses for its own large fixture.
+  if (value.length > 1_000) await page.keyboard.insertText(value);
+  else await editor.pressSequentially(value);
+};
+
+const readDownloadBytes = async (download: import('@playwright/test').Download): Promise<Buffer> => {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
 };
 
 test('markdown page copy reads like product guidance rather than implementation notes', async ({ page }) => {
@@ -156,4 +170,47 @@ test('a mermaid code fence is rendered as a diagram, not highlighted as source t
 
   await expect(page.locator('.markdown-workbench-preview .markdown-workbench-diagram svg')).toBeVisible();
   await expect(page.locator('.markdown-workbench-preview [class*="tok-"]')).toHaveCount(0);
+});
+
+test('standalone HTML export carries the tok-* color rules its own highlighted code needs', async ({ page }) => {
+  // Regression guard: the exported document is self-contained and never
+  // includes markdown-workbench.css, so the tok-* spans render-engine.ts
+  // adds to fenced code need their color rules inlined into the export's
+  // own <style> block, not merely present in the live app's stylesheet.
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '```js\nconst x = 1;\n```');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
+  const html = (await readDownloadBytes(await downloadPromise)).toString('utf8');
+  expect(html).toContain('tok-keyword');
+  // Minified CSS groups this rule's several comma-separated selectors
+  // before the shared declaration block, so `.tok-keyword` is not
+  // immediately followed by `{` - only by `,` or `{`, with the actual
+  // `color:` declaration reachable before the next `}`.
+  expect(html).toMatch(/\.tok-keyword[,{][^}]*color/);
+});
+
+test('EPUB export carries the tok-* color rules its own highlighted code needs', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '```js\nconst x = 1;\n```');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'EPUB (structural)', exact: true }).click();
+  const zip = await JSZip.loadAsync(await readDownloadBytes(await downloadPromise));
+  const chapter = await zip.file('OEBPS/chapter1.xhtml')?.async('string');
+  expect(chapter).toContain('tok-keyword');
+  const stylesheet = await zip.file('OEBPS/styles/markdown.css')?.async('string');
+  expect(stylesheet).toMatch(/\.tok-keyword[,{][^}]*color/);
+});
+
+test('a fenced code block past the highlighting size guard renders as plain text instead of stalling', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const hugeFence = '```js\n' + 'const x = 1;\n'.repeat(2_000) + '```';
+  await setSource(page, hugeFence);
+
+  const codeBlock = page.locator('.markdown-workbench-preview pre code.language-js');
+  await expect(codeBlock).toBeVisible();
+  await expect(codeBlock).toContainText('const x = 1;');
+  await expect(codeBlock.locator('[class*="tok-"]')).toHaveCount(0);
 });

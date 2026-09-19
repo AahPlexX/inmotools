@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { highlightFencedCode, isDiagramLanguageTag } from '../../src/tools/markdown/code-highlight-engine';
+import {
+  highlightFencedCode,
+  isDiagramLanguageTag,
+  MAX_HIGHLIGHT_SOURCE_CHARS,
+} from '../../src/tools/markdown/code-highlight-engine';
 import { renderMarkdown } from '../../src/tools/markdown/render-engine';
 
 describe('code-highlight-engine', () => {
@@ -33,6 +37,18 @@ describe('code-highlight-engine', () => {
     expect(isDiagramLanguageTag('mermaid')).toBe(true);
     expect(isDiagramLanguageTag('DOT')).toBe(true);
     expect(isDiagramLanguageTag('javascript')).toBe(false);
+  });
+
+  it('falls back to no highlighting for a fence past the size guard, so one huge block cannot stall every keystroke', () => {
+    const line = 'const x = 1;\n';
+    const huge = line.repeat(Math.ceil(MAX_HIGHLIGHT_SOURCE_CHARS / line.length) + 1);
+    expect(huge.length).toBeGreaterThan(MAX_HIGHLIGHT_SOURCE_CHARS);
+    expect(highlightFencedCode(huge, 'javascript')).toBeUndefined();
+  });
+
+  it('still highlights a fence right at the size guard boundary', () => {
+    const atLimit = 'x'.repeat(MAX_HIGHLIGHT_SOURCE_CHARS);
+    expect(highlightFencedCode(atLimit, 'javascript')).toBeDefined();
   });
 });
 
