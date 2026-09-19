@@ -8,9 +8,12 @@ import {
   resolveDatumPlaneFrame,
   resolveMidPlaneDatumPlaneFrame,
   resolveThreePointDatumPlaneFrame,
+  resolveTwoPlaneDatumAxis,
+  resolveTwoPointDatumAxis,
   resolveSketchAxis3d,
   resolveSketchPlane3d,
   type CadDatumPlaneFrames,
+  type CadSketchAxis3d,
   type CadSketchPlane3d,
   type CadSketchProfile3d,
   type CadSketchWire3d,
@@ -157,6 +160,53 @@ function resolveDatumPlanes(project: CadProject): CadDatumPlaneFrames {
     }
   }
   return frames;
+}
+
+type CadDatumAxes = ReadonlyMap<string, CadSketchAxis3d>;
+
+function resolveDatumAxes(project: CadProject, datumPlanes: CadDatumPlaneFrames): CadDatumAxes {
+  const axes = new Map<string, CadSketchAxis3d>();
+  for (const feature of project.features) {
+    if (feature.type !== 'datum-axis' || feature.suppressed) continue;
+    const kind = feature.parameters.kind;
+    try {
+      if (kind === 'two-point') {
+        axes.set(feature.id, resolveTwoPointDatumAxis(
+          parameterVector3(feature, 'point1'),
+          parameterVector3(feature, 'point2'),
+        ));
+      } else if (kind === 'two-plane') {
+        axes.set(feature.id, resolveTwoPlaneDatumAxis(
+          parameterPlaneReference(feature, 'plane1', datumPlanes),
+          parameterPlaneReference(feature, 'plane2', datumPlanes),
+        ));
+      } else {
+        throw new CadFeatureEvaluationError(
+          feature.id,
+          `${feature.label} datum axis kind '${String(kind)}' is not supported; use 'two-point' or 'two-plane'.`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof CadFeatureEvaluationError) throw error;
+      throw new CadFeatureEvaluationError(
+        feature.id,
+        `${feature.label}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+  }
+  return axes;
+}
+
+function parameterDatumAxis(feature: CadFeature, datumAxes: CadDatumAxes): CadSketchAxis3d | null {
+  const value = feature.parameters.axisFeatureId;
+  if (value === undefined) return null;
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} parameter 'axisFeatureId' must be a non-empty string when provided.`);
+  }
+  const axis = datumAxes.get(value);
+  if (!axis) throw new CadFeatureEvaluationError(feature.id, `${feature.label} references unknown datum axis '${value}'.`);
+  return axis;
 }
 
 function parameterStringArray(feature: CadFeature, key: string): string[] {
@@ -577,6 +627,7 @@ function mirrorFeature(
   feature: CadFeature,
   project: CadProject,
   datumPlanes: CadDatumPlaneFrames,
+  datumAxes: CadDatumAxes,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape {
@@ -605,6 +656,7 @@ function mirrorFeature(
  */
 function patternFeature(
   feature: CadFeature,
+  datumAxes: CadDatumAxes,
   kernel: CadFeatureKernel,
   featureShapes: ReadonlyMap<string, CadKernelShape>,
 ): CadKernelShape {
@@ -623,8 +675,9 @@ function patternFeature(
         instances.push(kernel.translate(shape, [step[0] * i, step[1] * i, step[2] * i]));
       }
     } else if (kind === 'circular') {
-      const axisOrigin = parameterVector3(feature, 'axisOrigin');
-      const axisDirection = parameterVector3(feature, 'axisDirection');
+      const datumAxis = parameterDatumAxis(feature, datumAxes);
+      const axisOrigin = datumAxis?.origin ?? parameterVector3(feature, 'axisOrigin');
+      const axisDirection = datumAxis?.direction ?? parameterVector3(feature, 'axisDirection');
       const angleStep = parameterNonZeroNumber(feature, 'angleStep');
       for (let i = 0; i < count; i += 1) {
         instances.push(kernel.rotateAroundAxis(shape, axisOrigin, axisDirection, angleStep * i));
@@ -993,6 +1046,7 @@ function revolveFeature(
   feature: CadFeature,
   project: CadProject,
   datumPlanes: CadDatumPlaneFrames,
+  datumAxes: CadDatumAxes,
   kernel: CadFeatureKernel,
 ): CadKernelShape {
   const angle = parameterNumber(feature, 'angle');
@@ -1000,13 +1054,18 @@ function revolveFeature(
     throw new CadFeatureEvaluationError(feature.id, `${feature.label} revolve angle must not exceed one full revolution.`);
   }
   const sketch = sketchForFeature(feature, project);
-  const axisLineId = parameterString(feature, 'axisLineId');
-  let axis;
-  try {
-    axis = resolveSketchAxis3d(sketch, axisLineId, datumPlanes);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new CadFeatureEvaluationError(feature.id, `${feature.label} axis is invalid: ${message}`, { cause: error });
+  let axis = parameterDatumAxis(feature, datumAxes);
+  if (axis && feature.parameters.axisLineId !== undefined) {
+    throw new CadFeatureEvaluationError(feature.id, `${feature.label} must reference either axisFeatureId or axisLineId, not both.`);
+  }
+  if (!axis) {
+    const axisLineId = parameterString(feature, 'axisLineId');
+    try {
+      axis = resolveSketchAxis3d(sketch, axisLineId, datumPlanes);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new CadFeatureEvaluationError(feature.id, `${feature.label} axis is invalid: ${message}`, { cause: error });
+    }
   }
   return withProfileFace(feature, project, datumPlanes, kernel, (profile) => kernel.revolve(
     profile,
@@ -1102,7 +1161,7 @@ function createFeatureShape(
     case 'extrude':
       return extrudeFeature(feature, project, datumPlanes, kernel);
     case 'revolve':
-      return revolveFeature(feature, project, datumPlanes, kernel);
+      return revolveFeature(feature, project, datumPlanes, datumAxes, kernel);
     case 'sweep':
       return sweepFeature(feature, project, datumPlanes, kernel);
     case 'loft':
@@ -1132,7 +1191,7 @@ function createFeatureShape(
     case 'mirror':
       return mirrorFeature(feature, project, datumPlanes, kernel, featureShapes);
     case 'pattern':
-      return patternFeature(feature, kernel, featureShapes);
+      return patternFeature(feature, datumAxes, kernel, featureShapes);
     case 'thicken':
       return thickenFeature(feature, kernel, featureShapes);
     case 'hole':
@@ -1173,11 +1232,12 @@ export function evaluateCadFeatures(project: CadProject, kernel: CadFeatureKerne
 
   try {
     const datumPlanes = resolveDatumPlanes(project);
+    const datumAxes = resolveDatumAxes(project, datumPlanes);
     for (const feature of project.features) {
       activeFeature = feature;
       if (feature.suppressed) continue;
 
-      const shape = createFeatureShape(feature, project, datumPlanes, kernel, featureShapes, warnings);
+      const shape = createFeatureShape(feature, project, datumPlanes, datumAxes, kernel, featureShapes, warnings);
       if (!shape) continue;
 
       if (!feature.bodyId) {
