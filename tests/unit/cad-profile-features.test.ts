@@ -177,6 +177,32 @@ describe('CAD sketch-driven exact features', () => {
     expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'revolve-1', shape: result }]);
   });
 
+  it('revolves around a reusable two-point datum axis', () => {
+    const { kernel, profile, result } = kernelFixture();
+    const axis = feature('axis-1', 'datum-axis', {
+      kind: 'two-point',
+      point1: [0, 0, 0],
+      point2: [0, 10, 0],
+    });
+    const revolve = feature('revolve-1', 'revolve', {
+      sketchId: 'sketch-1',
+      profileEntityIds,
+      axisFeatureId: 'axis-1',
+      angle: Math.PI * 2,
+    });
+    const input: CadProject = {
+      ...createCadProject('Datum-axis revolve fixture'),
+      sketches: [rectangleSketch()],
+      features: [axis, revolve],
+      bodies: [{ id: 'body-main', label: 'Main body', featureIds: ['revolve-1'], visible: true }],
+    };
+
+    const evaluation = evaluateCadFeatures(input, kernel);
+
+    expect(kernel.revolve).toHaveBeenCalledWith(profile, [0, 0, 0], [0, 1, 0], Math.PI * 2);
+    expect(evaluation.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'revolve-1', shape: result }]);
+  });
+
   it('attributes an open-profile rejection to the feature being rebuilt', () => {
     const { kernel } = kernelFixture();
     let thrown: unknown;
