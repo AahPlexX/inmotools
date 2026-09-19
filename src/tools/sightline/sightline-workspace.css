@@ -1059,3 +1059,43 @@
   font-weight: 650;
   overflow-wrap: anywhere;
 }
+
+/* Sightline UX audit remediation: component-driven reflow and touch ergonomics. */
+.sightline { container: sightline / inline-size; container-type: inline-size; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.sightline-card > h2, .sightline-card > h3, .sightline-card summary { font-size: clamp(.95rem, .9rem + .2vw, 1.1rem); }
+.sightline-note, .sightline-row--inline, .sightline-list, .sightline-diagnostics, .sightline-limits { font-size: .875rem; }
+.sightline-field > span { font-size: .75rem; }
+.sightline-button, .sightline-tab, .sightline-chip, .sightline-source-details > summary, .sightline-settings-details > summary, .sightline-contents-details > summary { min-height: 40px; }
+.sightline-source-details > summary, .sightline-settings-details > summary, .sightline-contents-details > summary, .sightline-evidence-details > summary { display: flex; align-items: center; cursor: pointer; font-weight: 750; }
+.sightline-source-details, .sightline-settings-details, .sightline-technical-details, .sightline-diagnostic-details { min-width: 0; }
+.sightline-source-details[open], .sightline-settings-details[open], .sightline-technical-details[open], .sightline-diagnostic-details[open] { display: grid; gap: 10px; }
+.sightline-start-here, .sightline-inline-details { min-width: 0; }
+.sightline-inline-details > summary { cursor: pointer; font-weight: 700; }
+.sightline-document-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.sightline-document-bar > div { display: grid; gap: 2px; min-width: 0; }
+.sightline-document-bar strong { overflow-wrap: anywhere; }
+.sightline-document-bar span { color: var(--muted); font-size: .875rem; }
+.sightline-batch-results { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sightline-batch-results li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.sightline-cockpit { position: sticky; top: 8px; z-index: 8; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); }
+.sightline-field--cockpit { grid-template-columns: auto minmax(72px, 96px); align-items: center; }
+.sightline-field--cockpit input { min-height: 40px; }
+.sightline-basic-controls { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.sightline-page-scroll { height: clamp(280px, 58dvh, 720px); max-height: none; }
+.sightline-surface { min-height: clamp(320px, 52dvh, 760px); }
+@container sightline (max-width: 760px) {
+  .sightline-main { grid-template-columns: minmax(0, 1fr); }
+  .sightline-surface { padding: 10px; min-height: min(70dvh, 620px); }
+  .sightline-rsvp-line { font-size: clamp(1.65rem, 9vw, var(--sightline-word-size, 3.4rem)); }
+  .sightline-document-bar, .sightline-batch-results li { align-items: stretch; }
+  .sightline-document-bar .sightline-field { width: 100%; }
+}
+@media (pointer: coarse) {
+  .sightline-button, .sightline-tab, .sightline-chip, .sightline-field input, .sightline-field select, .sightline-field textarea, .sightline summary { min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .sightline { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .sightline-cockpit { position: fixed; inset-inline: 8px; bottom: 0; top: auto; z-index: 50; padding-bottom: max(8px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgb(0 0 0 / .12); }
+  .sightline-cockpit .sightline-button { flex: 1 1 auto; }
+  .sightline-field--cockpit { flex: 1 1 100%; grid-template-columns: auto minmax(72px, 1fr); }
+}
