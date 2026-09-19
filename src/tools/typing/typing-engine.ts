@@ -1,7 +1,7 @@
 // Typing Workstation core engine
 // Deterministic, dependency-free arithmetic and analytics for keystroke input.
 // All timing is captured with performance.now() in the UI layer and forwarded
-// as microsecond-precision timestamps into the reducer here.
+// as high-resolution millisecond timestamps into the reducer here.
 
 export type CharState = 'pending' | 'correct' | 'incorrect' | 'extra' | 'missed';
 

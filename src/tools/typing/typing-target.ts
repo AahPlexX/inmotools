@@ -40,7 +40,8 @@ const WORD_DURATION_VALUES = [10, 25, 50, 100, 200] as const;
 export function normalizeDurationValue(mode: DurationMode, currentValue: number): number {
   if (mode === 'time') return TIME_DURATION_VALUES.includes(currentValue as (typeof TIME_DURATION_VALUES)[number]) ? currentValue : 30;
   if (mode === 'words') return WORD_DURATION_VALUES.includes(currentValue as (typeof WORD_DURATION_VALUES)[number]) ? currentValue : 25;
-  return currentValue;
+  if (mode === 'certification') return 300;
+  return 0;
 }
 
 export function countWords(text: string): number {

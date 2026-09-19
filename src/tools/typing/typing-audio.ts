@@ -39,6 +39,8 @@ interface RuntimeState {
   metronomeId: number | null;
   metronomeInterval: number | null;
   bpm: number;
+  volume: number;
+  scheduledTimeouts: Set<number>;
 }
 
 function ensure(state: RuntimeState): { ctx: AudioContext; master: GainNode } | null {
@@ -47,7 +49,7 @@ function ensure(state: RuntimeState): { ctx: AudioContext; master: GainNode } | 
     try {
       state.ctx = new AudioContext();
       state.master = state.ctx.createGain();
-      state.master.gain.value = 0.35;
+      state.master.gain.value = state.volume;
       state.master.connect(state.ctx.destination);
     } catch {
       return null;
@@ -58,6 +60,14 @@ function ensure(state: RuntimeState): { ctx: AudioContext; master: GainNode } | 
   }
   if (!state.ctx || !state.master) return null;
   return { ctx: state.ctx, master: state.master };
+}
+
+function schedule(state: RuntimeState, callback: () => void, delayMs: number): void {
+  const id = window.setTimeout(() => {
+    state.scheduledTimeouts.delete(id);
+    callback();
+  }, delayMs);
+  state.scheduledTimeouts.add(id);
 }
 
 function whiteNoise(ctx: AudioContext, durationMs: number): AudioBuffer {
@@ -134,7 +144,7 @@ function playSwitch(state: RuntimeState, profile: SwitchProfile, kind: 'correct'
   noiseSrc.stop(now + shape.clickDurationMs / 1000 + 0.02);
 
   // Cleanup: disconnect nodes shortly after playback ends.
-  window.setTimeout(() => {
+  schedule(state, () => {
     try { gain.disconnect(); filter.disconnect(); oscGain.disconnect(); noiseGain.disconnect(); } catch { /* noop */ }
   }, shape.clickDurationMs + shape.bottomDurationMs + 200);
 }
@@ -156,7 +166,7 @@ function playTone(state: RuntimeState, opts: { freq: number; durationMs: number;
   g.connect(master);
   osc.start(now);
   osc.stop(now + opts.durationMs / 1000 + 0.05);
-  window.setTimeout(() => { try { g.disconnect(); } catch { /* noop */ } }, opts.durationMs + 200);
+  schedule(state, () => { try { g.disconnect(); } catch { /* noop */ } }, opts.durationMs + 200);
 }
 
 export function createAudioController(initialProfile: SwitchProfile = 'off'): AudioController {
@@ -167,6 +177,8 @@ export function createAudioController(initialProfile: SwitchProfile = 'off'): Au
     metronomeId: null,
     metronomeInterval: null,
     bpm: 0,
+    volume: 0.35,
+    scheduledTimeouts: new Set<number>(),
   };
   return {
     playKeystroke(kind) {
@@ -174,21 +186,21 @@ export function createAudioController(initialProfile: SwitchProfile = 'off'): Au
     },
     playMilestone() {
       playTone(state, { freq: 660, durationMs: 120, type: 'triangle', volume: 0.4 });
-      window.setTimeout(() => playTone(state, { freq: 990, durationMs: 160, type: 'triangle', volume: 0.4 }), 120);
+      schedule(state, () => playTone(state, { freq: 990, durationMs: 160, type: 'triangle', volume: 0.4 }), 120);
     },
     playFail() {
       playTone(state, { freq: 220, durationMs: 200, type: 'square', volume: 0.4, sweepTo: 110 });
     },
     playCompletion() {
       playTone(state, { freq: 523, durationMs: 140, type: 'sine', volume: 0.5 });
-      window.setTimeout(() => playTone(state, { freq: 659, durationMs: 140, type: 'sine', volume: 0.5 }), 140);
-      window.setTimeout(() => playTone(state, { freq: 784, durationMs: 240, type: 'sine', volume: 0.5 }), 280);
+      schedule(state, () => playTone(state, { freq: 659, durationMs: 140, type: 'sine', volume: 0.5 }), 140);
+      schedule(state, () => playTone(state, { freq: 784, durationMs: 240, type: 'sine', volume: 0.5 }), 280);
     },
     setSwitch(profile) { state.profile = profile; },
     setVolume(v) {
       const clamped = Math.max(0, Math.min(1, v));
-      const audio = ensure(state);
-      if (audio) audio.master.gain.value = clamped;
+      state.volume = clamped;
+      if (state.master) state.master.gain.value = clamped;
     },
     startMetronome(bpm) {
       this.stopMetronome();
@@ -209,6 +221,8 @@ export function createAudioController(initialProfile: SwitchProfile = 'off'): Au
     },
     dispose() {
       this.stopMetronome();
+      for (const timeoutId of state.scheduledTimeouts) window.clearTimeout(timeoutId);
+      state.scheduledTimeouts.clear();
       if (state.ctx) {
         try { state.ctx.close(); } catch { /* noop */ }
       }

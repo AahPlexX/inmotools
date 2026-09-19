@@ -8,6 +8,7 @@ import Chart from 'chart.js/auto';
 import confetti from 'canvas-confetti';
 import Papa from 'papaparse';
 import { downloadBlob, downloadText } from '../../lib/download';
+import { PagedTable } from '../../components/PagedTable';
 import './typing-styles.css';
 
 import {
@@ -50,7 +51,6 @@ import {
   readPreference,
   rollingWpm,
   saveTest,
-  updateTestTags,
   writePreference,
   type StoredTest,
 } from './typing-storage';
@@ -190,6 +190,65 @@ const CARET_OPTIONS: { id: CaretStyle; label: string }[] = [
   { id: 'ghost', label: 'Ghost' },
 ];
 
+const CORPUS_MODE_VALUES: readonly CorpusMode[] = ['words-200','words-1000','words-5000','punctuation','numbers','code','medical','legal','kids','quote','zen','custom'];
+const DURATION_MODE_VALUES: readonly DurationMode[] = ['time','words','quote','zen','certification'];
+const QUOTE_LENGTH_VALUES: readonly Quote['length'][] = ['short','medium','long','thicc'];
+const ERROR_MODE_VALUES: readonly ErrorMode[] = ['strict','master','forgiving','confidence'];
+const SWITCH_PROFILE_VALUES: readonly SwitchProfile[] = ['off','mx-blue','mx-red','mx-brown','holy-panda','topre','typewriter'];
+
+function oneOf<T extends string>(value: unknown, values: readonly T[], fallback: T): T {
+  return typeof value === 'string' && values.includes(value as T) ? value as T : fallback;
+}
+function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+function booleanValue(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+function normalizeSavedConfig(value: unknown): Config {
+  const saved = value != null && typeof value === 'object' ? value as Partial<Record<keyof Config, unknown>> : {};
+  let durationMode = oneOf(saved.durationMode, DURATION_MODE_VALUES, DEFAULT_CONFIG.durationMode);
+  let mode = oneOf(saved.mode, CORPUS_MODE_VALUES, DEFAULT_CONFIG.mode);
+  const durationCandidate = typeof saved.durationValue === 'number' && Number.isFinite(saved.durationValue) ? saved.durationValue : DEFAULT_CONFIG.durationValue;
+  const language = typeof saved.language === 'string' && Object.prototype.hasOwnProperty.call(LANGUAGE_POOLS, saved.language) ? saved.language as Language : DEFAULT_CONFIG.language;
+  const layout = typeof saved.layout === 'string' && LAYOUTS.some((item) => item.id === saved.layout) ? saved.layout as LayoutId : DEFAULT_CONFIG.layout;
+  const customText = typeof saved.customText === 'string' ? saved.customText : DEFAULT_CONFIG.customText;
+  const codeIndex = Math.trunc(boundedNumber(saved.codeIndex, DEFAULT_CONFIG.codeIndex, 0, Math.max(0, CODE_SNIPPETS.length - 1)));
+
+  if (durationMode === 'quote') mode = 'quote';
+  else if (durationMode === 'zen') mode = 'zen';
+  else if (mode === 'quote') durationMode = 'quote';
+  else if (mode === 'zen') durationMode = 'zen';
+  if (mode === 'custom' && !customText.replace(/\t/g, '    ').trim()) mode = DEFAULT_CONFIG.mode;
+
+  return {
+    language, layout,
+    mode,
+    durationMode,
+    durationValue: normalizeDurationValue(durationMode, durationCandidate),
+    quoteLength: oneOf(saved.quoteLength, QUOTE_LENGTH_VALUES, DEFAULT_CONFIG.quoteLength),
+    caret: oneOf(saved.caret, CARET_OPTIONS.map((item) => item.id), DEFAULT_CONFIG.caret),
+    theme: oneOf(saved.theme, THEME_OPTIONS.map((item) => item.id), DEFAULT_CONFIG.theme),
+    font: oneOf(saved.font, FONT_OPTIONS.map((item) => item.id), DEFAULT_CONFIG.font),
+    fontSize: Math.round(boundedNumber(saved.fontSize, DEFAULT_CONFIG.fontSize, 16, 40)),
+    errorMode: oneOf(saved.errorMode, ERROR_MODE_VALUES, DEFAULT_CONFIG.errorMode),
+    allowExtras: booleanValue(saved.allowExtras, DEFAULT_CONFIG.allowExtras),
+    caseSensitive: booleanValue(saved.caseSensitive, DEFAULT_CONFIG.caseSensitive),
+    blurUntilFocus: booleanValue(saved.blurUntilFocus, DEFAULT_CONFIG.blurUntilFocus),
+    hideStatsDuringTest: booleanValue(saved.hideStatsDuringTest, DEFAULT_CONFIG.hideStatsDuringTest),
+    audioProfile: oneOf(saved.audioProfile, SWITCH_PROFILE_VALUES, DEFAULT_CONFIG.audioProfile),
+    audioVolume: boundedNumber(saved.audioVolume, DEFAULT_CONFIG.audioVolume, 0, 1),
+    metronomeOn: booleanValue(saved.metronomeOn, DEFAULT_CONFIG.metronomeOn),
+    metronomeBpm: Math.round(boundedNumber(saved.metronomeBpm, DEFAULT_CONFIG.metronomeBpm, 40, 300)),
+    ariaLive: booleanValue(saved.ariaLive, DEFAULT_CONFIG.ariaLive),
+    ghostEnabled: booleanValue(saved.ghostEnabled, DEFAULT_CONFIG.ghostEnabled),
+    pacerWpm: Math.round(boundedNumber(saved.pacerWpm, DEFAULT_CONFIG.pacerWpm, 20, 220)),
+    pacerEnabled: booleanValue(saved.pacerEnabled, DEFAULT_CONFIG.pacerEnabled),
+    customText,
+    codeIndex,
+  };
+}
+
 // -------------------- helpers --------------------
 
 function classifyDuration(cfg: Config): { mode: 'time' | 'words' | 'quote' | 'zen' | 'certification'; value: number } {
@@ -252,8 +311,7 @@ export default function TypingWorkspace() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [customTextModalOpen, setCustomTextModalOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [pendingMeta, setPendingMeta] = useState<ExportMetadata>(EMPTY_EXPORT_METADATA);
-  const [savedTestId, setSavedTestId] = useState<number | null>(null);
+  const [configHydrated, setConfigHydrated] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [pauseUntilFocus, setPauseUntilFocus] = useState(false);
 
@@ -276,13 +334,9 @@ export default function TypingWorkspace() {
   useEffect(() => {
     void (async () => {
       try {
-        const saved = await readPreference<Partial<Config> | null>('config', null);
+        const saved = await readPreference<unknown>('config', null);
         if (saved) {
-          const restoredBase = { ...DEFAULT_CONFIG, ...saved };
-          const restored = {
-            ...restoredBase,
-            durationValue: normalizeDurationValue(restoredBase.durationMode, restoredBase.durationValue),
-          };
+          const restored = normalizeSavedConfig(saved);
           const restoredTarget = buildTargetText(restored, seed);
           setConfig(restored);
           setTarget(restoredTarget);
@@ -295,6 +349,7 @@ export default function TypingWorkspace() {
         const rows = await listTests();
         setHistory(rows);
       } catch { /* IndexedDB unavailable, keep defaults */ }
+      finally { setConfigHydrated(true); }
     })();
     audioRef.current = createAudioController(DEFAULT_CONFIG.audioProfile);
     return () => {
@@ -305,8 +360,9 @@ export default function TypingWorkspace() {
 
   // Persist configuration whenever it changes.
   useEffect(() => {
-    void writePreference('config', config).catch(() => undefined);
-  }, [config]);
+    if (!configHydrated) return;
+    void writePreference('config', normalizeSavedConfig(config)).catch(() => undefined);
+  }, [config, configHydrated]);
 
   // Rebuild the audio profile when it changes.
   useEffect(() => {
@@ -316,21 +372,27 @@ export default function TypingWorkspace() {
     else audioRef.current?.stopMetronome();
   }, [config.audioProfile, config.audioVolume, config.metronomeOn, config.metronomeBpm]);
 
-  // Refresh the personal-best pacer when config changes.
-  useEffect(() => {
-    void (async () => {
-      const dur = classifyDuration(config);
-      const pb = await findPersonalBest({
+  const personalBestQuery = useMemo(() => {
+    const dur = classifyDuration(config);
+    return {
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
       language: config.language,
       layout: config.layout,
       quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-    });
-      setPersonalBest(pb ?? null);
-    })();
+    };
   }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
+
+  // Refresh the personal-best pacer when its comparison family changes.
+  useEffect(() => {
+    if (!configHydrated) return;
+    let cancelled = false;
+    void findPersonalBest(personalBestQuery).then((pb) => {
+      if (!cancelled) setPersonalBest(pb ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [configHydrated, personalBestQuery]);
 
   // Wall-clock tick while a test is running.
   useEffect(() => {
@@ -513,7 +575,6 @@ export default function TypingWorkspace() {
       caseSensitive: cfg.caseSensitive,
     }) });
     setRunning(false);
-    setSavedTestId(null);
     milestoneRef.current.clear();
     zenChunkRef.current = 0;
     setStatusText('New text ready.');
@@ -526,6 +587,10 @@ export default function TypingWorkspace() {
     }
     if (patch.durationMode === 'quote') normalized.mode = 'quote';
     if (patch.durationMode === 'zen') normalized.mode = 'zen';
+    if (patch.durationMode !== undefined && patch.durationMode !== 'quote' && patch.durationMode !== 'zen'
+        && patch.mode === undefined && (config.mode === 'quote' || config.mode === 'zen')) {
+      normalized.mode = DEFAULT_CONFIG.mode;
+    }
     if (patch.mode === 'quote' && patch.durationMode === undefined) normalized.durationMode = 'quote';
     if (patch.mode === 'zen' && patch.durationMode === undefined) normalized.durationMode = 'zen';
     if (patch.mode && patch.mode !== 'quote' && patch.mode !== 'zen' && patch.durationMode === undefined
@@ -610,87 +675,45 @@ export default function TypingWorkspace() {
       notes: meta.notes,
       keystrokes: options.includeKeystrokes ? engine.events : undefined,
     };
-    const id = await saveTest(stored);
-    setSavedTestId(id);
+    await saveTest(stored);
     setHistory(await listTests());
-    setPersonalBest(await findPersonalBest({
+    setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
+    setSaveModalOpen(false);
+    setStatusText('Test saved to local history.');
+  }, [config, engine, metrics, target, personalBestQuery]);
+
+  const handleExportSingle = useCallback(async (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => {
+    const dur = classifyDuration(config);
+    const currentTest: StoredTest = {
+      savedAt: Date.now(),
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
+      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
       language: config.language,
       layout: config.layout,
-      quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-    }) ?? null);
-    setSaveModalOpen(false);
-    setStatusText('Test saved to local history.');
-  }, [config, engine, metrics, target]);
-
-  const handleExportSingle = useCallback(async (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => {
-    if (savedTestId == null && engine.finished) {
-      // Save first if we haven't yet.
-      await handleSave(meta, { includeKeystrokes: meta.includeKeystrokes });
-    }
-    const dur = classifyDuration(config);
-    const currentTest: StoredTest = savedTestId != null
-      ? (history.find((h) => h.id === savedTestId) ?? {
-          id: savedTestId,
-          savedAt: Date.now(),
-          mode: config.mode,
-          durationMode: dur.mode,
-          durationValue: dur.value,
-          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-          language: config.language,
-          layout: config.layout,
-          targetText: target,
-          finishReason: engine.finishReason ?? 'aborted',
-          netWpm: metrics.netWpm,
-          grossWpm: metrics.grossWpm,
-          rawCpm: metrics.rawCpm,
-          accuracy: metrics.accuracy,
-          consistency: metrics.consistency,
-          elapsedMs: metrics.elapsedMs,
-          correctChars: metrics.correctChars,
-          incorrectChars: metrics.incorrectChars,
-          missedChars: metrics.missedChars,
-          extraChars: metrics.extraChars,
-          tags: meta.tags,
-          notes: meta.notes,
-          keystrokes: engine.events,
-        })
-      : {
-          savedAt: Date.now(),
-          mode: config.mode,
-          durationMode: dur.mode,
-          durationValue: dur.value,
-          quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
-          language: config.language,
-          layout: config.layout,
-          targetText: target,
-          finishReason: engine.finishReason ?? 'aborted',
-          netWpm: metrics.netWpm,
-          grossWpm: metrics.grossWpm,
-          rawCpm: metrics.rawCpm,
-          accuracy: metrics.accuracy,
-          consistency: metrics.consistency,
-          elapsedMs: metrics.elapsedMs,
-          correctChars: metrics.correctChars,
-          incorrectChars: metrics.incorrectChars,
-          missedChars: metrics.missedChars,
-          extraChars: metrics.extraChars,
-          tags: meta.tags,
-          notes: meta.notes,
-          keystrokes: engine.events,
-        };
-    if (savedTestId != null) {
-      await updateTestTags(savedTestId, meta.tags, meta.notes);
-      setHistory(await listTests());
-    }
+      targetText: target,
+      finishReason: engine.finishReason ?? 'aborted',
+      netWpm: metrics.netWpm,
+      grossWpm: metrics.grossWpm,
+      rawCpm: metrics.rawCpm,
+      accuracy: metrics.accuracy,
+      consistency: metrics.consistency,
+      elapsedMs: metrics.elapsedMs,
+      correctChars: metrics.correctChars,
+      incorrectChars: metrics.incorrectChars,
+      missedChars: metrics.missedChars,
+      extraChars: metrics.extraChars,
+      tags: [],
+      notes: '',
+      keystrokes: engine.events,
+    };
     if (format === 'csv') downloadText(testsToCsv([currentTest], meta), suggestFilename('csv', 'test'), 'text/csv;charset=utf-8');
     if (format === 'json') downloadText(testToJson(currentTest, meta), suggestFilename('json', 'test'), 'application/json');
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
     setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);
-  }, [config, engine, history, metrics, savedTestId, target, handleSave]);
+  }, [config, engine, metrics, target]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
@@ -708,12 +731,13 @@ export default function TypingWorkspace() {
       const { tests, skipped } = parseImportedTests(parsed);
       for (const record of tests) await saveTest(record);
       setHistory(await listTests());
+      setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
       const skippedText = skipped > 0 ? ` Skipped ${skipped} invalid record${skipped === 1 ? '' : 's'}.` : '';
       setStatusText(`Imported ${tests.length} test${tests.length === 1 ? '' : 's'}.${skippedText}`);
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
-  }, []);
+  }, [personalBestQuery]);
 
   const importCsvDictionary = useCallback(async (file: File) => {
     try {
@@ -916,7 +940,7 @@ export default function TypingWorkspace() {
         </div>
         <div className="tw-panel">
           <h3>Per-key summary</h3>
-          <KeyStatsTable rows={keyStats.slice(0, 12)} />
+          <KeyStatsTable rows={keyStats} />
         </div>
         <div className="tw-panel">
           <h3>Personal best / pacer</h3>
@@ -924,7 +948,7 @@ export default function TypingWorkspace() {
             {personalBest ? (
               <>Best {personalBest.netWpm} WPM · {personalBest.accuracy}% acc · {new Date(personalBest.savedAt).toLocaleDateString()}</>
             ) : (
-              <>No PB yet at this mode &amp; duration.</>
+              <>No comparable personal best yet.</>
             )}
           </p>
           <label style={{ display: 'block', marginTop: '0.4rem' }}>
@@ -936,7 +960,11 @@ export default function TypingWorkspace() {
           {config.pacerEnabled && (
             <label>
               Pacer WPM
-              <input type="number" min={20} max={220} value={config.pacerWpm} onChange={(e) => setConfig((c) => ({ ...c, pacerWpm: Number(e.target.value) }))} />
+              <input
+                type="number" min={20} max={220} value={config.pacerWpm}
+                onChange={(e) => { if (Number.isFinite(e.currentTarget.valueAsNumber)) setConfig((c) => ({ ...c, pacerWpm: e.currentTarget.valueAsNumber })); }}
+                onBlur={() => setConfig((c) => ({ ...c, pacerWpm: Math.round(boundedNumber(c.pacerWpm, DEFAULT_CONFIG.pacerWpm, 20, 220)) }))}
+              />
             </label>
           )}
         </div>
@@ -1005,7 +1033,11 @@ export default function TypingWorkspace() {
           {config.metronomeOn && (
             <label>
               BPM
-              <input type="number" min={40} max={300} value={config.metronomeBpm} onChange={(e) => setConfig((c) => ({ ...c, metronomeBpm: Number(e.target.value) }))} />
+              <input
+                type="number" min={40} max={300} value={config.metronomeBpm}
+                onChange={(e) => { if (Number.isFinite(e.currentTarget.valueAsNumber)) setConfig((c) => ({ ...c, metronomeBpm: e.currentTarget.valueAsNumber })); }}
+                onBlur={() => setConfig((c) => ({ ...c, metronomeBpm: Math.round(boundedNumber(c.metronomeBpm, DEFAULT_CONFIG.metronomeBpm, 40, 300)) }))}
+              />
             </label>
           )}
         </div>
@@ -1037,29 +1069,42 @@ export default function TypingWorkspace() {
           <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
         </div>
         <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
-        <table>
-          <thead><tr><th>Saved</th><th>Mode</th><th>WPM</th><th>Acc</th><th>Cons</th><th>Tags</th><th>Actions</th></tr></thead>
-          <tbody>
-            {visibleHistory.slice(0, 24).map((t) => (
-              <tr key={t.id}>
-                <td>{new Date(t.savedAt).toLocaleString()}</td>
-                <td>{t.mode}</td>
-                <td>{t.netWpm}</td>
-                <td>{t.accuracy}%</td>
-                <td>{t.consistency}%</td>
-                <td>{t.tags.join(', ')}</td>
-                <td>
-                  <button type="button" className="subtle" onClick={async () => {
-                    if (t.id != null) {
-                      await deleteTest(t.id);
-                      setHistory(await listTests());
-                    }
-                  }}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <PagedTable
+          columns={[
+            { key: 'saved', label: 'Saved' },
+            { key: 'mode', label: 'Mode' },
+            { key: 'wpm', label: 'WPM' },
+            { key: 'accuracy', label: 'Acc' },
+            { key: 'consistency', label: 'Cons' },
+            { key: 'tags', label: 'Tags' },
+            { key: 'actions', label: 'Actions' },
+          ]}
+          rows={visibleHistory}
+          pageSize={24}
+          caption="Saved typing tests"
+          rowKey={(test, index) => String(test.id ?? (String(test.savedAt) + '-' + index))}
+          renderCell={(test, columnKey) => {
+            if (columnKey === 'saved') return new Date(test.savedAt).toLocaleString();
+            if (columnKey === 'mode') return test.mode;
+            if (columnKey === 'wpm') return test.netWpm;
+            if (columnKey === 'accuracy') return `${test.accuracy}%`;
+            if (columnKey === 'consistency') return `${test.consistency}%`;
+            if (columnKey === 'tags') return test.tags.join(', ');
+            if (columnKey === 'actions') {
+              return (
+                <button type="button" className="subtle" onClick={async () => {
+                  if (test.id != null) {
+                    await deleteTest(test.id);
+                    setHistory(await listTests());
+                    setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
+                    setStatusText('Test deleted from local history.');
+                  }
+                }}>Delete</button>
+              );
+            }
+            return null;
+          }}
+        />
         <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
       </section>
 
@@ -1097,7 +1142,13 @@ export default function TypingWorkspace() {
             <p id="tw-clear-history-description">This removes every locally stored test from this browser. Exports are not affected.</p>
             <div className="row">
               <button autoFocus type="button" className="subtle" onClick={() => setConfirmClear(false)}>Cancel</button>
-              <button type="button" onClick={async () => { await clearAllTests(); setHistory([]); setConfirmClear(false); }}>Clear history</button>
+              <button type="button" onClick={async () => {
+                await clearAllTests();
+                setHistory([]);
+                setPersonalBest(null);
+                setConfirmClear(false);
+                setStatusText('Local test history cleared.');
+              }}>Clear history</button>
             </div>
           </div>
         </div>
@@ -1171,28 +1222,54 @@ function VirtualKeyboard({ layout, heat, errors }: { layout: ReturnType<typeof f
 function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
   if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>Finish a test to see analytics.</p>;
   return (
-    <table>
-      <thead><tr><th>Gram</th><th>Mean</th><th>Median</th><th>Count</th><th>Acc</th></tr></thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.gram}><td><code>{r.gram.replace(/\s/g, '␠')}</code></td><td>{r.meanMs}</td><td>{r.medianMs}</td><td>{r.count}</td><td>{r.accuracy}%</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <PagedTable
+      columns={[
+        { key: 'gram', label: 'Gram' },
+        { key: 'mean', label: 'Mean' },
+        { key: 'median', label: 'Median' },
+        { key: 'count', label: 'Count' },
+        { key: 'accuracy', label: 'Acc' },
+      ]}
+      rows={rows}
+      pageSize={20}
+      caption="N-gram latency analytics"
+      rowKey={(row) => row.gram}
+      renderCell={(row, columnKey) => {
+        if (columnKey === 'gram') return <code>{row.gram.replace(/\s/g, '␠')}</code>;
+        if (columnKey === 'mean') return row.meanMs;
+        if (columnKey === 'median') return row.medianMs;
+        if (columnKey === 'count') return row.count;
+        if (columnKey === 'accuracy') return `${row.accuracy}%`;
+        return null;
+      }}
+    />
   );
 }
 
 function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
   if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>No data yet.</p>;
   return (
-    <table>
-      <thead><tr><th>Key</th><th>Presses</th><th>Errors</th><th>Interval</th><th>Acc</th></tr></thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.key}><td><code>{r.key === ' ' ? '␠' : r.key}</code></td><td>{r.presses}</td><td>{r.errors}</td><td>{r.meanIntervalMs}</td><td>{r.accuracy}%</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <PagedTable
+      columns={[
+        { key: 'key', label: 'Key' },
+        { key: 'presses', label: 'Presses' },
+        { key: 'errors', label: 'Errors' },
+        { key: 'interval', label: 'Interval' },
+        { key: 'accuracy', label: 'Acc' },
+      ]}
+      rows={rows}
+      pageSize={12}
+      caption="Per-key typing analytics, weakest keys first"
+      rowKey={(row) => row.key}
+      renderCell={(row, columnKey) => {
+        if (columnKey === 'key') return <code>{row.key === ' ' ? '␠' : row.key}</code>;
+        if (columnKey === 'presses') return row.presses;
+        if (columnKey === 'errors') return row.errors;
+        if (columnKey === 'interval') return row.meanIntervalMs;
+        if (columnKey === 'accuracy') return `${row.accuracy}%`;
+        return null;
+      }}
+    />
   );
 }
 
@@ -1226,7 +1303,7 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: 
         <label htmlFor="tw-result-tag">Tags (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
-            <span key={t} className="tw-tag">{t} <button type="button" onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
+            <span key={t} className="tw-tag">{t} <button type="button" aria-label={`Remove tag ${t}`} title={`Remove tag ${t}`} onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
           ))}
           <input
             id="tw-result-tag"
@@ -1283,7 +1360,7 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
         <label htmlFor="tw-history-tag">Global tags to add (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
-            <span key={t} className="tw-tag">{t} <button type="button" onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
+            <span key={t} className="tw-tag">{t} <button type="button" aria-label={`Remove tag ${t}`} title={`Remove tag ${t}`} onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((tt) => tt !== t) }))}>×</button></span>
           ))}
           <input
             id="tw-history-tag"
@@ -1318,16 +1395,18 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
 
 function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
   const [text, setText] = useState(value);
+  const usableText = text.replace(/\t/g, '    ').trim();
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-custom-text-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
         <h3 id="tw-custom-text-title">Paste or edit custom text</h3>
-        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything is kept locally. Longer prose becomes book-length practice.</p>
+        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything stays in this browser. Longer passages can be used for extended practice.</p>
         <label htmlFor="tw-custom-text-input">Custom text</label>
         <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
+        {!usableText ? <p role="status" style={{ fontSize: '0.8rem', color: '#6b7280' }}>Enter at least one non-whitespace character.</p> : null}
         <div className="row">
           <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
-          <button type="button" onClick={() => onApply(text)}>Use this text</button>
+          <button type="button" disabled={!usableText} onClick={() => onApply(text)}>Use this text</button>
         </div>
       </div>
     </div>

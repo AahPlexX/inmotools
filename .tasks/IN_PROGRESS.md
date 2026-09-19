@@ -1,5 +1,12 @@
 # In Progress
 
+- **Typing Workstation post-integration audit hardening (TASK-020 follow-up, 2026-09-19)** — the original 38-function Typing baseline is already integrated on `main` via PR #40; this entry tracks only the later hardening delta still on `feature/typing-workstation`.
+  - Plan/ledger: `docs/superpowers/plans/2026-09-15-typing-workstation.md`; functional ledger remains **38/38 implemented**.
+  - Accepted executable revision: `468b9d5ec15bf2b595d9120b7e3820ba2f90597d`; focused run `35464187569` / job `105953299929` passed supply-chain policy, **67/67 units**, production build, and **14/14 desktop/mobile Chromium checks** in 55.5s.
+  - Hardening covered explicit Save-vs-export semantics, quote/Zen/config/storage coherence, blank custom-preference recovery, legacy-read sanitization, imported-PB refresh, paginated full history, narrow-screen modal actions, and bounded full per-key/n-gram analytics.
+  - Integration state immediately before this docs-only commit: branch 0 behind current `main` `eb70aaaaaae764ce895e462e0a5834c1c701ad32` and 17 ahead; branch-only file diff is Typing source/tests/docs only. This docs-only handoff adds one ahead commit.
+  - Next agent sequence: re-fetch `main` and the feature branch; reconcile only if `main` moved; integrate the post-integration Typing delta scope-safely; run the focused Typing workflow on the exact integrated `main` SHA; verify applicable Pages deployment; then remove this IN_PROGRESS entry and append the exact-main evidence to TASK-020/DONE. Do not reopen already-green functionality without a reproducible finding.
+
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
