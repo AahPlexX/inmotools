@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { a1FromParts, columnLetters } from './sheets-formula';
+import { safeHyperlink, toArgb } from './sheets-grid';
 import {
   SCHEMA_VERSION,
   TOOL_ID,
@@ -90,7 +91,9 @@ export function sheetToMatrix(sheet: PortableSheet): Array<Array<string | number
       matrix[row] = line;
     }
   }
-  return matrix.filter((row) => row);
+  const lastRow = matrix.reduce((max, row, index) => (row ? index : max), -1);
+  if (lastRow < 0) return [];
+  return Array.from({ length: lastRow + 1 }, (_, row) => matrix[row] ?? []);
 }
 
 export function sheetToCsv(sheet: PortableSheet): string {
@@ -161,21 +164,44 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+interface SheetJsCell {
+  v?: string | number | boolean | null;
+  w?: string;
+  f?: string;
+  z?: string;
+  l?: { Target?: string };
+}
+
 export function importXlsx(buffer: ArrayBuffer, fileName = 'Imported'): PortableWorkbook {
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellFormula: true, cellNF: true });
   const book = createWorkbook(fileName.replace(/\.[^.]+$/, '') || 'Imported');
   const sheets = workbook.SheetNames.map((name) => {
     const sheet = createSheet(name);
-    const aoa = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(workbook.Sheets[name] ?? {}, { header: 1, raw: true, defval: null });
-    aoa.forEach((row, r) => {
-      (row ?? []).forEach((value, c) => {
-        if (value === null || value === undefined || value === '') return;
-        const text = String(value);
-        sheet.cells[cellKey(r, c)] = text.startsWith('=') ? { f: text } : { v: typeof value === 'number' || typeof value === 'boolean' ? value : text };
-        sheet.columnCount = Math.max(sheet.columnCount, c + 2);
-      });
-      sheet.rowCount = Math.max(sheet.rowCount, r + 8);
-    });
+    const ws = workbook.Sheets[name] ?? {};
+    const addresses = Object.keys(ws).filter((key) => !key.startsWith('!'));
+    for (const addr of addresses) {
+      const parsed = XLSX.utils.decode_cell(addr);
+      const cell = ws[addr] as SheetJsCell | undefined;
+      if (!cell) continue;
+      const formula = cell.f ? (cell.f.startsWith('=') ? cell.f : `=${cell.f}`) : null;
+      const value = cell.v ?? null;
+      if ((value === null || value === '') && !formula) continue;
+      sheet.cells[cellKey(parsed.r, parsed.c)] = {
+        v: formula ? (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string' ? value : null) : value,
+        f: formula,
+        z: typeof cell.z === 'string' && cell.z !== 'General' ? cell.z : undefined,
+        hyperlink: safeHyperlink(cell.l?.Target) ?? undefined,
+      };
+      sheet.columnCount = Math.max(sheet.columnCount, parsed.c + 2);
+      sheet.rowCount = Math.max(sheet.rowCount, parsed.r + 8);
+    }
+    const merges = ws['!merges'] ?? [];
+    sheet.merges = merges.map((merge) => ({
+      r1: merge.s.r,
+      c1: merge.s.c,
+      r2: merge.e.r,
+      c2: merge.e.c,
+    }));
     return sheet;
   });
   book.sheets = sheets.length ? sheets : [createSheet('Sheet1')];
@@ -200,10 +226,12 @@ export async function exportXlsx(workbook: PortableWorkbook, meta: ExportMeta = 
       if (cell.z) target.numFmt = cell.z;
       if (cell.s?.bold) target.font = { ...(target.font ?? {}), bold: true };
       if (cell.s?.italic) target.font = { ...(target.font ?? {}), italic: true };
-      if (cell.s?.color) target.font = { ...(target.font ?? {}), color: { argb: cell.s.color.replace('#', '') } };
-      if (cell.s?.fill) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cell.s.fill.replace('#', '') } };
+      if (cell.s?.underline) target.font = { ...(target.font ?? {}), underline: true };
+      if (cell.s?.color) target.font = { ...(target.font ?? {}), color: { argb: toArgb(cell.s.color) } };
+      if (cell.s?.fill) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(cell.s.fill) } };
       if (cell.s?.wrap) target.alignment = { ...(target.alignment ?? {}), wrapText: true };
-      if (cell.hyperlink) target.value = { text: String(cell.v ?? cell.hyperlink), hyperlink: cell.hyperlink };
+      const href = safeHyperlink(cell.hyperlink);
+      if (href) target.value = { text: String(cell.v ?? href), hyperlink: href };
       if (cell.note) target.note = cell.note;
     }
     for (const merge of sheet.merges) {

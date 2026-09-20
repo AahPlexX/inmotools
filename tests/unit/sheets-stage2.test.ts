@@ -19,6 +19,19 @@ import {
   upsertValidation,
   validationsForCell,
 } from '../../src/tools/sheets/sheets-validation';
+import {
+  applyResizeToSelection,
+  clearRange,
+  clampSelection,
+  findReplaceInSheet,
+  moveSelection,
+  rangeToTsv,
+  safeHyperlink,
+  toArgb,
+  visibleMergePaint,
+  windowedIndices,
+} from '../../src/tools/sheets/sheets-grid';
+import { insertRows, mergeCells, resizeCol } from '../../src/tools/sheets/sheets-model';
 import { cellKey, starterWorkbook } from '../../src/tools/sheets/sheets-types';
 
 describe('tabular sheet stage 2 surfaces', () => {
@@ -158,5 +171,45 @@ describe('tabular sheet stage 2 surfaces', () => {
       dispose: () => undefined,
     }, 'D2')).toEqual({ a1: 'D2', value: 10, formula: '=B2*C2' });
     expect(a1FromParts(1, 3)).toBe('D2');
+  });
+
+  it('selects a bounded range, paints visible merges, and windows frozen rows', () => {
+    expect(clampSelection({ r1: -2, c1: 90, r2: 3, c2: -1 }, 5, 4)).toEqual({ r1: 0, c1: 3, r2: 3, c2: 0 });
+    expect(moveSelection({ r1: 0, c1: 0, r2: 0, c2: 0 }, 1, 0, 4, 4, false)).toEqual({ r1: 1, c1: 0, r2: 1, c2: 0 });
+    expect(moveSelection({ r1: 1, c1: 1, r2: 1, c2: 1 }, 1, 1, 8, 8, true)).toEqual({ r1: 1, c1: 1, r2: 2, c2: 2 });
+    expect(moveSelection({ r1: 0, c1: 0, r2: 0, c2: 0 }, -1, -1, 4, 4, false)).toEqual({ r1: 0, c1: 0, r2: 0, c2: 0 });
+    expect(visibleMergePaint([{ r1: 1, c1: 0, r2: 2, c2: 0 }], 1, 0, [1, 2], [0, 1])).toEqual({ kind: 'anchor', rowSpan: 2, colSpan: 1 });
+    expect(visibleMergePaint([{ r1: 1, c1: 0, r2: 2, c2: 0 }], 2, 0, [1, 2], [0, 1])).toEqual({ kind: 'skip' });
+    expect(windowedIndices(10, 4, 3, [5], 2)).toEqual([0, 1, 4, 6, 7]);
+  });
+
+  it('copies a range as TSV, clears the whole selection, and replaces case-insensitively', () => {
+    const book = starterWorkbook();
+    const sheet = book.sheets[0]!;
+    const tsv = rangeToTsv(book, sheet.id, { r1: 1, c1: 0, r2: 2, c2: 1 }, (cell) => String(cell?.v ?? ''));
+    expect(tsv).toBe('Paper\t4\nInk\t2');
+    const cleared = clearRange(book, sheet.id, { r1: 1, c1: 0, r2: 2, c2: 0 });
+    expect(cleared.sheets[0]?.cells[cellKey(1, 0)]).toBeUndefined();
+    expect(cleared.sheets[0]?.cells[cellKey(2, 0)]).toBeUndefined();
+    expect(cleared.sheets[0]?.cells[cellKey(1, 1)]?.v).toBe(4);
+    const replaced = findReplaceInSheet(book, sheet.id, 'paper', 'Card', true);
+    expect(replaced.hits).toBeGreaterThan(0);
+    expect(replaced.next.sheets[0]?.cells[cellKey(1, 0)]?.v).toBe('Card');
+  });
+
+  it('writes column widths, shifts hidden rows on insert, and rejects unsafe hyperlinks', () => {
+    const book = starterWorkbook();
+    const sheet = book.sheets[0]!;
+    const sized = applyResizeToSelection(book, sheet.id, { r1: 0, c1: 1, r2: 0, c2: 1 }, 'col', 140);
+    expect(sized.sheets[0]?.columnWidths['1']).toBe(140);
+    expect(resizeCol(book, sheet.id, 2, 12).sheets[0]?.columnWidths['2']).toBe(28);
+    const filtered = { ...book, sheets: book.sheets.map((item, index) => index === 0 ? { ...item, hiddenRows: [2] } : item) };
+    const shifted = insertRows(filtered, sheet.id, 1);
+    expect(shifted.sheets[0]?.hiddenRows).toEqual([3]);
+    const merged = mergeCells(book, sheet.id, { r1: 1, c1: 0, r2: 2, c2: 0 });
+    expect(merged.sheets[0]?.merges).toEqual([expect.objectContaining({ r1: 1, c1: 0, r2: 2, c2: 0 })]);
+    expect(safeHyperlink('https://example.test/sheet')).toBe('https://example.test/sheet');
+    expect(safeHyperlink('javascript:alert(1)')).toBeNull();
+    expect(toArgb('#111827')).toBe('FF111827');
   });
 });

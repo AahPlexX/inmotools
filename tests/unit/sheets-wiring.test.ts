@@ -78,16 +78,19 @@ describe('tabular sheet workstation wiring', () => {
   });
 
   it('imports CSV and XLSX and exports formula-safe CSV', () => {
-    const csvBook = importCsv('name,qty\n=CMD,2\nAda,3');
+    const csvBook = importCsv('name,qty\n=CMD,2\n\nAda,3');
     const csv = sheetToCsv(csvBook.sheets[0]!);
     expect(csv).toContain("'=CMD");
-    const aoa = [['A', 1], ['B', 2]];
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
+    expect(csv.split('\n')).toHaveLength(4);
+    const sheet = XLSX.utils.aoa_to_sheet([['A', 1, { t: 'n', f: 'A1+B1', v: 3 }], ['B', 2]]);
+    sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, 'Data');
     const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const imported = importXlsx(buffer, 'demo.xlsx');
     expect(imported.sheets[0]?.cells[cellKey(0, 0)]?.v).toBe('A');
+    expect(imported.sheets[0]?.cells[cellKey(0, 2)]?.f).toMatch(/^=A1\+B1$/);
+    expect(imported.sheets[0]?.merges).toEqual([expect.objectContaining({ r1: 0, c1: 0, r2: 1, c2: 0 })]);
   });
 
   it('builds an in-house pivot without a Pro engine', () => {

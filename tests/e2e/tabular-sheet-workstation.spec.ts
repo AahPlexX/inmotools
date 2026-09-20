@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 const ROUTE = './#/tools/tabular-sheet-workstation';
@@ -84,6 +85,34 @@ test('keeps Stage 2 chrome readable at a 320 CSS-pixel portrait viewport', async
   await expect(workspace.getByTestId('tsw-grid-scroll')).toBeVisible();
   const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflowX).toBeLessThanOrEqual(8);
+});
+
+test('selects a range, paints a merge, and writes column width', async ({ page }) => {
+  const workspace = await openWorkspace(page);
+  await gridCell(workspace, 'Paper').click();
+  await gridCell(workspace, 'Ink').click({ modifiers: ['Shift'] });
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('A2:A3');
+  await workspace.getByRole('button', { name: 'Merge' }).click();
+  await expect(workspace.locator('td[data-row="1"][data-col="0"]')).toHaveAttribute('rowspan', '2');
+  await workspace.getByRole('button', { name: 'Unmerge' }).click();
+  await expect(workspace.locator('td[data-row="1"][data-col="0"]')).not.toHaveAttribute('rowspan', '2');
+  await workspace.getByTestId('tsw-col-width').fill('140');
+  await expect(workspace.locator('td[data-row="1"][data-col="0"]')).toHaveAttribute('data-col-width', '140');
+  await gridCell(workspace, '2.5').click();
+  await workspace.getByRole('button', { name: 'Freeze' }).click();
+  await expect(workspace.locator('td[data-row="0"][data-col="0"]')).toHaveAttribute('data-frozen-row', 'true');
+});
+
+test('has no serious or critical axe violations in the local grid', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused axe pass covers the shared workspace DOM.');
+  const workspace = await openWorkspace(page);
+  await expect(workspace.getByTestId('tsw-grid-scroll')).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="tabular-sheet-workspace"]')
+    .exclude('.tsw-univer-host')
+    .analyze();
+  const blocking = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+  expect(blocking, blocking.map((item) => `${item.id}: ${item.help}`).join('\n')).toEqual([]);
 });
 
 test('mounts Univer engine-formula as the live formula SSOT', async ({ page }) => {

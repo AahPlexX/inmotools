@@ -42,13 +42,13 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 6 | Named ranges | Portable named-range table synced into snapshot | done |
 | 7 | Fill handle | Univer fill + portable relative rewrite | done |
 | 8 | Undo / redo | Univer history + portable command stack fallback | done |
-| 9 | Cut / copy / paste | Univer clipboard + portable range copy | done |
-| 10 | Find / replace | Workspace find panel (core preset has no dedicated find-replace pin) | done |
+| 9 | Cut / copy / paste | Range TSV (rows as newlines); cut/clear the whole selection | done |
+| 10 | Find / replace | Case-insensitive find; replace updates values and formulas | done |
 | 11 | Number formats | Format picker writes portable `z`; `formatDisplay` paints the grid. Hook: `data-testid=tsw-number-format`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 12 | Cell styles | Full style chrome: bold / italic / underline / color / fill / align. Hook: `data-testid=tsw-style-chrome`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
-| 13 | Merge cells | Univer merge + portable merge ranges | done |
-| 14 | Freeze panes | Univer freeze + portable freeze | done |
-| 15 | Row / col insert, delete, resize | Univer + portable structural edits | done |
+| 13 | Merge cells | Portable merges paint `colspan`/`rowspan` on the local grid. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 14 | Freeze panes | Local grid pins frozen rows/cols; portable freeze + Univer freeze. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 15 | Row / col insert, delete, resize | Structural edits shift hidden/size maps and A1 metadata. Width/height chrome writes `columnWidths`/`rowHeights`. Hooks: `data-testid=tsw-col-width`, `data-testid=tsw-row-height`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 16 | Sort | In-house range sort on portable model | done |
 | 17 | Filter | Column autofilter UI writes `hiddenRows` + `columnFilters`. Hook: `data-testid=tsw-autofilter`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 18 | Data validation | Rule editor + Enter enforcement. Hook: `data-testid=tsw-validation-editor`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
@@ -65,7 +65,7 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 29 | Comments / notes | Portable notes (no Pro thread-comment) | done |
 | 30 | IndexedDB persistence | Dexie database scoped to this tool | done |
 | 31 | LocalStorage prefs | Theme / zoom / last workbook id | done |
-| 32 | XLSX import (SheetJS CE 0.20.3) | Official CE tarball only | done |
+| 32 | XLSX import (SheetJS CE 0.20.3) | Official CE tarball; formulas, merges, and safe hyperlinks | done |
 | 33 | XLSX export (`exceljs@4.4.0`) | Browser `writeBuffer` download | done |
 | 34 | CSV export | Current sheet, formula-safe | done |
 | 35 | Export with editable tags / meta | Title, author, tags, notes on every export | done |
@@ -90,4 +90,4 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 
 ## Handoff
 
-Keep this matrix, the in-tool progress TODO, and `.tasks/IN_PROGRESS.md` in the same cycle. Move a row to `done` only with focused evidence. Newly discovered gaps stay listed here rather than disappearing.
+Resume file: `src/tools/sheets/HANDOFF.md` (tip SHA, verify commands, fixed vs deferred findings). Keep this matrix, the in-tool progress TODO, and `.tasks/IN_PROGRESS.md` in the same cycle. Move a row to `done` only with focused evidence. Newly discovered gaps stay listed here rather than disappearing.

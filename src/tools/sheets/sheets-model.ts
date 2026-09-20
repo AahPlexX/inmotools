@@ -1,4 +1,5 @@
 import { rewriteRelative } from './sheets-formula';
+import { rewriteA1ForAxis, shiftHidden, shiftIndex, shiftSizeMap } from './sheets-grid';
 import {
   cellKey,
   createSheet,
@@ -117,11 +118,55 @@ function shiftAxis(book: PortableWorkbook, sheetId: string, axis: 'row' | 'col',
     moved[cellKey(nextRow, nextCol)] = cell;
   }
   sheet.cells = moved;
-  if (axis === 'row') sheet.rowCount = Math.max(8, sheet.rowCount + delta);
-  else sheet.columnCount = Math.max(4, sheet.columnCount + delta);
+  if (axis === 'row') {
+    sheet.rowCount = Math.max(8, sheet.rowCount + delta);
+    sheet.hiddenRows = shiftHidden(sheet.hiddenRows, at, delta);
+    sheet.rowHeights = shiftSizeMap(sheet.rowHeights, at, delta);
+    const nextFreeze = shiftIndex(sheet.freezeRow, at, delta);
+    sheet.freezeRow = nextFreeze === null ? 0 : nextFreeze;
+    if (sheet.filterHeaderRow !== null) {
+      const nextHeader = shiftIndex(sheet.filterHeaderRow, at, delta);
+      sheet.filterHeaderRow = nextHeader;
+    }
+  } else {
+    sheet.columnCount = Math.max(4, sheet.columnCount + delta);
+    sheet.hiddenCols = shiftHidden(sheet.hiddenCols, at, delta);
+    sheet.columnWidths = shiftSizeMap(sheet.columnWidths, at, delta);
+    const nextFreeze = shiftIndex(sheet.freezeCol, at, delta);
+    sheet.freezeCol = nextFreeze === null ? 0 : nextFreeze;
+    if (sheet.columnFilters) {
+      const nextFilters: typeof sheet.columnFilters = {};
+      for (const [key, filter] of Object.entries(sheet.columnFilters)) {
+        const shifted = shiftIndex(Number(key), at, delta);
+        if (shifted === null) continue;
+        nextFilters[String(shifted)] = filter;
+      }
+      sheet.columnFilters = nextFilters;
+    }
+  }
   sheet.merges = sheet.merges
     .map((merge) => shiftMerge(merge, axis, at, delta))
     .filter((merge): merge is MergeRange => merge !== null);
+  next.namedRanges = next.namedRanges.flatMap((range) => {
+    if (range.sheetId !== sheetId) return [range];
+    const a1 = rewriteA1ForAxis(range.a1, axis, at, delta);
+    return a1 ? [{ ...range, a1 }] : [];
+  });
+  next.validations = next.validations.flatMap((rule) => {
+    if (rule.sheetId !== sheetId) return [rule];
+    const a1 = rewriteA1ForAxis(rule.a1, axis, at, delta);
+    return a1 ? [{ ...rule, a1 }] : [];
+  });
+  next.conditionalFormats = next.conditionalFormats.flatMap((rule) => {
+    if (rule.sheetId !== sheetId) return [rule];
+    const a1 = rewriteA1ForAxis(rule.a1, axis, at, delta);
+    return a1 ? [{ ...rule, a1 }] : [];
+  });
+  next.comments = next.comments.flatMap((comment) => {
+    if (comment.sheetId !== sheetId) return [comment];
+    const a1 = rewriteA1ForAxis(comment.a1, axis, at, delta);
+    return a1 ? [{ ...comment, a1 }] : [];
+  });
   return next;
 }
 

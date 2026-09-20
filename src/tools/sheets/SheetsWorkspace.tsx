@@ -27,8 +27,22 @@ import {
   renameSheet,
   setCell,
   sortRange,
+  unmergeCells,
   upsertNamedRange,
 } from './sheets-model';
+import {
+  applyResizeToSelection,
+  clearRange,
+  clampSelection,
+  findReplaceInSheet,
+  frozenOffset,
+  moveSelection,
+  rangeToTsv,
+  safeHyperlink,
+  selectionA1,
+  visibleMergePaint,
+  windowedIndices,
+} from './sheets-grid';
 import {
   clearWorkbooks,
   listWorkbooks,
@@ -128,12 +142,16 @@ export default function SheetsWorkspace() {
     fill: '#dcfce7',
     color: '#14532d',
   });
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [tipPos, setTipPos] = useState({ left: 12, top: 220, width: 280 });
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pointer = useRef({ x: 0, y: 0 });
+  const pointer = useRef({ x: 0, y: 0, dragging: false });
   const univerHost = useRef<UniverHost | null>(null);
   const univerNode = useRef<HTMLDivElement | null>(null);
   const chartNode = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
+  const formulaBar = useRef<HTMLDivElement | null>(null);
 
   const computed = useMemo(() => evaluateWorkbook(book), [book]);
   const sheet = computed.sheets.find((item) => item.id === (selection.sheetId || computed.activeSheetId)) ?? computed.sheets[0];
@@ -171,25 +189,21 @@ export default function SheetsWorkspace() {
 
   const visibleRows = useMemo(() => {
     if (!sheet) return [];
-    const rows: number[] = [];
-    for (let row = scroll.row; rows.length < WINDOW_ROWS && row < sheet.rowCount; row += 1) {
-      if (sheet.hiddenRows.includes(row)) continue;
-      if (filterText && row > 0) {
+    const hidden = new Set(sheet.hiddenRows);
+    const extraHidden: number[] = [];
+    if (filterText) {
+      const needle = filterText.toLocaleLowerCase();
+      for (let row = 1; row < sheet.rowCount; row += 1) {
         const hay = Array.from({ length: sheet.columnCount }, (_, col) => cellLabel(sheet.cells[`${row},${col}`])).join(' ').toLocaleLowerCase();
-        if (!hay.includes(filterText.toLocaleLowerCase())) continue;
+        if (!hay.includes(needle)) extraHidden.push(row);
       }
-      rows.push(row);
     }
-    return rows;
+    return windowedIndices(sheet.rowCount, scroll.row, WINDOW_ROWS, [...hidden, ...extraHidden], sheet.freezeRow);
   }, [sheet, scroll.row, filterText]);
 
   const visibleCols = useMemo(() => {
     if (!sheet) return [];
-    const cols: number[] = [];
-    for (let col = scroll.col; cols.length < WINDOW_COLS && col < sheet.columnCount; col += 1) {
-      if (!sheet.hiddenCols.includes(col)) cols.push(col);
-    }
-    return cols;
+    return windowedIndices(sheet.columnCount, scroll.col, WINDOW_COLS, sheet.hiddenCols, sheet.freezeCol);
   }, [sheet, scroll.col]);
 
   const aggregates = useMemo(() => {
@@ -288,7 +302,7 @@ export default function SheetsWorkspace() {
 
   const copySelection = async () => {
     if (!sheet) return;
-    const text = collectRange(computed, sheet.id, selection).map((item) => cellLabel(item.cell)).join('\t');
+    const text = rangeToTsv(computed, sheet.id, selection, cellLabel);
     if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
     setStatus('Copied the current selection locally.');
   };
@@ -313,24 +327,13 @@ export default function SheetsWorkspace() {
   };
 
   const findReplace = (doReplace: boolean) => {
-    if (!find) return;
-    let next = book;
-    let hits = 0;
-    const target = book.sheets.find((item) => item.id === sheetId);
-    if (!target) return;
-    for (const [key, cell] of Object.entries(target.cells)) {
-      const hay = `${cell.v ?? ''} ${cell.f ?? ''}`;
-      if (!hay.toLocaleLowerCase().includes(find.toLocaleLowerCase())) continue;
-      hits += 1;
-      if (doReplace && typeof cell.v === 'string') {
-        const [row, col] = key.split(',').map(Number);
-        if (row !== undefined && col !== undefined) {
-          next = setCell(next, sheetId, row, col, { v: cell.v.replaceAll(find, replace) });
-        }
-      }
-    }
-    if (doReplace) commit(next, `Replaced in ${hits} cell${hits === 1 ? '' : 's'}.`);
-    else setStatus(`Found ${hits} cell${hits === 1 ? '' : 's'}.`);
+    const result = findReplaceInSheet(book, sheetId, find, replace, doReplace);
+    if (doReplace) commit(result.next, `Replaced in ${result.hits} cell${result.hits === 1 ? '' : 's'}.`);
+    else setStatus(`Found ${result.hits} cell${result.hits === 1 ? '' : 's'}.`);
+  };
+
+  const clearActiveRange = (message: string) => {
+    commit(clearRange(book, sheetId, selection), message);
   };
 
   const persist = async () => {
@@ -411,15 +414,37 @@ export default function SheetsWorkspace() {
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLTableCellElement>, row: number, col: number) => {
-    pointer.current = { x: event.clientX, y: event.clientY };
-    setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
+    pointer.current = { x: event.clientX, y: event.clientY, dragging: !event.shiftKey };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelection((current) => {
+      if (event.shiftKey) {
+        return { ...current, sheetId, r2: row, c2: col };
+      }
+      return { sheetId, r1: row, c1: col, r2: row, c2: col };
+    });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
     const cell = sheet?.cells[`${row},${col}`];
     if (cell?.f) setFormulaTipOpen(true);
-    scheduleLongPressStub(longPress, () => openContextMenuAt(pointer.current.x, pointer.current.y));
+    scheduleLongPressStub(longPress, () => {
+      pointer.current.dragging = false;
+      openContextMenuAt(pointer.current.x, pointer.current.y);
+    });
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLTableElement>) => {
+    if (!pointer.current.dragging) return;
+    const moved = Math.hypot(event.clientX - pointer.current.x, event.clientY - pointer.current.y);
+    if (moved > 8) cancelLongPressStub(longPress);
+    const target = (event.target as HTMLElement | null)?.closest('td[data-row][data-col]');
+    if (!(target instanceof HTMLElement)) return;
+    const row = Number(target.dataset.row);
+    const col = Number(target.dataset.col);
+    if (!Number.isInteger(row) || !Number.isInteger(col)) return;
+    setSelection((current) => ({ ...current, r2: row, c2: col }));
   };
 
   const onPointerUp = () => {
+    pointer.current.dragging = false;
     cancelLongPressStub(longPress);
   };
 
@@ -427,7 +452,7 @@ export default function SheetsWorkspace() {
     setContextMenu(null);
     if (id === 'cut') {
       void copySelection();
-      commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cut the active cell.');
+      clearActiveRange('Cut the current selection.');
       return;
     }
     if (id === 'copy') {
@@ -458,7 +483,7 @@ export default function SheetsWorkspace() {
       commit(applyStyleToRange(book, sheetId, selection, { wrap: !activeCell?.s?.wrap }), 'Toggled wrap on the selection.');
       return;
     }
-    commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cleared the active cell.');
+    clearActiveRange('Cleared the current selection.');
   };
 
   useEffect(() => {
@@ -491,32 +516,60 @@ export default function SheetsWorkspace() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') void copySelection();
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
         void copySelection();
-        commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cut the active cell.');
+        clearActiveRange('Cut the current selection.');
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') void pasteSelection();
       if (event.key === 'Enter') applyFormula();
-      if (event.key === 'Delete') commit(setCell(book, sheetId, selection.r1, selection.c1, { v: null, f: null }), 'Cleared the active cell.');
-      if (event.key === 'ArrowDown') setSelection((current) => ({ ...current, r1: current.r1 + 1, r2: current.r2 + 1 }));
-      if (event.key === 'ArrowUp') setSelection((current) => ({ ...current, r1: Math.max(0, current.r1 - 1), r2: Math.max(0, current.r2 - 1) }));
-      if (event.key === 'ArrowRight') setSelection((current) => ({ ...current, c1: current.c1 + 1, c2: current.c2 + 1 }));
-      if (event.key === 'ArrowLeft') setSelection((current) => ({ ...current, c1: Math.max(0, current.c1 - 1), c2: Math.max(0, current.c2 - 1) }));
+      if (event.key === 'Delete') clearActiveRange('Cleared the current selection.');
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const dRow = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+        const dCol = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        setSelection((current) => ({
+          ...current,
+          sheetId,
+          ...moveSelection(current, dRow, dCol, sheet?.rowCount ?? 1, sheet?.columnCount ?? 1, event.shiftKey),
+        }));
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  useEffect(() => {
+    if (!sheet) return;
+    setSelection((current) => ({ ...current, ...clampSelection(current, sheet.rowCount, sheet.columnCount) }));
+  }, [sheet?.rowCount, sheet?.columnCount]);
+
+  useEffect(() => {
+    if (!formulaTipOpen) return;
+    const place = () => {
+      const rect = formulaBar.current?.getBoundingClientRect();
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+      const box = clampPopupBox(
+        { x: rect?.left ?? 12, y: (rect?.bottom ?? 220) + 8, width: 280, height: 140 },
+        viewport,
+      );
+      setTipPos({ left: box.left, top: box.top, width: box.width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [formulaTipOpen]);
+
   const summary = progressSummary();
-  const tipBox = clampPopupBox(
-    { x: 12, y: 220, width: 280, height: 140 },
-    { width: typeof window === 'undefined' ? 360 : window.innerWidth, height: typeof window === 'undefined' ? 640 : window.innerHeight },
-  );
+  const fillTarget = selection.r1 === selection.r2 && selection.c1 === selection.c2
+    ? { row: selection.r1 + 3, col: selection.c1 }
+    : { row: selection.r2, col: selection.c2 };
+  const selectedColWidth = sheet?.columnWidths[String(selection.c1)] ?? 72;
+  const selectedRowHeight = sheet?.rowHeights[String(selection.r1)] ?? 28;
 
   return (
     <div className="workspace-body tsw-root" data-theme={prefs.theme} data-testid="tabular-sheet-workspace">
       <div className="workspace-header">
         <div>
           <h2>Tabular Sheet Workstation</h2>
-          <p>Local multi-sheet workbook. Univer engine-formula is the live formula SSOT when mounted; otherwise the portable DAG evaluator.</p>
+          <p>Local multi-sheet workbook. Univer engine-formula is the live formula SSOT when mounted; otherwise the portable DAG evaluator. Drag or Shift+click to select a range.</p>
         </div>
         <p className="tsw-engine-note" role="status">{status}</p>
       </div>
@@ -532,9 +585,21 @@ export default function SheetsWorkspace() {
         <button type="button" onClick={() => commit(insertCols(book, sheetId, selection.c1), 'Inserted a column.')}>Insert column</button>
         <button type="button" onClick={() => commit(deleteCols(book, sheetId, selection.c1), 'Deleted a column.')}>Delete column</button>
         <button type="button" onClick={() => commit(mergeCells(book, sheetId, selection), 'Merged the selection.')}>Merge</button>
+        <button type="button" onClick={() => commit(unmergeCells(book, sheetId, selection), 'Unmerged the selection.')}>Unmerge</button>
         <button type="button" onClick={() => commit(freezePanes(book, sheetId, selection.r1, selection.c1), 'Froze panes at the active cell.')}>Freeze</button>
         <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'asc'), 'Sorted the selection ascending.')}>Sort A–Z</button>
-        <button type="button" onClick={() => commit(fillHandle(book, sheetId, { row: selection.r1, col: selection.c1 }, { row: selection.r2 + 3, col: selection.c1 }), 'Filled down from the active cell.')}>Fill down</button>
+        <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'desc'), 'Sorted the selection descending.')}>Sort Z–A</button>
+        <button type="button" onClick={() => commit(fillHandle(book, sheetId, { row: selection.r1, col: selection.c1 }, fillTarget), 'Filled the fill range.')}>Fill down</button>
+        <button
+          type="button"
+          data-testid="tsw-rename-sheet"
+          onClick={() => {
+            setRenamingId(sheetId);
+            setRenameDraft(sheet?.name ?? '');
+          }}
+        >
+          Rename sheet
+        </button>
         <label>
           Zoom
           <input type="number" min={50} max={200} value={prefs.zoom} onChange={(event) => setPrefs((current) => ({ ...current, zoom: Number(event.target.value) || 100 }))} />
@@ -563,9 +628,10 @@ export default function SheetsWorkspace() {
         <button type="button" onClick={() => void exportCurrent('zip')}>Export zip</button>
       </div>
 
-      <div className="tsw-formula tsw-chrome">
+      <div className="tsw-formula tsw-chrome" ref={formulaBar}>
         <label htmlFor="tsw-cell">Active</label>
         <output id="tsw-cell">{a1FromParts(selection.r1, selection.c1)}</output>
+        <output data-testid="tsw-selection" aria-label="Selected range">{selectionA1(selection)}</output>
         <label className="tsw-formula-input" htmlFor="tsw-formula">Formula bar</label>
         <input
           id="tsw-formula"
@@ -634,26 +700,64 @@ export default function SheetsWorkspace() {
           <option value="clip">Clip</option>
           <option value="overflow">Overflow</option>
         </select>
+        <label htmlFor="tsw-col-width">Column width</label>
+        <input
+          id="tsw-col-width"
+          data-testid="tsw-col-width"
+          type="number"
+          min={28}
+          max={360}
+          value={selectedColWidth}
+          onChange={(event) => commit(applyResizeToSelection(book, sheetId, selection, 'col', Number(event.target.value) || 72), 'Resized selected columns.')}
+        />
+        <label htmlFor="tsw-row-height">Row height</label>
+        <input
+          id="tsw-row-height"
+          data-testid="tsw-row-height"
+          type="number"
+          min={18}
+          max={160}
+          value={selectedRowHeight}
+          onChange={(event) => commit(applyResizeToSelection(book, sheetId, selection, 'row', Number(event.target.value) || 28), 'Resized selected rows.')}
+        />
       </div>
 
       <div className="tsw-sheet-tabs" role="tablist" aria-label="Sheets">
         {computed.sheets.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-current={item.id === sheetId}
-            onClick={() => {
-              setBook((current) => ({ ...current, activeSheetId: item.id }));
-              setSelection((current) => ({ ...current, sheetId: item.id }));
-            }}
-            onDoubleClick={() => {
-              const name = window.prompt('Sheet name', item.name);
-              if (name) commit(renameSheet(book, item.id, name), 'Renamed the sheet.');
-            }}
-          >
-            {item.name}
-          </button>
+          renamingId === item.id ? (
+            <input
+              key={item.id}
+              aria-label={`Rename ${item.name}`}
+              value={renameDraft}
+              onChange={(event) => setRenameDraft(event.target.value)}
+              onBlur={() => {
+                if (renameDraft.trim()) commit(renameSheet(book, item.id, renameDraft), 'Renamed the sheet.');
+                setRenamingId(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+                if (event.key === 'Escape') setRenamingId(null);
+              }}
+              autoFocus
+            />
+          ) : (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-current={item.id === sheetId}
+              onClick={() => {
+                setBook((current) => ({ ...current, activeSheetId: item.id }));
+                setSelection((current) => ({ ...current, sheetId: item.id }));
+              }}
+              onDoubleClick={() => {
+                setRenamingId(item.id);
+                setRenameDraft(item.name);
+              }}
+            >
+              {item.name}
+            </button>
+          )
         ))}
       </div>
 
@@ -677,13 +781,28 @@ export default function SheetsWorkspace() {
             });
           }}
         >
-          <table className="tsw-grid" style={{ zoom: `${prefs.zoom}%` }}>
+          <table
+            className="tsw-grid"
+            style={{ zoom: `${prefs.zoom}%` }}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
             <caption className="visually-hidden">Virtualized local spreadsheet grid</caption>
             <thead>
               <tr>
                 <th scope="col"> </th>
                 {visibleCols.map((col) => (
-                  <th key={col} scope="col">
+                  <th
+                    key={col}
+                    scope="col"
+                    data-frozen-col={Boolean(sheet && col < sheet.freezeCol)}
+                    style={{
+                      width: sheet?.columnWidths[String(col)],
+                      minWidth: sheet?.columnWidths[String(col)] ?? undefined,
+                      left: frozenOffset(col, sheet?.freezeCol ?? 0, 38, 72),
+                    }}
+                  >
                     <span>{a1FromParts(0, col).replace('1', '')}</span>
                     <button
                       type="button"
@@ -703,12 +822,30 @@ export default function SheetsWorkspace() {
             </thead>
             <tbody>
               {visibleRows.map((row) => (
-                <tr key={row}>
-                  <th scope="row">{row + 1}</th>
+                <tr key={row} data-frozen-row={Boolean(sheet && row < sheet.freezeRow)}>
+                  <th
+                    scope="row"
+                    data-frozen-row={Boolean(sheet && row < sheet.freezeRow)}
+                    style={{
+                      height: sheet?.rowHeights[String(row)],
+                      top: frozenOffset(row, sheet?.freezeRow ?? 0, 32, 28),
+                    }}
+                  >
+                    {row + 1}
+                  </th>
                   {visibleCols.map((col) => {
+                    const paintKind = visibleMergePaint(sheet?.merges ?? [], row, col, visibleRows, visibleCols);
+                    if (paintKind.kind === 'skip') return null;
                     const cell = sheet?.cells[`${row},${col}`];
-                    const selected = row >= selection.r1 && row <= selection.r2 && col >= selection.c1 && col <= selection.c2;
+                    const bounds = {
+                      r1: Math.min(selection.r1, selection.r2),
+                      c1: Math.min(selection.c1, selection.c2),
+                      r2: Math.max(selection.r1, selection.r2),
+                      c2: Math.max(selection.c1, selection.c2),
+                    };
+                    const selected = row >= bounds.r1 && row <= bounds.r2 && col >= bounds.c1 && col <= bounds.c2;
                     const paint = sheet ? applyConditionalFormatPaint(computed, sheet.id, row, col, cell) : null;
+                    const href = safeHyperlink(cell?.hyperlink);
                     const style = {
                       fontWeight: cell?.s?.bold ? 700 : undefined,
                       fontStyle: cell?.s?.italic ? 'italic' : undefined,
@@ -716,20 +853,31 @@ export default function SheetsWorkspace() {
                       color: paint?.color ?? cell?.s?.color,
                       background: paint?.fill ?? cell?.s?.fill,
                       textAlign: cell?.s?.align,
+                      width: sheet?.columnWidths[String(col)],
+                      height: sheet?.rowHeights[String(row)],
+                      minWidth: sheet?.columnWidths[String(col)],
+                      top: frozenOffset(row, sheet?.freezeRow ?? 0, 32, 28),
+                      left: frozenOffset(col, sheet?.freezeCol ?? 0, 38, 72),
                       ...wrapCss(cell?.s),
                       ...overflowCss(cell?.s),
                     } as const;
                     return (
                       <td
                         key={`${row},${col}`}
+                        data-row={row}
+                        data-col={col}
                         data-selected={selected}
                         data-note={Boolean(cell?.note)}
                         data-wrap={Boolean(cell?.s?.wrap)}
                         data-overflow={cell?.s?.overflow ?? 'ellipsis'}
+                        data-frozen-row={Boolean(sheet && row < sheet.freezeRow)}
+                        data-frozen-col={Boolean(sheet && col < sheet.freezeCol)}
+                        data-col-width={sheet?.columnWidths[String(col)] ?? ''}
+                        data-row-height={sheet?.rowHeights[String(row)] ?? ''}
+                        rowSpan={paintKind.kind === 'anchor' ? paintKind.rowSpan : undefined}
+                        colSpan={paintKind.kind === 'anchor' ? paintKind.colSpan : undefined}
                         style={style}
                         onPointerDown={(event) => onPointerDown(event, row, col)}
-                        onPointerUp={onPointerUp}
-                        onPointerLeave={onPointerUp}
                         onDoubleClick={() => document.getElementById('tsw-formula')?.focus()}
                         onContextMenu={(event) => {
                           suppressNativeContextMenu(event);
@@ -737,7 +885,7 @@ export default function SheetsWorkspace() {
                           openContextMenuAt(event.clientX, event.clientY);
                         }}
                       >
-                        {cell?.hyperlink ? <a href={cell.hyperlink} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : cellLabel(cell)}
+                        {href ? <a href={href} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : cellLabel(cell)}
                       </td>
                     );
                   })}
@@ -821,7 +969,7 @@ export default function SheetsWorkspace() {
           role="dialog"
           aria-label="Formula help"
           data-trigger={formulaHelp.trigger}
-          style={{ left: tipBox.left, top: tipBox.top, width: tipBox.width }}
+          style={{ left: tipPos.left, top: tipPos.top, width: tipPos.width }}
         >
           <p>{formulaHelp.summary}</p>
           {formulaHelp.refs.length ? <p>Refs: {formulaHelp.refs.join(', ')}</p> : null}
@@ -987,6 +1135,16 @@ export default function SheetsWorkspace() {
         <section className="tsw-panel">
           <h3>Feature progress</h3>
           <p>{summary.done} done · {summary.stubStage2} stub-stage2 · {summary.inProgress} in-progress. Ledger: src/tools/sheets/FEATURE_MATRIX.md</p>
+          <label htmlFor="tsw-show-progress">
+            <input
+              id="tsw-show-progress"
+              type="checkbox"
+              checked={prefs.showProgress}
+              onChange={(event) => setPrefs((current) => ({ ...current, showProgress: event.target.checked }))}
+            />
+            Show feature list
+          </label>
+          {prefs.showProgress ? (
           <ol className="tsw-progress" tabIndex={0} aria-label="Feature progress">
             {FEATURE_PROGRESS.map((row) => (
               <li key={row.id}>
@@ -995,6 +1153,7 @@ export default function SheetsWorkspace() {
               </li>
             ))}
           </ol>
+          ) : null}
         </section>
       </div>
 

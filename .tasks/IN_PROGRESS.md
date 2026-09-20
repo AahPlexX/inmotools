@@ -1,10 +1,13 @@
 # In Progress
 
-- **Tabular Sheet Workstation (TASK-022)** — Stage 2 frontend chrome on `feature/tabular-sheet-workstation`.
-  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` statuses `done` | `stub-stage2` | `in-progress` (with notes).
-  - Current milestone: Stage 2 closes features 3, 11, 12, 17, 18, 19, 24, 27 — live Univer `engine-formula` SSOT, number-format picker, full style chrome, column autofilter, validation enforcement UI, CF rule editor, context menu + long-press, wrap/overflow chrome, plus viewport/scroll and tap/focus formula help. Feature 21 reuses `chart.js@4.5.1` (OSS replacement, not a Pro cut). Feature 22 is in-house group-by (OSS replacement, not a Pro cut). Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` live engine (`contextMenu: false`). No Univer Pro, no preset-sheets-advanced, no preset-sheets-drawing, no HyperFormula.
-  - Completion: Stage 2 surfaces + focused units + build green, draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge to main. Do not touch PR #33 / transcode.
-  - Scope: `src/tools/sheets/`, catalog/loader wiring, sheets unit tests, `tests/e2e/tabular-sheet-workstation.spec.ts`. Other workstreams remain untouched.
+- **Tabular Sheet Workstation (TASK-022)** — forensic audit + local-grid fixes on `feature/tabular-sheet-workstation` (draft PR #70).
+  - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` (all 1–36 `done`). Agent resume: `src/tools/sheets/HANDOFF.md`.
+  - Parent tip before this audit: `bc406b78dc80bd958d65479096a20d3447af0139`. Current tip: update after push.
+  - Open findings: Univer host is snapshot-on-`book.id` only (deferred); Pages full-suite reds in run `35477210462` are out-of-suite (web-layout/svg axe, app stale-chunk, hardware, geo, regex Python, crystal mobile). GOVERNANCE §4 vs keep-draft: do not merge.
+  - Next step: run the four verify commands in `src/tools/sheets/HANDOFF.md`, record the pushed SHA, keep PR #70 draft.
+  - Stack unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, no HyperFormula, no auth/db.
+  - Completion: focused sheets units + build + `tabular-sheet-workstation.spec.ts` + catalog axe `-g tabular-sheet-workstation` green. Draft PR → `main` only. Do not merge. Do not touch PR #33 / transcode.
+  - Scope: `src/tools/sheets/`, catalog copy, sheets unit/e2e tests, this TASK line, `HANDOFF.md`.
 
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
