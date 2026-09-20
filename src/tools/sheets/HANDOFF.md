@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/70 — `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not open a new PR.
 
-**Tip SHA:** `c11626fa825371042011d76ad593e1e92f45de71`  
+**Tip SHA:** `f38f2bf15f8a8f7a71f9f83b535382a32442b6d9`  
 **Last focused-gate code:** `b57c65a5e479ab99314ad5e521874d531fd0677a`  
 **Stage 2 close (not current):** `bc406b78dc80bd958d65479096a20d3447af0139` — Stage 2 chrome + catalog-axe progress-list fix. TASK-022 is post-Stage-3.
 
