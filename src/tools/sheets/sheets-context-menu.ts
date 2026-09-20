@@ -18,6 +18,14 @@ export const CONTEXT_MENU_ACTIONS = [
 ] as const;
 
 export type ContextMenuActionId = (typeof CONTEXT_MENU_ACTIONS)[number]['id'];
+
+export function contextMenuPixelSize(): { width: number; height: number } {
+  const item = 44;
+  const gap = 4;
+  const pad = 8;
+  const count = CONTEXT_MENU_ACTIONS.length;
+  return { width: 228, height: count * item + Math.max(0, count - 1) * gap + pad };
+}
 export type LongPressTimer = ReturnType<typeof setTimeout> | null;
 
 export function suppressNativeContextMenu(event: { preventDefault(): void }): void {

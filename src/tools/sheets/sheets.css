@@ -104,6 +104,18 @@
   scroll-padding-left: 2.8rem;
 }
 
+.tsw-grid-wrap:focus,
+.tsw-grid-wrap:focus-visible {
+  outline: 2px solid var(--signal, #2563eb);
+  outline-offset: 2px;
+}
+
+.tsw-grid td:focus,
+.tsw-grid td:focus-visible {
+  outline: 2px solid var(--signal, #2563eb);
+  outline-offset: -2px;
+}
+
 .tsw-grid {
   border-collapse: separate;
   border-spacing: 0;

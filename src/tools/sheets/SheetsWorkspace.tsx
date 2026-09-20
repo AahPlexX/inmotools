@@ -6,6 +6,7 @@ import { PagedTable } from '../../components/PagedTable';
 import {
   CONTEXT_MENU_ACTIONS,
   cancelLongPressStub,
+  contextMenuPixelSize,
   scheduleLongPressStub,
   suppressNativeContextMenu,
   type ContextMenuActionId,
@@ -70,7 +71,15 @@ import { applyStyleToRange, overflowCss, wrapCss } from './sheets-style';
 import { applyColumnAutofilter, distinctColumnValues } from './sheets-filter';
 import { enforceValidation, listValidationForCell, removeValidation, upsertValidation } from './sheets-validation';
 import { applyConditionalFormatPaint, removeConditionalFormat, upsertConditionalFormat } from './sheets-cf';
-import { clampPopupBox, describeFormula, resolveFormulaSsot } from './sheets-chrome';
+import {
+  applyGridTypeover,
+  clampPopupBox,
+  describeFormula,
+  gridKeyIntent,
+  gridNavBlockedByTyping,
+  resolveFormulaSsot,
+  shouldDismissSheetsOverlays,
+} from './sheets-chrome';
 import {
   fillDownSelection,
   FORMULA_CATALOG,
@@ -153,7 +162,7 @@ export default function SheetsWorkspace() {
   const [overflowMode, setOverflowMode] = useState<OverflowMode>('ellipsis');
   const [filterCol, setFilterCol] = useState<number | null>(null);
   const [filterQuery, setFilterQuery] = useState('');
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
   const [formulaTipOpen, setFormulaTipOpen] = useState(false);
   const [validationStatus, setValidationStatus] = useState('');
   const [validationDraft, setValidationDraft] = useState<Omit<ValidationRule, 'id' | 'sheetId'>>({
@@ -190,6 +199,8 @@ export default function SheetsWorkspace() {
   const chartRef = useRef<Chart | null>(null);
   const formulaBar = useRef<HTMLDivElement | null>(null);
   const gridScroll = useRef<HTMLDivElement | null>(null);
+  const gridOwnsKeys = useRef(true);
+  const [gridEditing, setGridEditing] = useState(false);
 
   const computed = useMemo(() => evaluateWorkbook(book), [book]);
   const sheet = computed.sheets.find((item) => item.id === (selection.sheetId || computed.activeSheetId)) ?? computed.sheets[0];
@@ -302,8 +313,9 @@ export default function SheetsWorkspace() {
   }, [engine, book.id]);
 
   const openContextMenuAt = (x: number, y: number) => {
-    const box = clampPopupBox({ x, y, width: 228, height: 360 }, { width: window.innerWidth, height: window.innerHeight });
-    setContextMenu({ x: box.left, y: box.top });
+    const size = contextMenuPixelSize();
+    const box = clampPopupBox({ x, y, width: size.width, height: size.height }, { width: window.innerWidth, height: window.innerHeight });
+    setContextMenu({ x: box.left, y: box.top, maxHeight: box.height });
   };
 
   const applyFormula = () => {
@@ -517,6 +529,10 @@ export default function SheetsWorkspace() {
     });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
     setInsertOpen(false);
+    setGridEditing(false);
+    gridOwnsKeys.current = true;
+    gridScroll.current?.focus({ preventScroll: true });
+    event.currentTarget.focus({ preventScroll: true });
     const cell = sheet?.cells[`${row},${col}`];
     setFormulaTipOpen(Boolean(cell?.f));
     scheduleLongPressStub(longPress, () => {
@@ -598,23 +614,34 @@ export default function SheetsWorkspace() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.target instanceof HTMLElement)) return;
-      const typing = event.target.closest('input, textarea, select');
-      if (event.key === 'Escape') {
+      if (shouldDismissSheetsOverlays(event.key)) {
         setContextMenu(null);
         setSheetMenu(null);
         setFormulaTipOpen(false);
         setFilterCol(null);
         setInsertOpen(false);
+        if (gridEditing) {
+          event.preventDefault();
+          setFormula(activeCell?.f ?? displayCell(activeCell));
+          setGridEditing(false);
+          return;
+        }
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      if (gridNavBlockedByTyping(target, gridOwnsKeys.current)) return;
+      const leftoverFormula = Boolean(target?.closest('#tsw-formula')) && gridOwnsKeys.current;
+      if (leftoverFormula) {
+        event.preventDefault();
+        event.stopPropagation();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void persist();
         return;
       }
-      if (typing) return;
       if (event.key === 'F2') {
         event.preventDefault();
+        gridOwnsKeys.current = false;
         document.getElementById('tsw-formula')?.focus();
         return;
       }
@@ -648,9 +675,23 @@ export default function SheetsWorkspace() {
         clearActiveRange('Cut the current selection.');
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') void pasteSelection('all');
-      if (event.key === 'Enter') applyFormula();
-      if (event.key === 'Delete') clearActiveRange('Cleared values and formulas in the selection.');
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      const intent = gridKeyIntent(event, gridEditing);
+      if (intent === 'typeover') {
+        event.preventDefault();
+        const next = applyGridTypeover(formula, gridEditing, event.key);
+        setFormula(next.formula);
+        setGridEditing(true);
+        return;
+      }
+      if (intent === 'commit') {
+        event.preventDefault();
+        applyFormula();
+        setGridEditing(false);
+        return;
+      }
+      if (intent === 'cancel') return;
+      if (event.key === 'Delete' && !gridEditing) clearActiveRange('Cleared values and formulas in the selection.');
+      if (intent === 'move') {
         event.preventDefault();
         const dRow = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
         const dCol = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
@@ -671,8 +712,8 @@ export default function SheetsWorkspace() {
         }));
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   });
 
   useEffect(() => {
@@ -783,7 +824,10 @@ export default function SheetsWorkspace() {
           id="tsw-formula"
           value={formula}
           onChange={(event) => setFormula(event.target.value)}
-          onFocus={() => { if (formula.startsWith('=')) setFormulaTipOpen(true); }}
+          onFocus={() => {
+            gridOwnsKeys.current = false;
+            setFormulaTipOpen(true);
+          }}
           onKeyDown={(event) => { if (event.key === 'Enter') applyFormula(); }}
         />
         <button type="button" onClick={applyFormula}>Enter</button>
@@ -1034,6 +1078,8 @@ export default function SheetsWorkspace() {
           ref={gridScroll}
           className="tsw-grid-wrap"
           data-testid="tsw-grid-scroll"
+          tabIndex={0}
+          aria-label="Local spreadsheet grid"
           onScroll={(event) => {
             const node = event.currentTarget;
             setScroll({
@@ -1125,6 +1171,7 @@ export default function SheetsWorkspace() {
                     return (
                       <td
                         key={`${row},${col}`}
+                        tabIndex={-1}
                         data-row={row}
                         data-col={col}
                         data-selected={selected}
@@ -1139,14 +1186,17 @@ export default function SheetsWorkspace() {
                         colSpan={paintKind.kind === 'anchor' ? paintKind.colSpan : undefined}
                         style={style}
                         onPointerDown={(event) => onPointerDown(event, row, col)}
-                        onDoubleClick={() => document.getElementById('tsw-formula')?.focus()}
+                        onDoubleClick={() => {
+                          gridOwnsKeys.current = false;
+                          document.getElementById('tsw-formula')?.focus();
+                        }}
                         onContextMenu={(event) => {
                           suppressNativeContextMenu(event);
                           setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
                           openContextMenuAt(event.clientX, event.clientY);
                         }}
                       >
-                        {href ? <a href={href} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : cellLabel(cell)}
+                        {href ? <a href={href} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : (selected && gridEditing ? formula : cellLabel(cell))}
                       </td>
                     );
                   })}
@@ -1213,7 +1263,7 @@ export default function SheetsWorkspace() {
           data-testid="tsw-context-menu"
           role="menu"
           aria-label="Cell context menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{ left: contextMenu.x, top: contextMenu.y, maxHeight: contextMenu.maxHeight, overflow: 'auto' }}
         >
           {CONTEXT_MENU_ACTIONS.map((action) => (
             <li key={action.id} role="none">

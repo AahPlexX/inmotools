@@ -198,9 +198,61 @@ for (const viewport of CLIENT_VIEWPORTS) {
     await expect(cellAt(workspace, 1, 0)).toBeVisible();
     await gridCell(workspace, 'Paper').dispatchEvent('pointerdown', { clientX: 40, clientY: 160 });
     await page.waitForTimeout(550);
-    await expect(workspace.getByTestId('tsw-context-menu')).toBeVisible();
+    const menu = workspace.getByTestId('tsw-context-menu');
+    await expect(menu).toBeVisible();
+    const menuBox = await menu.boundingBox();
+    expect(menuBox, `${viewport.name} context menu has a box`).toBeTruthy();
+    expect(menuBox!.y, `${viewport.name} context menu top`).toBeGreaterThanOrEqual(-1);
+    expect(menuBox!.y + menuBox!.height, `${viewport.name} context menu bottom`).toBeLessThanOrEqual(viewport.height + 1);
+    expect(menuBox!.x, `${viewport.name} context menu left`).toBeGreaterThanOrEqual(-1);
+    expect(menuBox!.x + menuBox!.width, `${viewport.name} context menu right`).toBeLessThanOrEqual(viewport.width + 1);
   });
 }
+
+test('keeps the 320x740 context menu in-viewport and dismisses it after focus is blurred', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  const workspace = await openWorkspace(page);
+  await gridCell(workspace, 'Paper').click({ button: 'right' });
+  const menu = workspace.getByTestId('tsw-context-menu');
+  await expect(menu).toBeVisible();
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).toBeTruthy();
+  expect(menuBox!.y).toBeGreaterThanOrEqual(-1);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(741);
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+});
+
+test('opens formula help when the formula bar receives focus without an equals sign', async ({ page }) => {
+  const workspace = await openWorkspace(page);
+  await cellAt(workspace, 0, 0).click();
+  await expect(workspace.locator('#tsw-formula')).toHaveValue('Item');
+  await workspace.locator('#tsw-formula').focus();
+  const tip = workspace.getByTestId('tsw-formula-tooltip');
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveAttribute('data-trigger', 'focus-or-tap');
+});
+
+test('types into a clicked cell and moves the selection with ArrowUp', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const workspace = await openWorkspace(page);
+  await cellAt(workspace, 5, 0).click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('A6');
+  await page.keyboard.type('10');
+  await page.keyboard.press('Enter');
+  await expect(cellAt(workspace, 5, 0)).toHaveText('10');
+  await cellAt(workspace, 6, 0).click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('A7');
+  await page.keyboard.press('ArrowUp');
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('A6');
+  await page.keyboard.press('Enter');
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('A6');
+  await expect(cellAt(workspace, 5, 0)).toHaveText('10');
+});
 
 test('mounts Univer engine-formula as the live formula SSOT', async ({ page }) => {
   test.setTimeout(60_000);

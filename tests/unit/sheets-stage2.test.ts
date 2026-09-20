@@ -5,6 +5,7 @@ import {
   CONTEXT_MENU_OWNER,
   LONG_PRESS_MS,
   cancelLongPressStub,
+  contextMenuPixelSize,
   scheduleLongPressStub,
   suppressNativeContextMenu,
 } from '../../src/tools/sheets/sheets-context-menu';
@@ -12,7 +13,15 @@ import { applyColumnAutofilter, distinctColumnValues } from '../../src/tools/she
 import { NUMBER_FORMATS, applyNumberFormat, formatDisplay } from '../../src/tools/sheets/sheets-format';
 import { applyConditionalFormatPaint, evaluateConditionalFormat, upsertConditionalFormat } from '../../src/tools/sheets/sheets-cf';
 import { applyStyleToRange, overflowCss, wrapCss } from '../../src/tools/sheets/sheets-style';
-import { clampPopupBox, describeFormula, resolveFormulaSsot } from '../../src/tools/sheets/sheets-chrome';
+import {
+  applyGridTypeover,
+  clampPopupBox,
+  describeFormula,
+  gridKeyIntent,
+  gridNavBlockedByTyping,
+  resolveFormulaSsot,
+  shouldDismissSheetsOverlays,
+} from '../../src/tools/sheets/sheets-chrome';
 import { PORTABLE_FORMULA_SSOT, UNIVER_FORMULA_SSOT, readUniverCalculated } from '../../src/tools/sheets/sheets-univer';
 import {
   enforceValidation,
@@ -156,6 +165,40 @@ describe('tabular sheet stage 2 surfaces', () => {
     expect(box.top + box.height).toBeLessThanOrEqual(640);
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.top).toBeGreaterThanOrEqual(0);
+  });
+
+  it('flips or clamps a 13-item context menu into a 320x740 portrait viewport', () => {
+    const size = contextMenuPixelSize();
+    expect(size.height).toBeGreaterThan(740 * 0.7);
+    const box = clampPopupBox({ x: 24, y: 372, width: size.width, height: size.height }, { width: 320, height: 740 });
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.left + box.width).toBeLessThanOrEqual(320);
+    expect(box.top + box.height).toBeLessThanOrEqual(740);
+    expect(box.height).toBeLessThanOrEqual(740 - 16);
+  });
+
+  it('starts type-over into the selected-cell formula buffer and commits or cancels', () => {
+    const first = applyGridTypeover('Item', false, '1');
+    expect(first).toEqual({ formula: '1', editing: true });
+    const next = applyGridTypeover(first.formula, first.editing, '0');
+    expect(next).toEqual({ formula: '10', editing: true });
+    expect(applyGridTypeover('10', true, 'Backspace')).toEqual({ formula: '1', editing: true });
+    expect(gridKeyIntent({ key: 'Enter' }, true)).toBe('commit');
+    expect(gridKeyIntent({ key: 'Escape' }, true)).toBe('cancel');
+    expect(gridKeyIntent({ key: 'ArrowUp' }, false)).toBe('move');
+    expect(gridKeyIntent({ key: 'ArrowUp' }, true)).toBe('ignore');
+    expect(gridKeyIntent({ key: '1' }, false)).toBe('typeover');
+    expect(shouldDismissSheetsOverlays('Escape')).toBe(true);
+    expect(shouldDismissSheetsOverlays('Enter')).toBe(false);
+  });
+
+  it('does not let leftover formula-bar focus swallow grid keys after a cell click', () => {
+    expect(gridNavBlockedByTyping({ id: 'tsw-formula', tagName: 'INPUT' }, true)).toBe(false);
+    expect(gridNavBlockedByTyping({ id: 'tsw-formula', tagName: 'INPUT' }, false)).toBe(true);
+    expect(gridNavBlockedByTyping({ id: 'tsw-find', tagName: 'INPUT' }, true)).toBe(true);
+    expect(gridNavBlockedByTyping({ tagName: 'TD' }, true)).toBe(false);
+    expect(gridNavBlockedByTyping(null, true)).toBe(false);
   });
 
   it('treats live Univer engine-formula as SSOT only when the host is mounted', () => {
