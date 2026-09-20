@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools. Do not open a second PR.
 
-**Tip SHA:** `97af34501133cc4df29867c08898ad563841c4b5`  
+**Tip SHA:** `f4b0bc3673bf79d777a21006f0699c8a4d134d16`  
 **Last focused-gate code:** `c4f55d32159e4ba751ece9f940ac90fb2560ebe7`  
 **Workstream:** **PRODUCT CUT APPROVED** — CoS P1–P16 only. P16 proof is a device-agnostic portrait+landscape CSS-width matrix. Not an XLOOKUP-only cut. Do not invent extra product scope.
 
