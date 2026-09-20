@@ -78,15 +78,15 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 - Features 3, 11, 12, 17, 18, 19, 24, 27 move from `stub-stage2` to `done` only with focused evidence.
 - Viewport / scroll chrome stays device-agnostic across `CLIENT_VIEWPORTS` (portrait + landscape CSS widths). Formula help is tap/focus, never hover-only (`data-testid=tsw-formula-tooltip`). iPhone 13 / `mobile-chromium` is not the sole P16 gate.
 - `pnpm test:unit` and `pnpm build` pass. Playwright hooks live in `tests/e2e/tabular-sheet-workstation.spec.ts`.
-- Draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not touch PR #33 / transcode.
+- Historical Stage 2 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: draft PR #71 on `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch PR #33 / transcode.
 
 ## Stage 1 done-when
 
-- Branch `feature/tabular-sheet-workstation` has unique commits (not identical to `origin/main`).
+- Historical Stage 1 branch `feature/tabular-sheet-workstation` (closed history) had unique commits versus `origin/main`.
 - Catalog entry + lazy workspace + multi-sheet grid + formulas + persist + working import/export path.
 - `pnpm test:unit` and `pnpm build` pass, with focused formula/persist units.
-- Draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not touch PR #33 / transcode.
-- Stop commits after the draft PR is current with this ledger.
+- Historical Stage 1 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: draft PR #71 on `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch PR #33 / transcode.
+- Stop commits after draft PR #71 is current with this ledger.
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
