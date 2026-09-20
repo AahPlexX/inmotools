@@ -1,10 +1,10 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools.
+Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools.
 
-**Tip SHA:** `86d21720067689d21031bc451694df83c5b084e5`  
-**Last focused-gate code:** pending this push.  
+**Tip SHA:** `c455bd4b4dfc9874fe7e38a8ada854b54b1b30ca`  
+**Last focused-gate code:** `c455bd4b4dfc9874fe7e38a8ada854b54b1b30ca`  
 **Workstream:** Excel / Sheets parity slice (G1–G17) plus device-agnostic mobile widths.
 
 ## What works
