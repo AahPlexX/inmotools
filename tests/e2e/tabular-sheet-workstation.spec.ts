@@ -134,12 +134,16 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
   await workspace.getByRole('button', { name: 'Close formula help' }).click();
 
-  await cellAt(workspace, 3, 1).click({ force: true });
+  await workspace.getByTestId('tsw-goto-a1').fill('B4');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('B4');
   await workspace.getByTestId('tsw-autosum').click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(B2:B3)');
 
   await workspace.getByRole('button', { name: 'Save validation' }).click();
-  await cellAt(workspace, 1, 1).click({ force: true });
+  await workspace.getByTestId('tsw-goto-a1').fill('B2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('B2');
   await expect(workspace.getByTestId('tsw-list-picker')).toBeVisible();
   await workspace.getByTestId('tsw-list-picker').selectOption('6');
   await expect(workspace.locator('#tsw-formula')).toHaveValue('6');

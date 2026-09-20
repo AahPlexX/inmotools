@@ -391,6 +391,7 @@ export default function SheetsWorkspace() {
     }
     commit(setCell(book, sheetId, placed.row, placed.col, { f: placed.formula, v: null }), `Wrote ${placed.formula}.`);
     setSelection((current) => ({ ...current, r1: placed.row, c1: placed.col, r2: placed.row, c2: placed.col }));
+    revealCell(placed.row, placed.col);
     setFormula(placed.formula);
   };
 
