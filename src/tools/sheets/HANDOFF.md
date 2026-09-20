@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools. Do not open a second PR.
 
-**Tip SHA:** pending-docs  
+**Tip SHA:** 0ea2c943e5c4b463f5daea78229e48370ce4fc2d  
 **Last focused-gate code:** `65e8029f8c1b6f7c837d4d3387aadcc2fdb4ee8f`  
 **Workstream:** CoS-locked Excel / Sheets first parity slice **P1–P16** (not an XLOOKUP-only cut). FEATURE_MATRIX 1–36 stay `done`. Protect sheet is optional extra PX, not P15/P16.
 
