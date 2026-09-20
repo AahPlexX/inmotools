@@ -35,6 +35,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
   'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
+  'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

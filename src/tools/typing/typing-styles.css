@@ -394,7 +394,7 @@
   border: 1px solid #b6bfce; border-radius: 8px; font-size: 0.9rem; margin-bottom: 0.3rem;
 }
 .tw-modal textarea { min-height: 80px; }
-.tw-modal .row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+.tw-modal .row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 .tw-modal .row button { padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid #1f2a44; background: #1f2a44; color: white; font-weight: 600; }
 .tw-modal .row button.subtle { background: white; color: #1f2a44; }
 
