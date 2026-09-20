@@ -3,7 +3,7 @@
 - **Tabular Sheet Workstation (TASK-022)** — post-Stage-3 on `feature/tabular-sheet-workstation` (draft PR #70 only; do not merge; do not open a new PR).
   - Stage 2 is closed. Tip `bc406b78dc80bd958d65479096a20d3447af0139` already shipped Stage 2 chrome plus the catalog-axe `scrollable-region-focusable` fix. That is not the current milestone.
   - Current milestone: post-Stage-3 forensic audit + local-grid fix follow-through. Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done`).
-  - Tip SHA: `09fd0fc5c20da4e7f8640ff94b2b1706cd8932ca` (update this line in the same cycle as any later push). Last focused-gate code: `b57c65a5e479ab99314ad5e521874d531fd0677a`.
+  - Tip SHA: `c11626fa825371042011d76ad593e1e92f45de71` (update this line in the same cycle as any later push). Last focused-gate code: `b57c65a5e479ab99314ad5e521874d531fd0677a`.
   - Sheets gates: green — focused units 27/27; `pnpm build` pass; `tests/e2e/tabular-sheet-workstation.spec.ts` 13 passed / 1 skipped (mobile axe by design); catalog axe `-g tabular-sheet-workstation` 2/2.
   - Pages full-suite: red, out-of-suite. Validate run `35477210462` failed web-layout-studio axe, svg-sprite-compiler axe, stale lazy-chunk recovery, Hardware Packet Inspector, GeoJSON Simplifier, regex-matrix Python re, crystal mobile symmetry-break. No sheets-spec failure. Do not chase unless a sheets change causes them.
   - Audit+fix: landed on this branch (range select, merge/freeze/resize paint, range TSV, case-insensitive replace, safe links, SheetJS formulas/merges, exceljs ARGB, CSV blank rows). Still deferred: Univer remounts only on `book.id`; GOVERNANCE §4 vs keep-draft (do not merge); lockfile may list `@univerjs-pro/*` transitively.
