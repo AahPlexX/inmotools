@@ -189,6 +189,7 @@ export default function SheetsWorkspace() {
   const chartNode = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
   const formulaBar = useRef<HTMLDivElement | null>(null);
+  const gridScroll = useRef<HTMLDivElement | null>(null);
 
   const computed = useMemo(() => evaluateWorkbook(book), [book]);
   const sheet = computed.sheets.find((item) => item.id === (selection.sheetId || computed.activeSheetId)) ?? computed.sheets[0];
@@ -371,6 +372,17 @@ export default function SheetsWorkspace() {
     commit(clearRangeMode(book, sheetId, selection, mode), message);
   };
 
+  const revealCell = (row: number, col: number) => {
+    const node = gridScroll.current;
+    const left = Math.max(0, col * 72 - 48);
+    const top = Math.max(0, row * 28 - 40);
+    node?.scrollTo({ left, top });
+    setScroll({
+      row: Math.max(0, Math.floor(top / 28)),
+      col: Math.max(0, Math.floor(left / 72)),
+    });
+  };
+
   const applyAutoSum = () => {
     const placed = autoSumPlacement(computed, sheetId, selection);
     if (!placed) {
@@ -391,6 +403,7 @@ export default function SheetsWorkspace() {
         return;
       }
       setSelection((current) => ({ ...current, r1: first.row, c1: first.col, r2: first.row, c2: first.col }));
+      revealCell(first.row, first.col);
       setStatus(`Go to special: ${hits.length} ${kind}.`);
       return;
     }
@@ -400,6 +413,7 @@ export default function SheetsWorkspace() {
       return;
     }
     setSelection((current) => ({ ...current, r1: cell.row, c1: cell.col, r2: cell.row, c2: cell.col }));
+    revealCell(cell.row, cell.col);
     setStatus(`Moved to ${gotoA1.toUpperCase()}.`);
   };
 
@@ -646,6 +660,7 @@ export default function SheetsWorkspace() {
               ? { ...current, sheetId, r2: edge.row, c2: edge.col }
               : { sheetId, r1: edge.row, c1: edge.col, r2: edge.row, c2: edge.col }
           ));
+          revealCell(edge.row, edge.col);
           return;
         }
         setSelection((current) => ({
@@ -1015,6 +1030,7 @@ export default function SheetsWorkspace() {
         />
       ) : (
         <div
+          ref={gridScroll}
           className="tsw-grid-wrap"
           data-testid="tsw-grid-scroll"
           onScroll={(event) => {

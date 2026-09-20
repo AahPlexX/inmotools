@@ -138,15 +138,15 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   await workspace.getByTestId('tsw-autosum').click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(B2:B3)');
 
-  await workspace.getByTestId('tsw-goto-a1').fill('D2');
-  await workspace.getByTestId('tsw-goto-apply').click();
-  await expect(workspace.getByTestId('tsw-selection')).toHaveText('D2');
-
   await workspace.getByRole('button', { name: 'Save validation' }).click();
-  await gridCell(workspace, '4').click();
+  await cellAt(workspace, 1, 1).click({ force: true });
   await expect(workspace.getByTestId('tsw-list-picker')).toBeVisible();
   await workspace.getByTestId('tsw-list-picker').selectOption('6');
   await expect(workspace.locator('#tsw-formula')).toHaveValue('6');
+
+  await workspace.getByTestId('tsw-goto-a1').fill('D2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('D2');
 
   await expect(workspace.getByTestId('tsw-named-ranges')).toContainText('TaxRate');
   await expect(workspace.getByTestId('tsw-chart-kind')).toHaveValue('column');

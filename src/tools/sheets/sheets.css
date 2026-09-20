@@ -100,6 +100,8 @@
   border-radius: var(--radius-sm);
   max-height: clamp(18rem, 58vh, 44rem);
   touch-action: manipulation;
+  scroll-padding-top: 2.5rem;
+  scroll-padding-left: 2.8rem;
 }
 
 .tsw-grid {
@@ -120,6 +122,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   height: 2rem;
+  scroll-margin-top: 2.5rem;
+  scroll-margin-left: 2.8rem;
 }
 
 .tsw-grid th {
