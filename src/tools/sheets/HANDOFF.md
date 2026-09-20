@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/70 (`feature/tabular-sheet-workstation` → `main` only). Do not merge. Do not open a new PR.
 
-**Tip SHA:** `b57c65a5e479ab99314ad5e521874d531fd0677a`
+**Tip SHA:** use `git rev-parse HEAD` on `feature/tabular-sheet-workstation`. Last verified code: `b57c65a5e479ab99314ad5e521874d531fd0677a`.
 
 ## What works
 
