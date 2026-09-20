@@ -92,7 +92,7 @@ test('selects a range, paints a merge, and writes column width', async ({ page }
   await gridCell(workspace, 'Paper').click();
   await gridCell(workspace, 'Ink').click({ modifiers: ['Shift'] });
   await expect(workspace.getByTestId('tsw-selection')).toHaveText('A2:A3');
-  await workspace.getByRole('button', { name: 'Merge' }).click();
+  await workspace.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(workspace.locator('td[data-row="1"][data-col="0"]')).toHaveAttribute('rowspan', '2');
   await workspace.getByRole('button', { name: 'Unmerge' }).click();
   await expect(workspace.locator('td[data-row="1"][data-col="0"]')).not.toHaveAttribute('rowspan', '2');

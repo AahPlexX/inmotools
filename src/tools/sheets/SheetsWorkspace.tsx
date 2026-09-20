@@ -415,7 +415,13 @@ export default function SheetsWorkspace() {
 
   const onPointerDown = (event: ReactPointerEvent<HTMLTableCellElement>, row: number, col: number) => {
     pointer.current = { x: event.clientX, y: event.clientY, dragging: !event.shiftKey };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (typeof event.pointerId === 'number') {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* Synthetic Playwright pointerdown has no capturing pointer. */
+      }
+    }
     setSelection((current) => {
       if (event.shiftKey) {
         return { ...current, sheetId, r2: row, c2: col };
