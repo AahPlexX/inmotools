@@ -3,8 +3,8 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools. Do not open a second PR.
 
-**Tip SHA:** `f4b0bc3673bf79d777a21006f0699c8a4d134d16`  
-**Last focused-gate code:** `c4f55d32159e4ba751ece9f940ac90fb2560ebe7`  
+**Tip SHA:** `3e87e0a2f0ead527625925f4f0d7b83260e4a4ad`  
+**Last focused-gate code:** `3e87e0a2f0ead527625925f4f0d7b83260e4a4ad`  
 **Workstream:** **PRODUCT CUT APPROVED** — CoS P1–P16 only. P16 proof is a device-agnostic portrait+landscape CSS-width matrix. Not an XLOOKUP-only cut. Do not invent extra product scope.
 
 ## What works
@@ -25,13 +25,13 @@ Each case checks: parity chrome visible, no horizontal page overflow (>8px fails
 ## Sheets gates (green at last focused-gate code)
 
 ```bash
-# focused units 39/39; pnpm build pass
-# desktop-chromium 21 passed
+# focused units 42/42; pnpm build pass
+# desktop-chromium 24 passed
 # P16 matrix 12/12 (6 portrait + 6 landscape)
-# mobile-chromium 8 passed / 13 skipped (matrix skipped — iPhone 13 is not the P16 gate)
+# mobile-chromium 11 passed / 13 skipped (matrix skipped — iPhone 13 is not the P16 gate)
 ```
 
-Counts recorded at `c4f55d32159e4ba751ece9f940ac90fb2560ebe7`. Verify commands:
+Counts recorded at `3e87e0a2f0ead527625925f4f0d7b83260e4a4ad`. Verify commands:
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts
