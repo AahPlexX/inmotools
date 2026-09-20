@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools.
 
-**Tip SHA:** *(set on the next push of this branch)*  
+**Tip SHA:** `8872c6a2b4cb988c39bbf1c7666302e45687043f`  
 **Workstream:** Excel / Sheets parity slice (G1–G17) plus device-agnostic mobile widths.
 
 ## What works
