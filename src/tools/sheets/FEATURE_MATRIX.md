@@ -76,7 +76,7 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 ## Stage 2 done-when
 
 - Features 3, 11, 12, 17, 18, 19, 24, 27 move from `stub-stage2` to `done` only with focused evidence.
-- Viewport / scroll chrome stays device-agnostic; formula help is tap/focus, never hover-only (`data-testid=tsw-formula-tooltip`).
+- Viewport / scroll chrome stays device-agnostic across `CLIENT_VIEWPORTS` (portrait + landscape CSS widths). Formula help is tap/focus, never hover-only (`data-testid=tsw-formula-tooltip`). iPhone 13 / `mobile-chromium` is not the sole P16 gate.
 - `pnpm test:unit` and `pnpm build` pass. Playwright hooks live in `tests/e2e/tabular-sheet-workstation.spec.ts`.
 - Draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not touch PR #33 / transcode.
 
@@ -113,7 +113,18 @@ Status values: `done` | `in-progress` | `excluded`.
 | P13 | Charts column + line + pie | Chart.js only; `column` maps to `bar`. Hook: `tsw-chart-kind` | done |
 | P14 | Print CSS / print view | `@media print` plus `data-print-view` chrome hide. Hook: `tsw-print` | done |
 | P15 | Keyboard + fill | F2 edits the formula bar; Ctrl/Cmd+Arrow jumps to the data edge; Ctrl/Cmd+; inserts the local date; Ctrl/Cmd+D and Fill down (`data-testid=tsw-fill-down`) run `fillDownSelection`. Protect sheet is not this row. | done |
-| P16 | Client harden | No hover-only actions. Long-press + click menus. Formula help is tap/focus only. Anti-slop catalog/sheets copy only. Device-agnostic CSS + Playwright loop at 320/360/390/412/430 portrait and 740×360 landscape. Not an iPhone-13-only proof. | done |
+| P16 | Client harden | No hover-only actions. Long-press + click menus. Formula help is tap/focus only. Anti-slop catalog/sheets copy only. **Proof is device-agnostic:** `CLIENT_VIEWPORTS` pairs narrow-phone, mid-phone, wide-phone, and tablet CSS widths in **portrait and landscape**. Playwright sets those sizes on `desktop-chromium`. `devices['iPhone 13']` / `mobile-chromium` is **not** accepted as the sole mobile gate. Constant: `P16_PROOF_NOT_ACCEPTED`. | done |
+
+### P16 proof rule (PR review must enforce)
+
+Acceptance for #16 and any responsive parity UI is the CSS-width matrix in `CLIENT_VIEWPORTS`, both orientations, not a single Playwright device project.
+
+| Orientation | CSS viewports (width×height) |
+| --- | --- |
+| Portrait | 320×740, 360×800, 390×844, 412×915, 430×932, 768×1024 |
+| Landscape | 740×320, 800×360, 844×390, 915×412, 932×430, 1024×768 |
+
+Not accepted as the only proof: iPhone 13, `mobile-chromium`, or any one hardcoded device name. Evidence: `tests/unit/sheets-parity.test.ts` (matrix lock) and `tests/e2e/tabular-sheet-workstation.spec.ts` (`keeps parity chrome readable at *`, skipped on `mobile-chromium` by design).
 
 ### Not in the approved cut (do not expand)
 

@@ -3,9 +3,9 @@
 - **Tabular Sheet Workstation (TASK-022)** — PRODUCT CUT APPROVED. Sole writer on `feature/tabular-sheet-parity` P1–P16 (draft PR only; do not merge; do not open a second PR; do not invent extra product scope). Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. Approved milestone is CoS P1–P16 only. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus approved P1–P16). Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, FILTER/SORT/UNIQUE formulas.
-  - Tip SHA: 3aabf3260619eafff6dceb9b413731f5be066877 (update this line in the same cycle as any later push). Last focused-gate code: `65e8029f8c1b6f7c837d4d3387aadcc2fdb4ee8f`.
-  - Sheets gates at that SHA: focused units 39/39; `pnpm build` pass; sheets e2e 15 passed on desktop-chromium (viewport matrix 320/360/390/412/430 + 740×360); mobile-chromium 8 passed / 7 skipped by design (generic width loop is desktop-chromium); catalog axe `-g tabular-sheet-workstation` 2/2.
-  - Client constraint: mobile proof is a CSS-width matrix (320/360/390/412/430 portrait + 740×360 landscape), not an iPhone 13-only profile. Long-press + click menus; formula help tap/focus only; no hover-only actions; anti-slop catalog/sheets copy only.
+  - Tip SHA: pending-docs (update this line in the same cycle as any later push). Last focused-gate code: pending-docs.
+  - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
+  - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
   - Stack pins unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, HyperFormula, AI, or auth/db.
   - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
 

@@ -6,6 +6,7 @@ import { applyNumberFormat, formatDisplay } from '../../src/tools/sheets/sheets-
 import { evaluateFormula } from '../../src/tools/sheets/sheets-formula';
 import {
   CLIENT_VIEWPORTS,
+  P16_PROOF_NOT_ACCEPTED,
   FORMULA_CATALOG,
   LOCKED_INSERT_FUNCTIONS,
   autoSumPlacement,
@@ -195,15 +196,25 @@ describe('tabular sheet parity slice', () => {
     expect(sheetIsLocked(book.sheets[0], [sheetId])).toBe(false);
   });
 
-  it('keeps the device-agnostic viewport matrix and paste-special menu actions', () => {
-    expect(CLIENT_VIEWPORTS.map((item) => `${item.width}x${item.height}`)).toEqual([
-      '320x740',
-      '360x800',
-      '390x844',
-      '412x915',
-      '430x932',
-      '740x360',
+  it('keeps a device-agnostic portrait+landscape viewport matrix, not an iPhone 13-only proof', () => {
+    expect(CLIENT_VIEWPORTS.map((item) => `${item.width}x${item.height}:${item.orientation}`)).toEqual([
+      '320x740:portrait',
+      '360x800:portrait',
+      '390x844:portrait',
+      '412x915:portrait',
+      '430x932:portrait',
+      '768x1024:portrait',
+      '740x320:landscape',
+      '800x360:landscape',
+      '844x390:landscape',
+      '915x412:landscape',
+      '932x430:landscape',
+      '1024x768:landscape',
     ]);
+    expect(CLIENT_VIEWPORTS.filter((item) => item.orientation === 'portrait').length).toBeGreaterThanOrEqual(4);
+    expect(CLIENT_VIEWPORTS.filter((item) => item.orientation === 'landscape').length).toBeGreaterThanOrEqual(4);
+    expect(CLIENT_VIEWPORTS.map((item) => item.name).join(' ')).not.toMatch(/iphone/i);
+    expect(P16_PROOF_NOT_ACCEPTED).toEqual(['iPhone 13', 'mobile-chromium']);
     expect(CONTEXT_MENU_ACTIONS.map((item) => item.id)).toEqual(expect.arrayContaining([
       'paste-values',
       'paste-formats',

@@ -488,11 +488,19 @@ export function sheetIsLocked(sheet: PortableSheet | undefined, unlockedIds: Ite
   return !new Set(unlockedIds).has(sheet.id);
 }
 
+export const P16_PROOF_NOT_ACCEPTED = ['iPhone 13', 'mobile-chromium'] as const;
+
 export const CLIENT_VIEWPORTS = [
-  { name: '320-portrait', width: 320, height: 740 },
-  { name: '360-portrait', width: 360, height: 800 },
-  { name: '390-portrait', width: 390, height: 844 },
-  { name: '412-portrait', width: 412, height: 915 },
-  { name: '430-portrait', width: 430, height: 932 },
-  { name: '740x360-landscape', width: 740, height: 360 },
+  { name: '320-portrait', width: 320, height: 740, orientation: 'portrait' },
+  { name: '360-portrait', width: 360, height: 800, orientation: 'portrait' },
+  { name: '390-portrait', width: 390, height: 844, orientation: 'portrait' },
+  { name: '412-portrait', width: 412, height: 915, orientation: 'portrait' },
+  { name: '430-portrait', width: 430, height: 932, orientation: 'portrait' },
+  { name: '768-portrait', width: 768, height: 1024, orientation: 'portrait' },
+  { name: '740-landscape', width: 740, height: 320, orientation: 'landscape' },
+  { name: '800-landscape', width: 800, height: 360, orientation: 'landscape' },
+  { name: '844-landscape', width: 844, height: 390, orientation: 'landscape' },
+  { name: '915-landscape', width: 915, height: 412, orientation: 'landscape' },
+  { name: '932-landscape', width: 932, height: 430, orientation: 'landscape' },
+  { name: '1024-landscape', width: 1024, height: 768, orientation: 'landscape' },
 ] as const;

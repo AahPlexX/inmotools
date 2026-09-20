@@ -177,7 +177,10 @@ test('opens paste-special and clear-all from the click and long-press menu', asy
 
 for (const viewport of CLIENT_VIEWPORTS) {
   test(`keeps parity chrome readable at ${viewport.name}`, async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop-chromium', 'Viewport matrix is CSS-width proof, not a single phone profile.');
+    test.skip(
+      testInfo.project.name !== 'desktop-chromium',
+      'P16 proof is a CSS-width portrait+landscape matrix on desktop-chromium. iPhone 13 / mobile-chromium is not accepted as the sole mobile gate.',
+    );
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const workspace = await openWorkspace(page);
     await expect(workspace.getByTestId('tsw-parity-chrome')).toBeVisible();
@@ -185,10 +188,14 @@ for (const viewport of CLIENT_VIEWPORTS) {
     await expect(workspace.getByTestId('tsw-insert-function')).toBeVisible();
     await expect(workspace.getByTestId('tsw-grid-scroll')).toBeVisible();
     const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflowX, `${viewport.name} horizontal overflow`).toBeLessThanOrEqual(8);
+    expect(overflowX, `${viewport.name} ${viewport.orientation} horizontal overflow`).toBeLessThanOrEqual(8);
     await workspace.getByTestId('tsw-formula-help').click();
-    await expect(workspace.getByTestId('tsw-formula-tooltip')).toHaveAttribute('data-trigger', 'focus-or-tap');
+    const tip = workspace.getByTestId('tsw-formula-tooltip');
+    await expect(tip).toHaveAttribute('data-trigger', 'focus-or-tap');
+    await expect(tip).not.toHaveAttribute('data-trigger', 'hover');
     await workspace.getByRole('button', { name: 'Close formula help' }).click();
+    await expect(tip).toHaveCount(0);
+    await expect(cellAt(workspace, 1, 0)).toBeVisible();
     await gridCell(workspace, 'Paper').dispatchEvent('pointerdown', { clientX: 40, clientY: 160 });
     await page.waitForTimeout(550);
     await expect(workspace.getByTestId('tsw-context-menu')).toBeVisible();
