@@ -129,7 +129,8 @@ describe('tabular sheet stage 2 surfaces', () => {
   it('opens the reserved long-press hook into a real context-menu action list', () => {
     expect(CONTEXT_MENU_OWNER).toBe('frontend-stage-2');
     expect(CONTEXT_MENU_ACTIONS.map((item) => item.id)).toEqual([
-      'cut', 'copy', 'paste', 'insert-row', 'insert-col', 'delete-row', 'delete-col', 'wrap', 'clear',
+      'cut', 'copy', 'paste', 'paste-values', 'paste-formats', 'paste-transpose',
+      'insert-row', 'insert-col', 'delete-row', 'delete-col', 'wrap', 'clear', 'clear-all',
     ]);
     const event = { prevented: false, preventDefault() { this.prevented = true; } };
     suppressNativeContextMenu(event);

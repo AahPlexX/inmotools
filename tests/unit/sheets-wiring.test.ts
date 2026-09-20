@@ -20,6 +20,10 @@ describe('tabular sheet workstation wiring', () => {
     expect(tool?.privacy).toMatch(/IndexedDB|browser/i);
     expect(tool?.accepts).toMatch(/XLSX/i);
     expect(tool?.outputs).toMatch(/CSV/i);
+    const catalogCopy = `${tool?.summary} ${tool?.hint} ${tool?.steps.join(' ')}`;
+    expect(catalogCopy).not.toMatch(/seamless|robust|empower|unlock|delve/i);
+    expect(read('src/tools/sheets/sheets.css')).toMatch(/@media print/);
+    expect(read('src/tools/sheets/SheetsWorkspace.tsx')).toContain('tsw-parity-chrome');
     expect(read('src/tools/workspaces.tsx')).toContain(`'${SLUG}': () => import('./sheets/SheetsWorkspace')`);
   });
 

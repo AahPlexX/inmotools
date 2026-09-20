@@ -3,7 +3,7 @@ import { displayCell } from './sheets-formula';
 import { collectRange } from './sheets-model';
 import type { MergeRange, PortableWorkbook } from './sheets-types';
 
-export type ChartKind = 'bar' | 'line' | 'pie';
+export type ChartKind = 'bar' | 'column' | 'line' | 'pie';
 
 export function chartConfigFromSelection(
   book: PortableWorkbook,
@@ -25,8 +25,9 @@ export function chartConfigFromSelection(
     if (offset === 1 && typeof item.cell?.v === 'number') values.push(item.cell.v);
   }
   const palette = ['#205bd6', '#087a55', '#9b5d00', '#b3261e', '#6b4fbb', '#0b66ff'];
+  const chartType = kind === 'column' ? 'bar' : kind;
   return {
-    type: kind,
+    type: chartType,
     data: {
       labels: labels.length ? labels : values.map((_, index) => String(index + 1)),
       datasets: [{

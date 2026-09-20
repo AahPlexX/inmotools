@@ -481,8 +481,12 @@ function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: Na
       if (!sheet) return { kind: 'error', code: '#REF!', message: 'Missing sheet.' };
       return readCell(book, sheet.id, expr.value.row, expr.value.col, named);
     }
-    case 'name':
+    case 'name': {
+      const token = expr.value.toUpperCase();
+      if (token === 'TRUE') return true;
+      if (token === 'FALSE') return false;
       return resolveName(expr.value, book, named);
+    }
     case 'unary': {
       const inner = asNumber(evalExpr(expr.value, book, sheetId, named));
       if (isError(inner)) return inner;
@@ -539,6 +543,62 @@ function numbers(args: Expr[], book: PortableWorkbook, sheetId: string, named: N
     }
   }
   return out;
+}
+
+export function criteriaMatches(value: FormulaValue, criteria: FormulaValue): boolean {
+  if (isError(value) || isError(criteria)) return false;
+  const test = String(criteria ?? '');
+  if (test === '') return value === null || value === '';
+  const compare = /^(<=|>=|<>|=|<|>)(.*)$/.exec(test);
+  if (compare) {
+    const op = compare[1] ?? '=';
+    const raw = compare[2] ?? '';
+    const rightNum = Number(raw);
+    const leftNum = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
+      if (op === '=') return leftNum === rightNum;
+      if (op === '<>') return leftNum !== rightNum;
+      if (op === '<') return leftNum < rightNum;
+      if (op === '>') return leftNum > rightNum;
+      if (op === '<=') return leftNum <= rightNum;
+      return leftNum >= rightNum;
+    }
+    const left = String(value ?? '').toLocaleLowerCase();
+    const right = raw.toLocaleLowerCase();
+    if (op === '=') return left === right;
+    if (op === '<>') return left !== right;
+    return false;
+  }
+  const left = String(value ?? '').toLocaleLowerCase();
+  const right = test.toLocaleLowerCase();
+  if (right.includes('*')) {
+    const escaped = right.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    return new RegExp(`^${escaped}$`, 'i').test(String(value ?? ''));
+  }
+  return left === right || (typeof value === 'number' && Number(test) === value);
+}
+
+function rangeMatrix(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaValue[][] | FormulaError {
+  if (expr.kind !== 'range' && expr.kind !== 'ref') {
+    const value = evalExpr(expr, book, sheetId, named);
+    if (isError(value)) return value;
+    return [[value]];
+  }
+  const from = expr.kind === 'ref' ? expr.value : expr.from;
+  const to = expr.kind === 'ref' ? expr.value : expr.to;
+  const sheet = sheetByName(book, from.sheetName, sheetId);
+  if (!sheet) return { kind: 'error', code: '#REF!', message: 'Missing sheet.' };
+  const r1 = Math.min(from.row, to.row);
+  const r2 = Math.max(from.row, to.row);
+  const c1 = Math.min(from.col, to.col);
+  const c2 = Math.max(from.col, to.col);
+  const rows: FormulaValue[][] = [];
+  for (let row = r1; row <= r2; row += 1) {
+    const line: FormulaValue[] = [];
+    for (let col = c1; col <= c2; col += 1) line.push(readCell(book, sheet.id, row, col, named));
+    rows.push(line);
+  }
+  return rows;
 }
 
 function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaValue {
@@ -652,6 +712,78 @@ function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: s
       return true;
     case 'FALSE':
       return false;
+    case 'TEXTJOIN': {
+      const delimiter = first ? String(evalExpr(first, book, sheetId, named) ?? '') : '';
+      const ignoreEmpty = args[1] ? evalExpr(args[1], book, sheetId, named) : true;
+      const skipBlank = ignoreEmpty !== false && ignoreEmpty !== 0;
+      const parts = args.slice(2).flatMap((arg) => flatten(arg, book, sheetId, named))
+        .filter((value) => !isError(value) && (!skipBlank || (value !== null && value !== '')))
+        .map((value) => String(value ?? ''));
+      return parts.join(delimiter);
+    }
+    case 'COUNTIF': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'COUNTIF needs a range and a test.' };
+      const values = flatten(first, book, sheetId, named);
+      const criteria = evalExpr(args[1], book, sheetId, named);
+      return values.filter((value) => criteriaMatches(value, criteria)).length;
+    }
+    case 'SUMIF': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'SUMIF needs a range and a test.' };
+      const tests = flatten(first, book, sheetId, named);
+      const criteria = evalExpr(args[1], book, sheetId, named);
+      const sums = args[2] ? flatten(args[2], book, sheetId, named) : tests;
+      let total = 0;
+      tests.forEach((value, index) => {
+        if (!criteriaMatches(value, criteria)) return;
+        const num = asNumber(sums[index] ?? null);
+        if (!isError(num)) total += num;
+      });
+      return total;
+    }
+    case 'VLOOKUP': {
+      if (!first || !args[1] || !args[2]) return { kind: 'error', code: '#N/A', message: 'VLOOKUP needs a lookup, range, and column.' };
+      const lookup = evalExpr(first, book, sheetId, named);
+      const table = rangeMatrix(args[1], book, sheetId, named);
+      if (!Array.isArray(table)) return table;
+      const colIndex = asNumber(evalExpr(args[2], book, sheetId, named));
+      if (isError(colIndex)) return colIndex;
+      const column = Math.trunc(colIndex) - 1;
+      if (column < 0) return { kind: 'error', code: '#VALUE!', message: 'VLOOKUP column must be 1 or greater.' };
+      for (const row of table) {
+        const key = row[0] ?? null;
+        if (String(key ?? '') !== String(lookup ?? '')) continue;
+        return row[column] ?? { kind: 'error', code: '#REF!', message: 'VLOOKUP column is outside the range.' };
+      }
+      return { kind: 'error', code: '#N/A', message: 'VLOOKUP found no match.' };
+    }
+    case 'XLOOKUP': {
+      if (!first || !args[1] || !args[2]) return { kind: 'error', code: '#N/A', message: 'XLOOKUP needs a lookup, lookup range, and return range.' };
+      const lookup = evalExpr(first, book, sheetId, named);
+      const keys = flatten(args[1], book, sheetId, named);
+      const values = flatten(args[2], book, sheetId, named);
+      const index = keys.findIndex((value) => String(value ?? '') === String(lookup ?? ''));
+      if (index < 0) return { kind: 'error', code: '#N/A', message: 'XLOOKUP found no match.' };
+      return values[index] ?? null;
+    }
+    case 'INDEX': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'INDEX needs a range and a row.' };
+      const table = rangeMatrix(first, book, sheetId, named);
+      if (!Array.isArray(table)) return table;
+      const rowNum = asNumber(evalExpr(args[1], book, sheetId, named));
+      const colNum = args[2] ? asNumber(evalExpr(args[2], book, sheetId, named)) : 1;
+      if (isError(rowNum)) return rowNum;
+      if (isError(colNum)) return colNum;
+      const row = table[Math.trunc(rowNum) - 1];
+      if (!row) return { kind: 'error', code: '#REF!', message: 'INDEX row is outside the range.' };
+      return row[Math.trunc(colNum) - 1] ?? { kind: 'error', code: '#REF!', message: 'INDEX column is outside the range.' };
+    }
+    case 'MATCH': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'MATCH needs a lookup and a range.' };
+      const lookup = evalExpr(first, book, sheetId, named);
+      const values = flatten(args[1], book, sheetId, named);
+      const index = values.findIndex((value) => String(value ?? '') === String(lookup ?? ''));
+      return index < 0 ? { kind: 'error', code: '#N/A', message: 'MATCH found no match.' } : index + 1;
+    }
     default:
       return { kind: 'error', code: '#NAME?', message: `Unknown function ${name}` };
   }

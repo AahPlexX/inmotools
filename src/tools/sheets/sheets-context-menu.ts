@@ -5,12 +5,16 @@ export const CONTEXT_MENU_ACTIONS = [
   { id: 'cut', label: 'Cut' },
   { id: 'copy', label: 'Copy' },
   { id: 'paste', label: 'Paste' },
+  { id: 'paste-values', label: 'Paste values' },
+  { id: 'paste-formats', label: 'Paste formats' },
+  { id: 'paste-transpose', label: 'Paste transpose' },
   { id: 'insert-row', label: 'Insert row' },
   { id: 'insert-col', label: 'Insert column' },
   { id: 'delete-row', label: 'Delete row' },
   { id: 'delete-col', label: 'Delete column' },
   { id: 'wrap', label: 'Toggle wrap' },
-  { id: 'clear', label: 'Clear' },
+  { id: 'clear', label: 'Clear contents' },
+  { id: 'clear-all', label: 'Clear all' },
 ] as const;
 
 export type ContextMenuActionId = (typeof CONTEXT_MENU_ACTIONS)[number]['id'];

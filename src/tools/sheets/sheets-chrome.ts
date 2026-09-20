@@ -5,6 +5,7 @@ const KNOWN_FUNCTIONS = new Set([
   'SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT', 'COUNTA', 'PRODUCT', 'ABS', 'INT', 'SQRT',
   'ROUND', 'IF', 'AND', 'OR', 'NOT', 'CONCAT', 'CONCATENATE', 'LEN', 'UPPER', 'LOWER',
   'TRIM', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'PI', 'TRUE', 'FALSE',
+  'TEXTJOIN', 'COUNTIF', 'SUMIF', 'VLOOKUP', 'XLOOKUP', 'INDEX', 'MATCH',
 ]);
 
 export function resolveFormulaSsot(

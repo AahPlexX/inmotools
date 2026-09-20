@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { CLIENT_VIEWPORTS } from '../../src/tools/sheets/sheets-parity';
 
 const ROUTE = './#/tools/tabular-sheet-workstation';
 
@@ -114,6 +115,73 @@ test('has no serious or critical axe violations in the local grid', async ({ pag
   const blocking = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
   expect(blocking, blocking.map((item) => `${item.id}: ${item.help}`).join('\n')).toEqual([]);
 });
+
+test('exposes paste special, AutoSum, insert function, go to, and list picker', async ({ page }) => {
+  const workspace = await openWorkspace(page);
+  await expect(workspace.getByTestId('tsw-parity-chrome')).toBeVisible();
+  await workspace.getByTestId('tsw-insert-function').click();
+  const functions = workspace.getByTestId('tsw-insert-function-list');
+  await expect(functions).toBeVisible();
+  await functions.getByRole('button', { name: /SUM —/ }).click();
+  await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(');
+  await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
+
+  await gridCell(workspace, '4').click();
+  await gridCell(workspace, '2').click({ modifiers: ['Shift'] });
+  await workspace.getByTestId('tsw-autosum').click();
+  await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(B2:B3)');
+
+  await workspace.getByTestId('tsw-goto-a1').fill('D2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await expect(workspace.getByTestId('tsw-selection')).toHaveText('D2');
+
+  await workspace.getByRole('button', { name: 'Save validation' }).click();
+  await gridCell(workspace, '4').click();
+  await expect(workspace.getByTestId('tsw-list-picker')).toBeVisible();
+  await workspace.getByTestId('tsw-list-picker').selectOption('6');
+  await expect(workspace.locator('#tsw-formula')).toHaveValue('6');
+
+  await expect(workspace.getByTestId('tsw-named-ranges')).toContainText('TaxRate');
+  await expect(workspace.getByTestId('tsw-chart-kind')).toHaveValue('column');
+  await workspace.getByTestId('tsw-custom-format').fill('0.0');
+  await workspace.getByTestId('tsw-apply-custom-format').click();
+  await expect(workspace.getByTestId('tsw-print')).toBeVisible();
+  await expect(workspace.getByTestId('tsw-protect')).toBeVisible();
+});
+
+test('opens paste-special and clear-all from the click and long-press menu', async ({ page }) => {
+  const workspace = await openWorkspace(page);
+  const paper = gridCell(workspace, 'Paper');
+  await paper.click({ button: 'right' });
+  const menu = workspace.getByTestId('tsw-context-menu');
+  await expect(menu.getByRole('menuitem', { name: 'Paste values' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Clear contents' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Clear all' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await paper.dispatchEvent('pointerdown', { clientX: 80, clientY: 180 });
+  await page.waitForTimeout(550);
+  await expect(workspace.getByTestId('tsw-context-menu')).toBeVisible();
+});
+
+for (const viewport of CLIENT_VIEWPORTS) {
+  test(`keeps parity chrome readable at ${viewport.name}`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chromium', 'Viewport matrix is CSS-width proof, not a single phone profile.');
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    const workspace = await openWorkspace(page);
+    await expect(workspace.getByTestId('tsw-parity-chrome')).toBeVisible();
+    await expect(workspace.getByTestId('tsw-formula-help')).toBeVisible();
+    await expect(workspace.getByTestId('tsw-insert-function')).toBeVisible();
+    await expect(workspace.getByTestId('tsw-grid-scroll')).toBeVisible();
+    const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflowX, `${viewport.name} horizontal overflow`).toBeLessThanOrEqual(8);
+    await workspace.getByTestId('tsw-formula-help').click();
+    await expect(workspace.getByTestId('tsw-formula-tooltip')).toHaveAttribute('data-trigger', 'focus-or-tap');
+    await workspace.getByRole('button', { name: 'Close formula help' }).click();
+    await gridCell(workspace, 'Paper').dispatchEvent('pointerdown', { clientX: 40, clientY: 160 });
+    await page.waitForTimeout(550);
+    await expect(workspace.getByTestId('tsw-context-menu')).toBeVisible();
+  });
+}
 
 test('mounts Univer engine-formula as the live formula SSOT', async ({ page }) => {
   test.setTimeout(60_000);

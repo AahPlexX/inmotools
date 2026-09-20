@@ -88,6 +88,47 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 - Draft PR `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not touch PR #33 / transcode.
 - Stop commits after the draft PR is current with this ledger.
 
+## Gap ledger (Excel / Sheets parity beyond 1–36)
+
+Status values: `done` | `in-progress` | `excluded`.
+
+### Implement now (local browser, no server)
+
+| ID | Feature | Notes | Status |
+| --- | --- | --- | --- |
+| G1 | Paste special | Values / formats / transpose from the last copied snapshot or TSV. Hooks: context menu + `data-testid=tsw-parity-chrome`. Evidence: `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| G2 | Insert Function | Tap-only catalog (SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, INDEX, MATCH, TEXTJOIN, COUNTIF, SUMIF, INDEX-MATCH). Hook: `data-testid=tsw-insert-function`. Portable engine evaluates those functions. | done |
+| G3 | AutoSum | Writes `=SUM(...)` below a column, right of a row, or into a cell with numbers above. Hook: `data-testid=tsw-autosum` | done |
+| G4 | Named range manager | List, go to, define, delete. Hook: `data-testid=tsw-named-ranges` | done |
+| G5 | Go to / Go to special | A1 jump plus blanks / formulas / constants. Hooks: `tsw-goto`, `tsw-goto-blanks` | done |
+| G6 | Sheet hide / unhide + tab color | Hidden tabs leave the tablist; unhide select + long-press/right-click tab menu. | done |
+| G7 | Clear contents vs clear all | Contents keeps style/notes; all deletes the cell. Context menu + parity chrome. | done |
+| G8 | Remove duplicates | Packs unique rows in the selection. Hook: `tsw-remove-duplicates` | done |
+| G9 | Text to columns | Delimiter split across columns. Hook: `tsw-text-to-columns` | done |
+| G10 | Custom number format | Pattern field + Apply. Hook: `tsw-custom-format` | done |
+| G11 | CF color scales | `color-scale` kind interpolates fill from the rule range min/max. | done |
+| G12 | Validation list picker | Select appears on list-validated cells. Hook: `tsw-list-picker` | done |
+| G13 | Charts column + line + pie | Chart.js only; `column` maps to `bar`. Hook: `tsw-chart-kind` | done |
+| G14 | Print CSS / print view | `@media print` plus `data-print-view` chrome hide. Hook: `tsw-print` | done |
+| G15 | Protect sheet (local PIN) | SHA-256 + salt stored on the workbook in IndexedDB. Session unlock only. Not Excel file encryption. Hook: `tsw-protect` | done |
+| G16 | Keyboard parity | F2 edits the formula bar; Ctrl/Cmd+Arrow jumps to the data edge; Ctrl/Cmd+; inserts the local date. | done |
+| G17 | Multi-viewport client | Device-agnostic CSS + Playwright loop at 320/360/390/412/430 portrait and 740×360 landscape. Not an iPhone-13-only proof. | done |
+
+### Explicitly excluded
+
+| ID | Feature | Why excluded |
+| --- | --- | --- |
+| X1 | Univer Pro / HyperFormula / `@univerjs/preset-sheets-advanced` | Banned engines. Portable DAG + optional Univer OSS sheets-core 0.25.1 only. |
+| X2 | Collaboration, auth, remote DB | Local-first GitHub Pages. Workbooks stay in this browser. |
+| X3 | VBA / Apps Script / macros | No script host, no server. Formulas and chrome actions only. |
+| X4 | Remote Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
+| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine is scalar (no spill arrays). Use Autofilter, Sort, and Remove duplicates. |
+| X6 | Excel workbook encryption / IRM / password-to-open | A hashed PIN is a local edit lock. It can be stripped from the portable JSON, so it is not file crypto. |
+| X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). |
+| X8 | Drawing / images / sparklines / Pro charts | Chart.js column/line/pie from the selection only. |
+| X9 | Real-time multiplayer + comments threads | Portable notes only. No Pro thread-comment. |
+| X10 | Solver / Goal Seek / Data Tables / Power Pivot | Heavy analysis add-ins; not in the local OSS stack. |
+
 ## Handoff
 
 Resume file: `src/tools/sheets/HANDOFF.md` (tip SHA, verify commands, fixed vs deferred findings). Keep this matrix, the in-tool progress TODO, and `.tasks/IN_PROGRESS.md` in the same cycle. Move a row to `done` only with focused evidence. Newly discovered gaps stay listed here rather than disappearing.

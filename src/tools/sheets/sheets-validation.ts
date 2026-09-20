@@ -19,6 +19,15 @@ export function validationsForCell(book: PortableWorkbook, sheetId: string, row:
   return book.validations.filter((rule) => rule.sheetId === sheetId && a1CoversCell(rule.a1, row, col));
 }
 
+export function listValidationChoices(argument: string): string[] {
+  return argument.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+export function listValidationForCell(book: PortableWorkbook, sheetId: string, row: number, col: number): string[] {
+  const rule = validationsForCell(book, sheetId, row, col).find((item) => item.kind === 'list');
+  return rule ? listValidationChoices(rule.argument) : [];
+}
+
 export function enforceValidation(
   book: PortableWorkbook,
   sheetId: string,
