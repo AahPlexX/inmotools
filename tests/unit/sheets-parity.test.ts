@@ -6,7 +6,10 @@ import { applyNumberFormat, formatDisplay } from '../../src/tools/sheets/sheets-
 import { evaluateFormula } from '../../src/tools/sheets/sheets-formula';
 import {
   CLIENT_VIEWPORTS,
+  FORMULA_CATALOG,
+  LOCKED_INSERT_FUNCTIONS,
   autoSumPlacement,
+  fillDownSelection,
   clearRangeMode,
   colorScaleFill,
   createSheetProtect,
@@ -111,7 +114,7 @@ describe('tabular sheet parity slice', () => {
     expect(deleteNamedRange(book, 'TaxRate').namedRanges).toEqual([]);
   });
 
-  it('places AutoSum and inserts function templates', () => {
+  it('places AutoSum and keeps the locked Insert Function catalog, not an XLOOKUP-only slice', () => {
     const book = starterWorkbook();
     const sheet = book.sheets[0]!;
     const below = autoSumPlacement(book, sheet.id, { r1: 1, c1: 1, r2: 2, c2: 1 });
@@ -120,6 +123,17 @@ describe('tabular sheet parity slice', () => {
     expect(into?.formula).toBe('=SUM(B2:B3)');
     expect(insertFunctionTemplate('SUM')).toBe('=SUM(');
     expect(insertFunctionTemplate('INDEX-MATCH')).toContain('MATCH');
+    expect(FORMULA_CATALOG.map((item) => item.name)).toEqual(expect.arrayContaining([...LOCKED_INSERT_FUNCTIONS]));
+    expect(LOCKED_INSERT_FUNCTIONS).toEqual([
+      'SUM', 'AVERAGE', 'IF', 'VLOOKUP', 'XLOOKUP', 'INDEX-MATCH', 'TEXTJOIN', 'COUNTIF', 'SUMIF',
+    ]);
+    expect(LOCKED_INSERT_FUNCTIONS).not.toEqual(['XLOOKUP']);
+    const catalogNames = FORMULA_CATALOG.map((item) => item.name);
+    expect(catalogNames).not.toContain('FILTER');
+    expect(catalogNames).not.toContain('SORT');
+    expect(catalogNames).not.toContain('UNIQUE');
+    const filled = fillDownSelection(book, sheet.id, { r1: 1, c1: 1, r2: 4, c2: 1 });
+    expect(filled.sheets[0]?.cells[cellKey(3, 1)]?.v).toBe(6);
   });
 
   it('jumps to the data edge and formats a local date for Ctrl+;', () => {

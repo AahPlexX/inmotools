@@ -126,6 +126,9 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   await workspace.getByTestId('tsw-insert-function').click();
   const functions = workspace.getByTestId('tsw-insert-function-list');
   await expect(functions).toBeVisible();
+  for (const name of ['SUM', 'AVERAGE', 'IF', 'VLOOKUP', 'XLOOKUP', 'INDEX-MATCH', 'TEXTJOIN', 'COUNTIF', 'SUMIF']) {
+    await expect(functions.getByRole('button', { name: new RegExp(`^${name} `) })).toBeVisible();
+  }
   await functions.getByRole('button', { name: /SUM —/ }).click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(');
   await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
@@ -147,6 +150,7 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
 
   await expect(workspace.getByTestId('tsw-named-ranges')).toContainText('TaxRate');
   await expect(workspace.getByTestId('tsw-chart-kind')).toHaveValue('column');
+  await expect(workspace.getByTestId('tsw-fill-down')).toBeVisible();
   await workspace.getByTestId('tsw-custom-format').fill('0.0');
   await workspace.getByTestId('tsw-apply-custom-format').click();
   await expect(workspace.getByTestId('tsw-print')).toBeVisible();

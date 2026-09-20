@@ -90,41 +90,48 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
+CoS product cut is locked as **P1–P16**. Do not shrink this slice to XLOOKUP-only. Historical G1–G14 map 1:1 onto P1–P14. Historical G15 (protect sheet) is an optional extra and is **not** CoS P15. Historical G16/G17 are CoS P15/P16.
+
 Status values: `done` | `in-progress` | `excluded`.
 
-### Implement now (local browser, no server)
+### Implement now — CoS P1–P16 (local browser, no server)
 
 | ID | Feature | Notes | Status |
 | --- | --- | --- | --- |
-| G1 | Paste special | Values / formats / transpose from the last copied snapshot or TSV. Hooks: context menu + `data-testid=tsw-parity-chrome`. Evidence: `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
-| G2 | Insert Function | Tap-only catalog (SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, INDEX, MATCH, TEXTJOIN, COUNTIF, SUMIF, INDEX-MATCH). Hook: `data-testid=tsw-insert-function`. Portable engine evaluates those functions. | done |
-| G3 | AutoSum | Writes `=SUM(...)` below a column, right of a row, or into a cell with numbers above. Hook: `data-testid=tsw-autosum` | done |
-| G4 | Named range manager | List, go to, define, delete. Hook: `data-testid=tsw-named-ranges` | done |
-| G5 | Go to / Go to special | A1 jump plus blanks / formulas / constants. Hooks: `tsw-goto`, `tsw-goto-blanks` | done |
-| G6 | Sheet hide / unhide + tab color | Hidden tabs leave the tablist; unhide select + long-press/right-click tab menu. | done |
-| G7 | Clear contents vs clear all | Contents keeps style/notes; all deletes the cell. Context menu + parity chrome. | done |
-| G8 | Remove duplicates | Packs unique rows in the selection. Hook: `tsw-remove-duplicates` | done |
-| G9 | Text to columns | Delimiter split across columns. Hook: `tsw-text-to-columns` | done |
-| G10 | Custom number format | Pattern field + Apply. Hook: `tsw-custom-format` | done |
-| G11 | CF color scales | `color-scale` kind interpolates fill from the rule range min/max. | done |
-| G12 | Validation list picker | Select appears on list-validated cells. Hook: `tsw-list-picker` | done |
-| G13 | Charts column + line + pie | Chart.js only; `column` maps to `bar`. Hook: `tsw-chart-kind` | done |
-| G14 | Print CSS / print view | `@media print` plus `data-print-view` chrome hide. Hook: `tsw-print` | done |
-| G15 | Protect sheet (local PIN) | SHA-256 + salt stored on the workbook in IndexedDB. Session unlock only. Not Excel file encryption. Hook: `tsw-protect` | done |
-| G16 | Keyboard parity | F2 edits the formula bar; Ctrl/Cmd+Arrow jumps to the data edge; Ctrl/Cmd+; inserts the local date. | done |
-| G17 | Multi-viewport client | Device-agnostic CSS + Playwright loop at 320/360/390/412/430 portrait and 740×360 landscape. Not an iPhone-13-only proof. | done |
+| P1 | Paste special | Values / formats / transpose from the last copied snapshot or TSV. Hooks: context menu + `data-testid=tsw-parity-chrome`. Evidence: `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| P2 | Insert Function (full catalog) | Locked names: SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, INDEX-MATCH, TEXTJOIN, COUNTIF, SUMIF. INDEX and MATCH stay in the picker as the INDEX-MATCH building blocks. Hook: `data-testid=tsw-insert-function`. Constant: `LOCKED_INSERT_FUNCTIONS`. Not an XLOOKUP-only slice. FILTER / SORT / UNIQUE formulas are excluded (X5). | done |
+| P3 | AutoSum | Writes `=SUM(...)` below a column, right of a row, or into a cell with numbers above. Hook: `data-testid=tsw-autosum` | done |
+| P4 | Named range manager | List, go to, define, delete. Hook: `data-testid=tsw-named-ranges` | done |
+| P5 | Go to / Go to special | A1 jump plus blanks / formulas / constants. Hooks: `tsw-goto`, `tsw-goto-blanks` | done |
+| P6 | Sheet hide / unhide + tab color | Hidden tabs leave the tablist; unhide select + long-press/right-click tab menu. | done |
+| P7 | Clear contents vs clear all | Contents keeps style/notes; all deletes the cell. Context menu + parity chrome. | done |
+| P8 | Remove duplicates | Packs unique rows in the selection. Hook: `tsw-remove-duplicates` | done |
+| P9 | Text to columns | Delimiter split across columns. Hook: `tsw-text-to-columns` | done |
+| P10 | Custom number format | Pattern field + Apply. Hook: `tsw-custom-format` | done |
+| P11 | CF color scales | `color-scale` kind interpolates fill from the rule range min/max. | done |
+| P12 | Validation list picker | Select appears on list-validated cells. Hook: `tsw-list-picker` | done |
+| P13 | Charts column + line + pie | Chart.js only; `column` maps to `bar`. Hook: `tsw-chart-kind` | done |
+| P14 | Print CSS / print view | `@media print` plus `data-print-view` chrome hide. Hook: `tsw-print` | done |
+| P15 | Keyboard + fill | F2 edits the formula bar; Ctrl/Cmd+Arrow jumps to the data edge; Ctrl/Cmd+; inserts the local date; Ctrl/Cmd+D and Fill down (`data-testid=tsw-fill-down`) run `fillDownSelection`. Protect sheet is not this row. | done |
+| P16 | Client harden | No hover-only actions. Long-press + click menus. Formula help is tap/focus only. Anti-slop catalog/sheets copy only. Device-agnostic CSS + Playwright loop at 320/360/390/412/430 portrait and 740×360 landscape. Not an iPhone-13-only proof. | done |
+
+### Optional extra (not a substitute for P15 / P16)
+
+| ID | Feature | Notes | Status |
+| --- | --- | --- | --- |
+| PX | Protect sheet (local PIN) | SHA-256 + salt stored on the workbook in IndexedDB. Session unlock only. Not Excel file encryption. Hook: `tsw-protect`. Kept from the original brief; CoS 16 does not number it. | done |
 
 ### Explicitly excluded
 
 | ID | Feature | Why excluded |
 | --- | --- | --- |
-| X1 | Univer Pro / HyperFormula / `@univerjs/preset-sheets-advanced` | Banned engines. Portable DAG + optional Univer OSS sheets-core 0.25.1 only. |
-| X2 | Collaboration, auth, remote DB | Local-first GitHub Pages. Workbooks stay in this browser. |
+| X1 | Univer Pro / HyperFormula / `@univerjs/preset-sheets-advanced` / `@univerjs/preset-sheets-drawing` | Banned engines. Portable DAG + optional Univer OSS sheets-core 0.25.1 only. Pro pivots/drawing stay out. |
+| X2 | Realtime collaboration, auth, remote DB | Local-first GitHub Pages. Workbooks stay in this browser. |
 | X3 | VBA / Apps Script / macros | No script host, no server. Formulas and chrome actions only. |
-| X4 | Remote Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
-| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine is scalar (no spill arrays). Use Autofilter, Sort, and Remove duplicates. |
+| X4 | Remote / cloud Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
+| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine is scalar (no spill arrays; HyperFormula is banned). Use Autofilter, Sort, and Remove duplicates. |
 | X6 | Excel workbook encryption / IRM / password-to-open | A hashed PIN is a local edit lock. It can be stripped from the portable JSON, so it is not file crypto. |
-| X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). |
+| X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). Not Univer Pro pivots. |
 | X8 | Drawing / images / sparklines / Pro charts | Chart.js column/line/pie from the selection only. |
 | X9 | Real-time multiplayer + comments threads | Portable notes only. No Pro thread-comment. |
 | X10 | Solver / Goal Seek / Data Tables / Power Pivot | Heavy analysis add-ins; not in the local OSS stack. |

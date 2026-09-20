@@ -1,6 +1,6 @@
 import { a1FromParts, parseA1Range } from './sheets-formula';
 import { clearRange, normalizeRange, rangeToTsv } from './sheets-grid';
-import { cloneWorkbook, collectRange, getCell, setCell } from './sheets-model';
+import { cloneWorkbook, collectRange, fillHandle, getCell, setCell } from './sheets-model';
 import {
   cellKey,
   type CellPrimitive,
@@ -43,6 +43,30 @@ export const FORMULA_CATALOG = [
   { name: 'SUMIF', template: '=SUMIF(', summary: 'Sum cells that match a test.' },
   { name: 'INDEX-MATCH', template: '=INDEX(,MATCH(,,0))', summary: 'INDEX plus MATCH as a VLOOKUP stand-in.' },
 ] as const;
+
+export const LOCKED_INSERT_FUNCTIONS = [
+  'SUM',
+  'AVERAGE',
+  'IF',
+  'VLOOKUP',
+  'XLOOKUP',
+  'INDEX-MATCH',
+  'TEXTJOIN',
+  'COUNTIF',
+  'SUMIF',
+] as const;
+
+export function fillDownSelection(
+  book: PortableWorkbook,
+  sheetId: string,
+  range: MergeRange,
+): PortableWorkbook {
+  const bounds = normalizeRange(range);
+  const from = { row: bounds.r1, col: bounds.c1 };
+  const single = bounds.r1 === bounds.r2 && bounds.c1 === bounds.c2;
+  const to = single ? { row: bounds.r1 + 3, col: bounds.c1 } : { row: bounds.r2, col: bounds.c2 };
+  return fillHandle(book, sheetId, from, to);
+}
 
 export function parseTsvGrid(text: string): ClipboardCell[][] {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');

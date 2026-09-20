@@ -17,7 +17,6 @@ import {
   collectRange,
   deleteCols,
   deleteRows,
-  fillHandle,
   freezePanes,
   getCell,
   insertCols,
@@ -73,6 +72,7 @@ import { enforceValidation, listValidationForCell, removeValidation, upsertValid
 import { applyConditionalFormatPaint, removeConditionalFormat, upsertConditionalFormat } from './sheets-cf';
 import { clampPopupBox, describeFormula, resolveFormulaSsot } from './sheets-chrome';
 import {
+  fillDownSelection,
   FORMULA_CATALOG,
   autoSumPlacement,
   clearRangeMode,
@@ -622,6 +622,11 @@ export default function SheetsWorkspace() {
         setFormula(today);
         return;
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        commit(fillDownSelection(book, sheetId, selection), 'Filled the selection.');
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') void copySelection();
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
         void copySelection();
@@ -676,9 +681,6 @@ export default function SheetsWorkspace() {
   }, [formulaTipOpen]);
 
   const summary = progressSummary();
-  const fillTarget = selection.r1 === selection.r2 && selection.c1 === selection.c2
-    ? { row: selection.r1 + 3, col: selection.c1 }
-    : { row: selection.r2, col: selection.c2 };
   const selectedColWidth = sheet?.columnWidths[String(selection.c1)] ?? 72;
   const selectedRowHeight = sheet?.rowHeights[String(selection.r1)] ?? 28;
   const listChoices = listValidationForCell(book, sheetId, selection.r1, selection.c1);
@@ -717,7 +719,7 @@ export default function SheetsWorkspace() {
         <button type="button" onClick={() => commit(freezePanes(book, sheetId, selection.r1, selection.c1), 'Froze panes at the active cell.')}>Freeze</button>
         <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'asc'), 'Sorted the selection ascending.')}>Sort A–Z</button>
         <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'desc'), 'Sorted the selection descending.')}>Sort Z–A</button>
-        <button type="button" onClick={() => commit(fillHandle(book, sheetId, { row: selection.r1, col: selection.c1 }, fillTarget), 'Filled the fill range.')}>Fill down</button>
+        <button type="button" data-testid="tsw-fill-down" onClick={() => commit(fillDownSelection(book, sheetId, selection), 'Filled the fill range.')}>Fill down</button>
         <button
           type="button"
           data-testid="tsw-rename-sheet"
