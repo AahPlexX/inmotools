@@ -3,7 +3,8 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not touch unrelated tools.
 
-**Tip SHA:** `8872c6a2b4cb988c39bbf1c7666302e45687043f`  
+**Tip SHA:** `86d21720067689d21031bc451694df83c5b084e5`  
+**Last focused-gate code:** pending this push.  
 **Workstream:** Excel / Sheets parity slice (G1–G17) plus device-agnostic mobile widths.
 
 ## What works
@@ -18,29 +19,22 @@ Draft PR: `feature/tabular-sheet-parity` → `main` only. Do not merge. Do not t
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts
-```
+# 39/39
 
-```bash
 pnpm build
-```
+# pass
 
-```bash
 pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium
-```
+# 15 passed (includes 320/360/390/412/430 portrait + 740×360 landscape)
 
-```bash
-pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=mobile-chromium
-```
-
-Device-agnostic viewport matrix (not an iPhone 13-only proof). Loop lives in `CLIENT_VIEWPORTS` and the e2e `keeps parity chrome readable at` tests. Widths: 320, 360, 390, 412, 430 portrait plus 740×360 landscape.
-
-```bash
 pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium -g 'keeps parity chrome readable at'
-```
+# 6/6 generic CSS-width matrix; not an iPhone 13-only proof
 
-```bash
-pnpm exec playwright test tests/e2e/accessibility.spec.ts --project=desktop-chromium -g 'tabular-sheet-workstation'
-pnpm exec playwright test tests/e2e/accessibility.spec.ts --project=mobile-chromium -g 'tabular-sheet-workstation'
+pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=mobile-chromium
+# remaining tests passed; viewport-matrix skipped here on purpose (generic CSS-width loop is desktop-chromium)
+
+pnpm exec playwright test tests/e2e/accessibility.spec.ts -g 'tabular-sheet-workstation'
+# 2/2 desktop + mobile
 ```
 
 ## Known out-of-suite CI reds

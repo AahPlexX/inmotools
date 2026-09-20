@@ -3,7 +3,8 @@
 - **Tabular Sheet Workstation (TASK-022)** — Excel/Sheets parity slice on `feature/tabular-sheet-parity` (draft PR only; do not merge; do not touch unrelated tools).
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` on `origin/main`. Current milestone: gap ledger G1–G17 (paste special, Insert Function, AutoSum, named-range manager, Go to special, hide/unhide + tab color, clear contents vs all, remove duplicates, text to columns, custom number format, CF color scales, list picker, column/line/pie charts, print CSS, local hashed PIN, keyboard parity, multi-viewport client).
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus Gap ledger). Exclusions X1–X10 stay documented (Pro/HyperFormula, collab, VBA, remote Power Query, spill-array formulas, file encryption).
-  - Tip SHA: `8872c6a2b4cb988c39bbf1c7666302e45687043f`.
+  - Tip SHA: `86d21720067689d21031bc451694df83c5b084e5` (update this line in the same cycle as any later push).
+  - Sheets gates: focused units 39/39; `pnpm build` pass; sheets e2e 15 passed on desktop-chromium (viewport matrix 320/360/390/412/430 + 740×360); mobile-chromium remaining tests passed with the generic width loop skipped by design; catalog axe `-g tabular-sheet-workstation` 2/2.
   - Client constraint: mobile proof is a CSS-width matrix (320/360/390/412/430 portrait + 740×360 landscape), not an iPhone 13-only profile. Long-press + click menus; formula help tap/focus only; no hover-only actions.
   - Stack pins unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, HyperFormula, AI, or auth/db.
   - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.

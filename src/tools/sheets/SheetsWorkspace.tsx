@@ -501,8 +501,9 @@ export default function SheetsWorkspace() {
       return { sheetId, r1: row, c1: col, r2: row, c2: col };
     });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
+    setInsertOpen(false);
     const cell = sheet?.cells[`${row},${col}`];
-    if (cell?.f) setFormulaTipOpen(true);
+    setFormulaTipOpen(Boolean(cell?.f));
     scheduleLongPressStub(longPress, () => {
       pointer.current.dragging = false;
       openContextMenuAt(pointer.current.x, pointer.current.y);

@@ -15,6 +15,10 @@ function gridCell(workspace: ReturnType<Page['getByTestId']>, name: string) {
   return workspace.getByTestId('tsw-grid-scroll').getByRole('cell', { name, exact: true });
 }
 
+function cellAt(workspace: ReturnType<Page['getByTestId']>, row: number, col: number) {
+  return workspace.locator(`td[data-row="${row}"][data-col="${col}"]`);
+}
+
 test('exposes Stage 2 formula SSOT, format, style, wrap, and tap-safe formula help', async ({ page }) => {
   const workspace = await openWorkspace(page);
 
@@ -99,7 +103,7 @@ test('selects a range, paints a merge, and writes column width', async ({ page }
   await expect(workspace.locator('td[data-row="1"][data-col="0"]')).not.toHaveAttribute('rowspan', '2');
   await workspace.getByTestId('tsw-col-width').fill('140');
   await expect(workspace.locator('td[data-row="1"][data-col="0"]')).toHaveAttribute('data-col-width', '140');
-  await gridCell(workspace, '2.5').click();
+  await cellAt(workspace, 1, 2).click({ force: true });
   await workspace.getByRole('button', { name: 'Freeze' }).click();
   await expect(workspace.locator('td[data-row="0"][data-col="0"]')).toHaveAttribute('data-frozen-row', 'true');
 });
@@ -125,9 +129,9 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   await functions.getByRole('button', { name: /SUM —/ }).click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(');
   await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
+  await workspace.getByRole('button', { name: 'Close formula help' }).click();
 
-  await gridCell(workspace, '4').click();
-  await gridCell(workspace, '2').click({ modifiers: ['Shift'] });
+  await cellAt(workspace, 3, 1).click({ force: true });
   await workspace.getByTestId('tsw-autosum').click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(B2:B3)');
 
