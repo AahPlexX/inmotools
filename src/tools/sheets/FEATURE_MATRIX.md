@@ -90,11 +90,11 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
-CoS product cut is locked as **P1–P16**. Do not shrink this slice to XLOOKUP-only. Historical G1–G14 map 1:1 onto P1–P14. Historical G15 (protect sheet) is an optional extra and is **not** CoS P15. Historical G16/G17 are CoS P15/P16.
+**PRODUCT CUT APPROVED.** CoS locked set is **P1–P16** only. Do not shrink to XLOOKUP-only. Do not invent extra product scope. Historical G1–G14 map 1:1 onto P1–P14. Historical G16/G17 are CoS P15/P16. Historical G15 (protect sheet) is leftover optional chrome and is **not** in this approved cut.
 
 Status values: `done` | `in-progress` | `excluded`.
 
-### Implement now — CoS P1–P16 (local browser, no server)
+### Approved implement-now set — P1–P16 (local browser, no server)
 
 | ID | Feature | Notes | Status |
 | --- | --- | --- | --- |
@@ -115,13 +115,15 @@ Status values: `done` | `in-progress` | `excluded`.
 | P15 | Keyboard + fill | F2 edits the formula bar; Ctrl/Cmd+Arrow jumps to the data edge; Ctrl/Cmd+; inserts the local date; Ctrl/Cmd+D and Fill down (`data-testid=tsw-fill-down`) run `fillDownSelection`. Protect sheet is not this row. | done |
 | P16 | Client harden | No hover-only actions. Long-press + click menus. Formula help is tap/focus only. Anti-slop catalog/sheets copy only. Device-agnostic CSS + Playwright loop at 320/360/390/412/430 portrait and 740×360 landscape. Not an iPhone-13-only proof. | done |
 
-### Optional extra (not a substitute for P15 / P16)
+### Not in the approved cut (do not expand)
 
 | ID | Feature | Notes | Status |
 | --- | --- | --- | --- |
-| PX | Protect sheet (local PIN) | SHA-256 + salt stored on the workbook in IndexedDB. Session unlock only. Not Excel file encryption. Hook: `tsw-protect`. Kept from the original brief; CoS 16 does not number it. | done |
+| PX | Protect sheet (local PIN) | Present from an earlier brief. Not one of the approved 16. Not a substitute for P15/P16. Do not grow this surface. | done |
 
-### Explicitly excluded
+### Explicitly excluded — do not build
+
+CoS-named exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db.
 
 | ID | Feature | Why excluded |
 | --- | --- | --- |
@@ -129,8 +131,8 @@ Status values: `done` | `in-progress` | `excluded`.
 | X2 | Realtime collaboration, auth, remote DB | Local-first GitHub Pages. Workbooks stay in this browser. |
 | X3 | VBA / Apps Script / macros | No script host, no server. Formulas and chrome actions only. |
 | X4 | Remote / cloud Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
-| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine is scalar (no spill arrays; HyperFormula is banned). Use Autofilter, Sort, and Remove duplicates. |
-| X6 | Excel workbook encryption / IRM / password-to-open | A hashed PIN is a local edit lock. It can be stripped from the portable JSON, so it is not file crypto. |
+| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine cannot spill arrays without HyperFormula. Use Autofilter, Sort, and Remove duplicates. |
+| X6 | Excel workbook encryption / IRM / password-to-open | Not in the approved cut. A leftover hashed PIN is a local edit lock, not file crypto. |
 | X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). Not Univer Pro pivots. |
 | X8 | Drawing / images / sparklines / Pro charts | Chart.js column/line/pie from the selection only. |
 | X9 | Real-time multiplayer + comments threads | Portable notes only. No Pro thread-comment. |
