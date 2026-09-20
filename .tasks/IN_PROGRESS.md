@@ -2,7 +2,7 @@
 
 - **Tabular Sheet Workstation (TASK-022)** — forensic audit + local-grid fixes on `feature/tabular-sheet-workstation` (draft PR #70).
   - Feature ledger: `src/tools/sheets/FEATURE_MATRIX.md` (all 1–36 `done`). Agent resume: `src/tools/sheets/HANDOFF.md`.
-  - Parent tip before this audit: `bc406b78dc80bd958d65479096a20d3447af0139`. Current tip: update after push.
+  - Parent tip before this audit: `bc406b78dc80bd958d65479096a20d3447af0139`. Current tip: `4fd7776303b9a29063886caa7bbdb1ebdfbc1e81`.
   - Open findings: Univer host is snapshot-on-`book.id` only (deferred); Pages full-suite reds in run `35477210462` are out-of-suite (web-layout/svg axe, app stale-chunk, hardware, geo, regex Python, crystal mobile). GOVERNANCE §4 vs keep-draft: do not merge.
   - Next step: run the four verify commands in `src/tools/sheets/HANDOFF.md`, record the pushed SHA, keep PR #70 draft.
   - Stack unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, no HyperFormula, no auth/db.
