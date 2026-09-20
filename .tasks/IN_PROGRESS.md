@@ -3,7 +3,7 @@
 - **Tabular Sheet Workstation (TASK-022)** — PRODUCT CUT APPROVED. Sole writer on `feature/tabular-sheet-parity` P1–P16 (draft PR only; do not merge; do not open a second PR; do not invent extra product scope). Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. Approved milestone is CoS P1–P16 only. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus approved P1–P16). Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, FILTER/SORT/UNIQUE formulas.
-  - Tip SHA: 1e4d5b0b0eb2ddebdbe349b747a835657863e63e (update this line in the same cycle as any later push). Last focused-gate code: `c4f55d32159e4ba751ece9f940ac90fb2560ebe7`.
+  - Tip SHA: `a911c02cda3e43793dc46d9521ecd6f2ca8303c3` (update this line in the same cycle as any later push). Last focused-gate code: `c4f55d32159e4ba751ece9f940ac90fb2560ebe7`.
   - Sheets gates at that SHA: focused units 39/39; `pnpm build` pass; desktop-chromium 21 passed; P16 matrix 12/12 (6 portrait + 6 landscape CSS widths); mobile-chromium 8 passed / 13 skipped by design (iPhone 13 is not the P16 gate).
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
   - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
