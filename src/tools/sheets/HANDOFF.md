@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/70 (`feature/tabular-sheet-workstation` → `main` only). Do not merge. Do not open a new PR.
 
-**Tip SHA:** `4fd7776303b9a29063886caa7bbdb1ebdfbc1e81` (update if a later commit lands on this branch).
+**Tip SHA:** `b57c65a5e479ab99314ad5e521874d531fd0677a`
 
 ## What works
 
@@ -54,8 +54,13 @@ Catalog-wide `pnpm test:unit` may still be red on pre-existing `sightline-encodi
 
 ## Next sequential steps
 
-1. Confirm the four commands above on this tip (browser + axe if this revision is pre-verification).
-2. Put the pushed SHA in this file and `.tasks/IN_PROGRESS.md`.
-3. Keep PR #70 draft. Do not merge. Do not open a new PR.
-4. Do not chase out-of-suite Pages reds listed above.
-5. If a later agent needs two-way Univer sync, that is a new scoped task — not a FEATURE_MATRIX status change without evidence.
+1. Keep PR #70 draft. Do not merge. Do not open a new PR.
+2. Do not chase out-of-suite Pages reds listed above.
+3. If a later agent needs two-way Univer sync, that is a new scoped task — not a FEATURE_MATRIX status change without evidence.
+
+## Fresh verification on `b57c65a5e479ab99314ad5e521874d531fd0677a`
+
+- Focused sheets units: 27/27 pass
+- `pnpm build`: pass
+- `tests/e2e/tabular-sheet-workstation.spec.ts`: 13 passed, 1 skipped (mobile axe by design)
+- Catalog axe `-g tabular-sheet-workstation`: 2/2 pass (desktop + mobile)
