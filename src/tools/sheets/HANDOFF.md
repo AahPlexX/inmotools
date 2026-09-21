@@ -1,10 +1,10 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: pending — `feature/tabular-sheet-wave-a` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity`. Do not touch unrelated tools.
+Draft PR: https://github.com/AahPlexX/inmotools/pull/73 — `feature/tabular-sheet-wave-a` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity`. Do not touch unrelated tools.
 
-**Tip SHA:** pending  
-**Last focused-gate code:** pending  
+**Tip SHA:** pending stamp  
+**Last focused-gate code:** pending stamp  
 **Workstream:** **Wave A** (Formula.js + FILTER/SORT/UNIQUE spill + export-surviving comments) on top of merged PR #71 P1–P16 / docs PR #72.
 
 ## Merge status (prior)
@@ -39,19 +39,26 @@ Do **not** treat iPhone 13 or the `mobile-chromium` Playwright project as the on
 Portrait (narrow phone → tablet): 320×740, 360×800, 390×844, 412×915, 430×932, 768×1024  
 Landscape (same widths, swapped): 740×320, 800×360, 844×390, 915×412, 932×430, 1024×768
 
-## Sheets gates
+## Sheets gates (green at last focused-gate code)
+
+```bash
+# focused units 47/47; pnpm build pass
+# desktop-chromium 25 passed
+# P16 matrix 12/12 (6 portrait + 6 landscape)
+```
+
+Counts last proven green on this branch. Verify commands:
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts tests/unit/sheets-wave-a.test.ts
 
 pnpm build
 
+# P16 device-agnostic matrix — required. Not an iPhone 13-only story.
 pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium -g 'keeps parity chrome readable at'
 
 pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium
 ```
-
-Record the counts from a fresh run in this file with the tip SHA.
 
 ## Known out-of-suite CI reds
 
@@ -81,7 +88,7 @@ Catalog / lockfile edits select `__FULL_SUITE__` via `scripts/select-e2e-specs.m
 
 ## Next sequential steps
 
-1. Keep this draft PR. Push only `feature/tabular-sheet-wave-a`. Never merge. Never open a second PR.
+1. Keep draft PR #73. Push only `feature/tabular-sheet-wave-a`. Never merge. Never open a second PR.
 2. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
 3. Do not chase out-of-suite Pages reds listed above.
 4. Do not invent Wave B/C/D.

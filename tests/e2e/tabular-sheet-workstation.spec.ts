@@ -129,7 +129,7 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   for (const name of ['SUM', 'AVERAGE', 'IF', 'VLOOKUP', 'XLOOKUP', 'INDEX-MATCH', 'TEXTJOIN', 'COUNTIF', 'SUMIF', 'FILTER', 'SORT', 'UNIQUE']) {
     await expect(functions.getByRole('button', { name: new RegExp(`^${name} `) })).toBeVisible();
   }
-  await functions.getByRole('button', { name: /SUM —/ }).click();
+  await functions.getByRole('button', { name: /^SUM —/ }).click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(');
   await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
   await workspace.getByRole('button', { name: 'Close formula help' }).click();
