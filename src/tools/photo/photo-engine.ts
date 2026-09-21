@@ -355,6 +355,7 @@ function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
       y: clamp(operation.y, 0, 1),
       radius: clamp(operation.radius, 0.001, 1),
       strength: clamp(operation.strength, 0, 1),
+      enabled: operation.enabled ?? true,
     };
   }
   return {
@@ -367,6 +368,14 @@ function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
     radius: clamp(operation.radius, 0.001, 1),
     feather: clamp(operation.feather, 0, 1),
     opacity: clamp(operation.opacity, 0, 1),
+    enabled: operation.enabled ?? true,
+    // Legacy operations saved before multi-stroke painting existed have no path;
+    // an empty path keeps them rendering as the single anchored stamp they always were.
+    path: (operation.path ?? []).slice(0, 2000).map((point) => ({ x: clamp(point.x, 0, 1), y: clamp(point.y, 0, 1) })),
+    // Legacy operations already have a meaningful target from source/target placement, so they
+    // count as anchored; only an operation that has genuinely never had its target placed (or
+    // was just re-sourced) should treat its next target placement as setting a fresh anchor.
+    anchored: operation.anchored ?? true,
   };
 }
 
@@ -1054,15 +1063,27 @@ function applyCloneOrHeal(
   const centerCorrection = operation.type === 'heal'
     ? [0, 1, 2].map((channel) => source[targetCenterOffset + channel] - source[sourceCenterOffset + channel])
     : [0, 0, 0];
+  // The source offset is locked to the source/target anchor for the whole operation, so every
+  // additional stroke point painted afterward samples with that same fixed offset (a real
+  // clone-stamp "aligned" behavior) rather than each dab picking its own source.
+  const deltaX = sourceCenterX - targetCenterX;
+  const deltaY = sourceCenterY - targetCenterY;
+  const stamps: Array<{ x: number; y: number }> = [{ x: operation.targetX, y: operation.targetY }, ...operation.path];
 
   for (let py = 0; py < height; py += 1) {
     for (let px = 0; px < width; px += 1) {
       const nx = (px + 0.5) / width;
       const ny = (py + 0.5) / height;
-      const weight = retouchCircleWeight(nx, ny, operation.targetX, operation.targetY, operation.radius, operation.feather) * operation.opacity;
+      let stampWeight = 0;
+      for (const stamp of stamps) {
+        const candidate = retouchCircleWeight(nx, ny, stamp.x, stamp.y, operation.radius, operation.feather);
+        if (candidate > stampWeight) stampWeight = candidate;
+        if (stampWeight >= 1) break;
+      }
+      const weight = stampWeight * operation.opacity;
       if (weight <= EPSILON) continue;
-      const sourceX = clamp(sourceCenterX + (px - targetCenterX), 0, width - 1);
-      const sourceY = clamp(sourceCenterY + (py - targetCenterY), 0, height - 1);
+      const sourceX = clamp(px + deltaX, 0, width - 1);
+      const sourceY = clamp(py + deltaY, 0, height - 1);
       const sampleOffset = (sourceY * width + sourceX) * 4;
       const targetOffset = (py * width + px) * 4;
       for (let channel = 0; channel < 3; channel += 1) {
@@ -1075,6 +1096,7 @@ function applyCloneOrHeal(
 
 function applyRetouch(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
   for (const operation of recipe.retouch) {
+    if (!operation.enabled) continue;
     if (operation.type === 'red-eye') applyRedEye(data, width, height, operation);
     else applyCloneOrHeal(data, width, height, operation);
   }

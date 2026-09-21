@@ -183,9 +183,37 @@ export interface LocalAdjustment {
 }
 
 export type RetouchOperation =
-  | { id: string; type: 'red-eye'; x: number; y: number; radius: number; strength: number }
-  | { id: string; type: 'clone'; sourceX: number; sourceY: number; targetX: number; targetY: number; radius: number; feather: number; opacity: number }
-  | { id: string; type: 'heal'; sourceX: number; sourceY: number; targetX: number; targetY: number; radius: number; feather: number; opacity: number };
+  | { id: string; type: 'red-eye'; x: number; y: number; radius: number; strength: number; enabled: boolean }
+  | {
+      id: string;
+      type: 'clone';
+      sourceX: number;
+      sourceY: number;
+      targetX: number;
+      targetY: number;
+      radius: number;
+      feather: number;
+      opacity: number;
+      enabled: boolean;
+      /** Additional stroke points painted after the source/target anchor, all sharing its locked offset. */
+      path: Array<{ x: number; y: number }>;
+      /** True once a target has been explicitly placed, locking the source offset for further strokes. */
+      anchored: boolean;
+    }
+  | {
+      id: string;
+      type: 'heal';
+      sourceX: number;
+      sourceY: number;
+      targetX: number;
+      targetY: number;
+      radius: number;
+      feather: number;
+      opacity: number;
+      enabled: boolean;
+      path: Array<{ x: number; y: number }>;
+      anchored: boolean;
+    };
 
 export interface PhotoRecipe {
   version: 1;

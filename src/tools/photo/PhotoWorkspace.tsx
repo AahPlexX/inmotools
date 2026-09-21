@@ -1041,22 +1041,35 @@ export default function PhotoWorkspace() {
   function addRetouch(type: RetouchOperation['type']) {
     const id = crypto.randomUUID?.() ?? `retouch-${Date.now()}-${recipe.retouch.length}`;
     const operation: RetouchOperation = type === 'red-eye'
-      ? { id, type, x: 0.5, y: 0.5, radius: 0.04, strength: 0.8 }
+      ? { id, type, x: 0.5, y: 0.5, radius: 0.04, strength: 0.8, enabled: true }
       : type === 'clone'
-        ? { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.55, opacity: 1 }
-        : { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.75, opacity: 0.8 };
-    patchRecipe({ retouch: [...recipe.retouch.map((item) => ({ ...item })), operation] });
+        ? { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.55, opacity: 1, enabled: true, path: [], anchored: false }
+        : { id, type, sourceX: 0.38, sourceY: 0.5, targetX: 0.62, targetY: 0.5, radius: 0.06, feather: 0.75, opacity: 0.8, enabled: true, path: [], anchored: false };
+    patchRecipe({ retouch: [...recipe.retouch.map(cloneRetouchOperation), operation] });
     setPanel('retouch');
     setCanvasInteraction(retouchInteraction(operation, operation.type === 'red-eye' ? 'target' : 'source'));
   }
 
+  function cloneRetouchOperation(item: RetouchOperation): RetouchOperation {
+    return item.type === 'red-eye' ? { ...item } : { ...item, path: item.path.map((point) => ({ ...point })) };
+  }
+
   function updateRetouch(id: string, update: (item: RetouchOperation) => RetouchOperation) {
-    patchRecipe({ retouch: recipe.retouch.map((item) => item.id === id ? update({ ...item }) : ({ ...item })) });
+    patchRecipe({ retouch: recipe.retouch.map((item) => item.id === id ? update(cloneRetouchOperation(item)) : cloneRetouchOperation(item)) });
   }
 
   function removeRetouch(id: string) {
-    patchRecipe({ retouch: recipe.retouch.filter((item) => item.id !== id).map((item) => ({ ...item })) });
+    patchRecipe({ retouch: recipe.retouch.filter((item) => item.id !== id).map(cloneRetouchOperation) });
     if (canvasInteraction?.id === id) setCanvasInteraction(null);
+  }
+
+  function reorderRetouch(id: string, direction: -1 | 1) {
+    const index = recipe.retouch.findIndex((item) => item.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= recipe.retouch.length) return;
+    const retouch = recipe.retouch.map(cloneRetouchOperation);
+    [retouch[index], retouch[target]] = [retouch[target], retouch[index]];
+    patchRecipe({ retouch });
   }
 
   function duplicateLocal(id: string) {
@@ -1142,6 +1155,7 @@ export default function PhotoWorkspace() {
           interaction.id,
           gesture.end,
           interaction.mode === 'retouch-source' ? 'source' : 'target',
+          interaction.mode === 'retouch-target' ? gesture.path : [],
         );
       } else {
         let source: PhotoSelectionSource | null = null;
@@ -1193,12 +1207,18 @@ export default function PhotoWorkspace() {
       const operation = recipe.retouch.find((item) => item.id === interaction.id);
       if (operation && operation.type !== 'red-eye') {
         setCanvasInteraction(retouchInteraction(operation, 'target'));
-        setStatus('Source sampled. Now place the target on the photo.');
+        setStatus('Source sampled. Now paint the target on the photo.');
       }
       return;
     }
+    if (interaction.mode === 'retouch-target') {
+      // Stays active like brush painting: the source offset is locked, so further drags keep
+      // adding stroke coverage without needing to re-select the target tool each time.
+      setStatus('Retouch stroke painted with the locked source offset as one undo step.');
+      return;
+    }
     setCanvasInteraction(null);
-    setStatus(interaction.mode === 'red-eye' ? 'Red-eye correction placed.' : 'Retouch target placed.');
+    setStatus('Red-eye correction placed.');
   }
 
   function applyPreset(patch: Partial<PhotoRecipe>) {
@@ -1964,10 +1984,14 @@ export default function PhotoWorkspace() {
         {recipe.retouch.map((operation, index) => (
           <article className="photo-local-card" key={operation.id} data-testid="photo-retouch-operation">
             <header><strong>{operation.type === 'red-eye' ? 'Red-eye' : operation.type === 'clone' ? 'Clone' : 'Healing'} operation {index + 1}</strong></header>
+            <label className="photo-check">
+              <input type="checkbox" checked={operation.enabled} onChange={(event) => updateRetouch(operation.id, (item) => ({ ...item, enabled: event.target.checked }))} />
+              Enabled
+            </label>
             <p className="photo-export-note">
               {operation.type === 'red-eye'
                 ? `Center ${Math.round(operation.x * 100)}%, ${Math.round(operation.y * 100)}% · radius ${Math.round(operation.radius * 100)}%`
-                : `Source ${Math.round(operation.sourceX * 100)}%, ${Math.round(operation.sourceY * 100)}% → target ${Math.round(operation.targetX * 100)}%, ${Math.round(operation.targetY * 100)}%`}
+                : `Source ${Math.round(operation.sourceX * 100)}%, ${Math.round(operation.sourceY * 100)}% → target ${Math.round(operation.targetX * 100)}%, ${Math.round(operation.targetY * 100)}%${operation.path.length ? ` (+${operation.path.length} more stroke ${operation.path.length === 1 ? 'point' : 'points'} at the same locked offset)` : ''}`}
             </p>
             {operation.type === 'red-eye' ? (
               <>
@@ -1979,14 +2003,19 @@ export default function PhotoWorkspace() {
               <>
                 <div className="photo-inline-actions">
                   <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-source'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'source'))}>Set source on photo</button>
-                  <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-target'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'target'))}>Set target on photo</button>
+                  <button type="button" aria-pressed={canvasInteraction?.id === operation.id && canvasInteraction.mode === 'retouch-target'} onClick={() => setCanvasInteraction(retouchInteraction(operation, 'target'))}>Paint target on photo</button>
+                  {operation.path.length ? <button type="button" onClick={() => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, path: [] }) : item)}>Clear stroke</button> : null}
                 </div>
                 <SimpleControl label={`${operation.type} ${index + 1} radius`} value={operation.radius} min={0.005} max={0.25} step={0.005} neutral={0.06} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, radius: value }) : item)} />
                 <SimpleControl label={`${operation.type} ${index + 1} feather`} value={operation.feather} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 0.55 : 0.75} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, feather: value }) : item)} />
                 <SimpleControl label={`${operation.type} ${index + 1} opacity`} value={operation.opacity} min={0} max={1} step={0.02} neutral={operation.type === 'clone' ? 1 : 0.8} onChange={(value) => updateRetouch(operation.id, (item) => item.type !== 'red-eye' ? ({ ...item, opacity: value }) : item)} />
               </>
             )}
-            <button type="button" onClick={() => removeRetouch(operation.id)}>Remove operation</button>
+            <div className="photo-inline-actions">
+              <button type="button" disabled={index === 0} onClick={() => reorderRetouch(operation.id, -1)}>Move up</button>
+              <button type="button" disabled={index === recipe.retouch.length - 1} onClick={() => reorderRetouch(operation.id, 1)}>Move down</button>
+              <button type="button" onClick={() => removeRetouch(operation.id)}>Remove operation</button>
+            </div>
           </article>
         ))}
       </>

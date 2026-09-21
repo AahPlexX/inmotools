@@ -118,6 +118,7 @@ export function placeRetouchPoint(
   operationId: string,
   point: PhotoGesturePoint,
   placement: 'source' | 'target' = 'target',
+  path: PhotoGesturePoint[] = [],
 ): PhotoRecipe {
   const normalized = normalizedPoint(point);
   const next = {
@@ -128,9 +129,19 @@ export function placeRetouchPoint(
         return { ...operation, x: normalized.x, y: normalized.y };
       }
       if (placement === 'source') {
-        return { ...operation, sourceX: normalized.x, sourceY: normalized.y };
+        // Re-anchoring the source point clears any stroke painted under the old locked offset,
+        // so the next target placement is treated as setting a fresh anchor again.
+        return { ...operation, sourceX: normalized.x, sourceY: normalized.y, path: [], anchored: false };
       }
-      return { ...operation, targetX: normalized.x, targetY: normalized.y };
+      const strokePoints = (path.length ? path : [point]).map((gesturePoint) => normalizedPoint(gesturePoint));
+      if (!operation.anchored) {
+        // First target placement establishes the anchor (and the locked source offset with it);
+        // any further points already dragged in this same gesture become the start of the path.
+        const [anchor, ...rest] = strokePoints;
+        return { ...operation, targetX: anchor.x, targetY: anchor.y, path: rest, anchored: true };
+      }
+      // The anchor and its offset are already locked: every later stroke only appends dabs.
+      return { ...operation, path: [...operation.path, ...strokePoints].slice(-2000) };
     }),
   };
   return normalizeRecipe(next);

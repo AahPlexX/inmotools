@@ -139,6 +139,7 @@ function PhotoOverlays({
         return null;
       })}
       {retouch.map((operation) => {
+        if (!operation.enabled) return null;
         const active = operation.id === activeId;
         if (operation.type === 'red-eye') {
           return <circle key={operation.id} data-photo-retouch="red-eye" cx={operation.x * 100} cy={operation.y * 100} r={operation.radius * 100} className={active ? 'is-active' : undefined} />;
@@ -147,6 +148,9 @@ function PhotoOverlays({
           <line x1={operation.sourceX * 100} y1={operation.sourceY * 100} x2={operation.targetX * 100} y2={operation.targetY * 100} />
           <circle cx={operation.sourceX * 100} cy={operation.sourceY * 100} r={operation.radius * 100} className="photo-retouch-source" />
           <circle cx={operation.targetX * 100} cy={operation.targetY * 100} r={operation.radius * 100} className="photo-retouch-target" />
+          {operation.path.map((point, index) => (
+            <circle key={`${operation.id}-stroke-${index}`} cx={point.x * 100} cy={point.y * 100} r={operation.radius * 100} className="photo-retouch-stroke" />
+          ))}
         </g>;
       })}
     </svg>

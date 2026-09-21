@@ -334,6 +334,43 @@ test('clone retouch supports explicit source then target placement on the photo'
   expect(targetCx).toBeLessThan(80);
 });
 
+test('retouch operations paint multi-stroke coverage, bypass, reorder, and clear independently', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Retouch' }).click();
+  await page.getByRole('button', { name: 'Add clone spot' }).click();
+  await clickPhoto(page, 0.22, 0.35);
+  await clickPhoto(page, 0.72, 0.62);
+
+  const overlay = page.locator('[data-photo-retouch="clone"]').first();
+  // A plain click still carries a same-position [start, end] gesture path, so the very first
+  // target click can already record one redundant (harmless, same-spot) stroke point; the real
+  // signal is the count rising further once a real drag adds distinct stroke points.
+  const baselineCircles = await overlay.locator('circle').count();
+  expect(baselineCircles).toBeGreaterThanOrEqual(2);
+
+  const cloneCard = page.getByTestId('photo-retouch-operation').filter({ hasText: 'Clone operation' });
+  await cloneCard.getByRole('button', { name: 'Paint target on photo' }).click();
+  await dragOnPhoto(page, 0.5, 0.5, 0.55, 0.5);
+  await expect.poll(() => overlay.locator('circle').count()).toBeGreaterThan(baselineCircles);
+  await expect(cloneCard.getByText(/more stroke point/)).toBeVisible();
+
+  await cloneCard.getByLabel('Enabled').uncheck();
+  await expect(page.locator('[data-photo-retouch="clone"]')).toHaveCount(0);
+  await cloneCard.getByLabel('Enabled').check();
+  await expect(page.locator('[data-photo-retouch="clone"]')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Add healing spot' }).click();
+  await expect(page.getByTestId('photo-retouch-operation')).toHaveCount(2);
+  const healCard = page.getByTestId('photo-retouch-operation').filter({ hasText: 'Healing operation' });
+  await expect(healCard.locator('strong')).toHaveText('Healing operation 2');
+  await healCard.getByRole('button', { name: 'Move up' }).click();
+  await expect(healCard.locator('strong')).toHaveText('Healing operation 1');
+  await expect(cloneCard.locator('strong')).toHaveText('Clone operation 2');
+
+  await cloneCard.getByRole('button', { name: 'Clear stroke' }).click();
+  await expect(overlay.locator('circle')).toHaveCount(2);
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();
