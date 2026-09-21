@@ -379,3 +379,162 @@ test('Phase 1 controls are keyboard operable and dialogs restore focus', async (
   await expect(page.getByRole('dialog', { name: 'Export crystal' })).not.toBeVisible();
   await expect(exportButton).toBeFocused();
 });
+
+test('inspects a coordination shell for a selected site', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Coordination site').selectOption({ index: 0 });
+  await expect(page.getByTestId('crystal-coordination-result')).toContainText('Coordination number 8');
+});
+
+test('lists structure-health findings for the working structure', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await expect(page.getByTestId('crystal-health-findings').getByRole('listitem').first()).toContainText(/error|warning|info/i);
+});
+
+test('builds vacancy, substitution and interstitial defects with undo', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('nacl');
+  await page.getByLabel('Defect site').selectOption({ label: 'Na1' });
+  await page.getByRole('button', { name: 'Create vacancy' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('7 sites');
+  await expect(page.getByTestId('crystal-defect-status')).toContainText(/vacancy/i);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('8 sites');
+
+  await page.getByLabel('Defect element').fill('Fe');
+  await page.getByRole('button', { name: 'Create substitution' }).click();
+  await expect(page.getByLabel(/Na1 element/)).toHaveValue('Fe');
+  await page.getByRole('button', { name: 'Undo' }).click();
+
+  await page.getByRole('button', { name: 'Create interstitial' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('9 sites');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('8 sites');
+});
+
+test('applies a cubic cell constraint to subsequent edits', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Crystal system constraint').selectOption('cubic');
+  await page.getByLabel(/^Cell a \(/).fill('4');
+  await expect(page.getByLabel(/^Cell b \(/)).toHaveValue('4');
+  await expect(page.getByLabel(/^Cell c \(/)).toHaveValue('4');
+});
+
+test('detects BCC symmetry and shows one operation and Wyckoff result', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('229');
+  await expect(page.getByTestId('crystal-symmetry-operations').getByRole('listitem').first()).toContainText(/1/);
+  await expect(page.getByTestId('crystal-symmetry-wyckoffs').getByRole('listitem')).toHaveCount(2);
+});
+
+test('runs a symmetry tolerance sweep', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Run tolerance sweep' }).click();
+  const rows = page.getByTestId('crystal-symmetry-sweep').getByRole('listitem');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.first()).toContainText('0.0001');
+});
+
+test('inspects a symmetry break after perturbing a site', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  await page.getByLabel(/Fe2 fractional x/).fill('0.51');
+  await page.getByRole('button', { name: 'Inspect symmetry break' }).click();
+  await expect(page.getByTestId('crystal-symmetry-break')).toContainText(/broken/i);
+  await expect(page.getByTestId('crystal-symmetry-break')).toContainText('Fe2');
+});
+
+test('previews and applies a standardized symmetry cell', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  await page.getByLabel('Standardized cell').selectOption('primitive');
+  await page.getByRole('button', { name: 'Preview standardized cell' }).click();
+  await expect(page.getByTestId('crystal-symmetry-standard-preview')).toContainText('1 site');
+  await page.getByRole('button', { name: 'Apply standardized cell' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('1 site');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('crystal-site-count')).toContainText('2 sites');
+});
+
+test('renders a coordination polyhedron for the selected site', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Coordination site').selectOption({ index: 0 });
+  await page.getByLabel('Show coordination polyhedron').check();
+  await expect(page.getByTestId('crystal-polyhedron-status')).toContainText('8 vertices');
+  await expect(page.getByRole('img', { name: /interactive crystal structure/i })).toBeVisible();
+});
+
+test('Phase 2 acceptance detects high- and lower-symmetry structures', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('graphite');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).not.toContainText('Im-3m');
+});
+
+test('Phase 2 acceptance surfaces partial occupancy as a limitation', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByLabel('Fe1 occupancy').fill('0.5');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-status')).toContainText(/occupancy|disorder/i);
+  await expect(page.getByTestId('crystal-symmetry-result')).toHaveCount(0);
+});
+
+test('Phase 2 acceptance invalidates a symmetry result after an edit', async ({ page }) => {
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  await page.getByLabel(/Fe2 fractional x/).fill('0.51');
+  await page.getByLabel(/Fe2 fractional x/).press('Tab');
+  await expect(page.getByTestId('crystal-symmetry-status')).toContainText(/changed|re-run/i);
+});
+
+test('Phase 2 acceptance reflows the new panels without overflow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One reflow pass covers the shared panel DOM.');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await expect(page.getByTestId('crystal-symmetry-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-environment-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-model-builder-panel')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('Phase 2 acceptance passes Axe and keyboard operation for the new panels', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe/keyboard pass covers the shared panel DOM.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await expect(page.getByTestId('crystal-environment-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-model-builder-panel')).toBeVisible();
+  await expect(page.getByTestId('crystal-symmetry-panel')).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="crystal-environment-panel"]')
+    .include('[data-testid="crystal-model-builder-panel"]')
+    .include('[data-testid="crystal-symmetry-panel"]')
+    .analyze();
+  const severe = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+  expect(severe).toEqual([]);
+
+  const detect = page.getByRole('button', { name: 'Detect symmetry' });
+  await detect.focus();
+  await detect.press('Enter');
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+});

@@ -5,7 +5,7 @@ test('composites alpha tokens, omits self pairs, and exposes labelled matrix con
  await page.locator('#contrast-tokens').fill('--glass: rgb(0 0 0 / 50%);\n--paper: #ffffff;');
  await expect(page.locator('.metric').filter({hasText:'Valid tokens'})).toContainText('2');
  await expect(page.locator('.metric').filter({hasText:'Directional pairings'})).toContainText('2');
- await expect(page.getByText(/α 0\.50/)).toBeVisible();
+ await expect(page.getByText(/α 0\.50/).first()).toBeVisible();
  await page.locator('#contrast-view').selectOption('heatmap');
  const heatmap=page.getByRole('region',{name:'Axis-labelled contrast heatmap'});
  await expect(heatmap.getByRole('columnheader',{name:'--paper'})).toBeVisible();
@@ -18,7 +18,7 @@ test('composites alpha tokens, omits self pairs, and exposes labelled matrix con
 test('rejects duplicate exported token names and exports filtered CSV',async({page})=>{
  await page.goto('./#/tools/apca-token-matrix');
  await page.locator('#contrast-tokens').fill('accent:#000;\nACCENT:#fff;\n--paper:#fff;');
- await expect(page.getByText(/Duplicate exported token name/i)).toBeVisible();
+ await expect(page.getByRole('listitem').filter({hasText:/Duplicate exported token name/i})).toBeVisible();
  await page.locator('#contrast-tokens').fill('--ink:#000;\n--paper:#fff;\n--muted:#777;');
  await page.locator('#contrast-filter').selectOption('fail');
  const downloadPromise=page.waitForEvent('download');

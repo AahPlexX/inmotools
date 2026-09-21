@@ -346,9 +346,13 @@ test('saves, lists, reloads and deletes a local draft', async ({ page }) => {
   await draftList.locator('li > button').first().click();
   await expect(page.locator('.markdown-workbench-preview h1')).toContainText('Draft under test');
 
-  await page.getByRole('button', { name: /^Delete draft saved/ }).click();
+  // Switching also preserves the document we leave, so target the requested draft.
+  await expect(draftList.locator('li')).toHaveCount(2);
+  await draftList.locator('li').filter({ hasText: 'Draft under test' })
+    .getByRole('button', { name: /^Delete draft saved/ }).click();
   await expect(page.getByTestId('markdown-status')).toContainText(/Deleted/, { timeout: 15_000 });
-  await expect(draftList).toHaveCount(0);
+  await expect(draftList.locator('li')).toHaveCount(1);
+  await expect(draftList).toContainText('Untitled document');
 });
 
 test('changing the font size keeps the caret and document intact', async ({ page }) => {

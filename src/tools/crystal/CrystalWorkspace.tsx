@@ -1,8 +1,11 @@
 import { type ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { consumeFileInput } from '../../lib/file-input';
+import CrystalEnvironmentPanel from './CrystalEnvironmentPanel';
 import CrystalExportDialog from './CrystalExportDialog';
 import CrystalMetadataDialog from './CrystalMetadataDialog';
+import CrystalModelBuilderPanel from './CrystalModelBuilderPanel';
 import CrystalStructurePanel from './CrystalStructurePanel';
+import CrystalSymmetryPanel from './CrystalSymmetryPanel';
 import CrystalViewport from './CrystalViewport';
 import { createStarterStructure } from './document-engine';
 import { commitCrystalHistory, createCrystalHistory, type CrystalHistory } from './history-engine';
@@ -67,6 +70,7 @@ export default function CrystalWorkspace() {
   const [representation, setRepresentation] = useState<CrystalRepresentation>('ball-stick');
   const [projection, setProjection] = useState<CrystalProjection>('perspective');
   const [selectedSiteIds, setSelectedSiteIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [polyhedronCenterId, setPolyhedronCenterId] = useState<string | null>(null);
   const [fileStatus, setFileStatus] = useState('No local structure or project file is open.');
   const structureFileRef = useRef<HTMLInputElement | null>(null);
   const projectFileRef = useRef<HTMLInputElement | null>(null);
@@ -88,6 +92,11 @@ export default function CrystalWorkspace() {
     bondScale: 1,
     background: '#ffffff',
   }), [projection, representation]);
+
+  const viewportRenderOptions = useMemo(
+    () => (polyhedronCenterId ? { polyhedronCenterIds: new Set([polyhedronCenterId]) } : undefined),
+    [polyhedronCenterId],
+  );
 
   const handleSelectionChange = useCallback((ids: ReadonlySet<string>) => {
     setSelectedSiteIds(new Set(ids));
@@ -243,6 +252,7 @@ export default function CrystalWorkspace() {
         onSelectionChange={handleSelectionChange}
         onProjectionChange={setProjection}
         onCanvasChange={handleCanvasChange}
+        renderOptions={viewportRenderOptions}
       />
 
       <CrystalStructurePanel
@@ -251,6 +261,16 @@ export default function CrystalWorkspace() {
         measurements={measurements}
         onMeasurementsChange={setMeasurements}
       />
+
+      <CrystalEnvironmentPanel
+        document={document}
+        polyhedronCenterId={polyhedronCenterId}
+        onPolyhedronCenterChange={setPolyhedronCenterId}
+      />
+
+      <CrystalModelBuilderPanel history={history} onHistoryChange={handleHistoryChange} />
+
+      <CrystalSymmetryPanel document={document} history={history} onHistoryChange={handleHistoryChange} />
     </div>
   );
 }

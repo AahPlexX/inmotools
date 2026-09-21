@@ -33,6 +33,10 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
   'transcode-workstation': () => import('./transcode/TranscodeWorkspace'),
+  'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
+  'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
+  'typing-workstation': () => import('./typing/TypingWorkspace'),
+  'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

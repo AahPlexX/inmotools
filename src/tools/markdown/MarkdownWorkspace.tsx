@@ -11,6 +11,7 @@ import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
+import { renderDiagramBlocks } from './diagram-renderer';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
@@ -59,7 +60,7 @@ const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
 
 const DEFAULT_SOURCE = `# Untitled document
 
-Start writing here. This workbench supports **GFM** tables, math like $E = mc^2$, diagrams, and citations.
+Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, and citations.
 
 | Item | Qty | Price | Total |
 | - | - | - | - |
@@ -76,6 +77,9 @@ export default function MarkdownWorkspace() {
   const [view, setView] = useState<ViewMode>('split');
   const [history, setHistory] = useState<ProjectHistory<string>>(() => createHistory(DEFAULT_SOURCE));
   const source = history.present;
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+  const fileReadRef = useRef(0);
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
@@ -123,7 +127,7 @@ export default function MarkdownWorkspace() {
 
   const persistDraft = useCallback((text: string, name?: string) => {
     const store = draftStoreRef.current;
-    if (!store) return Promise.resolve();
+    if (!store) return Promise.resolve(false);
     const now = Date.now();
     const draft = draftIdRef.current
       ? updateDraftRecord(
@@ -135,14 +139,17 @@ export default function MarkdownWorkspace() {
     draftIdRef.current = draft.id;
     return saveDraft(store, draft)
       .then(() => {
-        persistedTextRef.current = text;
-        setIsDirty(false);
-        setLastSavedAt(now);
+        if (draftIdRef.current === draft.id) {
+          persistedTextRef.current = text;
+          setIsDirty(sourceRef.current !== text);
+          setLastSavedAt(now);
+        }
         return listDrafts(store);
       })
       .then(setDrafts)
       .then(refreshStorageEstimate)
-      .catch(() => setStatus('Local autosave failed; your work is still in the editor.'));
+      .then(() => true)
+      .catch(() => { setStatus('Local autosave failed; your work is still in the editor.'); return false; });
   }, [refreshStorageEstimate]);
 
   useEffect(() => {
@@ -260,8 +267,15 @@ export default function MarkdownWorkspace() {
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
+    const request = ++fileReadRef.current;
+    const original = sourceRef.current;
     try {
       const text = await file.text();
+      if (request !== fileReadRef.current) return;
+      if (sourceRef.current !== original) {
+        setStatus('File opening cancelled because the document changed. Open the file again when ready.');
+        return;
+      }
       setSource(text);
       setDocumentName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
       setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
@@ -301,12 +315,19 @@ export default function MarkdownWorkspace() {
     if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
   }, []);
 
-  const buildExportBodyHtml = useCallback((): { html: string; usedFallback: boolean } => {
+  const buildExportBodyHtml = useCallback(async (): Promise<string> => {
     const live = previewHostRef.current
       ?.querySelector<HTMLElement>('.markdown-workbench-preview')
       ?.innerHTML;
-    if (live && live.trim()) return { html: live, usedFallback: false };
-    return { html: renderMarkdown(preparedSource).html, usedFallback: true };
+    if (live && live.trim()) return live;
+
+    // Source view has no mounted preview to scrape. Build the same rendered
+    // document in a detached DOM host and run the shared diagram pass so
+    // every HTML-derived export receives Mermaid/Graphviz SVGs consistently.
+    const scratch = document.createElement('div');
+    scratch.innerHTML = renderMarkdown(preparedSource).html;
+    await renderDiagramBlocks(scratch);
+    return scratch.innerHTML;
   }, [preparedSource]);
 
   const noteExport = (message: string) => {
@@ -328,7 +349,7 @@ export default function MarkdownWorkspace() {
   const exportHtml = async () => {
     setStatus('Preparing standalone HTML and bundling its assets…');
     await waitForPreviewSettled();
-    const { html: bodyHtml, usedFallback } = buildExportBodyHtml();
+    const bodyHtml = await buildExportBodyHtml();
     const [images, katexCss] = await Promise.all([
       bundleHtmlImages(bodyHtml, document.baseURI, 'inline'),
       inlineStylesheetAssets(katexExportCss, document.baseURI),
@@ -340,9 +361,7 @@ export default function MarkdownWorkspace() {
     }
     const html = buildStandaloneMarkdownHtml(effectiveTitle, images.html, { additionalCss: katexCss.css });
     downloadText(html, `${filenameStem}.html`, 'text/html;charset=utf-8');
-    setStatus(usedFallback
-      ? `Exported ${filenameStem}.html as a self-contained file from source. Open Split view first if you need rendered diagrams included.`
-      : `Exported ${filenameStem}.html as a self-contained offline file with KaTeX fonts and images bundled.`);
+    setStatus(`Exported ${filenameStem}.html as a self-contained offline file with rendered diagrams, KaTeX fonts, and images bundled.`);
     noteExport('Exported a self-contained offline HTML file locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
@@ -367,7 +386,7 @@ export default function MarkdownWorkspace() {
     setStatus('Packaging EPUB and bundling referenced images…');
     try {
       await waitForPreviewSettled();
-      const { html: bodyHtml } = buildExportBodyHtml();
+      const bodyHtml = await buildExportBodyHtml();
       const bundled = await bundleHtmlImages(bodyHtml, document.baseURI, 'epub');
       if (bundled.unresolved.length > 0) {
         setStatus(`EPUB export stopped: ${bundled.unresolved.length} referenced image${bundled.unresolved.length === 1 ? '' : 's'} could not be bundled.`);
@@ -417,10 +436,22 @@ export default function MarkdownWorkspace() {
       setStatus('Local draft storage is unavailable in this browser.');
       return;
     }
-    void persistDraft(source, effectiveTitleRef.current).then(() => setStatus('Saved a local draft.'));
+    void persistDraft(source, effectiveTitleRef.current).then((saved) => { if (saved) setStatus('Saved a local draft.'); });
   }, [persistDraft, source]);
 
-  const startNewDraft = () => {
+  const startNewDraft = async () => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before starting a new document.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose New again when ready.');
+      return;
+    }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
     setHistory(createHistory(DEFAULT_SOURCE));
@@ -429,7 +460,19 @@ export default function MarkdownWorkspace() {
     setStatus('Started a new document. The previous draft is still listed below.');
   };
 
-  const loadDraft = (draft: DraftRecord) => {
+  const loadDraft = async (draft: DraftRecord) => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before switching drafts.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose the draft again when ready.');
+      return;
+    }
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
     setSource(draft.text);
@@ -523,7 +566,7 @@ export default function MarkdownWorkspace() {
         <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">Exports as <code>{filenameStem}.*</code></span>
         <div className="markdown-workbench-toolbar-group">
           <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')}>Copy Markdown</button>
-          <button type="button" onClick={() => void copyToClipboard(buildExportBodyHtml().html, 'the rendered HTML')}>Copy HTML</button>
+          <button type="button" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }}>Copy HTML</button>
         </div>
       </div>
 
@@ -533,6 +576,7 @@ export default function MarkdownWorkspace() {
             value={source}
             onChange={setSource}
             onCursorLineChange={view === 'split' ? scrollPreviewToLine : undefined}
+            onStatus={setStatus}
             lineWrapping={lineWrapping}
             fontSize={fontSize}
             vimMode={vimMode}
