@@ -1,15 +1,15 @@
 # In Progress
 
-- **Tabular Sheet Workstation (TASK-022)** — Wave A DONE. Merged on `main` via PR #73 (https://github.com/AahPlexX/inmotools/pull/73) squash `4dcc856bc97027862342513cdea7eb769c0ffbc1`. Do not push to `feature/tabular-sheet-wave-a`. Do not invent Wave B/C/D. Do not shrink Insert Function to XLOOKUP-only.
-  - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3 stay `done`. Protect sheet (PX) is leftover chrome, not in the approved 16.
-  - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5). FILTER/SORT/UNIQUE spill is Wave A.
-  - Tip SHA: `4dcc856bc97027862342513cdea7eb769c0ffbc1` (PR #73 squash / product tip). Last focused-gate code: `4dcc856bc97027862342513cdea7eb769c0ffbc1`.
-  - Product is on `main` at that squash. Prior green client stamp `c0da201e08a7e062b78299a6b521a1fad767c203` is included. Focused units 47/47; `pnpm build` pass; desktop-chromium 25 passed; P16 matrix 12/12. Do not claim the full Pages suite green.
+- **Tabular Sheet Workstation (TASK-022)** — Wave B in progress on `feature/tabular-sheet-wave-b` (local PivotTable UX + GETPIVOTDATA subset). Wave A is merged on `main` via PR #73 squash `4dcc856bc97027862342513cdea7eb769c0ffbc1`; docs stamp PR #74. Do not push to `feature/tabular-sheet-wave-a`. Do not reuse `feature/tabular-sheet-parity`. Do not invent Wave C/D. Do not shrink Insert Function to XLOOKUP-only.
+  - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3 stay `done`. Wave B ledger WB1–WB2. Protect sheet (PX) is leftover chrome, not in the approved 16.
+  - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5), Excel caches/slicers/OLAP/Power Pivot. FILTER/SORT/UNIQUE spill is Wave A.
+  - Draft PR: https://github.com/AahPlexX/inmotools/pull/75. Tip SHA: `34d8b5f`. Last focused-gate code: `34d8b5f` (units 56/56; `pnpm build` pass; desktop-chromium 28 passed; P16 matrix 12/12).
+  - Do not claim the full Pages suite green.
   - Known out-of-suite CI reds (do not chase): web-layout-studio axe; svg-sprite-compiler axe; stale lazy chunk; Hardware Packet Inspector; GeoJSON Simplifier; Python re named groups; crystal-lattice-studio mobile.
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
-  - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
+  - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only. Pivot chrome is tap/click and usable at ~320–430 CSS px.
   - Stack pins: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`, `@formulajs/formulajs@4.6.1` exact. No Univer Pro, HyperFormula, AI, or auth/db.
-  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`, `package.json` pin + lockfile. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
+  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
 
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 

@@ -78,6 +78,42 @@ export interface SheetComment {
   updatedAt: number;
 }
 
+export type PivotAgg = 'sum' | 'count' | 'avg' | 'min' | 'max';
+export type PivotFieldRole = 'unused' | 'row' | 'column' | 'value' | 'filter';
+export type PivotPlacement = 'new-sheet' | 'range';
+
+export interface PivotField {
+  name: string;
+  col: number;
+}
+
+export interface PivotValueField extends PivotField {
+  agg: PivotAgg;
+}
+
+export interface PivotFilter extends PivotField {
+  selected: string[];
+}
+
+export interface PivotTableDef {
+  id: string;
+  name: string;
+  sourceSheetId: string;
+  sourceA1: string;
+  rows: PivotField[];
+  columns: PivotField[];
+  values: PivotValueField[];
+  filters: PivotFilter[];
+  placement: PivotPlacement;
+  destSheetId: string;
+  destA1: string;
+  destRow: number;
+  destCol: number;
+  outputRows: number;
+  outputCols: number;
+  autoRefresh: boolean;
+}
+
 export interface PortableSheet {
   id: string;
   name: string;
@@ -107,6 +143,7 @@ export interface PortableWorkbook {
   validations: ValidationRule[];
   conditionalFormats: ConditionalFormat[];
   comments: SheetComment[];
+  pivots: PivotTableDef[];
 }
 
 export interface ExportMeta {
@@ -187,7 +224,12 @@ export function createWorkbook(name = 'Workbook'): PortableWorkbook {
     validations: [],
     conditionalFormats: [],
     comments: [],
+    pivots: [],
   };
+}
+
+export function workbookPivots(book: PortableWorkbook): PivotTableDef[] {
+  return Array.isArray(book.pivots) ? book.pivots : [];
 }
 
 export function cryptoRandomId(): string {

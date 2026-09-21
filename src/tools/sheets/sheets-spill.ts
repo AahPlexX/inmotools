@@ -108,6 +108,7 @@ export function omitSpillCells(book: PortableWorkbook): PortableWorkbook {
     validations: [...book.validations],
     conditionalFormats: [...book.conditionalFormats],
     comments: [...book.comments],
+    pivots: [...(book.pivots ?? [])],
   };
   for (const sheet of next.sheets) {
     for (const [key, cell] of Object.entries(sheet.cells)) {
