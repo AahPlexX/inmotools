@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import Chart from 'chart.js/auto';
 import { consumeFileInput } from '../../lib/file-input';
 import { downloadBytes, downloadText } from '../../lib/download';
-import { PagedTable } from '../../components/PagedTable';
 import {
   CONTEXT_MENU_ACTIONS,
   cancelLongPressStub,
@@ -62,7 +61,7 @@ import {
   sheetToCsv,
   toBundle,
 } from './sheets-io';
-import { pivotSheet, type PivotAgg } from './sheets-pivot';
+import { applyPivotOutputs, createPivotTable, distinctFieldValues, headersFromRange, refreshPivotTable, type PivotAgg } from './sheets-pivot';
 import { chartConfigFromSelection, type ChartKind } from './sheets-charts';
 import { FEATURE_PROGRESS, progressSummary } from './sheets-progress';
 import { mountUniverSheets, readUniverCalculated, type UniverHost } from './sheets-univer';
@@ -117,6 +116,7 @@ import {
   type ExportMeta,
   type MergeRange,
   type OverflowMode,
+  type PivotFieldRole,
   type PortableWorkbook,
   type SheetPrefs,
   type ValidationRule,
@@ -153,7 +153,10 @@ export default function SheetsWorkspace() {
   const [univerProof, setUniverProof] = useState<{ a1: string; value: unknown; formula: string } | null>(null);
   const [library, setLibrary] = useState<StoredWorkbook[]>([]);
   const [chartKind, setChartKind] = useState<ChartKind>('column');
-  const [pivotAgg, setPivotAgg] = useState<PivotAgg>('sum');
+  const [pivotSource, setPivotSource] = useState('A1:C3');
+  const [pivotPlacement, setPivotPlacement] = useState<'new-sheet' | 'range'>('new-sheet');
+  const [pivotDest, setPivotDest] = useState('A1');
+  const [pivotFields, setPivotFields] = useState<Array<{ col: number; name: string; role: PivotFieldRole; agg: PivotAgg; selected: string[] }>>([]);
   const [namedName, setNamedName] = useState('TaxRate');
   const [namedA1, setNamedA1] = useState('B1');
   const [note, setNote] = useState('');
@@ -230,7 +233,10 @@ export default function SheetsWorkspace() {
     }
     setHistory((stack) => [...stack.slice(-40), book]);
     setFuture([]);
-    setBook(next);
+    const withPivots = next.pivots && next.pivots.length > 0
+      ? applyPivotOutputs(next, evaluateWorkbook(next))
+      : next;
+    setBook(withPivots);
     setStatus(message);
   }, [book, selection.sheetId, unlockedSheetIds]);
 
@@ -277,10 +283,20 @@ export default function SheetsWorkspace() {
     return selectionAggregates(values);
   }, [computed, sheet, selection]);
 
-  const pivot = useMemo(() => {
-    if (!sheet) return null;
-    return pivotSheet(sheet, { headerRow: 0, groupCol: 0, valueCol: 1, agg: pivotAgg });
-  }, [sheet, pivotAgg]);
+  useEffect(() => {
+    if (!sheet) return;
+    const headers = headersFromRange(sheet, pivotSource);
+    setPivotFields((current) => headers.map((header) => {
+      const previous = current.find((item) => item.col === header.col || item.name === header.name);
+      return {
+        col: header.col,
+        name: header.name,
+        role: previous?.role ?? 'unused',
+        agg: previous?.agg ?? 'sum',
+        selected: previous?.selected ?? [],
+      };
+    }));
+  }, [sheet, pivotSource]);
 
   useEffect(() => {
     if (!chartNode.current || !sheet) return;
@@ -755,6 +771,41 @@ export default function SheetsWorkspace() {
   const locked = sheetIsLocked(sheet, unlockedSheetIds);
   const tabs = visibleSheets(computed);
   const hiddenTabs = hiddenSheets(computed);
+  const pivotList = book.pivots ?? [];
+
+  const createLocalPivot = () => {
+    const result = createPivotTable(book, {
+      sourceSheetId: sheetId,
+      sourceA1: pivotSource,
+      rows: pivotFields.filter((field) => field.role === 'row').map((field) => ({ name: field.name, col: field.col })),
+      columns: pivotFields.filter((field) => field.role === 'column').map((field) => ({ name: field.name, col: field.col })),
+      values: pivotFields.filter((field) => field.role === 'value').map((field) => ({ name: field.name, col: field.col, agg: field.agg })),
+      filters: pivotFields.filter((field) => field.role === 'filter').map((field) => ({ name: field.name, col: field.col, selected: field.selected })),
+      placement: pivotPlacement,
+      destSheetId: pivotPlacement === 'range' ? sheetId : undefined,
+      destA1: pivotDest,
+    }, computed);
+    if (result.error || !result.pivot) {
+      setStatus(result.error ?? 'Could not create the PivotTable.');
+      return;
+    }
+    const destName = computed.sheets.find((item) => item.id === result.pivot?.destSheetId)?.name
+      ?? result.book.sheets.find((item) => item.id === result.pivot?.destSheetId)?.name
+      ?? result.pivot.destA1;
+    const where = result.pivot.placement === 'new-sheet'
+      ? `new sheet ${destName} at A1`
+      : `${destName}!${result.pivot.destA1}`;
+    commit(result.book, `Created ${result.pivot.name} on ${where}.`);
+  };
+
+  const refreshLocalPivots = (pivotId?: string) => {
+    const result = refreshPivotTable(book, pivotId, computed);
+    if (result.error) {
+      setStatus(result.error);
+      return;
+    }
+    commit(result.book, pivotId ? 'Refreshed the selected PivotTable from its source range.' : 'Refreshed local PivotTables from their source ranges.');
+  };
 
   return (
     <div
@@ -1592,25 +1643,126 @@ export default function SheetsWorkspace() {
           <div className="tsw-chart"><canvas ref={chartNode} aria-label="Selection chart" /></div>
         </section>
 
-        <section className="tsw-panel">
-          <h3>In-house pivot</h3>
-          <p>Group column A by values in column B on the header row. Open substitute for Univer Pro pivot.</p>
-          <label htmlFor="tsw-pivot-agg">Aggregation</label>
-          <select id="tsw-pivot-agg" value={pivotAgg} onChange={(event) => setPivotAgg(event.target.value as PivotAgg)}>
-            <option value="sum">Sum</option>
-            <option value="count">Count</option>
-            <option value="avg">Average</option>
-            <option value="min">Min</option>
-            <option value="max">Max</option>
-          </select>
-          {pivot ? (
-            <PagedTable
-              caption="Pivot result"
-              columns={[{ key: 'group', label: pivot.groupHeader }, { key: 'value', label: pivot.valueHeader }]}
-              rows={pivot.rows}
-              renderCell={(row, key) => key === 'group' ? row.group : row.value}
-              rowKey={(row) => row.group}
-            />
+        <section className="tsw-panel tsw-pivot-chrome" data-testid="tsw-pivot-chrome">
+          <h3>Local PivotTable</h3>
+          <p>
+            Build a pivot from a contiguous range with a header row. The table writes to a new sheet at A1 by default, or to a destination cell you choose. Refresh reads the source again in this browser. GETPIVOTDATA looks up those local pivot values. Not an Excel cache, slicer, or Univer Pro pivot.
+          </p>
+          <label htmlFor="tsw-pivot-source">Source range</label>
+          <input id="tsw-pivot-source" data-testid="tsw-pivot-source" value={pivotSource} onChange={(event) => setPivotSource(event.target.value)} />
+          <button type="button" data-testid="tsw-pivot-use-selection" onClick={() => setPivotSource(selectionA1(selection))}>Use selection</button>
+          <fieldset className="tsw-pivot-placement" data-testid="tsw-pivot-placement">
+            <legend>Destination</legend>
+            <label htmlFor="tsw-pivot-new-sheet">
+              <input
+                id="tsw-pivot-new-sheet"
+                type="radio"
+                name="tsw-pivot-placement"
+                checked={pivotPlacement === 'new-sheet'}
+                onChange={() => setPivotPlacement('new-sheet')}
+              />
+              New sheet at A1
+            </label>
+            <label htmlFor="tsw-pivot-dest-range">
+              <input
+                id="tsw-pivot-dest-range"
+                type="radio"
+                name="tsw-pivot-placement"
+                checked={pivotPlacement === 'range'}
+                onChange={() => setPivotPlacement('range')}
+              />
+              Destination cell on this sheet
+            </label>
+          </fieldset>
+          {pivotPlacement === 'range' ? (
+            <>
+              <label htmlFor="tsw-pivot-dest">Destination cell</label>
+              <input id="tsw-pivot-dest" data-testid="tsw-pivot-dest" value={pivotDest} onChange={(event) => setPivotDest(event.target.value)} />
+            </>
+          ) : null}
+          <div className="tsw-pivot-fields" data-testid="tsw-pivot-fields">
+            {pivotFields.map((field) => (
+              <div key={`${field.col}-${field.name}`} className="tsw-pivot-field">
+                <span>{field.name}</span>
+                <label htmlFor={`tsw-pivot-role-${field.col}`}>
+                  Role
+                  <select
+                    id={`tsw-pivot-role-${field.col}`}
+                    data-testid={`tsw-pivot-role-${field.col}`}
+                    value={field.role}
+                    onChange={(event) => setPivotFields((current) => current.map((item) => (
+                      item.col === field.col ? { ...item, role: event.target.value as PivotFieldRole } : item
+                    )))}
+                  >
+                    <option value="unused">Unused</option>
+                    <option value="row">Rows</option>
+                    <option value="column">Columns</option>
+                    <option value="value">Values</option>
+                    <option value="filter">Filters</option>
+                  </select>
+                </label>
+                {field.role === 'value' ? (
+                  <label htmlFor={`tsw-pivot-agg-${field.col}`}>
+                    Aggregation
+                    <select
+                      id={`tsw-pivot-agg-${field.col}`}
+                      data-testid={`tsw-pivot-agg-${field.col}`}
+                      value={field.agg}
+                      onChange={(event) => setPivotFields((current) => current.map((item) => (
+                        item.col === field.col ? { ...item, agg: event.target.value as PivotAgg } : item
+                      )))}
+                    >
+                      <option value="sum">Sum</option>
+                      <option value="count">Count</option>
+                      <option value="avg">Average</option>
+                      <option value="min">Min</option>
+                      <option value="max">Max</option>
+                    </select>
+                  </label>
+                ) : null}
+                {field.role === 'filter' ? (
+                  <fieldset className="tsw-pivot-field-filters">
+                    <legend>Keep values</legend>
+                    {distinctFieldValues(computed, sheetId, pivotSource, field.col).map((value) => {
+                      const checked = field.selected.length === 0 || field.selected.includes(value);
+                      return (
+                        <label key={value} htmlFor={`tsw-pivot-filter-${field.col}-${value}`}>
+                          <input
+                            id={`tsw-pivot-filter-${field.col}-${value}`}
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setPivotFields((current) => current.map((item) => {
+                              if (item.col !== field.col) return item;
+                              const all = distinctFieldValues(computed, sheetId, pivotSource, field.col);
+                              const selected = new Set(item.selected.length === 0 ? all : item.selected);
+                              if (selected.has(value)) selected.delete(value);
+                              else selected.add(value);
+                              return { ...item, selected: [...selected] };
+                            }))}
+                          />
+                          {value}
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <button type="button" data-testid="tsw-pivot-create" onClick={createLocalPivot}>Create PivotTable</button>
+          <button type="button" data-testid="tsw-pivot-refresh" onClick={() => refreshLocalPivots()}>Refresh pivots</button>
+          {pivotList.length > 0 ? (
+            <ul className="tsw-pivot-list">
+              {pivotList.map((pivot) => {
+                const destSheet = computed.sheets.find((item) => item.id === pivot.destSheetId);
+                return (
+                  <li key={pivot.id}>
+                    {pivot.name}: {pivot.sourceA1} → {pivot.placement === 'new-sheet' ? `new sheet ${destSheet?.name ?? 'Pivot'} at A1` : `${destSheet?.name ?? 'sheet'}!${pivot.destA1}`}
+                    <button type="button" onClick={() => refreshLocalPivots(pivot.id)}>Refresh {pivot.name}</button>
+                  </li>
+                );
+              })}
+            </ul>
           ) : null}
         </section>
 

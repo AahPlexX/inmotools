@@ -279,3 +279,53 @@ test('spills FILTER into an empty neighbor and keeps a saved cell comment', asyn
   await expect(cellAt(workspace, 2, 5)).toHaveText('Ink');
   await expect(cellAt(workspace, 2, 5)).toHaveAttribute('data-spill', 'true');
 });
+
+test('creates a local PivotTable on a new sheet and reads GETPIVOTDATA', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const workspace = await openWorkspace(page);
+  await workspace.getByTestId('tsw-pivot-source').fill('A1:B3');
+  await workspace.getByTestId('tsw-pivot-role-0').selectOption('row');
+  await workspace.getByTestId('tsw-pivot-role-1').selectOption('value');
+  await workspace.getByTestId('tsw-pivot-create').click();
+  const pivotTab = workspace.getByRole('tab', { name: 'Pivot1' });
+  await expect(pivotTab).toBeVisible();
+  await pivotTab.click();
+  await expect(cellAt(workspace, 0, 0)).toHaveText('Item');
+  await expect(cellAt(workspace, 1, 0)).toHaveText('Ink');
+  await expect(cellAt(workspace, 1, 1)).toHaveText('2');
+  await expect(cellAt(workspace, 2, 0)).toHaveText('Paper');
+  await expect(cellAt(workspace, 2, 1)).toHaveText('4');
+  await expect(cellAt(workspace, 3, 1)).toHaveText('6');
+
+  await workspace.getByRole('tab', { name: 'Sheet1' }).click();
+  await workspace.getByTestId('tsw-goto-a1').fill('F2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await workspace.locator('#tsw-formula').fill('=GETPIVOTDATA("Qty",Pivot1!A1,"Item","Paper")');
+  await workspace.getByRole('button', { name: 'Enter', exact: true }).click();
+  await expect(cellAt(workspace, 1, 5)).toHaveText('4');
+
+  await workspace.getByTestId('tsw-goto-a1').fill('B2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await workspace.locator('#tsw-formula').fill('10');
+  await workspace.getByRole('button', { name: 'Enter', exact: true }).click();
+  await expect(cellAt(workspace, 1, 5)).toHaveText('10');
+  await workspace.getByRole('tab', { name: 'Pivot1' }).click();
+  await expect(cellAt(workspace, 2, 1)).toHaveText('10');
+  await expect(cellAt(workspace, 3, 1)).toHaveText('12');
+});
+
+test('keeps pivot chrome usable at 320 CSS px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  const workspace = await openWorkspace(page);
+  const create = workspace.getByTestId('tsw-pivot-create');
+  await create.scrollIntoViewIfNeeded();
+  await expect(workspace.getByTestId('tsw-pivot-chrome')).toBeVisible();
+  await expect(create).toBeVisible();
+  await expect(workspace.getByTestId('tsw-pivot-refresh')).toBeVisible();
+  await expect(workspace.getByTestId('tsw-pivot-role-0')).toBeVisible();
+  const box = await workspace.getByTestId('tsw-pivot-chrome').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(-1);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(321);
+});
+

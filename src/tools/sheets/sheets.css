@@ -296,6 +296,65 @@
 .tsw-progress strong[data-status='stub-stage2'] { color: var(--warning); }
 .tsw-progress strong[data-status='in-progress'] { color: var(--muted); }
 
+.tsw-pivot-chrome {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.tsw-pivot-placement,
+.tsw-pivot-field-filters {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.tsw-pivot-placement label,
+.tsw-pivot-field-filters label {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 100%;
+}
+
+.tsw-pivot-fields {
+  display: grid;
+  gap: clamp(0.35rem, 1vw, 0.6rem);
+  width: 100%;
+}
+
+.tsw-pivot-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.tsw-pivot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.tsw-pivot-list li {
+  display: grid;
+  gap: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
 .tsw-chart {
   min-height: 14rem;
   position: relative;
@@ -556,7 +615,8 @@
   .tsw-toolbar button,
   .tsw-parity-chrome button,
   .tsw-sheet-tabs button,
-  .tsw-style-chrome button {
+  .tsw-style-chrome button,
+  .tsw-pivot-chrome button {
     flex: 1 1 calc(50% - 0.4rem);
     min-width: min(100%, 8.5rem);
   }
@@ -585,7 +645,8 @@
   .tsw-parity-chrome button,
   .tsw-sheet-tabs button,
   .tsw-style-chrome button,
-  .tsw-formula button {
+  .tsw-formula button,
+  .tsw-pivot-chrome button {
     flex: 1 1 100%;
     min-width: 0;
   }
