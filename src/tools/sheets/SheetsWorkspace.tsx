@@ -57,7 +57,7 @@ import {
   filenameFor,
   importBundleZip,
   importCsv,
-  importXlsx,
+  importXlsxWorkbook,
   parseBundle,
   sheetToCsv,
   toBundle,
@@ -109,6 +109,7 @@ import {
   type ParityClipboard,
   type PasteSpecialMode,
 } from './sheets-parity';
+import { omitSpillCells, spillOriginFromCell } from './sheets-spill';
 import {
   emptyMeta,
   starterWorkbook,
@@ -189,6 +190,7 @@ export default function SheetsWorkspace() {
   const [sheetMenu, setSheetMenu] = useState<{ x: number; y: number; sheetId: string } | null>(null);
   const [printView, setPrintView] = useState(false);
   const [insertOpen, setInsertOpen] = useState(false);
+  const [insertQuery, setInsertQuery] = useState('');
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sheetLongPress = useRef<ReturnType<typeof setTimeout> | null>(null);
   const parityClipboard = useRef<ParityClipboard | null>(null);
@@ -233,13 +235,22 @@ export default function SheetsWorkspace() {
   }, [book, selection.sheetId, unlockedSheetIds]);
 
   const activeCell = getCell(computed, sheetId, selection.r1, selection.c1);
+  const visibleFunctions = useMemo(() => {
+    const needle = insertQuery.trim().toLocaleLowerCase();
+    if (!needle) return FORMULA_CATALOG;
+    return FORMULA_CATALOG.filter((item) => (
+      item.name.toLocaleLowerCase().includes(needle) || item.summary.toLocaleLowerCase().includes(needle)
+    ));
+  }, [insertQuery]);
   useEffect(() => {
-    setFormula(activeCell?.f ?? displayCell(activeCell));
+    const origin = spillOriginFromCell(activeCell);
+    const originCell = origin ? getCell(computed, sheetId, origin.row, origin.col) : undefined;
+    setFormula(originCell?.f ?? activeCell?.f ?? displayCell(activeCell));
     setNote(activeCell?.note ?? '');
     setLink(activeCell?.hyperlink ?? '');
     setFormatZ(activeCell?.z ?? 'General');
     setOverflowMode(activeCell?.s?.overflow ?? 'ellipsis');
-  }, [activeCell, selection.r1, selection.c1, sheetId]);
+  }, [activeCell, selection.r1, selection.c1, sheetId, computed]);
 
   const visibleRows = useMemo(() => {
     if (!sheet) return [];
@@ -437,7 +448,7 @@ export default function SheetsWorkspace() {
 
   const persist = async () => {
     try {
-      const id = await saveWorkbook({ ...computed, name: meta.title || computed.name });
+      const id = await saveWorkbook({ ...omitSpillCells(computed), name: meta.title || computed.name });
       setPrefs((current) => ({ ...current, lastWorkbookId: id }));
       setLibrary(await listWorkbooks());
       setStatus('Saved this workbook in IndexedDB on this device.');
@@ -484,7 +495,7 @@ export default function SheetsWorkspace() {
         commit(bundle.workbook, `Imported portable bundle ${file.name}.`);
         return;
       }
-      commit(importXlsx(buffer, file.name), `Imported ${file.name} with SheetJS CE 0.20.3.`);
+      commit(await importXlsxWorkbook(buffer, file.name), `Imported ${file.name} with SheetJS CE 0.20.3.`);
     }).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : 'Import failed.');
     });
@@ -832,7 +843,10 @@ export default function SheetsWorkspace() {
         />
         <button type="button" onClick={applyFormula}>Enter</button>
         <button type="button" data-testid="tsw-autosum" onClick={applyAutoSum}>AutoSum</button>
-        <button type="button" data-testid="tsw-insert-function" aria-expanded={insertOpen} onClick={() => setInsertOpen((open) => !open)}>Insert function</button>
+        <button type="button" data-testid="tsw-insert-function" aria-expanded={insertOpen} onClick={() => {
+          setInsertOpen((open) => !open);
+          setInsertQuery('');
+        }}>Insert function</button>
         <button type="button" data-testid="tsw-formula-help" onClick={() => setFormulaTipOpen(true)}>Formula help</button>
         {listChoices.length ? (
           <label className="tsw-list-picker" htmlFor="tsw-list-picker">
@@ -1176,6 +1190,7 @@ export default function SheetsWorkspace() {
                         data-col={col}
                         data-selected={selected}
                         data-note={Boolean(cell?.note)}
+                        data-spill={Boolean(cell?.spillFrom)}
                         data-wrap={Boolean(cell?.s?.wrap)}
                         data-overflow={cell?.s?.overflow ?? 'ellipsis'}
                         data-frozen-row={Boolean(sheet && row < sheet.freezeRow)}
@@ -1276,14 +1291,23 @@ export default function SheetsWorkspace() {
       {insertOpen ? (
         <aside className="tsw-insert-function" data-testid="tsw-insert-function-list" role="dialog" aria-label="Insert function">
           <p>Tap a function to put its template in the formula bar. Help stays tap or focus, never hover-only.</p>
+          <label htmlFor="tsw-insert-function-search">Find a function</label>
+          <input
+            id="tsw-insert-function-search"
+            data-testid="tsw-insert-function-search"
+            value={insertQuery}
+            onChange={(event) => setInsertQuery(event.target.value)}
+            autoComplete="off"
+          />
           <ul>
-            {FORMULA_CATALOG.map((item) => (
+            {visibleFunctions.map((item) => (
               <li key={item.name}>
                 <button
                   type="button"
                   onClick={() => {
                     setFormula(item.template);
                     setInsertOpen(false);
+                    setInsertQuery('');
                     setFormulaTipOpen(true);
                     window.setTimeout(() => document.getElementById('tsw-formula')?.focus(), 0);
                   }}
@@ -1293,7 +1317,7 @@ export default function SheetsWorkspace() {
               </li>
             ))}
           </ul>
-          <button type="button" onClick={() => setInsertOpen(false)}>Close function list</button>
+          <button type="button" onClick={() => { setInsertOpen(false); setInsertQuery(''); }}>Close function list</button>
         </aside>
       ) : null}
 

@@ -1,25 +1,36 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Merged PR: https://github.com/AahPlexX/inmotools/pull/71 — CoS squash-merged `feature/tabular-sheet-parity` onto `main`. Product tip is that squash. Do not push to `feature/tabular-sheet-parity`. Do not touch unrelated tools.
+Draft PR: https://github.com/AahPlexX/inmotools/pull/73 — `feature/tabular-sheet-wave-a` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity`. Do not touch unrelated tools.
 
-**Tip SHA:** `b582c34dea4ba97ab7080743dc290eeb45946b54`  
-**Last focused-gate code:** `b582c34dea4ba97ab7080743dc290eeb45946b54`  
-**Workstream:** **PRODUCT CUT P1–P16 DONE** and merged on `main` via PR #71. Not an XLOOKUP-only cut. Do not invent extra product scope.
+**Tip SHA:** `c0da201`  
+**Last focused-gate code:** `c0da201`  
+**Workstream:** **Wave A** (Formula.js + FILTER/SORT/UNIQUE spill + export-surviving comments) on top of merged PR #71 P1–P16 / docs PR #72.
 
-## Merge status (PR #71)
+## Merge status (prior)
 
-- CoS squash-merged PR #71 onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54` (`feat(sheets): local Excel/Sheets parity slice for Tabular Sheet Workstation (#71)`).
-- Parent of that squash is `95db6eec84c7f77f096bdbfea69c75f79baaa96d`. Product code from the parity branch is on `main`.
-- Pre-merge diff vs `main` was sheets-scoped (19 files): `src/tools/sheets/*`, sheets unit/e2e, catalog sheets blurb only, `.tasks/IN_PROGRESS.md` TASK-022 line. Other tools' code is untouched.
-- Repository-wide validate remaining reds are **out-of-suite** e2e (same class as PR #70). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
+- CoS squash-merged PR #71 onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54`.
+- Docs PR #72 stamped HANDOFF to that squash (`6776107`).
+- This branch starts from `origin/main` at that tip and does not push to `feature/tabular-sheet-parity`.
 
 ## What works
 
-- FEATURE_MATRIX 1–36 remain `done`. Approved gap ledger P1–P16 are `done` with focused units/e2e. Exclusions X1–X10 stay listed.
-- P16 client harden: no hover-only, no overlap at phone/tablet CSS widths, long-press + click, tap/focus formula help, anti-slop sheets-only copy. Proof is `CLIENT_VIEWPORTS` (six portrait + six landscape CSS sizes). `P16_PROOF_NOT_ACCEPTED`: iPhone 13, `mobile-chromium`.
-- Insert Function stays the full locked catalog. FILTER / SORT / UNIQUE formulas stay excluded (X5).
-- Client loop closed on stamp `c37fff4` / content `3e87e0a`: laptop keyboard P0 (type-into-cell + ArrowUp), phone context-menu clamp/Escape, formula help on focus, Copy Gate catalog strings.
+- FEATURE_MATRIX 1–36 remain `done`. Approved gap ledger P1–P16 remain `done`. Wave A rows WA1–WA3 are `done` with focused evidence.
+- Portable DAG remains SSOT for the local grid. `@formulajs/formulajs@4.6.1` (exact pin, no `^`) supplies implementations for names the local catalog does not own. Locked P2 Insert Function names are unchanged.
+- FILTER, SORT, and UNIQUE spill into empty neighboring cells. Formula.js has no FILTER; its UNIQUE is not Excel UNIQUE; spill is engine-owned.
+- Cell comments/notes round-trip through exceljs XLSX and the portable JSON/zip bundle. No auth, no DB, no realtime threads.
+- P16 client harden unchanged: no hover-only, no overlap at phone/tablet CSS widths, long-press + click, tap/focus formula help, anti-slop sheets-only copy. Proof is `CLIENT_VIEWPORTS`. `P16_PROOF_NOT_ACCEPTED`: iPhone 13, `mobile-chromium`.
+
+## Spill limitations (honest)
+
+- Spill is same-sheet, into empty neighbors only. A value, formula, note, hyperlink, or foreign merge in the spill box writes `#SPILL!`.
+- Empty FILTER with no `if_empty` argument writes `#CALC!`.
+- Nested arrays that are not FILTER/SORT/UNIQUE take the top-left value (implicit intersection), except when flattened by functions such as SUM.
+- No `{1,2;3,4}` array constants, SEQUENCE, SORTBY, RANDARRAY, or dotted Excel names (`BETA.DIST`).
+- Named ranges remain single-cell in the portable table.
+- Range DAG expansion stops at 20,000 cells and then keeps corners only.
+- Spilled values are display/cache only; save and XLSX export omit `spillFrom` cells so Excel/this app recalculate from the origin formula.
+- Formula.js UNIQUE is not used for `UNIQUE()`; engine-owned UNIQUE is row-wise (optional `by_col` / `exactly_once`).
 
 ## P16 / responsive proof (PR review must enforce)
 
@@ -28,20 +39,18 @@ Do **not** treat iPhone 13 or the `mobile-chromium` Playwright project as the on
 Portrait (narrow phone → tablet): 320×740, 360×800, 390×844, 412×915, 430×932, 768×1024  
 Landscape (same widths, swapped): 740×320, 800×360, 844×390, 915×412, 932×430, 1024×768
 
-Each case checks: parity chrome visible, no horizontal page overflow (>8px fails), formula help `data-trigger=focus-or-tap` (never hover), help closed so the grid stays reachable, long-press context menu.
-
 ## Sheets gates (green at last focused-gate code)
 
 ```bash
-# focused units 42/42; pnpm build pass
-# desktop-chromium 24 passed
+# focused units 47/47; pnpm build pass
+# desktop-chromium 25 passed
 # P16 matrix 12/12 (6 portrait + 6 landscape)
 ```
 
-Counts last proven green on feature-branch stamp `c37fff4c1bdd98827266be6f6fd611901756e75e`, which is included in squash / product tip `b582c34dea4ba97ab7080743dc290eeb45946b54`. CoS sets last focused-gate to that squash. Verify commands:
+Counts last proven green on this branch. Verify commands:
 
 ```bash
-pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts
+pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts tests/unit/sheets-wave-a.test.ts
 
 pnpm build
 
@@ -53,7 +62,7 @@ pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=
 
 ## Known out-of-suite CI reds
 
-Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70. **Do not chase or edit those tools:**
+Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70 / #71. **Do not chase or edit those tools:**
 
 - `web-layout-studio` axe
 - `svg-sprite-compiler` axe
@@ -63,22 +72,24 @@ Do **not** claim the full Pages / PR validate suite is green. Validate may fail 
 - Python `re` named groups
 - `crystal-lattice-studio` mobile
 
-Pages / PR validate reds on those suites are not sheets regressions. Do not touch them unless a sheets change causes them.
+Catalog / lockfile edits select `__FULL_SUITE__` via `scripts/select-e2e-specs.mjs`. That is not a sheets regression.
 
 ## Excluded — do not build
 
-- Realtime collab
-- VBA / Apps Script
-- Cloud Power Query
-- Univer Pro pivots / drawing (`@univerjs-pro/*`, `preset-sheets-advanced`, `preset-sheets-drawing`)
+- Univer Pro / `@univerjs-pro/*` / `preset-sheets-advanced` / `preset-sheets-drawing`
 - HyperFormula
-- Auth / db / telemetry
-- FILTER / SORT / UNIQUE formulas (no spill without HyperFormula)
+- Realtime collab, auth, remote DB
+- VBA / Apps Script
+- Cloud Power Query / connectors
+- Workbook encryption / IRM
+- Solver / Goal Seek / Data Tables / Power Pivot
+- Wave B/C/D (pivots upgrade, drawing/sparklines pack, Sheet Actions)
+- SEQUENCE / SORTBY / RANDARRAY / array constants / dotted Excel names (X5)
 
 ## Next sequential steps
 
-1. PR #71 is merged. Do not push to `feature/tabular-sheet-parity`.
-2. Docs-only follow-ups land on a new branch → `main` as a draft PR. CoS merges. The agent does not merge.
-3. Keep Tip SHA / last focused-gate as the PR #71 squash product tip `b582c34dea4ba97ab7080743dc290eeb45946b54` unless CoS names a later product tip.
-4. Do not invent extra product scope beyond P1–P16.
+1. Keep draft PR #73. Push only `feature/tabular-sheet-wave-a`. Never merge. Never open a second PR.
+2. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
+3. Do not chase out-of-suite Pages reds listed above.
+4. Do not invent Wave B/C/D.
 5. Reject reviews that treat iPhone 13 / `mobile-chromium` as the only #16 proof.

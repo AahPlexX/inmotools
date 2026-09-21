@@ -130,9 +130,8 @@ describe('tabular sheet parity slice', () => {
     ]);
     expect(LOCKED_INSERT_FUNCTIONS).not.toEqual(['XLOOKUP']);
     const catalogNames = FORMULA_CATALOG.map((item) => item.name);
-    expect(catalogNames).not.toContain('FILTER');
-    expect(catalogNames).not.toContain('SORT');
-    expect(catalogNames).not.toContain('UNIQUE');
+    expect(catalogNames).toEqual(expect.arrayContaining(['FILTER', 'SORT', 'UNIQUE', 'LEFT', 'POWER']));
+    expect(catalogNames.indexOf('SUM')).toBeLessThan(catalogNames.indexOf('FILTER'));
     const filled = fillDownSelection(book, sheet.id, { r1: 1, c1: 1, r2: 4, c2: 1 });
     expect(filled.sheets[0]?.cells[cellKey(3, 1)]?.v).toBe(6);
   });

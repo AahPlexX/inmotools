@@ -126,10 +126,10 @@ test('exposes paste special, AutoSum, insert function, go to, and list picker', 
   await workspace.getByTestId('tsw-insert-function').click();
   const functions = workspace.getByTestId('tsw-insert-function-list');
   await expect(functions).toBeVisible();
-  for (const name of ['SUM', 'AVERAGE', 'IF', 'VLOOKUP', 'XLOOKUP', 'INDEX-MATCH', 'TEXTJOIN', 'COUNTIF', 'SUMIF']) {
+  for (const name of ['SUM', 'AVERAGE', 'IF', 'VLOOKUP', 'XLOOKUP', 'INDEX-MATCH', 'TEXTJOIN', 'COUNTIF', 'SUMIF', 'FILTER', 'SORT', 'UNIQUE']) {
     await expect(functions.getByRole('button', { name: new RegExp(`^${name} `) })).toBeVisible();
   }
-  await functions.getByRole('button', { name: /SUM —/ }).click();
+  await functions.getByRole('button', { name: /^SUM —/ }).click();
   await expect(workspace.locator('#tsw-formula')).toHaveValue('=SUM(');
   await expect(workspace.getByTestId('tsw-formula-tooltip')).toBeVisible();
   await workspace.getByRole('button', { name: 'Close formula help' }).click();
@@ -262,4 +262,20 @@ test('mounts Univer engine-formula as the live formula SSOT', async ({ page }) =
   await expect(host).toBeVisible({ timeout: 45_000 });
   await expect(workspace.getByTestId('tsw-formula-ssot')).toHaveText('univer-engine-formula', { timeout: 45_000 });
   await expect(host).toHaveAttribute('data-formula-ssot', 'univer-engine-formula');
+});
+
+test('spills FILTER into an empty neighbor and keeps a saved cell comment', async ({ page }) => {
+  const workspace = await openWorkspace(page);
+  await gridCell(workspace, 'Paper').click();
+  await workspace.locator('#tsw-note').fill('Keep this note');
+  await workspace.getByRole('button', { name: 'Save note' }).click();
+  await expect(cellAt(workspace, 1, 0)).toHaveAttribute('data-note', 'true');
+
+  await workspace.getByTestId('tsw-goto-a1').fill('F2');
+  await workspace.getByTestId('tsw-goto-apply').click();
+  await workspace.locator('#tsw-formula').fill('=FILTER(A2:A3,B2:B3>=2)');
+  await workspace.getByRole('button', { name: 'Enter', exact: true }).click();
+  await expect(cellAt(workspace, 1, 5)).toHaveText('Paper');
+  await expect(cellAt(workspace, 2, 5)).toHaveText('Ink');
+  await expect(cellAt(workspace, 2, 5)).toHaveAttribute('data-spill', 'true');
 });

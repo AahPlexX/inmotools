@@ -28,6 +28,7 @@ export interface SheetCell {
   s?: CellStyle;
   hyperlink?: string;
   note?: string;
+  spillFrom?: string;
 }
 
 export interface MergeRange {

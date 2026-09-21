@@ -3,7 +3,7 @@ import type { FeatureStatus } from './sheets-types';
 export const FEATURE_PROGRESS: FeatureStatus[] = [
   { id: 1, title: 'Multi-sheet workbook', status: 'done', note: 'Portable sheets + optional Univer host' },
   { id: 2, title: 'Formula bar', status: 'done', note: 'Workspace formula bar; Univer formulaBar when mounted' },
-  { id: 3, title: 'AST/DAG via Univer engine-formula', status: 'done', note: 'Live Univer engine-formula is SSOT when the host is mounted (data-testid=tsw-formula-ssot, univer-host data-formula-ssot). Portable DAG remains the offline evaluator. Proof: tests/unit/sheets-stage2.test.ts + tests/e2e/tabular-sheet-workstation.spec.ts. Official: https://docs.univer.ai/guides/sheets/features/core as-of 2026-09-19' },
+  { id: 3, title: 'AST/DAG via Univer engine-formula', status: 'done', note: 'Live Univer engine-formula is SSOT when the host is mounted (data-testid=tsw-formula-ssot, univer-host data-formula-ssot). Portable DAG remains the offline evaluator and calls @formulajs/formulajs@4.6.1 for names the local catalog does not own. Proof: tests/unit/sheets-stage2.test.ts + tests/unit/sheets-wave-a.test.ts + tests/e2e/tabular-sheet-workstation.spec.ts. Official: https://docs.univer.ai/guides/sheets/features/core as-of 2026-09-19' },
   { id: 4, title: 'Relative / absolute refs', status: 'done', note: 'Parse and fill rewrite for $A$1 / A$1 / $A1 / A1' },
   { id: 5, title: 'Cross-sheet refs', status: 'done', note: 'Sheet2!A1 and quoted sheet names' },
   { id: 6, title: 'Named ranges', status: 'done', note: 'Portable named-range table' },
@@ -29,7 +29,7 @@ export const FEATURE_PROGRESS: FeatureStatus[] = [
   { id: 26, title: 'Zoom', status: 'done', note: '50–200% workspace zoom' },
   { id: 27, title: 'Wrap / overflow', status: 'done', note: 'Wrap toggle + overflow clip/ellipsis/overflow chrome. Hooks: data-testid=tsw-wrap and tsw-overflow. Evidence: sheets-stage2 unit + tabular-sheet-workstation.spec.ts' },
   { id: 28, title: 'Hyperlinks', status: 'done', note: 'Per-cell links' },
-  { id: 29, title: 'Comments / notes', status: 'done', note: 'Portable notes; no Pro thread-comment' },
+  { id: 29, title: 'Comments / notes', status: 'done', note: 'Portable notes round-trip through XLSX and the portable bundle. No Pro thread-comment.' },
   { id: 30, title: 'IndexedDB persistence', status: 'done', note: 'Dexie scoped to this tool' },
   { id: 31, title: 'LocalStorage prefs', status: 'done', note: 'Zoom/theme/last id' },
   { id: 32, title: 'XLSX import SheetJS CE 0.20.3', status: 'done', note: 'Official CE tarball; formulas, merges, and safe hyperlinks' },
