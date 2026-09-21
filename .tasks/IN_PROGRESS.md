@@ -1,5 +1,8 @@
 # In Progress
 
+- **Sightline Velocity UX/real-world audit remediation** — DONE. F1–F35 remain implemented; this follow-up did not expand the feature denominator. Accepted work: accurate multi-file failure accounting + in-session document switching, loaded-state source collapse, persistent reading cockpit/direct WPM, progressive disclosure of specialist controls/diagnostics/technical metadata/contents, live status semantics, nested drag-leave correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel ARIA wiring, and container/coarse-pointer/mobile responsive ergonomics. Source of truth: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
+  - 2026-09-21 verification on `origin/main` merged in: `tsc --noEmit -p tsconfig.app.json` clean; `pnpm exec vitest run tests/unit` 1465/1466 passing (the 1 failure is the unrelated, environmental `markdown-citation.test.ts` CSL-formatting timeout); `pnpm build` clean; the full `tests/e2e/sightline.spec.ts` (48 cases, including the automated accessibility sweep and full keyboard-only operability check) passes on desktop+mobile Chromium in an isolated single-worker run.
+
 - **Transcode Workstation** — universal local file-to-file transcoder, tabular data transformer, and multi-format media conversion workstation with 36 planned functional capabilities.
   - Design: `docs/superpowers/specs/2026-09-15-transcode-workstation-design.md`.
   - Plan and feature ledger: `docs/superpowers/plans/2026-09-15-transcode-workstation.md`.
