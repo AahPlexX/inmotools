@@ -20,6 +20,8 @@
   - Completion gate: every ledger item in the design document implemented or explicitly excluded per its scope policy, each phase's own unit/build/Playwright evidence green, and the repository-wide Pages workflow green on the integrated revision. Phase 1 alone is not workstream completion — Phases 2-4 (sequential/combinational depth and the logic-analyzer dock; buses, subcircuits, memory, arithmetic, K-map, educational modes; HDL/netlist/PDF/BOM export; the one remaining deferred Phase 1 UX gap above) remain open and are fully specified in the plan for continuation by any session.
   - Scope: `src/tools/logic/`, `tests/unit/logic-*.test.ts`, `tests/e2e/logic.spec.ts`, this design/plan pair, and the additive catalog/loader registration. Other workstreams and branches are preserved.
 
+- **Markdown Workbench MVP completion** — DONE. Merged on `main` via PR #46 (squash `ed23235a`): source highlighting, discoverable syntax guide, touch formatting/search, draft/file race guards, full formatting toolbar, local paste/drop image embedding, GitHub-style alert blockquotes, heading anchor ids, a working Table of Contents insert, a curated emoji shortcode set, fenced-code syntax coloring, and a fix for a CodeMirror-vs-workspace file-drop race. Details: `docs/markdown-audit-2026-09-16.md`.
+
 - **Tabular Sheet Workstation (TASK-022)** — Wave A DONE. Merged on `main` via PR #73 (https://github.com/AahPlexX/inmotools/pull/73) squash `4dcc856bc97027862342513cdea7eb769c0ffbc1`. Do not push to `feature/tabular-sheet-wave-a`. Do not invent Wave B/C/D. Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3 stay `done`. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5). FILTER/SORT/UNIQUE spill is Wave A.
@@ -30,8 +32,6 @@
   - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
   - Stack pins: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`, `@formulajs/formulajs@4.6.1` exact. No Univer Pro, HyperFormula, AI, or auth/db.
   - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`, `package.json` pin + lockfile. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
-
-- **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.

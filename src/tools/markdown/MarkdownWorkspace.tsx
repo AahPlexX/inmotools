@@ -576,6 +576,7 @@ export default function MarkdownWorkspace() {
             value={source}
             onChange={setSource}
             onCursorLineChange={view === 'split' ? scrollPreviewToLine : undefined}
+            onStatus={setStatus}
             lineWrapping={lineWrapping}
             fontSize={fontSize}
             vimMode={vimMode}
