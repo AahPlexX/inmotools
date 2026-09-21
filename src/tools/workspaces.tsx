@@ -33,6 +33,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
   'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
+  'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
 };
