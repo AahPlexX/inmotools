@@ -1,56 +1,83 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: https://github.com/AahPlexX/inmotools/pull/70 — `feature/tabular-sheet-workstation` → `main` only. Do not merge. Do not open a new PR.
+Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not open a second PR. Do not touch unrelated tools.
 
-**Tip SHA:** `f38f2bf15f8a8f7a71f9f83b535382a32442b6d9`  
-**Last focused-gate code:** `b57c65a5e479ab99314ad5e521874d531fd0677a`  
-**Stage 2 close (not current):** `bc406b78dc80bd958d65479096a20d3447af0139` — Stage 2 chrome + catalog-axe progress-list fix. TASK-022 is post-Stage-3.
+**Tip SHA:** `febf88c2a699f66f906cbdfd43e7ad92a0b554b0`  
+**Last focused-gate code:** `c37fff4c1bdd98827266be6f6fd611901756e75e`  
+**Workstream:** **PRODUCT CUT P1–P16 DONE.** Ready for CoS to undraft and squash-merge. CoS merges — the agent does not merge, mark ready, or open a second PR. Not an XLOOKUP-only cut. Do not invent extra product scope.
+
+## Merge readiness (for CoS squash-merge)
+
+- `origin/main` fetched at `95db6eec84c7f77f096bdbfea69c75f79baaa96d`. Merge-base equals that tip. **No rebase or merge of main was required.** `git merge origin/main` is already up to date. **No conflict resolutions.**
+- Diff vs `main` stays sheets-scoped (19 files): `src/tools/sheets/*`, sheets unit/e2e, catalog sheets blurb only, `.tasks/IN_PROGRESS.md` TASK-022 line. Other tools' code is untouched.
+- Git merge into `main` is clean. GitHub `mergeable_state` may stay `unstable` because repository-wide validate is red on **out-of-suite** e2e (same class as PR #70). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
 
 ## What works
 
-- FEATURE_MATRIX 1–36 remain `done`. Stage 2 surfaces stay in place (formula SSOT, format/style/wrap, autofilter, validation, CF, context menu + long-press, tap/focus formula help).
-- Post-Stage-3 local-grid audit fixes: range select (drag / Shift+click / Shift+arrows), merge paint, freeze pins, column/row size chrome, range TSV cut/copy/clear, case-insensitive find/replace, safe hyperlinks, inline sheet rename, SheetJS formula/merge import, exceljs ARGB, CSV blank rows kept.
-- Portable DAG evaluator; optional Univer `@univerjs/presets@0.25.1` + `@univerjs/preset-sheets-core@0.25.1` (`contextMenu: false`). Live `engine-formula` is SSOT only while mounted.
-- Local-only persist (IndexedDB + LocalStorage). Charts reuse `chart.js@4.5.1`. Pivot is in-house group-by.
+- FEATURE_MATRIX 1–36 remain `done`. Approved gap ledger P1–P16 are `done` with focused units/e2e. Exclusions X1–X10 stay listed.
+- P16 client harden: no hover-only, no overlap at phone/tablet CSS widths, long-press + click, tap/focus formula help, anti-slop sheets-only copy. Proof is `CLIENT_VIEWPORTS` (six portrait + six landscape CSS sizes). `P16_PROOF_NOT_ACCEPTED`: iPhone 13, `mobile-chromium`.
+- Insert Function stays the full locked catalog. FILTER / SORT / UNIQUE formulas stay excluded (X5).
+- Client loop closed on stamp `c37fff4` / content `3e87e0a`: laptop keyboard P0 (type-into-cell + ArrowUp), phone context-menu clamp/Escape, formula help on focus, Copy Gate catalog strings.
 
-## Sheets gates (green)
+## P16 / responsive proof (PR review must enforce)
+
+Do **not** treat iPhone 13 or the `mobile-chromium` Playwright project as the only mobile gate. P16 and any responsive parity UI pass only when the CSS-width matrix is green on `desktop-chromium` via `page.setViewportSize`.
+
+Portrait (narrow phone → tablet): 320×740, 360×800, 390×844, 412×915, 430×932, 768×1024  
+Landscape (same widths, swapped): 740×320, 800×360, 844×390, 915×412, 932×430, 1024×768
+
+Each case checks: parity chrome visible, no horizontal page overflow (>8px fails), formula help `data-trigger=focus-or-tap` (never hover), help closed so the grid stays reachable, long-press context menu.
+
+## Sheets gates (green at last focused-gate code)
 
 ```bash
-pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts
-# 27/27
+# focused units 42/42; pnpm build pass
+# desktop-chromium 24 passed
+# P16 matrix 12/12 (6 portrait + 6 landscape)
+```
+
+Counts re-verified after `origin/main` fetch on code tip `c37fff4c1bdd98827266be6f6fd611901756e75e`. Verify commands:
+
+```bash
+pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts
 
 pnpm build
-# pass
 
-pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts
-# 13 passed, 1 skipped (mobile axe by design)
+# P16 device-agnostic matrix — required. Not an iPhone 13-only story.
+pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium -g 'keeps parity chrome readable at'
 
-pnpm exec playwright test tests/e2e/accessibility.spec.ts -g 'tabular-sheet-workstation'
-# 2/2 desktop + mobile
+pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=desktop-chromium
 ```
 
 ## Known out-of-suite CI reds
 
-Pages / PR validate run `35477210462` is red. Failures are not sheets-owned:
+Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70. **Do not chase or edit those tools:**
 
-- `accessibility.spec.ts` — web-layout-studio, svg-sprite-compiler (desktop + mobile)
-- `app.spec.ts` — stale lazy chunk recovery
-- `audit-hardening.spec.ts` — Hardware Packet Inspector; GeoJSON Simplifier
-- `regex-matrix.spec.ts` — Python re named groups
-- `crystal-lattice-studio.spec.ts` — mobile symmetry-break
+- `web-layout-studio` axe
+- `svg-sprite-compiler` axe
+- stale lazy chunk
+- Hardware Packet Inspector
+- GeoJSON Simplifier
+- Python `re` named groups
+- `crystal-lattice-studio` mobile
 
-Do not chase these unless a sheets change causes them. Catalog / lockfile edits select `__FULL_SUITE__` via `scripts/select-e2e-specs.mjs`.
+Pages / PR validate reds on those suites are not sheets regressions. Do not touch them unless a sheets change causes them.
 
-## Deferred
+## Excluded — do not build
 
-1. Univer host remounts only on `book.id` (portable grid is the edit SSOT).
-2. GOVERNANCE §4 vs keep-draft: do not merge PR #70 to satisfy `origin/main`.
-3. `pnpm-lock.yaml` may list `@univerjs-pro/*` as transitive 0.25.1 metadata; source/`package.json` do not import them.
+- Realtime collab
+- VBA / Apps Script
+- Cloud Power Query
+- Univer Pro pivots / drawing (`@univerjs-pro/*`, `preset-sheets-advanced`, `preset-sheets-drawing`)
+- HyperFormula
+- Auth / db / telemetry
+- FILTER / SORT / UNIQUE formulas (no spill without HyperFormula)
 
 ## Next sequential steps
 
-1. Keep draft PR #70. Push only `feature/tabular-sheet-workstation`. Never merge. Never open a new PR.
-2. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
-3. Do not chase out-of-suite Pages reds listed above.
-4. Two-way Univer sync is a new scoped task if requested — not a FEATURE_MATRIX status change without evidence.
+1. Stay on draft PR #71. Do not open a second PR. The agent does not merge or mark ready.
+2. CoS may undraft and squash-merge when ready. Squash keeps other tools' `main` history intact.
+3. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
+4. Do not invent extra product scope beyond P1–P16.
+5. Reject reviews that treat iPhone 13 / `mobile-chromium` as the only #16 proof.

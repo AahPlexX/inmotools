@@ -52,14 +52,21 @@ export interface ValidationRule {
   message: string;
 }
 
+export type ConditionalFormatKind = 'gt' | 'lt' | 'eq' | 'contains' | 'color-scale';
+
 export interface ConditionalFormat {
   id: string;
   sheetId: string;
   a1: string;
-  kind: 'gt' | 'lt' | 'eq' | 'contains';
+  kind: ConditionalFormatKind;
   argument: string;
   fill: string;
   color: string;
+}
+
+export interface SheetProtect {
+  salt: string;
+  hash: string;
 }
 
 export interface SheetComment {
@@ -85,6 +92,9 @@ export interface PortableSheet {
   hiddenCols: number[];
   filterHeaderRow: number | null;
   columnFilters?: Record<string, ColumnFilterState>;
+  hidden?: boolean;
+  tabColor?: string;
+  protect?: SheetProtect | null;
 }
 
 export interface PortableWorkbook {
@@ -158,6 +168,9 @@ export function createSheet(name: string, id = cryptoRandomId()): PortableSheet 
     hiddenRows: [],
     hiddenCols: [],
     filterHeaderRow: null,
+    hidden: false,
+    tabColor: undefined,
+    protect: null,
   };
 }
 

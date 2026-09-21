@@ -6,6 +6,7 @@ import { PagedTable } from '../../components/PagedTable';
 import {
   CONTEXT_MENU_ACTIONS,
   cancelLongPressStub,
+  contextMenuPixelSize,
   scheduleLongPressStub,
   suppressNativeContextMenu,
   type ContextMenuActionId,
@@ -17,7 +18,6 @@ import {
   collectRange,
   deleteCols,
   deleteRows,
-  fillHandle,
   freezePanes,
   getCell,
   insertCols,
@@ -32,7 +32,6 @@ import {
 } from './sheets-model';
 import {
   applyResizeToSelection,
-  clearRange,
   clampSelection,
   findReplaceInSheet,
   frozenOffset,
@@ -70,9 +69,46 @@ import { mountUniverSheets, readUniverCalculated, type UniverHost } from './shee
 import { NUMBER_FORMATS, applyNumberFormat, formatDisplay } from './sheets-format';
 import { applyStyleToRange, overflowCss, wrapCss } from './sheets-style';
 import { applyColumnAutofilter, distinctColumnValues } from './sheets-filter';
-import { enforceValidation, removeValidation, upsertValidation } from './sheets-validation';
+import { enforceValidation, listValidationForCell, removeValidation, upsertValidation } from './sheets-validation';
 import { applyConditionalFormatPaint, removeConditionalFormat, upsertConditionalFormat } from './sheets-cf';
-import { clampPopupBox, describeFormula, resolveFormulaSsot } from './sheets-chrome';
+import {
+  applyGridTypeover,
+  clampPopupBox,
+  describeFormula,
+  gridKeyIntent,
+  gridNavBlockedByTyping,
+  resolveFormulaSsot,
+  shouldDismissSheetsOverlays,
+} from './sheets-chrome';
+import {
+  fillDownSelection,
+  FORMULA_CATALOG,
+  autoSumPlacement,
+  clearRangeMode,
+  createSheetProtect,
+  currentDateValue,
+  deleteNamedRange,
+  gotoSpecial,
+  hiddenSheets,
+  insertFunctionTemplate,
+  jumpToDataEdge,
+  namedRangeBounds,
+  parseGotoA1,
+  pasteSpecial,
+  removeDuplicates,
+  setSheetHidden,
+  setSheetProtect,
+  setSheetTabColor,
+  sheetIsLocked,
+  snapshotRange,
+  textToColumns,
+  verifySheetProtect,
+  visibleSheets,
+  type ClearMode,
+  type GotoKind,
+  type ParityClipboard,
+  type PasteSpecialMode,
+} from './sheets-parity';
 import {
   emptyMeta,
   starterWorkbook,
@@ -115,7 +151,7 @@ export default function SheetsWorkspace() {
   const [univerReady, setUniverReady] = useState(false);
   const [univerProof, setUniverProof] = useState<{ a1: string; value: unknown; formula: string } | null>(null);
   const [library, setLibrary] = useState<StoredWorkbook[]>([]);
-  const [chartKind, setChartKind] = useState<ChartKind>('bar');
+  const [chartKind, setChartKind] = useState<ChartKind>('column');
   const [pivotAgg, setPivotAgg] = useState<PivotAgg>('sum');
   const [namedName, setNamedName] = useState('TaxRate');
   const [namedA1, setNamedA1] = useState('B1');
@@ -126,7 +162,7 @@ export default function SheetsWorkspace() {
   const [overflowMode, setOverflowMode] = useState<OverflowMode>('ellipsis');
   const [filterCol, setFilterCol] = useState<number | null>(null);
   const [filterQuery, setFilterQuery] = useState('');
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
   const [formulaTipOpen, setFormulaTipOpen] = useState(false);
   const [validationStatus, setValidationStatus] = useState('');
   const [validationDraft, setValidationDraft] = useState<Omit<ValidationRule, 'id' | 'sheetId'>>({
@@ -145,13 +181,26 @@ export default function SheetsWorkspace() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [tipPos, setTipPos] = useState({ left: 12, top: 220, width: 280 });
+  const [customFormat, setCustomFormat] = useState('');
+  const [gotoA1, setGotoA1] = useState('A1');
+  const [splitDelimiter, setSplitDelimiter] = useState(',');
+  const [pinDraft, setPinDraft] = useState('');
+  const [unlockedSheetIds, setUnlockedSheetIds] = useState<string[]>([]);
+  const [sheetMenu, setSheetMenu] = useState<{ x: number; y: number; sheetId: string } | null>(null);
+  const [printView, setPrintView] = useState(false);
+  const [insertOpen, setInsertOpen] = useState(false);
   const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sheetLongPress = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parityClipboard = useRef<ParityClipboard | null>(null);
   const pointer = useRef({ x: 0, y: 0, dragging: false });
   const univerHost = useRef<UniverHost | null>(null);
   const univerNode = useRef<HTMLDivElement | null>(null);
   const chartNode = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
   const formulaBar = useRef<HTMLDivElement | null>(null);
+  const gridScroll = useRef<HTMLDivElement | null>(null);
+  const gridOwnsKeys = useRef(true);
+  const [gridEditing, setGridEditing] = useState(false);
 
   const computed = useMemo(() => evaluateWorkbook(book), [book]);
   const sheet = computed.sheets.find((item) => item.id === (selection.sheetId || computed.activeSheetId)) ?? computed.sheets[0];
@@ -171,12 +220,17 @@ export default function SheetsWorkspace() {
     void listWorkbooks().then(setLibrary).catch(() => undefined);
   }, [book.id]);
 
-  const commit = useCallback((next: PortableWorkbook, message: string) => {
+  const commit = useCallback((next: PortableWorkbook, message: string, options?: { allowLocked?: boolean }) => {
+    const current = book.sheets.find((item) => item.id === (selection.sheetId || book.activeSheetId));
+    if (!options?.allowLocked && sheetIsLocked(current, unlockedSheetIds)) {
+      setStatus('This sheet is locked. Enter the local PIN to edit.');
+      return;
+    }
     setHistory((stack) => [...stack.slice(-40), book]);
     setFuture([]);
     setBook(next);
     setStatus(message);
-  }, [book]);
+  }, [book, selection.sheetId, unlockedSheetIds]);
 
   const activeCell = getCell(computed, sheetId, selection.r1, selection.c1);
   useEffect(() => {
@@ -259,8 +313,9 @@ export default function SheetsWorkspace() {
   }, [engine, book.id]);
 
   const openContextMenuAt = (x: number, y: number) => {
-    const box = clampPopupBox({ x, y, width: 228, height: 360 }, { width: window.innerWidth, height: window.innerHeight });
-    setContextMenu({ x: box.left, y: box.top });
+    const size = contextMenuPixelSize();
+    const box = clampPopupBox({ x, y, width: size.width, height: size.height }, { width: window.innerWidth, height: window.innerHeight });
+    setContextMenu({ x: box.left, y: box.top, maxHeight: box.height });
   };
 
   const applyFormula = () => {
@@ -302,28 +357,21 @@ export default function SheetsWorkspace() {
 
   const copySelection = async () => {
     if (!sheet) return;
-    const text = rangeToTsv(computed, sheet.id, selection, cellLabel);
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    const snapshot = snapshotRange(computed, sheet.id, selection, cellLabel);
+    parityClipboard.current = snapshot;
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(snapshot.tsv);
     setStatus('Copied the current selection locally.');
   };
 
-  const pasteSelection = async () => {
+  const pasteSelection = async (mode: PasteSpecialMode = 'all') => {
+    const snapshot = parityClipboard.current;
+    if (snapshot) {
+      commit(pasteSpecial(book, sheetId, { row: selection.r1, col: selection.c1 }, snapshot, mode), `Pasted ${mode} into the selection.`);
+      return;
+    }
     if (!navigator.clipboard?.readText) return;
     const text = await navigator.clipboard.readText();
-    const rows = text.split(/\r?\n/);
-    let next = book;
-    rows.forEach((line, r) => {
-      line.split('\t').forEach((value, c) => {
-        const check = enforceValidation(next, sheetId, selection.r1 + r, selection.c1 + c, value);
-        if (!check.ok) {
-          setValidationStatus(check.message);
-          setStatus(check.message);
-          return;
-        }
-        next = setCell(next, sheetId, selection.r1 + r, selection.c1 + c, value.startsWith('=') ? { f: value } : { v: value });
-      });
-    });
-    commit(next, 'Pasted into the selection.');
+    commit(pasteSpecial(book, sheetId, { row: selection.r1, col: selection.c1 }, text, mode), `Pasted ${mode} into the selection.`);
   };
 
   const findReplace = (doReplace: boolean) => {
@@ -332,8 +380,59 @@ export default function SheetsWorkspace() {
     else setStatus(`Found ${result.hits} cell${result.hits === 1 ? '' : 's'}.`);
   };
 
-  const clearActiveRange = (message: string) => {
-    commit(clearRange(book, sheetId, selection), message);
+  const clearActiveRange = (message: string, mode: ClearMode = 'contents') => {
+    commit(clearRangeMode(book, sheetId, selection, mode), message);
+  };
+
+  const revealCell = (row: number, col: number) => {
+    const node = gridScroll.current;
+    const left = Math.max(0, col * 72 - 48);
+    const top = Math.max(0, row * 28 - 40);
+    node?.scrollTo({ left, top });
+    setScroll({
+      row: Math.max(0, Math.floor(top / 28)),
+      col: Math.max(0, Math.floor(left / 72)),
+    });
+  };
+
+  const applyAutoSum = () => {
+    const placed = autoSumPlacement(computed, sheetId, selection);
+    if (!placed) {
+      setStatus('AutoSum needs numbers above the active cell or a selected range.');
+      return;
+    }
+    commit(setCell(book, sheetId, placed.row, placed.col, { f: placed.formula, v: null }), `Wrote ${placed.formula}.`);
+    setSelection((current) => ({ ...current, r1: placed.row, c1: placed.col, r2: placed.row, c2: placed.col }));
+    revealCell(placed.row, placed.col);
+    setFormula(placed.formula);
+  };
+
+  const jumpGoto = (kind?: GotoKind) => {
+    if (kind) {
+      const hits = gotoSpecial(computed, sheetId, selection, kind);
+      const first = hits[0];
+      if (!first) {
+        setStatus(`No ${kind} in the selection.`);
+        return;
+      }
+      setSelection((current) => ({ ...current, r1: first.row, c1: first.col, r2: first.row, c2: first.col }));
+      revealCell(first.row, first.col);
+      setStatus(`Go to special: ${hits.length} ${kind}.`);
+      return;
+    }
+    const cell = parseGotoA1(gotoA1);
+    if (!cell) {
+      setStatus('Go to needs an A1 address such as B4.');
+      return;
+    }
+    setSelection((current) => ({ ...current, r1: cell.row, c1: cell.col, r2: cell.row, c2: cell.col }));
+    revealCell(cell.row, cell.col);
+    setStatus(`Moved to ${gotoA1.toUpperCase()}.`);
+  };
+
+  const openSheetMenuAt = (sheetKey: string, x: number, y: number) => {
+    const box = clampPopupBox({ x, y, width: 228, height: 280 }, { width: window.innerWidth, height: window.innerHeight });
+    setSheetMenu({ x: box.left, y: box.top, sheetId: sheetKey });
   };
 
   const persist = async () => {
@@ -429,8 +528,13 @@ export default function SheetsWorkspace() {
       return { sheetId, r1: row, c1: col, r2: row, c2: col };
     });
     setBook((current) => ({ ...current, activeSheetId: sheetId }));
+    setInsertOpen(false);
+    setGridEditing(false);
+    gridOwnsKeys.current = true;
+    gridScroll.current?.focus({ preventScroll: true });
+    event.currentTarget.focus({ preventScroll: true });
     const cell = sheet?.cells[`${row},${col}`];
-    if (cell?.f) setFormulaTipOpen(true);
+    setFormulaTipOpen(Boolean(cell?.f));
     scheduleLongPressStub(longPress, () => {
       pointer.current.dragging = false;
       openContextMenuAt(pointer.current.x, pointer.current.y);
@@ -466,7 +570,19 @@ export default function SheetsWorkspace() {
       return;
     }
     if (id === 'paste') {
-      void pasteSelection();
+      void pasteSelection('all');
+      return;
+    }
+    if (id === 'paste-values') {
+      void pasteSelection('values');
+      return;
+    }
+    if (id === 'paste-formats') {
+      void pasteSelection('formats');
+      return;
+    }
+    if (id === 'paste-transpose') {
+      void pasteSelection('transpose');
       return;
     }
     if (id === 'insert-row') {
@@ -489,24 +605,46 @@ export default function SheetsWorkspace() {
       commit(applyStyleToRange(book, sheetId, selection, { wrap: !activeCell?.s?.wrap }), 'Toggled wrap on the selection.');
       return;
     }
-    clearActiveRange('Cleared the current selection.');
+    if (id === 'clear-all') {
+      clearActiveRange('Cleared values, formulas, notes, links, and style.', 'all');
+      return;
+    }
+    clearActiveRange('Cleared values and formulas in the selection.');
   };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.target instanceof HTMLElement)) return;
-      const typing = event.target.closest('input, textarea, select');
-      if (event.key === 'Escape') {
+      if (shouldDismissSheetsOverlays(event.key)) {
         setContextMenu(null);
+        setSheetMenu(null);
         setFormulaTipOpen(false);
         setFilterCol(null);
+        setInsertOpen(false);
+        if (gridEditing) {
+          event.preventDefault();
+          setFormula(activeCell?.f ?? displayCell(activeCell));
+          setGridEditing(false);
+          return;
+        }
+      }
+      const target = event.target instanceof Element ? event.target : null;
+      if (gridNavBlockedByTyping(target, gridOwnsKeys.current)) return;
+      const leftoverFormula = Boolean(target?.closest('#tsw-formula')) && gridOwnsKeys.current;
+      if (leftoverFormula) {
+        event.preventDefault();
+        event.stopPropagation();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
         void persist();
         return;
       }
-      if (typing) return;
+      if (event.key === 'F2') {
+        event.preventDefault();
+        gridOwnsKeys.current = false;
+        document.getElementById('tsw-formula')?.focus();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         undo();
@@ -519,18 +657,54 @@ export default function SheetsWorkspace() {
         event.preventDefault();
         document.getElementById('tsw-find')?.focus();
       }
+      if ((event.ctrlKey || event.metaKey) && event.key === ';') {
+        event.preventDefault();
+        const today = currentDateValue();
+        commit(setCell(book, sheetId, selection.r1, selection.c1, { v: today, f: null }), `Inserted ${today}.`);
+        setFormula(today);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        commit(fillDownSelection(book, sheetId, selection), 'Filled the selection.');
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') void copySelection();
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
         void copySelection();
         clearActiveRange('Cut the current selection.');
       }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') void pasteSelection();
-      if (event.key === 'Enter') applyFormula();
-      if (event.key === 'Delete') clearActiveRange('Cleared the current selection.');
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') void pasteSelection('all');
+      const intent = gridKeyIntent(event, gridEditing);
+      if (intent === 'typeover') {
+        event.preventDefault();
+        const next = applyGridTypeover(formula, gridEditing, event.key);
+        setFormula(next.formula);
+        setGridEditing(true);
+        return;
+      }
+      if (intent === 'commit') {
+        event.preventDefault();
+        applyFormula();
+        setGridEditing(false);
+        return;
+      }
+      if (intent === 'cancel') return;
+      if (event.key === 'Delete' && !gridEditing) clearActiveRange('Cleared values and formulas in the selection.');
+      if (intent === 'move') {
         event.preventDefault();
         const dRow = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
         const dCol = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (event.ctrlKey || event.metaKey) {
+          const edge = jumpToDataEdge(computed, sheetId, { row: selection.r1, col: selection.c1 }, dRow, dCol);
+          setSelection((current) => (
+            event.shiftKey
+              ? { ...current, sheetId, r2: edge.row, c2: edge.col }
+              : { sheetId, r1: edge.row, c1: edge.col, r2: edge.row, c2: edge.col }
+          ));
+          revealCell(edge.row, edge.col);
+          return;
+        }
         setSelection((current) => ({
           ...current,
           sheetId,
@@ -538,8 +712,8 @@ export default function SheetsWorkspace() {
         }));
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   });
 
   useEffect(() => {
@@ -564,18 +738,25 @@ export default function SheetsWorkspace() {
   }, [formulaTipOpen]);
 
   const summary = progressSummary();
-  const fillTarget = selection.r1 === selection.r2 && selection.c1 === selection.c2
-    ? { row: selection.r1 + 3, col: selection.c1 }
-    : { row: selection.r2, col: selection.c2 };
   const selectedColWidth = sheet?.columnWidths[String(selection.c1)] ?? 72;
   const selectedRowHeight = sheet?.rowHeights[String(selection.r1)] ?? 28;
+  const listChoices = listValidationForCell(book, sheetId, selection.r1, selection.c1);
+  const locked = sheetIsLocked(sheet, unlockedSheetIds);
+  const tabs = visibleSheets(computed);
+  const hiddenTabs = hiddenSheets(computed);
 
   return (
-    <div className="workspace-body tsw-root" data-theme={prefs.theme} data-testid="tabular-sheet-workspace">
+    <div
+      className="workspace-body tsw-root"
+      data-theme={prefs.theme}
+      data-print-view={printView}
+      data-sheet-locked={locked}
+      data-testid="tabular-sheet-workspace"
+    >
       <div className="workspace-header">
         <div>
           <h2>Tabular Sheet Workstation</h2>
-          <p>Local multi-sheet workbook. Univer engine-formula is the live formula SSOT when mounted; otherwise the portable DAG evaluator. Drag or Shift+click to select a range.</p>
+          <p>Local multi-sheet workbook. Univer engine-formula is the live formula SSOT when mounted; otherwise the portable DAG evaluator. Drag, Shift+click, or long-press a cell. Formula help opens from tap or focus, not hover.</p>
         </div>
         <p className="tsw-engine-note" role="status">{status}</p>
       </div>
@@ -595,7 +776,7 @@ export default function SheetsWorkspace() {
         <button type="button" onClick={() => commit(freezePanes(book, sheetId, selection.r1, selection.c1), 'Froze panes at the active cell.')}>Freeze</button>
         <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'asc'), 'Sorted the selection ascending.')}>Sort A–Z</button>
         <button type="button" onClick={() => commit(sortRange(book, sheetId, selection, selection.c1, 'desc'), 'Sorted the selection descending.')}>Sort Z–A</button>
-        <button type="button" onClick={() => commit(fillHandle(book, sheetId, { row: selection.r1, col: selection.c1 }, fillTarget), 'Filled the fill range.')}>Fill down</button>
+        <button type="button" data-testid="tsw-fill-down" onClick={() => commit(fillDownSelection(book, sheetId, selection), 'Filled the fill range.')}>Fill down</button>
         <button
           type="button"
           data-testid="tsw-rename-sheet"
@@ -643,11 +824,40 @@ export default function SheetsWorkspace() {
           id="tsw-formula"
           value={formula}
           onChange={(event) => setFormula(event.target.value)}
-          onFocus={() => { if (formula.startsWith('=')) setFormulaTipOpen(true); }}
+          onFocus={() => {
+            gridOwnsKeys.current = false;
+            setFormulaTipOpen(true);
+          }}
           onKeyDown={(event) => { if (event.key === 'Enter') applyFormula(); }}
         />
         <button type="button" onClick={applyFormula}>Enter</button>
+        <button type="button" data-testid="tsw-autosum" onClick={applyAutoSum}>AutoSum</button>
+        <button type="button" data-testid="tsw-insert-function" aria-expanded={insertOpen} onClick={() => setInsertOpen((open) => !open)}>Insert function</button>
         <button type="button" data-testid="tsw-formula-help" onClick={() => setFormulaTipOpen(true)}>Formula help</button>
+        {listChoices.length ? (
+          <label className="tsw-list-picker" htmlFor="tsw-list-picker">
+            List
+            <select
+              id="tsw-list-picker"
+              data-testid="tsw-list-picker"
+              value={String(activeCell?.v ?? '')}
+              onChange={(event) => {
+                setFormula(event.target.value);
+                const value = event.target.value;
+                const check = enforceValidation(book, sheetId, selection.r1, selection.c1, value);
+                if (!check.ok) {
+                  setValidationStatus(check.message);
+                  setStatus(check.message);
+                  return;
+                }
+                commit(setCell(book, sheetId, selection.r1, selection.c1, { v: Number.isFinite(Number(value)) ? Number(value) : value, f: null }), 'Picked a list value.');
+              }}
+            >
+              <option value="">Choose</option>
+              {listChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+            </select>
+          </label>
+        ) : null}
         <output data-testid="tsw-formula-ssot" data-ssot={formulaSsot} aria-label="Formula source of truth">{formulaSsot}</output>
         {univerProof ? <output data-testid="tsw-formula-proof">{univerProof.a1}={String(univerProof.value ?? '')}</output> : null}
       </div>
@@ -665,7 +875,32 @@ export default function SheetsWorkspace() {
           }}
         >
           {NUMBER_FORMATS.map((item) => <option key={item.id} value={item.z}>{item.label}</option>)}
+          {!NUMBER_FORMATS.some((item) => item.z === formatZ) ? <option value={formatZ}>Custom</option> : null}
         </select>
+        <label htmlFor="tsw-custom-format">Custom pattern</label>
+        <input
+          id="tsw-custom-format"
+          data-testid="tsw-custom-format"
+          value={customFormat}
+          placeholder="#,##0.0"
+          onChange={(event) => setCustomFormat(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !customFormat.trim()) return;
+            setFormatZ(customFormat.trim());
+            commit(applyNumberFormat(book, sheetId, selection, customFormat.trim()), `Applied ${customFormat.trim()} to the selection.`);
+          }}
+        />
+        <button
+          type="button"
+          data-testid="tsw-apply-custom-format"
+          onClick={() => {
+            if (!customFormat.trim()) return;
+            setFormatZ(customFormat.trim());
+            commit(applyNumberFormat(book, sheetId, selection, customFormat.trim()), `Applied ${customFormat.trim()} to the selection.`);
+          }}
+        >
+          Apply pattern
+        </button>
         <button type="button" aria-pressed={Boolean(activeCell?.s?.bold)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { bold: !activeCell?.s?.bold }), 'Toggled bold.')}>Bold</button>
         <button type="button" aria-pressed={Boolean(activeCell?.s?.italic)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { italic: !activeCell?.s?.italic }), 'Toggled italic.')}>Italic</button>
         <button type="button" aria-pressed={Boolean(activeCell?.s?.underline)} onClick={() => commit(applyStyleToRange(book, sheetId, selection, { underline: !activeCell?.s?.underline }), 'Toggled underline.')}>Underline</button>
@@ -728,8 +963,42 @@ export default function SheetsWorkspace() {
         />
       </div>
 
+      <div className="tsw-parity-chrome tsw-chrome" data-testid="tsw-parity-chrome" role="toolbar" aria-label="Sheet parity actions">
+        <button type="button" onClick={() => void pasteSelection('values')}>Paste values</button>
+        <button type="button" onClick={() => void pasteSelection('formats')}>Paste formats</button>
+        <button type="button" onClick={() => void pasteSelection('transpose')}>Paste transpose</button>
+        <button type="button" onClick={() => clearActiveRange('Cleared values and formulas in the selection.')}>Clear contents</button>
+        <button type="button" onClick={() => clearActiveRange('Cleared values, formulas, notes, links, and style.', 'all')}>Clear all</button>
+        <button type="button" data-testid="tsw-remove-duplicates" onClick={() => commit(removeDuplicates(book, sheetId, selection), 'Removed duplicate rows in the selection.')}>Remove duplicates</button>
+        <button
+          type="button"
+          data-testid="tsw-text-to-columns"
+          onClick={() => commit(textToColumns(book, sheetId, selection, splitDelimiter), `Split on ${splitDelimiter || 'comma'}.`)}
+        >
+          Text to columns
+        </button>
+        <label htmlFor="tsw-split-delimiter">Delimiter</label>
+        <input id="tsw-split-delimiter" data-testid="tsw-split-delimiter" value={splitDelimiter} onChange={(event) => setSplitDelimiter(event.target.value)} />
+        <button type="button" data-testid="tsw-goto-blanks" onClick={() => jumpGoto('blanks')}>Go to blanks</button>
+        <button type="button" data-testid="tsw-goto-formulas" onClick={() => jumpGoto('formulas')}>Go to formulas</button>
+        <button type="button" data-testid="tsw-goto-constants" onClick={() => jumpGoto('constants')}>Go to constants</button>
+        <button
+          type="button"
+          data-testid="tsw-print"
+          onClick={() => {
+            setPrintView(true);
+            window.setTimeout(() => {
+              window.print();
+              setPrintView(false);
+            }, 50);
+          }}
+        >
+          Print
+        </button>
+      </div>
+
       <div className="tsw-sheet-tabs" role="tablist" aria-label="Sheets">
-        {computed.sheets.map((item) => (
+        {tabs.map((item) => (
           renamingId === item.id ? (
             <input
               key={item.id}
@@ -752,6 +1021,8 @@ export default function SheetsWorkspace() {
               type="button"
               role="tab"
               aria-current={item.id === sheetId}
+              data-tab-color={item.tabColor ?? ''}
+              style={item.tabColor ? { boxShadow: `inset 0 -4px 0 ${item.tabColor}` } : undefined}
               onClick={() => {
                 setBook((current) => ({ ...current, activeSheetId: item.id }));
                 setSelection((current) => ({ ...current, sheetId: item.id }));
@@ -760,11 +1031,38 @@ export default function SheetsWorkspace() {
                 setRenamingId(item.id);
                 setRenameDraft(item.name);
               }}
+              onContextMenu={(event) => {
+                suppressNativeContextMenu(event);
+                openSheetMenuAt(item.id, event.clientX, event.clientY);
+              }}
+              onPointerDown={(event) => {
+                sheetLongPress.current && cancelLongPressStub(sheetLongPress);
+                scheduleLongPressStub(sheetLongPress, () => openSheetMenuAt(item.id, event.clientX, event.clientY));
+              }}
+              onPointerUp={() => cancelLongPressStub(sheetLongPress)}
+              onPointerCancel={() => cancelLongPressStub(sheetLongPress)}
             >
               {item.name}
             </button>
           )
         ))}
+        {hiddenTabs.length ? (
+          <label htmlFor="tsw-unhide-sheet">
+            Hidden sheets
+            <select
+              id="tsw-unhide-sheet"
+              data-testid="tsw-unhide-sheet"
+              value=""
+              onChange={(event) => {
+                if (!event.target.value) return;
+                commit(setSheetHidden(book, event.target.value, false), 'Unhid a sheet.', { allowLocked: true });
+              }}
+            >
+              <option value="">Unhide…</option>
+              {hiddenTabs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {engine === 'univer' ? (
@@ -777,8 +1075,11 @@ export default function SheetsWorkspace() {
         />
       ) : (
         <div
+          ref={gridScroll}
           className="tsw-grid-wrap"
           data-testid="tsw-grid-scroll"
+          tabIndex={0}
+          aria-label="Local spreadsheet grid"
           onScroll={(event) => {
             const node = event.currentTarget;
             setScroll({
@@ -870,6 +1171,7 @@ export default function SheetsWorkspace() {
                     return (
                       <td
                         key={`${row},${col}`}
+                        tabIndex={-1}
                         data-row={row}
                         data-col={col}
                         data-selected={selected}
@@ -884,14 +1186,17 @@ export default function SheetsWorkspace() {
                         colSpan={paintKind.kind === 'anchor' ? paintKind.colSpan : undefined}
                         style={style}
                         onPointerDown={(event) => onPointerDown(event, row, col)}
-                        onDoubleClick={() => document.getElementById('tsw-formula')?.focus()}
+                        onDoubleClick={() => {
+                          gridOwnsKeys.current = false;
+                          document.getElementById('tsw-formula')?.focus();
+                        }}
                         onContextMenu={(event) => {
                           suppressNativeContextMenu(event);
                           setSelection({ sheetId, r1: row, c1: col, r2: row, c2: col });
                           openContextMenuAt(event.clientX, event.clientY);
                         }}
                       >
-                        {href ? <a href={href} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : cellLabel(cell)}
+                        {href ? <a href={href} target="_blank" rel="noreferrer">{cellLabel(cell)}</a> : (selected && gridEditing ? formula : cellLabel(cell))}
                       </td>
                     );
                   })}
@@ -958,13 +1263,75 @@ export default function SheetsWorkspace() {
           data-testid="tsw-context-menu"
           role="menu"
           aria-label="Cell context menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{ left: contextMenu.x, top: contextMenu.y, maxHeight: contextMenu.maxHeight, overflow: 'auto' }}
         >
           {CONTEXT_MENU_ACTIONS.map((action) => (
             <li key={action.id} role="none">
               <button type="button" role="menuitem" onClick={() => runContextAction(action.id)}>{action.label}</button>
             </li>
           ))}
+        </ul>
+      ) : null}
+
+      {insertOpen ? (
+        <aside className="tsw-insert-function" data-testid="tsw-insert-function-list" role="dialog" aria-label="Insert function">
+          <p>Tap a function to put its template in the formula bar. Help stays tap or focus, never hover-only.</p>
+          <ul>
+            {FORMULA_CATALOG.map((item) => (
+              <li key={item.name}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormula(item.template);
+                    setInsertOpen(false);
+                    setFormulaTipOpen(true);
+                    window.setTimeout(() => document.getElementById('tsw-formula')?.focus(), 0);
+                  }}
+                >
+                  {item.name} — {item.summary}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setInsertOpen(false)}>Close function list</button>
+        </aside>
+      ) : null}
+
+      {sheetMenu ? (
+        <ul
+          className="tsw-context"
+          data-testid="tsw-sheet-tab-menu"
+          role="menu"
+          aria-label="Sheet tab menu"
+          style={{ left: sheetMenu.x, top: sheetMenu.y }}
+        >
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                commit(setSheetHidden(book, sheetMenu.sheetId, true), 'Hid the sheet.', { allowLocked: true });
+                setSheetMenu(null);
+              }}
+            >
+              Hide sheet
+            </button>
+          </li>
+          <li role="none">
+            <label htmlFor="tsw-tab-color">Tab color</label>
+            <input
+              id="tsw-tab-color"
+              data-testid="tsw-tab-color"
+              type="color"
+              value={computed.sheets.find((item) => item.id === sheetMenu.sheetId)?.tabColor ?? '#205bd6'}
+              onChange={(event) => {
+                commit(setSheetTabColor(book, sheetMenu.sheetId, event.target.value), 'Set the sheet tab color.', { allowLocked: true });
+              }}
+            />
+          </li>
+          <li role="none">
+            <button type="button" role="menuitem" onClick={() => setSheetMenu(null)}>Close sheet menu</button>
+          </li>
         </ul>
       ) : null}
 
@@ -993,6 +1360,71 @@ export default function SheetsWorkspace() {
       </div>
 
       <div className="tsw-panels">
+        <section className="tsw-panel" data-testid="tsw-goto">
+          <h3>Go to</h3>
+          <label htmlFor="tsw-goto-a1">A1</label>
+          <input id="tsw-goto-a1" data-testid="tsw-goto-a1" value={gotoA1} onChange={(event) => setGotoA1(event.target.value)} />
+          <button type="button" data-testid="tsw-goto-apply" onClick={() => jumpGoto()}>Go to cell</button>
+        </section>
+
+        <section className="tsw-panel" data-testid="tsw-protect">
+          <h3>Protect sheet</h3>
+          <p>Local edit lock only. The PIN is hashed with SHA-256 and a random salt, then stored on this workbook in IndexedDB. It is not Excel file encryption; anyone with this browser profile can still export or delete the workbook.</p>
+          <label htmlFor="tsw-protect-pin">Local PIN</label>
+          <input id="tsw-protect-pin" data-testid="tsw-protect-pin" type="password" inputMode="numeric" autoComplete="off" value={pinDraft} onChange={(event) => setPinDraft(event.target.value)} />
+          <button
+            type="button"
+            data-testid="tsw-protect-lock"
+            onClick={() => {
+              if (!pinDraft.trim()) {
+                setStatus('Enter a local PIN first.');
+                return;
+              }
+              void createSheetProtect(pinDraft).then((protect) => {
+                commit(setSheetProtect(book, sheetId, protect), 'Locked this sheet with a local PIN.', { allowLocked: true });
+                setUnlockedSheetIds((current) => current.filter((id) => id !== sheetId));
+                setPinDraft('');
+              }).catch(() => setStatus('Could not hash the local PIN in this browser.'));
+            }}
+          >
+            Lock sheet
+          </button>
+          <button
+            type="button"
+            data-testid="tsw-protect-unlock"
+            onClick={() => {
+              if (!sheet?.protect) {
+                setStatus('This sheet is not locked.');
+                return;
+              }
+              void verifySheetProtect(pinDraft, sheet.protect).then((ok) => {
+                if (!ok) {
+                  setStatus('That PIN does not match the stored hash.');
+                  return;
+                }
+                setUnlockedSheetIds((current) => current.includes(sheetId) ? current : [...current, sheetId]);
+                setPinDraft('');
+                setStatus('Sheet unlocked for this session.');
+              });
+            }}
+          >
+            Unlock sheet
+          </button>
+          <button
+            type="button"
+            data-testid="tsw-protect-clear"
+            onClick={() => {
+              if (sheetIsLocked(sheet, unlockedSheetIds)) {
+                setStatus('Unlock the sheet before removing the lock.');
+                return;
+              }
+              commit(setSheetProtect(book, sheetId, null), 'Removed the local sheet lock.');
+            }}
+          >
+            Remove lock
+          </button>
+        </section>
+
         <section className="tsw-panel">
           <h3>Find / replace</h3>
           <label htmlFor="tsw-find">Find</label>
@@ -1048,6 +1480,7 @@ export default function SheetsWorkspace() {
             <option value="lt">Less than</option>
             <option value="eq">Equal</option>
             <option value="contains">Contains</option>
+            <option value="color-scale">Color scale</option>
           </select>
           <label htmlFor="tsw-cf-arg">Argument</label>
           <input id="tsw-cf-arg" value={cfDraft.argument} onChange={(event) => setCfDraft((current) => ({ ...current, argument: event.target.value }))} />
@@ -1071,13 +1504,31 @@ export default function SheetsWorkspace() {
           </ul>
         </section>
 
-        <section className="tsw-panel">
+        <section className="tsw-panel" data-testid="tsw-named-ranges">
           <h3>Named ranges, notes, links</h3>
           <label htmlFor="tsw-name">Name</label>
           <input id="tsw-name" value={namedName} onChange={(event) => setNamedName(event.target.value)} />
           <label htmlFor="tsw-name-a1">A1</label>
           <input id="tsw-name-a1" value={namedA1} onChange={(event) => setNamedA1(event.target.value)} />
           <button type="button" onClick={() => commit(upsertNamedRange(book, namedName, sheetId, namedA1), 'Saved a named range.')}>Define name</button>
+          <ul className="tsw-named-range-list" data-testid="tsw-named-range-list">
+            {book.namedRanges.map((range) => (
+              <li key={range.name}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bounds = namedRangeBounds(range.a1);
+                    setBook((current) => ({ ...current, activeSheetId: range.sheetId }));
+                    if (bounds) setSelection({ sheetId: range.sheetId, ...bounds });
+                    setStatus(`Moved to ${range.name}.`);
+                  }}
+                >
+                  {range.name} {range.a1}
+                </button>
+                <button type="button" onClick={() => commit(deleteNamedRange(book, range.name), `Deleted ${range.name}.`)}>Delete {range.name}</button>
+              </li>
+            ))}
+          </ul>
           <label htmlFor="tsw-note">Comment / note</label>
           <textarea id="tsw-note" value={note} onChange={(event) => setNote(event.target.value)} />
           <button type="button" onClick={() => commit(addComment(setCell(book, sheetId, selection.r1, selection.c1, { note }), sheetId, a1FromParts(selection.r1, selection.c1), note), 'Saved a local note.')}>Save note</button>
@@ -1108,7 +1559,8 @@ export default function SheetsWorkspace() {
           <h3>Chart.js selection chart</h3>
           <p>Uses the existing chart.js@4.5.1 pin. No Univer Pro chart package.</p>
           <label htmlFor="tsw-chart-kind">Kind</label>
-          <select id="tsw-chart-kind" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
+          <select id="tsw-chart-kind" data-testid="tsw-chart-kind" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
+            <option value="column">Column</option>
             <option value="bar">Bar</option>
             <option value="line">Line</option>
             <option value="pie">Pie</option>

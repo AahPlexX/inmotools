@@ -216,7 +216,10 @@ export async function exportXlsx(workbook: PortableWorkbook, meta: ExportMeta = 
   excel.description = [meta.notes, meta.tags.length ? `tags: ${meta.tags.join(', ')}` : ''].filter(Boolean).join('\n');
   excel.created = new Date();
   for (const sheet of workbook.sheets) {
-    const ws = excel.addWorksheet(sheet.name);
+    const ws = excel.addWorksheet(sheet.name, {
+      state: sheet.hidden ? 'hidden' : 'visible',
+      properties: sheet.tabColor ? { tabColor: { argb: toArgb(sheet.tabColor) } } : {},
+    });
     for (const [key, cell] of Object.entries(sheet.cells)) {
       const parsed = parseCellKey(key);
       if (!parsed) continue;

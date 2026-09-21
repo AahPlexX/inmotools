@@ -1,15 +1,15 @@
 # In Progress
 
-- **Tabular Sheet Workstation (TASK-022)** — post-Stage-3 on `feature/tabular-sheet-workstation` (draft PR #70 only; do not merge; do not open a new PR).
-  - Stage 2 is closed. Tip `bc406b78dc80bd958d65479096a20d3447af0139` already shipped Stage 2 chrome plus the catalog-axe `scrollable-region-focusable` fix. That is not the current milestone.
-  - Current milestone: post-Stage-3 forensic audit + local-grid fix follow-through. Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done`).
-  - Tip SHA: `f38f2bf15f8a8f7a71f9f83b535382a32442b6d9` (update this line in the same cycle as any later push). Last focused-gate code: `b57c65a5e479ab99314ad5e521874d531fd0677a`.
-  - Sheets gates: green — focused units 27/27; `pnpm build` pass; `tests/e2e/tabular-sheet-workstation.spec.ts` 13 passed / 1 skipped (mobile axe by design); catalog axe `-g tabular-sheet-workstation` 2/2.
-  - Pages full-suite: red, out-of-suite. Validate run `35477210462` failed web-layout-studio axe, svg-sprite-compiler axe, stale lazy-chunk recovery, Hardware Packet Inspector, GeoJSON Simplifier, regex-matrix Python re, crystal mobile symmetry-break. No sheets-spec failure. Do not chase unless a sheets change causes them.
-  - Audit+fix: landed on this branch (range select, merge/freeze/resize paint, range TSV, case-insensitive replace, safe links, SheetJS formulas/merges, exceljs ARGB, CSV blank rows). Still deferred: Univer remounts only on `book.id`; GOVERNANCE §4 vs keep-draft (do not merge); lockfile may list `@univerjs-pro/*` transitively.
-  - Next sequential step: keep PR #70 draft; push only this branch; do not merge; do not open a new PR; do not chase out-of-suite Pages reds. Two-way Univer sync is a new scoped task if requested.
+- **Tabular Sheet Workstation (TASK-022)** — PRODUCT CUT P1–P16 DONE. Sole writer on `feature/tabular-sheet-parity` (draft PR #71 only; CoS squash-merges; agent does not merge or mark ready; do not open a second PR; do not invent extra product scope). Do not shrink Insert Function to XLOOKUP-only.
+  - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. Approved milestone is CoS P1–P16 only. Protect sheet (PX) is leftover chrome, not in the approved 16.
+  - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus approved P1–P16). Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, FILTER/SORT/UNIQUE formulas.
+  - Tip SHA: `febf88c2a699f66f906cbdfd43e7ad92a0b554b0` (update this line in the same cycle as any later push). Last focused-gate code: `c37fff4c1bdd98827266be6f6fd611901756e75e`.
+  - Sheets gates re-verified after `origin/main` fetch (merge-base already `95db6eec`; no rebase/conflicts): focused units 42/42; `pnpm build` pass; desktop-chromium 24 passed; P16 matrix 12/12. Do not claim the full Pages suite green.
+  - Known out-of-suite CI reds (do not chase): web-layout-studio axe; svg-sprite-compiler axe; stale lazy chunk; Hardware Packet Inspector; GeoJSON Simplifier; Python re named groups; crystal-lattice-studio mobile.
+  - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
+  - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
   - Stack pins unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, HyperFormula, AI, or auth/db.
-  - Scope: `src/tools/sheets/`, catalog copy, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not touch PR #33 / transcode.
+  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
 
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
