@@ -2,11 +2,12 @@ import type {
   ColorGrade,
   HslAdjustment,
   LocalAdjustment,
-  PhotoChannelMixer,
   PhotoChannelMixerRow,
+  PhotoChannelMixer,
   PhotoColorManagement,
   PhotoHistogram,
   PhotoHistory,
+  PhotoLayer,
   PhotoLevels,
   PhotoLut,
   PhotoMask,
@@ -20,6 +21,7 @@ import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './ph
 import { normalizePhotoColorManagement } from './color/photo-color-management';
 import { clonePhotoSelection, normalizePhotoSelection, photoSelectionWeight } from './photo-selection';
 import { clonePhotoMask, normalizePhotoMaskOverlay } from './photo-mask';
+import { blendChannels, cloneLayer, normalizeLayerFields } from './photo-layers';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -71,6 +73,7 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
       overlay: normalizePhotoMaskOverlay(adjustment.overlay),
     })),
     retouch: recipe.retouch.map((operation) => ({ ...operation })),
+    layers: (recipe.layers ?? []).map(cloneLayer),
   };
 }
 
@@ -166,6 +169,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   selection: null,
   localAdjustments: [],
   retouch: [],
+  layers: [],
 };
 
 function normalizeToneCurve(points: TonePoint[]): TonePoint[] {
@@ -379,6 +383,13 @@ function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
   };
 }
 
+function normalizeLayer(layer: PhotoLayer): PhotoLayer {
+  return {
+    ...normalizeLayerFields(layer),
+    mask: layer.mask ? normalizeMask(layer.mask) : null,
+  };
+}
+
 export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
   const source = cloneRecipe({ ...DEFAULT_RECIPE, ...recipe });
   const cropWidth = clamp(source.crop?.width ?? 1, 0.001, 1);
@@ -441,6 +452,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     selection: normalizePhotoSelection(source.selection),
     localAdjustments: source.localAdjustments.map(normalizeLocalAdjustment),
     retouch: source.retouch.map(normalizeRetouch),
+    layers: (source.layers ?? []).slice(0, 50).map(normalizeLayer),
   };
 }
 
@@ -1102,24 +1114,106 @@ function applyRetouch(data: Uint8ClampedArray, width: number, height: number, re
   }
 }
 
+/** A layer's own source image, decoded to raw pixels by the caller (layer decoding is
+ * inherently async; this whole pixel pipeline is synchronous by design, so decoding stays
+ * outside it, matching how the primary source image is already decoded before this runs). */
+export interface PhotoLayerPixels {
+  layerId: string;
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+function bilinearSample(data: Uint8ClampedArray, width: number, height: number, x: number, y: number): [number, number, number, number] {
+  const x0 = Math.floor(x - 0.5);
+  const y0 = Math.floor(y - 0.5);
+  const fx = x - 0.5 - x0;
+  const fy = y - 0.5 - y0;
+  const at = (sx: number, sy: number, channel: number) => {
+    const cx = clamp(sx, 0, width - 1);
+    const cy = clamp(sy, 0, height - 1);
+    return data[(cy * width + cx) * 4 + channel];
+  };
+  const result: [number, number, number, number] = [0, 0, 0, 0];
+  for (let channel = 0; channel < 4; channel += 1) {
+    const top = at(x0, y0, channel) * (1 - fx) + at(x0 + 1, y0, channel) * fx;
+    const bottom = at(x0, y0 + 1, channel) * (1 - fx) + at(x0 + 1, y0 + 1, channel) * fx;
+    result[channel] = top * (1 - fy) + bottom * fy;
+  }
+  return result;
+}
+
+function compositeOneLayer(data: Uint8ClampedArray, width: number, height: number, layer: PhotoLayer, source: PhotoLayerPixels): void {
+  const radians = (-layer.transform.rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const centerX = layer.transform.x * width;
+  const centerY = layer.transform.y * height;
+  const halfW = (source.width * layer.transform.scale) / 2;
+  const halfH = (source.height * layer.transform.scale) / 2;
+  if (halfW <= EPSILON || halfH <= EPSILON) return;
+
+  for (let py = 0; py < height; py += 1) {
+    for (let px = 0; px < width; px += 1) {
+      const dx = px + 0.5 - centerX;
+      const dy = py + 0.5 - centerY;
+      // Inverse-rotate the output pixel into the layer's own unrotated local space.
+      const localX = dx * cos - dy * sin;
+      const localY = dx * sin + dy * cos;
+      const sourceX = (localX / (2 * halfW) + 0.5) * source.width;
+      const sourceY = (localY / (2 * halfH) + 0.5) * source.height;
+      if (sourceX < 0 || sourceY < 0 || sourceX >= source.width || sourceY >= source.height) continue;
+      const sample = bilinearSample(source.data, source.width, source.height, sourceX, sourceY);
+      const offset = (py * width + px) * 4;
+      let maskWeight = 1;
+      if (layer.mask) {
+        maskWeight = photoMaskWeight(layer.mask, (px + 0.5) / width, (py + 0.5) / height, data[offset], data[offset + 1], data[offset + 2]);
+      }
+      const alpha = clamp((sample[3] / 255) * layer.opacity * maskWeight, 0, 1);
+      if (alpha <= EPSILON) continue;
+      const base: [number, number, number] = [data[offset] / 255, data[offset + 1] / 255, data[offset + 2] / 255];
+      const top: [number, number, number] = [sample[0] / 255, sample[1] / 255, sample[2] / 255];
+      const blended = blendChannels(layer.blendMode, base, top);
+      for (let channel = 0; channel < 3; channel += 1) {
+        const blendedByte = clamp(Math.round(blended[channel] * 255), 0, 255);
+        data[offset + channel] = clamp(Math.round(data[offset + channel] + (blendedByte - data[offset + channel]) * alpha), 0, 255);
+      }
+    }
+  }
+}
+
+function compositeLayers(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe, layerPixels: PhotoLayerPixels[]): void {
+  if (!recipe.layers?.length) return;
+  const pixelsById = new Map(layerPixels.map((entry) => [entry.layerId, entry]));
+  for (const layer of recipe.layers) {
+    if (!layer.visible || layer.opacity <= EPSILON) continue;
+    const source = pixelsById.get(layer.id);
+    if (!source) continue; // Not yet decoded by the caller; renders once it is.
+    compositeOneLayer(data, width, height, layer, source);
+  }
+}
+
 export function applyPixelAdjustments(
   data: Uint8ClampedArray,
   width: number,
   height: number,
   inputRecipe: PhotoRecipe,
+  layerPixels: PhotoLayerPixels[] = [],
 ): void {
   const recipe = inputRecipe === DEFAULT_RECIPE ? inputRecipe : normalizeRecipe(inputRecipe);
   if (width <= 0 || height <= 0 || data.length < width * height * 4) return;
   const isFullyNeutral = isNeutralGlobal(recipe)
     && !hasSpatialDetail(recipe)
     && !hasLocalWork(recipe)
-    && recipe.retouch.length === 0;
+    && recipe.retouch.length === 0
+    && !recipe.layers?.length;
   if (isFullyNeutral) return;
 
   applyGlobalAdjustments(data, width, height, recipe);
   applySpatialDetail(data, width, height, recipe);
   applyLocalAdjustments(data, width, height, recipe);
   applyRetouch(data, width, height, recipe);
+  compositeLayers(data, width, height, recipe, layerPixels);
 }
 
 export function sampleHistogram(data: Uint8ClampedArray): PhotoHistogram {

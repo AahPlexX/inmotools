@@ -276,6 +276,36 @@ export interface PhotoRecipe {
   selection?: PhotoSelection | null;
   localAdjustments: LocalAdjustment[];
   retouch: RetouchOperation[];
+  /** Optional on older version-1 recipes; normalized to an empty stack. */
+  layers?: PhotoLayer[];
+}
+
+export type PhotoBlendMode =
+  | 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light' | 'hard-light'
+  | 'darken' | 'lighten' | 'color' | 'luminosity' | 'hue' | 'saturation';
+
+export interface PhotoLayerTransform {
+  /** Normalized canvas-space offset of the layer's own center. */
+  x: number;
+  y: number;
+  scale: number;
+  /** Degrees, clockwise. */
+  rotation: number;
+}
+
+export interface PhotoLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  blendMode: PhotoBlendMode;
+  transform: PhotoLayerTransform;
+  /** In canvas-normalized space, same convention as LocalAdjustment masks. */
+  mask?: PhotoMask | null;
+  /** Self-contained like PhotoLut.data, so a recipe stays a single portable JSON document. */
+  sourceDataUrl: string;
+  sourceWidth: number;
+  sourceHeight: number;
 }
 
 export interface PhotoHistogram {
