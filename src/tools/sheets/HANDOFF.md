@@ -3,8 +3,8 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-sheet-wave-b` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
 
-**Tip SHA:** `6807b2f`  
-**Last focused-gate code:** `6807b2f`  
+**Tip SHA:** `34d8b5f`  
+**Last focused-gate code:** `34d8b5f`  
 **Workstream:** **Wave B** (local PivotTable UX + GETPIVOTDATA subset) on top of merged PR #73 Wave A / docs stamp PR #74 / #71 P1–P16 / docs PR #72.
 
 ## Merge status (PR #73 + #74)
@@ -19,7 +19,7 @@ Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-she
 
 - FEATURE_MATRIX 1–36 remain `done`. Approved gap ledger P1–P16 remain `done`. Wave A rows WA1–WA3 remain `done`. Wave B rows WB1–WB2 are `done` with focused evidence.
 - Portable DAG remains SSOT for the local grid. `@formulajs/formulajs@4.6.1` (exact pin, no `^`) supplies implementations for names the local catalog does not own.
-- Local PivotTable: contiguous source range with a header row; row / column / value / filter fields; aggregations SUM, COUNT, AVERAGE, MIN, MAX. Auto-refresh on commit plus explicit Refresh. No server.
+- Local PivotTable: contiguous source range with a header row; row / column / value / filter fields; aggregations SUM, COUNT, AVERAGE, MIN, MAX. Auto-refresh on commit plus explicit Refresh. No server. Changing the value aggregation on an existing table rebuilds headers from the current agg (Count of Qty, not leftover Sum of Qty).
 - **Placement:** default is a new sheet named `PivotN` with the table at A1. Alternative is a destination cell on the current sheet; that rectangle is overwritten and other cells are not shifted.
 - GETPIVOTDATA subset reads those in-house pivot defs from formulas: grand total, one field/item, and row+column pairs. Data field may be `Amount` or `Sum of Amount`.
 - P16 client harden unchanged: no hover-only, no overlap at phone/tablet CSS widths, long-press + click, tap/focus formula help, anti-slop sheets-only copy. Proof is `CLIENT_VIEWPORTS`. `P16_PROOF_NOT_ACCEPTED`: iPhone 13, `mobile-chromium`.
@@ -46,8 +46,8 @@ Pivot chrome is tap/click (no hover-only) and stacks at ~320–430 CSS px.
 ## Sheets gates (green at last focused-gate code)
 
 ```bash
-# focused units 54/54; pnpm build pass
-# desktop-chromium 27 passed
+# focused units 56/56; pnpm build pass
+# desktop-chromium 28 passed
 # P16 matrix 12/12 (6 portrait + 6 landscape)
 ```
 
