@@ -7,16 +7,17 @@ import { createPhotoInspectionOverlay } from './photo-scopes';
 import { photoSelectionWeight } from './photo-selection';
 import { photoMaskWeight } from './photo-engine';
 import { normalizePhotoMaskOverlay } from './photo-mask';
-import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, PhotoSelection, RetouchOperation } from './photo-types';
+import type { LocalAdjustment, NormalizedCrop, PhotoHistogram, PhotoLayer, PhotoSelection, RetouchOperation } from './photo-types';
 import './photo-comparison.css';
 import './photo-observation.css';
 
 export interface PhotoCanvasInteraction {
-  kind: 'local' | 'retouch' | 'selection';
+  kind: 'local' | 'retouch' | 'selection' | 'layer-mask';
   id: string;
   label: string;
   mode: 'radial' | 'linear' | 'brush' | 'red-eye' | 'retouch-source' | 'retouch-target'
-    | 'selection-rectangle' | 'selection-ellipse' | 'selection-lasso' | 'selection-color';
+    | 'selection-rectangle' | 'selection-ellipse' | 'selection-lasso' | 'selection-color'
+    | 'layer-radial' | 'layer-linear' | 'layer-brush';
 }
 
 export interface PhotoCanvasGesture {
@@ -38,6 +39,7 @@ interface PhotoCanvasProps {
   busy?: boolean;
   localAdjustments?: LocalAdjustment[];
   retouch?: RetouchOperation[];
+  layers?: PhotoLayer[];
   selection?: PhotoSelection | null;
   interaction?: PhotoCanvasInteraction | null;
   crop?: NormalizedCrop;
@@ -98,46 +100,49 @@ function pointerPoint(event: ReactPointerEvent<HTMLElement>) {
   };
 }
 
+function maskShape(id: string, mask: LocalAdjustment['mask'] | PhotoLayer['mask'], active: boolean) {
+  if (!mask) return null;
+  if (mask.type === 'radial') {
+    return <ellipse key={id} data-photo-mask="radial" cx={mask.cx * 100} cy={mask.cy * 100} rx={mask.rx * 100} ry={mask.ry * 100} className={active ? 'is-active' : undefined} />;
+  }
+  if (mask.type === 'linear') {
+    return <g key={id} data-photo-mask="linear" className={active ? 'is-active' : undefined}>
+      <line x1={mask.x1 * 100} y1={mask.y1 * 100} x2={mask.x2 * 100} y2={mask.y2 * 100} />
+      <circle cx={mask.x1 * 100} cy={mask.y1 * 100} r="1.4" />
+      <circle cx={mask.x2 * 100} cy={mask.y2 * 100} r="1.4" />
+    </g>;
+  }
+  if (mask.type === 'brush') {
+    return <g key={id} data-photo-mask="brush" className={active ? 'is-active' : undefined}>
+      {mask.points.slice(-500).map((point, index) => (
+        <circle
+          key={`${id}-${index}`}
+          cx={point.x * 100}
+          cy={point.y * 100}
+          r={Math.max(0.6, mask.radius * 50 * point.pressure)}
+          data-photo-brush-dab={point.erase ? 'erase' : 'paint'}
+        />
+      ))}
+    </g>;
+  }
+  return null;
+}
+
 function PhotoOverlays({
   localAdjustments,
   retouch,
+  layers,
   activeId,
 }: {
   localAdjustments: LocalAdjustment[];
   retouch: RetouchOperation[];
+  layers?: PhotoLayer[];
   activeId?: string;
 }) {
   return (
     <svg className="photo-edit-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      {localAdjustments.map((adjustment) => {
-        if (!adjustment.enabled) return null;
-        const mask = adjustment.mask;
-        const active = adjustment.id === activeId;
-        if (mask.type === 'radial') {
-          return <ellipse key={adjustment.id} data-photo-mask="radial" cx={mask.cx * 100} cy={mask.cy * 100} rx={mask.rx * 100} ry={mask.ry * 100} className={active ? 'is-active' : undefined} />;
-        }
-        if (mask.type === 'linear') {
-          return <g key={adjustment.id} data-photo-mask="linear" className={active ? 'is-active' : undefined}>
-            <line x1={mask.x1 * 100} y1={mask.y1 * 100} x2={mask.x2 * 100} y2={mask.y2 * 100} />
-            <circle cx={mask.x1 * 100} cy={mask.y1 * 100} r="1.4" />
-            <circle cx={mask.x2 * 100} cy={mask.y2 * 100} r="1.4" />
-          </g>;
-        }
-        if (mask.type === 'brush') {
-          return <g key={adjustment.id} data-photo-mask="brush" className={active ? 'is-active' : undefined}>
-            {mask.points.slice(-500).map((point, index) => (
-              <circle
-                key={`${adjustment.id}-${index}`}
-                cx={point.x * 100}
-                cy={point.y * 100}
-                r={Math.max(0.6, mask.radius * 50 * point.pressure)}
-                data-photo-brush-dab={point.erase ? 'erase' : 'paint'}
-              />
-            ))}
-          </g>;
-        }
-        return null;
-      })}
+      {localAdjustments.map((adjustment) => adjustment.enabled ? maskShape(adjustment.id, adjustment.mask, adjustment.id === activeId) : null)}
+      {(layers ?? []).map((layer) => layer.visible && layer.mask ? maskShape(layer.id, layer.mask, layer.id === activeId) : null)}
       {retouch.map((operation) => {
         if (!operation.enabled) return null;
         const active = operation.id === activeId;
@@ -169,6 +174,7 @@ export default function PhotoCanvas({
   busy,
   localAdjustments = [],
   retouch = [],
+  layers = [],
   selection = null,
   interaction = null,
   crop = { x: 0, y: 0, width: 1, height: 1 },
@@ -589,7 +595,7 @@ export default function PhotoCanvas({
           draggable={false}
         />
         {inspectionLayers()}
-        <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
+        <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} />
         {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
       </div>
     );
@@ -792,7 +798,7 @@ export default function PhotoCanvas({
               </>
             ) : null}
             {inspectionLayers()}
-            <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} activeId={interaction?.id} />
+            <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
         )}

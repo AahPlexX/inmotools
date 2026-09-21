@@ -1,4 +1,4 @@
-import { applyPixelAdjustments } from '../photo-engine';
+import { applyPixelAdjustments, type PhotoLayerPixels } from '../photo-engine';
 import type { PhotoRecipe } from '../photo-types';
 import {
   applyAssignedPhotoProfile,
@@ -19,6 +19,7 @@ export async function processPhotoColorPipeline(
   recipe: PhotoRecipe,
   mode: 'preview' | 'export',
   jpegBackground?: readonly [number, number, number],
+  layerPixels: PhotoLayerPixels[] = [],
 ): Promise<PhotoColorPipelineResult> {
   const color = recipe.colorManagement;
   if (color?.assignedProfile) {
@@ -30,7 +31,7 @@ export async function processPhotoColorPipeline(
     );
   }
 
-  applyPixelAdjustments(pixels, width, height, recipe);
+  applyPixelAdjustments(pixels, width, height, recipe, layerPixels);
 
   if (mode === 'export' && jpegBackground) {
     for (let offset = 0; offset < pixels.length; offset += 4) {

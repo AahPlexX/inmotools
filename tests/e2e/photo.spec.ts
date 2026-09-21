@@ -371,6 +371,60 @@ test('retouch operations paint multi-stroke coverage, bypass, reorder, and clear
   await expect(overlay.locator('circle')).toHaveCount(2);
 });
 
+test('layers import, blend, transform, mask, duplicate, reorder, and remove independently', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Layers' }).click();
+  await expect(page.getByText('Add an image layer to composite extra local content over this photo.')).toBeVisible();
+
+  await page.getByTestId('photo-layer-file-input').setInputFiles({ name: 'overlay.png', mimeType: 'image/png', buffer: FIXTURE_PNG });
+  const layerCard = page.getByTestId('photo-layer');
+  await expect(layerCard).toHaveCount(1);
+  await expect(layerCard.locator('strong')).toHaveText('overlay');
+
+  const rename = layerCard.getByLabel('Rename overlay');
+  await rename.fill('Sky overlay');
+  await rename.press('Enter');
+  await expect(layerCard.locator('strong')).toHaveText('Sky overlay');
+
+  await layerCard.getByLabel('Sky overlay blend mode').selectOption('multiply');
+  await expect(layerCard.getByLabel('Sky overlay blend mode')).toHaveValue('multiply');
+  await layerCard.getByLabel('Sky overlay opacity value').fill('0.6');
+  await layerCard.getByLabel('Sky overlay opacity value').press('Enter');
+  await expect(layerCard.getByLabel('Sky overlay opacity value')).toHaveValue('0.6');
+  await layerCard.getByLabel('Sky overlay scale value').fill('1.4');
+  await layerCard.getByLabel('Sky overlay scale value').press('Enter');
+  await expect(layerCard.getByLabel('Sky overlay scale value')).toHaveValue('1.4');
+
+  await layerCard.getByRole('button', { name: 'Add radial mask' }).click();
+  const maskOverlay = page.locator('[data-photo-mask="radial"]');
+  await expect(maskOverlay).toBeVisible();
+  await dragOnPhoto(page, 0.3, 0.3, 0.6, 0.6);
+  await expect(layerCard.getByText('Mask: radial')).toBeVisible();
+
+  await layerCard.getByLabel('Visible').uncheck();
+  await expect(maskOverlay).toHaveCount(0);
+  await layerCard.getByLabel('Visible').check();
+  await expect(maskOverlay).toBeVisible();
+
+  await layerCard.getByRole('button', { name: 'Remove mask' }).click();
+  await expect(maskOverlay).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add radial mask' })).toBeVisible();
+
+  await layerCard.getByRole('button', { name: 'Duplicate layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(2);
+  const duplicateCard = page.getByTestId('photo-layer').filter({ hasText: 'Sky overlay copy' });
+  await expect(duplicateCard.locator('strong')).toHaveText('Sky overlay copy');
+
+  await expect(duplicateCard.getByRole('button', { name: 'Move up' })).toBeEnabled();
+  await duplicateCard.getByRole('button', { name: 'Move up' }).click();
+  await expect(page.getByTestId('photo-layer').first().locator('strong')).toHaveText('Sky overlay copy');
+
+  await duplicateCard.getByRole('button', { name: 'Remove layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(1);
+  await layerCard.getByRole('button', { name: 'Remove layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(0);
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();

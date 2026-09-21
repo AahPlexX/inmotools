@@ -146,3 +146,51 @@ export function placeRetouchPoint(
   };
   return normalizeRecipe(next);
 }
+
+/** Places or repaints a layer's existing mask by direct canvas gesture, mirroring
+ * applyLocalGesture's radial/linear/brush placement exactly but targeting a PhotoLayer's own
+ * mask. A layer with no mask yet is left unchanged — creating one is a separate, explicit UI
+ * action (choosing a mask type), not implied by a gesture landing on an unmasked layer. */
+export function applyLayerMaskGesture(
+  recipe: PhotoRecipe,
+  layerId: string,
+  start: PhotoGesturePoint,
+  end: PhotoGesturePoint,
+  path: PhotoGesturePoint[] = [],
+  strokeId = 0,
+  erase = false,
+): PhotoRecipe {
+  const normalizedStart = normalizedPoint(start);
+  const normalizedEnd = normalizedPoint(end);
+  const next = {
+    ...recipe,
+    layers: (recipe.layers ?? []).map((layer) => {
+      if (layer.id !== layerId || !layer.mask) return layer;
+      const mask = layer.mask;
+      if (mask.type === 'radial') {
+        const rx = Math.max(0.01, Math.abs(normalizedEnd.x - normalizedStart.x));
+        const ry = Math.max(0.01, Math.abs(normalizedEnd.y - normalizedStart.y));
+        return { ...layer, mask: { ...mask, cx: normalizedStart.x, cy: normalizedStart.y, rx, ry } };
+      }
+      if (mask.type === 'linear') {
+        return {
+          ...layer,
+          mask: { ...mask, x1: normalizedStart.x, y1: normalizedStart.y, x2: normalizedEnd.x, y2: normalizedEnd.y },
+        };
+      }
+      if (mask.type === 'brush') {
+        const rawPath = (path.length ? path : [end]).map((point) => ({
+          x: clamp01(point.x),
+          y: clamp01(point.y),
+          pressure: clamp01(point.pressure ?? 1),
+        }));
+        const smoothed = smoothBrushPath(rawPath, mask.smoothing);
+        const spaced = decimateBrushPath(smoothed, mask.spacing * mask.radius);
+        const points = spaced.map((point) => ({ ...point, strokeId, erase }));
+        return { ...layer, mask: { ...mask, points: [...mask.points, ...points].slice(-5000) } };
+      }
+      return layer;
+    }),
+  };
+  return normalizeRecipe(next);
+}

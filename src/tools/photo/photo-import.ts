@@ -194,3 +194,26 @@ export function photoImportErrorMessage(error: unknown): string {
   if (error instanceof PhotoImportError) return error.message;
   return `Could not import that photo${error instanceof Error && error.message ? `: ${error.message}` : '.'}`;
 }
+
+export interface DecodedLayerSource {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/** Decodes a local image file into the self-contained data URL a PhotoLayer stores, the same
+ * embed-in-the-recipe convention as PhotoLut.data — no separate asset reference to keep alive. */
+export async function decodeImageFileForLayer(file: File): Promise<DecodedLayerSource> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('2D canvas rendering is unavailable in this browser.');
+    context.drawImage(bitmap, 0, 0);
+    return { dataUrl: canvas.toDataURL('image/png'), width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+}

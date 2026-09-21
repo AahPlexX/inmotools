@@ -1,4 +1,4 @@
-import { normalizeRecipe, sampleHistogram } from './photo-engine';
+import { normalizeRecipe, sampleHistogram, type PhotoLayerPixels } from './photo-engine';
 import { warpPhotoGeometryPixels } from './photo-geometry';
 import { preparePhotoRaster } from './photo-import';
 import type {
@@ -39,6 +39,13 @@ export interface PhotoRenderResult {
   outputMime: string;
   proofBaseBlob?: Blob;
   gamutWarningPixels: number;
+}
+
+interface LayerBufferPayload {
+  layerId: string;
+  buffer: ArrayBuffer;
+  width: number;
+  height: number;
 }
 
 interface RenderWorkerResponse {
@@ -117,6 +124,29 @@ function getContext2d(canvas: HTMLCanvasElement | OffscreenCanvas): CanvasRender
   const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
   if (!context) throw new Error('2D canvas rendering is unavailable in this browser.');
   return context as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+}
+
+/** Decodes one layer's self-contained data URL to raw pixels for compositing. A layer with no
+ * image yet (still being added) or an image this browser cannot decode is skipped rather than
+ * failing the whole render, matching how the engine already treats an undecoded layer as a
+ * no-op. */
+async function decodeLayerPixels(layer: { id: string; sourceDataUrl: string }): Promise<LayerBufferPayload | null> {
+  if (!layer.sourceDataUrl) return null;
+  try {
+    const blob = await (await fetch(layer.sourceDataUrl)).blob();
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas = createCanvas(bitmap.width, bitmap.height);
+      const context = getContext2d(canvas);
+      context.drawImage(bitmap, 0, 0);
+      const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width: bitmap.width, height: bitmap.height };
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return null;
+  }
 }
 
 async function canvasToBlob(
@@ -231,15 +261,24 @@ async function processPixels(
   recipe: PhotoRecipe,
   mode: 'preview' | 'export',
   jpegBackground?: readonly [number, number, number],
+  layerPixels: PhotoLayerPixels[] = [],
 ): Promise<ProcessedPixelBuffers> {
   const activeWorker = ensureWorker();
   if (!activeWorker) {
     const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
-    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground);
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground, layerPixels);
   }
 
   const requestId = nextWorkerRequestId++;
   const transferable = new Uint8ClampedArray(pixels);
+  // Copies, not the caller's own buffers, so layerPixels stays valid for the main-thread
+  // fallback below if the worker attempt fails after these have already been transferred away.
+  const transferableLayers: LayerBufferPayload[] = layerPixels.map((entry) => ({
+    layerId: entry.layerId,
+    buffer: new Uint8ClampedArray(entry.data).buffer as ArrayBuffer,
+    width: entry.width,
+    height: entry.height,
+  }));
   try {
     const result = await new Promise<ProcessedPixelBuffers>((resolve, reject) => {
       pendingWorkerRequests.set(requestId, { resolve, reject });
@@ -249,10 +288,11 @@ async function processPixels(
         width,
         height,
         buffer: transferable.buffer,
+        layers: transferableLayers,
         recipe,
         mode,
         jpegBackground,
-      }, [transferable.buffer]);
+      }, [transferable.buffer, ...transferableLayers.map((entry) => entry.buffer)]);
     });
     return result;
   } catch (error) {
@@ -266,7 +306,7 @@ async function processPixels(
       throw new Error(`Color-managed render failed without a main-thread retry: ${message}`);
     }
     const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
-    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground);
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground, layerPixels);
   }
 }
 
@@ -393,6 +433,10 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const jpegBackground = request.mode === 'export' && mime === 'image/jpeg'
       ? resolveJpegBackground(request.jpegBackground ?? '#ffffff')
       : undefined;
+    const decodedLayers = await Promise.all((recipe.layers ?? []).map(decodeLayerPixels));
+    const layerPixels: PhotoLayerPixels[] = decodedLayers
+      .filter((entry): entry is LayerBufferPayload => entry !== null)
+      .map((entry) => ({ layerId: entry.layerId, data: new Uint8ClampedArray(entry.buffer), width: entry.width, height: entry.height }));
     const processed = await processPixels(
       geometryPixels,
       target.width,
@@ -400,6 +444,7 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       recipe,
       request.mode === 'export' ? 'export' : 'preview',
       jpegBackground,
+      layerPixels,
     );
     const ownedPixels = new Uint8ClampedArray(processed.pixels.length);
     ownedPixels.set(processed.pixels);

@@ -23,7 +23,8 @@ import {
   undoHistory,
 } from './photo-engine';
 import { photoNaturalDimensions } from './photo-export-dimensions';
-import { applyLocalGesture, placeRetouchPoint } from './photo-interaction';
+import { applyLayerMaskGesture, applyLocalGesture, placeRetouchPoint } from './photo-interaction';
+import { cloneLayer, createLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
   parseCubeLut,
@@ -36,6 +37,7 @@ import {
 } from './color/photo-color-management';
 import {
   PHOTO_FILE_ACCEPT,
+  decodeImageFileForLayer,
   isPhotoImportFile,
   normalizePhotoImport,
   preparePhotoRaster,
@@ -82,10 +84,13 @@ import {
 } from './photo-renderer';
 import type {
   LocalAdjustment,
+  PhotoBlendMode,
   PhotoCapabilities,
   PhotoColorManagement,
   PhotoHistogram,
   PhotoHistory,
+  PhotoLayer,
+  PhotoMask,
   PhotoRecipe,
   PhotoRawSource,
   PhotoSelectionCombineMode,
@@ -96,7 +101,7 @@ import type {
 } from './photo-types';
 import './photo.css';
 
-type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'inspect';
+type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'inspect';
 type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
 type MixerOutputChannel = 'red' | 'green' | 'blue';
 
@@ -314,6 +319,7 @@ export default function PhotoWorkspace() {
   const [mixerOutputChannel, setMixerOutputChannel] = useState<MixerOutputChannel>('red');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
   const [brushEraseMode, setBrushEraseMode] = useState(false);
+  const [layerEraseMode, setLayerEraseMode] = useState(false);
   const [selectionCombineMode, setSelectionCombineMode] = useState<PhotoSelectionCombineMode>('replace');
   const [selectionColorTolerance, setSelectionColorTolerance] = useState(0.12);
   const [selectionLuminanceMin, setSelectionLuminanceMin] = useState(0.2);
@@ -355,6 +361,8 @@ export default function PhotoWorkspace() {
   const projectSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const projectBeingDeletedRef = useRef<string | null>(null);
   const brushStrokeCounterRef = useRef(0);
+  const layerStrokeCounterRef = useRef(0);
+  const layerFileInputRef = useRef<HTMLInputElement | null>(null);
   const userPresetMutationRef = useRef(false);
   const autoAnalysisRevisionRef = useRef(0);
   const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
@@ -1072,6 +1080,81 @@ export default function PhotoWorkspace() {
     patchRecipe({ retouch });
   }
 
+  function addImageLayer(file: File) {
+    const id = crypto.randomUUID?.() ?? `layer-${Date.now()}-${(recipe.layers ?? []).length}`;
+    const name = file.name.replace(/\.[^.]+$/, '') || 'Layer';
+    setStatus(`Reading ${file.name}…`);
+    decodeImageFileForLayer(file)
+      .then((decoded) => {
+        const layer = createLayer(id, name, decoded.dataUrl, decoded.width, decoded.height);
+        // Read layers fresh inside the updater rather than from the recipe captured when this
+        // decode started, so another edit made while the file was decoding is never discarded.
+        setHistory((current) => commitHistory(current, normalizeRecipe({
+          ...current.present,
+          layers: [...(current.present.layers ?? []).map(cloneLayer), layer],
+        })));
+        setPanel('layers');
+        setStatus(`${layer.name} added as a new layer. Nothing was uploaded.`);
+      })
+      .catch(() => setStatus(`Could not read "${file.name}" as an image in this browser.`));
+  }
+
+  function updateLayer(id: string, update: (item: PhotoLayer) => PhotoLayer) {
+    patchRecipe({ layers: (recipe.layers ?? []).map((item) => item.id === id ? update(cloneLayer(item)) : cloneLayer(item)) });
+  }
+
+  function removeLayer(id: string) {
+    patchRecipe({ layers: (recipe.layers ?? []).filter((item) => item.id !== id).map(cloneLayer) });
+    if (canvasInteraction?.id === id) setCanvasInteraction(null);
+  }
+
+  function duplicateLayer(id: string) {
+    const layers = recipe.layers ?? [];
+    const index = layers.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const source = cloneLayer(layers[index]);
+    const duplicate: PhotoLayer = { ...source, id: crypto.randomUUID?.() ?? `layer-copy-${Date.now()}`, name: `${source.name} copy`.slice(0, 80) };
+    const next = layers.map(cloneLayer);
+    next.splice(index + 1, 0, duplicate);
+    patchRecipe({ layers: next });
+    setStatus(`${duplicate.name} created as an independent layer.`);
+  }
+
+  function reorderLayer(id: string, direction: -1 | 1) {
+    const layers = recipe.layers ?? [];
+    const index = layers.findIndex((item) => item.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= layers.length) return;
+    const next = layers.map(cloneLayer);
+    [next[index], next[target]] = [next[target], next[index]];
+    patchRecipe({ layers: next });
+  }
+
+  function setLayerMaskType(id: string, type: 'radial' | 'linear' | 'brush' | null) {
+    updateLayer(id, (item) => {
+      if (type === null) return { ...item, mask: null };
+      const base = { feather: 0.45, opacity: 1, invert: false };
+      const mask: PhotoMask = type === 'radial'
+        ? { type: 'radial', cx: 0.5, cy: 0.5, rx: 0.28, ry: 0.28, ...base }
+        : type === 'linear'
+          ? { type: 'linear', x1: 0.2, y1: 0.25, x2: 0.8, y2: 0.75, ...base }
+          : { type: 'brush', points: [], radius: 0.12, flow: 1, spacing: 0.25, smoothing: 0.3, ...base };
+      return { ...item, mask };
+    });
+    const layer = (recipe.layers ?? []).find((item) => item.id === id);
+    if (type && layer) {
+      setPanel('layers');
+      setCanvasInteraction({
+        kind: 'layer-mask',
+        id,
+        label: `${type === 'brush' ? 'Paint' : 'Place'} ${layer.name} mask`,
+        mode: type === 'radial' ? 'layer-radial' : type === 'linear' ? 'layer-linear' : 'layer-brush',
+      });
+    } else {
+      setCanvasInteraction(null);
+    }
+  }
+
   function duplicateLocal(id: string) {
     const index = recipe.localAdjustments.findIndex((item) => item.id === id);
     if (index < 0) return;
@@ -1157,6 +1240,10 @@ export default function PhotoWorkspace() {
           interaction.mode === 'retouch-source' ? 'source' : 'target',
           interaction.mode === 'retouch-target' ? gesture.path : [],
         );
+      } else if (interaction.kind === 'layer-mask') {
+        next = interaction.mode === 'layer-brush'
+          ? applyLayerMaskGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path, ++layerStrokeCounterRef.current, layerEraseMode)
+          : applyLayerMaskGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path);
       } else {
         let source: PhotoSelectionSource | null = null;
         if (interaction.mode === 'selection-rectangle') {
@@ -1215,6 +1302,11 @@ export default function PhotoWorkspace() {
       // Stays active like brush painting: the source offset is locked, so further drags keep
       // adding stroke coverage without needing to re-select the target tool each time.
       setStatus('Retouch stroke painted with the locked source offset as one undo step.');
+      return;
+    }
+    if (interaction.kind === 'layer-mask') {
+      if (interaction.mode !== 'layer-brush') setCanvasInteraction(null);
+      setStatus(interaction.mode === 'layer-brush' ? 'Layer mask brush stroke added as one undo step.' : 'Layer mask placed on the photo.');
       return;
     }
     setCanvasInteraction(null);
@@ -2022,6 +2114,108 @@ export default function PhotoWorkspace() {
     );
   }
 
+  function renderLayersPanel() {
+    const layers = recipe.layers ?? [];
+    return (
+      <>
+        <div className="photo-inspector-header">
+          <h2>Layers</h2>
+          <p>Add extra local images, position and blend them, and mask where each one shows through.</p>
+        </div>
+        <div className="photo-inline-actions">
+          <button type="button" onClick={() => layerFileInputRef.current?.click()}>Add image layer</button>
+          <input
+            ref={layerFileInputRef}
+            data-testid="photo-layer-file-input"
+            type="file"
+            accept={PHOTO_FILE_ACCEPT}
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) addImageLayer(file);
+            }}
+          />
+        </div>
+        {layers.length ? layers.map((layer, index) => (
+          <article className="photo-local-card" key={layer.id} data-testid="photo-layer">
+            <header>
+              <strong>{layer.name}</strong>
+              <label>
+                Layer name
+                <input
+                  type="text"
+                  aria-label={`Rename ${layer.name}`}
+                  defaultValue={layer.name}
+                  maxLength={80}
+                  onKeyDown={inputCommit}
+                  onBlur={(event) => {
+                    const name = event.currentTarget.value.trim().slice(0, 80) || layer.name;
+                    event.currentTarget.value = name;
+                    if (name !== layer.name) updateLayer(layer.id, (item) => ({ ...item, name }));
+                  }}
+                />
+              </label>
+            </header>
+            <label className="photo-check">
+              <input type="checkbox" checked={layer.visible} onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, visible: event.target.checked }))} />
+              Visible
+            </label>
+            <label>
+              Blend mode
+              <select
+                aria-label={`${layer.name} blend mode`}
+                value={layer.blendMode}
+                onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, blendMode: event.target.value as PhotoBlendMode }))}
+              >
+                {PHOTO_BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.replace('-', ' ')}</option>)}
+              </select>
+            </label>
+            <SimpleControl label={`${layer.name} opacity`} value={layer.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, opacity: value }))} />
+            <SimpleControl label={`${layer.name} horizontal position`} value={layer.transform.x} min={0} max={1} step={0.01} neutral={0.5} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, x: value } }))} />
+            <SimpleControl label={`${layer.name} vertical position`} value={layer.transform.y} min={0} max={1} step={0.01} neutral={0.5} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, y: value } }))} />
+            <SimpleControl label={`${layer.name} scale`} value={layer.transform.scale} min={0.05} max={5} step={0.01} neutral={1} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, scale: value } }))} />
+            <SimpleControl label={`${layer.name} rotation`} value={layer.transform.rotation} min={-180} max={180} step={1} neutral={0} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, rotation: value } }))} />
+            {layer.mask ? (
+              <>
+                <p className="photo-export-note">Mask: {layer.mask.type}</p>
+                <button
+                  type="button"
+                  aria-pressed={canvasInteraction?.id === layer.id && canvasInteraction.kind === 'layer-mask'}
+                  onClick={() => setLayerMaskType(layer.id, layer.mask!.type === 'brush' ? 'brush' : layer.mask!.type === 'linear' ? 'linear' : 'radial')}
+                >{layer.mask.type === 'brush' ? 'Paint mask on photo' : 'Place mask on photo'}</button>
+                {layer.mask.type === 'brush' ? (
+                  <label className="photo-check">
+                    <input type="checkbox" aria-label={`${layer.name} mask erase mode`} checked={layerEraseMode} onChange={(event) => setLayerEraseMode(event.target.checked)} />
+                    Erase with this brush
+                  </label>
+                ) : null}
+                <SimpleControl label={`${layer.name} mask feather`} value={layer.mask.feather} min={0} max={1} step={0.02} neutral={0.45} onChange={(value) => updateLayer(layer.id, (item) => item.mask ? ({ ...item, mask: { ...item.mask, feather: value } }) : item)} />
+                <SimpleControl label={`${layer.name} mask opacity`} value={layer.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLayer(layer.id, (item) => item.mask ? ({ ...item, mask: { ...item.mask, opacity: value } }) : item)} />
+                <div className="photo-inline-actions">
+                  <button type="button" onClick={() => updateLayer(layer.id, (item) => item.mask ? ({ ...item, mask: { ...item.mask, invert: !item.mask.invert } }) : item)}>{layer.mask.invert ? 'Use normal mask' : 'Invert mask'}</button>
+                  <button type="button" onClick={() => setLayerMaskType(layer.id, null)}>Remove mask</button>
+                </div>
+              </>
+            ) : (
+              <div className="photo-inline-actions" role="group" aria-label={`Add a mask to ${layer.name}`}>
+                <button type="button" onClick={() => setLayerMaskType(layer.id, 'radial')}>Add radial mask</button>
+                <button type="button" onClick={() => setLayerMaskType(layer.id, 'linear')}>Add linear mask</button>
+                <button type="button" onClick={() => setLayerMaskType(layer.id, 'brush')}>Add brush mask</button>
+              </div>
+            )}
+            <div className="photo-inline-actions">
+              <button type="button" disabled={index === 0} onClick={() => reorderLayer(layer.id, -1)}>Move up</button>
+              <button type="button" disabled={index === layers.length - 1} onClick={() => reorderLayer(layer.id, 1)}>Move down</button>
+              <button type="button" onClick={() => duplicateLayer(layer.id)}>Duplicate layer</button>
+              <button type="button" onClick={() => removeLayer(layer.id)}>Remove layer</button>
+            </div>
+          </article>
+        )) : <p className="photo-export-note">Add an image layer to composite extra local content over this photo.</p>}
+      </>
+    );
+  }
+
   function renderInspectPanel() {
     return (
       <>
@@ -2199,6 +2393,7 @@ export default function PhotoWorkspace() {
     if (panel === 'geometry') return renderGeometryPanel();
     if (panel === 'local') return renderLocalPanel();
     if (panel === 'retouch') return renderRetouchPanel();
+    if (panel === 'layers') return renderLayersPanel();
     if (panel === 'inspect') return renderInspectPanel();
     return renderEditPanel();
   }
@@ -2313,6 +2508,7 @@ export default function PhotoWorkspace() {
             ['geometry', 'Crop & geometry'],
             ['local', 'Local adjustments'],
             ['retouch', 'Retouch'],
+            ['layers', 'Layers'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
             <button
@@ -2321,7 +2517,7 @@ export default function PhotoWorkspace() {
               aria-pressed={panel === id}
               onClick={() => {
                 setPanel(id);
-                if (id !== 'local' && id !== 'retouch') setCanvasInteraction(null);
+                if (id !== 'local' && id !== 'retouch' && id !== 'layers') setCanvasInteraction(null);
                 if (id !== 'geometry') setGeometryInteraction(null);
               }}
             >{label}</button>
@@ -2341,6 +2537,7 @@ export default function PhotoWorkspace() {
           busy={previewBusy}
           localAdjustments={recipe.localAdjustments}
           retouch={recipe.retouch}
+          layers={recipe.layers}
           selection={recipe.selection}
           interaction={canvasInteraction}
           crop={recipe.crop}
