@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not open a second PR. Do not touch unrelated tools.
 
-**Tip SHA:** `PLACEHOLDER_TIP_SHA`  
+**Tip SHA:** `a92d80d56d081b4e927d2d503617b5e454117eca`  
 **Last focused-gate code:** `c37fff4c1bdd98827266be6f6fd611901756e75e`  
 **Workstream:** **PRODUCT CUT P1–P16 DONE.** Client loop green on `c37fff4` / `3e87e0a`. CoS squash-merged #71 onto `main` at `b582c34`. This branch synced that tip. The agent does not merge, mark ready, or open a second PR. Not an XLOOKUP-only cut. Do not invent extra product scope. Do not expand PX.
 
