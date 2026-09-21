@@ -2,21 +2,12 @@ import type {
   NormalizedPoint,
   TacticalProject,
 } from './tactics-types';
-import { trainingFormatProfiles } from './pitch-engine';
+import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
 
 export const TACTICS_SCHEMA_VERSION = 1 as const;
 
 function isoNow(): string {
   return new Date().toISOString();
-}
-
-function isNormalizedPoint(point: NormalizedPoint): boolean {
-  return Number.isFinite(point.x)
-    && Number.isFinite(point.y)
-    && point.x >= 0
-    && point.x <= 1
-    && point.y >= 0
-    && point.y <= 1;
 }
 
 function cloneDefaultRuleset(): TacticalProject['ruleset'] {
@@ -157,6 +148,13 @@ export function validateTacticalProject(project: TacticalProject): string[] {
   for (const official of project.officials) validatePosition(errors, official.id, official.position);
   for (const item of project.equipment) validatePosition(errors, item.id, item.position);
   validatePosition(errors, 'ball', project.ball.position);
+
+  for (const overlay of project.pitch.overlays) {
+    for (const point of overlay.points) validatePosition(errors, overlay.id, point);
+  }
+  for (const annotation of project.annotations) {
+    for (const point of annotation.points) validatePosition(errors, annotation.id, point);
+  }
 
   for (const scene of project.scenes) {
     if (!Number.isInteger(scene.startMs) || scene.startMs < 0) {
