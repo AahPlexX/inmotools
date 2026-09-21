@@ -108,6 +108,25 @@ describe('Tactical Matchboard foundation contracts', () => {
     }
   });
 
+  it('rejects out-of-range coordinates across pitch overlays and annotations', () => {
+    const project = createStarterTacticalProject();
+    project.pitch.overlays.push({
+      id: 'bad-zone',
+      kind: 'zone',
+      label: 'Bad zone',
+      points: [{ x: -0.1, y: 0.5 }],
+    });
+    project.annotations.push({
+      id: 'bad-annotation',
+      kind: 'arrow',
+      points: [{ x: 0.5, y: 1.1 }],
+    });
+
+    const errors = validateTacticalProject(project);
+    expect(errors).toContainEqual(expect.stringMatching(/bad-zone.*normalized/i));
+    expect(errors).toContainEqual(expect.stringMatching(/bad-annotation.*normalized/i));
+  });
+
   it('creates a schema-versioned starter project with integer time and normalized scene state', () => {
     const project = createStarterTacticalProject();
     expect(project.schemaVersion).toBe(TACTICS_SCHEMA_VERSION);
