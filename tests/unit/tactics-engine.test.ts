@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addAnnotation,
+  addEquipment,
+  addPlayerToken,
+  addRosterPlayer,
+  addTeam,
+  commitTacticalProject,
+  createTacticalHistory,
+  movePlayerToken,
+  redoTacticalProject,
+  setSceneLayerState,
+  undoTacticalProject,
+} from '../../src/tools/tactics/editor-engine';
+import {
   createStarterTacticalProject,
   TACTICS_SCHEMA_VERSION,
   validateTacticalProject,
@@ -148,5 +161,132 @@ describe('Tactical Matchboard foundation contracts', () => {
     expect(validateTacticalProject(project)).toContainEqual(
       expect.stringMatching(/bad-player.*normalized/i),
     );
+  });
+});
+
+
+describe('Tactical Matchboard immutable editor contracts', () => {
+  it('commits, undoes and redoes project edits with bounded history', () => {
+    let history = createTacticalHistory(createStarterTacticalProject());
+    history = commitTacticalProject(history, 'title A', (project) => ({
+      ...project,
+      metadata: { ...project.metadata, title: 'A' },
+    }));
+    expect(history.present.metadata.title).toBe('A');
+
+    const undone = undoTacticalProject(history);
+    expect(undone.present.metadata.title).toBe('Untitled tactical project');
+
+    const redone = redoTacticalProject(undone);
+    expect(redone.present.metadata.title).toBe('A');
+
+    let bounded = createTacticalHistory(createStarterTacticalProject());
+    for (let index = 0; index < 110; index += 1) {
+      bounded = commitTacticalProject(bounded, `edit ${index}`, (project) => ({
+        ...project,
+        metadata: { ...project.metadata, title: `Project ${index}` },
+      }));
+    }
+    expect(bounded.past).toHaveLength(100);
+    expect(bounded.present.metadata.title).toBe('Project 109');
+  });
+
+  it('adds a team, roster player and scene token without mutating prior project state', () => {
+    const start = createStarterTacticalProject();
+    const withTeam = addTeam(start, {
+      id: 'home',
+      name: 'Home',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+    const withPlayer = addRosterPlayer(withTeam, 'home', {
+      id: 'p9',
+      displayName: 'Player 9',
+      jerseyNumber: '9',
+      role: 'Striker',
+      status: 'active',
+    });
+    const withToken = addPlayerToken(withPlayer, {
+      id: 'token-p9',
+      playerId: 'p9',
+      teamId: 'home',
+      position: { x: 0.7, y: 0.5 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    });
+
+    expect(start.teams).toHaveLength(0);
+    expect(withTeam.teams[0]?.roster).toHaveLength(0);
+    expect(withPlayer.teams[0]?.roster[0]?.displayName).toBe('Player 9');
+    expect(withToken.playerTokens[0]?.position).toEqual({ x: 0.7, y: 0.5 });
+  });
+
+  it('rejects invalid token placement and keeps roster/team relationships valid', () => {
+    const project = addTeam(createStarterTacticalProject(), {
+      id: 'home',
+      name: 'Home',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+
+    expect(() => addPlayerToken(project, {
+      id: 'orphan',
+      playerId: 'missing',
+      teamId: 'home',
+      position: { x: 0.5, y: 0.5 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    })).toThrow(/roster player/i);
+
+    expect(() => movePlayerToken({
+      ...project,
+      playerTokens: [{
+        id: 'token',
+        playerId: 'missing',
+        teamId: 'home',
+        position: { x: 0.5, y: 0.5 },
+        rotationDeg: 0,
+        visible: true,
+        locked: false,
+      }],
+    }, 'token', { x: 1.1, y: 0.5 })).toThrow(/normalized/i);
+  });
+
+  it('adds validated equipment and annotations, and honors layer locking', () => {
+    const start = createStarterTacticalProject();
+    const equipped = addEquipment(start, {
+      id: 'cone-1',
+      kind: 'cone',
+      position: { x: 0.25, y: 0.25 },
+      rotationDeg: 0,
+      scale: 1,
+      layerId: 'layer-1',
+      visible: true,
+      locked: false,
+    });
+    const annotated = addAnnotation(equipped, {
+      id: 'arrow-1',
+      kind: 'arrow',
+      label: 'Run',
+      points: [{ x: 0.4, y: 0.5 }, { x: 0.7, y: 0.5 }],
+    });
+    const locked = setSceneLayerState(annotated, 'scene-1', 'layer-1', { locked: true });
+
+    expect(locked.equipment).toHaveLength(1);
+    expect(locked.annotations).toHaveLength(1);
+    expect(locked.scenes[0]?.layers[0]?.locked).toBe(true);
+    expect(() => addEquipment(start, {
+      id: 'bad-cone',
+      kind: 'cone',
+      position: { x: -0.1, y: 0.25 },
+      rotationDeg: 0,
+      scale: 1,
+      visible: true,
+      locked: false,
+    })).toThrow(/normalized/i);
   });
 });
