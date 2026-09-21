@@ -16,7 +16,8 @@
 .tsw-formula,
 .tsw-status,
 .tsw-panel,
-.tsw-sheet-tabs {
+.tsw-sheet-tabs,
+.tsw-parity-chrome {
   display: flex;
   flex-wrap: wrap;
   gap: clamp(0.4rem, 1.2vw, 0.7rem);
@@ -28,7 +29,8 @@
 .tsw-formula,
 .tsw-status,
 .tsw-panel,
-.tsw-sheet-tabs {
+.tsw-sheet-tabs,
+.tsw-parity-chrome {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -37,7 +39,8 @@
 
 .tsw-toolbar button,
 .tsw-sheet-tabs button,
-.tsw-panel button {
+.tsw-panel button,
+.tsw-parity-chrome button {
   min-height: 44px;
   min-width: 44px;
   padding: 0.45rem 0.75rem;
@@ -46,6 +49,7 @@
   background: var(--surface);
   color: var(--ink);
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .tsw-toolbar button[data-primary='true'],
@@ -58,6 +62,7 @@
 .tsw-toolbar label,
 .tsw-formula label,
 .tsw-style-chrome label,
+.tsw-parity-chrome label,
 .tsw-panel label {
   display: grid;
   gap: 0.25rem;
@@ -69,8 +74,11 @@
 .tsw-toolbar input,
 .tsw-toolbar select,
 .tsw-formula input,
+.tsw-formula select,
 .tsw-style-chrome input,
 .tsw-style-chrome select,
+.tsw-parity-chrome input,
+.tsw-parity-chrome select,
 .tsw-panel input,
 .tsw-panel select,
 .tsw-panel textarea {
@@ -92,6 +100,20 @@
   border-radius: var(--radius-sm);
   max-height: clamp(18rem, 58vh, 44rem);
   touch-action: manipulation;
+  scroll-padding-top: 2.5rem;
+  scroll-padding-left: 2.8rem;
+}
+
+.tsw-grid-wrap:focus,
+.tsw-grid-wrap:focus-visible {
+  outline: 2px solid var(--signal, #2563eb);
+  outline-offset: 2px;
+}
+
+.tsw-grid td:focus,
+.tsw-grid td:focus-visible {
+  outline: 2px solid var(--signal, #2563eb);
+  outline-offset: -2px;
 }
 
 .tsw-grid {
@@ -112,6 +134,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   height: 2rem;
+  scroll-margin-top: 2.5rem;
+  scroll-margin-left: 2.8rem;
 }
 
 .tsw-grid th {
@@ -195,6 +219,10 @@
   border-top: 6px solid var(--warning);
 }
 
+.tsw-grid td[data-spill='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal, #2563eb) 55%, transparent);
+}
+
 .tsw-grid td {
   position: relative;
 }
@@ -228,11 +256,22 @@
 }
 
 .tsw-panel p,
-.tsw-hint {
+.tsw-hint,
+.tsw-status output,
+.tsw-formula-tooltip p {
   margin: 0;
   color: var(--muted);
   font-size: clamp(0.75rem, 1.6vw, 0.85rem);
   line-height: 1.45;
+  letter-spacing: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.tsw-panel h3 {
+  overflow-wrap: break-word;
+  word-break: normal;
+  letter-spacing: 0;
 }
 
 .tsw-progress {
@@ -453,6 +492,166 @@
     max-height: 48vh;
     min-height: 12rem;
   }
+}
+
+.tsw-insert-function,
+.tsw-list-picker {
+  display: grid;
+  gap: 0.45rem;
+  min-width: min(100%, 16rem);
+}
+
+.tsw-insert-function {
+  position: relative;
+  z-index: 5;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: clamp(0.6rem, 1.6vw, 0.9rem);
+  max-height: min(70vh, 28rem);
+  overflow: auto;
+}
+
+.tsw-insert-function ul,
+.tsw-named-range-list,
+.tsw-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.tsw-insert-function input {
+  min-height: 44px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.tsw-root[data-sheet-locked='true'] .tsw-grid {
+  outline: 2px dashed var(--warning);
+}
+
+@media (max-width: 430px) {
+  .tsw-formula-tooltip,
+  .tsw-insert-function {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .tsw-toolbar,
+  .tsw-formula,
+  .tsw-style-chrome,
+  .tsw-parity-chrome,
+  .tsw-status,
+  .tsw-sheet-tabs {
+    align-items: stretch;
+  }
+
+  .tsw-toolbar button,
+  .tsw-parity-chrome button,
+  .tsw-sheet-tabs button,
+  .tsw-style-chrome button {
+    flex: 1 1 calc(50% - 0.4rem);
+    min-width: min(100%, 8.5rem);
+  }
+
+  .tsw-toolbar label,
+  .tsw-formula label,
+  .tsw-style-chrome label,
+  .tsw-parity-chrome label,
+  .tsw-panel label {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .tsw-status {
+    justify-content: flex-start;
+  }
+
+  .tsw-status output {
+    flex: 1 1 calc(50% - 0.4rem);
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 360px) {
+  .tsw-toolbar button,
+  .tsw-parity-chrome button,
+  .tsw-sheet-tabs button,
+  .tsw-style-chrome button,
+  .tsw-formula button {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .tsw-grid th,
+  .tsw-grid td {
+    min-width: 3.4rem;
+    max-width: 42vw;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-height: 400px) and (orientation: landscape) {
+  .tsw-grid-wrap,
+  .tsw-univer-host {
+    max-height: 42vh;
+    min-height: 10rem;
+  }
+
+  .tsw-toolbar,
+  .tsw-parity-chrome,
+  .tsw-formula,
+  .tsw-style-chrome {
+    gap: 0.35rem;
+    padding: 0.45rem;
+  }
+}
+
+@media print {
+  .suite-topline,
+  .suite-intro,
+  .suite-guide,
+  .tsw-toolbar,
+  .tsw-parity-chrome,
+  .tsw-style-chrome,
+  .tsw-panels,
+  .tsw-context,
+  .tsw-formula-tooltip,
+  .tsw-insert-function,
+  .tsw-autofilter,
+  .favorite-button,
+  .back-link {
+    display: none !important;
+  }
+
+  .tsw-grid-wrap {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .tsw-root,
+  .suite-workspace {
+    background: #fff;
+    color: #111;
+  }
+}
+
+.tsw-root[data-print-view='true'] .tsw-toolbar,
+.tsw-root[data-print-view='true'] .tsw-parity-chrome,
+.tsw-root[data-print-view='true'] .tsw-style-chrome,
+.tsw-root[data-print-view='true'] .tsw-panels,
+.tsw-root[data-print-view='true'] .tsw-context,
+.tsw-root[data-print-view='true'] .tsw-insert-function,
+.tsw-root[data-print-view='true'] .tsw-formula-tooltip {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

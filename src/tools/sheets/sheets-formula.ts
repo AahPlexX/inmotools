@@ -1,3 +1,5 @@
+import { callFormulaJs, hasFormulaJsFunction, isoDate, jsErrorCode, storedPrimitive, toJsPrimitive } from './sheets-formula-js';
+import { applySpill, isSpillMatrix, type SpillMatrix } from './sheets-spill';
 import { cellKey, type CellPrimitive, type NamedRange, type PortableSheet, type PortableWorkbook, type SheetCell } from './sheets-types';
 
 export interface A1Ref {
@@ -10,11 +12,17 @@ export interface A1Ref {
 
 export interface FormulaError {
   kind: 'error';
-  code: '#REF!' | '#DIV/0!' | '#VALUE!' | '#NAME?' | '#CYCLE!' | '#N/A';
+  code: '#REF!' | '#DIV/0!' | '#VALUE!' | '#NAME?' | '#CYCLE!' | '#N/A' | '#SPILL!' | '#CALC!' | '#NUM!';
   message: string;
 }
 
-export type FormulaValue = CellPrimitive | null | FormulaError;
+export type FormulaValue = CellPrimitive | null | Date | FormulaError;
+export type FormulaMatrix = FormulaValue[][];
+export type FormulaResult = FormulaValue | FormulaMatrix;
+
+const ERROR_CODES = new Set<FormulaError['code']>([
+  '#REF!', '#DIV/0!', '#VALUE!', '#NAME?', '#CYCLE!', '#N/A', '#SPILL!', '#CALC!', '#NUM!',
+]);
 
 export interface DagNode {
   sheetId: string;
@@ -87,6 +95,36 @@ export function extractRefs(formula: string): A1Ref[] {
   return refs;
 }
 
+const RANGE_TOKEN_RE = /(?:(?:'((?:[^']|'')+)'|([A-Za-z0-9_]+))!)?(\$?[A-Za-z]+\$?\d+):(\$?[A-Za-z]+\$?\d+)/g;
+
+export function extractRangeCells(formula: string): A1Ref[] {
+  const refs: A1Ref[] = [];
+  const source = formula.startsWith('=') ? formula.slice(1) : formula;
+  RANGE_TOKEN_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = RANGE_TOKEN_RE.exec(source))) {
+    const start = parseA1Ref(match[3] ?? '');
+    const end = parseA1Ref(match[4] ?? '');
+    if (!start || !end) continue;
+    const sheetName = match[1]?.replaceAll("''", "'") ?? match[2] ?? start.sheetName ?? end.sheetName;
+    const r1 = Math.min(start.row, end.row);
+    const r2 = Math.max(start.row, end.row);
+    const c1 = Math.min(start.col, end.col);
+    const c2 = Math.max(start.col, end.col);
+    const area = (r2 - r1 + 1) * (c2 - c1 + 1);
+    if (area > 20000) {
+      refs.push({ ...start, sheetName }, { ...end, sheetName });
+      continue;
+    }
+    for (let row = r1; row <= r2; row += 1) {
+      for (let col = c1; col <= c2; col += 1) {
+        refs.push({ sheetName, col, row, colAbs: false, rowAbs: false });
+      }
+    }
+  }
+  return refs;
+}
+
 export function rewriteRelative(formula: string, dRow: number, dCol: number): string {
   const prefix = formula.startsWith('=') ? '=' : '';
   const body = prefix ? formula.slice(1) : formula;
@@ -124,7 +162,8 @@ export function buildFormulaDag(book: PortableWorkbook): DagResult {
       if (row === undefined || col === undefined || Number.isNaN(row) || Number.isNaN(col)) continue;
       const id = nodeId(sheet.id, row, col);
       const dependsOn: string[] = [];
-      for (const ref of extractRefs(cell.f)) {
+      const deps = [...extractRefs(cell.f), ...extractRangeCells(cell.f)];
+      for (const ref of deps) {
         const targetSheet = sheetByName(book, ref.sheetName, sheet.id);
         if (!targetSheet) continue;
         dependsOn.push(nodeId(targetSheet.id, ref.row, ref.col));
@@ -172,21 +211,51 @@ export function buildFormulaDag(book: PortableWorkbook): DagResult {
   return { nodes, order, cycles };
 }
 
-function isError(value: FormulaValue): value is FormulaError {
-  return typeof value === 'object' && value !== null && 'kind' in value && value.kind === 'error';
+function isError(value: FormulaResult | FormulaValue): value is FormulaError {
+  return !Array.isArray(value) && typeof value === 'object' && value !== null && !(value instanceof Date) && 'kind' in value && value.kind === 'error';
 }
 
 function isNumberListError(value: number[] | FormulaError): value is FormulaError {
   return !Array.isArray(value);
 }
 
-function asNumber(value: FormulaValue): number | FormulaError {
-  if (isError(value)) return value;
-  if (value === null || value === '') return 0;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'boolean') return value ? 1 : 0;
-  if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+export function isFormulaMatrix(value: FormulaResult): value is FormulaMatrix {
+  return Array.isArray(value);
+}
+
+export function firstScalar(value: FormulaResult): FormulaValue {
+  if (isFormulaMatrix(value)) {
+    const first = value[0]?.[0];
+    return first === undefined ? null : first;
+  }
+  return value;
+}
+
+function excelSerial(value: Date): number {
+  return (Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()) - Date.UTC(1899, 11, 30)) / 86400000;
+}
+
+function asNumber(value: FormulaResult): number | FormulaError {
+  const scalar = firstScalar(value);
+  if (isError(scalar)) return scalar;
+  if (scalar === null || scalar === '') return 0;
+  if (scalar instanceof Date) return excelSerial(scalar);
+  if (typeof scalar === 'number' && Number.isFinite(scalar)) return scalar;
+  if (typeof scalar === 'boolean') return scalar ? 1 : 0;
+  if (typeof scalar === 'string' && scalar.trim() !== '' && Number.isFinite(Number(scalar))) return Number(scalar);
   return { kind: 'error', code: '#VALUE!', message: 'Expected a number.' };
+}
+
+function storedCellValue(value: FormulaResult): CellPrimitive | null {
+  const scalar = firstScalar(value);
+  if (isError(scalar)) return scalar.code;
+  return storedPrimitive(scalar);
+}
+
+function displayText(value: FormulaValue): string {
+  if (isError(value)) return value.code;
+  if (value instanceof Date) return isoDate(value);
+  return String(value ?? '');
 }
 
 type Token =
@@ -442,7 +511,9 @@ function flatten(expr: Expr, book: PortableWorkbook, sheetId: string, named: Nam
     }
     return values;
   }
-  return [evalExpr(expr, book, sheetId, named)];
+  const value = evalExpr(expr, book, sheetId, named);
+  if (isFormulaMatrix(value)) return value.flat();
+  return [value];
 }
 
 function readCell(book: PortableWorkbook, sheetId: string, row: number, col: number, named: NamedRange[]): FormulaValue {
@@ -454,10 +525,13 @@ function readCell(book: PortableWorkbook, sheetId: string, row: number, col: num
   if (cell.f && cell.f.startsWith('=') && (cell.v === null || cell.v === undefined)) {
     evaluationStack.add(id);
     try {
-      return evaluateFormula(cell.f, book, sheetId, named);
+      return firstScalar(evaluateFormulaResult(cell.f, book, sheetId, named));
     } finally {
       evaluationStack.delete(id);
     }
+  }
+  if (typeof cell.v === 'string' && ERROR_CODES.has(cell.v as FormulaError['code'])) {
+    return { kind: 'error', code: cell.v as FormulaError['code'], message: cell.v };
   }
   return cell.v ?? null;
 }
@@ -470,7 +544,7 @@ function resolveName(name: string, book: PortableWorkbook, named: NamedRange[]):
   return readCell(book, found.sheetId, ref.row, ref.col, named);
 }
 
-function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaValue {
+function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
   switch (expr.kind) {
     case 'num':
       return expr.value;
@@ -481,8 +555,12 @@ function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: Na
       if (!sheet) return { kind: 'error', code: '#REF!', message: 'Missing sheet.' };
       return readCell(book, sheet.id, expr.value.row, expr.value.col, named);
     }
-    case 'name':
+    case 'name': {
+      const token = expr.value.toUpperCase();
+      if (token === 'TRUE') return true;
+      if (token === 'FALSE') return false;
       return resolveName(expr.value, book, named);
+    }
     case 'unary': {
       const inner = asNumber(evalExpr(expr.value, book, sheetId, named));
       if (isError(inner)) return inner;
@@ -490,14 +568,14 @@ function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: Na
     }
     case 'bin': {
       if (expr.op === '&') {
-        const left = evalExpr(expr.left, book, sheetId, named);
-        const right = evalExpr(expr.right, book, sheetId, named);
+        const left = firstScalar(evalExpr(expr.left, book, sheetId, named));
+        const right = firstScalar(evalExpr(expr.right, book, sheetId, named));
         if (isError(left)) return left;
         if (isError(right)) return right;
-        return `${left ?? ''}${right ?? ''}`;
+        return `${displayText(left)}${displayText(right)}`;
       }
-      const left = evalExpr(expr.left, book, sheetId, named);
-      const right = evalExpr(expr.right, book, sheetId, named);
+      const left = firstScalar(evalExpr(expr.left, book, sheetId, named));
+      const right = firstScalar(evalExpr(expr.right, book, sheetId, named));
       if (['=', '<>', '<', '>', '<=', '>='].includes(expr.op)) {
         const eq = String(left ?? '') === String(right ?? '');
         if (expr.op === '=') return eq;
@@ -541,7 +619,64 @@ function numbers(args: Expr[], book: PortableWorkbook, sheetId: string, named: N
   return out;
 }
 
-function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaValue {
+export function criteriaMatches(value: FormulaValue, criteria: FormulaValue): boolean {
+  if (isError(value) || isError(criteria)) return false;
+  const test = String(criteria ?? '');
+  if (test === '') return value === null || value === '';
+  const compare = /^(<=|>=|<>|=|<|>)(.*)$/.exec(test);
+  if (compare) {
+    const op = compare[1] ?? '=';
+    const raw = compare[2] ?? '';
+    const rightNum = Number(raw);
+    const leftNum = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
+      if (op === '=') return leftNum === rightNum;
+      if (op === '<>') return leftNum !== rightNum;
+      if (op === '<') return leftNum < rightNum;
+      if (op === '>') return leftNum > rightNum;
+      if (op === '<=') return leftNum <= rightNum;
+      return leftNum >= rightNum;
+    }
+    const left = String(value ?? '').toLocaleLowerCase();
+    const right = raw.toLocaleLowerCase();
+    if (op === '=') return left === right;
+    if (op === '<>') return left !== right;
+    return false;
+  }
+  const left = String(value ?? '').toLocaleLowerCase();
+  const right = test.toLocaleLowerCase();
+  if (right.includes('*')) {
+    const escaped = right.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+    return new RegExp(`^${escaped}$`, 'i').test(String(value ?? ''));
+  }
+  return left === right || (typeof value === 'number' && Number(test) === value);
+}
+
+function rangeMatrix(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaValue[][] | FormulaError {
+  if (expr.kind !== 'range' && expr.kind !== 'ref') {
+    const value = evalExpr(expr, book, sheetId, named);
+    if (isError(value)) return value;
+    if (isFormulaMatrix(value)) return value;
+    return [[value]];
+  }
+  const from = expr.kind === 'ref' ? expr.value : expr.from;
+  const to = expr.kind === 'ref' ? expr.value : expr.to;
+  const sheet = sheetByName(book, from.sheetName, sheetId);
+  if (!sheet) return { kind: 'error', code: '#REF!', message: 'Missing sheet.' };
+  const r1 = Math.min(from.row, to.row);
+  const r2 = Math.max(from.row, to.row);
+  const c1 = Math.min(from.col, to.col);
+  const c2 = Math.max(from.col, to.col);
+  const rows: FormulaValue[][] = [];
+  for (let row = r1; row <= r2; row += 1) {
+    const line: FormulaValue[] = [];
+    for (let col = c1; col <= c2; col += 1) line.push(readCell(book, sheet.id, row, col, named));
+    rows.push(line);
+  }
+  return rows;
+}
+
+function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
   const first = args[0];
   switch (name) {
     case 'SUM': {
@@ -590,60 +725,60 @@ function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: s
       return Math.round(value * factor) / factor;
     }
     case 'IF': {
-      const cond = first ? evalExpr(first, book, sheetId, named) : false;
+      const cond = first ? firstScalar(evalExpr(first, book, sheetId, named)) : false;
       const truthy = cond === true || (typeof cond === 'number' && cond !== 0) || (typeof cond === 'string' && cond !== '');
       const chosen = truthy ? args[1] : args[2];
       return chosen ? evalExpr(chosen, book, sheetId, named) : truthy;
     }
     case 'AND':
       return args.every((arg) => {
-        const value = evalExpr(arg, book, sheetId, named);
+        const value = firstScalar(evalExpr(arg, book, sheetId, named));
         return value === true || (typeof value === 'number' && value !== 0);
       });
     case 'OR':
       return args.some((arg) => {
-        const value = evalExpr(arg, book, sheetId, named);
+        const value = firstScalar(evalExpr(arg, book, sheetId, named));
         return value === true || (typeof value === 'number' && value !== 0);
       });
     case 'NOT': {
-      const value = first ? evalExpr(first, book, sheetId, named) : false;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : false;
       return !(value === true || (typeof value === 'number' && value !== 0));
     }
     case 'CONCAT':
     case 'CONCATENATE':
       return args.map((arg) => {
-        const value = evalExpr(arg, book, sheetId, named);
-        return isError(value) ? '' : String(value ?? '');
+        const value = firstScalar(evalExpr(arg, book, sheetId, named));
+        return isError(value) ? '' : displayText(value);
       }).join('');
     case 'LEN': {
-      const value = first ? evalExpr(first, book, sheetId, named) : '';
-      return isError(value) ? value : String(value ?? '').length;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : '';
+      return isError(value) ? value : displayText(value).length;
     }
     case 'UPPER':
     case 'LOWER':
     case 'TRIM': {
-      const value = first ? evalExpr(first, book, sheetId, named) : '';
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : '';
       if (isError(value)) return value;
-      const text = String(value ?? '');
+      const text = displayText(value);
       if (name === 'UPPER') return text.toUpperCase();
       if (name === 'LOWER') return text.toLowerCase();
       return text.trim();
     }
     case 'IFERROR': {
-      const value = first ? evalExpr(first, book, sheetId, named) : null;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : null;
       if (isError(value)) return args[1] ? evalExpr(args[1], book, sheetId, named) : '';
       return value;
     }
     case 'ISNUMBER': {
-      const value = first ? evalExpr(first, book, sheetId, named) : null;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : null;
       return typeof value === 'number' && Number.isFinite(value);
     }
     case 'ISTEXT': {
-      const value = first ? evalExpr(first, book, sheetId, named) : null;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : null;
       return typeof value === 'string';
     }
     case 'ISBLANK': {
-      const value = first ? evalExpr(first, book, sheetId, named) : null;
+      const value = first ? firstScalar(evalExpr(first, book, sheetId, named)) : null;
       return value === null || value === '';
     }
     case 'PI':
@@ -652,18 +787,304 @@ function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: s
       return true;
     case 'FALSE':
       return false;
-    default:
-      return { kind: 'error', code: '#NAME?', message: `Unknown function ${name}` };
+    case 'TEXTJOIN': {
+      const delimiter = first ? displayText(firstScalar(evalExpr(first, book, sheetId, named))) : '';
+      const ignoreEmpty = args[1] ? firstScalar(evalExpr(args[1], book, sheetId, named)) : true;
+      const skipBlank = ignoreEmpty !== false && ignoreEmpty !== 0;
+      const parts = args.slice(2).flatMap((arg) => flatten(arg, book, sheetId, named))
+        .filter((value) => !isError(value) && (!skipBlank || (value !== null && value !== '')))
+        .map((value) => String(value ?? ''));
+      return parts.join(delimiter);
+    }
+    case 'COUNTIF': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'COUNTIF needs a range and a test.' };
+      const values = flatten(first, book, sheetId, named);
+      const criteria = firstScalar(evalExpr(args[1], book, sheetId, named));
+      return values.filter((value) => criteriaMatches(value, criteria)).length;
+    }
+    case 'SUMIF': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'SUMIF needs a range and a test.' };
+      const tests = flatten(first, book, sheetId, named);
+      const criteria = firstScalar(evalExpr(args[1], book, sheetId, named));
+      const sums = args[2] ? flatten(args[2], book, sheetId, named) : tests;
+      let total = 0;
+      tests.forEach((value, index) => {
+        if (!criteriaMatches(value, criteria)) return;
+        const num = asNumber(sums[index] ?? null);
+        if (!isError(num)) total += num;
+      });
+      return total;
+    }
+    case 'VLOOKUP': {
+      if (!first || !args[1] || !args[2]) return { kind: 'error', code: '#N/A', message: 'VLOOKUP needs a lookup, range, and column.' };
+      const lookup = evalExpr(first, book, sheetId, named);
+      const table = rangeMatrix(args[1], book, sheetId, named);
+      if (!Array.isArray(table)) return table;
+      const colIndex = asNumber(evalExpr(args[2], book, sheetId, named));
+      if (isError(colIndex)) return colIndex;
+      const column = Math.trunc(colIndex) - 1;
+      if (column < 0) return { kind: 'error', code: '#VALUE!', message: 'VLOOKUP column must be 1 or greater.' };
+      for (const row of table) {
+        const key = row[0] ?? null;
+        if (String(key ?? '') !== String(lookup ?? '')) continue;
+        return row[column] ?? { kind: 'error', code: '#REF!', message: 'VLOOKUP column is outside the range.' };
+      }
+      return { kind: 'error', code: '#N/A', message: 'VLOOKUP found no match.' };
+    }
+    case 'XLOOKUP': {
+      if (!first || !args[1] || !args[2]) return { kind: 'error', code: '#N/A', message: 'XLOOKUP needs a lookup, lookup range, and return range.' };
+      const lookup = evalExpr(first, book, sheetId, named);
+      const keys = flatten(args[1], book, sheetId, named);
+      const values = flatten(args[2], book, sheetId, named);
+      const index = keys.findIndex((value) => String(value ?? '') === String(lookup ?? ''));
+      if (index < 0) return { kind: 'error', code: '#N/A', message: 'XLOOKUP found no match.' };
+      return values[index] ?? null;
+    }
+    case 'INDEX': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'INDEX needs a range and a row.' };
+      const table = rangeMatrix(first, book, sheetId, named);
+      if (!Array.isArray(table)) return table;
+      const rowNum = asNumber(evalExpr(args[1], book, sheetId, named));
+      const colNum = args[2] ? asNumber(evalExpr(args[2], book, sheetId, named)) : 1;
+      if (isError(rowNum)) return rowNum;
+      if (isError(colNum)) return colNum;
+      const row = table[Math.trunc(rowNum) - 1];
+      if (!row) return { kind: 'error', code: '#REF!', message: 'INDEX row is outside the range.' };
+      return row[Math.trunc(colNum) - 1] ?? { kind: 'error', code: '#REF!', message: 'INDEX column is outside the range.' };
+    }
+    case 'MATCH': {
+      if (!first || !args[1]) return { kind: 'error', code: '#N/A', message: 'MATCH needs a lookup and a range.' };
+      const lookup = firstScalar(evalExpr(first, book, sheetId, named));
+      const values = flatten(args[1], book, sheetId, named);
+      const index = values.findIndex((value) => displayText(value) === displayText(lookup));
+      return index < 0 ? { kind: 'error', code: '#N/A', message: 'MATCH found no match.' } : index + 1;
+    }
+    case 'FILTER':
+      return evalFilter(args, book, sheetId, named);
+    case 'SORT':
+      return evalSort(args, book, sheetId, named);
+    case 'UNIQUE':
+      return evalUnique(args, book, sheetId, named);
+    default: {
+      if (!hasFormulaJsFunction(name)) {
+        return { kind: 'error', code: '#NAME?', message: `Unknown function ${name}` };
+      }
+      try {
+        const jsArgs = args.map((arg) => exprToFormulaJs(arg, book, sheetId, named));
+        return fromFormulaJsResult(callFormulaJs(name, jsArgs));
+      } catch (error) {
+        if (error instanceof Error) {
+          return { kind: 'error', code: jsErrorCode(error), message: error.message };
+        }
+        return { kind: 'error', code: '#VALUE!', message: 'Formula.js evaluation failed.' };
+      }
+    }
   }
 }
 
-export function evaluateFormula(
+function truthyCell(value: FormulaValue): boolean {
+  if (isError(value) || value === null || value === '') return false;
+  if (value === false) return false;
+  if (typeof value === 'number') return value !== 0;
+  return true;
+}
+
+function compareOp(left: FormulaValue, right: FormulaValue, op: string): boolean {
+  if (op === '=' || op === '<>') {
+    const eq = displayText(left).toLocaleLowerCase() === displayText(right).toLocaleLowerCase()
+      || (typeof left === 'number' && typeof right === 'number' && left === right);
+    return op === '=' ? eq : !eq;
+  }
+  const ln = asNumber(left);
+  const rn = asNumber(right);
+  if (isError(ln) || isError(rn)) return false;
+  if (op === '<') return ln < rn;
+  if (op === '>') return ln > rn;
+  if (op === '<=') return ln <= rn;
+  if (op === '>=') return ln >= rn;
+  return false;
+}
+
+function includeMask(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): boolean[][] | FormulaError {
+  if (expr.kind === 'bin' && (expr.left.kind === 'range' || expr.left.kind === 'ref')) {
+    const table = rangeMatrix(expr.left, book, sheetId, named);
+    if (!Array.isArray(table)) return table;
+    const right = firstScalar(evalExpr(expr.right, book, sheetId, named));
+    if (isError(right)) return right;
+    return table.map((row) => row.map((cell) => compareOp(cell, right, expr.op)));
+  }
+  const table = rangeMatrix(expr, book, sheetId, named);
+  if (!Array.isArray(table)) return table;
+  return table.map((row) => row.map((cell) => truthyCell(cell)));
+}
+
+function evalFilter(args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
+  if (!args[0] || !args[1]) return { kind: 'error', code: '#N/A', message: 'FILTER needs an array and a test.' };
+  const table = rangeMatrix(args[0], book, sheetId, named);
+  if (!Array.isArray(table)) return table;
+  const mask = includeMask(args[1], book, sheetId, named);
+  if (!Array.isArray(mask)) return mask;
+  const height = table.length;
+  const width = table[0]?.length ?? 0;
+  const maskHeight = mask.length;
+  const maskWidth = mask[0]?.length ?? 0;
+  let rows: FormulaValue[][] = [];
+  if (maskHeight === height && (maskWidth === 1 || maskWidth === width)) {
+    rows = table.filter((_, index) => mask[index]?.some((flag) => flag));
+  } else if (maskWidth === width && (maskHeight === 1 || maskHeight === height)) {
+    rows = table.map((row) => row.filter((_, index) => mask.some((line) => line[index])));
+    rows = rows.filter((row) => row.length > 0);
+  } else {
+    return { kind: 'error', code: '#VALUE!', message: 'FILTER include range must match the array.' };
+  }
+  if (rows.length === 0) {
+    if (!args[2]) return { kind: 'error', code: '#CALC!', message: 'FILTER found no rows.' };
+    const fallback = evalExpr(args[2], book, sheetId, named);
+    return isFormulaMatrix(fallback) ? fallback : [[firstScalar(fallback)]];
+  }
+  return rows;
+}
+
+function evalSort(args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
+  if (!args[0]) return { kind: 'error', code: '#N/A', message: 'SORT needs an array.' };
+  const table = rangeMatrix(args[0], book, sheetId, named);
+  if (!Array.isArray(table)) return table;
+  const indexRaw = args[1] ? asNumber(evalExpr(args[1], book, sheetId, named)) : 1;
+  const orderRaw = args[2] ? asNumber(evalExpr(args[2], book, sheetId, named)) : 1;
+  const byCol = args[3] ? truthyCell(firstScalar(evalExpr(args[3], book, sheetId, named))) : false;
+  if (isError(indexRaw)) return indexRaw;
+  if (isError(orderRaw)) return orderRaw;
+  const sortIndex = Math.trunc(indexRaw) - 1;
+  const direction = orderRaw < 0 ? -1 : 1;
+  const copy = table.map((row) => [...row]);
+  const target = byCol
+    ? copy[0]?.map((_, col) => copy.map((row) => row[col] ?? null)) ?? []
+    : copy;
+  target.sort((left, right) => {
+    const a = left[sortIndex] ?? null;
+    const b = right[sortIndex] ?? null;
+    const an = asNumber(a);
+    const bn = asNumber(b);
+    if (!isError(an) && !isError(bn)) return (an - bn) * direction;
+    return displayText(a).localeCompare(displayText(b)) * direction;
+  });
+  if (!byCol) return target;
+  const height = target[0]?.length ?? 0;
+  const restored: FormulaValue[][] = [];
+  for (let row = 0; row < height; row += 1) {
+    restored.push(target.map((column) => column[row] ?? null));
+  }
+  return restored;
+}
+
+function evalUnique(args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
+  if (!args[0]) return { kind: 'error', code: '#N/A', message: 'UNIQUE needs an array.' };
+  const table = rangeMatrix(args[0], book, sheetId, named);
+  if (!Array.isArray(table)) return table;
+  const byCol = args[1] ? truthyCell(firstScalar(evalExpr(args[1], book, sheetId, named))) : false;
+  const exactlyOnce = args[2] ? truthyCell(firstScalar(evalExpr(args[2], book, sheetId, named))) : false;
+  const rows = byCol
+    ? (table[0]?.map((_, col) => table.map((row) => row[col] ?? null)) ?? [])
+    : table.map((row) => [...row]);
+  const counts = new Map<string, number>();
+  const keys = rows.map((row) => row.map((cell) => displayText(cell)).join('\u0000'));
+  for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  const unique = rows.filter((_, index) => {
+    const key = keys[index] ?? '';
+    const count = counts.get(key) ?? 0;
+    if (exactlyOnce) return count === 1;
+    return keys.indexOf(key) === index;
+  });
+  if (!byCol) return unique;
+  const height = unique[0]?.length ?? 0;
+  const restored: FormulaValue[][] = [];
+  for (let row = 0; row < height; row += 1) restored.push(unique.map((column) => column[row] ?? null));
+  return restored;
+}
+
+function exprToFormulaJs(expr: Expr, book: PortableWorkbook, sheetId: string, named: NamedRange[]): unknown {
+  if (expr.kind === 'range' || expr.kind === 'ref') {
+    const table = rangeMatrix(expr, book, sheetId, named);
+    if (!Array.isArray(table)) return new Error(table.code);
+    const js = table.map((row) => row.map((cell) => formulaValueToJs(cell)));
+    return expr.kind === 'ref' ? js[0]?.[0] ?? null : js;
+  }
+  return formulaValueToJs(firstScalar(evalExpr(expr, book, sheetId, named)));
+}
+
+function formulaValueToJs(value: FormulaValue): unknown {
+  if (isError(value)) return new Error(value.code);
+  if (value instanceof Date) return value;
+  return toJsPrimitive(value);
+}
+
+function fromFormulaJsResult(value: unknown): FormulaResult {
+  if (value instanceof Error) return { kind: 'error', code: jsErrorCode(value), message: value.message };
+  if (isSpillMatrix(value)) {
+    return value.map((row) => row.map((cell) => fromFormulaJsScalar(cell)));
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (Array.isArray(item)) return item.map((cell) => fromFormulaJsScalar(cell));
+      return [fromFormulaJsScalar(item)];
+    });
+  }
+  return fromFormulaJsScalar(value);
+}
+
+function fromFormulaJsScalar(value: unknown): FormulaValue {
+  if (value instanceof Error) return { kind: 'error', code: jsErrorCode(value), message: value.message };
+  if (value instanceof Date) return value;
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  return String(value);
+}
+
+function toSpillMatrix(value: FormulaMatrix): SpillMatrix {
+  return value.map((row) => row.map((cell) => {
+    if (isError(cell) || cell === undefined) return null;
+    if (cell instanceof Date) return isoDate(cell);
+    return cell;
+  }));
+}
+
+function writeEvaluatedCell(
+  book: PortableWorkbook,
+  sheetId: string,
+  row: number,
+  col: number,
+  formula: string,
+  result: FormulaResult,
+): void {
+  const sheet = book.sheets.find((item) => item.id === sheetId);
+  if (!sheet) return;
+  const cell = sheet.cells[cellKey(row, col)];
+  if (!cell) return;
+  if (isError(result)) {
+    applySpill(book, sheetId, row, col, [[null]]);
+    sheet.cells[cellKey(row, col)] = { ...cell, f: formula, v: result.code };
+    return;
+  }
+  if (isFormulaMatrix(result)) {
+    const spill = applySpill(book, sheetId, row, col, toSpillMatrix(result));
+    if (!spill.ok) {
+      sheet.cells[cellKey(row, col)] = { ...cell, f: formula, v: spill.code };
+      return;
+    }
+    sheet.cells[cellKey(row, col)] = { ...cell, f: formula, v: storedCellValue(result) };
+    return;
+  }
+  applySpill(book, sheetId, row, col, [[null]]);
+  sheet.cells[cellKey(row, col)] = { ...cell, f: formula, v: storedCellValue(result) };
+}
+
+export function evaluateFormulaResult(
   formula: string,
   book: PortableWorkbook,
   sheetId: string,
   named = book.namedRanges,
   stack = new Set<string>(),
-): FormulaValue {
+): FormulaResult {
   try {
     const body = formula.startsWith('=') ? formula.slice(1) : formula;
     const dag = buildFormulaDag(book);
@@ -680,12 +1101,25 @@ export function evaluateFormula(
   }
 }
 
+export function evaluateFormula(
+  formula: string,
+  book: PortableWorkbook,
+  sheetId: string,
+  named = book.namedRanges,
+  stack = new Set<string>(),
+): FormulaValue {
+  return firstScalar(evaluateFormulaResult(formula, book, sheetId, named, stack));
+}
+
 export function evaluateWorkbook(book: PortableWorkbook): PortableWorkbook {
   const dag = buildFormulaDag(book);
   const next: PortableWorkbook = {
     ...book,
     sheets: book.sheets.map((sheet) => ({ ...sheet, cells: { ...sheet.cells } })),
     namedRanges: [...book.namedRanges],
+    validations: [...book.validations],
+    conditionalFormats: [...book.conditionalFormats],
+    comments: [...book.comments],
   };
   if (dag.cycles.length > 0) {
     for (const id of dag.cycles.flat()) {
@@ -699,21 +1133,22 @@ export function evaluateWorkbook(book: PortableWorkbook): PortableWorkbook {
       if (cell) sheet.cells[cellKey(row, col)] = { ...cell, v: '#CYCLE!' };
     }
   }
-  for (const id of dag.order) {
-    const [sheetId, coord] = id.split(':');
-    const parts = coord?.split(',').map(Number);
-    const row = parts?.[0];
-    const col = parts?.[1];
-    const sheet = next.sheets.find((item) => item.id === sheetId);
-    if (!sheet || row === undefined || col === undefined) continue;
-    const cell = sheet.cells[cellKey(row, col)];
-    if (!cell?.f) continue;
-    const value = evaluateFormula(cell.f, next, sheet.id);
-    sheet.cells[cellKey(row, col)] = {
-      ...cell,
-      v: isError(value) ? value.code : value,
-    };
-  }
+  const evaluateOrder = () => {
+    for (const id of dag.order) {
+      const [sheetId, coord] = id.split(':');
+      const parts = coord?.split(',').map(Number);
+      const row = parts?.[0];
+      const col = parts?.[1];
+      const sheet = next.sheets.find((item) => item.id === sheetId);
+      if (!sheet || row === undefined || col === undefined) continue;
+      const cell = sheet.cells[cellKey(row, col)];
+      if (!cell?.f) continue;
+      const value = evaluateFormulaResult(cell.f, next, sheet.id);
+      writeEvaluatedCell(next, sheet.id, row, col, cell.f, value);
+    }
+  };
+  evaluateOrder();
+  evaluateOrder();
   return next;
 }
 

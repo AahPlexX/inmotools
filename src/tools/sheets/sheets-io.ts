@@ -1,7 +1,9 @@
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
-import { a1FromParts, columnLetters } from './sheets-formula';
+import { a1FromParts, columnLetters, parseA1Ref } from './sheets-formula';
+import { applyXlsxComments, excelNoteText, hydrateComments } from './sheets-comments';
+import { omitSpillCells } from './sheets-spill';
 import { safeHyperlink, toArgb } from './sheets-grid';
 import {
   SCHEMA_VERSION,
@@ -29,7 +31,7 @@ export function toBundle(workbook: PortableWorkbook, meta: ExportMeta, now = new
       tags: uniqueTags(meta.tags),
       notes: meta.notes.trim(),
     },
-    workbook,
+    workbook: omitSpillCells(hydrateComments(workbook)),
   };
 }
 
@@ -41,6 +43,7 @@ export function parseBundle(value: unknown): WorkbookBundle | null {
   if (!record.workbook || typeof record.workbook !== 'object') return null;
   const workbook = record.workbook as PortableWorkbook;
   if (!Array.isArray(workbook.sheets) || workbook.sheets.length === 0) return null;
+  if (!Array.isArray(workbook.comments)) workbook.comments = [];
   return {
     tool: TOOL_ID,
     schemaVersion: SCHEMA_VERSION,
@@ -51,7 +54,7 @@ export function parseBundle(value: unknown): WorkbookBundle | null {
       tags: Array.isArray(record.meta?.tags) ? uniqueTags(record.meta.tags.filter((tag): tag is string => typeof tag === 'string')) : [],
       notes: typeof record.meta?.notes === 'string' ? record.meta.notes : '',
     },
-    workbook,
+    workbook: hydrateComments(workbook),
   };
 }
 
@@ -206,17 +209,25 @@ export function importXlsx(buffer: ArrayBuffer, fileName = 'Imported'): Portable
   });
   book.sheets = sheets.length ? sheets : [createSheet('Sheet1')];
   book.activeSheetId = book.sheets[0]?.id ?? book.activeSheetId;
-  return book;
+  return hydrateComments(book);
+}
+
+export async function importXlsxWorkbook(buffer: ArrayBuffer, fileName = 'Imported'): Promise<PortableWorkbook> {
+  return applyXlsxComments(importXlsx(buffer, fileName), buffer);
 }
 
 export async function exportXlsx(workbook: PortableWorkbook, meta: ExportMeta = emptyMeta()): Promise<Uint8Array> {
+  const source = omitSpillCells(hydrateComments(workbook));
   const excel = new ExcelJS.Workbook();
   excel.creator = meta.author || 'Tabular Sheet Workstation';
   excel.title = meta.title || workbook.name;
   excel.description = [meta.notes, meta.tags.length ? `tags: ${meta.tags.join(', ')}` : ''].filter(Boolean).join('\n');
   excel.created = new Date();
-  for (const sheet of workbook.sheets) {
-    const ws = excel.addWorksheet(sheet.name);
+  for (const sheet of source.sheets) {
+    const ws = excel.addWorksheet(sheet.name, {
+      state: sheet.hidden ? 'hidden' : 'visible',
+      properties: sheet.tabColor ? { tabColor: { argb: toArgb(sheet.tabColor) } } : {},
+    });
     for (const [key, cell] of Object.entries(sheet.cells)) {
       const parsed = parseCellKey(key);
       if (!parsed) continue;
@@ -233,6 +244,13 @@ export async function exportXlsx(workbook: PortableWorkbook, meta: ExportMeta = 
       const href = safeHyperlink(cell.hyperlink);
       if (href) target.value = { text: String(cell.v ?? href), hyperlink: href };
       if (cell.note) target.note = cell.note;
+    }
+    for (const comment of source.comments) {
+      if (comment.sheetId !== sheet.id || !comment.body.trim()) continue;
+      const ref = parseA1Ref(comment.a1);
+      if (!ref) continue;
+      const target = ws.getCell(ref.row + 1, ref.col + 1);
+      if (!excelNoteText(target.note)) target.note = comment.body;
     }
     for (const merge of sheet.merges) {
       ws.mergeCells(a1FromParts(merge.r1, merge.c1), a1FromParts(merge.r2, merge.c2));

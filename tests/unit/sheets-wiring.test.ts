@@ -20,6 +20,13 @@ describe('tabular sheet workstation wiring', () => {
     expect(tool?.privacy).toMatch(/IndexedDB|browser/i);
     expect(tool?.accepts).toMatch(/XLSX/i);
     expect(tool?.outputs).toMatch(/CSV/i);
+    const catalogCopy = `${tool?.summary} ${tool?.hint} ${tool?.steps.join(' ')}`;
+    expect(tool?.summary).toBe('Edit multi-sheet workbooks in this browser: formula bar, AutoSum, paste special, named ranges, FILTER/SORT/UNIQUE spill, column/line/pie charts, and an in-house pivot. Import and export stay on this device.');
+    expect(tool?.hint).toBe('Paste special, text to columns, and remove duplicates run on the local grid. FILTER, SORT, and UNIQUE spill into empty neighboring cells; a blocked spill writes #SPILL!. Cell comments survive XLSX and portable bundle export. Univer Pro and HyperFormula are not used. Browser memory still bounds very large workbooks.');
+    expect(catalogCopy).not.toMatch(/seamless|robust|empower|unlock|delve/i);
+    expect(tool?.summary).not.toMatch(/sheets-core|engine-formula|Univer/i);
+    expect(read('src/tools/sheets/sheets.css')).toMatch(/@media print/);
+    expect(read('src/tools/sheets/SheetsWorkspace.tsx')).toContain('tsw-parity-chrome');
     expect(read('src/tools/workspaces.tsx')).toContain(`'${SLUG}': () => import('./sheets/SheetsWorkspace')`);
   });
 
@@ -33,6 +40,8 @@ describe('tabular sheet workstation wiring', () => {
     expect(pkg).toContain('"@univerjs/preset-sheets-core": "0.25.1"');
     expect(pkg).toContain('cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz');
     expect(pkg).not.toMatch(/"chart\.js": "4\.5\.1".*"chart\.js"/s);
+    expect(pkg).toContain('"@formulajs/formulajs": "4.6.1"');
+    expect(pkg).not.toMatch(/\^4\.6\.1/);
     expect(pkg).not.toContain('@univerjs-pro/');
     expect(pkg).not.toContain('hyperformula');
   });

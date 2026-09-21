@@ -28,6 +28,9 @@ export function setCell(book: PortableWorkbook, sheetId: string, row: number, co
   const key = cellKey(row, col);
   const current = sheet.cells[key] ?? {};
   const merged = { ...current, ...patch };
+  if ((patch.v !== undefined || patch.f !== undefined) && patch.spillFrom === undefined) {
+    delete merged.spillFrom;
+  }
   if (
     (merged.v === null || merged.v === undefined || merged.v === '')
     && !merged.f
@@ -35,6 +38,7 @@ export function setCell(book: PortableWorkbook, sheetId: string, row: number, co
     && !merged.hyperlink
     && !merged.z
     && !merged.s
+    && !merged.spillFrom
   ) {
     delete sheet.cells[key];
   } else {
