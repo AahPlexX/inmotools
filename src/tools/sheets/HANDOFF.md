@@ -1,17 +1,18 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: https://github.com/AahPlexX/inmotools/pull/73 — `feature/tabular-sheet-wave-a` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity`. Do not touch unrelated tools.
+Merged PR: https://github.com/AahPlexX/inmotools/pull/73 — CoS squash-merged `feature/tabular-sheet-wave-a` onto `main`. Product tip is that squash. Do not push to `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
 
-**Tip SHA:** `c0da201`  
-**Last focused-gate code:** `c0da201`  
-**Workstream:** **Wave A** (Formula.js + FILTER/SORT/UNIQUE spill + export-surviving comments) on top of merged PR #71 P1–P16 / docs PR #72.
+**Tip SHA:** `4dcc856bc97027862342513cdea7eb769c0ffbc1`  
+**Last focused-gate code:** `4dcc856bc97027862342513cdea7eb769c0ffbc1`  
+**Workstream:** **Wave A DONE** and merged on `main` via PR #73 (Formula.js + FILTER/SORT/UNIQUE spill + export-surviving comments). Built on merged PR #71 P1–P16 / docs PR #72. Do not invent Wave B/C/D.
 
-## Merge status (prior)
+## Merge status (PR #73)
 
-- CoS squash-merged PR #71 onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54`.
-- Docs PR #72 stamped HANDOFF to that squash (`6776107`).
-- This branch starts from `origin/main` at that tip and does not push to `feature/tabular-sheet-parity`.
+- CoS squash-merged PR #73 onto `main` at `4dcc856bc97027862342513cdea7eb769c0ffbc1` (`feat(sheets): Wave A Formula.js, spill, and export comments (#73)`). Product tip is that squash. This docs stamp is a separate follow-up commit.
+- Parent of that squash is `6776107f946b16bfe4edddc275ea5a1af234d7fb`. Product code from `feature/tabular-sheet-wave-a` is on `main`.
+- Prior: CoS squash-merged PR #71 at `b582c34dea4ba97ab7080743dc290eeb45946b54`; docs PR #72 stamped HANDOFF to that squash (`6776107f946b16bfe4edddc275ea5a1af234d7fb`).
+- Repository-wide validate remaining reds are **out-of-suite** e2e (same class as PR #70 / #71). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
 
 ## What works
 
@@ -47,7 +48,7 @@ Landscape (same widths, swapped): 740×320, 800×360, 844×390, 915×412, 932×4
 # P16 matrix 12/12 (6 portrait + 6 landscape)
 ```
 
-Counts last proven green on this branch. Verify commands:
+Counts last proven green on feature-branch stamp `c0da201e08a7e062b78299a6b521a1fad767c203`, which is included in squash / product tip `4dcc856bc97027862342513cdea7eb769c0ffbc1`. CoS sets last focused-gate to that squash. Verify commands:
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts tests/unit/sheets-wave-a.test.ts
@@ -88,8 +89,8 @@ Catalog / lockfile edits select `__FULL_SUITE__` via `scripts/select-e2e-specs.m
 
 ## Next sequential steps
 
-1. Keep draft PR #73. Push only `feature/tabular-sheet-wave-a`. Never merge. Never open a second PR.
-2. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
-3. Do not chase out-of-suite Pages reds listed above.
+1. PR #73 is merged. Do not push to `feature/tabular-sheet-wave-a`.
+2. Docs-only follow-ups land on a new branch → `main` as a draft PR. CoS merges. The agent does not merge.
+3. Keep Tip SHA / last focused-gate as the PR #73 squash product tip `4dcc856bc97027862342513cdea7eb769c0ffbc1` unless CoS names a later product tip.
 4. Do not invent Wave B/C/D.
 5. Reject reviews that treat iPhone 13 / `mobile-chromium` as the only #16 proof.
