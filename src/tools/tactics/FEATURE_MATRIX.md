@@ -1,0 +1,75 @@
+# Tactical Matchboard Studio Feature Matrix
+
+**Deterministic denominator:** 60 accepted functional features
+**Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
+**Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
+**Current verified count:** 0/60
+
+| ID | Feature | Status | Implementation surface | Validation evidence / limitation |
+| ---: | --- | --- | --- | --- |
+| 1 | Versioned Multi-Tier Pitch & Ruleset Matrix | in-progress | `tactics-types.ts`, `pitch-engine.ts` planned foundation | RED contract being established; sourced specialty presets remain unimplemented. |
+| 2 | Grassroots Special-Line / Restart Overlay Engine | planned | — | — |
+| 3 | Dynamic Squad & Neutral-Player Scaler | planned | — | — |
+| 4 | Normalized `[0,1]` Tactical Coordinate System | in-progress | `tactics-types.ts`, `pitch-engine.ts` planned foundation | RED contract being established. |
+| 5 | Roster, Jersey, Role & Developmental Token Editor | planned | — | — |
+| 6 | Authored Ball Elevation & Trajectory Layer | planned | — | — |
+| 7 | Training Equipment & Prop Library | planned | — | — |
+| 8 | Precision Snapping & Tactical Guides | in-progress | `pitch-engine.ts` planned primitive | RED contract covers pure snapping; full UI integration not yet present. |
+| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` planned foundation | RED formation-count contract being established; no product UI yet. |
+| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` planned foundation | U.S. Soccer example provenance to be encoded; no product UI yet. |
+| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` planned foundation | Required common structures to be encoded as editable templates; no product UI yet. |
+| 12 | Phase-of-Play Formation Morphing | planned | — | — |
+| 13 | Mirror, Flip & Direction-of-Play Transform | in-progress | `pitch-engine.ts` planned primitive | RED coordinate-transform contract being established; temporal/project-wide transform not yet implemented. |
+| 14 | Formation Count & Restart Legality Validator | in-progress | `formation-engine.ts` planned count validator | Count/goalkeeper invariants in first slice; restart legality aid remains planned. |
+| 15 | Set-Piece / Restart Template Builder | planned | — | — |
+| 16 | Multi-Track Timeline & Deterministic Playhead | planned | — | — |
+| 17 | Interactive Bézier Motion-Path Authoring | planned | — | — |
+| 18 | Interpolation & Easing Studio | planned | — | — |
+| 19 | Multi-Scene Sequencing | planned | — | — |
+| 20 | Temporal Visibility Spans | planned | — | — |
+| 21 | Stagger, Offset & Group Timing Controls | planned | — | — |
+| 22 | Timeline Markers & Coaching Triggers | planned | — | — |
+| 23 | Coordinated Tactical Action Templates | planned | — | — |
+| 24 | Linked Defensive / Midfield / Attacking Units | planned | — | — |
+| 25 | Ball Attachment, Possession & Handoff | planned | — | — |
+| 26 | Potential Path-Conflict Indicator | planned | — | — |
+| 27 | Geometric Voronoi Territory View | planned | — | — |
+| 28 | Team Convex Hull & Compactness Geometry | planned | — | — |
+| 29 | Geometric Passing-Lane Clearance | planned | — | — |
+| 30 | Player Orientation & Authored Vision Sectors | planned | — | — |
+| 31 | Positional Play Grid | planned | — | — |
+| 32 | Distance Rings & Dynamic Tethers | planned | — | — |
+| 33 | Trajectory Heat Map / Occupancy Map | planned | — | — |
+| 34 | Authored-Trajectory Speed & Distance Metrics | planned | — | — |
+| 35 | Synchronized Real-Time Three.js Pitch Projection | planned | — | — |
+| 36 | Multi-Angle Camera Presets | planned | — | — |
+| 37 | Camera Keyframing | planned | — | — |
+| 38 | 2D/3D Synchronized Editing | planned | — | — |
+| 39 | Presentation / Spotlight Telestration | planned | — | — |
+| 40 | Onion-Skin / Ghost Positions | planned | — | — |
+| 41 | Scenario Comparison View | planned | — | — |
+| 42 | Coaching Session / Drill Plan | planned | — | — |
+| 43 | Local Match-Video Import & Precision Review | planned | — | — |
+| 44 | Video-Synchronized Telestration | planned | — | — |
+| 45 | Manual / Interpolated Overlay Tracking | planned | — | — |
+| 46 | Match Event Tagging | planned | — | — |
+| 47 | Local Clip / Playlist Builder | planned | — | — |
+| 48 | Multi-Angle Local Video Sync | planned | — | — |
+| 49 | Open Tactical Trajectory Import | planned | — | — |
+| 50 | Tactical Analytics CSV/JSON Export | planned | — | — |
+| 51 | Device-Agnostic Responsive Workspace | planned | — | — |
+| 52 | Context Menu + Explicit Touch Equivalent | planned | — | — |
+| 53 | Collision-Protected Tooltips & Help Reference | planned | — | — |
+| 54 | Keyboard Shortcut & Transport Engine | planned | — | — |
+| 55 | Layers, Selection, Grouping, Locking & Visibility | planned | — | — |
+| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | planned | — | — |
+| 57 | Capability-Negotiated Local Video Export | planned | — | — |
+| 58 | Vector-First Coaching PDF / Contact-Sheet Publisher | planned | — | — |
+| 59 | Still, Social-Card & Standalone Playback Export | planned | — | — |
+| 60 | Deterministic Project Vault / ZIP / Schema Migration | planned | — | — |
+
+## Evidence policy
+
+A pure engine feature may be verified by exhaustive deterministic unit/invariant coverage plus a green production build when no browser interaction is part of its accepted behavior. Any feature with user interaction, responsive, accessibility, persistence, import/export, local media, or presentation behavior additionally requires the corresponding browser/runtime evidence.
+
+The numerator in human-facing reports is the count of rows in state `verified`, never the number of files, controls, partial subparts, or tests.
