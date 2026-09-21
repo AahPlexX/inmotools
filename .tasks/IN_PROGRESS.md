@@ -3,7 +3,7 @@
 - **Tabular Sheet Workstation (TASK-022)** — Wave A in progress on `feature/tabular-sheet-wave-a` (Formula.js `@formulajs/formulajs@4.6.1` + FILTER/SORT/UNIQUE spill + export-surviving comments). Branched from `origin/main` after PR #71 P1–P16 (`b582c34dea4ba97ab7080743dc290eeb45946b54`) and docs PR #72. Do not reuse `feature/tabular-sheet-parity`. Do not invent Wave B/C/D. Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5). FILTER/SORT/UNIQUE spill is Wave A.
-  - Tip SHA: pending (this branch). Last focused-gate code: pending.
+  - Draft PR: https://github.com/AahPlexX/inmotools/pull/73. Tip SHA: `8821106208510d12263773725cc51286f8459250`. Last focused-gate code: `ff9f3f0fc2fbd6bbc0fa9e12e7461e07d5d35bf1` (units 47/47; `pnpm build` pass; desktop-chromium 25 passed; P16 matrix 12/12).
   - Do not claim the full Pages suite green.
   - Known out-of-suite CI reds (do not chase): web-layout-studio axe; svg-sprite-compiler axe; stale lazy chunk; Hardware Packet Inspector; GeoJSON Simplifier; Python re named groups; crystal-lattice-studio mobile.
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
