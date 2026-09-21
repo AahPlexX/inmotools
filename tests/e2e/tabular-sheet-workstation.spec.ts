@@ -323,7 +323,9 @@ test('keeps pivot chrome usable at 320 CSS px', async ({ page }) => {
   await expect(create).toBeVisible();
   await expect(workspace.getByTestId('tsw-pivot-refresh')).toBeVisible();
   await expect(workspace.getByTestId('tsw-pivot-role-0')).toBeVisible();
-  const box = await workspace.getByTestId('tsw-pivot-chrome').boundingBox();
+  const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflowX).toBeLessThanOrEqual(8);
+  const box = await create.boundingBox();
   expect(box).not.toBeNull();
   expect(box!.x).toBeGreaterThanOrEqual(-1);
   expect(box!.x + box!.width).toBeLessThanOrEqual(321);

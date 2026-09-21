@@ -299,6 +299,14 @@
 .tsw-pivot-chrome {
   align-items: stretch;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tsw-pivot-chrome button {
+  width: 100%;
+  flex: 1 1 100%;
 }
 
 .tsw-pivot-placement,
@@ -603,12 +611,17 @@
     max-width: 100%;
   }
 
+  .tsw-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .tsw-toolbar,
   .tsw-formula,
   .tsw-style-chrome,
   .tsw-parity-chrome,
   .tsw-status,
-  .tsw-sheet-tabs {
+  .tsw-sheet-tabs,
+  .tsw-panel {
     align-items: stretch;
   }
 
@@ -617,8 +630,9 @@
   .tsw-sheet-tabs button,
   .tsw-style-chrome button,
   .tsw-pivot-chrome button {
-    flex: 1 1 calc(50% - 0.4rem);
-    min-width: min(100%, 8.5rem);
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
   }
 
   .tsw-toolbar label,
