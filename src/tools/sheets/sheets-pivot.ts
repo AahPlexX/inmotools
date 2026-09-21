@@ -567,6 +567,31 @@ export function createPivotTable(book: PortableWorkbook, input: CreatePivotInput
   return { book: next, pivot };
 }
 
+function matchIncomingValueAgg(stored: PivotValueField, incoming: PivotValueField[]): PivotValueField {
+  const match = incoming.find((field) => (
+    field.col === stored.col
+    || normalizeDataFieldName(field.name) === normalizeDataFieldName(stored.name)
+  ));
+  return match ? { ...stored, agg: match.agg } : stored;
+}
+
+export function updatePivotValueAgg(
+  book: PortableWorkbook,
+  values: PivotValueField[],
+  pivotId?: string,
+  source: PortableWorkbook = book,
+): PivotWriteResult {
+  const next = cloneBook(book);
+  const targets = workbookPivots(next).filter((pivot) => (pivotId ? pivot.id === pivotId : true));
+  if (targets.length === 0) {
+    return { book, error: pivotId ? 'PivotTable was not found.' : 'Workbook has no local PivotTable to refresh.' };
+  }
+  for (const pivot of targets) {
+    pivot.values = pivot.values.map((field) => matchIncomingValueAgg(field, values));
+  }
+  return refreshPivotTable(next, pivotId, source);
+}
+
 export function refreshPivotTable(book: PortableWorkbook, pivotId?: string, source: PortableWorkbook = book): PivotWriteResult {
   const ids = pivotId ? [pivotId] : workbookPivots(book).map((pivot) => pivot.id);
   if (ids.length === 0) return { book, error: 'Workbook has no local PivotTable to refresh.' };

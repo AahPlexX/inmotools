@@ -61,7 +61,7 @@ import {
   sheetToCsv,
   toBundle,
 } from './sheets-io';
-import { applyPivotOutputs, createPivotTable, distinctFieldValues, headersFromRange, refreshPivotTable, type PivotAgg } from './sheets-pivot';
+import { applyPivotOutputs, createPivotTable, distinctFieldValues, headersFromRange, refreshPivotTable, updatePivotValueAgg, type PivotAgg } from './sheets-pivot';
 import { chartConfigFromSelection, type ChartKind } from './sheets-charts';
 import { FEATURE_PROGRESS, progressSummary } from './sheets-progress';
 import { mountUniverSheets, readUniverCalculated, type UniverHost } from './sheets-univer';
@@ -154,6 +154,7 @@ export default function SheetsWorkspace() {
   const [library, setLibrary] = useState<StoredWorkbook[]>([]);
   const [chartKind, setChartKind] = useState<ChartKind>('column');
   const [pivotSource, setPivotSource] = useState('A1:C3');
+  const [pivotSourceSheetId, setPivotSourceSheetId] = useState(book.activeSheetId);
   const [pivotPlacement, setPivotPlacement] = useState<'new-sheet' | 'range'>('new-sheet');
   const [pivotDest, setPivotDest] = useState('A1');
   const [pivotFields, setPivotFields] = useState<Array<{ col: number; name: string; role: PivotFieldRole; agg: PivotAgg; selected: string[] }>>([]);
@@ -284,8 +285,9 @@ export default function SheetsWorkspace() {
   }, [computed, sheet, selection]);
 
   useEffect(() => {
-    if (!sheet) return;
-    const headers = headersFromRange(sheet, pivotSource);
+    const sourceSheet = computed.sheets.find((item) => item.id === pivotSourceSheetId) ?? sheet;
+    if (!sourceSheet) return;
+    const headers = headersFromRange(sourceSheet, pivotSource);
     setPivotFields((current) => headers.map((header) => {
       const previous = current.find((item) => item.col === header.col || item.name === header.name);
       return {
@@ -296,7 +298,7 @@ export default function SheetsWorkspace() {
         selected: previous?.selected ?? [],
       };
     }));
-  }, [sheet, pivotSource]);
+  }, [computed, sheet, pivotSource, pivotSourceSheetId]);
 
   useEffect(() => {
     if (!chartNode.current || !sheet) return;
@@ -775,7 +777,7 @@ export default function SheetsWorkspace() {
 
   const createLocalPivot = () => {
     const result = createPivotTable(book, {
-      sourceSheetId: sheetId,
+      sourceSheetId: pivotSourceSheetId || sheetId,
       sourceA1: pivotSource,
       rows: pivotFields.filter((field) => field.role === 'row').map((field) => ({ name: field.name, col: field.col })),
       columns: pivotFields.filter((field) => field.role === 'column').map((field) => ({ name: field.name, col: field.col })),
@@ -798,13 +800,34 @@ export default function SheetsWorkspace() {
     commit(result.book, `Created ${result.pivot.name} on ${where}.`);
   };
 
+  const chromeValueFields = () => pivotFields
+    .filter((field) => field.role === 'value')
+    .map((field) => ({ name: field.name, col: field.col, agg: field.agg }));
+
   const refreshLocalPivots = (pivotId?: string) => {
-    const result = refreshPivotTable(book, pivotId, computed);
+    const values = chromeValueFields();
+    const result = values.length > 0
+      ? updatePivotValueAgg(book, values, pivotId, computed)
+      : refreshPivotTable(book, pivotId, computed);
     if (result.error) {
       setStatus(result.error);
       return;
     }
     commit(result.book, pivotId ? 'Refreshed the selected PivotTable from its source range.' : 'Refreshed local PivotTables from their source ranges.');
+  };
+
+  const commitPivotValueAgg = (nextFields: typeof pivotFields) => {
+    setPivotFields(nextFields);
+    const values = nextFields
+      .filter((field) => field.role === 'value')
+      .map((field) => ({ name: field.name, col: field.col, agg: field.agg }));
+    if (values.length === 0 || pivotList.length === 0) return;
+    const result = updatePivotValueAgg(book, values, undefined, computed);
+    if (result.error) {
+      setStatus(result.error);
+      return;
+    }
+    commit(result.book, 'Updated PivotTable aggregation.');
   };
 
   return (
@@ -1650,7 +1673,10 @@ export default function SheetsWorkspace() {
           </p>
           <label htmlFor="tsw-pivot-source">Source range</label>
           <input id="tsw-pivot-source" data-testid="tsw-pivot-source" value={pivotSource} onChange={(event) => setPivotSource(event.target.value)} />
-          <button type="button" data-testid="tsw-pivot-use-selection" onClick={() => setPivotSource(selectionA1(selection))}>Use selection</button>
+          <button type="button" data-testid="tsw-pivot-use-selection" onClick={() => {
+            setPivotSourceSheetId(sheetId);
+            setPivotSource(selectionA1(selection));
+          }}>Use selection</button>
           <fieldset className="tsw-pivot-placement" data-testid="tsw-pivot-placement">
             <legend>Destination</legend>
             <label htmlFor="tsw-pivot-new-sheet">
@@ -1708,9 +1734,12 @@ export default function SheetsWorkspace() {
                       id={`tsw-pivot-agg-${field.col}`}
                       data-testid={`tsw-pivot-agg-${field.col}`}
                       value={field.agg}
-                      onChange={(event) => setPivotFields((current) => current.map((item) => (
-                        item.col === field.col ? { ...item, agg: event.target.value as PivotAgg } : item
-                      )))}
+                      onChange={(event) => {
+                        const agg = event.target.value as PivotAgg;
+                        commitPivotValueAgg(pivotFields.map((item) => (
+                          item.col === field.col ? { ...item, agg } : item
+                        )));
+                      }}
                     >
                       <option value="sum">Sum</option>
                       <option value="count">Count</option>
@@ -1723,7 +1752,7 @@ export default function SheetsWorkspace() {
                 {field.role === 'filter' ? (
                   <fieldset className="tsw-pivot-field-filters">
                     <legend>Keep values</legend>
-                    {distinctFieldValues(computed, sheetId, pivotSource, field.col).map((value) => {
+                    {distinctFieldValues(computed, pivotSourceSheetId || sheetId, pivotSource, field.col).map((value) => {
                       const checked = field.selected.length === 0 || field.selected.includes(value);
                       return (
                         <label key={value} htmlFor={`tsw-pivot-filter-${field.col}-${value}`}>
@@ -1733,7 +1762,7 @@ export default function SheetsWorkspace() {
                             checked={checked}
                             onChange={() => setPivotFields((current) => current.map((item) => {
                               if (item.col !== field.col) return item;
-                              const all = distinctFieldValues(computed, sheetId, pivotSource, field.col);
+                              const all = distinctFieldValues(computed, pivotSourceSheetId || sheetId, pivotSource, field.col);
                               const selected = new Set(item.selected.length === 0 ? all : item.selected);
                               if (selected.has(value)) selected.delete(value);
                               else selected.add(value);

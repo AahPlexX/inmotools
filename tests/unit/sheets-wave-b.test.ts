@@ -8,6 +8,7 @@ import {
   PIVOT_PLACEMENT_DEFAULT,
   pivotSheet,
   refreshPivotTable,
+  updatePivotValueAgg,
 } from '../../src/tools/sheets/sheets-pivot';
 import { cellKey, createWorkbook } from '../../src/tools/sheets/sheets-types';
 
@@ -117,6 +118,63 @@ describe('tabular sheet wave B', () => {
       ['min', 5, 5],
       ['max', 10, 20],
     ]);
+  });
+
+  it('rebuilds value headers from the current agg when an existing pivot is refreshed', () => {
+    const source = dataBook();
+    const created = createPivotTable(source, {
+      sourceSheetId: source.sheets[0]!.id,
+      sourceA1: 'A1:C5',
+      rows: [{ name: 'Region', col: 0 }],
+      columns: [],
+      values: [{ name: 'Amount', col: 2, agg: 'sum' }],
+      filters: [],
+      placement: 'new-sheet',
+    });
+    expect(cellValue(created.book, 'Pivot1', 0, 1)).toBe('Sum of Amount');
+    expect(cellValue(created.book, 'Pivot1', 1, 1)).toBe(15);
+
+    const refreshed = updatePivotValueAgg(
+      created.book,
+      [{ name: 'Amount', col: 2, agg: 'count' }],
+      created.pivot?.id,
+    );
+    expect(refreshed.error).toBeUndefined();
+    expect(cellValue(refreshed.book, 'Pivot1', 0, 1)).toBe('Count of Amount');
+    expect(cellValue(refreshed.book, 'Pivot1', 1, 0)).toBe('East');
+    expect(cellValue(refreshed.book, 'Pivot1', 1, 1)).toBe(2);
+    expect(cellValue(refreshed.book, 'Pivot1', 2, 1)).toBe(2);
+    expect(cellValue(refreshed.book, 'Pivot1', 3, 1)).toBe(4);
+    expect(JSON.stringify(refreshed.book.sheets.find((sheet) => sheet.name === 'Pivot1')?.cells)).not.toMatch(/Sum of Amount/);
+  });
+
+  it('rebuilds multi-column headers from chrome agg labels without leaking create-time Sum of', () => {
+    const source = dataBook();
+    const created = createPivotTable(source, {
+      sourceSheetId: source.sheets[0]!.id,
+      sourceA1: 'A1:C5',
+      rows: [{ name: 'Region', col: 0 }],
+      columns: [{ name: 'Product', col: 1 }],
+      values: [{ name: 'Amount', col: 2, agg: 'sum' }],
+      filters: [],
+      placement: 'new-sheet',
+    });
+    expect(cellValue(created.book, 'Pivot1', 0, 1)).toBe('Ink | Sum of Amount');
+
+    const refreshed = updatePivotValueAgg(
+      created.book,
+      [{ name: 'Sum of Amount', col: 2, agg: 'count' }],
+      created.pivot?.id,
+    );
+    expect(refreshed.error).toBeUndefined();
+    expect(cellValue(refreshed.book, 'Pivot1', 0, 1)).toBe('Ink | Count of Amount');
+    expect(cellValue(refreshed.book, 'Pivot1', 0, 2)).toBe('Paper | Count of Amount');
+    expect(cellValue(refreshed.book, 'Pivot1', 0, 3)).toBe('Grand Total | Count of Amount');
+    expect(cellValue(refreshed.book, 'Pivot1', 1, 1)).toBe(1);
+    expect(cellValue(refreshed.book, 'Pivot1', 1, 2)).toBe(1);
+    const headerBlob = [1, 2, 3].map((col) => cellValue(refreshed.book, 'Pivot1', 0, col)).join(' ');
+    expect(headerBlob).not.toMatch(/Sum of/);
+    expect(refreshed.book.pivots[0]?.values[0]?.name).toBe('Amount');
   });
 
   it('writes onto a chosen destination range and refuses to overlap the source', () => {

@@ -314,6 +314,32 @@ test('creates a local PivotTable on a new sheet and reads GETPIVOTDATA', async (
   await expect(cellAt(workspace, 3, 1)).toHaveText('12');
 });
 
+test('refreshes an existing PivotTable after changing Sum to Count', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const workspace = await openWorkspace(page);
+  await workspace.getByTestId('tsw-pivot-source').fill('A1:B3');
+  await workspace.getByTestId('tsw-pivot-role-0').selectOption('row');
+  await workspace.getByTestId('tsw-pivot-role-1').selectOption('value');
+  await expect(workspace.getByTestId('tsw-pivot-agg-1')).toHaveValue('sum');
+  await workspace.getByTestId('tsw-pivot-create').click();
+  const pivotTab = workspace.getByRole('tab', { name: 'Pivot1' });
+  await expect(pivotTab).toBeVisible();
+  await pivotTab.click();
+  await expect(cellAt(workspace, 0, 1)).toHaveText('Sum of Qty');
+  await expect(cellAt(workspace, 3, 1)).toHaveText('6');
+
+  await workspace.getByTestId('tsw-pivot-agg-1').selectOption('count');
+  await workspace.getByTestId('tsw-pivot-refresh').click();
+  await pivotTab.click();
+  await expect(cellAt(workspace, 0, 1)).toHaveText('Count of Qty');
+  await expect(cellAt(workspace, 1, 0)).toHaveText('Ink');
+  await expect(cellAt(workspace, 1, 1)).toHaveText('1');
+  await expect(cellAt(workspace, 2, 0)).toHaveText('Paper');
+  await expect(cellAt(workspace, 2, 1)).toHaveText('1');
+  await expect(cellAt(workspace, 3, 1)).toHaveText('2');
+  await expect(cellAt(workspace, 0, 1)).not.toHaveText(/Sum of/);
+});
+
 test('keeps pivot chrome usable at 320 CSS px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   const workspace = await openWorkspace(page);
