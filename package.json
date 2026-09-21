@@ -34,7 +34,7 @@
     "@fontsource/opendyslexic": "5.3.0",
     "@fontsource/roboto-mono": "5.3.0",
     "@formulajs/formulajs": "4.6.1",
-    "@gltf-transform/core": "4.4.2",
+    "@gltf-transform/core": "4.5.0",
     "@gltf-transform/extensions": "4.4.2",
     "@gltf-transform/functions": "4.4.2",
     "@hpcc-js/wasm-graphviz": "1.28.0",

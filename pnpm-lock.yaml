@@ -170,8 +170,8 @@ importers:
         specifier: 4.6.1
         version: 4.6.1
       '@gltf-transform/core':
-        specifier: 4.4.2
-        version: 4.4.2
+        specifier: 4.5.0
+        version: 4.5.0
       '@gltf-transform/extensions':
         specifier: 4.4.2
         version: 4.4.2
@@ -1077,8 +1077,8 @@ packages:
     resolution: {integrity: sha512-QkHPCaHljG4SRT5TNOIBx4ClgQYyLlblwthF4tJP5GsWEJ7uD8eu+yN9RyCl3NCQdpWIEdtJb+pnQpuceywrLA==}
     hasBin: true
 
-  '@gltf-transform/core@4.4.2':
-    resolution: {integrity: sha512-qsWKwNSwK+2s834Mt4xbYcyHqCrgNFP7hIv5s487JxebngRfDgelpghNF+kSswGb2/NuapasfK3UViFoSJJoMg==}
+  '@gltf-transform/core@4.5.0':
+    resolution: {integrity: sha512-JlvShvnB4AtfGZqjnESS/wfPJbpVnyHhTwJBbWN4qXqkB3C5HIoxxpu/orwGBge6Pc0zObeWj70lVf+4gbuu0A==}
 
   '@gltf-transform/extensions@4.4.2':
     resolution: {integrity: sha512-HJH1FM+edC5eNvl6xO0SOXJ/j/3oDoIpSu150OTdJaLBoM3TgCCGIfh4wyhgWAqZrkvgHKVGiZKxcKV5LkgPCQ==}
@@ -6773,18 +6773,18 @@ snapshots:
       bessel: 1.0.2
       jstat: 1.9.6
 
-  '@gltf-transform/core@4.4.2':
+  '@gltf-transform/core@4.5.0':
     dependencies:
       property-graph: 4.1.0
 
   '@gltf-transform/extensions@4.4.2':
     dependencies:
-      '@gltf-transform/core': 4.4.2
+      '@gltf-transform/core': 4.5.0
       ktx-parse: 1.1.0
 
   '@gltf-transform/functions@4.4.2(@types/node@26.4.1)':
     dependencies:
-      '@gltf-transform/core': 4.4.2
+      '@gltf-transform/core': 4.5.0
       '@gltf-transform/extensions': 4.4.2
       ktx-parse: 1.1.0
       ndarray: 1.1.1
