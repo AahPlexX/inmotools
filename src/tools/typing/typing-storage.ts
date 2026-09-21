@@ -124,6 +124,9 @@ export function normalizeStoredTest(value: unknown, fallbackSavedAt = Date.now()
   if (!LANGUAGES.has(record.language as Language) || !LAYOUT_IDS.has(record.layout as LayoutId)) return null;
   if (!FINISH_REASONS.has(record.finishReason as StoredTest['finishReason'])) return null;
   if (record.quoteLength !== undefined && !QUOTE_LENGTHS.has(record.quoteLength)) return null;
+  if ((record.mode === 'quote') !== (record.durationMode === 'quote')) return null;
+  if ((record.mode === 'zen') !== (record.durationMode === 'zen')) return null;
+  if (record.durationMode === 'quote' && record.quoteLength === undefined) return null;
   if (typeof record.targetText !== 'string' || !finiteNumber(record.durationValue)) return null;
   if (!finiteNumber(record.netWpm) || !finiteNumber(record.grossWpm) || !finiteNumber(record.rawCpm)) return null;
   if (!finiteNumber(record.accuracy, 0, 100) || !finiteNumber(record.consistency, 0, 100)) return null;
@@ -157,7 +160,11 @@ export async function deleteTest(id: number): Promise<void> {
 }
 
 export async function listTests(): Promise<StoredTest[]> {
-  return getDb().tests.orderBy('savedAt').reverse().toArray();
+  const rows = await getDb().tests.orderBy('savedAt').reverse().toArray();
+  return rows.flatMap((row) => {
+    const normalized = normalizeStoredTest(row, Number.NaN);
+    return normalized ? [normalized] : [];
+  });
 }
 
 export interface TestFilterOptions {
@@ -169,13 +176,17 @@ export interface TestFilterOptions {
   until?: number;
 }
 export function filterStoredTests(tests: StoredTest[], opts: TestFilterOptions): StoredTest[] {
+  const wantedTags = (opts.tags ?? []).map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean);
   return tests.filter((test) => {
     if (opts.mode && test.mode !== opts.mode) return false;
     if (opts.language && test.language !== opts.language) return false;
     if (opts.layout && test.layout !== opts.layout) return false;
     if (opts.since && test.savedAt < opts.since) return false;
     if (opts.until && test.savedAt > opts.until) return false;
-    if (opts.tags && opts.tags.length > 0 && !opts.tags.every((tag) => test.tags.includes(tag))) return false;
+    if (wantedTags.length > 0) {
+      const storedTags = new Set(test.tags.map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean));
+      if (!wantedTags.every((tag) => storedTags.has(tag))) return false;
+    }
     return true;
   });
 }
@@ -188,16 +199,20 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
     .where('mode').equals(query.mode)
     .filter((t) => (
       t.durationMode === query.durationMode
-      && (query.durationMode === 'quote' || t.durationValue === query.durationValue)
+      && (query.durationMode === 'quote' || query.durationMode === 'zen' || t.durationValue === query.durationValue)
       && t.language === query.language
       && t.layout === query.layout
       && t.finishReason === 'completed'
       && (query.durationMode !== 'quote' || t.quoteLength === query.quoteLength)
     ))
     .toArray();
-  if (rows.length === 0) return undefined;
-  rows.sort((a, b) => b.netWpm - a.netWpm);
-  return rows[0];
+  const normalizedRows = rows.flatMap((row) => {
+    const normalized = normalizeStoredTest(row, Number.NaN);
+    return normalized ? [normalized] : [];
+  });
+  if (normalizedRows.length === 0) return undefined;
+  normalizedRows.sort((a, b) => b.netWpm - a.netWpm);
+  return normalizedRows[0];
 }
 
 export async function clearAllTests(): Promise<void> {

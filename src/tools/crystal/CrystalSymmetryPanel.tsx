@@ -25,6 +25,7 @@ export default function CrystalSymmetryPanel({ document, history, onHistoryChang
   const [breakSummary, setBreakSummary] = useState<string | null>(null);
   const [mode, setMode] = useState<'conventional' | 'primitive'>('conventional');
   const [preview, setPreview] = useState<CrystalDocument | null>(null);
+  const isStale = result !== null && referenceRef.current !== document;
 
   const run = <T,>(action: () => Promise<T>, apply: (value: T) => void, failure: string) => {
     const generation = generationRef.current + 1;
@@ -80,8 +81,8 @@ export default function CrystalSymmetryPanel({ document, history, onHistoryChang
   };
 
   const previewStandard = () => {
-    if (!result) {
-      setError('Detect symmetry before previewing a standardized cell.');
+    if (!result || isStale) {
+      setError('Structure changed since detection; re-run Detect symmetry.');
       setStatus('error');
       return;
     }
@@ -116,7 +117,8 @@ export default function CrystalSymmetryPanel({ document, history, onHistoryChang
               {status === 'pending' ? 'Analyzing symmetry…' : null}
               {status === 'error' ? error : null}
               {status === 'ready' && !result ? 'Symmetry sweep ready.' : null}
-              {status === 'idle' ? 'No symmetry analysis has been run yet.' : null}
+              {status === 'idle' && !isStale ? 'No symmetry analysis has been run yet.' : null}
+              {isStale ? 'Structure changed since detection; re-run Detect symmetry.' : null}
             </p>
           </div>
           <div className="crystal-symmetry-buttons">
@@ -174,7 +176,7 @@ export default function CrystalSymmetryPanel({ document, history, onHistoryChang
           </div>
           <div className="crystal-symmetry-buttons">
             <button type="button" onClick={previewStandard}>Preview standardized cell</button>
-            <button type="button" onClick={applyStandard} disabled={!preview}>Apply standardized cell</button>
+            <button type="button" onClick={applyStandard} disabled={!preview || isStale}>Apply standardized cell</button>
           </div>
         </div>
         {preview ? (
