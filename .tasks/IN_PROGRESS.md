@@ -1,5 +1,16 @@
 # In Progress
 
+- **Tactical Matchboard Studio** — 60-feature local-first tactical authoring, animation, spatial-analysis, local-video, presentation, persistence, and export workstream on `feature/tactical-matchboard-studio`.
+  - Design: `docs/superpowers/specs/2026-09-21-tactical-matchboard-studio-design.md`
+  - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
+  - Ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`
+  - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
+  - Current milestone: Foundation — RED schema/geometry/formation contracts; implementation next.
+  - Current verified feature count: **0/60**. Features 1, 4, 8, 9, 10, 11, 13, and 14 are in progress; all others remain planned.
+  - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
+  - Completion gate: satisfy the branch-complete and integrated-complete contracts in the tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
+
+
 - **Tabular Sheet Workstation (TASK-022)** — Wave A in progress on `feature/tabular-sheet-wave-a` (Formula.js `@formulajs/formulajs@4.6.1` + FILTER/SORT/UNIQUE spill + export-surviving comments). Branched from `origin/main` after PR #71 P1–P16 (`b582c34dea4ba97ab7080743dc290eeb45946b54`) and docs PR #72. Do not reuse `feature/tabular-sheet-parity`. Do not invent Wave B/C/D. Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5). FILTER/SORT/UNIQUE spill is Wave A.
