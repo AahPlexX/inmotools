@@ -3,8 +3,8 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/73 — `feature/tabular-sheet-wave-a` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity`. Do not touch unrelated tools.
 
-**Tip SHA:** pending stamp  
-**Last focused-gate code:** pending stamp  
+**Tip SHA:** ff9f3f0fc2fbd6bbc0fa9e12e7461e07d5d35bf1  
+**Last focused-gate code:** ff9f3f0fc2fbd6bbc0fa9e12e7461e07d5d35bf1  
 **Workstream:** **Wave A** (Formula.js + FILTER/SORT/UNIQUE spill + export-surviving comments) on top of merged PR #71 P1–P16 / docs PR #72.
 
 ## Merge status (prior)
