@@ -166,11 +166,13 @@ export default function MarkdownEditor({
         keymap.of([...closeBracketsKeymap, ...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         attributesCompartment.of(buildAttributes(fontSizeRef.current, spellcheckRef.current)),
         // Pasting or dropping an image embeds it as a data URI at the drop
-        // point/selection instead of falling through to CodeMirror's default
-        // (pasting nothing useful for a paste, or the browser navigating to
-        // the file for a drop). A non-image paste/drop returns false so the
-        // browser's normal text-paste, and the workspace's own outer
-        // file-drop handler (opening a dropped .md file), still run.
+        // point/selection. A non-image paste returns false so the browser's
+        // normal text-paste still runs. A non-image *file* drop still
+        // returns true (with no stopPropagation) so it bubbles to the
+        // workspace's own file-drop handler (opening a dropped .md file):
+        // CodeMirror's own built-in drop handling would otherwise read the
+        // same file as text and race that handler to insert its raw
+        // contents at the cursor instead of opening it as a new document.
         EditorView.domEventHandlers({
           paste: (event, view) => {
             const file = Array.from(event.clipboardData?.files ?? []).find((item) => item.type.startsWith('image/'));
@@ -180,13 +182,20 @@ export default function MarkdownEditor({
             return true;
           },
           drop: (event, view) => {
-            const file = Array.from(event.dataTransfer?.files ?? []).find((item) => item.type.startsWith('image/'));
-            if (!file) return false;
-            event.preventDefault();
-            event.stopPropagation();
-            const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head;
-            void insertImageAtSelection(view, file, at);
-            return true;
+            const files = Array.from(event.dataTransfer?.files ?? []);
+            const imageFile = files.find((item) => item.type.startsWith('image/'));
+            if (imageFile) {
+              event.preventDefault();
+              event.stopPropagation();
+              const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head;
+              void insertImageAtSelection(view, imageFile, at);
+              return true;
+            }
+            if (files.length > 0) {
+              event.preventDefault();
+              return true;
+            }
+            return false;
           },
         }),
         EditorView.updateListener.of((update) => {
