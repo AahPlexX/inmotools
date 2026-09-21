@@ -306,7 +306,10 @@
 
 .tsw-pivot-chrome button {
   width: 100%;
-  flex: 1 1 100%;
+  flex: 0 0 auto;
+  min-height: 44px;
+  height: auto;
+  align-self: stretch;
 }
 
 .tsw-pivot-placement,
@@ -628,11 +631,17 @@
   .tsw-toolbar button,
   .tsw-parity-chrome button,
   .tsw-sheet-tabs button,
-  .tsw-style-chrome button,
-  .tsw-pivot-chrome button {
+  .tsw-style-chrome button {
     flex: 1 1 100%;
     min-width: 0;
     width: 100%;
+  }
+
+  .tsw-pivot-chrome button {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    height: auto;
   }
 
   .tsw-toolbar label,
@@ -659,10 +668,16 @@
   .tsw-parity-chrome button,
   .tsw-sheet-tabs button,
   .tsw-style-chrome button,
-  .tsw-formula button,
-  .tsw-pivot-chrome button {
+  .tsw-formula button {
     flex: 1 1 100%;
     min-width: 0;
+  }
+
+  .tsw-pivot-chrome button {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    height: auto;
   }
 
   .tsw-grid th,
