@@ -23,7 +23,7 @@ export function normalizePhotoMaskOverlay(overlay: PhotoMaskOverlay | null | und
 }
 
 export function clonePhotoMask(mask: PhotoMask, depth = 0): PhotoMask {
-  if (depth >= 8) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false };
+  if (depth >= 8) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false, flow: 1, spacing: 0.25, smoothing: 0.3 };
   if (mask.type === 'brush') {
     return { ...mask, points: mask.points.map((point) => ({ ...point })) };
   }

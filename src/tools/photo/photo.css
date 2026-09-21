@@ -245,6 +245,7 @@
 
 .photo-edit-overlay line { fill: none; }
 .photo-edit-overlay [data-photo-mask="brush"] circle { stroke-width: 0.8; fill: rgb(96 165 250 / 0.16); }
+.photo-edit-overlay [data-photo-mask="brush"] circle[data-photo-brush-dab="erase"] { stroke: #f87171; fill: rgb(248 113 113 / 0.16); }
 .photo-edit-overlay [data-photo-retouch] line { stroke-dasharray: 4 3; }
 .photo-edit-overlay .photo-retouch-source { stroke: #fbbf24; fill: rgb(251 191 36 / 0.12); }
 .photo-edit-overlay .photo-retouch-target { stroke: #22d3ee; fill: rgb(34 211 238 / 0.12); }

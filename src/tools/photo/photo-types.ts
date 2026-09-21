@@ -117,8 +117,32 @@ export interface PhotoSelection {
   inverted: boolean;
 }
 
+export interface PhotoBrushPoint {
+  x: number;
+  y: number;
+  pressure: number;
+  /** Groups points from one continuous paint gesture so flow builds up per pass, not per point. */
+  strokeId: number;
+  /** When true, this stroke's coverage subtracts from the mask instead of adding to it. */
+  erase: boolean;
+}
+
 export type PhotoPrimitiveMask =
-  | { type: 'brush'; points: Array<{ x: number; y: number; pressure: number }>; radius: number; feather: number; opacity: number; invert: boolean }
+  | {
+      type: 'brush';
+      points: PhotoBrushPoint[];
+      radius: number;
+      feather: number;
+      opacity: number;
+      invert: boolean;
+      /** Maximum coverage a single stroke pass can add; repeated passes build toward full coverage. */
+      flow: number;
+      /** Minimum distance between recorded dabs, as a fraction of radius. */
+      spacing: number;
+      /** Stroke-stabilization strength applied to the interior of a gesture path. */
+      smoothing: number;
+    }
+  | { type: 'radial'; cx: number; cy: number; rx: number; ry: number; feather: number; opacity: number; invert: boolean }
   | { type: 'radial'; cx: number; cy: number; rx: number; ry: number; feather: number; opacity: number; invert: boolean }
   | { type: 'linear'; x1: number; y1: number; x2: number; y2: number; feather: number; opacity: number; invert: boolean }
   | { type: 'luminance'; min: number; max: number; feather: number; opacity: number; invert: boolean }

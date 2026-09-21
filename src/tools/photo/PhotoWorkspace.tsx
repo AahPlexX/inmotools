@@ -313,6 +313,7 @@ export default function PhotoWorkspace() {
   const [toneCurveChannel, setToneCurveChannel] = useState<ToneCurveChannel>('master');
   const [mixerOutputChannel, setMixerOutputChannel] = useState<MixerOutputChannel>('red');
   const [canvasInteraction, setCanvasInteraction] = useState<PhotoCanvasInteraction | null>(null);
+  const [brushEraseMode, setBrushEraseMode] = useState(false);
   const [selectionCombineMode, setSelectionCombineMode] = useState<PhotoSelectionCombineMode>('replace');
   const [selectionColorTolerance, setSelectionColorTolerance] = useState(0.12);
   const [selectionLuminanceMin, setSelectionLuminanceMin] = useState(0.2);
@@ -353,6 +354,7 @@ export default function PhotoWorkspace() {
   const projectSaveRevisionRef = useRef(0);
   const projectSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const projectBeingDeletedRef = useRef<string | null>(null);
+  const brushStrokeCounterRef = useRef(0);
   const userPresetMutationRef = useRef(false);
   const autoAnalysisRevisionRef = useRef(0);
   const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
@@ -998,7 +1000,7 @@ export default function PhotoWorkspace() {
           ? { type: 'luminance', min: 0.2, max: 0.8, ...base }
           : type === 'hue'
             ? { type: 'hue', center: 30, range: 35, ...base }
-            : { type: 'brush', points: [], radius: 0.12, ...base };
+            : { type: 'brush', points: [], radius: 0.12, flow: 1, spacing: 0.25, smoothing: 0.3, ...base };
     const label = `${type === 'radial' ? 'Radial' : type === 'linear' ? 'Linear' : type === 'luminance' ? 'Luminance range' : type === 'hue' ? 'Hue range' : 'Brush'} adjustment ${index}`;
     const adjustment: LocalAdjustment = {
       id,
@@ -1131,7 +1133,9 @@ export default function PhotoWorkspace() {
     setHistory((current) => {
       let next: PhotoRecipe;
       if (interaction.kind === 'local') {
-        next = applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path);
+        next = interaction.mode === 'brush'
+          ? applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path, ++brushStrokeCounterRef.current, brushEraseMode)
+          : applyLocalGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path);
       } else if (interaction.kind === 'retouch') {
         next = placeRetouchPoint(
           current.present,
@@ -1898,7 +1902,21 @@ export default function PhotoWorkspace() {
             <SimpleControl label={`${adjustment.label} opacity`} value={adjustment.mask.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, opacity: value } }))} />
             <SimpleControl label={`${adjustment.label} feather`} value={adjustment.mask.feather} min={0} max={adjustment.mask.type === 'selection' ? 0.25 : 1} step={adjustment.mask.type === 'selection' ? 0.005 : 0.02} neutral={adjustment.mask.type === 'selection' ? adjustment.mask.selection.feather : adjustment.mask.type === 'composite' ? 0 : 0.45} onChange={(value) => updateLocal(adjustment.id, (item) => ({ ...item, mask: { ...item.mask, feather: value } }))} />
             {adjustment.mask.type === 'brush' ? (
-              <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
+              <>
+                <SimpleControl label={`${adjustment.label} brush radius`} value={adjustment.mask.radius} min={0.005} max={0.5} step={0.005} neutral={0.12} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, radius: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} flow`} value={adjustment.mask.flow} min={0.01} max={1} step={0.01} neutral={1} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, flow: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} spacing`} value={adjustment.mask.spacing} min={0.01} max={1} step={0.01} neutral={0.25} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, spacing: value } }) : item)} />
+                <SimpleControl label={`${adjustment.label} smoothing`} value={adjustment.mask.smoothing} min={0} max={1} step={0.01} neutral={0.3} onChange={(value) => updateLocal(adjustment.id, (item) => item.mask.type === 'brush' ? ({ ...item, mask: { ...item.mask, smoothing: value } }) : item)} />
+                <label className="photo-check">
+                  <input
+                    type="checkbox"
+                    aria-label={`${adjustment.label} erase mode`}
+                    checked={brushEraseMode}
+                    onChange={(event) => setBrushEraseMode(event.target.checked)}
+                  />
+                  Erase with this brush
+                </label>
+              </>
             ) : null}
             {adjustment.mask.type === 'luminance' ? (
               <>

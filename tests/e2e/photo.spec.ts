@@ -234,6 +234,42 @@ test('local masks rename, duplicate, bypass, visualize, and compose with an acti
   await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(1);
 });
 
+test('brush masks expose flow, spacing, and smoothing controls and record erase strokes separately', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+  await page.getByRole('button', { name: 'Add brush mask' }).click();
+  const brushMask = page.getByTestId('photo-local-adjustment').first();
+
+  const flow = brushMask.getByLabel('Brush adjustment 1 flow value');
+  const spacing = brushMask.getByLabel('Brush adjustment 1 spacing value');
+  const smoothing = brushMask.getByLabel('Brush adjustment 1 smoothing value');
+  await expect(flow).toHaveValue('1');
+  await expect(spacing).toHaveValue('0.25');
+  await expect(smoothing).toHaveValue('0.3');
+  await flow.fill('0.4');
+  await flow.press('Enter');
+  await expect(flow).toHaveValue('0.4');
+
+  await brushMask.getByRole('button', { name: 'Paint on photo' }).click();
+  await dragOnPhoto(page, 0.3, 0.3, 0.5, 0.3);
+  const paintDabs = page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="paint"]');
+  await expect(paintDabs.first()).toBeVisible();
+  const paintedCount = await paintDabs.count();
+  expect(paintedCount).toBeGreaterThan(0);
+  await expect(page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]')).toHaveCount(0);
+
+  await brushMask.getByLabel('Brush adjustment 1 erase mode').check();
+  await brushMask.getByRole('button', { name: 'Paint on photo' }).click();
+  await dragOnPhoto(page, 0.3, 0.5, 0.5, 0.5);
+  const eraseDabs = page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]');
+  await expect(eraseDabs.first()).toBeVisible();
+  await expect(paintDabs).toHaveCount(paintedCount);
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]')).toHaveCount(0);
+  await expect(paintDabs).toHaveCount(paintedCount);
+});
+
 test('tone curve points are user-editable and reversible through normal history', async ({ page }) => {
   await openFixture(page);
   await page.locator('summary').filter({ hasText: 'Tone curve' }).click();

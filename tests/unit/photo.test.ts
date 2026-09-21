@@ -211,7 +211,7 @@ describe('Photo Studio engine', () => {
       ...DEFAULT_RECIPE,
       localAdjustments: [{
         id: 'brush', label: 'Brush', enabled: true,
-        mask: { type: 'brush', points: [], radius: 0.1, feather: 0.4, opacity: 1, invert: false },
+        mask: { type: 'brush', points: [], radius: 0.1, feather: 0.4, opacity: 1, invert: false, flow: 1, spacing: 0.25, smoothing: 0.3 },
         effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
       }],
     });
@@ -219,12 +219,16 @@ describe('Photo Studio engine', () => {
       { x: 0.1, y: 0.1, pressure: 0.5 },
       { x: 0.2, y: 0.25, pressure: 0.75 },
       { x: 0.3, y: 0.4, pressure: 1 },
-    ]);
+    ], 7);
     const mask = next.localAdjustments[0].mask;
     expect(mask.type).toBe('brush');
     if (mask.type !== 'brush') throw new Error('expected brush mask');
     expect(mask.points).toHaveLength(3);
-    expect(mask.points[2]).toEqual({ x: 0.3, y: 0.4, pressure: 1 });
+    // The first and last points of a gesture stay exact even with stroke smoothing
+    // applied, so start/end placement remains precise; strokeId/erase are recorded
+    // per dab so flow accumulation and erase composition can group by pass later.
+    expect(mask.points[0]).toEqual({ x: 0.1, y: 0.1, pressure: 0.5, strokeId: 7, erase: false });
+    expect(mask.points[2]).toEqual({ x: 0.3, y: 0.4, pressure: 1, strokeId: 7, erase: false });
   });
 
   test('retouch direct placement independently sets source and target points', () => {

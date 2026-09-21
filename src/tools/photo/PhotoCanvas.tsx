@@ -125,7 +125,15 @@ function PhotoOverlays({
         }
         if (mask.type === 'brush') {
           return <g key={adjustment.id} data-photo-mask="brush" className={active ? 'is-active' : undefined}>
-            {mask.points.slice(-500).map((point, index) => <circle key={`${adjustment.id}-${index}`} cx={point.x * 100} cy={point.y * 100} r={Math.max(0.6, mask.radius * 50 * point.pressure)} />)}
+            {mask.points.slice(-500).map((point, index) => (
+              <circle
+                key={`${adjustment.id}-${index}`}
+                cx={point.x * 100}
+                cy={point.y * 100}
+                r={Math.max(0.6, mask.radius * 50 * point.pressure)}
+                data-photo-brush-dab={point.erase ? 'erase' : 'paint'}
+              />
+            ))}
           </g>;
         }
         return null;

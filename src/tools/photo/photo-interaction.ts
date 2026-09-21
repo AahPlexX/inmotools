@@ -16,12 +16,55 @@ function normalizedPoint(point: PhotoGesturePoint) {
   return { x: clamp01(point.x), y: clamp01(point.y) };
 }
 
+interface WeightedPoint {
+  x: number;
+  y: number;
+  pressure: number;
+}
+
+// Softens the interior of a captured path while keeping its first and last points
+// exact, so smoothing steadies a shaky hand without moving where the stroke starts
+// or where the pointer actually lifted.
+function smoothBrushPath(path: WeightedPoint[], smoothing: number): WeightedPoint[] {
+  if (path.length < 3 || smoothing <= 0) return path;
+  const result: WeightedPoint[] = [path[0]];
+  for (let index = 1; index < path.length - 1; index += 1) {
+    const previous = result[index - 1];
+    const raw = path[index];
+    result.push({
+      x: smoothing * previous.x + (1 - smoothing) * raw.x,
+      y: smoothing * previous.y + (1 - smoothing) * raw.y,
+      pressure: raw.pressure,
+    });
+  }
+  result.push(path[path.length - 1]);
+  return result;
+}
+
+// Drops interior dabs closer than minDistance to the last kept dab, always keeping
+// the first and last points so the stroke still covers its real endpoints.
+function decimateBrushPath(path: WeightedPoint[], minDistance: number): WeightedPoint[] {
+  if (path.length <= 2 || minDistance <= 0) return path;
+  const result: WeightedPoint[] = [path[0]];
+  let last = path[0];
+  for (let index = 1; index < path.length - 1; index += 1) {
+    const point = path[index];
+    if (Math.hypot(point.x - last.x, point.y - last.y) < minDistance) continue;
+    result.push(point);
+    last = point;
+  }
+  result.push(path[path.length - 1]);
+  return result;
+}
+
 export function applyLocalGesture(
   recipe: PhotoRecipe,
   adjustmentId: string,
   start: PhotoGesturePoint,
   end: PhotoGesturePoint,
   path: PhotoGesturePoint[] = [],
+  strokeId = 0,
+  erase = false,
 ): PhotoRecipe {
   const normalizedStart = normalizedPoint(start);
   const normalizedEnd = normalizedPoint(end);
@@ -51,11 +94,14 @@ export function applyLocalGesture(
         };
       }
       if (mask.type === 'brush') {
-        const points = (path.length ? path : [end]).map((point) => ({
+        const rawPath = (path.length ? path : [end]).map((point) => ({
           x: clamp01(point.x),
           y: clamp01(point.y),
           pressure: clamp01(point.pressure ?? 1),
         }));
+        const smoothed = smoothBrushPath(rawPath, mask.smoothing);
+        const spaced = decimateBrushPath(smoothed, mask.spacing * mask.radius);
+        const points = spaced.map((point) => ({ ...point, strokeId, erase }));
         return {
           ...adjustment,
           mask: { ...mask, points: [...mask.points, ...points].slice(-5000) },

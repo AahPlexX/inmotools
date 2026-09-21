@@ -23,6 +23,7 @@ import { clonePhotoMask, normalizePhotoMaskOverlay } from './photo-mask';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
+const EMPTY_BRUSH_MASK: PhotoMask = { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false, flow: 1, spacing: 0.25, smoothing: 0.3 };
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -249,7 +250,7 @@ function normalizeMask(mask: PhotoMask, depth = 0): PhotoMask {
     opacity: clamp(mask.opacity, 0, 1),
     invert: Boolean(mask.invert),
   };
-  if (depth >= 8) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false };
+  if (depth >= 8) return EMPTY_BRUSH_MASK;
   switch (mask.type) {
     case 'brush':
       return {
@@ -258,8 +259,15 @@ function normalizeMask(mask: PhotoMask, depth = 0): PhotoMask {
           x: clamp(point.x, 0, 1),
           y: clamp(point.y, 0, 1),
           pressure: clamp(point.pressure, 0, 1),
+          // Points from recipes saved before flow/erase existed are treated as one
+          // pass so legacy strokes render identically to their original max-based weight.
+          strokeId: Number.isFinite(point.strokeId) ? point.strokeId : 0,
+          erase: Boolean(point.erase),
         })),
         radius: clamp(mask.radius, 0.001, 1),
+        flow: clamp(mask.flow ?? 1, 0.01, 1),
+        spacing: clamp(mask.spacing ?? 0.25, 0.01, 1),
+        smoothing: clamp(mask.smoothing ?? 0.3, 0, 1),
         ...base,
       };
     case 'radial':
@@ -316,7 +324,7 @@ function normalizeMask(mask: PhotoMask, depth = 0): PhotoMask {
             : 'replace' as const,
         mask: normalizeMask(operation.mask, depth + 1),
       }));
-      if (!operations.length) return { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false };
+      if (!operations.length) return EMPTY_BRUSH_MASK;
       return { type: 'composite', operations, ...base };
     }
   }
@@ -846,8 +854,14 @@ function circularHueDistance(a: number, b: number): number {
   return Math.min(raw, 360 - raw);
 }
 
+// A stroke is every point sharing one strokeId (one continuous paint gesture). Dabs
+// within a stroke union via max, matching a single physical brush pass; separate
+// strokes then accumulate with "over" compositing scaled by flow, so one pass never
+// exceeds `flow` coverage and repeated passes build toward full coverage. Erase
+// strokes accumulate the same way, then multiplicatively remove coverage at the end.
 function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: number): number {
-  let best = 0;
+  const paintStrokes = new Map<number, number>();
+  const eraseStrokes = new Map<number, number>();
   for (const point of mask.points) {
     const distance = Math.hypot(x - point.x, y - point.y);
     if (distance > mask.radius) continue;
@@ -855,9 +869,15 @@ function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: 
     const edge = mask.feather <= EPSILON
       ? (distance <= mask.radius ? 1 : 0)
       : 1 - smoothstep(inner, mask.radius, distance);
-    best = Math.max(best, edge * point.pressure);
+    const contribution = edge * point.pressure;
+    const strokes = point.erase ? eraseStrokes : paintStrokes;
+    strokes.set(point.strokeId, Math.max(strokes.get(point.strokeId) ?? 0, contribution));
   }
-  return best;
+  let painted = 0;
+  for (const strokeMax of paintStrokes.values()) painted += strokeMax * mask.flow * (1 - painted);
+  let erased = 0;
+  for (const strokeMax of eraseStrokes.values()) erased += strokeMax * mask.flow * (1 - erased);
+  return painted * (1 - erased);
 }
 
 export function photoMaskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
