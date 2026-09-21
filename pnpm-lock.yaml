@@ -181,6 +181,9 @@ importers:
       '@hpcc-js/wasm-graphviz':
         specifier: 1.28.0
         version: 1.28.0
+      '@lezer/highlight':
+        specifier: 1.2.3
+        version: 1.2.3
       '@replit/codemirror-vim':
         specifier: 6.4.0
         version: 6.4.0(@codemirror/commands@6.11.0)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
@@ -355,6 +358,9 @@ importers:
       unified:
         specifier: 11.0.5
         version: 11.0.5
+      unist-util-visit:
+        specifier: 5.1.0
+        version: 5.1.0
       vscode-oniguruma:
         specifier: 2.0.1
         version: 2.0.1
