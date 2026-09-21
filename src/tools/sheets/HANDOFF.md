@@ -1,10 +1,10 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: this branch `feature/tabular-sheet-wave-b` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
+Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-sheet-wave-b` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
 
-**Tip SHA:** `TIP_PENDING`  
-**Last focused-gate code:** `TIP_PENDING`  
+**Tip SHA:** `8f5b662`  
+**Last focused-gate code:** `8f5b662`  
 **Workstream:** **Wave B** (local PivotTable UX + GETPIVOTDATA subset) on top of merged PR #73 Wave A / docs stamp PR #74 / #71 P1–P16 / docs PR #72.
 
 ## Merge status (PR #73 + #74)
@@ -46,12 +46,12 @@ Pivot chrome is tap/click (no hover-only) and stacks at ~320–430 CSS px.
 ## Sheets gates (green at last focused-gate code)
 
 ```bash
-# focused units; pnpm build pass
-# desktop-chromium sheets spec
+# focused units 54/54; pnpm build pass
+# desktop-chromium 27 passed
 # P16 matrix 12/12 (6 portrait + 6 landscape)
 ```
 
-Counts last proven green on feature-branch stamp `c0da201e08a7e062b78299a6b521a1fad767c203`, which is included in squash / product tip `4dcc856bc97027862342513cdea7eb769c0ffbc1`. CoS sets last focused-gate to that squash. Verify commands:
+Counts last proven green on this branch. Verify commands:
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts tests/unit/sheets-wave-a.test.ts tests/unit/sheets-wave-b.test.ts
