@@ -16,10 +16,14 @@ function assertNormalized(value: number, label: string): void {
   }
 }
 
+function canonicalUnit(value: number): number {
+  return Number(value.toFixed(12));
+}
+
 export function createNormalizedPoint(x: number, y: number): NormalizedPoint {
   assertNormalized(x, 'x');
   assertNormalized(y, 'y');
-  return { x, y };
+  return { x: canonicalUnit(x), y: canonicalUnit(y) };
 }
 
 export function normalizedToMeters(
