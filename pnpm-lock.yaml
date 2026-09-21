@@ -248,8 +248,8 @@ importers:
         specifier: 4.4.0
         version: 4.4.0
       exifreader:
-        specifier: 4.44.0
-        version: 4.44.0
+        specifier: 4.45.0
+        version: 4.45.0
       fast-xml-parser:
         specifier: 5.11.1
         version: 5.11.1
@@ -3927,8 +3927,8 @@ packages:
     resolution: {integrity: sha512-XctvKaEMaj1Ii9oDOqbW/6e1gXknSY4g/aLCDicOXqBE4M0nRWkUu0PTp++UPNzoFY12BNHMfs/VadKIS6llvg==}
     engines: {node: '>=8.3.0'}
 
-  exifreader@4.44.0:
-    resolution: {integrity: sha512-NviP4AQgrZHiNZT8IEsXtyaAKLkc0C55dfQ8fyaAXiL59EJLDdsvP/hZhAfTJpdVuHDGHU7GuUZ1qrJtINckvw==}
+  exifreader@4.45.0:
+    resolution: {integrity: sha512-l9WWwOmPo/RRC3mIdUeAllAA2tGknBrUjOaiMYsekpQnO2BAww7R8YFisGxxJSkWang1UM7nsHxDvD++zsZkpw==}
     hasBin: true
 
   expect-type@1.4.0:
@@ -10412,7 +10412,7 @@ snapshots:
       unzipper: 0.10.14
       uuid: 8.3.2
 
-  exifreader@4.44.0:
+  exifreader@4.45.0:
     optionalDependencies:
       '@xmldom/xmldom': 0.9.12
 
