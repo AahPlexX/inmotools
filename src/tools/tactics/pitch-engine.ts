@@ -20,6 +20,15 @@ function canonicalUnit(value: number): number {
   return Number(value.toFixed(12));
 }
 
+export function isNormalizedPoint(point: NormalizedPoint): boolean {
+  return Number.isFinite(point.x)
+    && Number.isFinite(point.y)
+    && point.x >= 0
+    && point.x <= 1
+    && point.y >= 0
+    && point.y <= 1;
+}
+
 export function createNormalizedPoint(x: number, y: number): NormalizedPoint {
   assertNormalized(x, 'x');
   assertNormalized(y, 'y');
