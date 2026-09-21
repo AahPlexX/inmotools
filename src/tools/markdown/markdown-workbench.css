@@ -60,6 +60,71 @@
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
 
+/* Fenced code blocks share the source editor's own background (var(--surface))
+   rather than the app's usual dark .code-output convention, because
+   code-highlight-engine.ts colors tokens with the editor's own
+   defaultHighlightStyle palette — a light-background style, tuned to read
+   correctly only on the same background the editor itself uses. */
+.markdown-workbench-preview pre {
+  overflow: auto;
+  max-width: 100%;
+  padding: 12px 14px;
+  margin: .75em 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.markdown-workbench-preview pre > code {
+  display: block;
+  color: var(--ink);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+
+.markdown-workbench-preview :not(pre) > code {
+  padding: .1em .35em;
+  border-radius: 5px;
+  background: var(--surface-strong);
+  font-size: .9em;
+}
+
+/* GitHub-style alert blockquotes (github-alerts-plugin.ts). Each kind reuses
+   the app's existing semantic status tokens rather than inventing new
+   colors, so a warning here reads the same as a warning anywhere else. */
+.markdown-workbench-preview .markdown-alert {
+  margin: .75em 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+
+.markdown-workbench-preview .markdown-alert > :last-child { margin-bottom: 0; }
+
+.markdown-workbench-preview .markdown-alert-title {
+  margin: 0 0 .35em;
+  font-weight: 700;
+  font-size: .85em;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.markdown-workbench-preview .markdown-alert-note { border-left-color: var(--signal); }
+.markdown-workbench-preview .markdown-alert-note .markdown-alert-title { color: var(--signal-strong); }
+
+.markdown-workbench-preview .markdown-alert-tip { border-left-color: var(--good); }
+.markdown-workbench-preview .markdown-alert-tip .markdown-alert-title { color: var(--good); }
+
+.markdown-workbench-preview .markdown-alert-important { border-left-color: var(--signal-strong); }
+.markdown-workbench-preview .markdown-alert-important .markdown-alert-title { color: var(--signal-strong); }
+
+.markdown-workbench-preview .markdown-alert-warning { border-left-color: var(--warning); }
+.markdown-workbench-preview .markdown-alert-warning .markdown-alert-title { color: var(--warning); }
+
+.markdown-workbench-preview .markdown-alert-caution { border-left-color: var(--danger); }
+.markdown-workbench-preview .markdown-alert-caution .markdown-alert-title { color: var(--danger); }
+
 .markdown-workbench-diagram-error-message {
   max-width: 100%;
   margin: .5rem 0 1rem;

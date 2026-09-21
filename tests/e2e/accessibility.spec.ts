@@ -14,6 +14,9 @@ for (const route of routes) {
       // reached through its focusable contenteditable role="textbox" child, so keyboard
       // access exists and scrollable-region-focusable reports a false positive here.
       .exclude('.cm-scroller')
+      // Univer's canvas grid is reached through the workspace formula bar and
+      // sheet tabs; its internal chrome is excluded the same way CodeMirror is.
+      .exclude('.tsw-univer-host')
       .analyze();
     const blocking = results.violations.filter((violation) =>
       violation.impact === 'serious' || violation.impact === 'critical');

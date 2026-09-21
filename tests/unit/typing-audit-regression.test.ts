@@ -137,6 +137,7 @@ describe('typing audit regressions', () => {
       { ...sampleTest, id: 3, tags: ['legal'] },
     ];
     expect(filterStoredTests(rows, { tags: ['morning', 'code'] })).toHaveLength(1);
+    expect(filterStoredTests(rows, { tags: [' MORNING ', 'Code'] })).toHaveLength(1);
     expect(filterStoredTests(rows, { tags: ['missing'] })).toHaveLength(0);
   });
 });

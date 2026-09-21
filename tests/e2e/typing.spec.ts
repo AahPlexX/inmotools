@@ -24,6 +24,23 @@ async function clearTypingDatabase(page: Page) {
   }, DB_NAME);
 }
 
+async function writeTypingConfigPreference(page: Page, value: unknown) {
+  await page.evaluate(async ({ dbName, value }) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(dbName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'));
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('preferences', 'readwrite');
+      tx.objectStore('preferences').put({ key: 'config', value });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('Preference write failed'));
+    });
+    db.close();
+  }, { dbName: DB_NAME, value });
+}
+
 async function downloadBuffer(download: Download): Promise<Buffer> {
   const stream = await download.createReadStream();
   expect(stream).not.toBeNull();
@@ -85,9 +102,34 @@ test('completes a multiline word-count custom target, persists it, and exports t
   expect(exported.test.targetText).toContain('\n');
   expect(exported.test.tags).toContain('e2e');
 
+  // Export is side-effect-free: history changes only when Save is explicitly chosen.
+  await expect(resultDialog).toBeVisible();
+  const preSaveHistory = workspace.getByRole('region', { name: 'Session history' });
+  const preSaveTotal = preSaveHistory.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(preSaveTotal).toContainText('0');
+
+  const csvPromise = page.waitForEvent('download');
+  await resultDialog.getByRole('button', { name: 'Export CSV' }).click();
+  expect((await csvPromise).suggestedFilename()).toMatch(/^typing-test-.*\.csv$/);
+  await expect(resultDialog).toBeVisible();
+
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
+  await expect(preSaveTotal).toContainText('1');
+
   await page.reload();
+  const reloadedWorkspace = page.getByTestId('suite-workspace');
   const history = page.getByRole('region', { name: 'Session history' });
-  await expect(history.locator('.tw-stat').filter({ hasText: 'Total tests' })).toContainText('1');
+  const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(totalTests).toContainText('1');
+  const pbPanel = reloadedWorkspace.getByRole('heading', { name: 'Personal best / pacer' }).locator('..');
+  await expect(pbPanel).toContainText('Best');
+
+  await reloadedWorkspace.getByRole('button', { name: 'Clear history…' }).click();
+  const clearDialog = reloadedWorkspace.getByRole('alertdialog', { name: 'Clear local test history?' });
+  await clearDialog.getByRole('button', { name: 'Clear history' }).click();
+  await expect(totalTests).toContainText('0');
+  await expect(pbPanel).toContainText('No comparable personal best yet.');
 });
 
 test('auto-finishes a forgiving target after an error and preserves the error in scoring', async ({ page }) => {
@@ -122,6 +164,8 @@ test('auto-finishes a forgiving target after an error and preserves the error in
   expect(exported.test.missedChars).toBe(1);
   expect(exported.test.accuracy).toBeLessThan(100);
 
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Discard' }).click();
   await expect(resultDialog).toBeHidden();
   await workspace.getByLabel('Errors').selectOption('master');
   await canvas.focus();
@@ -203,16 +247,29 @@ test('exports history metadata across formats and re-imports a bundle without id
   await expect(exportDialog).toBeHidden();
 
   const importInput = workspace.locator('label').filter({ hasText: /Import JSON/ }).locator('input[type="file"]');
+  const importedBestWpm = Number(bundle.tests[0].netWpm) + 100;
+  const bulkTests = Array.from({ length: 25 }, (_, index) => ({
+    ...bundle.tests[0],
+    id: 100 + index,
+    savedAt: Number(bundle.tests[0].savedAt) + index + 1,
+    tags: ['bulk'],
+  }));
   const importBundle = {
     ...bundle,
     tests: [
-      { ...bundle.tests[0], id: 77, tags: ['legal'] },
+      { ...bundle.tests[0], id: 77, tags: ['legal'], netWpm: importedBestWpm },
+      ...bulkTests,
       { ...bundle.tests[0], id: 78, tags: 'not-an-array' },
     ],
   };
   await importInput.setInputFiles({ name: 'typing-history.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(importBundle)) });
-  await expect(workspace).toContainText('Imported 1 test. Skipped 1 invalid record.');
-  await expect(totalTests).toContainText('2');
+  await expect(workspace).toContainText('Imported 26 tests. Skipped 1 invalid record.');
+  await expect(totalTests).toContainText('27');
+
+  const pbPanel = workspace.getByRole('heading', { name: 'Personal best / pacer' }).locator('..');
+  await expect(pbPanel).toContainText(`Best ${importedBestWpm} WPM`);
+  await expect(history.getByText('Rows 1–24 of 27')).toBeVisible();
+  await expect(history.getByRole('button', { name: 'Next' })).toBeVisible();
 
   const filterInput = history.getByLabel('Filter by tag');
   await filterInput.fill('legal');
@@ -229,7 +286,7 @@ test('exports history metadata across formats and re-imports a bundle without id
   expect(filteredBundle.tests[0].tags).toContain('legal');
   await page.keyboard.press('Escape');
   await filterInput.fill('');
-  await expect(totalTests).toContainText('2');
+  await expect(totalTests).toContainText('27');
 });
 
 test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', async ({ page }) => {
@@ -265,6 +322,10 @@ test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', 
 
   const history = workspace.getByRole('region', { name: 'Session history' });
   const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
+  await expect(totalTests).toContainText('0');
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
   await expect(totalTests).toContainText('1');
 
   await workspace.getByRole('button', { name: 'New text' }).click();
@@ -282,6 +343,10 @@ test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', 
   const pdfBuffer = await downloadBuffer(pdfDownload);
   expect(pdfBuffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   expect(pdfBuffer.length).toBeGreaterThan(500);
+  await expect(totalTests).toContainText('1');
+  await expect(resultDialog).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(resultDialog).toBeHidden();
   await expect(totalTests).toContainText('2');
 });
 
@@ -320,6 +385,55 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await expect(clearDialog).toContainText('This removes every locally stored test from this browser.');
   await page.keyboard.press('Escape');
   await expect(clearDialog).toBeHidden();
+
+  await writeTypingConfigPreference(page, {
+    mode: 'not-a-mode',
+    layout: 'not-a-layout',
+    durationMode: 'time',
+    durationValue: 999,
+    fontSize: 999,
+    audioVolume: 5,
+    metronomeBpm: 999,
+    pacerWpm: -20,
+  });
+  await page.reload();
+  const restoredWorkspace = page.getByTestId('suite-workspace');
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('words-1000');
+  await expect(restoredWorkspace.getByLabel('Layout')).toHaveValue('qwerty');
+  await expect(restoredWorkspace.locator('label').filter({ hasText: /^\s*Seconds/ }).locator('select')).toHaveValue('30');
+  await expect(restoredWorkspace.getByLabel('Font size')).toHaveValue('40');
+  await expect(restoredWorkspace.getByLabel('Volume')).toHaveValue('1');
+
+  await writeTypingConfigPreference(page, {
+    mode: 'words-1000',
+    durationMode: 'quote',
+    durationValue: 120,
+    quoteLength: 'short',
+    language: 'english',
+    layout: 'qwerty',
+  });
+  await page.reload();
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('quote');
+  await expect(restoredWorkspace.getByLabel('Duration')).toHaveValue('quote');
+  await restoredWorkspace.getByLabel('Duration').selectOption('time');
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('words-1000');
+
+  await writeTypingConfigPreference(page, {
+    mode: 'custom',
+    customText: '   ',
+    durationMode: 'time',
+    durationValue: 30,
+    language: 'english',
+    layout: 'qwerty',
+  });
+  await page.reload();
+  await expect(restoredWorkspace.getByLabel('Mode')).toHaveValue('words-1000');
+
+  await restoredWorkspace.getByLabel('Mode').selectOption('custom');
+  await restoredWorkspace.getByRole('button', { name: 'Paste text' }).click();
+  const emptyCustomDialog = restoredWorkspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await emptyCustomDialog.getByRole('textbox', { name: 'Custom text' }).fill('   ');
+  await expect(emptyCustomDialog.getByRole('button', { name: 'Use this text' })).toBeDisabled();
 });
 
 test('has no serious or critical automated accessibility violations at rest', async ({ page }) => {
