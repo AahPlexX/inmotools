@@ -3,8 +3,8 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-sheet-wave-b` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
 
-**Tip SHA:** `8f5b662`  
-**Last focused-gate code:** `8f5b662`  
+**Tip SHA:** `6807b2f`  
+**Last focused-gate code:** `6807b2f`  
 **Workstream:** **Wave B** (local PivotTable UX + GETPIVOTDATA subset) on top of merged PR #73 Wave A / docs stamp PR #74 / #71 P1–P16 / docs PR #72.
 
 ## Merge status (PR #73 + #74)
