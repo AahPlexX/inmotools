@@ -3,15 +3,15 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not open a second PR. Do not touch unrelated tools.
 
-**Tip SHA:** `febf88c2a699f66f906cbdfd43e7ad92a0b554b0`  
+**Tip SHA:** `PLACEHOLDER_TIP_SHA`  
 **Last focused-gate code:** `c37fff4c1bdd98827266be6f6fd611901756e75e`  
-**Workstream:** **PRODUCT CUT P1–P16 DONE.** Ready for CoS to undraft and squash-merge. CoS merges — the agent does not merge, mark ready, or open a second PR. Not an XLOOKUP-only cut. Do not invent extra product scope.
+**Workstream:** **PRODUCT CUT P1–P16 DONE.** Client loop green on `c37fff4` / `3e87e0a`. CoS squash-merged #71 onto `main` at `b582c34`. This branch synced that tip. The agent does not merge, mark ready, or open a second PR. Not an XLOOKUP-only cut. Do not invent extra product scope. Do not expand PX.
 
 ## Merge readiness (for CoS squash-merge)
 
-- `origin/main` fetched at `95db6eec84c7f77f096bdbfea69c75f79baaa96d`. Merge-base equals that tip. **No rebase or merge of main was required.** `git merge origin/main` is already up to date. **No conflict resolutions.**
-- Diff vs `main` stays sheets-scoped (19 files): `src/tools/sheets/*`, sheets unit/e2e, catalog sheets blurb only, `.tasks/IN_PROGRESS.md` TASK-022 line. Other tools' code is untouched.
-- Git merge into `main` is clean. GitHub `mergeable_state` may stay `unstable` because repository-wide validate is red on **out-of-suite** e2e (same class as PR #70). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
+- `origin/main` fetched at `b582c34dea4ba97ab7080743dc290eeb45946b54` (`feat(sheets): local Excel/Sheets parity slice for Tabular Sheet Workstation (#71)`).
+- Synced with `git merge origin/main` (ort). **No conflicts. No other-tool files rewritten.** Working tree matches `origin/main` after the sync merge.
+- Validate reds remain **out-of-suite only** (same class as PR #70). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
 
 ## What works
 
@@ -37,7 +37,7 @@ Each case checks: parity chrome visible, no horizontal page overflow (>8px fails
 # P16 matrix 12/12 (6 portrait + 6 landscape)
 ```
 
-Counts re-verified after `origin/main` fetch on code tip `c37fff4c1bdd98827266be6f6fd611901756e75e`. Verify commands:
+Counts recorded at client-loop code tip `c37fff4c1bdd98827266be6f6fd611901756e75e` (content `3e87e0a2f0ead527625925f4f0d7b83260e4a4ad`). Verify commands:
 
 ```bash
 pnpm exec vitest run tests/unit/sheets-wiring.test.ts tests/unit/sheets-stage2.test.ts tests/unit/sheets-formula.test.ts tests/unit/sheets-persist.test.ts tests/unit/sheets-parity.test.ts
@@ -52,14 +52,13 @@ pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=
 
 ## Known out-of-suite CI reds
 
-Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70. **Do not chase or edit those tools:**
+Do **not** claim the full Pages / PR validate suite is green. Validate reds are out-of-suite only (same class as PR #70). **Do not chase or edit those tools:**
 
 - `web-layout-studio` axe
 - `svg-sprite-compiler` axe
-- stale lazy chunk
 - Hardware Packet Inspector
 - GeoJSON Simplifier
-- Python `re` named groups
+- Python `re` / regex named groups
 - `crystal-lattice-studio` mobile
 
 Pages / PR validate reds on those suites are not sheets regressions. Do not touch them unless a sheets change causes them.
@@ -76,8 +75,8 @@ Pages / PR validate reds on those suites are not sheets regressions. Do not touc
 
 ## Next sequential steps
 
-1. Stay on draft PR #71. Do not open a second PR. The agent does not merge or mark ready.
-2. CoS may undraft and squash-merge when ready. Squash keeps other tools' `main` history intact.
+1. Stay on PR #71 / `feature/tabular-sheet-parity`. Do not open a second PR. The agent does not merge.
+2. CoS undraft + squash-merge is the vehicle (already landed on `main` at `b582c34` if that squash is the current default).
 3. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
-4. Do not invent extra product scope beyond P1–P16.
+4. Do not invent extra product scope beyond P1–P16. Do not expand PX.
 5. Reject reviews that treat iPhone 13 / `mobile-chromium` as the only #16 proof.
