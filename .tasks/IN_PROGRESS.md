@@ -1,5 +1,14 @@
 # In Progress
 
+- **Transcode Workstation** — universal local file-to-file transcoder, tabular data transformer, and multi-format media conversion workstation with 36 planned functional capabilities.
+  - Design: `docs/superpowers/specs/2026-09-15-transcode-workstation-design.md`.
+  - Plan and feature ledger: `docs/superpowers/plans/2026-09-15-transcode-workstation.md`.
+  - Current milestone: all six milestones (M0–M6) are complete as of 2026-09-15. F01–F36 are implemented: tabular, documents, images/icons/animation, audio, fonts, geospatial, archives, base64/hex/data-URI, metadata editing at export (EXIF + XMP + IPTC writers + strip), native audio container tags + ID3v2, and batch ZIP. 124 focused unit tests green (860/863 repo-wide; the 3 failures were the pre-existing vector-engine baseline, since fixed on `main`); production build green. Draft PR #33 carried the branch for CI; browser e2e (11 scenarios × 2 projects) previously awaited the vector baseline fix, which has since landed on `main`.
+  - 2026-09-21: merged `origin/main` (196 commits, including Sightline Velocity, Digital Logic Workstation, Typing Workstation, Tabular Sheet Workstation, and Markdown Workbench MVP) to clear conflicts the branch had picked up while idle; resolved additively in `package.json`/`pnpm-lock.yaml` (dependency lists merged and re-sorted), `src/catalog.ts` and `src/tools/workspaces.tsx` (all new `ToolSlug` variants and loaders kept as siblings), and this file (workstream entries kept as siblings).
+  - 2026-09-21 verification on the integrated revision: `tsc --noEmit -p tsconfig.app.json` clean; `pnpm exec vitest run tests/unit` 1464/1465 passing (the 1 failure is an unrelated, environmental `markdown-citation.test.ts` CSL-formatting timeout, confirmed by isolated rerun); the 9 focused transcode unit suites (124 tests) pass in isolation; `pnpm build` clean; the full `tests/e2e/transcode.spec.ts` (22 cases, 11 scenarios × 2 projects) passes on desktop+mobile Chromium in an isolated single-worker run. Two genuine test-authoring bugs found and fixed during this pass, both pre-existing on the branch and unrelated to the merge: (1) the download-reading helper called `.read()` immediately on a freshly opened Node.js Readable stream, which returns `null` before data buffers — replaced with a `readDownload` helper that fully drains the stream via `for await`, matching this repo's established idiom (e.g. `markdown-workbench.spec.ts`); (2) `page.getByText('Preview')` ambiguously matched both the actual Preview disclosure control and an unrelated instructional sentence containing the word "preview" — fixed with `{ exact: true }`. The underlying tool itself was already working correctly in both cases; only the test assertions were broken.
+  - Completion gate: every ledger capability implemented and reachable through the workspace UI, validated exports, focused unit tests, responsive keyboard-accessible UI, green `pnpm test:unit` and `pnpm build`, and browser coverage for the tool before integration — all satisfied on the integrated revision above.
+  - Scope: `src/tools/transcode/`, tool-specific tests, additive catalog/loader integration, additive dependency pins. Other workstreams and branches are preserved.
+
 - **Digital Logic Workstation** — local-first digital logic circuit simulator, schematic capture, and electronic-prototyping workstation governed by a 34-capability ledger.
   - Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
@@ -31,7 +40,7 @@
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
   - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
   - Stack pins: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`, `@formulajs/formulajs@4.6.1` exact. No Univer Pro, HyperFormula, AI, or auth/db.
-  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`, `package.json` pin + lockfile. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
+  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`, `package.json` pin + lockfile. Do not overwrite other tools' task entries.
 
 - **Web Layout Studio** — local responsive layout, design-token and frontend component workstation.
   - Contract and full 60-feature ledger: `docs/superpowers/plans/2026-09-12-web-layout-studio.md`.
