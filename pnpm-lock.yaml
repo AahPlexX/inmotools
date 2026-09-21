@@ -166,6 +166,9 @@ importers:
       '@fontsource/roboto-mono':
         specifier: 5.3.0
         version: 5.3.0
+      '@formulajs/formulajs':
+        specifier: 4.6.1
+        version: 4.6.1
       '@gltf-transform/core':
         specifier: 4.4.2
         version: 4.4.2
@@ -1069,6 +1072,10 @@ packages:
 
   '@fontsource/roboto-mono@5.3.0':
     resolution: {integrity: sha512-yhwplHMHW9dCk+1pZuERfcJe+K3rosGVZEoK0XktkxRSqQ9qsipSwwiuW2/8Qmtp9lzu3Ixa/ie4BMH3i8CkZQ==}
+
+  '@formulajs/formulajs@4.6.1':
+    resolution: {integrity: sha512-QkHPCaHljG4SRT5TNOIBx4ClgQYyLlblwthF4tJP5GsWEJ7uD8eu+yN9RyCl3NCQdpWIEdtJb+pnQpuceywrLA==}
+    hasBin: true
 
   '@gltf-transform/core@4.4.2':
     resolution: {integrity: sha512-qsWKwNSwK+2s834Mt4xbYcyHqCrgNFP7hIv5s487JxebngRfDgelpghNF+kSswGb2/NuapasfK3UViFoSJJoMg==}
@@ -3237,6 +3244,10 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  bessel@1.0.2:
+    resolution: {integrity: sha512-Al3nHGQGqDYqqinXhQzmwmcRToe/3WyBv4N8aZc5Pef8xw2neZlR9VPi84Sa23JtgWcucu18HxVZrnI0fn2etw==}
+    engines: {node: '>=0.8'}
+
   big-integer@1.6.52:
     resolution: {integrity: sha512-QxD8cf2eVqJOOz63z6JIN9BzvVs/dlySa5HGSBH5xtR8dPteIRQnBxxKqkNTiT6jbDTF6jAfrd4oMcND9RGbQg==}
     engines: {node: '>=0.6'}
@@ -4288,6 +4299,9 @@ packages:
 
   jspdf@4.2.1:
     resolution: {integrity: sha512-YyAXyvnmjTbR4bHQRLzex3CuINCDlQnBqoSYyjJwTP2x9jDLuKDzy7aKUl0hgx3uhcl7xzg32agn5vlie6HIlQ==}
+
+  jstat@1.9.6:
+    resolution: {integrity: sha512-rPBkJbK2TnA8pzs93QcDDPlKcrtZWuuCo2dVR0TFLOJSxhqfWOVCSp8aV3/oSbn+4uY4yw1URtLpHQedtmXfug==}
 
   jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
@@ -6753,6 +6767,11 @@ snapshots:
   '@fontsource/opendyslexic@5.3.0': {}
 
   '@fontsource/roboto-mono@5.3.0': {}
+
+  '@formulajs/formulajs@4.6.1':
+    dependencies:
+      bessel: 1.0.2
+      jstat: 1.9.6
 
   '@gltf-transform/core@4.4.2':
     dependencies:
@@ -9546,6 +9565,8 @@ snapshots:
 
   baseline-browser-mapping@2.11.20: {}
 
+  bessel@1.0.2: {}
+
   big-integer@1.6.52: {}
 
   binary@0.3.0:
@@ -10746,6 +10767,8 @@ snapshots:
       core-js: 3.50.0
       dompurify: 3.4.14
       html2canvas: 1.4.1
+
+  jstat@1.9.6: {}
 
   jszip@3.10.1:
     dependencies:

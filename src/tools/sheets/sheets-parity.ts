@@ -1,4 +1,5 @@
 import { a1FromParts, parseA1Range } from './sheets-formula';
+import { formulaJsFunctionNames } from './sheets-formula-js';
 import { clearRange, normalizeRange, rangeToTsv } from './sheets-grid';
 import { cloneWorkbook, collectRange, fillHandle, getCell, setCell } from './sheets-model';
 import {
@@ -30,7 +31,13 @@ export interface ParityClipboard {
   tsv: string;
 }
 
-export const FORMULA_CATALOG = [
+export interface FormulaCatalogItem {
+  name: string;
+  template: string;
+  summary: string;
+}
+
+export const FEATURED_INSERT_FUNCTIONS: FormulaCatalogItem[] = [
   { name: 'SUM', template: '=SUM(', summary: 'Add numbers in a range.' },
   { name: 'AVERAGE', template: '=AVERAGE(', summary: 'Average numbers in a range.' },
   { name: 'IF', template: '=IF(', summary: 'Pick one result when a test is true, another when it is false.' },
@@ -42,7 +49,27 @@ export const FORMULA_CATALOG = [
   { name: 'COUNTIF', template: '=COUNTIF(', summary: 'Count cells that match a test.' },
   { name: 'SUMIF', template: '=SUMIF(', summary: 'Sum cells that match a test.' },
   { name: 'INDEX-MATCH', template: '=INDEX(,MATCH(,,0))', summary: 'INDEX plus MATCH as a VLOOKUP stand-in.' },
-] as const;
+  { name: 'FILTER', template: '=FILTER(', summary: 'Keep rows that match a test and spill into empty cells.' },
+  { name: 'SORT', template: '=SORT(', summary: 'Sort a range and spill into empty cells.' },
+  { name: 'UNIQUE', template: '=UNIQUE(', summary: 'Return distinct rows and spill into empty cells.' },
+  { name: 'LEFT', template: '=LEFT(', summary: 'Return characters from the start of a text value.' },
+  { name: 'RIGHT', template: '=RIGHT(', summary: 'Return characters from the end of a text value.' },
+  { name: 'MID', template: '=MID(', summary: 'Return characters from the middle of a text value.' },
+  { name: 'LEN', template: '=LEN(', summary: 'Count characters in a text value.' },
+  { name: 'UPPER', template: '=UPPER(', summary: 'Convert text to uppercase.' },
+  { name: 'LOWER', template: '=LOWER(', summary: 'Convert text to lowercase.' },
+  { name: 'TRIM', template: '=TRIM(', summary: 'Strip extra spaces from text.' },
+  { name: 'IFERROR', template: '=IFERROR(', summary: 'Replace an error with another value.' },
+  { name: 'ROUND', template: '=ROUND(', summary: 'Round a number to a given number of digits.' },
+  { name: 'POWER', template: '=POWER(', summary: 'Raise a number to a power.' },
+  { name: 'DATE', template: '=DATE(', summary: 'Build a date from year, month, and day.' },
+  { name: 'YEAR', template: '=YEAR(', summary: 'Return the year of a date.' },
+  { name: 'MONTH', template: '=MONTH(', summary: 'Return the month of a date.' },
+  { name: 'DAY', template: '=DAY(', summary: 'Return the day of a date.' },
+  { name: 'TODAY', template: '=TODAY(', summary: 'Return the current local date.' },
+  { name: 'TEXT', template: '=TEXT(', summary: 'Format a number as text.' },
+  { name: 'CONCAT', template: '=CONCAT(', summary: 'Join text values.' },
+];
 
 export const LOCKED_INSERT_FUNCTIONS = [
   'SUM',
@@ -55,6 +82,24 @@ export const LOCKED_INSERT_FUNCTIONS = [
   'COUNTIF',
   'SUMIF',
 ] as const;
+
+export function buildFormulaCatalog(featured: FormulaCatalogItem[], extraNames: string[]): FormulaCatalogItem[] {
+  const seen = new Set<string>();
+  const out: FormulaCatalogItem[] = [];
+  for (const item of featured) {
+    if (seen.has(item.name)) continue;
+    seen.add(item.name);
+    out.push(item);
+  }
+  for (const name of extraNames) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push({ name, template: `=${name}(`, summary: 'Excel-compatible function evaluated in this browser.' });
+  }
+  return out;
+}
+
+export const FORMULA_CATALOG = buildFormulaCatalog(FEATURED_INSERT_FUNCTIONS, formulaJsFunctionNames());
 
 export function fillDownSelection(
   book: PortableWorkbook,

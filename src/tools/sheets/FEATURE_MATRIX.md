@@ -12,6 +12,7 @@ Local-first only. Workbooks stay in this browser (IndexedDB / LocalStorage). No 
 | `exceljs` | `4.4.0` | XLSX export via `workbook.xlsx.writeBuffer()` | npm `exceljs@4.4.0` |
 | `xlsx` (SheetJS CE) | `0.20.3` from `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` | XLSX import | Official CE install path on cdn.sheetjs.com / docs.sheetjs.com |
 | `chart.js` | `4.5.1` **reuse from main** | Feature 21 OSS replacement | Already declared on `origin/main`; do not duplicate |
+| `@formulajs/formulajs` | `4.6.1` | Excel-compatible function implementations behind the portable DAG | npm dist-tag `latest` = `4.6.1`; MIT. Not HyperFormula. |
 | Pivot / group-by | in-house | Feature 22 OSS replacement | In-house aggregation; not a Pro feature |
 
 Banned engines (not numbered-feature statuses): `@univerjs-pro/*`, `@univerjs/preset-sheets-advanced`, `@univerjs/preset-sheets-drawing`, HyperFormula, remote persistence, telemetry.
@@ -36,7 +37,7 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | ---: | --- | --- | --- |
 | 1 | Multi-sheet workbook | Univer core preset + portable snapshot model | done |
 | 2 | Formula bar | Univer `formulaBar` in `UniverSheetsCorePreset` | done |
-| 3 | AST/DAG via Univer `engine-formula` in preset | Live Univer `engine-formula` is SSOT when the host is mounted (`data-testid=tsw-formula-ssot`, `univer-host[data-formula-ssot]`). Portable DAG remains the offline evaluator. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| 3 | AST/DAG via Univer `engine-formula` in preset | Live Univer `engine-formula` is SSOT when the host is mounted (`data-testid=tsw-formula-ssot`, `univer-host[data-formula-ssot]`). Portable DAG remains the offline evaluator and calls `@formulajs/formulajs@4.6.1` for names the local catalog does not own. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/unit/sheets-wave-a.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 4 | Relative / absolute refs | `$A$1` / `A$1` / `$A1` / `A1` parse + fill rewrite | done |
 | 5 | Cross-sheet refs | `Sheet2!B3` / `'Sheet Name'!A1` | done |
 | 6 | Named ranges | Portable named-range table synced into snapshot | done |
@@ -62,7 +63,7 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 26 | Zoom | Univer zoom + workspace control | done |
 | 27 | Wrap / overflow | Wrap toggle + overflow clip / ellipsis / overflow chrome. Hooks: `data-testid=tsw-wrap`, `data-testid=tsw-overflow`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 28 | Hyperlinks | Portable per-cell links | done |
-| 29 | Comments / notes | Portable notes (no Pro thread-comment) | done |
+| 29 | Comments / notes | Portable notes (no Pro thread-comment). XLSX and portable bundle round-trip. Evidence: `tests/unit/sheets-wave-a.test.ts` | done |
 | 30 | IndexedDB persistence | Dexie database scoped to this tool | done |
 | 31 | LocalStorage prefs | Theme / zoom / last workbook id | done |
 | 32 | XLSX import (SheetJS CE 0.20.3) | Official CE tarball; formulas, merges, and safe hyperlinks | done |
@@ -86,7 +87,7 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 - Catalog entry + lazy workspace + multi-sheet grid + formulas + persist + working import/export path.
 - `pnpm test:unit` and `pnpm build` pass, with focused formula/persist units.
 - Historical Stage 1 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #71 squash-merged onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54` (https://github.com/AahPlexX/inmotools/pull/71). Do not touch PR #33 / transcode.
-- Stop product commits. PR #71 is merged on `main`. Do not invent extra product scope.
+- Stop product commits beyond Wave A. Do not invent Wave B/C/D.
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
@@ -99,7 +100,7 @@ Status values: `done` | `in-progress` | `excluded`.
 | ID | Feature | Notes | Status |
 | --- | --- | --- | --- |
 | P1 | Paste special | Values / formats / transpose from the last copied snapshot or TSV. Hooks: context menu + `data-testid=tsw-parity-chrome`. Evidence: `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
-| P2 | Insert Function (full catalog) | Locked names: SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, INDEX-MATCH, TEXTJOIN, COUNTIF, SUMIF. INDEX and MATCH stay in the picker as the INDEX-MATCH building blocks. Hook: `data-testid=tsw-insert-function`. Constant: `LOCKED_INSERT_FUNCTIONS`. Not an XLOOKUP-only slice. FILTER / SORT / UNIQUE formulas are excluded (X5). | done |
+| P2 | Insert Function (full catalog) | Locked names: SUM, AVERAGE, IF, VLOOKUP, XLOOKUP, INDEX-MATCH, TEXTJOIN, COUNTIF, SUMIF. INDEX and MATCH stay in the picker as the INDEX-MATCH building blocks. Wave A adds FILTER / SORT / UNIQUE plus Formula.js names, with search (`data-testid=tsw-insert-function-search`). Hook: `data-testid=tsw-insert-function`. Constant: `LOCKED_INSERT_FUNCTIONS`. Not an XLOOKUP-only slice. | done |
 | P3 | AutoSum | Writes `=SUM(...)` below a column, right of a row, or into a cell with numbers above. Hook: `data-testid=tsw-autosum` | done |
 | P4 | Named range manager | List, go to, define, delete. Hook: `data-testid=tsw-named-ranges` | done |
 | P5 | Go to / Go to special | A1 jump plus blanks / formulas / constants. Hooks: `tsw-goto`, `tsw-goto-blanks` | done |
@@ -126,6 +127,16 @@ Acceptance for #16 and any responsive parity UI is the CSS-width matrix in `CLIE
 
 Not accepted as the only proof: iPhone 13, `mobile-chromium`, or any one hardcoded device name. Evidence: `tests/unit/sheets-parity.test.ts` (matrix lock) and `tests/e2e/tabular-sheet-workstation.spec.ts` (`keeps parity chrome readable at *`, skipped on `mobile-chromium` by design).
 
+### Wave A — Tabular Sheet Expansion Cut v2 (this PR)
+
+Approved Wave A set only. Do not invent Wave B/C/D (pivots upgrade, drawing/sparklines pack, Sheet Actions).
+
+| ID | Feature | Notes | Status |
+| --- | --- | --- | --- |
+| WA1 | Broad Excel-class formulas | Exact pin `@formulajs/formulajs@4.6.1`. Portable DAG remains SSOT; Formula.js supplies implementations for names the local catalog does not own. Insert Function lists locked P2 names plus FILTER/SORT/UNIQUE and Formula.js names (`tsw-insert-function-search`). Evidence: `tests/unit/sheets-wave-a.test.ts`, `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| WA2 | FILTER / SORT / UNIQUE spill | Engine-owned spill into empty neighboring cells. Blocked spill writes `#SPILL!`. Formula.js has no FILTER and its UNIQUE is not Excel UNIQUE, so these three are local. Evidence: `tests/unit/sheets-wave-a.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| WA3 | Export-surviving comments | Cell notes/comments round-trip through exceljs XLSX and the portable JSON/zip bundle. No auth, no DB, no realtime threads. Evidence: `tests/unit/sheets-wave-a.test.ts` | done |
+
 ### Not in the approved cut (do not expand)
 
 | ID | Feature | Notes | Status |
@@ -142,7 +153,7 @@ CoS-named exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Unive
 | X2 | Realtime collaboration, auth, remote DB | Local-first GitHub Pages. Workbooks stay in this browser. |
 | X3 | VBA / Apps Script / macros | No script host, no server. Formulas and chrome actions only. |
 | X4 | Remote / cloud Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
-| X5 | FILTER / SORT / UNIQUE *formulas* | Portable engine cannot spill arrays without HyperFormula. Use Autofilter, Sort, and Remove duplicates. |
+| X5 | SEQUENCE / SORTBY / RANDARRAY / array constants / dotted names | FILTER / SORT / UNIQUE spill is Wave A. Remaining dynamic-array surface stays out: `{1,2;3,4}` literals, SEQUENCE, SORTBY, RANDARRAY, implicit intersection beyond top-left, and dotted Excel names (`BETA.DIST`) that the portable tokenizer cannot parse. |
 | X6 | Excel workbook encryption / IRM / password-to-open | Not in the approved cut. A leftover hashed PIN is a local edit lock, not file crypto. |
 | X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). Not Univer Pro pivots. |
 | X8 | Drawing / images / sparklines / Pro charts | Chart.js column/line/pie from the selection only. |

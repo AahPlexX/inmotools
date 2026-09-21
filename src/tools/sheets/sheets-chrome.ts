@@ -1,11 +1,11 @@
 import { a1FromParts, extractRefs, parseA1Ref } from './sheets-formula';
+import { formulaJsFunctionNames } from './sheets-formula-js';
+import { FORMULA_CATALOG } from './sheets-parity';
 import { PORTABLE_FORMULA_SSOT, UNIVER_FORMULA_SSOT } from './sheets-univer';
 
 const KNOWN_FUNCTIONS = new Set([
-  'SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT', 'COUNTA', 'PRODUCT', 'ABS', 'INT', 'SQRT',
-  'ROUND', 'IF', 'AND', 'OR', 'NOT', 'CONCAT', 'CONCATENATE', 'LEN', 'UPPER', 'LOWER',
-  'TRIM', 'IFERROR', 'ISNUMBER', 'ISTEXT', 'ISBLANK', 'PI', 'TRUE', 'FALSE',
-  'TEXTJOIN', 'COUNTIF', 'SUMIF', 'VLOOKUP', 'XLOOKUP', 'INDEX', 'MATCH',
+  ...FORMULA_CATALOG.map((item) => item.name),
+  ...formulaJsFunctionNames(),
 ]);
 
 export function resolveFormulaSsot(

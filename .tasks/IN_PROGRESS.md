@@ -1,15 +1,15 @@
 # In Progress
 
-- **Tabular Sheet Workstation (TASK-022)** — PRODUCT CUT P1–P16 DONE. Merged on `main` via PR #71 (https://github.com/AahPlexX/inmotools/pull/71) squash `b582c34dea4ba97ab7080743dc290eeb45946b54`. Do not push to `feature/tabular-sheet-parity`. Do not invent extra product scope. Do not shrink Insert Function to XLOOKUP-only.
-  - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. Approved milestone is CoS P1–P16 only. Protect sheet (PX) is leftover chrome, not in the approved 16.
-  - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus approved P1–P16). Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, FILTER/SORT/UNIQUE formulas.
-  - Tip SHA: `b582c34dea4ba97ab7080743dc290eeb45946b54` (PR #71 squash / product tip). Last focused-gate code: `b582c34dea4ba97ab7080743dc290eeb45946b54`.
-  - Product is on `main` at that squash. Prior green client stamp `c37fff4c1bdd98827266be6f6fd611901756e75e` is included. Focused units 42/42; `pnpm build` pass; desktop-chromium 24 passed; P16 matrix 12/12. Do not claim the full Pages suite green.
+- **Tabular Sheet Workstation (TASK-022)** — Wave A in progress on `feature/tabular-sheet-wave-a` (Formula.js `@formulajs/formulajs@4.6.1` + FILTER/SORT/UNIQUE spill + export-surviving comments). Branched from `origin/main` after PR #71 P1–P16 (`b582c34dea4ba97ab7080743dc290eeb45946b54`) and docs PR #72. Do not reuse `feature/tabular-sheet-parity`. Do not invent Wave B/C/D. Do not shrink Insert Function to XLOOKUP-only.
+  - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. P1–P16 stay `done`. Wave A ledger WA1–WA3. Protect sheet (PX) is leftover chrome, not in the approved 16.
+  - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md`. Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, SEQUENCE/SORTBY/RANDARRAY/array constants (X5). FILTER/SORT/UNIQUE spill is Wave A.
+  - Tip SHA: pending (this branch). Last focused-gate code: pending.
+  - Do not claim the full Pages suite green.
   - Known out-of-suite CI reds (do not chase): web-layout-studio axe; svg-sprite-compiler axe; stale lazy chunk; Hardware Packet Inspector; GeoJSON Simplifier; Python re named groups; crystal-lattice-studio mobile.
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.
   - Client constraint: no hover-only; no overlap at those widths; long-press + click; formula help tap/focus only; anti-slop catalog/sheets copy only.
-  - Stack pins unchanged: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`. No Univer Pro, HyperFormula, AI, or auth/db.
-  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
+  - Stack pins: `@univerjs/presets@0.25.1`, `@univerjs/preset-sheets-core@0.25.1`, `exceljs@4.4.0`, SheetJS CE `0.20.3`, reuse `chart.js@4.5.1`, `@formulajs/formulajs@4.6.1` exact. No Univer Pro, HyperFormula, AI, or auth/db.
+  - Scope: `src/tools/sheets/`, sheets catalog blurb, sheets unit/e2e, this TASK line, `HANDOFF.md`, `package.json` pin + lockfile. Do not overwrite other tools' task entries. Do not touch PR #33 / transcode.
 
 - **Markdown audit (2026-09-16)** — source highlighting, discoverable syntax guide, touch formatting/search, and draft/file race guards implemented. All 191 Markdown units pass after edits; UX/Mermaid checks passed in run 35144034742 and all 50 workflow checks passed in run 35144496126 at 007be946. Build and Pages deployment passed. Preview code-language coloring and dedicated delayed-I/O regression coverage remain open. Scope and remaining checks: `docs/markdown-audit-2026-09-16.md`.
 
