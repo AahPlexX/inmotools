@@ -3,7 +3,7 @@
 - **Tabular Sheet Workstation (TASK-022)** — PRODUCT CUT P1–P16 DONE. Sole writer on `feature/tabular-sheet-parity` (draft PR #71 only; CoS squash-merges; agent does not merge or mark ready; do not open a second PR; do not invent extra product scope). Do not shrink Insert Function to XLOOKUP-only.
   - Stage 1–3 and FEATURE_MATRIX 1–36 stay `done` historical. Approved milestone is CoS P1–P16 only. Protect sheet (PX) is leftover chrome, not in the approved 16.
   - Resume: `src/tools/sheets/HANDOFF.md`. Ledger: `src/tools/sheets/FEATURE_MATRIX.md` (1–36 `done` plus approved P1–P16). Exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Univer Pro pivots/drawing, HyperFormula, auth/db, FILTER/SORT/UNIQUE formulas.
-  - Tip SHA: `PLACEHOLDER_TIP_SHA` (update this line in the same cycle as any later push). Last focused-gate code: `c37fff4c1bdd98827266be6f6fd611901756e75e`.
+  - Tip SHA: `febf88c2a699f66f906cbdfd43e7ad92a0b554b0` (update this line in the same cycle as any later push). Last focused-gate code: `c37fff4c1bdd98827266be6f6fd611901756e75e`.
   - Sheets gates re-verified after `origin/main` fetch (merge-base already `95db6eec`; no rebase/conflicts): focused units 42/42; `pnpm build` pass; desktop-chromium 24 passed; P16 matrix 12/12. Do not claim the full Pages suite green.
   - Known out-of-suite CI reds (do not chase): web-layout-studio axe; svg-sprite-compiler axe; stale lazy chunk; Hardware Packet Inspector; GeoJSON Simplifier; Python re named groups; crystal-lattice-studio mobile.
   - P16 proof rule: device-agnostic CSS-width matrix in both orientations (320/360/390/412/430/768 portrait + 740/800/844/915/932/1024 landscape). iPhone 13 / `mobile-chromium` is not the sole mobile gate.

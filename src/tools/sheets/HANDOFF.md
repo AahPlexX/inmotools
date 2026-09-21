@@ -3,7 +3,7 @@
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Draft PR: https://github.com/AahPlexX/inmotools/pull/71 — `feature/tabular-sheet-parity` → `main` only. Do not open a second PR. Do not touch unrelated tools.
 
-**Tip SHA:** `PLACEHOLDER_TIP_SHA`  
+**Tip SHA:** `febf88c2a699f66f906cbdfd43e7ad92a0b554b0`  
 **Last focused-gate code:** `c37fff4c1bdd98827266be6f6fd611901756e75e`  
 **Workstream:** **PRODUCT CUT P1–P16 DONE.** Ready for CoS to undraft and squash-merge. CoS merges — the agent does not merge, mark ready, or open a second PR. Not an XLOOKUP-only cut. Do not invent extra product scope.
 
