@@ -7,20 +7,20 @@
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |
-| 1 | Versioned Multi-Tier Pitch & Ruleset Matrix | in-progress | `tactics-types.ts`, `pitch-engine.ts` planned foundation | RED contract being established; sourced specialty presets remain unimplemented. |
+| 1 | Versioned Multi-Tier Pitch & Ruleset Matrix | in-progress | `tactics-types.ts`, `pitch-engine.ts` | Generic editable 1v1/2v2/3v3/4v4/5v5/7v7/9v9/11v11 profile foundation exists; sourced specialty presets and profile UI remain. |
 | 2 | Grassroots Special-Line / Restart Overlay Engine | planned | — | — |
-| 3 | Dynamic Squad & Neutral-Player Scaler | planned | — | — |
-| 4 | Normalized `[0,1]` Tactical Coordinate System | in-progress | `tactics-types.ts`, `pitch-engine.ts` planned foundation | RED contract being established. |
-| 5 | Roster, Jersey, Role & Developmental Token Editor | planned | — | — |
+| 3 | Dynamic Squad & Neutral-Player Scaler | in-progress | `tactics-types.ts`, `editor-engine.ts` | Team/roster/token primitives support arbitrary roster growth; neutral/substitute/coach workflow and UI remain. |
+| 4 | Normalized `[0,1]` Tactical Coordinate System | in-progress | `tactics-types.ts`, `pitch-engine.ts`, `tactics-engine.ts` | Normalization, metre conversion, transforms, and validation exist for current spatial entities; full repository test/build evidence remains unavailable on this head. |
+| 5 | Roster, Jersey, Role & Developmental Token Editor | in-progress | `tactics-types.ts`, `editor-engine.ts` | Team/roster/player-token creation and scene/layer ownership exist; interactive editor, kit/status/avatar/development controls remain. |
 | 6 | Authored Ball Elevation & Trajectory Layer | planned | — | — |
-| 7 | Training Equipment & Prop Library | planned | — | — |
-| 8 | Precision Snapping & Tactical Guides | in-progress | `pitch-engine.ts` planned primitive | RED contract covers pure snapping; full UI integration not yet present. |
-| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` planned foundation | RED formation-count contract being established; no product UI yet. |
-| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` planned foundation | U.S. Soccer example provenance to be encoded; no product UI yet. |
-| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` planned foundation | Required common structures to be encoded as editable templates; no product UI yet. |
+| 7 | Training Equipment & Prop Library | in-progress | `tactics-types.ts`, `editor-engine.ts` | Validated scene/layer equipment placement primitive exists; full sourced prop catalog and transform UI remain. |
+| 8 | Precision Snapping & Tactical Guides | in-progress | `pitch-engine.ts` | Pure grid/guide snapping exists; board guides, teammate/equal-spacing assistance, and UI integration remain. |
+| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` | Editable starter templates exist for 3v3/4v4/5v5; custom authoring and product UI remain. |
+| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` | U.S. Soccer example templates are provenance-bearing recommendations; alternative/custom authoring and UI remain. |
+| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` | Required common 11v11 starter structures are encoded with count validation; custom authoring and UI remain. |
 | 12 | Phase-of-Play Formation Morphing | planned | — | — |
-| 13 | Mirror, Flip & Direction-of-Play Transform | in-progress | `pitch-engine.ts` planned primitive | RED coordinate-transform contract being established; temporal/project-wide transform not yet implemented. |
-| 14 | Formation Count & Restart Legality Validator | in-progress | `formation-engine.ts` planned count validator | Count/goalkeeper invariants in first slice; restart legality aid remains planned. |
+| 13 | Mirror, Flip & Direction-of-Play Transform | in-progress | `pitch-engine.ts` | Point-level horizontal/vertical transforms exist; whole-project/keyframe/vector transform remains. |
+| 14 | Formation Count & Restart Legality Validator | in-progress | `formation-engine.ts` | Team-size/goalkeeper/notation invariants exist; roster assignment and sourced restart legality aids remain. |
 | 15 | Set-Piece / Restart Template Builder | planned | — | — |
 | 16 | Multi-Track Timeline & Deterministic Playhead | planned | — | — |
 | 17 | Interactive Bézier Motion-Path Authoring | planned | — | — |
@@ -61,8 +61,8 @@
 | 52 | Context Menu + Explicit Touch Equivalent | planned | — | — |
 | 53 | Collision-Protected Tooltips & Help Reference | planned | — | — |
 | 54 | Keyboard Shortcut & Transport Engine | planned | — | — |
-| 55 | Layers, Selection, Grouping, Locking & Visibility | planned | — | — |
-| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | planned | — | — |
+| 55 | Layers, Selection, Grouping, Locking & Visibility | in-progress | `tactics-types.ts`, `editor-engine.ts` | Scene/layer ownership plus lock/visibility state primitives exist; selection, grouping, reorder, solo/focus UI remain. |
+| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | in-progress | `editor-engine.ts` | Immutable undo/redo history is bounded at 100 snapshots; autosave, named/recovery snapshots, persistence and crash recovery remain. |
 | 57 | Capability-Negotiated Local Video Export | planned | — | — |
 | 58 | Vector-First Coaching PDF / Contact-Sheet Publisher | planned | — | — |
 | 59 | Still, Social-Card & Standalone Playback Export | planned | — | — |
