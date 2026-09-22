@@ -4,8 +4,8 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Base `origin/main` SHA: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Tracked branch tip immediately before this handoff write: `7a36707909ab1ff9de1c5aa8ff31ba475e5ab2f9`
-- Milestone: Task 3 — immutable editor/history foundation and canonical scene/layer ownership
+- Tracked branch tip immediately before this handoff write: `12618365cc2e1b58ba0429cf110c95684c78a2e2`
+- Milestone: Task 3 — editor/history + deterministic SVG board/formation placement foundation
 - Verified functional features: **0/60**
 - Merge status: dedicated branch only; draft PR #76; not branch-complete; do not merge.
 
@@ -13,11 +13,11 @@ A committed file cannot literally contain its own final Git commit SHA because t
 
 ## Exact next sequential task
 
-Continue Task 3 with the smallest coherent 2D authoring vertical slice: create a standards-native SVG board/render primitive backed by the canonical project model, then accessible pointer + non-drag player movement, basic roster/formation placement, tactical arrow authoring, and vector diagram export. Do **not** register the catalog route until the beginner workflow can choose a pitch/team/formation, move a player, add an arrow, and export a real diagram without inert controls.
+Continue Task 3 by building the unregistered interactive surface on top of the completed pure primitives: `TacticalBoard.tsx` + `TacticalMatchboardWorkspace.tsx`, with pointer/touch selection, a single-pointer click-to-move path, explicit D-pad/numeric non-drag movement, formation placement using `materializeFormationPositions`, tactical arrow authoring, and SVG download using the shared renderer. Do **not** register the catalog route until the beginner workflow can choose a pitch/team/formation, move a player, add an arrow, and export a real diagram without inert controls.
 
 ## Active feature state
 
-In progress: 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 55, 56.
+In progress: 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 55, 56, 59.
 All other accepted features remain planned. No feature is verified.
 
 The current editor foundation now provides:
@@ -26,7 +26,9 @@ The current editor foundation now provides:
 - normalized-position guards at mutation boundaries;
 - explicit `sceneId + layerId` ownership for top-level spatial entities;
 - locked-layer write protection;
-- project validation that rejects missing scene/layer references.
+- project validation that rejects missing scene/layer references;
+- deterministic formation-to-normalized-position materialization with direction mirroring;
+- deterministic accessible SVG serialization preserving physical pitch aspect ratio, escaping user text, and respecting layer visibility.
 
 ## Files actively worked
 
@@ -39,7 +41,8 @@ The current editor foundation now provides:
 - `src/tools/tactics/FEATURE_MATRIX.md`
 - `src/tools/tactics/HANDOFF.md`
 - `.tasks/IN_PROGRESS.md`
-- Next: tactical SVG board/render surface and the minimal workspace vertical slice.
+- `src/tools/tactics/board-engine.ts`
+- Next: `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, and tool-scoped CSS/tests for the minimal unregistered workspace vertical slice.
 
 ## Validation evidence
 
