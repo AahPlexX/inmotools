@@ -274,6 +274,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
       id: 'orphan',
       playerId: 'missing',
       teamId: 'home',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
       position: { x: 0.5, y: 0.5 },
       rotationDeg: 0,
       visible: true,
@@ -306,7 +308,6 @@ describe('Tactical Matchboard immutable editor contracts', () => {
       position: { x: 0.25, y: 0.25 },
       rotationDeg: 0,
       scale: 1,
-      layerId: 'layer-1',
       visible: true,
       locked: false,
     });
