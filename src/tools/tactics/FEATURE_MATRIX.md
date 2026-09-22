@@ -4,6 +4,7 @@
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 0/60
+**Current executable evidence:** focused tactical unit suite passed 22/22 at source/docs SHA `7707b8102699e05841fa8a26f8e42315fa000e87`; production TypeScript/Vite build evidence remains open because the verification host's nested bare `pnpm` resolved to 11.24.0 instead of the repo-required 12.3.4 and the follow-up exact-Corepack build session became unreadable before its result was captured.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |
