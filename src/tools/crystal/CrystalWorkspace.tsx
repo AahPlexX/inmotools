@@ -1,5 +1,6 @@
 import { type ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { consumeFileInput } from '../../lib/file-input';
+import CrystalDiffractionPanel from './CrystalDiffractionPanel';
 import CrystalEnvironmentPanel from './CrystalEnvironmentPanel';
 import CrystalExportDialog from './CrystalExportDialog';
 import CrystalMetadataDialog from './CrystalMetadataDialog';
@@ -271,6 +272,8 @@ export default function CrystalWorkspace() {
       <CrystalModelBuilderPanel history={history} onHistoryChange={handleHistoryChange} />
 
       <CrystalSymmetryPanel document={document} history={history} onHistoryChange={handleHistoryChange} />
+
+      <CrystalDiffractionPanel document={document} />
     </div>
   );
 }
