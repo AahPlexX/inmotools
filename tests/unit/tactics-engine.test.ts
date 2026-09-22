@@ -410,10 +410,9 @@ describe('Tactical Matchboard SVG board contracts', () => {
     const svg = serializeTacticalBoardSvg(populatedProject(), 'scene-1');
 
     expect(svg).toContain('viewBox="0 0 1000 647.619"');
-    expect(svg).toContain('<title>Build &amp; press &lt;session&gt;</title>');
+    expect(svg).toContain('>Build &amp; press &lt;session&gt;</title>');
     expect(svg).toContain('id="token-p9"');
-    expect(svg).toContain('cx="500"');
-    expect(svg).toContain('cy="323.81"');
+    expect(svg).toContain('transform="translate(500 323.81) rotate(0)"');
     expect(svg).toContain('tactical-arrowhead');
     expect(svg).toContain('Player &lt;9&gt;');
     expect(svg).not.toContain('<script');
