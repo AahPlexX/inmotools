@@ -33,13 +33,29 @@ import {
   normalizedToMeters,
   snapNormalizedPoint,
   trainingFormatProfiles,
+  transformTacticalProject,
 } from '../../src/tools/tactics/pitch-engine';
 import {
+  createCustomFormationTemplate,
+  captureFormationPhase,
   FORMATION_TEMPLATES,
   getFormationTemplate,
   materializeFormationPositions,
+  morphFormationPhases,
+  reviewFormationLegality,
   validateFormationTemplate,
 } from '../../src/tools/tactics/formation-engine';
+import {
+  PITCH_RULE_PROFILES,
+  applyPitchRuleProfile,
+  createCustomPitchRuleProfile,
+  getPitchRuleProfile,
+} from '../../src/tools/tactics/rules-engine';
+import {
+  RESTART_TEMPLATES,
+  applyRestartTemplate,
+  createCustomRestartTemplate,
+} from '../../src/tools/tactics/restart-engine';
 
 describe('Tactical Matchboard foundation contracts', () => {
   it('keeps canonical pitch coordinates normalized and round-trips physical metres', () => {
@@ -148,6 +164,208 @@ describe('Tactical Matchboard foundation contracts', () => {
       expect(template?.provenance?.authoritative).toBe(false);
       expect(template?.provenance?.sourceDate).toBe('2026-09-21');
     }
+  });
+
+  it('keeps governing pitch profiles provenance-bearing and custom profiles editable', () => {
+    const ifab = getPitchRuleProfile('ifab-11v11-international-2026-27');
+    expect(ifab).toMatchObject({
+      teamSize: 11,
+      editable: false,
+      dimensions: { lengthMeters: 105, widthMeters: 68 },
+      dimensionRange: {
+        minLengthMeters: 100,
+        maxLengthMeters: 110,
+        minWidthMeters: 64,
+        maxWidthMeters: 75,
+      },
+      goalDimensions: { widthMeters: 7.32, heightMeters: 2.44 },
+      provenance: {
+        kind: 'governing-source',
+        authoritative: true,
+        organization: 'The IFAB',
+        sourceVersion: '2026/27',
+      },
+    });
+    expect(PITCH_RULE_PROFILES.some((profile) => profile.format === 'futsal')).toBe(true);
+
+    const custom = createCustomPitchRuleProfile({
+      id: '  academy-6v6  ',
+      label: ' Academy 6v6 ',
+      format: '6v6',
+      teamSize: 6,
+      dimensions: { lengthMeters: 48, widthMeters: 32 },
+      specialLines: [' Build-out line ', 'Build-out line'],
+      restartNotes: [' Retreat to the build-out line. '],
+    });
+    expect(custom).toMatchObject({
+      id: 'academy-6v6',
+      label: 'Academy 6v6',
+      editable: true,
+      provenance: { kind: 'custom', authoritative: false },
+    });
+    expect(custom.specialLines).toEqual(['Build-out line']);
+    expect(() => createCustomPitchRuleProfile({
+      id: 'bad',
+      label: 'Bad',
+      format: '0v0',
+      teamSize: 0,
+      dimensions: { lengthMeters: 0, widthMeters: 20 },
+    })).toThrow(/team size|pitch length/i);
+  });
+
+  it('applies pitch profiles with deterministic normalized specialty overlays', () => {
+    const project = applyPitchRuleProfile(createStarterTacticalProject(), 'ifab-11v11-international-2026-27');
+    expect(project.ruleset.id).toBe('ifab-11v11-international-2026-27');
+    expect(project.pitch.profileId).toBe(project.ruleset.id);
+    expect(project.pitch.dimensions).toEqual({ lengthMeters: 105, widthMeters: 68 });
+    expect(project.pitch.overlays.map((overlay) => overlay.id)).toEqual([
+      'ifab-halfway-line',
+      'ifab-left-penalty-area',
+      'ifab-right-penalty-area',
+    ]);
+    expect(project.pitch.overlays.every((overlay) => overlay.points.every((point) => (
+      point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
+    )))).toBe(true);
+    expect(validateTacticalProject(project)).toEqual([]);
+  });
+
+  it('mirrors the complete authored board while preserving the prior project', () => {
+    const start = applyRestartTemplate(
+      buildBeginnerTacticalProject({
+        title: 'Transform board',
+        teamName: 'Blue',
+        primaryColor: '#154c79',
+        secondaryColor: '#ffffff',
+        formationId: 'ussf-4v4-1-2-1',
+        pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+        direction: 'left-to-right',
+      }),
+      'scene-1',
+      'layer-1',
+      'tool-corner-left',
+    );
+    const mirrored = transformTacticalProject(start, 'horizontal');
+    expect(mirrored.pitch.direction).toBe('right-to-left');
+    expect(mirrored.playerTokens[0]?.position.x).toBeCloseTo(1 - start.playerTokens[0]!.position.x, 12);
+    expect(mirrored.ball.position).toEqual({ x: 0.98, y: 0.02 });
+    expect(mirrored.annotations[0]?.points[0]).toEqual({ x: 0.98, y: 0.02 });
+    expect(start.pitch.direction).toBe('left-to-right');
+    expect(start.ball.position).toEqual({ x: 0.02, y: 0.02 });
+    expect(validateTacticalProject(mirrored)).toEqual([]);
+  });
+
+  it('captures and deterministically morphs editable formation phases', () => {
+    const start = buildBeginnerTacticalProject({
+      title: 'Phase morph',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const token = start.playerTokens[0]!;
+    const withBase = captureFormationPhase(start, {
+      id: 'phase-base',
+      label: 'Base shape',
+      teamId: token.teamId,
+      timeMs: 0,
+    });
+    const moved = movePlayerToken(withBase, token.id, { x: 0.8, y: 0.2 });
+    const withTarget = captureFormationPhase(moved, {
+      id: 'phase-target',
+      label: 'Pressing shape',
+      teamId: token.teamId,
+      timeMs: 1_000,
+    });
+    const morphed = morphFormationPhases(withTarget, 'phase-base', 'phase-target', 0.5);
+    expect(morphed.playerTokens[0]?.position).toEqual({
+      x: Number(((token.position.x + 0.8) / 2).toFixed(12)),
+      y: Number(((token.position.y + 0.2) / 2).toFixed(12)),
+    });
+    expect(withTarget.formationStates).toHaveLength(2);
+    expect(() => morphFormationPhases(withTarget, 'phase-base', 'phase-target', 1.1)).toThrow(/progress/i);
+  });
+
+  it('authors custom formations and reports assignment legality without claiming a governing decision', () => {
+    const formation = createCustomFormationTemplate({
+      id: 'academy-8v8',
+      label: 'Academy 8v8',
+      teamSize: 8,
+      goalkeepers: 1,
+      outfieldLines: [3, 3, 1],
+    });
+    expect(formation).toMatchObject({
+      notation: '1-3-3-1',
+      notationIncludesGoalkeeper: true,
+      provenance: { kind: 'custom', authoritative: false },
+    });
+    expect(validateFormationTemplate(formation)).toEqual([]);
+    const customProject = buildBeginnerTacticalProject({
+      title: 'Custom formation',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: formation.id,
+      pitchDimensions: { lengthMeters: 70, widthMeters: 50 },
+      direction: 'left-to-right',
+    }, formation);
+    expect(customProject.playerTokens).toHaveLength(8);
+    expect(customProject.ruleset.teamSize).toBe(8);
+    expect(() => createCustomFormationTemplate({
+      id: 'bad',
+      label: 'Bad',
+      teamSize: 8,
+      goalkeepers: 1,
+      outfieldLines: [3, 3],
+    })).toThrow(/player total/i);
+
+    const project = buildBeginnerTacticalProject({
+      title: 'Legality aid',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-7v7-1-3-2-1',
+      pitchDimensions: { lengthMeters: 60, widthMeters: 40 },
+      direction: 'left-to-right',
+    });
+    expect(reviewFormationLegality(project, getFormationTemplate('ussf-7v7-1-3-2-1')!)).toEqual([]);
+    expect(reviewFormationLegality({ ...project, playerTokens: project.playerTokens.slice(1) }, getFormationTemplate('ussf-7v7-1-3-2-1')!))
+      .toContainEqual(expect.stringMatching(/expects 7 placed players/i));
+  });
+
+  it('applies provenance-bearing restart templates without mutating the prior project', () => {
+    const start = createStarterTacticalProject();
+    const corner = RESTART_TEMPLATES.find((template) => template.id === 'tool-corner-left');
+    expect(corner).toMatchObject({ provenance: { authoritative: false } });
+    const applied = applyRestartTemplate(start, 'scene-1', 'layer-1', 'tool-corner-left');
+    expect(start.annotations).toEqual([]);
+    expect(start.ball.position).toEqual({ x: 0.5, y: 0.5 });
+    expect(applied.ball.position).toEqual({ x: 0.02, y: 0.02 });
+    expect(applied.annotations).toContainEqual(expect.objectContaining({
+      kind: 'restart-guide',
+      label: 'Corner attacking route',
+    }));
+    expect(validateTacticalProject(applied)).toEqual([]);
+
+    const custom = createCustomRestartTemplate({
+      id: 'academy-goal-kick',
+      label: 'Academy goal-kick build',
+      kind: 'goal-kick',
+      ballPosition: { x: 0.08, y: 0.5 },
+      guideLabel: 'Build-out route',
+      guidePoints: [{ x: 0.08, y: 0.5 }, { x: 0.3, y: 0.25 }],
+    });
+    expect(custom.provenance).toMatchObject({ kind: 'custom', authoritative: false });
+    expect(applyRestartTemplate(start, 'scene-1', 'layer-1', custom).annotations[0]?.label).toBe('Build-out route');
+    expect(() => createCustomRestartTemplate({
+      id: 'bad',
+      label: 'Bad',
+      kind: 'free-kick',
+      ballPosition: { x: -0.1, y: 0.5 },
+      guideLabel: 'Bad route',
+      guidePoints: [{ x: 0.2, y: 0.2 }],
+    })).toThrow(/normalized|two points/i);
   });
 
   it('rejects out-of-range coordinates across pitch overlays and annotations', () => {

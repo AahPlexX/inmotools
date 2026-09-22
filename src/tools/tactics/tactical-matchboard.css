@@ -31,6 +31,7 @@
 }
 
 .tactical-setup-grid label,
+.tactical-authoring-grid label,
 .tactical-arrow-label,
 .tactical-coordinate-form label {
   display: grid;
@@ -45,7 +46,11 @@
 .tactical-coordinate-form button,
 .tactical-command-bar button,
 .tactical-player-list button,
-.tactical-dpad button {
+.tactical-dpad button,
+.tactical-authoring-grid input,
+.tactical-authoring-grid select,
+.tactical-authoring-grid textarea,
+.tactical-authoring-grid button {
   min-height: 44px;
 }
 
@@ -58,6 +63,47 @@
   display: grid;
   align-content: end;
   gap: 6px;
+}
+
+.tactical-authoring-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+
+.tactical-authoring-grid > section,
+.tactical-authoring-grid > form {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 10px;
+}
+
+.tactical-authoring-grid h3,
+.tactical-authoring-grid p {
+  margin: 0;
+}
+
+.tactical-authoring-grid textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.tactical-authoring-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tactical-phase-form {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #cbd5e1);
 }
 
 .tactical-command-bar {

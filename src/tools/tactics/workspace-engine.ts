@@ -1,8 +1,8 @@
 import { addAnnotation, addPlayerToken, addRosterPlayer, addTeam } from './editor-engine';
 import { getFormationTemplate, materializeFormationPositions } from './formation-engine';
-import { createNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
+import { createNormalizedPoint, createTrainingFormatProfile, trainingFormatProfiles } from './pitch-engine';
 import { createStarterTacticalProject } from './tactics-engine';
-import type { NormalizedPoint, PitchDimensions, TacticalProject } from './tactics-types';
+import type { FormationTemplate, NormalizedPoint, PitchDimensions, TacticalProject } from './tactics-types';
 
 export interface BeginnerTacticalProjectOptions {
   title: string;
@@ -38,8 +38,8 @@ function clampUnit(value: number): number {
 }
 
 function cloneRulesetForTeamSize(teamSize: number): TacticalProject['ruleset'] {
-  const source = trainingFormatProfiles.find((profile) => profile.teamSize === teamSize);
-  if (!source) throw new Error(`No editable training ruleset exists for ${teamSize}v${teamSize}.`);
+  const source = trainingFormatProfiles.find((profile) => profile.teamSize === teamSize)
+    ?? createTrainingFormatProfile(teamSize);
   return {
     ...source,
     provenance: { ...source.provenance },
@@ -103,8 +103,11 @@ export function nudgeNormalizedPoint(
 
 export function buildBeginnerTacticalProject(
   options: BeginnerTacticalProjectOptions,
+  customFormation?: FormationTemplate,
 ): TacticalProject {
-  const formation = getFormationTemplate(options.formationId);
+  const formation = customFormation?.id === options.formationId
+    ? customFormation
+    : getFormationTemplate(options.formationId);
   if (!formation) throw new Error(`Formation "${options.formationId}" does not exist.`);
 
   const pitchDimensions = {

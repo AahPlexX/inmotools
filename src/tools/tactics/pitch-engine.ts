@@ -2,6 +2,7 @@ import type {
   NormalizedPoint,
   PitchDimensions,
   PitchRuleProfile,
+  TacticalProject,
 } from './tactics-types';
 
 function assertFinitePositive(value: number, label: string): void {
@@ -130,7 +131,10 @@ export function snapNormalizedPoint(point: NormalizedPoint, options: SnapOptions
   };
 }
 
-function trainingProfile(teamSize: number): PitchRuleProfile {
+export function createTrainingFormatProfile(teamSize: number): PitchRuleProfile {
+  if (!Number.isInteger(teamSize) || teamSize < 1) {
+    throw new RangeError('Training format team size must be a positive integer.');
+  }
   return {
     id: `training-${teamSize}v${teamSize}`,
     label: `${teamSize}v${teamSize} training format`,
@@ -147,4 +151,70 @@ function trainingProfile(teamSize: number): PitchRuleProfile {
   };
 }
 
-export const trainingFormatProfiles: PitchRuleProfile[] = [1, 2, 3, 4, 5, 7, 9, 11].map(trainingProfile);
+export const trainingFormatProfiles: PitchRuleProfile[] = [1, 2, 3, 4, 5, 7, 9, 11].map(createTrainingFormatProfile);
+
+export type TacticalProjectTransform = 'horizontal' | 'vertical';
+
+export function transformTacticalProject(
+  project: TacticalProject,
+  transform: TacticalProjectTransform,
+): TacticalProject {
+  const point = transform === 'horizontal' ? mirrorHorizontal : mirrorVertical;
+  const rotation = (value: number) => transform === 'horizontal' ? 180 - value : -value;
+  return {
+    ...project,
+    pitch: {
+      ...project.pitch,
+      direction: transform === 'horizontal'
+        ? project.pitch.direction === 'left-to-right' ? 'right-to-left' : 'left-to-right'
+        : project.pitch.direction,
+      overlays: project.pitch.overlays.map((overlay) => ({
+        ...overlay,
+        points: overlay.points.map(point),
+        provenance: overlay.provenance ? { ...overlay.provenance } : undefined,
+      })),
+    },
+    playerTokens: project.playerTokens.map((token) => ({
+      ...token,
+      position: point(token.position),
+      rotationDeg: rotation(token.rotationDeg),
+    })),
+    officials: project.officials.map((official) => ({ ...official, position: point(official.position) })),
+    equipment: project.equipment.map((item) => ({
+      ...item,
+      position: point(item.position),
+      rotationDeg: rotation(item.rotationDeg),
+    })),
+    scenes: project.scenes.map((scene) => ({
+      ...scene,
+      objects: scene.objects.map((object) => ({
+        ...object,
+        position: point(object.position),
+        rotationDeg: rotation(object.rotationDeg),
+      })),
+    })),
+    formationStates: project.formationStates.map((state) => ({
+      ...state,
+      playerPositions: Object.fromEntries(
+        Object.entries(state.playerPositions).map(([id, position]) => [id, point(position)]),
+      ),
+    })),
+    ball: { ...project.ball, position: point(project.ball.position) },
+    annotations: project.annotations.map((annotation) => ({
+      ...annotation,
+      points: annotation.points.map(point),
+      provenance: annotation.provenance ? { ...annotation.provenance } : undefined,
+    })),
+    timeline: {
+      ...project.timeline,
+      tracks: project.timeline.tracks.map((track) => ({
+        ...track,
+        keyframes: track.keyframes.map((keyframe) => ({
+          ...keyframe,
+          position: keyframe.position ? point(keyframe.position) : undefined,
+          rotationDeg: keyframe.rotationDeg === undefined ? undefined : rotation(keyframe.rotationDeg),
+        })),
+      })),
+    },
+  };
+}

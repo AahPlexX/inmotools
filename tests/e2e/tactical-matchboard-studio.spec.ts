@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 const board = (page: Page) => page.locator('.tactical-board');
+const setupPanel = (page: Page) => page.locator('.tactical-setup').first();
+const coordinateInput = (page: Page, axis: 'X' | 'Y') => page.getByLabel(`${axis} %`, { exact: true });
 
 async function clickBoard(page: Page, xRatio: number, yRatio: number) {
   const surface = board(page);
@@ -51,9 +53,9 @@ test('catalog route exposes the local tactical workspace', async ({ page }) => {
 });
 
 test('builds a formation and supports click, D-pad, and exact player movement', async ({ page }) => {
-  await page.getByLabel('Formation').selectOption('ussf-4v4-1-2-1');
-  await page.getByLabel('Pitch length (m)').fill('40');
-  await page.getByLabel('Pitch width (m)').fill('30');
+  await setupPanel(page).getByRole('combobox', { name: /Formation/ }).selectOption('ussf-4v4-1-2-1');
+  await setupPanel(page).getByLabel('Pitch length (m)').fill('40');
+  await setupPanel(page).getByLabel('Pitch width (m)').fill('30');
   await page.getByRole('button', { name: 'Build board' }).click();
 
   await expect(page.locator('.tactical-player-list button')).toHaveCount(4);
@@ -62,19 +64,19 @@ test('builds a formation and supports click, D-pad, and exact player movement', 
 
   await page.locator('.tactical-player-list button').first().click();
   await clickBoard(page, 0.6, 0.4);
-  const clickX = Number(await page.getByLabel('X %').inputValue());
-  const clickY = Number(await page.getByLabel('Y %').inputValue());
+  const clickX = Number(await coordinateInput(page, 'X').inputValue());
+  const clickY = Number(await coordinateInput(page, 'Y').inputValue());
   expect(clickX).toBeCloseTo(60, 0);
   expect(clickY).toBeCloseTo(40, 0);
 
   await page.getByRole('button', { name: 'Move player right' }).click();
-  await expect.poll(async () => Number(await page.getByLabel('X %').inputValue())).toBeCloseTo(clickX + 2, 1);
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(clickX + 2, 1);
 
-  await page.getByLabel('X %').fill('25');
-  await page.getByLabel('Y %').fill('75');
+  await coordinateInput(page, 'X').fill('25');
+  await coordinateInput(page, 'Y').fill('75');
   await page.getByRole('button', { name: 'Set position' }).click();
-  await expect(page.getByLabel('X %')).toHaveValue('25.0');
-  await expect(page.getByLabel('Y %')).toHaveValue('75.0');
+  await expect(coordinateInput(page, 'X')).toHaveValue('25.0');
+  await expect(coordinateInput(page, 'Y')).toHaveValue('75.0');
 });
 
 test('authors an arrow and supports undo and redo', async ({ page }) => {
@@ -108,8 +110,8 @@ test('touch pointer selection and movement use the same non-drag workflow', asyn
   await dispatchTouchPoint(page, 'player');
   await expect(page.locator('.tactical-board')).toHaveAttribute('data-selected-token', 'token-1');
   await dispatchTouchPoint(page, 'board', 0.72, 0.28);
-  await expect(page.getByLabel('X %')).toHaveValue('72.0');
-  await expect(page.getByLabel('Y %')).toHaveValue('28.0');
+  await expect(coordinateInput(page, 'X')).toHaveValue('72.0');
+  await expect(coordinateInput(page, 'Y')).toHaveValue('28.0');
 });
 
 test('keyboard activation covers selection and precision movement without dragging', async ({ page }) => {
@@ -118,25 +120,70 @@ test('keyboard activation covers selection and precision movement without draggi
   await page.keyboard.press('Enter');
   await expect(firstPlayer).toHaveAttribute('aria-pressed', 'true');
 
-  const initialX = Number(await page.getByLabel('X %').inputValue());
+  const initialX = Number(await coordinateInput(page, 'X').inputValue());
   const moveRight = page.getByRole('button', { name: 'Move player right' });
   await moveRight.focus();
   await page.keyboard.press('Space');
-  await expect.poll(async () => Number(await page.getByLabel('X %').inputValue())).toBeCloseTo(initialX + 2, 1);
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(initialX + 2, 1);
 
-  await page.getByLabel('X %').focus();
+  await coordinateInput(page, 'X').focus();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('31');
-  await page.getByLabel('Y %').focus();
+  await coordinateInput(page, 'Y').focus();
   await page.keyboard.press('Control+A');
   await page.keyboard.type('64');
   await page.keyboard.press('Enter');
-  await expect(page.getByLabel('X %')).toHaveValue('31.0');
-  await expect(page.getByLabel('Y %')).toHaveValue('64.0');
+  await expect(coordinateInput(page, 'X')).toHaveValue('31.0');
+  await expect(coordinateInput(page, 'Y')).toHaveValue('64.0');
+});
+
+test('authors rules, formations, transforms, legality aids, and restart starters', async ({ page }) => {
+  await page.getByText('Rules, formations & restarts', { exact: true }).click();
+
+  await page.getByRole('combobox', { name: /Rules profile/ }).selectOption('ifab-11v11-international-2026-27');
+  await page.getByRole('button', { name: 'Apply rules profile' }).click();
+  await expect(page.locator('#ifab-left-penalty-area')).toHaveCount(1);
+  await expect(page.locator('#ifab-right-penalty-area')).toHaveCount(1);
+
+  const beforeMirror = Number(await coordinateInput(page, 'X').inputValue());
+  await page.getByRole('button', { name: 'Mirror direction' }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(100 - beforeMirror, 1);
+
+  await page.getByRole('combobox', { name: /Restart starter/ }).selectOption('tool-corner-left');
+  await page.getByRole('button', { name: 'Apply restart starter' }).click();
+  await expect(page.locator('[data-annotation-kind="restart-guide"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Author restart template' }).click();
+  await expect(page.getByRole('combobox', { name: /Restart starter/ })).toHaveValue('academy-goal-kick');
+  await page.getByRole('button', { name: 'Apply restart starter' }).click();
+  await expect(page.locator('[data-annotation-kind="restart-guide"]')).toHaveCount(2);
+
+  await page.getByRole('button', { name: 'Author formation' }).click();
+  await expect(setupPanel(page).getByRole('combobox', { name: /Formation/ })).toHaveValue('academy-8v8');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(page.locator('.tactical-player-list button')).toHaveCount(8);
+  await expect(page.locator('.status-line').last()).toContainText('Built 8v8 board with 8 placed players');
+
+  await page.getByRole('button', { name: 'Capture formation phase' }).click();
+  await coordinateInput(page, 'X').fill('80');
+  await coordinateInput(page, 'Y').fill('20');
+  await page.getByRole('button', { name: 'Set position' }).click();
+  await page.getByLabel('Phase label').fill('Pressing shape');
+  await page.getByRole('button', { name: 'Capture formation phase' }).click();
+  await expect(page.getByRole('combobox', { name: 'From phase' })).toHaveValue('phase-1');
+  await expect(page.getByRole('combobox', { name: 'To phase' })).toHaveValue('phase-2');
+  await page.getByRole('button', { name: 'Preview phase morph' }).click();
+  await expect(coordinateInput(page, 'X')).toHaveValue('44.0');
+  await expect(coordinateInput(page, 'Y')).toHaveValue('35.0');
+
+  await page.getByRole('button', { name: 'Author and apply rules' }).click();
+  await expect(page.locator('#custom-left-build-out-line')).toHaveCount(1);
+  await expect(page.locator('#custom-right-build-out-line')).toHaveCount(1);
+  await expect(page.locator('.status-line').last()).toContainText('Custom rules profile authored and applied locally');
 });
 
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
+  await page.getByText('Rules, formations & restarts', { exact: true }).click();
   const results = await new AxeBuilder({ page })
     .include('[data-testid="suite-workspace"]')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -159,6 +206,7 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('./#/tools/tactical-matchboard-studio');
     await expect(page.locator('.tactical-board')).toBeVisible();
+    await page.getByText('Rules, formations & restarts', { exact: true }).click();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${viewport.name} document overflow`).toBeLessThanOrEqual(1);
@@ -169,6 +217,10 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
       '.tactical-player-list button',
       '.tactical-dpad button',
       '.tactical-coordinate-form button',
+      '.tactical-authoring-grid input',
+      '.tactical-authoring-grid select',
+      '.tactical-authoring-grid textarea',
+      '.tactical-authoring-grid button',
     ].join(', ')).evaluateAll((elements) => elements
       .filter((element) => {
         const rect = element.getBoundingClientRect();

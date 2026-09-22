@@ -29,6 +29,12 @@ export interface PitchRuleProfile {
   editable: boolean;
   ageGroup?: string;
   dimensions?: PitchDimensions;
+  dimensionRange?: {
+    minLengthMeters: number;
+    maxLengthMeters: number;
+    minWidthMeters: number;
+    maxWidthMeters: number;
+  };
   goalDimensions?: { widthMeters: number; heightMeters: number };
   goalkeeperStatus?: 'included' | 'excluded' | 'optional';
   specialLines?: string[];
@@ -227,6 +233,7 @@ export interface TacticalAnnotation {
   points: NormalizedPoint[];
   startMs?: number;
   endMs?: number;
+  provenance?: SourceProvenance;
 }
 
 export interface CameraState {

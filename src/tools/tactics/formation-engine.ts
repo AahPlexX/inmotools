@@ -1,4 +1,5 @@
-import type { FormationTemplate, SourceProvenance } from './tactics-types';
+import type { FormationTemplate, SourceProvenance, TacticalProject } from './tactics-types';
+import { createNormalizedPoint } from './pitch-engine';
 
 const US_SOCCER_FORMATION_SOURCE: SourceProvenance = {
   kind: 'recommendation',
@@ -90,6 +91,138 @@ export function validateFormationTemplate(templateToValidate: FormationTemplate)
   }
 
   return errors;
+}
+
+export interface CustomFormationInput {
+  id: string;
+  label: string;
+  teamSize: number;
+  goalkeepers: number;
+  outfieldLines: number[];
+}
+
+export function createCustomFormationTemplate(input: CustomFormationInput): FormationTemplate {
+  const id = input.id.trim();
+  const label = input.label.trim();
+  if (!id) throw new Error('Formation id is required.');
+  if (!label) throw new Error('Formation label is required.');
+  const notationIncludesGoalkeeper = input.goalkeepers > 0;
+  const formation: FormationTemplate = {
+    id,
+    label,
+    teamSize: input.teamSize,
+    goalkeepers: input.goalkeepers,
+    outfieldLines: [...input.outfieldLines],
+    notation: (notationIncludesGoalkeeper
+      ? [input.goalkeepers, ...input.outfieldLines]
+      : input.outfieldLines).join('-'),
+    notationIncludesGoalkeeper,
+    provenance: {
+      kind: 'custom',
+      authoritative: false,
+      sourceTitle: 'User-authored formation',
+      note: 'Editable formation authored in Tactical Matchboard Studio.',
+    },
+  };
+  const errors = validateFormationTemplate(formation);
+  if (errors.length) throw new Error(errors.join(' '));
+  return formation;
+}
+
+export function reviewFormationLegality(
+  project: TacticalProject,
+  formation: FormationTemplate,
+): string[] {
+  const issues = validateFormationTemplate(formation);
+  const visibleTokens = project.playerTokens.filter((token) => token.visible);
+  if (visibleTokens.length !== formation.teamSize) {
+    issues.push(`Formation expects ${formation.teamSize} placed players; the board has ${visibleTokens.length}.`);
+  }
+  if (project.ruleset.teamSize !== formation.teamSize) {
+    issues.push(`Rules profile expects ${project.ruleset.teamSize} players while the formation expects ${formation.teamSize}.`);
+  }
+  const assignedPlayers = visibleTokens.map((token) => `${token.teamId}:${token.playerId}`);
+  if (new Set(assignedPlayers).size !== assignedPlayers.length) {
+    issues.push('A roster player is assigned to more than one visible token.');
+  }
+  const goalkeeperCount = visibleTokens.filter((token) => {
+    const team = project.teams.find((candidate) => candidate.id === token.teamId);
+    const player = team?.roster.find((candidate) => candidate.id === token.playerId);
+    return player?.role?.toLocaleLowerCase() === 'goalkeeper';
+  }).length;
+  if (goalkeeperCount !== formation.goalkeepers) {
+    issues.push(`Formation expects ${formation.goalkeepers} goalkeeper${formation.goalkeepers === 1 ? '' : 's'}; the board has ${goalkeeperCount}.`);
+  }
+  return issues;
+}
+
+export interface CaptureFormationPhaseInput {
+  id: string;
+  label: string;
+  teamId: string;
+  timeMs: number;
+}
+
+export function captureFormationPhase(
+  project: TacticalProject,
+  input: CaptureFormationPhaseInput,
+): TacticalProject {
+  const id = input.id.trim();
+  const label = input.label.trim();
+  if (!id) throw new Error('Formation phase id is required.');
+  if (!label) throw new Error('Formation phase label is required.');
+  if (!Number.isInteger(input.timeMs) || input.timeMs < 0) {
+    throw new RangeError('Formation phase time must be a non-negative integer number of milliseconds.');
+  }
+  if (!project.teams.some((team) => team.id === input.teamId)) {
+    throw new Error(`Team "${input.teamId}" does not exist.`);
+  }
+  const tokens = project.playerTokens.filter((token) => token.teamId === input.teamId);
+  if (!tokens.length) throw new Error(`Team "${input.teamId}" has no placed players to capture.`);
+  const phase = {
+    id,
+    label,
+    teamId: input.teamId,
+    timeMs: input.timeMs,
+    playerPositions: Object.fromEntries(tokens.map((token) => [
+      token.id,
+      createNormalizedPoint(token.position.x, token.position.y),
+    ])),
+  };
+  return {
+    ...project,
+    formationStates: [...project.formationStates.filter((state) => state.id !== id), phase],
+  };
+}
+
+export function morphFormationPhases(
+  project: TacticalProject,
+  fromId: string,
+  toId: string,
+  progress: number,
+): TacticalProject {
+  if (!Number.isFinite(progress) || progress < 0 || progress > 1) {
+    throw new RangeError('Formation morph progress must be within [0, 1].');
+  }
+  const from = project.formationStates.find((state) => state.id === fromId);
+  const to = project.formationStates.find((state) => state.id === toId);
+  if (!from || !to) throw new Error('Both formation phases must exist before morphing.');
+  if (from.teamId !== to.teamId) throw new Error('Formation phases must belong to the same team.');
+  return {
+    ...project,
+    playerTokens: project.playerTokens.map((token) => {
+      const start = from.playerPositions[token.id];
+      const end = to.playerPositions[token.id];
+      if (token.teamId !== from.teamId || !start || !end) return token;
+      return {
+        ...token,
+        position: createNormalizedPoint(
+          start.x + (end.x - start.x) * progress,
+          start.y + (end.y - start.y) * progress,
+        ),
+      };
+    }),
+  };
 }
 
 

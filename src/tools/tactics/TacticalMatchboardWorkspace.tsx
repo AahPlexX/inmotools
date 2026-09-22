@@ -9,8 +9,27 @@ import {
   redoTacticalProject,
   undoTacticalProject,
 } from './editor-engine';
-import { FORMATION_TEMPLATES, getFormationTemplate } from './formation-engine';
-import type { NormalizedPoint, TacticalProject } from './tactics-types';
+import {
+  captureFormationPhase,
+  createCustomFormationTemplate,
+  FORMATION_TEMPLATES,
+  getFormationTemplate,
+  morphFormationPhases,
+  reviewFormationLegality,
+} from './formation-engine';
+import { transformTacticalProject } from './pitch-engine';
+import {
+  PITCH_RULE_PROFILES,
+  applyPitchRuleProfile,
+  createCustomPitchRuleProfile,
+} from './rules-engine';
+import {
+  RESTART_TEMPLATES,
+  applyRestartTemplate,
+  createCustomRestartTemplate,
+  type RestartTemplate,
+} from './restart-engine';
+import type { FormationTemplate, NormalizedPoint, PitchRuleProfile, TacticalProject } from './tactics-types';
 import {
   addTacticalArrow,
   buildBeginnerTacticalProject,
@@ -42,7 +61,7 @@ const INITIAL_SETUP: SetupState = {
   direction: 'left-to-right',
 };
 
-function projectFromSetup(setup: SetupState): TacticalProject {
+function projectFromSetup(setup: SetupState, formation?: FormationTemplate): TacticalProject {
   return buildBeginnerTacticalProject({
     title: setup.title,
     teamName: setup.teamName,
@@ -54,7 +73,7 @@ function projectFromSetup(setup: SetupState): TacticalProject {
       widthMeters: Number(setup.widthMeters),
     },
     direction: setup.direction,
-  });
+  }, formation);
 }
 
 function errorMessage(error: unknown): string {
@@ -78,15 +97,37 @@ export default function TacticalMatchboardWorkspace() {
   const [mode, setMode] = useState<InteractionMode>('move');
   const [arrowStart, setArrowStart] = useState<NormalizedPoint | null>(null);
   const [arrowLabel, setArrowLabel] = useState('');
+  const [customFormations, setCustomFormations] = useState<FormationTemplate[]>([]);
+  const [customProfiles, setCustomProfiles] = useState<PitchRuleProfile[]>([]);
+  const [customRestarts, setCustomRestarts] = useState<RestartTemplate[]>([]);
+  const [activeFormation, setActiveFormation] = useState(() => getFormationTemplate(INITIAL_SETUP.formationId)!);
+  const [rulesProfileId, setRulesProfileId] = useState('training-7v7');
+  const [restartTemplateId, setRestartTemplateId] = useState(RESTART_TEMPLATES[0]!.id);
+  const [phaseLabel, setPhaseLabel] = useState('Base shape');
+  const [phaseTimeMs, setPhaseTimeMs] = useState('0');
+  const [fromPhaseId, setFromPhaseId] = useState('');
+  const [toPhaseId, setToPhaseId] = useState('');
+  const [morphPercent, setMorphPercent] = useState('50');
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
 
   const project = history.present;
   const sceneId = project.scenes[0]?.id ?? '';
   const layerId = project.scenes[0]?.layers[0]?.id ?? '';
   const selectedToken = project.playerTokens.find((token) => token.id === selectedTokenId);
+  const availableFormations = useMemo(
+    () => [...FORMATION_TEMPLATES, ...customFormations],
+    [customFormations],
+  );
   const selectedFormation = useMemo(
-    () => getFormationTemplate(setup.formationId),
-    [setup.formationId],
+    () => availableFormations.find((formation) => formation.id === setup.formationId),
+    [availableFormations, setup.formationId],
+  );
+  const availableProfiles = useMemo(() => [...PITCH_RULE_PROFILES, ...customProfiles], [customProfiles]);
+  const availableRestarts = useMemo(() => [...RESTART_TEMPLATES, ...customRestarts], [customRestarts]);
+  const selectedRulesProfile = availableProfiles.find((profile) => profile.id === rulesProfileId);
+  const legalityIssues = useMemo(
+    () => reviewFormationLegality(project, activeFormation),
+    [activeFormation, project],
   );
 
   function applyEdit(label: string, updater: (current: TacticalProject) => TacticalProject, message: string) {
@@ -101,8 +142,10 @@ export default function TacticalMatchboardWorkspace() {
   function rebuildBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const nextProject = projectFromSetup(setup);
+      if (!selectedFormation) throw new Error('Select a valid formation before building the board.');
+      const nextProject = projectFromSetup(setup, selectedFormation);
       setHistory(createTacticalHistory(nextProject));
+      setActiveFormation(selectedFormation);
       setSelectedTokenId(nextProject.playerTokens[0]?.id);
       setMode('move');
       setArrowStart(null);
@@ -110,6 +153,147 @@ export default function TacticalMatchboardWorkspace() {
     } catch (error) {
       setStatus(errorMessage(error));
     }
+  }
+
+  function applySelectedRulesProfile() {
+    applyEdit(
+      'Apply pitch rules profile',
+      (current) => {
+        const profile = availableProfiles.find((candidate) => candidate.id === rulesProfileId);
+        if (!profile) throw new Error('Select a valid rules profile.');
+        return applyPitchRuleProfile(current, profile);
+      },
+      'Pitch rules profile and overlays applied.',
+    );
+  }
+
+  function authorCustomRules(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const data = new FormData(event.currentTarget);
+      const profile = createCustomPitchRuleProfile({
+        id: String(data.get('rulesId') ?? ''),
+        label: String(data.get('rulesLabel') ?? ''),
+        format: String(data.get('rulesFormat') ?? ''),
+        teamSize: Number(data.get('rulesTeamSize')),
+        dimensions: {
+          lengthMeters: Number(data.get('rulesLength')),
+          widthMeters: Number(data.get('rulesWidth')),
+        },
+        specialLines: String(data.get('rulesSpecialLines') ?? '').split(','),
+        restartNotes: String(data.get('rulesRestartNotes') ?? '').split('\n'),
+      });
+      setCustomProfiles((current) => [...current.filter((item) => item.id !== profile.id), profile]);
+      setRulesProfileId(profile.id);
+      setHistory(commitTacticalProject(history, 'Apply custom rules profile', (current) => applyPitchRuleProfile(current, profile)));
+      setStatus('Custom rules profile authored and applied locally.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  }
+
+  function authorCustomFormation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const data = new FormData(event.currentTarget);
+      const formation = createCustomFormationTemplate({
+        id: String(data.get('formationId') ?? ''),
+        label: String(data.get('formationLabel') ?? ''),
+        teamSize: Number(data.get('formationTeamSize')),
+        goalkeepers: Number(data.get('formationGoalkeepers')),
+        outfieldLines: String(data.get('formationLines') ?? '')
+          .split(/[-,\s]+/)
+          .filter(Boolean)
+          .map(Number),
+      });
+      setCustomFormations((current) => [...current.filter((item) => item.id !== formation.id), formation]);
+      setSetup((current) => ({ ...current, formationId: formation.id }));
+      setStatus('Custom formation authored. Choose Build board to place it.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  }
+
+  function applySelectedRestart() {
+    if (!sceneId || !layerId) {
+      setStatus('The current scene does not have an editable layer.');
+      return;
+    }
+    applyEdit(
+      'Apply restart template',
+      (current) => {
+        const template = availableRestarts.find((candidate) => candidate.id === restartTemplateId);
+        if (!template) throw new Error('Select a valid restart template.');
+        return applyRestartTemplate(current, sceneId, layerId, template);
+      },
+      'Editable restart starter applied.',
+    );
+  }
+
+  function authorCustomRestart(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const data = new FormData(event.currentTarget);
+      const guidePoints = String(data.get('restartGuidePoints') ?? '')
+        .split(';')
+        .filter(Boolean)
+        .map((pair) => {
+          const [x, y] = pair.split(',').map((value) => Number(value.trim()) / 100);
+          return { x: x!, y: y! };
+        });
+      const template = createCustomRestartTemplate({
+        id: String(data.get('restartId') ?? ''),
+        label: String(data.get('restartLabel') ?? ''),
+        kind: String(data.get('restartKind') ?? '') as RestartTemplate['kind'],
+        ballPosition: {
+          x: Number(data.get('restartBallX')) / 100,
+          y: Number(data.get('restartBallY')) / 100,
+        },
+        guideLabel: String(data.get('restartGuideLabel') ?? ''),
+        guidePoints,
+      });
+      setCustomRestarts((current) => [...current.filter((item) => item.id !== template.id), template]);
+      setRestartTemplateId(template.id);
+      setStatus('Custom restart template authored. Choose Apply restart starter to place it.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  }
+
+  function capturePhase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const teamId = project.teams[0]?.id;
+    if (!teamId) {
+      setStatus('Build a team before capturing a formation phase.');
+      return;
+    }
+    const occupied = new Set(project.formationStates.map((state) => state.id));
+    let index = project.formationStates.length + 1;
+    while (occupied.has(`phase-${index}`)) index += 1;
+    const id = `phase-${index}`;
+    try {
+      setHistory(commitTacticalProject(history, 'Capture formation phase', (current) => captureFormationPhase(current, {
+        id,
+        label: phaseLabel,
+        teamId,
+        timeMs: Number(phaseTimeMs),
+      })));
+      if (!fromPhaseId) setFromPhaseId(id);
+      else setToPhaseId(id);
+      setPhaseLabel(`Phase ${index + 1}`);
+      setPhaseTimeMs(String(Number(phaseTimeMs) + 1_000));
+      setStatus('Formation phase captured from the current player positions.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  }
+
+  function applyPhaseMorph() {
+    applyEdit(
+      'Morph formation phase',
+      (current) => morphFormationPhases(current, fromPhaseId, toPhaseId, Number(morphPercent) / 100),
+      `Formation previewed at ${morphPercent}% between the selected phases.`,
+    );
   }
 
   function handlePitchPoint(point: NormalizedPoint) {
@@ -232,7 +416,7 @@ export default function TacticalMatchboardWorkspace() {
                 value={setup.formationId}
                 onChange={(event) => setSetup({ ...setup, formationId: event.target.value })}
               >
-                {FORMATION_TEMPLATES.map((formation) => (
+                {availableFormations.map((formation) => (
                   <option key={formation.id} value={formation.id}>{formation.label}</option>
                 ))}
               </select>
@@ -294,6 +478,121 @@ export default function TacticalMatchboardWorkspace() {
               <small>Dimensions are editable training inputs unless a sourced rules profile explicitly states otherwise.</small>
             </div>
           </form>
+        </details>
+
+        <details className="tactical-setup tactical-authoring">
+          <summary>Rules, formations &amp; restarts</summary>
+          <div className="tactical-authoring-grid">
+            <section aria-labelledby="tactical-rules-heading">
+              <h3 id="tactical-rules-heading">Pitch rules profile</h3>
+              <label>
+                Rules profile
+                <select value={rulesProfileId} onChange={(event) => setRulesProfileId(event.target.value)}>
+                  {availableProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>{profile.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={applySelectedRulesProfile}>Apply rules profile</button>
+              {selectedRulesProfile ? (
+                <small>
+                  {selectedRulesProfile.provenance.sourceTitle}
+                  {selectedRulesProfile.provenance.sourceVersion ? ` (${selectedRulesProfile.provenance.sourceVersion})` : ''}
+                  {selectedRulesProfile.provenance.note ? ` — ${selectedRulesProfile.provenance.note}` : ''}
+                </small>
+              ) : null}
+            </section>
+
+            <form onSubmit={authorCustomRules} aria-labelledby="custom-rules-heading">
+              <h3 id="custom-rules-heading">Custom rules profile</h3>
+              <label>Profile id<input name="rulesId" defaultValue="academy-6v6" required /></label>
+              <label>Profile label<input name="rulesLabel" defaultValue="Academy 6v6" required /></label>
+              <label>Format<input name="rulesFormat" defaultValue="6v6" required /></label>
+              <label>Team size<input name="rulesTeamSize" type="number" min="1" step="1" defaultValue="6" required /></label>
+              <label>Pitch length (m)<input name="rulesLength" type="number" min="1" step="0.1" defaultValue="48" required /></label>
+              <label>Pitch width (m)<input name="rulesWidth" type="number" min="1" step="0.1" defaultValue="32" required /></label>
+              <label>Special lines, comma separated<input name="rulesSpecialLines" defaultValue="Build-out line" /></label>
+              <label>Restart notes<textarea name="rulesRestartNotes" defaultValue="Retreat to the build-out line." /></label>
+              <button type="submit">Author and apply rules</button>
+            </form>
+
+            <form onSubmit={authorCustomFormation} aria-labelledby="custom-formation-heading">
+              <h3 id="custom-formation-heading">Custom formation</h3>
+              <label>Formation id<input name="formationId" defaultValue="academy-8v8" required /></label>
+              <label>Formation label<input name="formationLabel" defaultValue="Academy 8v8" required /></label>
+              <label>Team size<input name="formationTeamSize" type="number" min="1" step="1" defaultValue="8" required /></label>
+              <label>Goalkeepers<input name="formationGoalkeepers" type="number" min="0" step="1" defaultValue="1" required /></label>
+              <label>Outfield lines<input name="formationLines" defaultValue="3-3-1" required /></label>
+              <button type="submit">Author formation</button>
+            </form>
+
+            <section aria-labelledby="scenario-tools-heading">
+              <h3 id="scenario-tools-heading">Scenario tools</h3>
+              <div className="tactical-authoring-actions">
+                <button type="button" onClick={() => applyEdit('Mirror board', (current) => transformTacticalProject(current, 'horizontal'), 'Board mirrored with direction of play.')}>Mirror direction</button>
+                <button type="button" onClick={() => applyEdit('Flip board', (current) => transformTacticalProject(current, 'vertical'), 'Board flipped across the touchline axis.')}>Flip vertical</button>
+              </div>
+              <label>
+                Restart starter
+                <select value={restartTemplateId} onChange={(event) => setRestartTemplateId(event.target.value)}>
+                  {availableRestarts.map((template) => (
+                    <option key={template.id} value={template.id}>{template.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={applySelectedRestart}>Apply restart starter</button>
+              <form onSubmit={authorCustomRestart} className="tactical-phase-form" aria-label="Custom restart template">
+                <label>Restart id<input name="restartId" defaultValue="academy-goal-kick" required /></label>
+                <label>Restart label<input name="restartLabel" defaultValue="Academy goal-kick build" required /></label>
+                <label>
+                  Restart kind
+                  <select name="restartKind" defaultValue="goal-kick">
+                    <option value="kick-off">Kick-off</option>
+                    <option value="corner">Corner</option>
+                    <option value="free-kick">Free-kick</option>
+                    <option value="goal-kick">Goal-kick</option>
+                  </select>
+                </label>
+                <label>Ball X %<input name="restartBallX" type="number" min="0" max="100" step="0.1" defaultValue="8" required /></label>
+                <label>Ball Y %<input name="restartBallY" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
+                <label>Guide label<input name="restartGuideLabel" defaultValue="Build-out route" required /></label>
+                <label>Guide points (% x,y; x,y)<input name="restartGuidePoints" defaultValue="8,50; 30,25" required /></label>
+                <button type="submit">Author restart template</button>
+              </form>
+              <form onSubmit={capturePhase} className="tactical-phase-form">
+                <label>Phase label<input value={phaseLabel} onChange={(event) => setPhaseLabel(event.target.value)} required /></label>
+                <label>Phase time (ms)<input type="number" min="0" step="1" value={phaseTimeMs} onChange={(event) => setPhaseTimeMs(event.target.value)} required /></label>
+                <button type="submit">Capture formation phase</button>
+              </form>
+              {project.formationStates.length ? (
+                <div className="tactical-phase-form">
+                  <label>
+                    From phase
+                    <select value={fromPhaseId} onChange={(event) => setFromPhaseId(event.target.value)}>
+                      <option value="">Choose phase</option>
+                      {project.formationStates.map((phase) => <option key={phase.id} value={phase.id}>{phase.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    To phase
+                    <select value={toPhaseId} onChange={(event) => setToPhaseId(event.target.value)}>
+                      <option value="">Choose phase</option>
+                      {project.formationStates.map((phase) => <option key={phase.id} value={phase.id}>{phase.label}</option>)}
+                    </select>
+                  </label>
+                  <label>Morph %<input type="number" min="0" max="100" step="1" value={morphPercent} onChange={(event) => setMorphPercent(event.target.value)} /></label>
+                  <button type="button" disabled={!fromPhaseId || !toPhaseId} onClick={applyPhaseMorph}>Preview phase morph</button>
+                </div>
+              ) : null}
+              <div className={`tactical-legality ${legalityIssues.length ? 'notice' : 'good'}`} aria-live="polite">
+                <strong>Formation review</strong>
+                {legalityIssues.length
+                  ? <ul>{legalityIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+                  : <p>Placed-player, goalkeeper, roster-assignment, and profile counts agree.</p>}
+                <small>This is an authoring aid, not an officiating decision.</small>
+              </div>
+            </section>
+          </div>
         </details>
 
         <div className="tactical-command-bar" aria-label="Board commands">
