@@ -27,13 +27,14 @@
 ## Ordered queue
 
 ### T03-01 — Execute current Task 3 gate
-- **Status:** READY
+- **Status:** ACTIVE
 - **Depends on:** none
 - **Primary files:** `tests/unit/tactics-engine.test.ts`, current tactical source files only if the gate exposes a defect
 - **Action:** run the focused tactical unit suite and production build on the current branch tip. Preferred commands: `pnpm exec vitest run tests/unit/tactics-engine.test.ts` and `pnpm build`.
-- **Current limitation:** the connected GitHub surface reports no Actions workflow runs for the current tactical commits, so no executable RED/GREEN/build proof exists yet.
-- **Exit evidence:** exact branch SHA + focused unit result + production build result, including every failing test/build diagnostic if red.
-- **Reverse-safe:** yes; this is the only currently READY item.
+- **Current evidence:** at exact source/docs SHA `7707b8102699e05841fa8a26f8e42315fa000e87`, `corepack pnpm exec vitest run tests/unit/tactics-engine.test.ts` passed **22/22 tests**. The ordinary `corepack pnpm build` entrypoint did not reach TypeScript/Vite because its nested bare `pnpm` resolved to verifier pnpm 11.24.0 while the repo requires 12.3.4. Corepack 12.3.4 was activated and the equivalent prepare + `tsc` + Vite sequence was started, but the remote verification session became temporarily unreadable before its result could be captured. Production build evidence therefore remains open.
+- **Remaining action:** complete the production build gate on the same source state (or a later docs-only descendant), preferably with pnpm 12.3.4 on PATH; record exact SHA and full outcome.
+- **Exit evidence:** exact branch/source SHA + focused unit result + production build result, including every failing build diagnostic if red.
+- **Reverse-safe:** yes; T03-01 remains the only actionable item until build evidence is captured.
 
 ### T03-02 — Correct gate defects
 - **Status:** BLOCKED
