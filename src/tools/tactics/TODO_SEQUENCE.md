@@ -1,9 +1,9 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-21  
+**Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `a6225790fabfbc835e174cc439afbdf33a2a23cb`
+**Code tip described by this queue before this documentation commit:** `163a63d78131e90762246e86f58803e87d9d4788`
 
 ## Purpose and source-of-truth roles
 
@@ -27,34 +27,29 @@
 ## Ordered queue
 
 ### T03-01 — Execute current Task 3 gate
-- **Status:** ACTIVE
+- **Status:** DONE
 - **Depends on:** none
 - **Primary files:** `tests/unit/tactics-engine.test.ts`, current tactical source files only if the gate exposes a defect
-- **Action:** run the focused tactical unit suite and production build on the current branch tip. Preferred commands: `pnpm exec vitest run tests/unit/tactics-engine.test.ts` and `pnpm build`.
-- **Current evidence:** at exact source/docs SHA `7707b8102699e05841fa8a26f8e42315fa000e87`, `corepack pnpm exec vitest run tests/unit/tactics-engine.test.ts` passed **22/22 tests**. The ordinary `corepack pnpm build` entrypoint did not reach TypeScript/Vite because its nested bare `pnpm` resolved to verifier pnpm 11.24.0 while the repo requires 12.3.4. Corepack 12.3.4 was activated and the equivalent prepare + `tsc` + Vite sequence was started, but the remote verification session became temporarily unreadable before its result could be captured. Production build evidence therefore remains open.
-- **Remaining action:** complete the production build gate on the same source state (or a later docs-only descendant), preferably with pnpm 12.3.4 on PATH; record exact SHA and full outcome.
-- **Exit evidence:** exact branch/source SHA + focused unit result + production build result, including every failing build diagnostic if red.
-- **Reverse-safe:** yes; T03-01 remains the only actionable item until build evidence is captured.
-
+- **Evidence:** exact SHA `1374fd43c025d20a661317b54def6dede1cedaaf` passed **22/22** focused tactical units, `tsc --noEmit -p tsconfig.app.json` with exit 0, and a production Vite build (`✓ built in 1m 37s`).
+- **Exit evidence:** satisfied. The earlier verifier pnpm-path mismatch was environmental and required no repository change.
+- **Reverse-safe:** complete.
 ### T03-02 — Correct gate defects
-- **Status:** BLOCKED
+- **Status:** DONE — conditional branch not triggered
 - **Depends on:** T03-01 produces a real failing diagnostic
-- **Primary files:** only files named by the failing diagnostic; tactical scope only
-- **Action:** fix each genuine tactical defect test-first where behavior changes, then rerun the focused gate.
-- **Exit evidence:** failing diagnostic resolved on a newer exact SHA; focused unit/build results recorded.
-- **Reverse-safe:** no; conditional on T03-01 evidence.
-
+- **Primary files:** only files named by a failing diagnostic; tactical scope only
+- **Outcome:** T03-01 was green after correcting only the verifier invocation. No Tactical Matchboard source defect was produced, so no corrective code task was required.
+- **Exit evidence:** no failing tactical diagnostic remained.
+- **Reverse-safe:** complete.
 ### T03-03 — Register the coherent beginner vertical slice
-- **Status:** BLOCKED
-- **Depends on:** T03-01 green, plus T03-02 if needed
-- **Primary files:** `src/catalog.ts`, `src/tools/workspaces.tsx`, Tactical Matchboard registration-only support
-- **Action:** add one additive catalog/lazy-loader route for the existing `TacticalMatchboardWorkspace`. Preserve every unrelated tool entry.
-- **Gate:** only proceed if choose/configure pitch + choose team/formation + move player + add arrow + export SVG are all non-inert after the executable gate.
-- **Exit evidence:** route resolves to the workspace on the exact branch SHA; no unrelated catalog/workspace entries lost.
-- **Reverse-safe:** no.
-
+- **Status:** DONE
+- **Depends on:** T03-01 green; T03-02 not triggered
+- **Primary files:** `src/catalog.ts`, `src/tools/workspaces.tsx`, `tests/unit/tactics-engine.test.ts`
+- **Implementation:** commit `163a63d78131e90762246e86f58803e87d9d4788` adds one `ToolSlug`, one source-honest catalog entry, and one lazy workspace loader for the existing `TacticalMatchboardWorkspace`.
+- **TDD evidence:** registration contract was RED first (**22 passed / 1 failed**, catalog entry undefined), then GREEN **23/23**. The exact committed SHA passed **23/23** focused units and TypeScript exit 0; exact-commit Vite log records `✓ built in 55.63s` and emits dedicated Tactical Matchboard JS/CSS chunks.
+- **Exit evidence:** route registration compiles/builds without removing unrelated catalog/workspace entries.
+- **Reverse-safe:** complete.
 ### T03-04 — Add focused browser contract
-- **Status:** BLOCKED
+- **Status:** READY
 - **Depends on:** T03-03
 - **Primary files:** `tests/e2e/tactical-matchboard-studio.spec.ts`, `scripts/select-e2e-specs.mjs`
 - **Action:** cover beginner setup, player selection, click-to-move, D-pad movement, numeric movement, two-point arrow authoring, undo/redo, SVG download, and touch-equivalent operation.

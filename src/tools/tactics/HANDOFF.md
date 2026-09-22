@@ -4,62 +4,54 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Tracked branch tip immediately before this handoff write: `cdc98273cd0142eec6af2e32bd7430a94d53b925`
-- Last source-code commit before documentation-only synchronization: `a6225790fabfbc835e174cc439afbdf33a2a23cb`
-- Current comparison to `main`: **44 commits ahead / 5 behind**, status `diverged`
+- Last validated source commit: `163a63d78131e90762246e86f58803e87d9d4788`
+- Current comparison to `main`: **51 commits ahead / 5 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
-- Milestone: **Task 3 — unregistered beginner board/workspace slice authored; executable gate pending**
+- Milestone: **Task 3 — registered beginner vertical slice; focused browser contract next**
 - Verified functional features: **0/60**
-- Registration status: intentionally unregistered until T03-01/T03-02 executable gate is green.
+- Registration status: catalog entry and lazy workspace loader are now registered after executable unit/type/build gates passed.
 
-A committed handoff file cannot contain the SHA of its own final commit because its contents participate in that SHA. The branch ref is authoritative after this file is committed.
+A committed handoff file cannot contain its own final Git SHA because its contents participate in that SHA. The branch ref is authoritative after documentation commits.
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and resume **T03-01**. It is ACTIVE and remains the only actionable item.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and execute **T03-04**. It is the sole READY item.
 
-Captured executable evidence at exact SHA `7707b8102699e05841fa8a26f8e42315fa000e87`:
-1. `corepack pnpm exec vitest run tests/unit/tactics-engine.test.ts` — **22/22 passed**.
-2. Production build — **not yet captured**. The normal `corepack pnpm build` entrypoint never reached TypeScript/Vite because its nested bare `pnpm` resolved to verifier pnpm 11.24.0 while the repo requires 12.3.4. Corepack 12.3.4 was activated and the equivalent prepare + `tsc` + Vite sequence was started, but the remote session became unreadable before its result could be retrieved.
+T03-04 must add a focused browser contract in `tests/e2e/tactical-matchboard-studio.spec.ts` plus the repository selector entry in `scripts/select-e2e-specs.mjs`. Cover beginner setup, player selection, click-to-move, D-pad movement, numeric movement, two-point arrow authoring, undo/redo, SVG download, and touch-equivalent operation on desktop and mobile Chromium.
 
-The exact next action is therefore to finish only the production build half of T03-01 on the same source state or a docs-only descendant. If the build is red, execute T03-02 against the exact diagnostics. If it is green, T03-03 becomes READY and may add the catalog/lazy-loader route. Do not register before that point.
+Do not advance to T03-05 until that focused browser contract is executable and green. T03-05 then owns Axe, keyboard-only, device-width/reflow, and target-size validation.
+
+## Current executable evidence
+
+- `1374fd43c025d20a661317b54def6dede1cedaaf`: focused tactical units **22/22 passed**, TypeScript exit 0, production Vite build successful (`✓ built in 1m 37s`).
+- Registration TDD: new catalog contract was observed RED first (**22 passed / 1 failed**, Tactical entry undefined).
+- `163a63d78131e90762246e86f58803e87d9d4788`: focused tactical units **23/23 passed** and TypeScript exit 0 on the exact committed SHA.
+- Exact-commit Vite build log at `163a63d...` records `✓ built in 55.63s` and emits dedicated `TacticalMatchboardWorkspace` JS/CSS chunks.
+- Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
 
-The pure/editor foundation includes:
-- schema-versioned canonical `TacticalProject`, integer timeline time, normalized `[0,1]` coordinates, physical metre conversion and validation;
-- editable non-authoritative generic format profiles and provenance-bearing U.S. Soccer formation examples;
-- deterministic formation count/goalkeeper validation, placement and direction mirroring;
-- immutable bounded undo/redo history capped at 100 snapshots;
-- team, roster, player-token, equipment and annotation mutations;
-- explicit scene/layer ownership and locked-layer write protection;
-- missing scene/layer reference validation;
-- deterministic accessible SVG serialization preserving physical pitch aspect ratio and escaping user-authored text.
+The pure/editor foundation includes schema-versioned canonical project state, normalized coordinates, physical conversion, provenance-bearing format/formation data, deterministic formation placement and mirroring, bounded immutable undo/redo, editor/layer operations, locked-layer protection, validation, and deterministic accessible SVG serialization.
 
-The current unregistered beginner slice adds:
-- `workspace-engine.ts`: coherent formation project builder, client-to-normalized coordinate conversion, clamped precision nudges, collision-safe tactical-arrow creation;
-- `TacticalBoard.tsx`: pointer/touch pitch selection, move-mode player selection, arrow-mode two-point placement surface, shared SVG preview;
-- `TacticalMatchboardWorkspace.tsx`: editable project/team/colors/pitch dimensions/direction, formation selection, roster/token materialization, player picker, click-to-move, D-pad movement, numeric X/Y movement, two-point arrow authoring, undo/redo and real SVG download;
-- `tactical-matchboard.css`: pitch-first responsive layout, narrow single-column fallback, 44px+ tactical controls and reduced-motion handling;
-- focused unit contracts for beginner project materialization, normalized client mapping, precision nudging and deterministic arrow creation.
-
-No global catalog/workspace registration has been added.
+The registered beginner slice now provides:
+- editable project/team/colors/pitch dimensions/direction and formation selection;
+- deterministic roster/token materialization;
+- pointer/touch player selection and click-to-move;
+- explicit D-pad and numeric X/Y precision movement as non-drag alternatives;
+- two-point tactical arrow authoring;
+- undo/redo and real local SVG download;
+- pitch-first responsive styling and reduced-motion handling;
+- one source-honest catalog entry and one lazy loader in the global workspace registry.
 
 ## Active feature state
 
 In progress: **1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 51, 52, 55, 56, 59**.
 
-All other accepted feature rows remain planned. No feature is verified. The numerator stays 0 until the complete accepted behavior of a feature has the evidence required by `FEATURE_MATRIX.md`.
+All other accepted feature rows remain planned. No feature is verified yet. The numerator remains 0 until a row's complete accepted behavior has every required unit/build/browser/accessibility/persistence/export proof.
 
 ## Accessibility/input ruling
 
-The current interaction intentionally does not require dragging:
-- pitch taps/clicks move the selected player;
-- visible player buttons provide explicit selection;
-- D-pad buttons and numeric coordinates provide non-drag precision movement;
-- arrows use two single-pointer placements.
-
-This is aligned with the current WCAG 2.2 requirement that drag functionality have a single-pointer non-drag alternative. Browser/Axe/keyboard validation is still pending and must not be inferred from source inspection.
+The current movement workflow intentionally does not require dragging: pitch taps/clicks move the selected player, visible player buttons provide explicit selection, D-pad buttons and numeric coordinates provide precision movement, and arrows use two single-pointer placements. Browser/Axe/keyboard validation is still pending and must not be inferred from source inspection.
 
 ## Execution-order / multi-agent contract
 
@@ -67,18 +59,14 @@ This is aligned with the current WCAG 2.2 requirement that drag functionality ha
 
 - Forward agent: take the lowest-numbered READY item.
 - Reverse agent: take the highest-numbered READY item whose dependencies are all DONE and whose Primary files do not overlap an ACTIVE item.
-- Before every mutation, compare the last known branch tip to the live branch. Refresh first if another agent advanced it.
+- Before every mutation, compare the last known branch tip to the live branch and refresh if another agent advanced it.
 - Never edit Primary files reserved by another ACTIVE queue item.
 - T14/T15 integration/deployment are never reverse-safe before branch-complete.
 - Keep this file, `FEATURE_MATRIX.md`, `TODO_SEQUENCE.md`, and `.tasks/IN_PROGRESS.md` synchronized whenever material state changes.
 
-## Open defects / blockers
+## Open blockers / deferred evidence
 
-- **Execution evidence blocker:** focused tactical units are green 22/22 at `7707b8102699e05841fa8a26f8e42315fa000e87`; production TypeScript/Vite build evidence remains open because the verifier's nested bare `pnpm` used 11.24.0 and the exact-Corepack follow-up session became unreadable before its result was captured.
-- **Registration blocker:** route/catalog registration waits for T03-01/T03-02 green evidence.
-- **Browser validation blocker:** there is no registered route yet, so focused Playwright/Axe/reflow proof is intentionally deferred to T03-04/T03-05.
+- Focused desktop/mobile browser validation is not yet recorded; T03-04 is next.
+- Axe, keyboard-only, viewport/reflow and target-size evidence is deferred to T03-05 after the browser contract exists.
 - Current authoritative futsal/specialty geometry still requires exact primary-source verification before any preset can be labeled sourced/official.
-
-## Intentionally deferred by sequence
-
-Task 4 rules/restart authoring, timeline/animation, spatial analysis, Dexie persistence, synchronized 3D, local video, professional multi-format export, final accessibility/QoL hardening, adversarial/performance audit, branch-complete reconciliation, integration and deployment remain accepted scope. Their exact order and gates are enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
+- Task 4 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
