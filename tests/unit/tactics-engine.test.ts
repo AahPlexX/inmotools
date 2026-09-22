@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TOOL_BY_SLUG } from '../../src/catalog';
 import { serializeTacticalBoardSvg } from '../../src/tools/tactics/board-engine';
 import {
   addTacticalArrow,
@@ -518,5 +519,16 @@ describe('Tactical Matchboard beginner workspace contracts', () => {
     expect(project.annotations.map((annotation) => annotation.id)).toEqual(['arrow-1', 'arrow-2']);
     expect(project.annotations[0]).toMatchObject({ kind: 'arrow', label: 'Run' });
     expect(() => addTacticalArrow(project, 'scene-1', 'layer-1', { x: 0.4, y: 0.4 }, { x: 0.4, y: 0.4 })).toThrow(/different/i);
+  });
+});
+describe('Tactical Matchboard registration contract', () => {
+  it('publishes one coherent catalog entry for the validated beginner slice', () => {
+    const tool = TOOL_BY_SLUG.get('tactical-matchboard-studio');
+    expect(tool).toMatchObject({
+      slug: 'tactical-matchboard-studio',
+      shortTitle: 'Tactical Matchboard Studio',
+    });
+    expect(tool?.privacy).toMatch(/browser|device/i);
+    expect(tool?.outputs).toMatch(/SVG/i);
   });
 });

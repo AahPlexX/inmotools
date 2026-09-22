@@ -35,6 +35,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
+  'tactical-matchboard-studio': () => import('./tactics/TacticalMatchboardWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
