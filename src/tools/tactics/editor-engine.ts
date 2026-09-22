@@ -84,6 +84,20 @@ function requireRosterPlayer(project: TacticalProject, teamId: string, playerId:
   return player;
 }
 
+function requireSceneLayer(
+  project: TacticalProject,
+  sceneId: string,
+  layerId: string,
+  writable = true,
+): TacticalLayer {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new Error(`Scene "${sceneId}" does not exist.`);
+  const layer = scene.layers.find((candidate) => candidate.id === layerId);
+  if (!layer) throw new Error(`Layer "${layerId}" does not exist in scene "${sceneId}".`);
+  if (writable && layer.locked) throw new Error(`Layer "${layerId}" is locked.`);
+  return layer;
+}
+
 export function createTacticalHistory(project: TacticalProject): TacticalProjectHistory {
   return { past: [], present: project, future: [] };
 }
@@ -154,6 +168,7 @@ export function addRosterPlayer(
 export function addPlayerToken(project: TacticalProject, token: PlayerToken): TacticalProject {
   requireUniqueId(project, token.id);
   requireRosterPlayer(project, token.teamId, token.playerId);
+  requireSceneLayer(project, token.sceneId, token.layerId);
   if (project.playerTokens.some((candidate) =>
     candidate.teamId === token.teamId && candidate.playerId === token.playerId
   )) {
@@ -183,6 +198,7 @@ export function movePlayerToken(
   const token = project.playerTokens.find((candidate) => candidate.id === tokenId);
   if (!token) throw new Error(`Player token "${tokenId}" does not exist.`);
   if (token.locked) throw new Error(`Player token "${tokenId}" is locked.`);
+  requireSceneLayer(project, token.sceneId, token.layerId);
 
   return {
     ...project,
@@ -197,12 +213,7 @@ export function addEquipment(
   equipment: TacticalEquipment,
 ): TacticalProject {
   requireUniqueId(project, equipment.id);
-  if (
-    equipment.layerId
-    && !project.scenes.some((scene) => scene.layers.some((layer) => layer.id === equipment.layerId))
-  ) {
-    throw new Error(`Layer "${equipment.layerId}" does not exist.`);
-  }
+  requireSceneLayer(project, equipment.sceneId, equipment.layerId);
 
   return {
     ...project,
@@ -223,6 +234,7 @@ export function addAnnotation(
   annotation: TacticalAnnotation,
 ): TacticalProject {
   requireUniqueId(project, annotation.id);
+  requireSceneLayer(project, annotation.sceneId, annotation.layerId);
   if (!annotation.points.length) throw new Error('Annotation must contain at least one point.');
 
   const startMs = annotation.startMs;
