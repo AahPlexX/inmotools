@@ -91,3 +91,46 @@ export function validateFormationTemplate(templateToValidate: FormationTemplate)
 
   return errors;
 }
+
+
+export function materializeFormationPositions(
+  formation: FormationTemplate,
+  direction: 'left-to-right' | 'right-to-left' = 'left-to-right',
+): import('./tactics-types').NormalizedPoint[] {
+  const errors = validateFormationTemplate(formation);
+  if (errors.length) {
+    throw new Error(`Cannot place invalid formation: ${errors.join(' ')}`);
+  }
+
+  const points: import('./tactics-types').NormalizedPoint[] = [];
+  const lineCount = formation.outfieldLines.length;
+  const firstLineX = formation.goalkeepers > 0 ? 0.28 : 0.16;
+  const lastLineX = 0.82;
+
+  if (formation.goalkeepers > 0) {
+    for (let index = 0; index < formation.goalkeepers; index += 1) {
+      const y = (index + 1) / (formation.goalkeepers + 1);
+      points.push({ x: 0.08, y });
+    }
+  }
+
+  formation.outfieldLines.forEach((playersInLine, lineIndex) => {
+    const x = lineCount === 1
+      ? (firstLineX + lastLineX) / 2
+      : firstLineX + (lastLineX - firstLineX) * (lineIndex / (lineCount - 1));
+    for (let index = 0; index < playersInLine; index += 1) {
+      points.push({
+        x: Number(x.toFixed(12)),
+        y: Number(((index + 1) / (playersInLine + 1)).toFixed(12)),
+      });
+    }
+  });
+
+  if (points.length !== formation.teamSize) {
+    throw new Error('Formation placement did not produce the selected team size.');
+  }
+
+  return direction === 'right-to-left'
+    ? points.map((point) => ({ x: Number((1 - point.x).toFixed(12)), y: point.y }))
+    : points;
+}
