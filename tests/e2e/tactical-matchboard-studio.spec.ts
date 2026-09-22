@@ -145,11 +145,24 @@ test('authors rules, formations, transforms, legality aids, and restart starters
   await expect(page.locator('#ifab-left-penalty-area')).toHaveCount(1);
   await expect(page.locator('#ifab-right-penalty-area')).toHaveCount(1);
 
+  await page.getByRole('combobox', { name: /Restart starter/ }).selectOption('tool-corner-left');
+  await expect(page.getByText(/IFAB corner kicks place the ball within one metre/)).toBeVisible();
+
+  await page.getByRole('combobox', { name: /Rules profile/ }).selectOption('ussf-pdi-7v7-2017');
+  await page.getByRole('button', { name: 'Apply rules profile' }).click();
+  await expect(page.locator('#ussf-left-build-out-line')).toHaveCount(1);
+  await expect(page.locator('#ussf-right-build-out-line')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Load editable copy' }).click();
+  await expect(page.getByLabel('Profile id')).toHaveValue('ussf-pdi-7v7-2017-local');
+
   const beforeMirror = Number(await coordinateInput(page, 'X').inputValue());
   await page.getByRole('button', { name: 'Mirror direction' }).click();
   await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(100 - beforeMirror, 1);
 
-  await page.getByRole('combobox', { name: /Restart starter/ }).selectOption('tool-corner-left');
+  const beforeFlip = Number(await coordinateInput(page, 'Y').inputValue());
+  await page.getByRole('button', { name: 'Flip vertical' }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'Y').inputValue())).toBeCloseTo(100 - beforeFlip, 1);
+
   await page.getByRole('button', { name: 'Apply restart starter' }).click();
   await expect(page.locator('[data-annotation-kind="restart-guide"]')).toHaveCount(1);
   await page.getByRole('button', { name: 'Author restart template' }).click();

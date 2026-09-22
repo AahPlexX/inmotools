@@ -22,11 +22,13 @@ import {
   PITCH_RULE_PROFILES,
   applyPitchRuleProfile,
   createCustomPitchRuleProfile,
+  createEditablePitchRuleProfileCopy,
 } from './rules-engine';
 import {
   RESTART_TEMPLATES,
   applyRestartTemplate,
   createCustomRestartTemplate,
+  reviewRestartLegality,
   type RestartTemplate,
 } from './restart-engine';
 import type { FormationTemplate, NormalizedPoint, PitchRuleProfile, TacticalProject } from './tactics-types';
@@ -59,6 +61,17 @@ const INITIAL_SETUP: SetupState = {
   lengthMeters: '60',
   widthMeters: '40',
   direction: 'left-to-right',
+};
+
+const INITIAL_RULES_DRAFT = {
+  id: 'academy-6v6',
+  label: 'Academy 6v6',
+  format: '6v6',
+  teamSize: 6,
+  lengthMeters: 48,
+  widthMeters: 32,
+  specialLines: 'Build-out line',
+  restartNotes: 'Retreat to the build-out line.',
 };
 
 function projectFromSetup(setup: SetupState, formation?: FormationTemplate): TacticalProject {
@@ -102,6 +115,9 @@ export default function TacticalMatchboardWorkspace() {
   const [customRestarts, setCustomRestarts] = useState<RestartTemplate[]>([]);
   const [activeFormation, setActiveFormation] = useState(() => getFormationTemplate(INITIAL_SETUP.formationId)!);
   const [rulesProfileId, setRulesProfileId] = useState('training-7v7');
+  const [rulesDraft, setRulesDraft] = useState(INITIAL_RULES_DRAFT);
+  const [rulesDraftSourceId, setRulesDraftSourceId] = useState('');
+  const [rulesDraftRevision, setRulesDraftRevision] = useState(0);
   const [restartTemplateId, setRestartTemplateId] = useState(RESTART_TEMPLATES[0]!.id);
   const [phaseLabel, setPhaseLabel] = useState('Base shape');
   const [phaseTimeMs, setPhaseTimeMs] = useState('0');
@@ -125,6 +141,13 @@ export default function TacticalMatchboardWorkspace() {
   const availableProfiles = useMemo(() => [...PITCH_RULE_PROFILES, ...customProfiles], [customProfiles]);
   const availableRestarts = useMemo(() => [...RESTART_TEMPLATES, ...customRestarts], [customRestarts]);
   const selectedRulesProfile = availableProfiles.find((profile) => profile.id === rulesProfileId);
+  const selectedRestartTemplate = availableRestarts.find((template) => template.id === restartTemplateId);
+  const restartReviewIssues = useMemo(
+    () => selectedRestartTemplate
+      ? reviewRestartLegality(project, selectedRestartTemplate, project.teams[0]?.id)
+      : [],
+    [project, selectedRestartTemplate],
+  );
   const legalityIssues = useMemo(
     () => reviewFormationLegality(project, activeFormation),
     [activeFormation, project],
@@ -171,7 +194,7 @@ export default function TacticalMatchboardWorkspace() {
     event.preventDefault();
     try {
       const data = new FormData(event.currentTarget);
-      const profile = createCustomPitchRuleProfile({
+      const authored = createCustomPitchRuleProfile({
         id: String(data.get('rulesId') ?? ''),
         label: String(data.get('rulesLabel') ?? ''),
         format: String(data.get('rulesFormat') ?? ''),
@@ -183,6 +206,10 @@ export default function TacticalMatchboardWorkspace() {
         specialLines: String(data.get('rulesSpecialLines') ?? '').split(','),
         restartNotes: String(data.get('rulesRestartNotes') ?? '').split('\n'),
       });
+      const source = availableProfiles.find((profile) => profile.id === rulesDraftSourceId);
+      const profile = source
+        ? createEditablePitchRuleProfileCopy(source, { id: authored.id, label: authored.label }, authored)
+        : authored;
       setCustomProfiles((current) => [...current.filter((item) => item.id !== profile.id), profile]);
       setRulesProfileId(profile.id);
       setHistory(commitTacticalProject(history, 'Apply custom rules profile', (current) => applyPitchRuleProfile(current, profile)));
@@ -190,6 +217,27 @@ export default function TacticalMatchboardWorkspace() {
     } catch (error) {
       setStatus(errorMessage(error));
     }
+  }
+
+  function prepareEditableRulesCopy() {
+    if (!selectedRulesProfile) {
+      setStatus('Select a rules profile before creating an editable copy.');
+      return;
+    }
+    const dimensions = selectedRulesProfile.dimensions ?? project.pitch.dimensions;
+    setRulesDraft({
+      id: `${selectedRulesProfile.id}-local`,
+      label: `${selectedRulesProfile.label} — local copy`,
+      format: selectedRulesProfile.format,
+      teamSize: selectedRulesProfile.teamSize,
+      lengthMeters: dimensions.lengthMeters,
+      widthMeters: dimensions.widthMeters,
+      specialLines: selectedRulesProfile.specialLines?.join(', ') ?? '',
+      restartNotes: selectedRulesProfile.restartNotes?.join('\n') ?? '',
+    });
+    setRulesDraftSourceId(selectedRulesProfile.id);
+    setRulesDraftRevision((current) => current + 1);
+    setStatus('Selected rules profile loaded into the editable local-copy form.');
   }
 
   function authorCustomFormation(event: FormEvent<HTMLFormElement>) {
@@ -494,6 +542,7 @@ export default function TacticalMatchboardWorkspace() {
                 </select>
               </label>
               <button type="button" onClick={applySelectedRulesProfile}>Apply rules profile</button>
+              <button type="button" className="secondary" onClick={prepareEditableRulesCopy}>Load editable copy</button>
               {selectedRulesProfile ? (
                 <small>
                   {selectedRulesProfile.provenance.sourceTitle}
@@ -503,16 +552,16 @@ export default function TacticalMatchboardWorkspace() {
               ) : null}
             </section>
 
-            <form onSubmit={authorCustomRules} aria-labelledby="custom-rules-heading">
+            <form key={rulesDraftRevision} onSubmit={authorCustomRules} aria-labelledby="custom-rules-heading">
               <h3 id="custom-rules-heading">Custom rules profile</h3>
-              <label>Profile id<input name="rulesId" defaultValue="academy-6v6" required /></label>
-              <label>Profile label<input name="rulesLabel" defaultValue="Academy 6v6" required /></label>
-              <label>Format<input name="rulesFormat" defaultValue="6v6" required /></label>
-              <label>Team size<input name="rulesTeamSize" type="number" min="1" step="1" defaultValue="6" required /></label>
-              <label>Pitch length (m)<input name="rulesLength" type="number" min="1" step="0.1" defaultValue="48" required /></label>
-              <label>Pitch width (m)<input name="rulesWidth" type="number" min="1" step="0.1" defaultValue="32" required /></label>
-              <label>Special lines, comma separated<input name="rulesSpecialLines" defaultValue="Build-out line" /></label>
-              <label>Restart notes<textarea name="rulesRestartNotes" defaultValue="Retreat to the build-out line." /></label>
+              <label>Profile id<input name="rulesId" defaultValue={rulesDraft.id} required /></label>
+              <label>Profile label<input name="rulesLabel" defaultValue={rulesDraft.label} required /></label>
+              <label>Format<input name="rulesFormat" defaultValue={rulesDraft.format} required /></label>
+              <label>Team size<input name="rulesTeamSize" type="number" min="1" step="1" defaultValue={rulesDraft.teamSize} required /></label>
+              <label>Pitch length (m)<input name="rulesLength" type="number" min="1" step="0.1" defaultValue={rulesDraft.lengthMeters} required /></label>
+              <label>Pitch width (m)<input name="rulesWidth" type="number" min="1" step="0.1" defaultValue={rulesDraft.widthMeters} required /></label>
+              <label>Special lines, comma separated<input name="rulesSpecialLines" defaultValue={rulesDraft.specialLines} /></label>
+              <label>Restart notes<textarea name="rulesRestartNotes" defaultValue={rulesDraft.restartNotes} /></label>
               <button type="submit">Author and apply rules</button>
             </form>
 
@@ -541,6 +590,13 @@ export default function TacticalMatchboardWorkspace() {
                 </select>
               </label>
               <button type="button" onClick={applySelectedRestart}>Apply restart starter</button>
+              <div className={`tactical-restart-review ${restartReviewIssues.length ? 'notice' : 'good'}`} aria-live="polite">
+                <strong>Restart review</strong>
+                {restartReviewIssues.length
+                  ? <ul>{restartReviewIssues.map((issue) => <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>)}</ul>
+                  : <p>No placement or opponent-position conflicts were found for rules the selected profile can verify.</p>}
+                <small>Source-backed authoring aid only; quick restarts and match decisions remain with the referee and competition rules.</small>
+              </div>
               <form onSubmit={authorCustomRestart} className="tactical-phase-form" aria-label="Custom restart template">
                 <label>Restart id<input name="restartId" defaultValue="academy-goal-kick" required /></label>
                 <label>Restart label<input name="restartLabel" defaultValue="Academy goal-kick build" required /></label>

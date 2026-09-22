@@ -27,6 +27,17 @@ const FIFA_FUTSAL_2021: SourceProvenance = {
   note: 'Version is shown explicitly; verify the applicable competition edition before match use.',
 };
 
+const US_SOCCER_PDI_2017: SourceProvenance = {
+  kind: 'governing-source',
+  authoritative: true,
+  organization: 'U.S. Soccer',
+  sourceTitle: 'How Small-Sided Standards Will Change Youth Soccer',
+  sourceUrl: 'https://www.ussoccer.com/stories/2017/08/five-things-to-know-how-smallsided-standards-will-change-youth-soccer',
+  sourceVersion: '2017 PDI',
+  sourceDate: '2026-09-22',
+  note: 'U.S.-specific youth standard; verify the implementing competition rules before match use.',
+};
+
 const ifabInternationalProfile: PitchRuleProfile = {
   id: 'ifab-11v11-international-2026-27',
   label: 'IFAB international 11v11 (2026/27)',
@@ -61,10 +72,27 @@ const futsalProfile: PitchRuleProfile = {
   provenance: FIFA_FUTSAL_2021,
 };
 
+const usSoccerPdi7v7Profile: PitchRuleProfile = {
+  id: 'ussf-pdi-7v7-2017',
+  label: 'U.S. Soccer PDI 7v7 (2017)',
+  format: '7v7',
+  teamSize: 7,
+  editable: false,
+  ageGroup: 'U-9 to U-10',
+  goalkeeperStatus: 'included',
+  specialLines: ['Two build-out lines, each 14 yards in front of goal'],
+  restartNotes: [
+    'At a goal kick or while the goalkeeper holds the ball, opponents remain behind the build-out line until the ball is put into play.',
+    'Offside is not called between the halfway line and the build-out line.',
+  ],
+  provenance: US_SOCCER_PDI_2017,
+};
+
 export const PITCH_RULE_PROFILES: PitchRuleProfile[] = [
   ...trainingFormatProfiles,
   ifabInternationalProfile,
   futsalProfile,
+  usSoccerPdi7v7Profile,
 ];
 
 function cloneProfile(profile: PitchRuleProfile): PitchRuleProfile {
@@ -139,6 +167,31 @@ export function createCustomPitchRuleProfile(input: CustomPitchRuleProfileInput)
   };
 }
 
+export function createEditablePitchRuleProfileCopy(
+  source: PitchRuleProfile,
+  identity: { id: string; label: string },
+  changes: Partial<PitchRuleProfile> = {},
+): PitchRuleProfile {
+  const id = identity.id.trim();
+  const label = identity.label.trim();
+  if (!id) throw new Error('Rules profile copy id is required.');
+  if (!label) throw new Error('Rules profile copy label is required.');
+  const sourceCopy = cloneProfile(source);
+  const copy = cloneProfile({ ...sourceCopy, ...changes, id, label });
+  return {
+    ...copy,
+    id,
+    label,
+    editable: true,
+    provenance: {
+      ...sourceCopy.provenance,
+      kind: 'custom',
+      authoritative: false,
+      note: `Editable local copy derived from ${source.provenance.sourceTitle}. Verify changes against the applicable competition rules.`,
+    },
+  };
+}
+
 function line(
   id: string,
   label: string,
@@ -154,7 +207,10 @@ function line(
   };
 }
 
-function profileOverlays(profile: PitchRuleProfile): TacticalPitch['overlays'] {
+function profileOverlays(
+  profile: PitchRuleProfile,
+  pitchDimensions: TacticalPitch['dimensions'],
+): TacticalPitch['overlays'] {
   if (profile.id === 'ifab-11v11-international-2026-27') {
     const length = profile.dimensions!.lengthMeters;
     const width = profile.dimensions!.widthMeters;
@@ -175,6 +231,14 @@ function profileOverlays(profile: PitchRuleProfile): TacticalPitch['overlays'] {
       line('futsal-right-second-penalty-mark', 'Right second penalty mark', [[0.75, 0.48], [0.75, 0.52]], profile.provenance),
     ];
   }
+  if (profile.id === 'ussf-pdi-7v7-2017') {
+    const buildOutDistanceMeters = 14 * 0.9144;
+    const offset = buildOutDistanceMeters / pitchDimensions.lengthMeters;
+    return [
+      line('ussf-left-build-out-line', 'U.S. Soccer left build-out line', [[offset, 0], [offset, 1]], profile.provenance),
+      line('ussf-right-build-out-line', 'U.S. Soccer right build-out line', [[1 - offset, 0], [1 - offset, 1]], profile.provenance),
+    ];
+  }
   const hasBuildOutLine = profile.specialLines?.some((item) => /build[- ]out/i.test(item));
   return hasBuildOutLine
     ? [
@@ -192,14 +256,15 @@ export function applyPitchRuleProfile(
     ? getPitchRuleProfile(profileOrId)
     : cloneProfile(profileOrId);
   if (!profile) throw new Error(`Pitch rules profile "${profileOrId}" does not exist.`);
+  const dimensions = profile.dimensions ? { ...profile.dimensions } : { ...project.pitch.dimensions };
   return {
     ...project,
     ruleset: profile,
     pitch: {
       ...project.pitch,
       profileId: profile.id,
-      dimensions: profile.dimensions ? { ...profile.dimensions } : { ...project.pitch.dimensions },
-      overlays: profileOverlays(profile),
+      dimensions,
+      overlays: profileOverlays(profile, dimensions),
     },
   };
 }

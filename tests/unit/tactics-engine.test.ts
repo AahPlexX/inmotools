@@ -48,6 +48,7 @@ import {
 import {
   PITCH_RULE_PROFILES,
   applyPitchRuleProfile,
+  createEditablePitchRuleProfileCopy,
   createCustomPitchRuleProfile,
   getPitchRuleProfile,
 } from '../../src/tools/tactics/rules-engine';
@@ -55,6 +56,7 @@ import {
   RESTART_TEMPLATES,
   applyRestartTemplate,
   createCustomRestartTemplate,
+  reviewRestartLegality,
 } from '../../src/tools/tactics/restart-engine';
 
 describe('Tactical Matchboard foundation contracts', () => {
@@ -211,6 +213,22 @@ describe('Tactical Matchboard foundation contracts', () => {
       teamSize: 0,
       dimensions: { lengthMeters: 0, widthMeters: 20 },
     })).toThrow(/team size|pitch length/i);
+
+    const editableCopy = createEditablePitchRuleProfileCopy(ifab!, {
+      id: 'local-ifab-copy',
+      label: 'Local IFAB copy',
+    });
+    expect(editableCopy).toMatchObject({
+      id: 'local-ifab-copy',
+      label: 'Local IFAB copy',
+      editable: true,
+      provenance: {
+        kind: 'custom',
+        authoritative: false,
+        organization: 'The IFAB',
+        sourceVersion: '2026/27',
+      },
+    });
   });
 
   it('applies pitch profiles with deterministic normalized specialty overlays', () => {
@@ -227,6 +245,21 @@ describe('Tactical Matchboard foundation contracts', () => {
       point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
     )))).toBe(true);
     expect(validateTacticalProject(project)).toEqual([]);
+
+    const grassroots = applyPitchRuleProfile(createStarterTacticalProject(), 'ussf-pdi-7v7-2017');
+    expect(grassroots.ruleset).toMatchObject({
+      teamSize: 7,
+      ageGroup: 'U-9 to U-10',
+      provenance: {
+        organization: 'U.S. Soccer',
+        sourceVersion: '2017 PDI',
+      },
+    });
+    expect(grassroots.pitch.overlays.map((overlay) => overlay.id)).toEqual([
+      'ussf-left-build-out-line',
+      'ussf-right-build-out-line',
+    ]);
+    expect(grassroots.pitch.overlays[0]?.points[0]?.x).toBeCloseTo(12.8016 / 105, 12);
   });
 
   it('mirrors the complete authored board while preserving the prior project', () => {
@@ -252,6 +285,13 @@ describe('Tactical Matchboard foundation contracts', () => {
     expect(start.pitch.direction).toBe('left-to-right');
     expect(start.ball.position).toEqual({ x: 0.02, y: 0.02 });
     expect(validateTacticalProject(mirrored)).toEqual([]);
+
+    const flipped = transformTacticalProject(start, 'vertical');
+    expect(flipped.pitch.direction).toBe(start.pitch.direction);
+    expect(flipped.playerTokens[0]?.position.y).toBeCloseTo(1 - start.playerTokens[0]!.position.y, 12);
+    expect(flipped.ball.position).toEqual({ x: 0.02, y: 0.98 });
+    expect(flipped.annotations[0]?.points[0]).toEqual({ x: 0.02, y: 0.98 });
+    expect(validateTacticalProject(flipped)).toEqual([]);
   });
 
   it('captures and deterministically morphs editable formation phases', () => {
@@ -366,6 +406,58 @@ describe('Tactical Matchboard foundation contracts', () => {
       guideLabel: 'Bad route',
       guidePoints: [{ x: 0.2, y: 0.2 }],
     })).toThrow(/normalized|two points/i);
+  });
+
+  it('reviews sourced restart placement and opponent-distance constraints as authoring aids', () => {
+    let project = applyPitchRuleProfile(createStarterTacticalProject(), 'ifab-11v11-international-2026-27');
+    project = addTeam(project, {
+      id: 'home',
+      name: 'Home',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+    project = addTeam(project, {
+      id: 'away',
+      name: 'Away',
+      primaryColor: '#9f1239',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+    project = addRosterPlayer(project, 'away', {
+      id: 'away-1',
+      displayName: 'Opponent',
+      role: 'Defender',
+      status: 'active',
+    });
+    project = addPlayerToken(project, {
+      id: 'away-token-1',
+      teamId: 'away',
+      playerId: 'away-1',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      position: { x: 0.04, y: 0.04 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    });
+
+    const corner = RESTART_TEMPLATES.find((template) => template.id === 'tool-corner-left')!;
+    const issues = reviewRestartLegality(project, corner, 'home');
+    expect(issues.map((issue) => issue.code)).toContain('corner-ball-outside-area');
+    expect(issues.map((issue) => issue.code)).toContain('opponent-distance');
+    expect(issues.every((issue) => issue.source.authoritative)).toBe(true);
+
+    const kickoff = createCustomRestartTemplate({
+      id: 'bad-kickoff',
+      label: 'Bad kick-off',
+      kind: 'kick-off',
+      ballPosition: { x: 0.4, y: 0.5 },
+      guideLabel: 'First pass',
+      guidePoints: [{ x: 0.4, y: 0.5 }, { x: 0.3, y: 0.5 }],
+    });
+    expect(reviewRestartLegality(project, kickoff, 'home').map((issue) => issue.code))
+      .toContain('kickoff-ball-not-centered');
   });
 
   it('rejects out-of-range coordinates across pitch overlays and annotations', () => {

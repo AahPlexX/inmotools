@@ -18,6 +18,51 @@ const TOOL_RESTART_SOURCE: SourceProvenance = {
   note: 'Coaching layout starter, not a governing-body legality decision.',
 };
 
+const IFAB_RESTART_SOURCES = {
+  'kick-off': {
+    kind: 'governing-source',
+    authoritative: true,
+    organization: 'The IFAB',
+    sourceTitle: 'Laws of the Game 2026/27 — Law 8: The Start and Restart of Play',
+    sourceUrl: 'https://www.theifab.com/laws/latest/the-start-and-restart-of-play/',
+    sourceVersion: '2026/27',
+    sourceDate: '2026-09-22',
+  },
+  'free-kick': {
+    kind: 'governing-source',
+    authoritative: true,
+    organization: 'The IFAB',
+    sourceTitle: 'Laws of the Game 2026/27 — Law 13: Free Kicks',
+    sourceUrl: 'https://www.theifab.com/laws/latest/free-kicks/',
+    sourceVersion: '2026/27',
+    sourceDate: '2026-09-22',
+  },
+  'goal-kick': {
+    kind: 'governing-source',
+    authoritative: true,
+    organization: 'The IFAB',
+    sourceTitle: 'Laws of the Game 2026/27 — Law 16: The Goal Kick',
+    sourceUrl: 'https://www.theifab.com/laws/latest/the-goal-kick/',
+    sourceVersion: '2026/27',
+    sourceDate: '2026-09-22',
+  },
+  corner: {
+    kind: 'governing-source',
+    authoritative: true,
+    organization: 'The IFAB',
+    sourceTitle: 'Laws of the Game 2026/27 — Law 17: The Corner Kick',
+    sourceUrl: 'https://www.theifab.com/laws/latest/the-corner-kick/',
+    sourceVersion: '2026/27',
+    sourceDate: '2026-09-22',
+  },
+} satisfies Record<RestartTemplate['kind'], SourceProvenance>;
+
+export interface RestartReviewIssue {
+  code: 'kickoff-ball-not-centered' | 'corner-ball-outside-area' | 'goal-kick-ball-outside-area' | 'opponent-distance' | 'opponent-position';
+  message: string;
+  source: SourceProvenance;
+}
+
 export const RESTART_TEMPLATES: RestartTemplate[] = [
   {
     id: 'tool-kick-off',
@@ -78,6 +123,103 @@ export function createCustomRestartTemplate(input: CustomRestartTemplateInput): 
       note: 'Local coaching template; not a governing-body legality decision.',
     },
   };
+}
+
+function distanceMeters(
+  left: NormalizedPoint,
+  right: NormalizedPoint,
+  project: TacticalProject,
+): number {
+  const dx = (left.x - right.x) * project.pitch.dimensions.lengthMeters;
+  const dy = (left.y - right.y) * project.pitch.dimensions.widthMeters;
+  return Math.hypot(dx, dy);
+}
+
+function isInsideIfabGoalArea(point: NormalizedPoint, project: TacticalProject): boolean {
+  const { lengthMeters, widthMeters } = project.pitch.dimensions;
+  const xMeters = point.x * lengthMeters;
+  const yMeters = point.y * widthMeters;
+  const nearGoalLine = xMeters <= 5.5 || xMeters >= lengthMeters - 5.5;
+  const goalAreaHalfWidth = (7.32 + 11) / 2;
+  return nearGoalLine && Math.abs(yMeters - widthMeters / 2) <= goalAreaHalfWidth;
+}
+
+function isInsideIfabPenaltyArea(point: NormalizedPoint, project: TacticalProject, leftGoal: boolean): boolean {
+  const { lengthMeters, widthMeters } = project.pitch.dimensions;
+  const xMeters = point.x * lengthMeters;
+  const yMeters = point.y * widthMeters;
+  const withinDepth = leftGoal ? xMeters <= 16.5 : xMeters >= lengthMeters - 16.5;
+  const penaltyAreaHalfWidth = (7.32 + 33) / 2;
+  return withinDepth && Math.abs(yMeters - widthMeters / 2) <= penaltyAreaHalfWidth;
+}
+
+export function reviewRestartLegality(
+  project: TacticalProject,
+  template: RestartTemplate,
+  restartingTeamId?: string,
+): RestartReviewIssue[] {
+  const source = IFAB_RESTART_SOURCES[template.kind];
+  const issues: RestartReviewIssue[] = [];
+  const ball = createNormalizedPoint(template.ballPosition.x, template.ballPosition.y);
+  const usesIfabLaws = project.ruleset.provenance.organization === 'The IFAB';
+
+  if (usesIfabLaws && template.kind === 'kick-off' && distanceMeters(ball, { x: 0.5, y: 0.5 }, project) > 0.01) {
+    issues.push({ code: 'kickoff-ball-not-centered', message: 'IFAB kick-offs place the stationary ball on the centre mark.', source });
+  }
+  if (usesIfabLaws && template.kind === 'corner') {
+    const cornerDistance = Math.min(
+      ...[{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: 1, y: 1 }]
+        .map((corner) => distanceMeters(ball, corner, project)),
+    );
+    if (cornerDistance > 1) {
+      issues.push({ code: 'corner-ball-outside-area', message: 'IFAB corner kicks place the ball within one metre of the nearest corner.', source });
+    }
+  }
+  if (usesIfabLaws && template.kind === 'goal-kick' && !isInsideIfabGoalArea(ball, project)) {
+    issues.push({ code: 'goal-kick-ball-outside-area', message: 'IFAB goal kicks place the stationary ball within the defending goal area.', source });
+  }
+
+  const opponents = restartingTeamId
+    ? project.playerTokens.filter((token) => token.visible && token.teamId !== restartingTeamId)
+    : [];
+  if (usesIfabLaws && ['kick-off', 'free-kick', 'corner'].includes(template.kind)) {
+    for (const opponent of opponents) {
+      if (distanceMeters(ball, opponent.position, project) < 9.15) {
+        issues.push({
+          code: 'opponent-distance',
+          message: `${opponent.id} is inside the IFAB 9.15 m opponent-distance guide. Quick-restart exceptions require referee judgment.`,
+          source,
+        });
+      }
+    }
+  }
+  if (usesIfabLaws && template.kind === 'goal-kick') {
+    const leftGoal = ball.x <= 0.5;
+    for (const opponent of opponents) {
+      if (isInsideIfabPenaltyArea(opponent.position, project, leftGoal)) {
+        issues.push({
+          code: 'opponent-position',
+          message: `${opponent.id} is inside the penalty area before the goal kick; IFAB Law 16 includes quick-restart exceptions requiring referee judgment.`,
+          source,
+        });
+      }
+    }
+  }
+  if (project.ruleset.id === 'ussf-pdi-7v7-2017' && template.kind === 'goal-kick') {
+    const offset = (14 * 0.9144) / project.pitch.dimensions.lengthMeters;
+    const leftGoal = ball.x <= 0.5;
+    for (const opponent of opponents) {
+      const behindBuildOutLine = leftGoal ? opponent.position.x >= offset : opponent.position.x <= 1 - offset;
+      if (!behindBuildOutLine) {
+        issues.push({
+          code: 'opponent-position',
+          message: `${opponent.id} is not behind the U.S. Soccer PDI build-out line before the goal kick is put into play.`,
+          source: project.ruleset.provenance,
+        });
+      }
+    }
+  }
+  return issues;
 }
 
 function requireEditableLayer(project: TacticalProject, sceneId: string, layerId: string): void {
