@@ -3,7 +3,7 @@
 **Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `a8ee9f46`
+**Code tip described by this queue before this documentation commit:** `b2ec46e39712796731bc83a8cd40f82ec9caeeec`
 
 ## Purpose and source-of-truth roles
 
@@ -75,22 +75,21 @@
 - **Reverse-safe:** complete.
 
 ### T04-01 — Complete pitch/rules/formation authoring
-- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
+- **Status:** DONE
 - **Depends on:** T03-06
 - **Primary files:** tactical pitch/formation/rules engines, Tactical workspace rules UI, focused tests
-- **Implemented at `a8ee9f46`:** custom rules profiles; current IFAB plus explicitly dated futsal references; deterministic profile overlays; custom and sourced formation libraries; phase capture/morphing; whole-project mirror/flip transforms; formation review; provenance-bearing built-in/custom restart templates; responsive accessible UI and focused tests.
-- **Remaining action:** editable forks of sourced profiles, current primary-source specialty/grassroots line coverage, sourced restart-specific legality checks, and a focused whole-project vertical-transform assertion.
-- **Exit evidence:** primary-source provenance, invariant tests, build/browser evidence required by affected feature rows.
-- **Current evidence:** `a8ee9f46` passes 29/29 tactical units, 3/3 selector units, production/PWA build, and 16 browser scenarios with 2 intentional duplicate-project skips across desktop/mobile Chromium. Rows 9, 10, 11, 12, and 15 are verified; rows 1, 2, 13, and 14 remain open as described in the feature matrix.
-- **Reverse-safe:** no; its remaining primary files stay reserved.
-
+- **Implementation:** `a8ee9f46` established rules/profile application, custom rules/formations/restarts, phase morphing, transforms and accessible authoring UI; `f3a94e2` added editable sourced-profile forks, restart-specific legality review and whole-project vertical-transform evidence; `021cb63`/`42ec61c` updated current FIFA Futsal 2025-26 and IFAB provenance; `b2ec46e39712796731bc83a8cd40f82ec9caeeec` closed the declared-vs-rendered special-line gap with source-backed IFAB, FIFA futsal and U.S. Soccer geometry.
+- **Exit evidence:** current primary-source provenance; **30/30** focused tactical units plus **3/3** selector units; TypeScript and production/PWA build; **16 browser scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium, including rules/restarts/transforms, keyboard/touch, Axe, five-width reflow and 44px targets.
+- **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
+- **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** BLOCKED
-- **Depends on:** T04-01
+- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
+- **Depends on:** T04-01 DONE
 - **Primary files:** new tactical timeline/motion modules + tactical UI/tests
 - **Action:** integer-time scenes/tracks/keyframes, easing, Bézier paths, visibility spans, offsets, markers, coordinated actions, linked units, possession/handoffs, conflict review.
+- **First slice:** pure deterministic integer-time timeline engine over the existing canonical schema, with behavioral contracts for tracks/keyframes, interpolation/easing, visibility spans, offsets and markers before UI wiring.
 - **Exit evidence:** deterministic interpolation/sequencing tests + browser workflow.
-- **Reverse-safe:** no.
+- **Reverse-safe:** no; its primary files are reserved while ACTIVE.
 
 ### T06-01 — Spatial analysis
 - **Status:** BLOCKED

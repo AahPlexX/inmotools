@@ -4,22 +4,22 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source commit: `a8ee9f46`
-- Current comparison to `main`: **57 commits ahead / 7 behind**, status `diverged`
+- Last validated source commit: `b2ec46e39712796731bc83a8cd40f82ec9caeeec`
+- Current comparison to `main`: **63 commits ahead / 12 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
-- Milestone: **Task 4 — pitch, rules, formation, and restart authoring**
-- Verified functional features: **5/60**
+- Milestone: **Task 5 — timeline, trajectories and coordinated motion**
+- Verified functional features: **9/60**
 - Registration status: catalog entry and lazy workspace loader are now registered after executable unit/type/build gates passed.
 
 A committed handoff file cannot contain its own final Git SHA because its contents participate in that SHA. The branch ref is authoritative after documentation commits.
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T04-01**. It remains the sole ACTIVE forward item and its listed primary files are reserved until its remaining gate is recorded.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T05-01**. It is now the sole ACTIVE forward item.
 
-Next, add editable forks for sourced profiles, finish current primary-source specialty/grassroots line coverage and restart-specific legality checks, then add a whole-project vertical-transform assertion. Reuse the current engines and focused tests; do not introduce a dependency.
+Start with a pure deterministic timeline engine over the existing canonical project schema: integer-time tracks/keyframes, interpolation/easing, visibility spans, offsets and markers. Add behavioral contracts before implementation, then expose browser controls only after the engine invariants are green. Do not create a parallel scene graph or add a dependency unless a proven requirement cannot be met with the existing stack.
 
-Do not label a rules profile or restart as sourced/official without exact primary-source provenance. Preserve editable generic profiles where jurisdiction-specific rules vary.
+Task 4 is closed. Current sourced rules remain provenance-bearing and editable copies remain non-authoritative.
 
 ## Current executable evidence
 
@@ -30,6 +30,7 @@ Do not label a rules profile or restart as sourced/official without exact primar
 - `f885ed383b0bac6e85a10115a765d85baaad34b0`: focused tactical plus selector units **26/26 passed**, production/PWA build succeeded, and the focused Tactical Matchboard spec passed **10/10** scenarios across desktop and mobile Chromium.
 - `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`: expanded Tactical Matchboard browser gate passed **14 scenarios** with **2 intentional duplicate-project skips**, covering keyboard activation, Axe, phone/tablet/laptop/desktop reflow, document overflow, and essential 44px targets.
 - `a8ee9f46`: **29/29** focused tactical units and **3/3** selector units passed; TypeScript-checked production/PWA build passed (`✓ built in 1m 8s`); the expanded tactical browser gate passed **16 scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium.
+- `b2ec46e39712796731bc83a8cd40f82ec9caeeec`: Task 4 closure source passes **30/30** focused tactical units plus **3/3** selector units, TypeScript and production/PWA build, and **16 browser scenarios** with **2 intentional duplicate-project skips**. Evidence includes current IFAB 2026/27, FIFA Futsal 2025-26 and U.S. Soccer PDI overlays/restart aids, sourced-profile forks, vertical/horizontal whole-project transforms, keyboard/touch, Axe, reflow and 44px targets.
 - Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
@@ -52,13 +53,11 @@ The registered beginner slice now provides:
 
 ## Active feature state
 
-Verified: **9, 10, 11, 12, 15**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15**.
 
-Implemented, awaiting one focused evidence item: **13**.
+In progress: **3, 4, 5, 7, 8, 51, 52, 55, 56, 59**.
 
-In progress: **1, 2, 3, 4, 5, 7, 8, 14, 51, 52, 55, 56, 59**.
-
-All other accepted feature rows remain planned. The numerator includes only the five rows whose complete accepted behavior has the relevant unit/build/browser/accessibility proof.
+All other accepted feature rows remain planned. The numerator includes only the nine rows whose complete accepted behavior has the relevant unit/build/browser/accessibility proof.
 
 ## Accessibility/input ruling
 
@@ -77,6 +76,7 @@ The current movement workflow intentionally does not require dragging: pitch tap
 
 ## Open blockers / deferred evidence
 
-- Task 3 is closed with executable unit, build, desktop/mobile workflow, keyboard, Axe, reflow, and target-size evidence. No partial feature row was promoted solely from that milestone gate.
-- The futsal profile is explicitly versioned as a FIFA 2021 reference rather than presented as current; current primary-source futsal/grassroots specialty geometry and restart legality remain before Task 4 can close.
-- Task 4 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
+- Task 4 is closed with current-source rules geometry, legality aids, unit/build/browser/accessibility evidence and a reconciled 9/60 feature ledger.
+- T05-01 is active; timeline, trajectory and coordinated-motion behavior is not yet implemented or verified.
+- The branch is intentionally 63 commits ahead / 12 behind current main; reconciliation remains deferred until T14 after the branch-complete gate.
+- Task 5 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
