@@ -72,6 +72,7 @@ function downloadStem(title: string): string {
 
 export default function TacticalMatchboardWorkspace() {
   const [setup, setSetup] = useState<SetupState>(INITIAL_SETUP);
+  const [setupOpen, setSetupOpen] = useState(true);
   const [history, setHistory] = useState(() => createTacticalHistory(projectFromSetup(INITIAL_SETUP)));
   const [selectedTokenId, setSelectedTokenId] = useState(() => history.present.playerTokens[0]?.id);
   const [mode, setMode] = useState<InteractionMode>('move');
@@ -204,7 +205,11 @@ export default function TacticalMatchboardWorkspace() {
         </div>
       </div>
       <div className="workspace-body tactical-matchboard-workspace">
-        <details className="tactical-setup" open>
+        <details
+          className="tactical-setup"
+          open={setupOpen}
+          onToggle={(event) => setSetupOpen(event.currentTarget.open)}
+        >
           <summary>Board setup</summary>
           <form onSubmit={rebuildBoard} className="tactical-setup-grid">
             <label>
@@ -333,7 +338,7 @@ export default function TacticalMatchboardWorkspace() {
 
           <aside className="tactical-inspector" aria-label="Player precision controls">
             <h3>Players</h3>
-            <div className="tactical-player-list" role="list">
+            <div className="tactical-player-list">
               {project.playerTokens.map((token) => {
                 const team = project.teams.find((candidate) => candidate.id === token.teamId);
                 const player = team?.roster.find((candidate) => candidate.id === token.playerId);
