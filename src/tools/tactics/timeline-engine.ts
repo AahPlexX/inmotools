@@ -3,6 +3,7 @@ import type {
   NormalizedPoint,
   TacticalKeyframe,
   TacticalTimeline,
+  TacticalScene,
   TimelineMarker,
   TimelineTrack,
 } from './tactics-types';
@@ -197,4 +198,117 @@ export function addTimelineMarker(timeline: TacticalTimeline, marker: TimelineMa
     tracks: timeline.tracks.map((track) => ({ ...track, keyframes: track.keyframes.map(cloneKeyframe) })),
     markers: [...timeline.markers.map(cloneMarker), next].sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id)),
   };
+}
+
+function validateTrack(track: TimelineTrack): TimelineTrack {
+  const id = track.id.trim();
+  const targetId = track.targetId.trim();
+  if (!id) throw new Error('Timeline track id is required.');
+  if (!targetId) throw new Error('Timeline track target id is required.');
+  const ids = new Set<string>();
+  const times = new Set<number>();
+  const keyframes = sortedKeyframes(track).map((keyframe) => {
+    const next = validateKeyframe(keyframe);
+    if (ids.has(next.id)) throw new Error(`Keyframe id ${next.id} already exists in track ${id}.`);
+    if (times.has(next.timeMs)) throw new Error(`Track ${id} has more than one keyframe at time ${next.timeMs}.`);
+    ids.add(next.id);
+    times.add(next.timeMs);
+    return next;
+  });
+  return { ...track, id, targetId, keyframes };
+}
+
+export function addTimelineTrack(timeline: TacticalTimeline, track: TimelineTrack): TacticalTimeline {
+  const next = validateTrack(track);
+  if (timeline.tracks.some((item) => item.id === next.id)) throw new Error(`Timeline track id ${next.id} already exists.`);
+  if (timeline.tracks.some((item) => item.targetId === next.targetId)) throw new Error(`Timeline target ${next.targetId} already has a track.`);
+  return {
+    ...timeline,
+    tracks: [...timeline.tracks.map(validateTrack), next],
+    markers: timeline.markers.map(cloneMarker),
+  };
+}
+
+export function sampleTacticalTimeline(
+  timeline: TacticalTimeline,
+  timeMs: number,
+): Record<string, SampledTimelineState> {
+  requireIntegerTime(timeMs, 'Sample time');
+  const result: Record<string, SampledTimelineState> = {};
+  for (const track of timeline.tracks) {
+    const valid = validateTrack(track);
+    if (result[valid.targetId]) throw new Error(`Timeline target ${valid.targetId} has multiple tracks.`);
+    result[valid.targetId] = sampleTimelineTrack(valid, timeMs);
+  }
+  return result;
+}
+
+export function setTimelinePlayhead(timeline: TacticalTimeline, timeMs: number): TacticalTimeline {
+  requireIntegerTime(timeMs, 'Playhead time');
+  requireIntegerTime(timeline.durationMs, 'Timeline duration');
+  let playheadMs = Math.min(timeMs, timeline.durationMs);
+  if (timeline.loop) playheadMs = timeline.durationMs === 0 ? 0 : timeMs % timeline.durationMs;
+  return { ...timeline, playheadMs };
+}
+
+export function activeScenesAtTime(scenes: TacticalScene[], timeMs: number): TacticalScene[] {
+  requireIntegerTime(timeMs, 'Scene sample time');
+  return scenes
+    .map((scene) => {
+      requireIntegerTime(scene.startMs, `Scene ${scene.id} start`);
+      requireIntegerTime(scene.durationMs, `Scene ${scene.id} duration`);
+      return scene;
+    })
+    .filter((scene) => scene.durationMs === 0
+      ? timeMs === scene.startMs
+      : timeMs >= scene.startMs && timeMs < scene.startMs + scene.durationMs)
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
+}
+
+export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
+  const errors: string[] = [];
+  if (!Number.isInteger(timeline.durationMs) || timeline.durationMs < 0) {
+    errors.push('Timeline duration must be a non-negative integer number of milliseconds.');
+  }
+  if (!Number.isInteger(timeline.playheadMs) || timeline.playheadMs < 0) {
+    errors.push('Timeline playhead must be a non-negative integer number of milliseconds.');
+  } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && timeline.playheadMs > timeline.durationMs) {
+    errors.push(`Timeline playhead ${timeline.playheadMs} exceeds duration ${timeline.durationMs}.`);
+  }
+  if (!Number.isFinite(timeline.playbackRate) || timeline.playbackRate <= 0) {
+    errors.push('Timeline playback rate must be a positive finite number.');
+  }
+
+  const trackIds = new Set<string>();
+  const targetIds = new Set<string>();
+  for (const track of timeline.tracks) {
+    if (trackIds.has(track.id)) errors.push(`Timeline track id ${track.id} is duplicated.`);
+    if (targetIds.has(track.targetId)) errors.push(`Timeline target ${track.targetId} has multiple tracks.`);
+    trackIds.add(track.id);
+    targetIds.add(track.targetId);
+    try {
+      const valid = validateTrack(track);
+      if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0) {
+        for (const keyframe of valid.keyframes) {
+          if (keyframe.timeMs > timeline.durationMs) {
+            errors.push(`Keyframe ${keyframe.id} time ${keyframe.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+          }
+        }
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'Invalid timeline track.');
+    }
+  }
+
+  const markerIds = new Set<string>();
+  for (const marker of timeline.markers) {
+    if (markerIds.has(marker.id)) errors.push(`Timeline marker id ${marker.id} is duplicated.`);
+    markerIds.add(marker.id);
+    if (!Number.isInteger(marker.timeMs) || marker.timeMs < 0) {
+      errors.push(`Timeline marker ${marker.id} time must be a non-negative integer millisecond value.`);
+    } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && marker.timeMs > timeline.durationMs) {
+      errors.push(`Timeline marker ${marker.id} time ${marker.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+    }
+  }
+  return errors;
 }

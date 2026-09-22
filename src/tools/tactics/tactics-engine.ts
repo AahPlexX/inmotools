@@ -3,6 +3,7 @@ import type {
   TacticalProject,
 } from './tactics-types';
 import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
+import { validateTacticalTimeline } from './timeline-engine';
 
 export const TACTICS_SCHEMA_VERSION = 1 as const;
 
@@ -151,12 +152,7 @@ export function validateTacticalProject(project: TacticalProject): string[] {
     errors.push('Pitch dimensions must be positive finite metre values.');
   }
 
-  if (!Number.isInteger(project.timeline.playheadMs) || project.timeline.playheadMs < 0) {
-    errors.push('Timeline playhead must be a non-negative integer number of milliseconds.');
-  }
-  if (!Number.isInteger(project.timeline.durationMs) || project.timeline.durationMs < 0) {
-    errors.push('Timeline duration must be a non-negative integer number of milliseconds.');
-  }
+  errors.push(...validateTacticalTimeline(project.timeline));
 
   for (const token of project.playerTokens) {
     validatePosition(errors, token.id, token.position);
@@ -208,9 +204,6 @@ export function validateTacticalProject(project: TacticalProject): string[] {
 
   for (const track of project.timeline.tracks) {
     for (const keyframe of track.keyframes) {
-      if (!Number.isInteger(keyframe.timeMs) || keyframe.timeMs < 0) {
-        errors.push(`Keyframe ${keyframe.id} time must be a non-negative integer millisecond value.`);
-      }
       if (keyframe.position) validatePosition(errors, keyframe.id, keyframe.position);
     }
   }
