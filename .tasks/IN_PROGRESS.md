@@ -5,8 +5,8 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-  - Current milestone: Foundation — RED schema/geometry/formation contracts; implementation next.
-  - Current verified feature count: **0/60**. Features 1, 4, 8, 9, 10, 11, 13, and 14 are in progress; all others remain planned.
+  - Current milestone: Task 3 — immutable editor/history foundation and canonical scene/layer ownership; accessible SVG board vertical slice next.
+  - Current verified feature count: **0/60**. Features 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 55, and 56 are in progress; all others remain planned. Engine state now includes bounded undo/redo, team/roster/token/equipment/annotation operations, explicit scene/layer ownership, locked-layer write protection, and missing scene/layer project validation.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 
