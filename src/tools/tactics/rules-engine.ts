@@ -208,28 +208,135 @@ function line(
   };
 }
 
+function normalizeMeters(value: number, total: number): number {
+  return Math.min(1, Math.max(0, value / total));
+}
+
+function lineMeters(
+  id: string,
+  label: string,
+  points: Array<[number, number]>,
+  dimensions: TacticalPitch['dimensions'],
+  provenance: SourceProvenance,
+): TacticalPitch['overlays'][number] {
+  return line(
+    id,
+    label,
+    points.map(([xMeters, yMeters]) => [
+      normalizeMeters(xMeters, dimensions.lengthMeters),
+      normalizeMeters(yMeters, dimensions.widthMeters),
+    ]),
+    provenance,
+  );
+}
+
+function arcMeters(
+  id: string,
+  label: string,
+  center: [number, number],
+  radiusMeters: number,
+  startAngle: number,
+  endAngle: number,
+  dimensions: TacticalPitch['dimensions'],
+  provenance: SourceProvenance,
+  segments = 12,
+): TacticalPitch['overlays'][number] {
+  const points: Array<[number, number]> = Array.from({ length: segments + 1 }, (_, index) => {
+    const progress = index / segments;
+    const angle = startAngle + (endAngle - startAngle) * progress;
+    return [
+      center[0] + Math.cos(angle) * radiusMeters,
+      center[1] + Math.sin(angle) * radiusMeters,
+    ];
+  });
+  return lineMeters(id, label, points, dimensions, provenance);
+}
+
+function markMeters(
+  id: string,
+  label: string,
+  xMeters: number,
+  yMeters: number,
+  diameterMeters: number,
+  dimensions: TacticalPitch['dimensions'],
+  provenance: SourceProvenance,
+): TacticalPitch['overlays'][number] {
+  return lineMeters(
+    id,
+    label,
+    [[xMeters, yMeters - diameterMeters / 2], [xMeters, yMeters + diameterMeters / 2]],
+    dimensions,
+    provenance,
+  );
+}
+
+function futsalPenaltyArea(
+  id: string,
+  label: string,
+  leftGoal: boolean,
+  dimensions: TacticalPitch['dimensions'],
+  provenance: SourceProvenance,
+): TacticalPitch['overlays'][number] {
+  const goalLineX = leftGoal ? 0 : dimensions.lengthMeters;
+  const halfJoinWidth = 3.16 / 2;
+  const upperCenterY = dimensions.widthMeters / 2 - halfJoinWidth;
+  const lowerCenterY = dimensions.widthMeters / 2 + halfJoinWidth;
+  const upper = Array.from({ length: 13 }, (_, index): [number, number] => {
+    const progress = index / 12;
+    const start = -Math.PI / 2;
+    const end = leftGoal ? 0 : -Math.PI;
+    const angle = start + (end - start) * progress;
+    return [goalLineX + Math.cos(angle) * 6, upperCenterY + Math.sin(angle) * 6];
+  });
+  const lower = Array.from({ length: 13 }, (_, index): [number, number] => {
+    const progress = index / 12;
+    const start = leftGoal ? 0 : Math.PI;
+    const end = Math.PI / 2;
+    const angle = start + (end - start) * progress;
+    return [goalLineX + Math.cos(angle) * 6, lowerCenterY + Math.sin(angle) * 6];
+  });
+  return lineMeters(id, label, [...upper, ...lower], dimensions, provenance);
+}
+
 function profileOverlays(
   profile: PitchRuleProfile,
   pitchDimensions: TacticalPitch['dimensions'],
 ): TacticalPitch['overlays'] {
   if (profile.id === 'ifab-11v11-international-2026-27') {
-    const length = profile.dimensions!.lengthMeters;
-    const width = profile.dimensions!.widthMeters;
-    const depth = 16.5 / length;
-    const halfAreaWidth = (7.32 + 33) / 2 / width;
-    const top = 0.5 - halfAreaWidth;
-    const bottom = 0.5 + halfAreaWidth;
+    const { lengthMeters: length, widthMeters: width } = pitchDimensions;
+    const goalHalfWidth = 7.32 / 2;
+    const goalAreaHalfWidth = goalHalfWidth + 5.5;
+    const penaltyAreaHalfWidth = goalHalfWidth + 16.5;
     return [
       line('ifab-halfway-line', 'IFAB halfway line', [[0.5, 0], [0.5, 1]], profile.provenance),
-      line('ifab-left-penalty-area', 'IFAB left penalty area', [[0, top], [depth, top], [depth, bottom], [0, bottom]], profile.provenance),
-      line('ifab-right-penalty-area', 'IFAB right penalty area', [[1, top], [1 - depth, top], [1 - depth, bottom], [1, bottom]], profile.provenance),
+      lineMeters('ifab-left-goal-area', 'IFAB left goal area', [[0, width / 2 - goalAreaHalfWidth], [5.5, width / 2 - goalAreaHalfWidth], [5.5, width / 2 + goalAreaHalfWidth], [0, width / 2 + goalAreaHalfWidth]], pitchDimensions, profile.provenance),
+      lineMeters('ifab-right-goal-area', 'IFAB right goal area', [[length, width / 2 - goalAreaHalfWidth], [length - 5.5, width / 2 - goalAreaHalfWidth], [length - 5.5, width / 2 + goalAreaHalfWidth], [length, width / 2 + goalAreaHalfWidth]], pitchDimensions, profile.provenance),
+      lineMeters('ifab-left-penalty-area', 'IFAB left penalty area', [[0, width / 2 - penaltyAreaHalfWidth], [16.5, width / 2 - penaltyAreaHalfWidth], [16.5, width / 2 + penaltyAreaHalfWidth], [0, width / 2 + penaltyAreaHalfWidth]], pitchDimensions, profile.provenance),
+      lineMeters('ifab-right-penalty-area', 'IFAB right penalty area', [[length, width / 2 - penaltyAreaHalfWidth], [length - 16.5, width / 2 - penaltyAreaHalfWidth], [length - 16.5, width / 2 + penaltyAreaHalfWidth], [length, width / 2 + penaltyAreaHalfWidth]], pitchDimensions, profile.provenance),
+      markMeters('ifab-left-penalty-mark', 'IFAB left penalty-mark centre', 11, width / 2, 0.12, pitchDimensions, profile.provenance),
+      markMeters('ifab-right-penalty-mark', 'IFAB right penalty-mark centre', length - 11, width / 2, 0.12, pitchDimensions, profile.provenance),
+      arcMeters('ifab-corner-top-left', 'IFAB top-left corner area', [0, 0], 1, 0, Math.PI / 2, pitchDimensions, profile.provenance),
+      arcMeters('ifab-corner-bottom-left', 'IFAB bottom-left corner area', [0, width], 1, 0, -Math.PI / 2, pitchDimensions, profile.provenance),
+      arcMeters('ifab-corner-top-right', 'IFAB top-right corner area', [length, 0], 1, Math.PI, Math.PI / 2, pitchDimensions, profile.provenance),
+      arcMeters('ifab-corner-bottom-right', 'IFAB bottom-right corner area', [length, width], 1, Math.PI, 3 * Math.PI / 2, pitchDimensions, profile.provenance),
     ];
   }
   if (profile.id === 'fifa-futsal-2025-26') {
+    const { lengthMeters: length, widthMeters: width } = pitchDimensions;
+    const halfway = length / 2;
+    const substitutionMarkerDepth = 0.4;
     return [
       line('futsal-halfway-line', 'Futsal halfway line', [[0.5, 0], [0.5, 1]], profile.provenance),
-      line('futsal-left-second-penalty-mark', 'Left second penalty mark', [[0.25, 0.48], [0.25, 0.52]], profile.provenance),
-      line('futsal-right-second-penalty-mark', 'Right second penalty mark', [[0.75, 0.48], [0.75, 0.52]], profile.provenance),
+      futsalPenaltyArea('futsal-left-penalty-area', 'Futsal left six-metre penalty area', true, pitchDimensions, profile.provenance),
+      futsalPenaltyArea('futsal-right-penalty-area', 'Futsal right six-metre penalty area', false, pitchDimensions, profile.provenance),
+      markMeters('futsal-left-penalty-mark', 'Futsal left six-metre penalty mark', 6, width / 2, 0.12, pitchDimensions, profile.provenance),
+      markMeters('futsal-right-penalty-mark', 'Futsal right six-metre penalty mark', length - 6, width / 2, 0.12, pitchDimensions, profile.provenance),
+      markMeters('futsal-left-second-penalty-mark', 'Futsal left 10m mark', 10, width / 2, 0.12, pitchDimensions, profile.provenance),
+      markMeters('futsal-right-second-penalty-mark', 'Futsal right 10m mark', length - 10, width / 2, 0.12, pitchDimensions, profile.provenance),
+      lineMeters('futsal-left-substitution-far-marker', 'Futsal left substitution-zone far marker', [[halfway - 10, 0], [halfway - 10, substitutionMarkerDepth]], pitchDimensions, profile.provenance),
+      lineMeters('futsal-left-substitution-near-marker', 'Futsal left substitution-zone near marker', [[halfway - 5, 0], [halfway - 5, substitutionMarkerDepth]], pitchDimensions, profile.provenance),
+      lineMeters('futsal-right-substitution-near-marker', 'Futsal right substitution-zone near marker', [[halfway + 5, 0], [halfway + 5, substitutionMarkerDepth]], pitchDimensions, profile.provenance),
+      lineMeters('futsal-right-substitution-far-marker', 'Futsal right substitution-zone far marker', [[halfway + 10, 0], [halfway + 10, substitutionMarkerDepth]], pitchDimensions, profile.provenance),
     ];
   }
   if (profile.id === 'ussf-pdi-7v7-2017') {

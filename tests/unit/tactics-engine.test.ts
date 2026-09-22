@@ -252,13 +252,51 @@ describe('Tactical Matchboard foundation contracts', () => {
     expect(project.pitch.dimensions).toEqual({ lengthMeters: 105, widthMeters: 68 });
     expect(project.pitch.overlays.map((overlay) => overlay.id)).toEqual([
       'ifab-halfway-line',
+      'ifab-left-goal-area',
+      'ifab-right-goal-area',
       'ifab-left-penalty-area',
       'ifab-right-penalty-area',
+      'ifab-left-penalty-mark',
+      'ifab-right-penalty-mark',
+      'ifab-corner-top-left',
+      'ifab-corner-bottom-left',
+      'ifab-corner-top-right',
+      'ifab-corner-bottom-right',
     ]);
     expect(project.pitch.overlays.every((overlay) => overlay.points.every((point) => (
       point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
     )))).toBe(true);
     expect(validateTacticalProject(project)).toEqual([]);
+
+    const leftGoalArea = project.pitch.overlays.find((overlay) => overlay.id === 'ifab-left-goal-area');
+    expect(leftGoalArea?.points[1]?.x).toBeCloseTo(5.5 / 105, 12);
+    const leftPenaltyMark = project.pitch.overlays.find((overlay) => overlay.id === 'ifab-left-penalty-mark');
+    expect(leftPenaltyMark?.points[0]?.x).toBeCloseTo(11 / 105, 12);
+    expect(((leftPenaltyMark?.points[0]?.y ?? 0) + (leftPenaltyMark?.points[1]?.y ?? 0)) / 2).toBeCloseTo(0.5, 12);
+
+    const futsal = applyPitchRuleProfile(createStarterTacticalProject(), 'fifa-futsal-2025-26');
+    expect(futsal.pitch.overlays.map((overlay) => overlay.id)).toEqual([
+      'futsal-halfway-line',
+      'futsal-left-penalty-area',
+      'futsal-right-penalty-area',
+      'futsal-left-penalty-mark',
+      'futsal-right-penalty-mark',
+      'futsal-left-second-penalty-mark',
+      'futsal-right-second-penalty-mark',
+      'futsal-left-substitution-far-marker',
+      'futsal-left-substitution-near-marker',
+      'futsal-right-substitution-near-marker',
+      'futsal-right-substitution-far-marker',
+    ]);
+    const leftFutsalArea = futsal.pitch.overlays.find((overlay) => overlay.id === 'futsal-left-penalty-area');
+    expect(Math.max(...(leftFutsalArea?.points.map((point) => point.x) ?? []))).toBeCloseTo(6 / 40, 12);
+    const leftSecondMark = futsal.pitch.overlays.find((overlay) => overlay.id === 'futsal-left-second-penalty-mark');
+    expect(leftSecondMark?.points[0]?.x).toBeCloseTo(10 / 40, 12);
+    expect(Math.abs((leftSecondMark?.points[1]?.y ?? 0) - (leftSecondMark?.points[0]?.y ?? 0))).toBeCloseTo(0.12 / 20, 12);
+    const leftNearSubstitutionMarker = futsal.pitch.overlays.find((overlay) => overlay.id === 'futsal-left-substitution-near-marker');
+    expect(leftNearSubstitutionMarker?.points[0]).toEqual({ x: 15 / 40, y: 0 });
+    expect(leftNearSubstitutionMarker?.points[1]?.y).toBeCloseTo(0.4 / 20, 12);
+    expect(futsal.pitch.overlays.every((overlay) => overlay.provenance?.sourceVersion === '2025-26')).toBe(true);
 
     const grassroots = applyPitchRuleProfile(createStarterTacticalProject(), 'ussf-pdi-7v7-2017');
     expect(grassroots.ruleset).toMatchObject({
