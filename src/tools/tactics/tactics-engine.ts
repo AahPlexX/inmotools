@@ -123,6 +123,20 @@ function validatePosition(errors: string[], id: string, point: NormalizedPoint):
 
 export function validateTacticalProject(project: TacticalProject): string[] {
   const errors: string[] = [];
+  const sceneLayers = new Map(
+    project.scenes.map((scene) => [scene.id, new Set(scene.layers.map((layer) => layer.id))]),
+  );
+
+  function validateSceneLayerRef(id: string, sceneId: string, layerId: string): void {
+    const layers = sceneLayers.get(sceneId);
+    if (!layers) {
+      errors.push(`Object ${id} references missing scene ${sceneId}.`);
+      return;
+    }
+    if (!layers.has(layerId)) {
+      errors.push(`Object ${id} references missing layer ${layerId} in scene ${sceneId}.`);
+    }
+  }
 
   if (project.schemaVersion !== TACTICS_SCHEMA_VERSION) {
     errors.push(`Unsupported tactical project schema version: ${project.schemaVersion}.`);
@@ -144,15 +158,25 @@ export function validateTacticalProject(project: TacticalProject): string[] {
     errors.push('Timeline duration must be a non-negative integer number of milliseconds.');
   }
 
-  for (const token of project.playerTokens) validatePosition(errors, token.id, token.position);
-  for (const official of project.officials) validatePosition(errors, official.id, official.position);
-  for (const item of project.equipment) validatePosition(errors, item.id, item.position);
+  for (const token of project.playerTokens) {
+    validatePosition(errors, token.id, token.position);
+    validateSceneLayerRef(token.id, token.sceneId, token.layerId);
+  }
+  for (const official of project.officials) {
+    validatePosition(errors, official.id, official.position);
+    validateSceneLayerRef(official.id, official.sceneId, official.layerId);
+  }
+  for (const item of project.equipment) {
+    validatePosition(errors, item.id, item.position);
+    validateSceneLayerRef(item.id, item.sceneId, item.layerId);
+  }
   validatePosition(errors, 'ball', project.ball.position);
 
   for (const overlay of project.pitch.overlays) {
     for (const point of overlay.points) validatePosition(errors, overlay.id, point);
   }
   for (const annotation of project.annotations) {
+    validateSceneLayerRef(annotation.id, annotation.sceneId, annotation.layerId);
     for (const point of annotation.points) validatePosition(errors, annotation.id, point);
   }
 
