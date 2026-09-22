@@ -1,0 +1,290 @@
+.tactical-matchboard-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.tactical-workspace-header p {
+  max-width: 76ch;
+}
+
+.tactical-setup {
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+  overflow: clip;
+}
+
+.tactical-setup > summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: 750;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+.tactical-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+
+.tactical-setup-grid label,
+.tactical-arrow-label,
+.tactical-coordinate-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+}
+
+.tactical-setup-grid input,
+.tactical-setup-grid select,
+.tactical-command-bar input,
+.tactical-coordinate-form input,
+.tactical-coordinate-form button,
+.tactical-command-bar button,
+.tactical-player-list button,
+.tactical-dpad button {
+  min-height: 44px;
+}
+
+.tactical-setup-grid input[type="color"] {
+  width: 100%;
+  padding: 4px;
+}
+
+.tactical-setup-action {
+  display: grid;
+  align-content: end;
+  gap: 6px;
+}
+
+.tactical-command-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+
+.tactical-arrow-label {
+  min-width: min(240px, 100%);
+  flex: 1 1 220px;
+}
+
+.tactical-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  gap: 16px;
+  align-items: start;
+}
+
+.tactical-board-panel {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.tactical-board-heading-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tactical-board-heading-row h3,
+.tactical-inspector h3 {
+  margin: 0;
+}
+
+.tactical-board-heading-row p {
+  margin: 4px 0 0;
+  max-width: 72ch;
+}
+
+.tactical-board-mode {
+  white-space: nowrap;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.tactical-board {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #0f5132;
+  border-radius: 16px;
+  background: #2f7d45;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 12%);
+  touch-action: manipulation;
+  cursor: crosshair;
+}
+
+.tactical-board-svg,
+.tactical-board-svg svg {
+  display: block;
+  width: 100%;
+}
+
+.tactical-board-svg svg {
+  height: auto;
+  max-height: 72vh;
+}
+
+.tactical-board[data-interaction-mode="move"] .tactical-board-svg g[data-tactical-kind="player"] {
+  cursor: pointer;
+}
+
+.tactical-board[data-selected-token]:not([data-selected-token=""]) .tactical-board-svg g[data-tactical-kind="player"] circle {
+  transition: stroke-width 120ms ease, filter 120ms ease;
+}
+
+.tactical-arrow-start {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #facc15;
+  box-shadow: 0 0 0 2px #111827;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tactical-inspector {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--surface, #ffffff);
+  position: sticky;
+  top: 12px;
+}
+
+.tactical-player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.tactical-player-list button {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: transparent;
+}
+
+.tactical-player-list button.selected {
+  outline: 3px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.tactical-player-list button strong {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 50%;
+  background: #154c79;
+  color: #ffffff;
+}
+
+.tactical-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 48px);
+  grid-template-rows: repeat(3, 48px);
+  gap: 6px;
+  justify-content: center;
+}
+
+.tactical-dpad button {
+  width: 48px;
+  height: 48px;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.tactical-dpad button:nth-child(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.tactical-dpad button:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.tactical-dpad button:nth-child(3) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.tactical-dpad button:nth-child(4) {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.tactical-coordinate-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tactical-coordinate-form button {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .tactical-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tactical-inspector {
+    position: static;
+  }
+
+  .tactical-player-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .tactical-setup-grid,
+  .tactical-coordinate-form {
+    grid-template-columns: 1fr;
+  }
+
+  .tactical-command-bar {
+    align-items: stretch;
+  }
+
+  .tactical-command-bar > button,
+  .tactical-arrow-label {
+    flex: 1 1 100%;
+  }
+
+  .tactical-board-heading-row {
+    display: grid;
+  }
+
+  .tactical-board-mode {
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactical-board[data-selected-token]:not([data-selected-token=""]) .tactical-board-svg g[data-tactical-kind="player"] circle {
+    transition: none;
+  }
+}
