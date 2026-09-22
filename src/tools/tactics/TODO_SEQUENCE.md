@@ -3,7 +3,7 @@
 **Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`
+**Code tip described by this queue before this documentation commit:** `a8ee9f46`
 
 ## Purpose and source-of-truth roles
 
@@ -78,9 +78,11 @@
 - **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
 - **Depends on:** T03-06
 - **Primary files:** tactical pitch/formation/rules engines, Tactical workspace rules UI, focused tests
-- **Action:** sourced/editable pitch matrices, verified specialty overlays, custom rules profiles, formation authoring, transforms, legality aids, restart/set-piece templates.
+- **Implemented at `a8ee9f46`:** custom rules profiles; current IFAB plus explicitly dated futsal references; deterministic profile overlays; custom and sourced formation libraries; phase capture/morphing; whole-project mirror/flip transforms; formation review; provenance-bearing built-in/custom restart templates; responsive accessible UI and focused tests.
+- **Remaining action:** editable forks of sourced profiles, current primary-source specialty/grassroots line coverage, sourced restart-specific legality checks, and a focused whole-project vertical-transform assertion.
 - **Exit evidence:** primary-source provenance, invariant tests, build/browser evidence required by affected feature rows.
-- **Reverse-safe:** no until T03 closes.
+- **Current evidence:** `a8ee9f46` passes 29/29 tactical units, 3/3 selector units, production/PWA build, and 16 browser scenarios with 2 intentional duplicate-project skips across desktop/mobile Chromium. Rows 9, 10, 11, 12, and 15 are verified; rows 1, 2, 13, and 14 remain open as described in the feature matrix.
+- **Reverse-safe:** no; its remaining primary files stay reserved.
 
 ### T05-01 — Timeline, trajectories and coordinated motion
 - **Status:** BLOCKED

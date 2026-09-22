@@ -4,20 +4,20 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source commit: `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`
-- Current comparison to `main`: **55 commits ahead / 5 behind**, status `diverged`
+- Last validated source commit: `a8ee9f46`
+- Current comparison to `main`: **57 commits ahead / 7 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
 - Milestone: **Task 4 — pitch, rules, formation, and restart authoring**
-- Verified functional features: **0/60**
+- Verified functional features: **5/60**
 - Registration status: catalog entry and lazy workspace loader are now registered after executable unit/type/build gates passed.
 
 A committed handoff file cannot contain its own final Git SHA because its contents participate in that SHA. The branch ref is authoritative after documentation commits.
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T04-01**. It is the sole ACTIVE forward item and its listed primary files are reserved until its gate is recorded.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T04-01**. It remains the sole ACTIVE forward item and its listed primary files are reserved until its remaining gate is recorded.
 
-T04-01 must complete sourced/editable pitch matrices, verified specialty overlays, custom rules profiles, formation authoring and transforms, legality aids, and restart/set-piece templates.
+Next, add editable forks for sourced profiles, finish current primary-source specialty/grassroots line coverage and restart-specific legality checks, then add a whole-project vertical-transform assertion. Reuse the current engines and focused tests; do not introduce a dependency.
 
 Do not label a rules profile or restart as sourced/official without exact primary-source provenance. Preserve editable generic profiles where jurisdiction-specific rules vary.
 
@@ -29,6 +29,7 @@ Do not label a rules profile or restart as sourced/official without exact primar
 - Exact-commit Vite build log at `163a63d...` records `✓ built in 55.63s` and emits dedicated `TacticalMatchboardWorkspace` JS/CSS chunks.
 - `f885ed383b0bac6e85a10115a765d85baaad34b0`: focused tactical plus selector units **26/26 passed**, production/PWA build succeeded, and the focused Tactical Matchboard spec passed **10/10** scenarios across desktop and mobile Chromium.
 - `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`: expanded Tactical Matchboard browser gate passed **14 scenarios** with **2 intentional duplicate-project skips**, covering keyboard activation, Axe, phone/tablet/laptop/desktop reflow, document overflow, and essential 44px targets.
+- `a8ee9f46`: **29/29** focused tactical units and **3/3** selector units passed; TypeScript-checked production/PWA build passed (`✓ built in 1m 8s`); the expanded tactical browser gate passed **16 scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium.
 - Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
@@ -44,16 +45,24 @@ The registered beginner slice now provides:
 - undo/redo and real local SVG download;
 - pitch-first responsive styling and reduced-motion handling;
 - one source-honest catalog entry and one lazy loader in the global workspace registry.
+- profile-driven rules/pitch application with visible provenance, custom rules profiles, and deterministic specialty overlays;
+- source-honest formation libraries plus arbitrary-size custom formation authoring and count/assignment review;
+- immutable phase capture/morphing and whole-project mirror/flip actions;
+- provenance-bearing built-in restart starters and validated custom restart-template authoring.
 
 ## Active feature state
 
-In progress: **1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 51, 52, 55, 56, 59**.
+Verified: **9, 10, 11, 12, 15**.
 
-All other accepted feature rows remain planned. No feature is verified yet. The numerator remains 0 until a row's complete accepted behavior has every required unit/build/browser/accessibility/persistence/export proof.
+Implemented, awaiting one focused evidence item: **13**.
+
+In progress: **1, 2, 3, 4, 5, 7, 8, 14, 51, 52, 55, 56, 59**.
+
+All other accepted feature rows remain planned. The numerator includes only the five rows whose complete accepted behavior has the relevant unit/build/browser/accessibility proof.
 
 ## Accessibility/input ruling
 
-The current movement workflow intentionally does not require dragging: pitch taps/clicks move the selected player, visible player buttons provide explicit selection, D-pad buttons and numeric coordinates provide precision movement, and arrows use two single-pointer placements. Browser/Axe/keyboard validation is still pending and must not be inferred from source inspection.
+The current movement workflow intentionally does not require dragging: pitch taps/clicks move the selected player, visible player buttons provide explicit selection, D-pad buttons and numeric coordinates provide precision movement, and arrows use two single-pointer placements. The current rules/formation/restart panel is covered by desktop/mobile workflows, Axe, keyboard reachability, five CSS-width classes, overflow checks, and essential 44px target checks.
 
 ## Execution-order / multi-agent contract
 
@@ -69,5 +78,5 @@ The current movement workflow intentionally does not require dragging: pitch tap
 ## Open blockers / deferred evidence
 
 - Task 3 is closed with executable unit, build, desktop/mobile workflow, keyboard, Axe, reflow, and target-size evidence. No partial feature row was promoted solely from that milestone gate.
-- Current authoritative futsal/specialty geometry still requires exact primary-source verification before any preset can be labeled sourced/official.
+- The futsal profile is explicitly versioned as a FIFA 2021 reference rather than presented as current; current primary-source futsal/grassroots specialty geometry and restart legality remain before Task 4 can close.
 - Task 4 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
