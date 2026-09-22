@@ -100,6 +100,8 @@ export interface PlayerToken {
   id: string;
   playerId: string;
   teamId: string;
+  sceneId: string;
+  layerId: string;
   position: NormalizedPoint;
   rotationDeg: number;
   visible: boolean;
@@ -109,16 +111,19 @@ export interface PlayerToken {
 export interface TacticalOfficial {
   id: string;
   role: string;
+  sceneId: string;
+  layerId: string;
   position: NormalizedPoint;
 }
 
 export interface TacticalEquipment {
   id: string;
   kind: string;
+  sceneId: string;
+  layerId: string;
   position: NormalizedPoint;
   rotationDeg: number;
   scale: number;
-  layerId?: string;
   visible: boolean;
   locked: boolean;
 }
@@ -217,6 +222,8 @@ export interface TacticalAnnotation {
   id: string;
   kind: string;
   label?: string;
+  sceneId: string;
+  layerId: string;
   points: NormalizedPoint[];
   startMs?: number;
   endMs?: number;
