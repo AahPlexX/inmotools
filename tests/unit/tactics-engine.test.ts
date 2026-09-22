@@ -162,8 +162,44 @@ describe('Tactical Matchboard foundation contracts', () => {
       expect.stringMatching(/bad-player.*normalized/i),
     );
   });
-});
 
+  it('binds spatial entities to a scene layer and prevents edits through a locked layer', () => {
+    let project = addTeam(createStarterTacticalProject(), {
+      id: 'home',
+      name: 'Home',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+    project = addRosterPlayer(project, 'home', {
+      id: 'p8',
+      displayName: 'Player 8',
+      status: 'active',
+    });
+    project = addPlayerToken(project, {
+      id: 'token-p8',
+      playerId: 'p8',
+      teamId: 'home',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      position: { x: 0.5, y: 0.5 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    });
+    project = setSceneLayerState(project, 'scene-1', 'layer-1', { locked: true });
+
+    expect(() => movePlayerToken(project, 'token-p8', { x: 0.6, y: 0.5 })).toThrow(/layer.*locked/i);
+    expect(() => addAnnotation(project, {
+      id: 'locked-arrow',
+      kind: 'arrow',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      points: [{ x: 0.5, y: 0.5 }, { x: 0.6, y: 0.5 }],
+    })).toThrow(/layer.*locked/i);
+  });
+
+});
 
 describe('Tactical Matchboard immutable editor contracts', () => {
   it('commits, undoes and redoes project edits with bounded history', () => {
@@ -211,6 +247,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
       id: 'token-p9',
       playerId: 'p9',
       teamId: 'home',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
       position: { x: 0.7, y: 0.5 },
       rotationDeg: 0,
       visible: true,
@@ -248,6 +286,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
         id: 'token',
         playerId: 'missing',
         teamId: 'home',
+        sceneId: 'scene-1',
+        layerId: 'layer-1',
         position: { x: 0.5, y: 0.5 },
         rotationDeg: 0,
         visible: true,
@@ -261,6 +301,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
     const equipped = addEquipment(start, {
       id: 'cone-1',
       kind: 'cone',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
       position: { x: 0.25, y: 0.25 },
       rotationDeg: 0,
       scale: 1,
@@ -272,6 +314,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
       id: 'arrow-1',
       kind: 'arrow',
       label: 'Run',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
       points: [{ x: 0.4, y: 0.5 }, { x: 0.7, y: 0.5 }],
     });
     const locked = setSceneLayerState(annotated, 'scene-1', 'layer-1', { locked: true });
@@ -282,6 +326,8 @@ describe('Tactical Matchboard immutable editor contracts', () => {
     expect(() => addEquipment(start, {
       id: 'bad-cone',
       kind: 'cone',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
       position: { x: -0.1, y: 0.25 },
       rotationDeg: 0,
       scale: 1,
