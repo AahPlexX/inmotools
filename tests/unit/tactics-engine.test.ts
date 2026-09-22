@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { serializeTacticalBoardSvg } from '../../src/tools/tactics/board-engine';
 import {
+  addTacticalArrow,
+  buildBeginnerTacticalProject,
+  clientPointToNormalized,
+  nudgeNormalizedPoint,
+} from '../../src/tools/tactics/workspace-engine';
+import {
   addAnnotation,
   addEquipment,
   addPlayerToken,
@@ -452,5 +458,65 @@ describe('Tactical Matchboard SVG board contracts', () => {
 
   it('rejects an unknown scene instead of exporting an ambiguous board', () => {
     expect(() => serializeTacticalBoardSvg(populatedProject(), 'missing-scene')).toThrow(/scene/i);
+  });
+});
+
+
+describe('Tactical Matchboard beginner workspace contracts', () => {
+  it('builds a coherent formation project with roster, tokens, ruleset, pitch and direction', () => {
+    const project = buildBeginnerTacticalProject({
+      title: '7v7 build-out',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-7v7-1-3-2-1',
+      pitchDimensions: { lengthMeters: 60, widthMeters: 40 },
+      direction: 'left-to-right',
+    });
+    const expected = materializeFormationPositions(
+      getFormationTemplate('ussf-7v7-1-3-2-1')!,
+      'left-to-right',
+    );
+
+    expect(project.metadata.title).toBe('7v7 build-out');
+    expect(project.pitch.dimensions).toEqual({ lengthMeters: 60, widthMeters: 40 });
+    expect(project.pitch.direction).toBe('left-to-right');
+    expect(project.ruleset.teamSize).toBe(7);
+    expect(project.teams).toHaveLength(1);
+    expect(project.teams[0]?.name).toBe('Blue');
+    expect(project.teams[0]?.roster).toHaveLength(7);
+    expect(project.playerTokens).toHaveLength(7);
+    expect(project.playerTokens.map((token) => token.position)).toEqual(expected);
+    expect(validateTacticalProject(project)).toEqual([]);
+  });
+
+  it('maps client coordinates to clamped normalized pitch coordinates', () => {
+    const rect = { left: 100, top: 50, width: 400, height: 200 };
+    expect(clientPointToNormalized({ clientX: 300, clientY: 150 }, rect)).toEqual({ x: 0.5, y: 0.5 });
+    expect(clientPointToNormalized({ clientX: 25, clientY: 400 }, rect)).toEqual({ x: 0, y: 1 });
+    expect(() => clientPointToNormalized({ clientX: 100, clientY: 50 }, { ...rect, width: 0 })).toThrow(/positive/i);
+  });
+
+  it('nudges a selected player precisely while clamping to the pitch', () => {
+    expect(nudgeNormalizedPoint({ x: 0.99, y: 0.01 }, 0.02, -0.02)).toEqual({ x: 1, y: 0 });
+    expect(nudgeNormalizedPoint({ x: 0.5, y: 0.5 }, -0.025, 0.04)).toEqual({ x: 0.475, y: 0.54 });
+  });
+
+  it('adds deterministic non-zero tactical arrows without id collisions', () => {
+    let project = buildBeginnerTacticalProject({
+      title: 'Arrow test',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    project = addTacticalArrow(project, 'scene-1', 'layer-1', { x: 0.2, y: 0.4 }, { x: 0.6, y: 0.4 }, 'Run');
+    project = addTacticalArrow(project, 'scene-1', 'layer-1', { x: 0.6, y: 0.4 }, { x: 0.8, y: 0.2 });
+
+    expect(project.annotations.map((annotation) => annotation.id)).toEqual(['arrow-1', 'arrow-2']);
+    expect(project.annotations[0]).toMatchObject({ kind: 'arrow', label: 'Run' });
+    expect(() => addTacticalArrow(project, 'scene-1', 'layer-1', { x: 0.4, y: 0.4 }, { x: 0.4, y: 0.4 })).toThrow(/different/i);
   });
 });
