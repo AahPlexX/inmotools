@@ -199,6 +199,33 @@ describe('Tactical Matchboard foundation contracts', () => {
     })).toThrow(/layer.*locked/i);
   });
 
+
+  it('rejects spatial entities that reference missing scenes or layers during project validation', () => {
+    const project = createStarterTacticalProject();
+    project.playerTokens.push({
+      id: 'orphan-token',
+      playerId: 'p1',
+      teamId: 'home',
+      sceneId: 'missing-scene',
+      layerId: 'missing-layer',
+      position: { x: 0.5, y: 0.5 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    });
+    project.annotations.push({
+      id: 'orphan-arrow',
+      kind: 'arrow',
+      sceneId: 'scene-1',
+      layerId: 'missing-layer',
+      points: [{ x: 0.4, y: 0.5 }, { x: 0.6, y: 0.5 }],
+    });
+
+    const errors = validateTacticalProject(project);
+    expect(errors).toContainEqual(expect.stringMatching(/orphan-token.*missing scene/i));
+    expect(errors).toContainEqual(expect.stringMatching(/orphan-arrow.*missing layer/i));
+  });
+
 });
 
 describe('Tactical Matchboard immutable editor contracts', () => {
