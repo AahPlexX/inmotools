@@ -4,10 +4,10 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source commit: `f885ed383b0bac6e85a10115a765d85baaad34b0`
-- Current comparison to `main`: **53 commits ahead / 5 behind**, status `diverged`
+- Last validated source commit: `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`
+- Current comparison to `main`: **55 commits ahead / 5 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
-- Milestone: **Task 3 — accessibility and responsive validation**
+- Milestone: **Task 4 — pitch, rules, formation, and restart authoring**
 - Verified functional features: **0/60**
 - Registration status: catalog entry and lazy workspace loader are now registered after executable unit/type/build gates passed.
 
@@ -15,11 +15,11 @@ A committed handoff file cannot contain its own final Git SHA because its conten
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T03-05**. It is the sole ACTIVE item and its listed primary files are reserved until its gate is recorded.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T04-01**. It is the sole ACTIVE forward item and its listed primary files are reserved until its gate is recorded.
 
-T03-05 must extend the focused browser contract with Axe, keyboard-only, device-width/reflow, and target-size validation. Preserve the existing non-drag movement and arrow workflows.
+T04-01 must complete sourced/editable pitch matrices, verified specialty overlays, custom rules profiles, formation authoring and transforms, legality aids, and restart/set-piece templates.
 
-Do not advance to T03-06 until the accessibility/responsive matrix is executable and green or any concrete limitation is explicitly recorded.
+Do not label a rules profile or restart as sourced/official without exact primary-source provenance. Preserve editable generic profiles where jurisdiction-specific rules vary.
 
 ## Current executable evidence
 
@@ -28,6 +28,7 @@ Do not advance to T03-06 until the accessibility/responsive matrix is executable
 - `163a63d78131e90762246e86f58803e87d9d4788`: focused tactical units **23/23 passed** and TypeScript exit 0 on the exact committed SHA.
 - Exact-commit Vite build log at `163a63d...` records `✓ built in 55.63s` and emits dedicated `TacticalMatchboardWorkspace` JS/CSS chunks.
 - `f885ed383b0bac6e85a10115a765d85baaad34b0`: focused tactical plus selector units **26/26 passed**, production/PWA build succeeded, and the focused Tactical Matchboard spec passed **10/10** scenarios across desktop and mobile Chromium.
+- `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`: expanded Tactical Matchboard browser gate passed **14 scenarios** with **2 intentional duplicate-project skips**, covering keyboard activation, Axe, phone/tablet/laptop/desktop reflow, document overflow, and essential 44px targets.
 - Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
@@ -67,6 +68,6 @@ The current movement workflow intentionally does not require dragging: pitch tap
 
 ## Open blockers / deferred evidence
 
-- The beginner workflow browser contract is green on desktop and mobile Chromium; T03-05 owns the remaining Axe, keyboard-only, viewport/reflow and target-size evidence.
+- Task 3 is closed with executable unit, build, desktop/mobile workflow, keyboard, Axe, reflow, and target-size evidence. No partial feature row was promoted solely from that milestone gate.
 - Current authoritative futsal/specialty geometry still requires exact primary-source verification before any preset can be labeled sourced/official.
 - Task 4 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.

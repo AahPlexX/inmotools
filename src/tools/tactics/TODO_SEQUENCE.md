@@ -3,7 +3,7 @@
 **Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `f885ed383b0bac6e85a10115a765d85baaad34b0`
+**Code tip described by this queue before this documentation commit:** `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`
 
 ## Purpose and source-of-truth roles
 
@@ -58,23 +58,24 @@
 - **Reverse-safe:** complete.
 
 ### T03-05 — Accessibility and responsive gate
-- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
+- **Status:** DONE
 - **Depends on:** T03-04
 - **Primary files:** tactical workspace/board/CSS and tactical e2e only
 - **Action:** run Axe plus keyboard-only and device-width coverage; verify no essential operation relies on dragging; verify target sizing/reflow and phone/tablet/laptop layouts.
-- **Exit evidence:** recorded Axe/keyboard/reflow results and any accepted limitation.
-- **Reverse-safe:** no.
+- **Implementation:** commit `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8` extends the focused browser contract with keyboard activation, Axe, five CSS-width viewport classes, document overflow, and essential 44px target checks.
+- **Exit evidence:** **14 passed / 2 intentionally skipped** across desktop and mobile Chromium. The skips avoid rerunning the same shared-DOM Axe and CSS-width matrices in the emulated mobile project; mobile workflow and keyboard cases still execute there.
+- **Reverse-safe:** complete.
 
 ### T03-06 — Close Task 3 vertical-slice milestone
-- **Status:** BLOCKED
+- **Status:** DONE
 - **Depends on:** T03-05
 - **Primary files:** `FEATURE_MATRIX.md`, `HANDOFF.md`, `TODO_SEQUENCE.md`, `.tasks/IN_PROGRESS.md`
 - **Action:** reconcile feature-row states against evidence; do not inflate the verified numerator for partial features.
-- **Exit evidence:** current ledgers agree and exact next task is T04-01.
-- **Reverse-safe:** no.
+- **Exit evidence:** current ledgers agree; no partial row was promoted to verified; exact next task is T04-01.
+- **Reverse-safe:** complete.
 
 ### T04-01 — Complete pitch/rules/formation authoring
-- **Status:** BLOCKED
+- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
 - **Depends on:** T03-06
 - **Primary files:** tactical pitch/formation/rules engines, Tactical workspace rules UI, focused tests
 - **Action:** sourced/editable pitch matrices, verified specialty overlays, custom rules profiles, formation authoring, transforms, legality aids, restart/set-piece templates.

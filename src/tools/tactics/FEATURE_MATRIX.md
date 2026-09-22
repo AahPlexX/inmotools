@@ -4,7 +4,7 @@
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 0/60
-**Current executable evidence:** source commit `f885ed383b0bac6e85a10115a765d85baaad34b0` passes **26/26** focused tactical/selector units, a production/PWA build, and **10/10** focused Playwright scenarios across desktop and mobile Chromium. Axe, keyboard-only, viewport/reflow, and target-size evidence remain pending.
+**Current executable evidence:** source commit `f885ed383b0bac6e85a10115a765d85baaad34b0` passes **26/26** focused tactical/selector units plus a production/PWA build. Browser-contract commit `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8` passes **14 scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium, including keyboard activation, Axe, five CSS-width viewport classes, document overflow, and essential 44px target checks.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |
@@ -58,8 +58,8 @@
 | 48 | Multi-Angle Local Video Sync | planned | — | — |
 | 49 | Open Tactical Trajectory Import | planned | — | — |
 | 50 | Tactical Analytics CSV/JSON Export | planned | — | — |
-| 51 | Device-Agnostic Responsive Workspace | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `tactical-matchboard.css` | Pitch-first responsive grid, narrow single-column collapse, 44px+ command/player targets, and reduced-motion handling are authored; executable phone/tablet/laptop/reflow validation has not run. |
-| 52 | Context Menu + Explicit Touch Equivalent | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `workspace-engine.ts` | Pointer/touch click-to-place plus visible player buttons, D-pad movement, and numeric coordinates provide non-drag alternatives for the current movement workflow; future context-menu actions and their touch equivalents remain. |
+| 51 | Device-Agnostic Responsive Workspace | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `tactical-matchboard.css`, `tests/e2e/tactical-matchboard-studio.spec.ts` | The beginner slice passes phone portrait/landscape, tablet, laptop and desktop reflow plus 44px target checks; later timeline, analysis, media, 3D and export surfaces must join the same responsive contract before the whole feature is verified. |
+| 52 | Context Menu + Explicit Touch Equivalent | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `workspace-engine.ts`, `tests/e2e/tactical-matchboard-studio.spec.ts` | Pointer/touch click-to-place plus keyboard-reachable player buttons, D-pad movement, and numeric coordinates have desktop/mobile evidence for the current workflow; future context-menu actions and their touch equivalents remain. |
 | 53 | Collision-Protected Tooltips & Help Reference | planned | — | — |
 | 54 | Keyboard Shortcut & Transport Engine | planned | — | — |
 | 55 | Layers, Selection, Grouping, Locking & Visibility | in-progress | `tactics-types.ts`, `editor-engine.ts`, `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx` | Scene/layer ownership plus lock/visibility primitives exist and the beginner workspace has explicit player selection; grouping, layer reorder, solo/focus and full layer UI remain. |
