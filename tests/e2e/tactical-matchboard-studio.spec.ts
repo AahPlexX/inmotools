@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 const board = (page: Page) => page.locator('.tactical-board');
@@ -109,4 +110,74 @@ test('touch pointer selection and movement use the same non-drag workflow', asyn
   await dispatchTouchPoint(page, 'board', 0.72, 0.28);
   await expect(page.getByLabel('X %')).toHaveValue('72.0');
   await expect(page.getByLabel('Y %')).toHaveValue('28.0');
+});
+
+test('keyboard activation covers selection and precision movement without dragging', async ({ page }) => {
+  const firstPlayer = page.locator('.tactical-player-list button').first();
+  await firstPlayer.focus();
+  await page.keyboard.press('Enter');
+  await expect(firstPlayer).toHaveAttribute('aria-pressed', 'true');
+
+  const initialX = Number(await page.getByLabel('X %').inputValue());
+  const moveRight = page.getByRole('button', { name: 'Move player right' });
+  await moveRight.focus();
+  await page.keyboard.press('Space');
+  await expect.poll(async () => Number(await page.getByLabel('X %').inputValue())).toBeCloseTo(initialX + 2, 1);
+
+  await page.getByLabel('X %').focus();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('31');
+  await page.getByLabel('Y %').focus();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('64');
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('X %')).toHaveValue('31.0');
+  await expect(page.getByLabel('Y %')).toHaveValue('64.0');
+});
+
+test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
+  const results = await new AxeBuilder({ page })
+    .include('[data-testid="suite-workspace"]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  const blocking = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
+  expect(blocking.map((violation) => `${violation.id}: ${violation.help}`)).toEqual([]);
+});
+
+test('reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'CSS-width coverage is deterministic in one Chromium project.');
+  const viewports = [
+    { name: 'phone portrait', width: 320, height: 740 },
+    { name: 'phone landscape', width: 844, height: 390 },
+    { name: 'tablet portrait', width: 768, height: 1024 },
+    { name: 'laptop', width: 1024, height: 768 },
+    { name: 'desktop', width: 1440, height: 900 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('./#/tools/tactical-matchboard-studio');
+    await expect(page.locator('.tactical-board')).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${viewport.name} document overflow`).toBeLessThanOrEqual(1);
+
+    const undersizedTargets = await page.locator([
+      '.tactical-setup > summary',
+      '.tactical-command-bar button',
+      '.tactical-player-list button',
+      '.tactical-dpad button',
+      '.tactical-coordinate-form button',
+    ].join(', ')).evaluateAll((elements) => elements
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && (rect.width < 44 || rect.height < 44);
+      })
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return `${element.textContent?.trim() || element.tagName}: ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`;
+      }));
+    expect(undersizedTargets, `${viewport.name} essential target size`).toEqual([]);
+  }
 });
