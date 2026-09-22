@@ -10,7 +10,7 @@ const IFAB_2026_27: SourceProvenance = {
   kind: 'governing-source',
   authoritative: true,
   organization: 'The IFAB',
-  sourceTitle: 'Laws of the Game 2026/27 â€” Law 1: The Field of Play',
+  sourceTitle: 'Laws of the Game 2026/27 - Law 1: The Field of Play',
   sourceUrl: 'https://www.theifab.com/laws/latest/the-field-of-play/',
   sourceVersion: '2026/27',
   sourceDate: '2026-09-22',
