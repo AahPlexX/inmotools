@@ -36,7 +36,7 @@ export default function TacticalBoard({
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (!event.isPrimary || event.button !== 0) return;
     const tokenId = tokenIdFromTarget(event.target);
-    if (tokenId) {
+    if (interactionMode === 'move' && tokenId) {
       onSelectToken(tokenId);
       return;
     }
@@ -69,6 +69,7 @@ export default function TacticalBoard({
         data-interaction-mode={interactionMode}
         data-selected-token={selectedTokenId ?? ''}
         onPointerDown={handlePointerDown}
+        role="group"
         aria-label={instruction}
       >
         <div className="tactical-board-svg" dangerouslySetInnerHTML={{ __html: svg }} />
