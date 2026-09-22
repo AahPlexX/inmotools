@@ -106,3 +106,21 @@ Left as a task rather than forced now because both obvious unifications regress 
 - Cover the resulting behaviour in the browser spec.
 
 ---
+
+## TASK-023: Implement Crystal Lattice Studio Phase 3 — reciprocal space and diffraction
+**Priority:** P1 | **Tags:** crystal, feature, science, tdd
+
+Crystal Lattice Studio is governed by the 163-capability master design (`docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`). Phases 1 and 2 are complete and verified (see `IN_PROGRESS.md` → Crystal Lattice Studio). Phase 3 is the next sequential milestone: **reciprocal space and diffraction** (design lines 434–436), covering reciprocal lattice, planes/directions, stereographic projection, Ewald sphere, Wigner–Seitz/Brillouin geometry, reflection enumeration, X-ray/neutron/electron/single-crystal/Laue simulation, observed overlays, and reflection tables.
+
+**Do not rebuild existing, tested foundations.** `cell-engine.ts` already exports `reciprocalMatrix` and `reciprocalMetricTensor` (both covered by `tests/unit/crystal-cell.test.ts`). Build Phase-3 engines on top of them.
+
+### Plan
+- Add `reciprocal-engine.ts`: reciprocal-basis helpers, d-spacing from (hkl), plane/direction indexing — TDD against `tests/unit/crystal-reciprocal.test.ts` using the existing cell-engine functions.
+- Add `diffraction-engine.ts`: reflection enumeration with systematic-absence filtering, wavelength-parameterised X-ray/neutron/electron simulation — bounded enumeration (reuse the established `MAX_*`-cap pattern), TDD first.
+- Wire a read-only diffraction panel into `CrystalWorkspace.tsx` only after both engines are green; keep every engine pure and backend-free per the repo privacy model.
+- Add `tests/e2e/crystal-lattice-studio-phase3.spec.ts` and extend the spec-selection map so Crystal source changes also route to it.
+
+### Completion gate
+Phase 3 is complete only when the reciprocal/diffraction capability set in the master design is implemented and verified, `tsc` + production build are clean, and the new unit + browser specs pass from fresh evidence. Full design details: `docs/superpowers/plans/2026-09-22-crystal-lattice-studio-phase-3.md`.
+
+---
