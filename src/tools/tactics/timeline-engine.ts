@@ -7,6 +7,7 @@ import type {
   TimelineMarker,
   TimelineTrack,
 } from './tactics-types';
+import { createMotionPath, sampleMotionPath } from './motion-engine';
 
 export interface SampledTimelineState {
   position?: NormalizedPoint;
@@ -40,6 +41,9 @@ function cloneKeyframe(keyframe: TacticalKeyframe): TacticalKeyframe {
     ...keyframe,
     position: keyframe.position ? { ...keyframe.position } : undefined,
     bezier: keyframe.bezier ? [...keyframe.bezier] as [number, number, number, number] : undefined,
+    motionPath: keyframe.motionPath
+      ? { kind: keyframe.motionPath.kind, controlPoints: keyframe.motionPath.controlPoints.map((point) => ({ ...point })) }
+      : undefined,
   };
 }
 
@@ -56,6 +60,7 @@ function validateKeyframe(keyframe: TacticalKeyframe): TacticalKeyframe {
     if (![x1, y1, x2, y2].every(Number.isFinite)) throw new RangeError('Cubic-bezier controls must be finite.');
     if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) throw new RangeError('Cubic-bezier x controls must stay between 0 and 1.');
   }
+  if (keyframe.motionPath) createMotionPath(keyframe.motionPath.kind, keyframe.motionPath.controlPoints);
   return cloneKeyframe(keyframe);
 }
 
@@ -138,14 +143,17 @@ export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): Sampl
   const rightState = inheritedState(keyframes, rightIndex);
   const rawProgress = (timeMs - leftKeyframe.timeMs) / (rightKeyframe.timeMs - leftKeyframe.timeMs);
   const progress = easedProgress(leftKeyframe.interpolation, rawProgress, leftKeyframe.bezier);
-  const x = interpolateNumber(leftState.position?.x, rightState.position?.x, progress);
-  const y = interpolateNumber(leftState.position?.y, rightState.position?.y, progress);
+  let position: NormalizedPoint | undefined;
+  if (leftState.position && rightState.position) {
+    position = leftKeyframe.motionPath
+      ? sampleMotionPath(leftState.position, rightState.position, leftKeyframe.motionPath, progress)
+      : {
+          x: clampUnit(interpolateNumber(leftState.position.x, rightState.position.x, progress)!),
+          y: clampUnit(interpolateNumber(leftState.position.y, rightState.position.y, progress)!),
+        };
+  }
   const rotationDeg = interpolateNumber(leftState.rotationDeg, rightState.rotationDeg, progress);
-  return {
-    position: x === undefined || y === undefined ? undefined : { x: clampUnit(x), y: clampUnit(y) },
-    rotationDeg,
-    visible: leftState.visible,
-  };
+  return { position, rotationDeg, visible: leftState.visible };
 }
 
 export function offsetTimelineTrack(track: TimelineTrack, deltaMs: number): TimelineTrack {

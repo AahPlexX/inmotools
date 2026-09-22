@@ -178,6 +178,12 @@ export type InterpolationKind =
   | 'cubic-bezier'
   | 'hold';
 
+export type TacticalMotionPathKind = 'linear' | 'quadratic-bezier' | 'cubic-bezier';
+
+export interface TacticalMotionPath {
+  kind: TacticalMotionPathKind;
+  controlPoints: NormalizedPoint[];
+}
 export interface TacticalKeyframe {
   id: string;
   timeMs: number;
@@ -186,6 +192,7 @@ export interface TacticalKeyframe {
   visible?: boolean;
   interpolation: InterpolationKind;
   bezier?: [number, number, number, number];
+  motionPath?: TacticalMotionPath;
 }
 
 export interface TimelineTrack {

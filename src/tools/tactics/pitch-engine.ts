@@ -213,6 +213,9 @@ export function transformTacticalProject(
           ...keyframe,
           position: keyframe.position ? point(keyframe.position) : undefined,
           rotationDeg: keyframe.rotationDeg === undefined ? undefined : rotation(keyframe.rotationDeg),
+          motionPath: keyframe.motionPath
+            ? { ...keyframe.motionPath, controlPoints: keyframe.motionPath.controlPoints.map(point) }
+            : undefined,
         })),
       })),
     },
