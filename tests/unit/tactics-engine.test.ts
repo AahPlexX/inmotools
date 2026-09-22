@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { serializeTacticalBoardSvg } from '../../src/tools/tactics/board-engine';
 import {
   addAnnotation,
   addEquipment,
@@ -362,5 +363,74 @@ describe('Tactical Matchboard immutable editor contracts', () => {
       visible: true,
       locked: false,
     })).toThrow(/normalized/i);
+  });
+});
+
+
+describe('Tactical Matchboard SVG board contracts', () => {
+  function populatedProject() {
+    let project = createStarterTacticalProject();
+    project.metadata.title = 'Build & press <session>';
+    project = addTeam(project, {
+      id: 'home',
+      name: 'Home',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      roster: [],
+    });
+    project = addRosterPlayer(project, 'home', {
+      id: 'p9',
+      displayName: 'Player <9>',
+      jerseyNumber: '9',
+      status: 'active',
+    });
+    project = addPlayerToken(project, {
+      id: 'token-p9',
+      playerId: 'p9',
+      teamId: 'home',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      position: { x: 0.5, y: 0.5 },
+      rotationDeg: 0,
+      visible: true,
+      locked: false,
+    });
+    project = addAnnotation(project, {
+      id: 'arrow-1',
+      kind: 'arrow',
+      label: 'Press > switch',
+      sceneId: 'scene-1',
+      layerId: 'layer-1',
+      points: [{ x: 0.5, y: 0.5 }, { x: 0.75, y: 0.35 }],
+    });
+    return project;
+  }
+
+  it('serializes a deterministic vector board with escaped metadata and normalized geometry', () => {
+    const svg = serializeTacticalBoardSvg(populatedProject(), 'scene-1');
+
+    expect(svg).toContain('viewBox="0 0 1000 650"');
+    expect(svg).toContain('<title>Build &amp; press &lt;session&gt;</title>');
+    expect(svg).toContain('id="token-p9"');
+    expect(svg).toContain('cx="500"');
+    expect(svg).toContain('cy="325"');
+    expect(svg).toContain('id="tactical-arrowhead"');
+    expect(svg).toContain('Player &lt;9&gt;');
+    expect(svg).not.toContain('<script');
+    expect(svg).not.toContain('onload=');
+  });
+
+  it('omits entities on hidden layers without deleting project state', () => {
+    const project = setSceneLayerState(populatedProject(), 'scene-1', 'layer-1', { visible: false });
+    const svg = serializeTacticalBoardSvg(project, 'scene-1');
+
+    expect(project.playerTokens).toHaveLength(1);
+    expect(project.annotations).toHaveLength(1);
+    expect(svg).not.toContain('id="token-p9"');
+    expect(svg).not.toContain('id="arrow-1"');
+  });
+
+  it('rejects an unknown scene instead of exporting an ambiguous board', () => {
+    expect(() => serializeTacticalBoardSvg(populatedProject(), 'missing-scene')).toThrow(/scene/i);
   });
 });
