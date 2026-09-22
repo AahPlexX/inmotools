@@ -30,6 +30,7 @@ import {
 import {
   FORMATION_TEMPLATES,
   getFormationTemplate,
+  materializeFormationPositions,
   validateFormationTemplate,
 } from '../../src/tools/tactics/formation-engine';
 
@@ -94,6 +95,26 @@ describe('Tactical Matchboard foundation contracts', () => {
         expect(template.notationIncludesGoalkeeper).toBe(true);
         expect(template.notation.startsWith(`${template.goalkeepers}-`)).toBe(true);
       }
+    }
+  });
+
+
+
+  it('materializes editable normalized starter positions with direction mirroring', () => {
+    const template = getFormationTemplate('ussf-7v7-1-3-2-1');
+    expect(template).toBeDefined();
+    const forward = materializeFormationPositions(template!, 'left-to-right');
+    const reverse = materializeFormationPositions(template!, 'right-to-left');
+
+    expect(forward).toHaveLength(7);
+    expect(reverse).toHaveLength(7);
+    for (let index = 0; index < forward.length; index += 1) {
+      expect(forward[index]!.x).toBeGreaterThanOrEqual(0);
+      expect(forward[index]!.x).toBeLessThanOrEqual(1);
+      expect(forward[index]!.y).toBeGreaterThanOrEqual(0);
+      expect(forward[index]!.y).toBeLessThanOrEqual(1);
+      expect(reverse[index]!.x).toBeCloseTo(1 - forward[index]!.x, 12);
+      expect(reverse[index]!.y).toBe(forward[index]!.y);
     }
   });
 
