@@ -3,10 +3,12 @@
 - **Tactical Matchboard Studio** — 60-feature local-first tactical authoring, animation, spatial-analysis, local-video, presentation, persistence, and export workstream on `feature/tactical-matchboard-studio`.
   - Design: `docs/superpowers/specs/2026-09-21-tactical-matchboard-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
-  - Ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`
-  - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-  - Current milestone: Task 3 — editor/history + deterministic SVG board/formation placement foundation; unregistered interactive board/workspace vertical slice next.
-  - Current verified feature count: **0/60**. Features 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 55, 56, and 59 are in progress; all others remain planned. Engine state now includes bounded undo/redo, team/roster/token/equipment/annotation operations, explicit scene/layer ownership, locked-layer write protection, missing scene/layer project validation, deterministic formation placement/mirroring, and accessible deterministic SVG board serialization.
+  - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
+  - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
+  - Current milestone: **Task 3 — unregistered beginner board/workspace slice authored; executable gate pending.** T03-01 is the only READY queue item: run the focused tactical unit suite and production build on the exact current branch tip. Route/catalog registration remains blocked until that gate is green.
+  - Current verified feature count: **0/60**. Features 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 51, 52, 55, 56, and 59 are in progress; all others remain planned.
+  - Current implementation includes canonical normalized/project primitives, provenance-bearing formation templates, deterministic formation placement, bounded undo/redo, editor/layer operations, accessible SVG serialization, beginner project materialization, pointer/touch click-to-move, visible player selection, D-pad + numeric precision movement, two-point tactical arrows, responsive tool-scoped layout, and real local SVG download. No global route is registered yet.
+  - Current evidence limitation: the connected GitHub surface reports no Actions workflow runs for the tactical commits; CodeRabbit success is not a unit/build gate. Do not raise the verified numerator until executable evidence exists.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 
