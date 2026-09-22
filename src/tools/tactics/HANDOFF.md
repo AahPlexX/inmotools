@@ -4,8 +4,8 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source commit: `b2ec46e39712796731bc83a8cd40f82ec9caeeec`
-- Current comparison to `main`: **63 commits ahead / 12 behind**, status `diverged`
+- Last validated source commit: `11acadfb7a3aebf0d66d7c41c53fa01537629cf9`
+- Current comparison to `main`: **66 commits ahead / 12 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
 - Milestone: **Task 5 — timeline, trajectories and coordinated motion**
 - Verified functional features: **9/60**
@@ -17,7 +17,7 @@ A committed handoff file cannot contain its own final Git SHA because its conten
 
 Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T05-01**. It is now the sole ACTIVE forward item.
 
-Start with a pure deterministic timeline engine over the existing canonical project schema: integer-time tracks/keyframes, interpolation/easing, visibility spans, offsets and markers. Add behavioral contracts before implementation, then expose browser controls only after the engine invariants are green. Do not create a parallel scene graph or add a dependency unless a proven requirement cannot be met with the existing stack.
+The pure timeline foundation is now implemented. Next, add **spatial Bézier motion-path authoring** as a distinct path model (do not confuse it with the existing cubic-bezier timing easing), then proceed in order through coordinated action templates, linked units, ball possession/handoffs, and potential path-conflict review. Only after those engine invariants are green should timeline/motion authoring UI and browser coverage be wired. Reuse the canonical project model and add no dependency unless a proven requirement cannot be met with the existing stack.
 
 Task 4 is closed. Current sourced rules remain provenance-bearing and editable copies remain non-authoritative.
 
@@ -31,6 +31,9 @@ Task 4 is closed. Current sourced rules remain provenance-bearing and editable c
 - `ff82ade9e8290d382ec868bcb1dc4c58eca6c2b8`: expanded Tactical Matchboard browser gate passed **14 scenarios** with **2 intentional duplicate-project skips**, covering keyboard activation, Axe, phone/tablet/laptop/desktop reflow, document overflow, and essential 44px targets.
 - `a8ee9f46`: **29/29** focused tactical units and **3/3** selector units passed; TypeScript-checked production/PWA build passed (`✓ built in 1m 8s`); the expanded tactical browser gate passed **16 scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium.
 - `b2ec46e39712796731bc83a8cd40f82ec9caeeec`: Task 4 closure source passes **30/30** focused tactical units plus **3/3** selector units, TypeScript and production/PWA build, and **16 browser scenarios** with **2 intentional duplicate-project skips**. Evidence includes current IFAB 2026/27, FIFA Futsal 2025-26 and U.S. Soccer PDI overlays/restart aids, sourced-profile forks, vertical/horizontal whole-project transforms, keyboard/touch, Axe, reflow and 44px targets.
+- `f2d3565bbab22b7e86c69a8bb01db8e7f85bdd02`: first Task 5 timeline engine slice passes **38/38** focused Tactical/selector tests plus TypeScript, covering keyframe insertion/order, interpolation/easing, visibility spans, offsets and markers.
+- `11acadfb7a3aebf0d66d7c41c53fa01537629cf9`: multi-track sampling, playhead clamp/wrap, active-scene sampling and canonical timeline validation are integrated; current timeline/project suites pass **40/40** and TypeScript is clean.
+- Consolidated repository unit baseline after Task 5 engine work: **1318/1319** tests pass. The sole failure is unrelated Tactical scope: `tests/unit/markdown-citation.test.ts` -> Chicago author-date formatting timed out at 5000 ms. Do not chase it from this workstream.
 - Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
@@ -50,12 +53,21 @@ The registered beginner slice now provides:
 - source-honest formation libraries plus arbitrary-size custom formation authoring and count/assignment review;
 - immutable phase capture/morphing and whole-project mirror/flip actions;
 - provenance-bearing built-in restart starters and validated custom restart-template authoring.
+Task 5 pure timeline foundation now adds:
+- immutable integer-time keyframe insertion and sorted track state;
+- deterministic multi-track target sampling with one-track-per-target ownership;
+- linear, smooth, ease-in/out/in-out, hold, and cubic-bezier **timing** interpolation;
+- stepped visibility state and derived visibility spans;
+- immutable track time offsets with negative-time protection;
+- sorted, unique, duration-bounded markers;
+- loop/clamp playhead behavior and deterministic active-scene sampling;
+- shared structural timeline validation delegated through `validateTacticalProject`.
 
 ## Active feature state
 
 Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15**.
 
-In progress: **3, 4, 5, 7, 8, 51, 52, 55, 56, 59**.
+In progress: **3, 4, 5, 7, 8, 16, 18, 19, 20, 21, 22, 51, 52, 55, 56, 59**.
 
 All other accepted feature rows remain planned. The numerator includes only the nine rows whose complete accepted behavior has the relevant unit/build/browser/accessibility proof.
 
@@ -77,6 +89,6 @@ The current movement workflow intentionally does not require dragging: pitch tap
 ## Open blockers / deferred evidence
 
 - Task 4 is closed with current-source rules geometry, legality aids, unit/build/browser/accessibility evidence and a reconciled 9/60 feature ledger.
-- T05-01 is active; timeline, trajectory and coordinated-motion behavior is not yet implemented or verified.
-- The branch is intentionally 63 commits ahead / 12 behind current main; reconciliation remains deferred until T14 after the branch-complete gate.
+- T05-01 is active. Timeline keyframes/tracks, deterministic timing interpolation, visibility spans, offsets, markers, playhead behavior, active-scene sampling and structural validation are implemented at the pure-engine layer; spatial motion paths, coordinated actions, linked units, possession/handoffs, conflict review and browser authoring remain.
+- The branch is intentionally 66 commits ahead / 12 behind current main; reconciliation remains deferred until T14 after the branch-complete gate.
 - Task 5 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.

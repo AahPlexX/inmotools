@@ -4,7 +4,7 @@
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 9/60
-**Current executable evidence:** Task 4 closure commit `b2ec46e39712796731bc83a8cd40f82ec9caeeec` passes **30/30** focused tactical engine tests plus **3/3** focused selector tests, TypeScript and production/PWA build, and **16 browser scenarios** with **2 intentional duplicate-project skips** across desktop/mobile Chromium. The gate covers current sourced IFAB 2026/27, FIFA Futsal 2025-26, and U.S. Soccer PDI geometry/restart aids; editable sourced-profile forks; custom rules/formations/restarts; formation morphing; horizontal/vertical whole-project transforms; keyboard/touch flows; Axe; five CSS-width classes; overflow; and essential 44px targets.
+**Current executable evidence:** Task 4 remains closed at `b2ec46e`. Task 5 engine commits `f2d3565` and `11acadf` add deterministic timeline primitives and multi-track/project validation. Current Tactical-focused timeline/project suites pass **40/40** and TypeScript is clean. One consolidated repository unit run passed **1318/1319** tests; the sole failure is an unrelated pre-existing Markdown Chicago author-date citation timeout in `tests/unit/markdown-citation.test.ts`. No Task 5 browser/build verification has been claimed yet.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |
@@ -23,13 +23,13 @@
 | 13 | Mirror, Flip & Direction-of-Play Transform | verified | `pitch-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Whole-project horizontal and vertical transforms cover pitch overlays, players, officials, equipment, scenes, formation states, ball, annotations, timeline keyframes and rotations; horizontal direction is swapped only when appropriate. Focused horizontal/vertical invariants and desktop/mobile authoring evidence are green through `b2ec46e`. |
 | 14 | Formation Count & Restart Legality Validator | verified | `formation-engine.ts`, `restart-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Formation totals, goalkeeper/placed-player counts, unique roster assignment and profile agreement combine with sourced IFAB/U.S. Soccer restart placement and opponent-distance review. Results remain explicitly non-officiating authoring aids; unit invariants plus desktop/mobile UI evidence are green through `b2ec46e`. |
 | 15 | Set-Piece / Restart Template Builder | verified | `restart-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Provenance-bearing non-authoritative starters plus validated custom ball/guide authoring apply immutably to editable layers; units and desktop/mobile end-to-end author/apply evidence are green at `a8ee9f46`. |
-| 16 | Multi-Track Timeline & Deterministic Playhead | planned | — | — |
+| 16 | Multi-Track Timeline & Deterministic Playhead | in-progress | `timeline-engine.ts`, `tactics-engine.ts`, timeline unit tests | Immutable track/keyframe insertion, unique target ownership, deterministic multi-track sampling, integer playhead clamp/wrap, active-scene lookup and structural timeline validation exist. Playback/editor UI and browser evidence remain. |
 | 17 | Interactive Bézier Motion-Path Authoring | planned | — | — |
-| 18 | Interpolation & Easing Studio | planned | — | — |
-| 19 | Multi-Scene Sequencing | planned | — | — |
-| 20 | Temporal Visibility Spans | planned | — | — |
-| 21 | Stagger, Offset & Group Timing Controls | planned | — | — |
-| 22 | Timeline Markers & Coaching Triggers | planned | — | — |
+| 18 | Interpolation & Easing Studio | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Deterministic linear, smooth, ease-in, ease-out, ease-in-out, hold and cubic-bezier timing interpolation are unit-covered. Interactive easing authoring/preview UI remains. |
+| 19 | Multi-Scene Sequencing | in-progress | `timeline-engine.ts`, `tactics-types.ts` | Integer scene start/duration semantics and deterministic active-scene sampling exist, including exact zero-duration markers. Scene sequencing/editor UI remains. |
+| 20 | Temporal Visibility Spans | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Stepped visibility inheritance and deterministic visible/hidden span derivation are unit-covered. Timeline span authoring UI remains. |
+| 21 | Stagger, Offset & Group Timing Controls | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Immutable whole-track integer offsets with negative-time protection exist. Multi-track stagger/group timing operations and UI remain. |
+| 22 | Timeline Markers & Coaching Triggers | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Sorted, unique, duration-bounded timeline marker primitives exist. Trigger/action semantics and marker authoring UI remain. |
 | 23 | Coordinated Tactical Action Templates | planned | — | — |
 | 24 | Linked Defensive / Midfield / Attacking Units | planned | — | — |
 | 25 | Ball Attachment, Possession & Handoff | planned | — | — |

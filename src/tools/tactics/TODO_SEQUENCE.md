@@ -3,7 +3,7 @@
 **Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `b2ec46e39712796731bc83a8cd40f82ec9caeeec`
+**Code tip described by this queue before this documentation commit:** `11acadfb7a3aebf0d66d7c41c53fa01537629cf9`
 
 ## Purpose and source-of-truth roles
 
@@ -85,11 +85,14 @@
 ### T05-01 — Timeline, trajectories and coordinated motion
 - **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
 - **Depends on:** T04-01 DONE
-- **Primary files:** new tactical timeline/motion modules + tactical UI/tests
+- **Primary files:** `src/tools/tactics/timeline-engine.ts`, new tactical motion/action modules, canonical tactics types only when required, Tactical workspace timeline UI, focused Tactical tests
 - **Action:** integer-time scenes/tracks/keyframes, easing, Bézier paths, visibility spans, offsets, markers, coordinated actions, linked units, possession/handoffs, conflict review.
-- **First slice:** pure deterministic integer-time timeline engine over the existing canonical schema, with behavioral contracts for tracks/keyframes, interpolation/easing, visibility spans, offsets and markers before UI wiring.
-- **Exit evidence:** deterministic interpolation/sequencing tests + browser workflow.
-- **Reverse-safe:** no; its primary files are reserved while ACTIVE.
+- **Implemented at `f2d3565`:** immutable integer-time keyframe insertion/order; normalized position/rotation sampling; linear, smooth, ease-in/out/in-out, hold and cubic-bezier timing easing; stepped visibility spans; immutable track offsets; sorted/unique bounded markers.
+- **Implemented at `11acadf`:** unique one-track-per-target ownership, deterministic multi-track sampling, loop/clamp playhead behavior, active-scene sampling, structural timeline validation, and `validateTacticalProject` delegation so timestamp rules have one implementation.
+- **Current evidence:** current timeline/project Tactical suites pass **40/40** and TypeScript is clean. A consolidated repository unit run passed **1318/1319**; the sole failure is the unrelated Markdown Chicago author-date citation timeout in `tests/unit/markdown-citation.test.ts`.
+- **Remaining sequence:** (1) spatial Bézier motion-path model/geometry + TDD; (2) coordinated action templates; (3) linked units; (4) ball possession/handoffs; (5) path-conflict review; (6) timeline/motion authoring UI and focused desktop/mobile browser evidence. Keep timing Bézier easing distinct from spatial motion paths.
+- **Exit evidence:** deterministic interpolation/sequencing/motion invariants + complete browser authoring workflow for accepted rows 16–26.
+- **Reverse-safe:** no; these primary files remain reserved while ACTIVE.
 
 ### T06-01 — Spatial analysis
 - **Status:** BLOCKED
