@@ -3,7 +3,7 @@
 **Updated:** 2026-09-22
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `163a63d78131e90762246e86f58803e87d9d4788`
+**Code tip described by this queue before this documentation commit:** `f885ed383b0bac6e85a10115a765d85baaad34b0`
 
 ## Purpose and source-of-truth roles
 
@@ -49,15 +49,16 @@
 - **Exit evidence:** route registration compiles/builds without removing unrelated catalog/workspace entries.
 - **Reverse-safe:** complete.
 ### T03-04 — Add focused browser contract
-- **Status:** READY
+- **Status:** DONE
 - **Depends on:** T03-03
 - **Primary files:** `tests/e2e/tactical-matchboard-studio.spec.ts`, `scripts/select-e2e-specs.mjs`
 - **Action:** cover beginner setup, player selection, click-to-move, D-pad movement, numeric movement, two-point arrow authoring, undo/redo, SVG download, and touch-equivalent operation.
-- **Exit evidence:** focused desktop + mobile Chromium tactical spec results on an exact SHA.
-- **Reverse-safe:** no.
+- **Implementation:** commit `f885ed383b0bac6e85a10115a765d85baaad34b0` adds the focused Tactical Matchboard browser spec, repository selector mapping, and selector regression coverage.
+- **Exit evidence:** exact SHA `f885ed38` passed **26/26** focused tactical/selector units, production/PWA build, and **10/10** focused Playwright scenarios across desktop and mobile Chromium.
+- **Reverse-safe:** complete.
 
 ### T03-05 — Accessibility and responsive gate
-- **Status:** BLOCKED
+- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
 - **Depends on:** T03-04
 - **Primary files:** tactical workspace/board/CSS and tactical e2e only
 - **Action:** run Axe plus keyboard-only and device-width coverage; verify no essential operation relies on dragging; verify target sizing/reflow and phone/tablet/laptop layouts.

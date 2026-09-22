@@ -4,7 +4,7 @@
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 0/60
-**Current executable evidence:** source commit `163a63d78131e90762246e86f58803e87d9d4788` passes **23/23** focused tactical units and TypeScript with exit 0; its exact-commit Vite log records a successful production build in 55.63s and emits dedicated Tactical Matchboard JS/CSS chunks. Focused desktop/mobile browser, Axe and reflow evidence remain pending.
+**Current executable evidence:** source commit `f885ed383b0bac6e85a10115a765d85baaad34b0` passes **26/26** focused tactical/selector units, a production/PWA build, and **10/10** focused Playwright scenarios across desktop and mobile Chromium. Axe, keyboard-only, viewport/reflow, and target-size evidence remain pending.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |

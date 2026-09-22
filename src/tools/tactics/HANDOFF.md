@@ -4,10 +4,10 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source commit: `163a63d78131e90762246e86f58803e87d9d4788`
-- Current comparison to `main`: **51 commits ahead / 5 behind**, status `diverged`
+- Last validated source commit: `f885ed383b0bac6e85a10115a765d85baaad34b0`
+- Current comparison to `main`: **53 commits ahead / 5 behind**, status `diverged`
 - Existing PR: **#76 only**; draft/open/unmerged. Do not create a replacement Tactical Matchboard PR.
-- Milestone: **Task 3 — registered beginner vertical slice; focused browser contract next**
+- Milestone: **Task 3 — accessibility and responsive validation**
 - Verified functional features: **0/60**
 - Registration status: catalog entry and lazy workspace loader are now registered after executable unit/type/build gates passed.
 
@@ -15,11 +15,11 @@ A committed handoff file cannot contain its own final Git SHA because its conten
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and execute **T03-04**. It is the sole READY item.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and continue **T03-05**. It is the sole ACTIVE item and its listed primary files are reserved until its gate is recorded.
 
-T03-04 must add a focused browser contract in `tests/e2e/tactical-matchboard-studio.spec.ts` plus the repository selector entry in `scripts/select-e2e-specs.mjs`. Cover beginner setup, player selection, click-to-move, D-pad movement, numeric movement, two-point arrow authoring, undo/redo, SVG download, and touch-equivalent operation on desktop and mobile Chromium.
+T03-05 must extend the focused browser contract with Axe, keyboard-only, device-width/reflow, and target-size validation. Preserve the existing non-drag movement and arrow workflows.
 
-Do not advance to T03-05 until that focused browser contract is executable and green. T03-05 then owns Axe, keyboard-only, device-width/reflow, and target-size validation.
+Do not advance to T03-06 until the accessibility/responsive matrix is executable and green or any concrete limitation is explicitly recorded.
 
 ## Current executable evidence
 
@@ -27,6 +27,7 @@ Do not advance to T03-05 until that focused browser contract is executable and g
 - Registration TDD: new catalog contract was observed RED first (**22 passed / 1 failed**, Tactical entry undefined).
 - `163a63d78131e90762246e86f58803e87d9d4788`: focused tactical units **23/23 passed** and TypeScript exit 0 on the exact committed SHA.
 - Exact-commit Vite build log at `163a63d...` records `✓ built in 55.63s` and emits dedicated `TacticalMatchboardWorkspace` JS/CSS chunks.
+- `f885ed383b0bac6e85a10115a765d85baaad34b0`: focused tactical plus selector units **26/26 passed**, production/PWA build succeeded, and the focused Tactical Matchboard spec passed **10/10** scenarios across desktop and mobile Chromium.
 - Existing Vite browser-externalization and large-chunk messages are repository-wide warnings from pinned dependencies, not Tactical Matchboard failures.
 
 ## Current implementation state
@@ -66,7 +67,6 @@ The current movement workflow intentionally does not require dragging: pitch tap
 
 ## Open blockers / deferred evidence
 
-- Focused desktop/mobile browser validation is not yet recorded; T03-04 is next.
-- Axe, keyboard-only, viewport/reflow and target-size evidence is deferred to T03-05 after the browser contract exists.
+- The beginner workflow browser contract is green on desktop and mobile Chromium; T03-05 owns the remaining Axe, keyboard-only, viewport/reflow and target-size evidence.
 - Current authoritative futsal/specialty geometry still requires exact primary-source verification before any preset can be labeled sourced/official.
 - Task 4 through Task 15 remain accepted dependency-ordered scope exactly as enumerated in `TODO_SEQUENCE.md`; they are not removed from the 60-feature denominator.
