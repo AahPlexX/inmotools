@@ -10,21 +10,21 @@ const IFAB_2026_27: SourceProvenance = {
   kind: 'governing-source',
   authoritative: true,
   organization: 'The IFAB',
-  sourceTitle: 'Laws of the Game 2026/27 — Law 1: The Field of Play',
+  sourceTitle: 'Laws of the Game 2026/27 â€” Law 1: The Field of Play',
   sourceUrl: 'https://www.theifab.com/laws/latest/the-field-of-play/',
   sourceVersion: '2026/27',
   sourceDate: '2026-09-22',
 };
 
-const FIFA_FUTSAL_2021: SourceProvenance = {
+const FIFA_FUTSAL_2025_26: SourceProvenance = {
   kind: 'governing-source',
   authoritative: true,
   organization: 'FIFA',
-  sourceTitle: 'Futsal Laws of the Game 2021 and FIFA rules summary',
-  sourceUrl: 'https://inside.fifa.com/news/a-crash-course-in-futsal-rules',
-  sourceVersion: '2021',
+  sourceTitle: 'Futsal Laws of the Game 2025-26',
+  sourceUrl: 'https://cdn.sanity.io/files/oyf3dba6/production/ef303b9de23b797d2c74e1902b9f8ee2d07a6da4.pdf',
+  sourceVersion: '2025-26',
   sourceDate: '2026-09-22',
-  note: 'Version is shown explicitly; verify the applicable competition edition before match use.',
+  note: 'Current FIFA lawbook linked by U.S. Soccer Refereeing; competition-specific modifications may apply.',
 };
 
 const US_SOCCER_PDI_2017: SourceProvenance = {
@@ -59,17 +59,18 @@ const ifabInternationalProfile: PitchRuleProfile = {
 };
 
 const futsalProfile: PitchRuleProfile = {
-  id: 'fifa-futsal-reference-2021',
-  label: 'FIFA futsal reference (2021)',
+  id: 'fifa-futsal-2025-26',
+  label: 'FIFA futsal (2025-26)',
   format: 'futsal',
   teamSize: 5,
   editable: false,
   dimensions: { lengthMeters: 40, widthMeters: 20 },
+  dimensionRange: { minLengthMeters: 38, maxLengthMeters: 42, minWidthMeters: 20, maxWidthMeters: 25 },
   goalDimensions: { widthMeters: 3, heightMeters: 2 },
   goalkeeperStatus: 'included',
   specialLines: ['Halfway line', 'Six-metre penalty areas', 'Substitution zones', 'Second penalty marks'],
   restartNotes: ['Kick-ins replace throw-ins.', 'No offside.', 'Competition-specific modifications may apply.'],
-  provenance: FIFA_FUTSAL_2021,
+  provenance: FIFA_FUTSAL_2025_26,
 };
 
 const usSoccerPdi7v7Profile: PitchRuleProfile = {
@@ -224,7 +225,7 @@ function profileOverlays(
       line('ifab-right-penalty-area', 'IFAB right penalty area', [[1, top], [1 - depth, top], [1 - depth, bottom], [1, bottom]], profile.provenance),
     ];
   }
-  if (profile.id === 'fifa-futsal-reference-2021') {
+  if (profile.id === 'fifa-futsal-2025-26') {
     return [
       line('futsal-halfway-line', 'Futsal halfway line', [[0.5, 0], [0.5, 1]], profile.provenance),
       line('futsal-left-second-penalty-mark', 'Left second penalty mark', [[0.25, 0.48], [0.25, 0.52]], profile.provenance),

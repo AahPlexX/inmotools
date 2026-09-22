@@ -145,6 +145,12 @@ test('authors rules, formations, transforms, legality aids, and restart starters
   await expect(page.locator('#ifab-left-penalty-area')).toHaveCount(1);
   await expect(page.locator('#ifab-right-penalty-area')).toHaveCount(1);
 
+  await page.getByRole('combobox', { name: /Rules profile/ }).selectOption('fifa-futsal-2025-26');
+  await page.getByRole('button', { name: 'Apply rules profile' }).click();
+  await expect(page.locator('#futsal-left-second-penalty-mark')).toHaveCount(1);
+  await expect(page.locator('#futsal-right-second-penalty-mark')).toHaveCount(1);
+  await expect(page.getByText(/Futsal Laws of the Game 2025-26/)).toBeVisible();
+
   await page.getByRole('combobox', { name: /Restart starter/ }).selectOption('tool-corner-left');
   await expect(page.getByText(/IFAB corner kicks place the ball within one metre/)).toBeVisible();
 

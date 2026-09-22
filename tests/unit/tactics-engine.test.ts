@@ -188,7 +188,21 @@ describe('Tactical Matchboard foundation contracts', () => {
         sourceVersion: '2026/27',
       },
     });
-    expect(PITCH_RULE_PROFILES.some((profile) => profile.format === 'futsal')).toBe(true);
+    const futsal = getPitchRuleProfile('fifa-futsal-2025-26');
+    expect(futsal).toMatchObject({
+      format: 'futsal',
+      dimensions: { lengthMeters: 40, widthMeters: 20 },
+      dimensionRange: {
+        minLengthMeters: 38,
+        maxLengthMeters: 42,
+        minWidthMeters: 20,
+        maxWidthMeters: 25,
+      },
+      provenance: {
+        organization: 'FIFA',
+        sourceVersion: '2025-26',
+      },
+    });
 
     const custom = createCustomPitchRuleProfile({
       id: '  academy-6v6  ',
