@@ -16,15 +16,13 @@ A committed handoff file cannot contain the SHA of its own final commit because 
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and execute **T03-01**. It is the only READY item.
+Open `src/tools/tactics/TODO_SEQUENCE.md` and resume **T03-01**. It is ACTIVE and remains the only actionable item.
 
-T03-01 requires executable evidence on the current branch tip:
-1. `pnpm exec vitest run tests/unit/tactics-engine.test.ts`
-2. `pnpm build`
+Captured executable evidence at exact SHA `7707b8102699e05841fa8a26f8e42315fa000e87`:
+1. `corepack pnpm exec vitest run tests/unit/tactics-engine.test.ts` — **22/22 passed**.
+2. Production build — **not yet captured**. The normal `corepack pnpm build` entrypoint never reached TypeScript/Vite because its nested bare `pnpm` resolved to verifier pnpm 11.24.0 while the repo requires 12.3.4. Corepack 12.3.4 was activated and the equivalent prepare + `tsc` + Vite sequence was started, but the remote session became unreadable before its result could be retrieved.
 
-The connected GitHub surface currently reports **no GitHub Actions workflow runs** for the tactical commits, so neither the RED contract nor the current implementation has repository-run unit/build proof. Do not claim green until an actual runner produces it. CodeRabbit success is not a unit/build gate.
-
-If T03-01 is red, execute T03-02 against the exact diagnostics. If T03-01 is green, T03-03 becomes READY and may add the catalog/lazy-loader route. Do not register before that point.
+The exact next action is therefore to finish only the production build half of T03-01 on the same source state or a docs-only descendant. If the build is red, execute T03-02 against the exact diagnostics. If it is green, T03-03 becomes READY and may add the catalog/lazy-loader route. Do not register before that point.
 
 ## Current implementation state
 
@@ -76,7 +74,7 @@ This is aligned with the current WCAG 2.2 requirement that drag functionality ha
 
 ## Open defects / blockers
 
-- **Execution evidence blocker:** no repository Actions run exists for the current tactical commits through the connected GitHub surface.
+- **Execution evidence blocker:** focused tactical units are green 22/22 at `7707b8102699e05841fa8a26f8e42315fa000e87`; production TypeScript/Vite build evidence remains open because the verifier's nested bare `pnpm` used 11.24.0 and the exact-Corepack follow-up session became unreadable before its result was captured.
 - **Registration blocker:** route/catalog registration waits for T03-01/T03-02 green evidence.
 - **Browser validation blocker:** there is no registered route yet, so focused Playwright/Axe/reflow proof is intentionally deferred to T03-04/T03-05.
 - Current authoritative futsal/specialty geometry still requires exact primary-source verification before any preset can be labeled sourced/official.
