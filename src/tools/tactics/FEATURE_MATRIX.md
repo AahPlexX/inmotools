@@ -15,9 +15,9 @@
 | 6 | Authored Ball Elevation & Trajectory Layer | planned | — | — |
 | 7 | Training Equipment & Prop Library | in-progress | `tactics-types.ts`, `editor-engine.ts` | Validated scene/layer equipment placement primitive exists; full sourced prop catalog and transform UI remain. |
 | 8 | Precision Snapping & Tactical Guides | in-progress | `pitch-engine.ts` | Pure grid/guide snapping exists; board guides, teammate/equal-spacing assistance, and UI integration remain. |
-| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` | Editable starter templates plus deterministic normalized starter placement exist for 3v3/4v4/5v5; custom authoring and product UI remain. |
-| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` | Provenance-bearing U.S. Soccer examples plus deterministic mirrored starter placement exist; alternative/custom authoring and UI remain. |
-| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` | Required common 11v11 structures, count validation, and deterministic starter placement exist; custom authoring and UI remain. |
+| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts`, `workspace-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Editable starter templates plus deterministic normalized starter placement exist for 3v3/4v4/5v5 and are selectable in the unregistered beginner workspace; custom authoring remains. |
+| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts`, `workspace-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Provenance-bearing U.S. Soccer examples, deterministic mirrored starter placement, and formation selection exist in the unregistered workspace; alternative/custom authoring remains. |
+| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts`, `workspace-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Required common 11v11 structures, count validation, deterministic starter placement, and formation selection exist in the unregistered workspace; custom authoring remains. |
 | 12 | Phase-of-Play Formation Morphing | planned | — | — |
 | 13 | Mirror, Flip & Direction-of-Play Transform | in-progress | `pitch-engine.ts` | Point-level horizontal/vertical transforms exist; whole-project/keyframe/vector transform remains. |
 | 14 | Formation Count & Restart Legality Validator | in-progress | `formation-engine.ts` | Team-size/goalkeeper/notation invariants exist; roster assignment and sourced restart legality aids remain. |
@@ -57,15 +57,15 @@
 | 48 | Multi-Angle Local Video Sync | planned | — | — |
 | 49 | Open Tactical Trajectory Import | planned | — | — |
 | 50 | Tactical Analytics CSV/JSON Export | planned | — | — |
-| 51 | Device-Agnostic Responsive Workspace | planned | — | — |
-| 52 | Context Menu + Explicit Touch Equivalent | planned | — | — |
+| 51 | Device-Agnostic Responsive Workspace | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `tactical-matchboard.css` | Pitch-first responsive grid, narrow single-column collapse, 44px+ command/player targets, and reduced-motion handling are authored; executable phone/tablet/laptop/reflow validation has not run. |
+| 52 | Context Menu + Explicit Touch Equivalent | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `workspace-engine.ts` | Pointer/touch click-to-place plus visible player buttons, D-pad movement, and numeric coordinates provide non-drag alternatives for the current movement workflow; future context-menu actions and their touch equivalents remain. |
 | 53 | Collision-Protected Tooltips & Help Reference | planned | — | — |
 | 54 | Keyboard Shortcut & Transport Engine | planned | — | — |
-| 55 | Layers, Selection, Grouping, Locking & Visibility | in-progress | `tactics-types.ts`, `editor-engine.ts` | Scene/layer ownership plus lock/visibility state primitives exist; selection, grouping, reorder, solo/focus UI remain. |
-| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | in-progress | `editor-engine.ts` | Immutable undo/redo history is bounded at 100 snapshots; autosave, named/recovery snapshots, persistence and crash recovery remain. |
+| 55 | Layers, Selection, Grouping, Locking & Visibility | in-progress | `tactics-types.ts`, `editor-engine.ts`, `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx` | Scene/layer ownership plus lock/visibility primitives exist and the beginner workspace has explicit player selection; grouping, layer reorder, solo/focus and full layer UI remain. |
+| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | in-progress | `editor-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Immutable undo/redo history is bounded at 100 snapshots and exposed in the unregistered workspace; autosave, named/recovery snapshots, persistence and crash recovery remain. |
 | 57 | Capability-Negotiated Local Video Export | planned | — | — |
 | 58 | Vector-First Coaching PDF / Contact-Sheet Publisher | planned | — | — |
-| 59 | Still, Social-Card & Standalone Playback Export | in-progress | `board-engine.ts` | Deterministic accessible SVG serialization now exists with escaped text, physical pitch aspect ratio, scene/layer filtering, players, equipment and annotations; raster/social/standalone HTML paths remain. |
+| 59 | Still, Social-Card & Standalone Playback Export | in-progress | `board-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Deterministic accessible SVG serialization plus a real local SVG download action exist with escaped text, physical pitch aspect ratio, scene/layer filtering, players, equipment and annotations; raster/social/standalone HTML paths remain. |
 | 60 | Deterministic Project Vault / ZIP / Schema Migration | planned | — | — |
 
 ## Evidence policy
