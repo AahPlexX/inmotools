@@ -29,6 +29,7 @@ const TOOL_SPECS = new Map([
   ['sightline', ['tests/e2e/sightline.spec.ts']],
   ['shader', ['tests/e2e/shader.spec.ts']],
   ['sheets', ['tests/e2e/tabular-sheet-workstation.spec.ts']],
+  ['tactics', ['tests/e2e/tactical-matchboard-studio.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],

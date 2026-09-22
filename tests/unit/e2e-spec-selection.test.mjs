@@ -21,4 +21,10 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/photo.spec.ts',
     ]);
   });
+
+  it('routes Tactical Matchboard source changes to its focused browser contract', () => {
+    expect(selectE2eSpecs(['src/tools/tactics/TacticalBoard.tsx'])).toEqual([
+      'tests/e2e/tactical-matchboard-studio.spec.ts',
+    ]);
+  });
 });
