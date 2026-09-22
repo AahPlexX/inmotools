@@ -215,6 +215,45 @@ export type RetouchOperation =
       anchored: boolean;
     };
 
+/** One control point's displacement in a fixed-size normalized mesh-warp grid (see PHOTO_MESH_WARP_GRID). */
+export interface PhotoMeshWarpPoint {
+  dx: number;
+  dy: number;
+}
+
+export type PhotoLiquifyMode = 'push' | 'pull' | 'restore';
+
+/** One liquify brush stroke; 'restore' shrinks displacement already added by earlier strokes
+ * within its own radius rather than adding new displacement. */
+export interface PhotoLiquifyStroke {
+  id: string;
+  mode: PhotoLiquifyMode;
+  radius: number;
+  strength: number;
+  path: Array<{ x: number; y: number }>;
+}
+
+export interface PhotoDefringe {
+  /** Target hue in degrees, 0-360. */
+  hue: number;
+  /** Half-width of the targeted hue band, in degrees. */
+  range: number;
+  amount: number;
+}
+
+export interface PhotoDetailFilters {
+  gaussianBlur: number;
+  medianFilter: number;
+  bilateralSmoothing: number;
+  highPass: number;
+  /** -1 softens the extracted high-frequency detail band toward the low-frequency base
+   * (skin-smoothing direction), +1 boosts it (extra micro-contrast); 0 is neutral. */
+  frequencySeparationDetail: number;
+  defringe: PhotoDefringe;
+  moireReduction: number;
+  hotPixelCorrection: number;
+}
+
 export interface PhotoRecipe {
   version: 1;
   /** Optional on older version-1 recipes; normalized before decoding. */
@@ -227,6 +266,10 @@ export interface PhotoRecipe {
   lensDistortion: number;
   perspectiveHorizontal: number;
   perspectiveVertical: number;
+  /** Optional on older version-1 recipes; normalized to null (no distortion). */
+  meshWarp?: PhotoMeshWarpPoint[] | null;
+  /** Optional on older version-1 recipes; normalized to an empty stack. */
+  liquifyStrokes?: PhotoLiquifyStroke[];
 
   exposure: number;
   contrast: number;
@@ -264,6 +307,8 @@ export interface PhotoRecipe {
   denoiseLuminance: number;
   denoiseChroma: number;
   chromaticAberration: number;
+  /** Optional on older version-1 recipes; normalized to explicit neutral defaults. */
+  detailFilters?: PhotoDetailFilters;
 
   vignette: number;
   vignetteMidpoint: number;

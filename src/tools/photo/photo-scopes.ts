@@ -11,7 +11,7 @@ export interface PhotoScopeAnalysis {
   sampleCount: number;
 }
 
-export type PhotoInspectionOverlay = 'focus' | 'exposure-zones';
+export type PhotoInspectionOverlay = 'focus' | 'exposure-zones' | 'dust';
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -107,6 +107,34 @@ export function createPhotoInspectionOverlay(
         output[offset + 1] = color[1];
         output[offset + 2] = color[2];
         output[offset + 3] = 156;
+        continue;
+      }
+
+      if (mode === 'dust') {
+        // Isolated local-contrast spikes (a single point that disagrees with its whole ring of
+        // neighbors) — distinct from 'focus', which flags ordinary directional edges instead.
+        const leftX = Math.max(0, x - 1);
+        const rightX = Math.min(width - 1, x + 1);
+        const topY = Math.max(0, y - 1);
+        const bottomY = Math.min(height - 1, y + 1);
+        let neighborSum = 0;
+        let neighborCount = 0;
+        for (let sy = topY; sy <= bottomY; sy += 1) {
+          for (let sx = leftX; sx <= rightX; sx += 1) {
+            if (sx === x && sy === y) continue;
+            const neighborOffset = (sy * width + sx) * 4;
+            neighborSum += luminance(pixels[neighborOffset], pixels[neighborOffset + 1], pixels[neighborOffset + 2]);
+            neighborCount += 1;
+          }
+        }
+        const centerLuma = luminance(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+        const neighborAvg = neighborCount ? neighborSum / neighborCount : centerLuma;
+        const deviation = Math.abs(centerLuma - neighborAvg);
+        if (deviation < 0.18) continue;
+        output[offset] = 239;
+        output[offset + 1] = 68;
+        output[offset + 2] = 68;
+        output[offset + 3] = Math.round(140 + Math.min(1, deviation) * 115);
         continue;
       }
 

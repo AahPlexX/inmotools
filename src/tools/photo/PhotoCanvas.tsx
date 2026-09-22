@@ -12,12 +12,12 @@ import './photo-comparison.css';
 import './photo-observation.css';
 
 export interface PhotoCanvasInteraction {
-  kind: 'local' | 'retouch' | 'selection' | 'layer-mask';
+  kind: 'local' | 'retouch' | 'selection' | 'layer-mask' | 'warp';
   id: string;
   label: string;
   mode: 'radial' | 'linear' | 'brush' | 'red-eye' | 'retouch-source' | 'retouch-target'
     | 'selection-rectangle' | 'selection-ellipse' | 'selection-lasso' | 'selection-color'
-    | 'layer-radial' | 'layer-linear' | 'layer-brush';
+    | 'layer-radial' | 'layer-linear' | 'layer-brush' | 'warp-mesh' | 'warp-liquify';
 }
 
 export interface PhotoCanvasGesture {
@@ -66,7 +66,7 @@ interface StraightenGesture {
 }
 
 type PhotoCompareMode = 'split' | 'side-by-side';
-type PhotoOverlayMode = 'clipping' | 'focus' | 'exposure-zones' | null;
+type PhotoOverlayMode = 'clipping' | 'focus' | 'exposure-zones' | 'dust' | null;
 type PhotoCanvasBackground = 'checkerboard' | 'dark' | 'light' | 'black';
 
 interface PinnedPhotoSample {
@@ -691,6 +691,12 @@ export default function PhotoCanvas({
             disabled={!previewUrl}
             onClick={() => setOverlayMode((value) => value === 'exposure-zones' ? null : 'exposure-zones')}
           >Exposure zones</button>
+          <button
+            type="button"
+            aria-pressed={overlayMode === 'dust'}
+            disabled={!previewUrl}
+            onClick={() => setOverlayMode((value) => value === 'dust' ? null : 'dust')}
+          >Dust visualization</button>
           <button
             type="button"
             aria-pressed={samplerActive}

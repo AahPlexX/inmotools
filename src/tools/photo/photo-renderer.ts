@@ -1,5 +1,6 @@
 import { normalizeRecipe, sampleHistogram, type PhotoLayerPixels } from './photo-engine';
 import { warpPhotoGeometryPixels } from './photo-geometry';
+import { warpPhotoMeshLiquifyPixels } from './photo-warp';
 import { preparePhotoRaster } from './photo-import';
 import type {
   PhotoCapabilities,
@@ -503,13 +504,20 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const canvas = drawGeometry(bitmap, recipe, target.width, target.height);
     const context = getContext2d(canvas);
     const imageData = context.getImageData(0, 0, target.width, target.height);
-    const geometryPixels = warpPhotoGeometryPixels(
+    const lensPerspectivePixels = warpPhotoGeometryPixels(
       imageData.data,
       target.width,
       target.height,
       recipe.lensDistortion,
       recipe.perspectiveHorizontal,
       recipe.perspectiveVertical,
+    );
+    const geometryPixels = warpPhotoMeshLiquifyPixels(
+      lensPerspectivePixels,
+      target.width,
+      target.height,
+      recipe.meshWarp,
+      recipe.liquifyStrokes,
     );
     const mime = request.outputMime ?? 'image/png';
     const jpegBackground = request.mode === 'export' && mime === 'image/jpeg'

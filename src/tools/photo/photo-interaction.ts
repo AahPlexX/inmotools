@@ -1,5 +1,6 @@
 import { normalizeRecipe } from './photo-engine';
-import type { PhotoRecipe } from './photo-types';
+import { applyMeshWarpGesture as computeMeshWarpGesture } from './photo-warp';
+import type { PhotoLiquifyMode, PhotoRecipe } from './photo-types';
 
 export interface PhotoGesturePoint {
   x: number;
@@ -193,4 +194,35 @@ export function applyLayerMaskGesture(
     }),
   };
   return normalizeRecipe(next);
+}
+
+/** A drag on the photo nudges every mesh control point within reach toward the drag delta,
+ * weighted by proximity to the drag start — see photo-warp.ts's applyMeshWarpGesture. */
+export function applyMeshWarpDrag(recipe: PhotoRecipe, start: PhotoGesturePoint, end: PhotoGesturePoint): PhotoRecipe {
+  const meshWarp = computeMeshWarpGesture(recipe.meshWarp, normalizedPoint(start), normalizedPoint(end));
+  return normalizeRecipe({ ...recipe, meshWarp });
+}
+
+/** Appends one liquify stroke built from a captured drag path (push/pull/restore, per the
+ * active tool state), matching the brush/retouch stroke-append pattern used elsewhere. */
+export function applyLiquifyStroke(
+  recipe: PhotoRecipe,
+  strokeId: string,
+  mode: PhotoLiquifyMode,
+  radius: number,
+  strength: number,
+  path: PhotoGesturePoint[],
+): PhotoRecipe {
+  if (path.length === 0) return recipe;
+  const stroke = {
+    id: strokeId,
+    mode,
+    radius,
+    strength,
+    path: path.map((point) => normalizedPoint(point)),
+  };
+  return normalizeRecipe({
+    ...recipe,
+    liquifyStrokes: [...(recipe.liquifyStrokes ?? []), stroke],
+  });
 }

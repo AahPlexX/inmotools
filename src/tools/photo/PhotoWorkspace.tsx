@@ -23,7 +23,8 @@ import {
   undoHistory,
 } from './photo-engine';
 import { photoNaturalDimensions } from './photo-export-dimensions';
-import { applyLayerMaskGesture, applyLocalGesture, placeRetouchPoint } from './photo-interaction';
+import { applyLayerMaskGesture, applyLiquifyStroke, applyLocalGesture, applyMeshWarpDrag, placeRetouchPoint } from './photo-interaction';
+import { NEUTRAL_DETAIL_FILTERS } from './photo-detail-filters';
 import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
@@ -90,6 +91,7 @@ import type {
   PhotoHistogram,
   PhotoHistory,
   PhotoLayer,
+  PhotoLiquifyMode,
   PhotoMask,
   PhotoRecipe,
   PhotoRawSource,
@@ -102,7 +104,7 @@ import type {
 } from './photo-types';
 import './photo.css';
 
-type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'inspect';
+type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'detail' | 'inspect';
 type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
 type MixerOutputChannel = 'red' | 'green' | 'blue';
 type WatermarkAnchor = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
@@ -375,6 +377,10 @@ export default function PhotoWorkspace() {
   const layerStrokeCounterRef = useRef(0);
   const layerFileInputRef = useRef<HTMLInputElement | null>(null);
   const watermarkFileInputRef = useRef<HTMLInputElement | null>(null);
+  const liquifyStrokeCounterRef = useRef(0);
+  const [liquifyMode, setLiquifyMode] = useState<PhotoLiquifyMode>('push');
+  const [liquifyRadius, setLiquifyRadius] = useState(0.08);
+  const [liquifyStrength, setLiquifyStrength] = useState(0.6);
   const userPresetMutationRef = useRef(false);
   const autoAnalysisRevisionRef = useRef(0);
   const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
@@ -1296,6 +1302,17 @@ export default function PhotoWorkspace() {
         next = interaction.mode === 'layer-brush'
           ? applyLayerMaskGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path, ++layerStrokeCounterRef.current, layerEraseMode)
           : applyLayerMaskGesture(current.present, interaction.id, gesture.start, gesture.end, gesture.path);
+      } else if (interaction.kind === 'warp') {
+        next = interaction.mode === 'warp-mesh'
+          ? applyMeshWarpDrag(current.present, gesture.start, gesture.end)
+          : applyLiquifyStroke(
+            current.present,
+            `liquify-${++liquifyStrokeCounterRef.current}`,
+            liquifyMode,
+            liquifyRadius,
+            liquifyStrength,
+            gesture.path.length ? gesture.path : [gesture.end],
+          );
       } else {
         let source: PhotoSelectionSource | null = null;
         if (interaction.mode === 'selection-rectangle') {
@@ -1359,6 +1376,11 @@ export default function PhotoWorkspace() {
     if (interaction.kind === 'layer-mask') {
       if (interaction.mode !== 'layer-brush') setCanvasInteraction(null);
       setStatus(interaction.mode === 'layer-brush' ? 'Layer mask brush stroke added as one undo step.' : 'Layer mask placed on the photo.');
+      return;
+    }
+    if (interaction.kind === 'warp') {
+      // Stays active like brush/layer-mask painting so repeated drags keep refining the warp.
+      setStatus(interaction.mode === 'warp-mesh' ? 'Mesh warp adjusted as one undo step.' : 'Liquify stroke painted as one undo step.');
       return;
     }
     setCanvasInteraction(null);
@@ -2356,6 +2378,70 @@ export default function PhotoWorkspace() {
     );
   }
 
+  function renderDetailPanel() {
+    const filters = recipe.detailFilters ?? NEUTRAL_DETAIL_FILTERS;
+    const meshActive = Boolean(recipe.meshWarp && recipe.meshWarp.length > 0);
+    const liquifyStrokeCount = recipe.liquifyStrokes?.length ?? 0;
+    return (
+      <>
+        <div className="photo-inspector-header">
+          <h2>Warp &amp; detail</h2>
+          <p>Bounded local geometry tools plus deterministic detail filters. Dust visualization is a preview-only overlay in the canvas toolbar.</p>
+        </div>
+        <details className="photo-section" open>
+          <summary>Mesh warp</summary>
+          <p className="photo-export-note">Drag on the photo to nudge the nearest structural grid points.</p>
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              aria-pressed={canvasInteraction?.kind === 'warp' && canvasInteraction.mode === 'warp-mesh'}
+              onClick={() => setCanvasInteraction((current) => current?.mode === 'warp-mesh' ? null : { kind: 'warp', id: 'mesh-warp', label: 'Mesh warp', mode: 'warp-mesh' })}
+            >Warp mesh on photo</button>
+            <button type="button" disabled={!meshActive} onClick={() => patchRecipe({ meshWarp: null })}>Reset mesh warp</button>
+          </div>
+        </details>
+        <details className="photo-section" open>
+          <summary>Liquify</summary>
+          <p className="photo-export-note">Push/pull/restore brush strokes, painted like brush masks. {liquifyStrokeCount} stroke{liquifyStrokeCount === 1 ? '' : 's'} recorded.</p>
+          <label>
+            Liquify mode
+            <select aria-label="Liquify mode" value={liquifyMode} onChange={(event) => setLiquifyMode(event.target.value as PhotoLiquifyMode)}>
+              <option value="push">Push</option>
+              <option value="pull">Pull</option>
+              <option value="restore">Restore</option>
+            </select>
+          </label>
+          <SimpleControl label="Liquify brush radius" value={liquifyRadius} min={0.01} max={0.3} step={0.01} neutral={0.08} onChange={setLiquifyRadius} />
+          <SimpleControl label="Liquify strength" value={liquifyStrength} min={0.05} max={1} step={0.05} neutral={0.6} onChange={setLiquifyStrength} />
+          <div className="photo-inline-actions">
+            <button
+              type="button"
+              aria-pressed={canvasInteraction?.kind === 'warp' && canvasInteraction.mode === 'warp-liquify'}
+              onClick={() => setCanvasInteraction((current) => current?.mode === 'warp-liquify' ? null : { kind: 'warp', id: 'liquify', label: 'Liquify', mode: 'warp-liquify' })}
+            >Paint liquify on photo</button>
+            <button type="button" disabled={liquifyStrokeCount === 0} onClick={() => patchRecipe({ liquifyStrokes: [] })}>Clear liquify strokes</button>
+          </div>
+        </details>
+        <details className="photo-section" open>
+          <summary>Deterministic detail filters</summary>
+          <SimpleControl label="Gaussian blur" value={filters.gaussianBlur} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, gaussianBlur: value } })} />
+          <SimpleControl label="Median filter" value={filters.medianFilter} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, medianFilter: value } })} />
+          <SimpleControl label="Edge-preserving smoothing" value={filters.bilateralSmoothing} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, bilateralSmoothing: value } })} />
+          <SimpleControl label="High-pass detail" value={filters.highPass} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, highPass: value } })} />
+          <SimpleControl label="Frequency separation detail" value={filters.frequencySeparationDetail} min={-1} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, frequencySeparationDetail: value } })} />
+          <SimpleControl label="Moire reduction" value={filters.moireReduction} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, moireReduction: value } })} />
+          <SimpleControl label="Hot pixel correction" value={filters.hotPixelCorrection} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, hotPixelCorrection: value } })} />
+        </details>
+        <details className="photo-section" open>
+          <summary>Defringe</summary>
+          <SimpleControl label="Defringe hue" value={filters.defringe.hue} min={0} max={360} step={1} neutral={300} onChange={(value) => patchRecipe({ detailFilters: { ...filters, defringe: { ...filters.defringe, hue: value } } })} />
+          <SimpleControl label="Defringe range" value={filters.defringe.range} min={1} max={90} step={1} neutral={30} onChange={(value) => patchRecipe({ detailFilters: { ...filters, defringe: { ...filters.defringe, range: value } } })} />
+          <SimpleControl label="Defringe amount" value={filters.defringe.amount} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, defringe: { ...filters.defringe, amount: value } } })} />
+        </details>
+      </>
+    );
+  }
+
   function renderInspectPanel() {
     return (
       <>
@@ -2534,6 +2620,7 @@ export default function PhotoWorkspace() {
     if (panel === 'local') return renderLocalPanel();
     if (panel === 'retouch') return renderRetouchPanel();
     if (panel === 'layers') return renderLayersPanel();
+    if (panel === 'detail') return renderDetailPanel();
     if (panel === 'inspect') return renderInspectPanel();
     return renderEditPanel();
   }
@@ -2649,6 +2736,7 @@ export default function PhotoWorkspace() {
             ['local', 'Local adjustments'],
             ['retouch', 'Retouch'],
             ['layers', 'Layers'],
+            ['detail', 'Warp & detail'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
             <button
@@ -2657,7 +2745,7 @@ export default function PhotoWorkspace() {
               aria-pressed={panel === id}
               onClick={() => {
                 setPanel(id);
-                if (id !== 'local' && id !== 'retouch' && id !== 'layers') setCanvasInteraction(null);
+                if (id !== 'local' && id !== 'retouch' && id !== 'layers' && id !== 'detail') setCanvasInteraction(null);
                 if (id !== 'geometry') setGeometryInteraction(null);
               }}
             >{label}</button>

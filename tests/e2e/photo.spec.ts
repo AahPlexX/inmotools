@@ -468,6 +468,64 @@ test('adjustment, text, shape, and watermark layers can each be added and config
   await expect(page.getByTestId('photo-layer')).toHaveCount(4);
 });
 
+test('mesh warp, liquify, and deterministic detail filters are reachable and reversible', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Warp & detail' }).click();
+
+  const warpButton = page.getByRole('button', { name: 'Warp mesh on photo' });
+  const resetMeshButton = page.getByRole('button', { name: 'Reset mesh warp' });
+  await expect(resetMeshButton).toBeDisabled();
+  await warpButton.click();
+  await expect(warpButton).toHaveAttribute('aria-pressed', 'true');
+  await dragOnPhoto(page, 0.3, 0.3, 0.4, 0.35);
+  await expect(resetMeshButton).toBeEnabled();
+  await resetMeshButton.click();
+  await expect(resetMeshButton).toBeDisabled();
+  await warpButton.click();
+  await expect(warpButton).toHaveAttribute('aria-pressed', 'false');
+
+  await page.getByLabel('Liquify mode').selectOption('pull');
+  await expect(page.getByLabel('Liquify mode')).toHaveValue('pull');
+  await page.getByLabel('Liquify brush radius value').fill('0.15');
+  await page.getByLabel('Liquify brush radius value').press('Enter');
+  await expect(page.getByLabel('Liquify brush radius value')).toHaveValue('0.15');
+
+  const clearLiquifyButton = page.getByRole('button', { name: 'Clear liquify strokes' });
+  await expect(clearLiquifyButton).toBeDisabled();
+  await page.getByRole('button', { name: 'Paint liquify on photo' }).click();
+  await dragOnPhoto(page, 0.5, 0.5, 0.55, 0.5);
+  await expect(page.getByText(/stroke.* recorded/)).toContainText('1 stroke');
+  await expect(clearLiquifyButton).toBeEnabled();
+  await clearLiquifyButton.click();
+  await expect(page.getByText(/stroke.* recorded/)).toContainText('0 strokes');
+
+  const gaussianBlur = page.getByLabel('Gaussian blur value');
+  await gaussianBlur.fill('0.4');
+  await gaussianBlur.press('Enter');
+  await expect(gaussianBlur).toHaveValue('0.4');
+
+  const defringeAmount = page.getByLabel('Defringe amount value');
+  await defringeAmount.fill('0.5');
+  await defringeAmount.press('Enter');
+  await expect(defringeAmount).toHaveValue('0.5');
+
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Warp & detail' }).click();
+  await expect(gaussianBlur).toHaveValue('0.4');
+});
+
+test('dust visualization renders a preview-only overlay distinct from clipping/focus overlays', async ({ page }) => {
+  await openFixture(page);
+  const dustButton = page.getByRole('button', { name: 'Dust visualization' });
+  await dustButton.click();
+  await expect(dustButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('photo-dust-overlay')).toBeVisible();
+  await dustButton.click();
+  await expect(dustButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('photo-dust-overlay')).toHaveCount(0);
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();

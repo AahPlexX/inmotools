@@ -23,6 +23,8 @@ import { normalizePhotoColorManagement } from './color/photo-color-management';
 import { clonePhotoSelection, normalizePhotoSelection, photoSelectionWeight } from './photo-selection';
 import { clonePhotoMask, normalizePhotoMaskOverlay } from './photo-mask';
 import { blendChannels, cloneLayer, normalizeLayerFields } from './photo-layers';
+import { applyDetailFilters, isDetailFiltersNeutral, normalizeDetailFilters } from './photo-detail-filters';
+import { normalizeLiquifyStrokes, normalizeMeshWarp } from './photo-warp';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
@@ -75,6 +77,9 @@ function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
     })),
     retouch: recipe.retouch.map((operation) => ({ ...operation })),
     layers: (recipe.layers ?? []).map(cloneLayer),
+    meshWarp: recipe.meshWarp ? recipe.meshWarp.map((point) => ({ ...point })) : recipe.meshWarp,
+    liquifyStrokes: (recipe.liquifyStrokes ?? []).map((stroke) => ({ ...stroke, path: stroke.path.map((point) => ({ ...point })) })),
+    detailFilters: recipe.detailFilters ? { ...recipe.detailFilters, defringe: { ...recipe.detailFilters.defringe } } : recipe.detailFilters,
   };
 }
 
@@ -124,6 +129,8 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   lensDistortion: 0,
   perspectiveHorizontal: 0,
   perspectiveVertical: 0,
+  meshWarp: null,
+  liquifyStrokes: [],
 
   exposure: 0,
   contrast: 0,
@@ -159,6 +166,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   denoiseLuminance: 0,
   denoiseChroma: 0,
   chromaticAberration: 0,
+  detailFilters: { gaussianBlur: 0, medianFilter: 0, bilateralSmoothing: 0, highPass: 0, frequencySeparationDetail: 0, defringe: { hue: 300, range: 30, amount: 0 }, moireReduction: 0, hotPixelCorrection: 0 },
 
   vignette: 0,
   vignetteMidpoint: 0.5,
@@ -408,6 +416,8 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     lensDistortion: clamp(source.lensDistortion, -1, 1),
     perspectiveHorizontal: clamp(source.perspectiveHorizontal, -1, 1),
     perspectiveVertical: clamp(source.perspectiveVertical, -1, 1),
+    meshWarp: normalizeMeshWarp(source.meshWarp),
+    liquifyStrokes: normalizeLiquifyStrokes(source.liquifyStrokes),
 
     exposure: clamp(source.exposure, -5, 5),
     contrast: clamp(source.contrast, -1, 1),
@@ -442,6 +452,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     denoiseLuminance: clamp(source.denoiseLuminance, 0, 1),
     denoiseChroma: clamp(source.denoiseChroma, 0, 1),
     chromaticAberration: clamp(source.chromaticAberration, -1, 1),
+    detailFilters: normalizeDetailFilters(source.detailFilters),
 
     vignette: clamp(source.vignette, -1, 1),
     vignetteMidpoint: clamp(source.vignetteMidpoint, 0, 1),
@@ -1236,11 +1247,13 @@ export function applyPixelAdjustments(
     && !hasSpatialDetail(recipe)
     && !hasLocalWork(recipe)
     && recipe.retouch.length === 0
-    && !recipe.layers?.length;
+    && !recipe.layers?.length
+    && isDetailFiltersNeutral(recipe.detailFilters);
   if (isFullyNeutral) return;
 
   applyGlobalAdjustments(data, width, height, recipe);
   applySpatialDetail(data, width, height, recipe);
+  applyDetailFilters(data, width, height, recipe.detailFilters);
   applyLocalAdjustments(data, width, height, recipe);
   applyRetouch(data, width, height, recipe);
   compositeLayers(data, width, height, recipe, layerPixels);
