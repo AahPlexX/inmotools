@@ -425,6 +425,49 @@ test('layers import, blend, transform, mask, duplicate, reorder, and remove inde
   await expect(page.getByTestId('photo-layer')).toHaveCount(0);
 });
 
+test('adjustment, text, shape, and watermark layers can each be added and configured', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Layers' }).click();
+
+  await page.getByRole('button', { name: 'Add adjustment layer' }).click();
+  const adjustmentCard = page.getByTestId('photo-layer').filter({ hasText: 'Adjustment 1' });
+  await expect(adjustmentCard).toHaveCount(1);
+  const exposureControl = adjustmentCard.getByLabel('Adjustment 1 exposure value');
+  await exposureControl.fill('0.9');
+  await exposureControl.press('Enter');
+  await expect(exposureControl).toHaveValue('0.9');
+
+  await page.getByRole('button', { name: 'Add text layer' }).click();
+  const textCard = page.getByTestId('photo-layer').filter({ hasText: 'Text 1' });
+  await expect(textCard).toHaveCount(1);
+  const textInput = textCard.getByLabel('Text 1 text content');
+  await textInput.fill('Sample caption');
+  await textInput.blur();
+  await expect(textInput).toHaveValue('Sample caption');
+  const fontSizeControl = textCard.getByLabel('Text 1 font size value');
+  await fontSizeControl.fill('72');
+  await fontSizeControl.press('Enter');
+  await expect(fontSizeControl).toHaveValue('72');
+
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const shapeCard = page.getByTestId('photo-layer').filter({ hasText: 'Rectangle 1' });
+  await expect(shapeCard).toHaveCount(1);
+  await shapeCard.getByLabel('Rectangle 1 shape kind').selectOption('ellipse');
+  await expect(shapeCard.getByLabel('Rectangle 1 shape kind')).toHaveValue('ellipse');
+  await shapeCard.getByLabel('Filled').uncheck();
+  await expect(shapeCard.getByLabel('Filled')).not.toBeChecked();
+
+  await page.getByTestId('photo-watermark-file-input').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: FIXTURE_PNG });
+  const watermarkCard = page.getByTestId('photo-layer').filter({ hasText: 'logo' });
+  await expect(watermarkCard).toHaveCount(1);
+  await expect(watermarkCard.getByRole('button', { name: 'top left' })).toBeVisible();
+  await watermarkCard.getByRole('button', { name: 'top left' }).click();
+  await expect(watermarkCard.getByLabel('logo horizontal position value')).toHaveValue('0.12');
+  await expect(watermarkCard.getByLabel('logo vertical position value')).toHaveValue('0.12');
+
+  await expect(page.getByTestId('photo-layer')).toHaveCount(4);
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();

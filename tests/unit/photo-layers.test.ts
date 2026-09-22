@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { applyPixelAdjustments, DEFAULT_RECIPE, normalizeRecipe, type PhotoLayerPixels } from '../../src/tools/photo/photo-engine';
-import { blendChannels, createLayer } from '../../src/tools/photo/photo-layers';
+import { blendChannels, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, normalizeLayerFields } from '../../src/tools/photo/photo-layers';
 import type { PhotoLayer, PhotoRecipe } from '../../src/tools/photo/photo-types';
 
 function solidLayerPixels(layerId: string, width: number, height: number, r: number, g: number, b: number, a = 255): PhotoLayerPixels {
@@ -66,7 +66,7 @@ describe('layer recipe normalization', () => {
   });
 
   test('layer fields clamp to safe ranges and unknown blend modes fall back to normal', () => {
-    const layer = createLayer('a', 'A', 'data:image/png;base64,', 10, 10);
+    const layer = createImageLayer('a', 'A', 'data:image/png;base64,', 10, 10);
     const recipe = normalizeRecipe({
       ...DEFAULT_RECIPE,
       layers: [{
@@ -86,7 +86,7 @@ describe('layer recipe normalization', () => {
   });
 
   test('more than 50 layers are truncated', () => {
-    const layers = Array.from({ length: 60 }, (_, index) => createLayer(`layer-${index}`, `Layer ${index}`, '', 1, 1));
+    const layers = Array.from({ length: 60 }, (_, index) => createImageLayer(`layer-${index}`, `Layer ${index}`, '', 1, 1));
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers });
     expect(recipe.layers).toHaveLength(50);
   });
@@ -96,7 +96,7 @@ describe('layer compositing', () => {
   test('a centered, unscaled, fully opaque normal layer replaces the base pixel at its center', () => {
     const width = 4, height = 4;
     const data = basePixels(width, height, 10, 10, 10);
-    const layer = { ...createLayer('a', 'A', '', 2, 2), transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0 } };
+    const layer = { ...createImageLayer('a', 'A', '', 2, 2), transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0 } };
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
     const pixels = [solidLayerPixels('a', 2, 2, 250, 5, 5)];
     applyPixelAdjustments(data, width, height, recipe, pixels);
@@ -108,7 +108,7 @@ describe('layer compositing', () => {
     const width = 4, height = 4;
     const data = basePixels(width, height, 10, 10, 10);
     const untouched = Uint8ClampedArray.from(data);
-    const layer = { ...createLayer('a', 'A', '', 4, 4), visible: false };
+    const layer = { ...createImageLayer('a', 'A', '', 4, 4), visible: false };
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
     applyPixelAdjustments(data, width, height, recipe, [solidLayerPixels('a', 4, 4, 250, 5, 5)]);
     expect(Array.from(data)).toEqual(Array.from(untouched));
@@ -118,7 +118,7 @@ describe('layer compositing', () => {
     const width = 4, height = 4;
     const data = basePixels(width, height, 10, 10, 10);
     const untouched = Uint8ClampedArray.from(data);
-    const layer = createLayer('a', 'A', '', 4, 4);
+    const layer = createImageLayer('a', 'A', '', 4, 4);
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
     expect(() => applyPixelAdjustments(data, width, height, recipe, [])).not.toThrow();
     expect(Array.from(data)).toEqual(Array.from(untouched));
@@ -127,7 +127,7 @@ describe('layer compositing', () => {
   test('opacity partially blends the layer toward the base rather than fully replacing it', () => {
     const width = 2, height = 2;
     const data = basePixels(width, height, 0, 0, 0);
-    const layer = { ...createLayer('a', 'A', '', 2, 2), opacity: 0.5 };
+    const layer = { ...createImageLayer('a', 'A', '', 2, 2), opacity: 0.5 };
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
     applyPixelAdjustments(data, width, height, recipe, [solidLayerPixels('a', 2, 2, 200, 200, 200)]);
     expect(data[0]).toBeGreaterThan(50);
@@ -138,12 +138,92 @@ describe('layer compositing', () => {
     const width = 4, height = 1;
     const data = basePixels(width, height, 10, 10, 10);
     const layer: PhotoLayer = {
-      ...createLayer('a', 'A', '', 4, 1),
+      ...createImageLayer('a', 'A', '', 4, 1),
       mask: { type: 'linear', x1: 0, y1: 0.5, x2: 0.5, y2: 0.5, feather: 0, opacity: 1, invert: false },
     };
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
     applyPixelAdjustments(data, width, height, recipe, [solidLayerPixels('a', 4, 1, 250, 5, 5)]);
     expect(data[0]).toBeLessThan(50); // left half: masked out, stays near the base color
     expect(data[3 * 4]).toBeGreaterThan(150); // right half: masked in, picks up the layer color
+  });
+});
+
+describe('role-specific layer factories', () => {
+  test('createAdjustmentLayer defaults to a neutral-shifted effect and the adjustment role', () => {
+    const layer = createAdjustmentLayer('a', 'Adjustment');
+    expect(layer.role).toBe('adjustment');
+    expect(layer.effect).toEqual({ exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 });
+  });
+
+  test('createTextLayer and createShapeLayer default sensible role-specific fields', () => {
+    const text = createTextLayer('t', 'Text', 'Hello');
+    expect(text.role).toBe('text');
+    expect(text.text).toBe('Hello');
+    expect(text.textColor).toBe('#ffffff');
+    expect(text.fontSize).toBe(48);
+
+    const shape = createShapeLayer('s', 'Shape', 'ellipse');
+    expect(shape.role).toBe('shape');
+    expect(shape.shapeKind).toBe('ellipse');
+    expect(shape.shapeFilled).toBe(true);
+  });
+});
+
+describe('layer field normalization for new Task 4.3 fields', () => {
+  test('a layer with no role field (saved before roles existed) normalizes to image, preserving backward compatibility', () => {
+    const normalized = normalizeLayerFields({ id: 'a', name: 'A', sourceDataUrl: 'data:image/png;base64,', sourceWidth: 10, sourceHeight: 10 });
+    expect(normalized.role).toBe('image');
+  });
+
+  test('a zero fontSize is preserved rather than falling back to the default (no falsy-coercion bug)', () => {
+    const normalized = normalizeLayerFields({ role: 'text', fontSize: 0 });
+    expect(normalized.fontSize).toBe(8); // clamped to the minimum, not overridden by the 48 fallback
+  });
+
+  test('an out-of-range fontSize clamps within bounds and an invalid one falls back to the default', () => {
+    expect(normalizeLayerFields({ role: 'text', fontSize: 9999 }).fontSize).toBe(400);
+    expect(normalizeLayerFields({ role: 'text', fontSize: 'not-a-number' }).fontSize).toBe(48);
+  });
+
+  test('an invalid hex color falls back to the default rather than passing through unsanitized', () => {
+    expect(normalizeLayerFields({ role: 'text', textColor: 'javascript:alert(1)' }).textColor).toBe('#ffffff');
+    expect(normalizeLayerFields({ role: 'shape', shapeColor: '#abc123' }).shapeColor).toBe('#abc123');
+  });
+
+  test('an unknown shapeKind falls back to rectangle', () => {
+    expect(normalizeLayerFields({ role: 'shape', shapeKind: 'triangle' }).shapeKind).toBe('rectangle');
+  });
+});
+
+describe('adjustment layer compositing', () => {
+  test('an adjustment layer changes pixels beneath it without needing a supplied pixel buffer', () => {
+    const width = 2, height = 2;
+    const data = basePixels(width, height, 128, 128, 128);
+    const untouched = Uint8ClampedArray.from(data);
+    const layer = { ...createAdjustmentLayer('a', 'Adjustment'), effect: { exposure: 1, saturation: 0, sharpness: 0, blur: 0 } };
+    const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
+    // No PhotoLayerPixels entry for this layer id — an adjustment layer has none, unlike image/text/shape layers.
+    applyPixelAdjustments(data, width, height, recipe, []);
+    expect(Array.from(data)).not.toEqual(Array.from(untouched));
+  });
+
+  test('an adjustment layer at zero opacity leaves the base pixels unchanged', () => {
+    const width = 2, height = 2;
+    const data = basePixels(width, height, 128, 128, 128);
+    const untouched = Uint8ClampedArray.from(data);
+    const layer = { ...createAdjustmentLayer('a', 'Adjustment'), opacity: 0, effect: { exposure: 1, saturation: 0, sharpness: 0, blur: 0 } };
+    const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
+    applyPixelAdjustments(data, width, height, recipe, []);
+    expect(Array.from(data)).toEqual(Array.from(untouched));
+  });
+
+  test('an invisible adjustment layer leaves the base pixels unchanged', () => {
+    const width = 2, height = 2;
+    const data = basePixels(width, height, 128, 128, 128);
+    const untouched = Uint8ClampedArray.from(data);
+    const layer = { ...createAdjustmentLayer('a', 'Adjustment'), visible: false, effect: { exposure: 1, saturation: 0, sharpness: 0, blur: 0 } };
+    const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, layers: [layer] });
+    applyPixelAdjustments(data, width, height, recipe, []);
+    expect(Array.from(data)).toEqual(Array.from(untouched));
   });
 });

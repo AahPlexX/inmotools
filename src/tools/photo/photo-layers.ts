@@ -1,5 +1,5 @@
 import { clonePhotoMask } from './photo-mask';
-import type { PhotoBlendMode, PhotoLayer } from './photo-types';
+import type { LocalEffect, PhotoBlendMode, PhotoLayer, PhotoLayerRole, PhotoShapeKind } from './photo-types';
 
 export const PHOTO_BLEND_MODES: PhotoBlendMode[] = [
   'normal', 'multiply', 'screen', 'overlay', 'soft-light', 'hard-light',
@@ -9,6 +9,12 @@ export const PHOTO_BLEND_MODES: PhotoBlendMode[] = [
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
+}
+
+function clampRange(value: unknown, min: number, max: number, fallback: number): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, num));
 }
 
 function softLightChannel(base: number, top: number): number {
@@ -94,7 +100,10 @@ export function cloneLayer(layer: PhotoLayer): PhotoLayer {
   };
 }
 
-export function createLayer(id: string, name: string, sourceDataUrl: string, sourceWidth: number, sourceHeight: number): PhotoLayer {
+const PHOTO_LAYER_ROLES: PhotoLayerRole[] = ['image', 'adjustment', 'text', 'shape'];
+const PHOTO_SHAPE_KINDS: PhotoShapeKind[] = ['rectangle', 'ellipse', 'line'];
+
+function baseLayer(id: string, name: string): Omit<PhotoLayer, 'role' | 'sourceDataUrl' | 'sourceWidth' | 'sourceHeight'> {
   return {
     id,
     name,
@@ -103,20 +112,72 @@ export function createLayer(id: string, name: string, sourceDataUrl: string, sou
     blendMode: 'normal',
     transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0 },
     mask: null,
-    sourceDataUrl,
-    sourceWidth,
-    sourceHeight,
   };
 }
 
-export function normalizeLayerFields(layer: {
+export function createImageLayer(id: string, name: string, sourceDataUrl: string, sourceWidth: number, sourceHeight: number, isWatermark = false): PhotoLayer {
+  return { ...baseLayer(id, name), role: 'image', sourceDataUrl, sourceWidth, sourceHeight, isWatermark };
+}
+
+export function createAdjustmentLayer(id: string, name: string): PhotoLayer {
+  return {
+    ...baseLayer(id, name),
+    role: 'adjustment',
+    sourceDataUrl: '',
+    sourceWidth: 1,
+    sourceHeight: 1,
+    effect: { exposure: 0.5, saturation: 0, sharpness: 0, blur: 0 },
+  };
+}
+
+export function createTextLayer(id: string, name: string, text: string): PhotoLayer {
+  return {
+    ...baseLayer(id, name),
+    role: 'text',
+    sourceDataUrl: '',
+    sourceWidth: 1,
+    sourceHeight: 1,
+    text,
+    textColor: '#ffffff',
+    fontSize: 48,
+  };
+}
+
+export function createShapeLayer(id: string, name: string, shapeKind: PhotoShapeKind): PhotoLayer {
+  return {
+    ...baseLayer(id, name),
+    role: 'shape',
+    sourceDataUrl: '',
+    sourceWidth: 1,
+    sourceHeight: 1,
+    shapeKind,
+    shapeColor: '#ffffff',
+    shapeStrokeWidth: 0.02,
+    shapeFilled: true,
+  };
+}
+
+type NormalizableLayer = {
   id?: unknown; name?: unknown; visible?: unknown; opacity?: unknown; blendMode?: unknown;
   transform?: { x?: unknown; y?: unknown; scale?: unknown; rotation?: unknown };
-  sourceDataUrl?: unknown; sourceWidth?: unknown; sourceHeight?: unknown;
-}): Pick<PhotoLayer, 'id' | 'name' | 'visible' | 'opacity' | 'blendMode' | 'transform' | 'sourceDataUrl' | 'sourceWidth' | 'sourceHeight'> {
+  role?: unknown; sourceDataUrl?: unknown; sourceWidth?: unknown; sourceHeight?: unknown;
+  isWatermark?: unknown; effect?: { exposure?: unknown; saturation?: unknown; sharpness?: unknown; blur?: unknown };
+  text?: unknown; textColor?: unknown; fontSize?: unknown;
+  shapeKind?: unknown; shapeColor?: unknown; shapeStrokeWidth?: unknown; shapeFilled?: unknown;
+};
+
+function normalizeHexColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
+export function normalizeLayerFields(layer: NormalizableLayer): Omit<PhotoLayer, 'mask'> {
   const blendMode = typeof layer.blendMode === 'string' && (PHOTO_BLEND_MODES as string[]).includes(layer.blendMode)
     ? layer.blendMode as PhotoBlendMode
     : 'normal';
+  // Layers saved before roles existed are image layers, the only role that existed then.
+  const role = typeof layer.role === 'string' && (PHOTO_LAYER_ROLES as string[]).includes(layer.role)
+    ? layer.role as PhotoLayerRole
+    : 'image';
   return {
     id: typeof layer.id === 'string' && layer.id ? layer.id : 'layer',
     name: typeof layer.name === 'string' && layer.name ? layer.name.slice(0, 80) : 'Layer',
@@ -129,8 +190,25 @@ export function normalizeLayerFields(layer: {
       scale: Math.min(20, Math.max(0.01, Number(layer.transform?.scale ?? 1) || 1)),
       rotation: Number.isFinite(Number(layer.transform?.rotation)) ? Number(layer.transform?.rotation) % 360 : 0,
     },
+    role,
     sourceDataUrl: typeof layer.sourceDataUrl === 'string' ? layer.sourceDataUrl : '',
     sourceWidth: Math.max(1, Math.round(Number(layer.sourceWidth) || 1)),
     sourceHeight: Math.max(1, Math.round(Number(layer.sourceHeight) || 1)),
+    isWatermark: Boolean(layer.isWatermark),
+    effect: {
+      exposure: Number.isFinite(Number(layer.effect?.exposure)) ? Number(layer.effect?.exposure) : 0.5,
+      saturation: Number.isFinite(Number(layer.effect?.saturation)) ? Number(layer.effect?.saturation) : 0,
+      sharpness: Number.isFinite(Number(layer.effect?.sharpness)) ? Number(layer.effect?.sharpness) : 0,
+      blur: Number.isFinite(Number(layer.effect?.blur)) ? Number(layer.effect?.blur) : 0,
+    } satisfies LocalEffect,
+    text: typeof layer.text === 'string' ? layer.text.slice(0, 200) : '',
+    textColor: normalizeHexColor(layer.textColor, '#ffffff'),
+    fontSize: clampRange(layer.fontSize, 8, 400, 48),
+    shapeKind: typeof layer.shapeKind === 'string' && (PHOTO_SHAPE_KINDS as string[]).includes(layer.shapeKind)
+      ? layer.shapeKind as PhotoShapeKind
+      : 'rectangle',
+    shapeColor: normalizeHexColor(layer.shapeColor, '#ffffff'),
+    shapeStrokeWidth: clampRange(layer.shapeStrokeWidth, 0, 1, 0.02),
+    shapeFilled: layer.shapeFilled === undefined ? true : Boolean(layer.shapeFilled),
   };
 }

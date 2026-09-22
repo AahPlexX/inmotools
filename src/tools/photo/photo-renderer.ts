@@ -130,7 +130,7 @@ function getContext2d(canvas: HTMLCanvasElement | OffscreenCanvas): CanvasRender
  * image yet (still being added) or an image this browser cannot decode is skipped rather than
  * failing the whole render, matching how the engine already treats an undecoded layer as a
  * no-op. */
-async function decodeLayerPixels(layer: { id: string; sourceDataUrl: string }): Promise<LayerBufferPayload | null> {
+async function decodeImageLayerPixels(layer: { id: string; sourceDataUrl: string }): Promise<LayerBufferPayload | null> {
   if (!layer.sourceDataUrl) return null;
   try {
     const blob = await (await fetch(layer.sourceDataUrl)).blob();
@@ -147,6 +147,88 @@ async function decodeLayerPixels(layer: { id: string; sourceDataUrl: string }): 
   } catch {
     return null;
   }
+}
+
+const TEXT_LAYER_PADDING = 24;
+const SHAPE_LAYER_SIZE = 400;
+
+/** Renders a text layer to an offscreen canvas at its natural size (canvas dimensions become the
+ * layer's own pixel-buffer size, which compositeOneLayer then scales/positions like any image
+ * layer). An empty string renders nothing rather than failing the layer. */
+function renderTextLayerPixels(layer: { id: string; text?: string; textColor?: string; fontSize?: number }): LayerBufferPayload | null {
+  const text = layer.text?.trim();
+  if (!text) return null;
+  const fontSize = Math.max(8, layer.fontSize ?? 48);
+  const measuringCanvas = createCanvas(1, 1);
+  const measuringContext = getContext2d(measuringCanvas);
+  measuringContext.font = `${fontSize}px sans-serif`;
+  const metrics = measuringContext.measureText(text);
+  const width = Math.max(1, Math.ceil(metrics.width) + TEXT_LAYER_PADDING * 2);
+  const height = Math.max(1, Math.ceil(fontSize * 1.4) + TEXT_LAYER_PADDING);
+  const canvas = createCanvas(width, height);
+  const context = getContext2d(canvas);
+  context.clearRect(0, 0, width, height);
+  context.font = `${fontSize}px sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = layer.textColor ?? '#ffffff';
+  context.fillText(text, width / 2, height / 2);
+  const imageData = context.getImageData(0, 0, width, height);
+  return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width, height };
+}
+
+/** Renders a shape layer (rectangle/ellipse/line) to a fixed-size offscreen canvas; transform.scale
+ * on the layer is what a user then resizes it with, matching text and image layers. */
+function renderShapeLayerPixels(layer: { id: string; shapeKind?: string; shapeColor?: string; shapeStrokeWidth?: number; shapeFilled?: boolean }): LayerBufferPayload | null {
+  const size = SHAPE_LAYER_SIZE;
+  const canvas = createCanvas(size, size);
+  const context = getContext2d(canvas);
+  context.clearRect(0, 0, size, size);
+  const color = layer.shapeColor ?? '#ffffff';
+  const strokeWidth = Math.max(0, layer.shapeStrokeWidth ?? 0.02) * size;
+  const filled = layer.shapeFilled ?? true;
+  const inset = Math.max(strokeWidth / 2, 4);
+  context.fillStyle = color;
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(1, strokeWidth);
+  if (layer.shapeKind === 'ellipse') {
+    context.beginPath();
+    context.ellipse(size / 2, size / 2, size / 2 - inset, size / 2 - inset, 0, 0, Math.PI * 2);
+    if (filled) context.fill(); else context.stroke();
+  } else if (layer.shapeKind === 'line') {
+    context.beginPath();
+    context.moveTo(inset, size / 2);
+    context.lineTo(size - inset, size / 2);
+    context.stroke();
+  } else {
+    if (filled) context.fillRect(inset, inset, size - inset * 2, size - inset * 2);
+    else context.strokeRect(inset, inset, size - inset * 2, size - inset * 2);
+  }
+  const imageData = context.getImageData(0, 0, size, size);
+  return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width: size, height: size };
+}
+
+interface RenderableLayer {
+  id: string;
+  role: string;
+  sourceDataUrl: string;
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  shapeKind?: string;
+  shapeColor?: string;
+  shapeStrokeWidth?: number;
+  shapeFilled?: boolean;
+}
+
+/** Produces a pixel buffer for any layer role that composites as pixels ('image', 'text', 'shape').
+ * An 'adjustment' layer has no pixel buffer of its own — the engine applies it directly to the
+ * pixels beneath it — so it resolves to null here and is skipped by the caller. */
+async function decodeLayerPixels(layer: RenderableLayer): Promise<LayerBufferPayload | null> {
+  if (layer.role === 'text') return renderTextLayerPixels(layer);
+  if (layer.role === 'shape') return renderShapeLayerPixels(layer);
+  if (layer.role === 'adjustment') return null;
+  return decodeImageLayerPixels(layer);
 }
 
 async function canvasToBlob(

@@ -293,6 +293,17 @@ export interface PhotoLayerTransform {
   rotation: number;
 }
 
+/**
+ * 'image' composites a decoded source image (also used for a watermark/logo layer — same
+ * content, placed via an anchor preset instead of freeform dragging). 'text' and 'shape' are
+ * rendered to a bitmap once at decode time and then flow through the exact same transform/
+ * blend/mask compositing as an image layer. 'adjustment' has no bitmap of its own; it applies
+ * LocalAdjustment-style effect math directly to the pixels already composited beneath it,
+ * restricted by its own mask — transform and blendMode are unused for this role.
+ */
+export type PhotoLayerRole = 'image' | 'adjustment' | 'text' | 'shape';
+export type PhotoShapeKind = 'rectangle' | 'ellipse' | 'line';
+
 export interface PhotoLayer {
   id: string;
   name: string;
@@ -302,10 +313,26 @@ export interface PhotoLayer {
   transform: PhotoLayerTransform;
   /** In canvas-normalized space, same convention as LocalAdjustment masks. */
   mask?: PhotoMask | null;
-  /** Self-contained like PhotoLut.data, so a recipe stays a single portable JSON document. */
+  role: PhotoLayerRole;
+  /** Self-contained like PhotoLut.data, so a recipe stays a single portable JSON document.
+   * Populated for 'image' layers only; 'text'/'shape' layers render their own bitmap at decode
+   * time and never persist it here, so edits to text/shape fields always re-render from source. */
   sourceDataUrl: string;
   sourceWidth: number;
   sourceHeight: number;
+  /** True for an 'image' layer added via the watermark quick-action, purely for UI labeling. */
+  isWatermark?: boolean;
+  /** 'adjustment' role. */
+  effect?: LocalEffect;
+  /** 'text' role. */
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  /** 'shape' role. */
+  shapeKind?: PhotoShapeKind;
+  shapeColor?: string;
+  shapeStrokeWidth?: number;
+  shapeFilled?: boolean;
 }
 
 export interface PhotoHistogram {

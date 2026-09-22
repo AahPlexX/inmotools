@@ -2,6 +2,7 @@ import type {
   ColorGrade,
   HslAdjustment,
   LocalAdjustment,
+  LocalEffect,
   PhotoChannelMixerRow,
   PhotoChannelMixer,
   PhotoColorManagement,
@@ -961,18 +962,19 @@ function applyLocalColorEffect(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  adjustment: LocalAdjustment,
+  mask: PhotoMask,
+  effect: LocalEffect,
 ): void {
-  const exposureScale = 2 ** adjustment.effect.exposure;
+  const exposureScale = 2 ** effect.exposure;
   for (let pixel = 0; pixel < width * height; pixel += 1) {
     const offset = pixel * 4;
     if (data[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = photoMaskWeight(adjustment.mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
+    const weight = photoMaskWeight(mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
     if (weight <= EPSILON) continue;
 
-    if (adjustment.effect.exposure !== 0) {
+    if (effect.exposure !== 0) {
       for (let channel = 0; channel < 3; channel += 1) {
         const linear = srgbToLinear(data[offset + channel]);
         const adjusted = linear * (1 + (exposureScale - 1) * weight);
@@ -980,9 +982,9 @@ function applyLocalColorEffect(
       }
     }
 
-    if (adjustment.effect.saturation !== 0) {
+    if (effect.saturation !== 0) {
       const [hue, saturation, lightness] = rgbToHsl(data[offset] / 255, data[offset + 1] / 255, data[offset + 2] / 255);
-      const targetSaturation = clamp(saturation * (1 + adjustment.effect.saturation), 0, 1);
+      const targetSaturation = clamp(saturation * (1 + effect.saturation), 0, 1);
       const mixedSaturation = saturation + (targetSaturation - saturation) * weight;
       const [r, g, b] = hslToRgb(hue, mixedSaturation, lightness);
       data[offset] = Math.round(r * 255);
@@ -996,9 +998,10 @@ function applyLocalSpatialEffect(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  adjustment: LocalAdjustment,
+  mask: PhotoMask,
+  effect: LocalEffect,
 ): void {
-  if (adjustment.effect.sharpness === 0 && adjustment.effect.blur === 0) return;
+  if (effect.sharpness === 0 && effect.blur === 0) return;
   const source = new Uint8ClampedArray(data);
   const blurred = boxBlur(source, width, height, 2);
   for (let pixel = 0; pixel < width * height; pixel += 1) {
@@ -1006,13 +1009,13 @@ function applyLocalSpatialEffect(
     if (source[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = photoMaskWeight(adjustment.mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
+    const weight = photoMaskWeight(mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
     if (weight <= EPSILON) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const difference = source[offset + channel] - blurred[offset + channel];
-      const sharpened = source[offset + channel] + difference * adjustment.effect.sharpness;
-      const softened = source[offset + channel] + (blurred[offset + channel] - source[offset + channel]) * adjustment.effect.blur;
-      const target = adjustment.effect.blur > 0 ? softened : sharpened;
+      const sharpened = source[offset + channel] + difference * effect.sharpness;
+      const softened = source[offset + channel] + (blurred[offset + channel] - source[offset + channel]) * effect.blur;
+      const target = effect.blur > 0 ? softened : sharpened;
       data[offset + channel] = clamp(Math.round(source[offset + channel] + (target - source[offset + channel]) * weight), 0, 255);
     }
   }
@@ -1022,9 +1025,28 @@ function applyLocalAdjustments(data: Uint8ClampedArray, width: number, height: n
   if (!hasLocalWork(recipe)) return;
   for (const adjustment of recipe.localAdjustments) {
     if (!adjustment.enabled || adjustment.mask.opacity <= 0) continue;
-    applyLocalColorEffect(data, width, height, adjustment);
-    applyLocalSpatialEffect(data, width, height, adjustment);
+    applyLocalColorEffect(data, width, height, adjustment.mask, adjustment.effect);
+    applyLocalSpatialEffect(data, width, height, adjustment.mask, adjustment.effect);
   }
+}
+
+// A full-canvas mask (opacity 1, no feather) so an adjustment layer with no mask of its own
+// still applies everywhere, matching how an unmasked local adjustment already behaves.
+const FULL_CANVAS_LAYER_MASK: PhotoMask = { type: 'radial', cx: 0.5, cy: 0.5, rx: 4, ry: 4, feather: 0, opacity: 1, invert: false };
+
+function applyAdjustmentLayer(data: Uint8ClampedArray, width: number, height: number, layer: PhotoLayer): void {
+  if (!layer.effect || layer.opacity <= EPSILON) return;
+  // Layer opacity scales the whole effect's strength, since an adjustment layer has no pixels
+  // of its own to blend at partial opacity the way an image layer does.
+  const effect: LocalEffect = {
+    exposure: layer.effect.exposure * layer.opacity,
+    saturation: layer.effect.saturation * layer.opacity,
+    sharpness: layer.effect.sharpness * layer.opacity,
+    blur: layer.effect.blur * layer.opacity,
+  };
+  const mask = layer.mask ?? FULL_CANVAS_LAYER_MASK;
+  applyLocalColorEffect(data, width, height, mask, effect);
+  applyLocalSpatialEffect(data, width, height, mask, effect);
 }
 
 function pixelFromNormalized(value: number, size: number): number {
@@ -1187,8 +1209,16 @@ function compositeLayers(data: Uint8ClampedArray, width: number, height: number,
   const pixelsById = new Map(layerPixels.map((entry) => [entry.layerId, entry]));
   for (const layer of recipe.layers) {
     if (!layer.visible || layer.opacity <= EPSILON) continue;
+    if (layer.role === 'adjustment') {
+      applyAdjustmentLayer(data, width, height, layer);
+      continue;
+    }
+    // 'image', 'text', and 'shape' all composite from a rendered bitmap: an image layer's is
+    // its decoded sourceDataUrl, while text/shape are rendered to a bitmap by the caller (the
+    // renderer, which owns canvas/text-measurement APIs this pure engine does not depend on)
+    // and handed in exactly like a decoded image, so this path never special-cases them.
     const source = pixelsById.get(layer.id);
-    if (!source) continue; // Not yet decoded by the caller; renders once it is.
+    if (!source) continue; // Not yet rendered/decoded by the caller; composites once it is.
     compositeOneLayer(data, width, height, layer, source);
   }
 }

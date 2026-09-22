@@ -24,7 +24,7 @@ import {
 } from './photo-engine';
 import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLayerMaskGesture, applyLocalGesture, placeRetouchPoint } from './photo-interaction';
-import { cloneLayer, createLayer, PHOTO_BLEND_MODES } from './photo-layers';
+import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
   parseCubeLut,
@@ -93,6 +93,7 @@ import type {
   PhotoMask,
   PhotoRecipe,
   PhotoRawSource,
+  PhotoShapeKind,
   PhotoSelectionCombineMode,
   PhotoSelectionSource,
   PhotoSnapshot,
@@ -104,6 +105,16 @@ import './photo.css';
 type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'inspect';
 type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
 type MixerOutputChannel = 'red' | 'green' | 'blue';
+type WatermarkAnchor = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+
+const WATERMARK_ANCHOR_POSITIONS: Record<WatermarkAnchor, { x: number; y: number }> = {
+  'top-left': { x: 0.12, y: 0.12 },
+  'top-right': { x: 0.88, y: 0.12 },
+  'bottom-left': { x: 0.12, y: 0.88 },
+  'bottom-right': { x: 0.88, y: 0.88 },
+  center: { x: 0.5, y: 0.5 },
+};
+const WATERMARK_ANCHORS: WatermarkAnchor[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
 
 interface SourcePhoto {
   file: File;
@@ -363,6 +374,7 @@ export default function PhotoWorkspace() {
   const brushStrokeCounterRef = useRef(0);
   const layerStrokeCounterRef = useRef(0);
   const layerFileInputRef = useRef<HTMLInputElement | null>(null);
+  const watermarkFileInputRef = useRef<HTMLInputElement | null>(null);
   const userPresetMutationRef = useRef(false);
   const autoAnalysisRevisionRef = useRef(0);
   const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
@@ -1080,13 +1092,28 @@ export default function PhotoWorkspace() {
     patchRecipe({ retouch });
   }
 
-  function addImageLayer(file: File) {
-    const id = crypto.randomUUID?.() ?? `layer-${Date.now()}-${(recipe.layers ?? []).length}`;
-    const name = file.name.replace(/\.[^.]+$/, '') || 'Layer';
+  function nextLayerId() {
+    return crypto.randomUUID?.() ?? `layer-${Date.now()}-${(recipe.layers ?? []).length}`;
+  }
+
+  function addLayer(layer: PhotoLayer) {
+    patchRecipe({ layers: [...(recipe.layers ?? []).map(cloneLayer), layer] });
+    setPanel('layers');
+    setStatus(`${layer.name} added as a new layer.`);
+  }
+
+  function addImageLayer(file: File, isWatermark = false) {
+    const id = nextLayerId();
+    const name = file.name.replace(/\.[^.]+$/, '') || (isWatermark ? 'Watermark' : 'Layer');
     setStatus(`Reading ${file.name}…`);
     decodeImageFileForLayer(file)
       .then((decoded) => {
-        const layer = createLayer(id, name, decoded.dataUrl, decoded.width, decoded.height);
+        const layer = createImageLayer(id, name, decoded.dataUrl, decoded.width, decoded.height, isWatermark);
+        if (isWatermark) {
+          const anchor = WATERMARK_ANCHOR_POSITIONS['bottom-right'];
+          layer.transform = { ...layer.transform, x: anchor.x, y: anchor.y, scale: 0.25 };
+          layer.opacity = 0.6;
+        }
         // Read layers fresh inside the updater rather than from the recipe captured when this
         // decode started, so another edit made while the file was decoding is never discarded.
         setHistory((current) => commitHistory(current, normalizeRecipe({
@@ -1094,9 +1121,34 @@ export default function PhotoWorkspace() {
           layers: [...(current.present.layers ?? []).map(cloneLayer), layer],
         })));
         setPanel('layers');
-        setStatus(`${layer.name} added as a new layer. Nothing was uploaded.`);
+        setStatus(`${layer.name} added as a new ${isWatermark ? 'watermark' : ''} layer. Nothing was uploaded.`);
       })
       .catch(() => setStatus(`Could not read "${file.name}" as an image in this browser.`));
+  }
+
+  function nextRoleIndex(predicate: (layer: PhotoLayer) => boolean) {
+    return (recipe.layers ?? []).filter(predicate).length + 1;
+  }
+
+  function addAdjustmentLayer() {
+    const index = nextRoleIndex((item) => item.role === 'adjustment');
+    addLayer(createAdjustmentLayer(nextLayerId(), `Adjustment ${index}`));
+  }
+
+  function addTextLayer() {
+    const index = nextRoleIndex((item) => item.role === 'text');
+    addLayer(createTextLayer(nextLayerId(), `Text ${index}`, 'Text'));
+  }
+
+  function addShapeLayer(shapeKind: PhotoShapeKind) {
+    const index = nextRoleIndex((item) => item.role === 'shape' && item.shapeKind === shapeKind);
+    const label = shapeKind === 'rectangle' ? 'Rectangle' : shapeKind === 'ellipse' ? 'Ellipse' : 'Line';
+    addLayer(createShapeLayer(nextLayerId(), `${label} ${index}`, shapeKind));
+  }
+
+  function setWatermarkAnchor(id: string, anchor: WatermarkAnchor) {
+    const position = WATERMARK_ANCHOR_POSITIONS[anchor];
+    updateLayer(id, (item) => ({ ...item, transform: { ...item.transform, x: position.x, y: position.y } }));
   }
 
   function updateLayer(id: string, update: (item: PhotoLayer) => PhotoLayer) {
@@ -2136,6 +2188,24 @@ export default function PhotoWorkspace() {
               if (file) addImageLayer(file);
             }}
           />
+          <button type="button" onClick={() => watermarkFileInputRef.current?.click()}>Add watermark</button>
+          <input
+            ref={watermarkFileInputRef}
+            data-testid="photo-watermark-file-input"
+            type="file"
+            accept={PHOTO_FILE_ACCEPT}
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) addImageLayer(file, true);
+            }}
+          />
+          <button type="button" onClick={addAdjustmentLayer}>Add adjustment layer</button>
+          <button type="button" onClick={addTextLayer}>Add text layer</button>
+          <button type="button" onClick={() => addShapeLayer('rectangle')}>Add rectangle</button>
+          <button type="button" onClick={() => addShapeLayer('ellipse')}>Add ellipse</button>
+          <button type="button" onClick={() => addShapeLayer('line')}>Add line</button>
         </div>
         {layers.length ? layers.map((layer, index) => (
           <article className="photo-local-card" key={layer.id} data-testid="photo-layer">
@@ -2176,6 +2246,76 @@ export default function PhotoWorkspace() {
             <SimpleControl label={`${layer.name} vertical position`} value={layer.transform.y} min={0} max={1} step={0.01} neutral={0.5} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, y: value } }))} />
             <SimpleControl label={`${layer.name} scale`} value={layer.transform.scale} min={0.05} max={5} step={0.01} neutral={1} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, scale: value } }))} />
             <SimpleControl label={`${layer.name} rotation`} value={layer.transform.rotation} min={-180} max={180} step={1} neutral={0} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, transform: { ...item.transform, rotation: value } }))} />
+            {layer.isWatermark ? (
+              <div className="photo-inline-actions" role="group" aria-label={`${layer.name} watermark position`}>
+                {WATERMARK_ANCHORS.map((anchor) => (
+                  <button type="button" key={anchor} onClick={() => setWatermarkAnchor(layer.id, anchor)}>{anchor.replace('-', ' ')}</button>
+                ))}
+              </div>
+            ) : null}
+            {layer.role === 'adjustment' && layer.effect ? (
+              <>
+                <SimpleControl label={`${layer.name} exposure`} value={layer.effect.exposure} min={0} max={1} step={0.01} neutral={0.5} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, effect: { ...item.effect!, exposure: value } }))} />
+                <SimpleControl label={`${layer.name} saturation`} value={layer.effect.saturation} min={-1} max={1} step={0.02} neutral={0} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, effect: { ...item.effect!, saturation: value } }))} />
+                <SimpleControl label={`${layer.name} sharpness`} value={layer.effect.sharpness} min={0} max={1} step={0.02} neutral={0} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, effect: { ...item.effect!, sharpness: value } }))} />
+                <SimpleControl label={`${layer.name} blur`} value={layer.effect.blur} min={0} max={1} step={0.02} neutral={0} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, effect: { ...item.effect!, blur: value } }))} />
+              </>
+            ) : null}
+            {layer.role === 'text' ? (
+              <>
+                <label>
+                  Text content
+                  <input
+                    type="text"
+                    aria-label={`${layer.name} text content`}
+                    defaultValue={layer.text ?? ''}
+                    maxLength={200}
+                    onKeyDown={inputCommit}
+                    onBlur={(event) => updateLayer(layer.id, (item) => ({ ...item, text: event.currentTarget.value.slice(0, 200) }))}
+                  />
+                </label>
+                <label>
+                  Text color
+                  <input
+                    type="color"
+                    aria-label={`${layer.name} text color`}
+                    value={layer.textColor ?? '#ffffff'}
+                    onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, textColor: event.target.value }))}
+                  />
+                </label>
+                <SimpleControl label={`${layer.name} font size`} value={layer.fontSize ?? 48} min={8} max={400} step={1} neutral={48} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, fontSize: value }))} />
+              </>
+            ) : null}
+            {layer.role === 'shape' ? (
+              <>
+                <label>
+                  Shape kind
+                  <select
+                    aria-label={`${layer.name} shape kind`}
+                    value={layer.shapeKind ?? 'rectangle'}
+                    onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, shapeKind: event.target.value as PhotoShapeKind }))}
+                  >
+                    <option value="rectangle">Rectangle</option>
+                    <option value="ellipse">Ellipse</option>
+                    <option value="line">Line</option>
+                  </select>
+                </label>
+                <label>
+                  Shape color
+                  <input
+                    type="color"
+                    aria-label={`${layer.name} shape color`}
+                    value={layer.shapeColor ?? '#ffffff'}
+                    onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, shapeColor: event.target.value }))}
+                  />
+                </label>
+                <SimpleControl label={`${layer.name} stroke width`} value={layer.shapeStrokeWidth ?? 0.02} min={0} max={1} step={0.01} neutral={0.02} onChange={(value) => updateLayer(layer.id, (item) => ({ ...item, shapeStrokeWidth: value }))} />
+                <label className="photo-check">
+                  <input type="checkbox" checked={layer.shapeFilled ?? true} onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, shapeFilled: event.target.checked }))} />
+                  Filled
+                </label>
+              </>
+            ) : null}
             {layer.mask ? (
               <>
                 <p className="photo-export-note">Mask: {layer.mask.type}</p>
