@@ -15,9 +15,9 @@
 | 6 | Authored Ball Elevation & Trajectory Layer | planned | — | — |
 | 7 | Training Equipment & Prop Library | in-progress | `tactics-types.ts`, `editor-engine.ts` | Validated scene/layer equipment placement primitive exists; full sourced prop catalog and transform UI remain. |
 | 8 | Precision Snapping & Tactical Guides | in-progress | `pitch-engine.ts` | Pure grid/guide snapping exists; board guides, teammate/equal-spacing assistance, and UI integration remain. |
-| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` | Editable starter templates exist for 3v3/4v4/5v5; custom authoring and product UI remain. |
-| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` | U.S. Soccer example templates are provenance-bearing recommendations; alternative/custom authoring and UI remain. |
-| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` | Required common 11v11 starter structures are encoded with count validation; custom authoring and UI remain. |
+| 9 | Small-Sided Formation Library | in-progress | `formation-engine.ts` | Editable starter templates plus deterministic normalized starter placement exist for 3v3/4v4/5v5; custom authoring and product UI remain. |
+| 10 | 7v7 & 9v9 Developmental Formation Library | in-progress | `formation-engine.ts` | Provenance-bearing U.S. Soccer examples plus deterministic mirrored starter placement exist; alternative/custom authoring and UI remain. |
+| 11 | 11v11 Formation Library | in-progress | `formation-engine.ts` | Required common 11v11 structures, count validation, and deterministic starter placement exist; custom authoring and UI remain. |
 | 12 | Phase-of-Play Formation Morphing | planned | — | — |
 | 13 | Mirror, Flip & Direction-of-Play Transform | in-progress | `pitch-engine.ts` | Point-level horizontal/vertical transforms exist; whole-project/keyframe/vector transform remains. |
 | 14 | Formation Count & Restart Legality Validator | in-progress | `formation-engine.ts` | Team-size/goalkeeper/notation invariants exist; roster assignment and sourced restart legality aids remain. |
@@ -65,7 +65,7 @@
 | 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | in-progress | `editor-engine.ts` | Immutable undo/redo history is bounded at 100 snapshots; autosave, named/recovery snapshots, persistence and crash recovery remain. |
 | 57 | Capability-Negotiated Local Video Export | planned | — | — |
 | 58 | Vector-First Coaching PDF / Contact-Sheet Publisher | planned | — | — |
-| 59 | Still, Social-Card & Standalone Playback Export | planned | — | — |
+| 59 | Still, Social-Card & Standalone Playback Export | in-progress | `board-engine.ts` | Deterministic accessible SVG serialization now exists with escaped text, physical pitch aspect ratio, scene/layer filtering, players, equipment and annotations; raster/social/standalone HTML paths remain. |
 | 60 | Deterministic Project Vault / ZIP / Schema Migration | planned | — | — |
 
 ## Evidence policy
