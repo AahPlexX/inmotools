@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import TacticalCoordinationControls from './TacticalCoordinationControls';
 import { createMotionPath, setKeyframeMotionPath } from './motion-engine';
 import { createNormalizedPoint } from './pitch-engine';
 import {
@@ -187,7 +188,7 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
           <label>Marker time (ms)<input name="markerTimeMs" type="number" min="0" step="1" max={project.timeline.durationMs} required /></label>
           <button type="submit">Add timeline marker</button>
           {project.timeline.markers.length ? (
-            <ul>{project.timeline.markers.map((marker) => <li key={marker.id}>{marker.timeMs} ms — {marker.label}</li>)}</ul>
+            <ul>{project.timeline.markers.map((marker) => <li key={marker.id}>{marker.timeMs} ms â€” {marker.label}</li>)}</ul>
           ) : <p>No timeline markers yet.</p>}
         </form>
 
@@ -213,8 +214,8 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
             Motion path
             <select value={pathKind} onChange={(event) => setPathKind(event.target.value as TacticalMotionPathKind)}>
               <option value="linear">Linear</option>
-              <option value="quadratic-bezier">Quadratic Bézier</option>
-              <option value="cubic-bezier">Cubic Bézier</option>
+              <option value="quadratic-bezier">Quadratic BÃ©zier</option>
+              <option value="cubic-bezier">Cubic BÃ©zier</option>
             </select>
           </label>
           {pathKind !== 'linear' ? (
@@ -231,6 +232,8 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
           ) : null}
           <button type="submit">Author motion segment</button>
         </form>
+
+        <TacticalCoordinationControls project={project} onEdit={onEdit} />
 
         <section aria-labelledby="timeline-tracks-heading">
           <h3 id="timeline-tracks-heading">Tracks</h3>

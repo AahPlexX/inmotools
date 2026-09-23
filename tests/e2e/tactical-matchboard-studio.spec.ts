@@ -230,6 +230,40 @@ test('authors timeline markers and a curved player motion segment', async ({ pag
   await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
 });
 
+test('authors coordinated actions, linked units, possession, and conflict review', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+
+  await page.getByLabel('Action target A').selectOption('token-1');
+  await page.getByLabel('Action target B').selectOption('token-2');
+  await page.getByLabel('Action start (ms)').fill('0');
+  await page.getByLabel('Action duration (ms)').fill('1000');
+  await page.getByLabel('Action A end X %').fill('45');
+  await page.getByLabel('Action A end Y %').fill('35');
+  await page.getByLabel('Action B end X %').fill('55');
+  await page.getByLabel('Action B end Y %').fill('65');
+  await page.getByRole('button', { name: 'Apply coordinated action' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Coordinated action authored');
+
+  await page.getByLabel('Linked member A').selectOption('token-1');
+  await page.getByLabel('Linked member B').selectOption('token-2');
+  await page.getByLabel('Unit start (ms)').fill('1500');
+  await page.getByLabel('Unit duration (ms)').fill('1000');
+  await page.getByLabel('Unit delta X %').fill('5');
+  await page.getByLabel('Unit delta Y %').fill('0');
+  await page.getByRole('button', { name: 'Translate linked unit' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Linked unit translated');
+
+  await page.getByLabel('Possession holder').selectOption('token-1');
+  await page.getByLabel('Possession time (ms)').fill('500');
+  await page.getByRole('button', { name: 'Add possession event' }).click();
+  await expect(page.getByText('500 ms → token-1')).toBeVisible();
+
+  await page.getByLabel('Conflict step (ms)').fill('500');
+  await page.getByLabel('Conflict threshold (m)').fill('100');
+  await page.getByRole('button', { name: 'Review path conflicts' }).click();
+  await expect(page.getByText(/Potential conflicts found:/)).toBeVisible();
+});
+
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
   await page.getByText('Rules, formations & restarts', { exact: true }).click();
