@@ -5,6 +5,7 @@ import CrystalEnvironmentPanel from './CrystalEnvironmentPanel';
 import CrystalExportDialog from './CrystalExportDialog';
 import CrystalMetadataDialog from './CrystalMetadataDialog';
 import CrystalModelBuilderPanel from './CrystalModelBuilderPanel';
+import CrystalReciprocalPanel from './CrystalReciprocalPanel';
 import CrystalStructurePanel from './CrystalStructurePanel';
 import CrystalSymmetryPanel from './CrystalSymmetryPanel';
 import CrystalViewport from './CrystalViewport';
@@ -274,6 +275,8 @@ export default function CrystalWorkspace() {
       <CrystalSymmetryPanel document={document} history={history} onHistoryChange={handleHistoryChange} />
 
       <CrystalDiffractionPanel document={document} />
+
+      <CrystalReciprocalPanel document={document} />
     </div>
   );
 }
