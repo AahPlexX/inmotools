@@ -2,8 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Crystal Lattice Studio phase 3 — diffraction', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('button', { name: /Crystal Lattice Studio/i }).click();
+    await page.goto('./#/tools/crystal-lattice-studio');
     await expect(page.getByTestId('crystal-workspace')).toBeVisible();
   });
 
