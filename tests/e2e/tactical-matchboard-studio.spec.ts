@@ -205,6 +205,31 @@ test('authors rules, formations, transforms, legality aids, and restart starters
   await expect(page.locator('.status-line').last()).toContainText('Custom rules profile authored and applied locally');
 });
 
+test('authors timeline markers and a curved player motion segment', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Playhead (ms)').fill('1200');
+  await page.getByRole('button', { name: 'Set playhead' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Playhead set to 1200 ms');
+
+  await page.getByLabel('Marker label').fill('Press trigger');
+  await page.getByLabel('Marker time (ms)').fill('1200');
+  await page.getByRole('button', { name: 'Add timeline marker' }).click();
+  await expect(page.getByText('1200 ms — Press trigger')).toBeVisible();
+
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('1200');
+  await page.getByLabel('Motion end (ms)').fill('2200');
+  await page.getByLabel('Motion end X %').fill('70');
+  await page.getByLabel('Motion end Y %').fill('30');
+  await page.getByLabel('Motion path').selectOption('quadratic-bezier');
+  await page.getByLabel('Control 1 X %').fill('50');
+  await page.getByLabel('Control 1 Y %').fill('10');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  await expect(page.getByText(/token-1.*2 keyframes/i)).toBeVisible();
+  await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
+});
+
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
   await page.getByText('Rules, formations & restarts', { exact: true }).click();

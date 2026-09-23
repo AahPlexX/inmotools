@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalBoard from './TacticalBoard';
+import TacticalTimelinePanel from './TacticalTimelinePanel';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
   commitTacticalProject,
@@ -227,7 +228,7 @@ export default function TacticalMatchboardWorkspace() {
     const dimensions = selectedRulesProfile.dimensions ?? project.pitch.dimensions;
     setRulesDraft({
       id: `${selectedRulesProfile.id}-local`,
-      label: `${selectedRulesProfile.label} — local copy`,
+      label: `${selectedRulesProfile.label} â€” local copy`,
       format: selectedRulesProfile.format,
       teamSize: selectedRulesProfile.teamSize,
       lengthMeters: dimensions.lengthMeters,
@@ -471,7 +472,7 @@ export default function TacticalMatchboardWorkspace() {
               {selectedFormation?.provenance ? (
                 <small>
                   {selectedFormation.provenance.sourceTitle}
-                  {selectedFormation.provenance.note ? ` — ${selectedFormation.provenance.note}` : ''}
+                  {selectedFormation.provenance.note ? ` â€” ${selectedFormation.provenance.note}` : ''}
                 </small>
               ) : null}
             </label>
@@ -547,7 +548,7 @@ export default function TacticalMatchboardWorkspace() {
                 <small>
                   {selectedRulesProfile.provenance.sourceTitle}
                   {selectedRulesProfile.provenance.sourceVersion ? ` (${selectedRulesProfile.provenance.sourceVersion})` : ''}
-                  {selectedRulesProfile.provenance.note ? ` — ${selectedRulesProfile.provenance.note}` : ''}
+                  {selectedRulesProfile.provenance.note ? ` â€” ${selectedRulesProfile.provenance.note}` : ''}
                 </small>
               ) : null}
             </section>
@@ -651,6 +652,9 @@ export default function TacticalMatchboardWorkspace() {
           </div>
         </details>
 
+
+        <TacticalTimelinePanel project={project} onEdit={applyEdit} />
+
         <div className="tactical-command-bar" aria-label="Board commands">
           <button
             className={`action-button ${mode === 'move' ? '' : 'secondary'}`}
@@ -705,7 +709,7 @@ export default function TacticalMatchboardWorkspace() {
                     aria-pressed={token.id === selectedTokenId}
                     onClick={() => setSelectedTokenId(token.id)}
                   >
-                    <strong>{player?.jerseyNumber ?? '—'}</strong>
+                    <strong>{player?.jerseyNumber ?? 'â€”'}</strong>
                     <span>{player?.displayName ?? token.id}</span>
                   </button>
                 );
@@ -714,10 +718,10 @@ export default function TacticalMatchboardWorkspace() {
 
             <h3>Precision move</h3>
             <div className="tactical-dpad" role="group" aria-label="Nudge selected player">
-              <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up">↑</button>
-              <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left">←</button>
-              <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right">→</button>
-              <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down">↓</button>
+              <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up">â†‘</button>
+              <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left">â†</button>
+              <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right">â†’</button>
+              <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down">â†“</button>
             </div>
 
             {selectedToken ? (
