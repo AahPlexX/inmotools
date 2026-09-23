@@ -1,6 +1,7 @@
 import { reciprocalMatrix } from './cell-engine';
 import { dSpacing, type MillerIndex } from './reciprocal-engine';
-import type { UnitCell, Vec3 } from './crystal-types';
+import { structureFactorIntensity } from './structure-factor-engine';
+import type { CrystalDocument, UnitCell, Vec3 } from './crystal-types';
 
 const EPSILON = 1e-12;
 const DEFAULT_MAX_REFLECTIONS = 10_000;
@@ -23,6 +24,8 @@ export interface PowderPattern {
   readonly kind: RadiationType;
   readonly wavelength: number;
   readonly reflections: readonly PowderReflection[];
+  /** Which intensity model produced the pattern; 'kinematic' is the document-free fallback. */
+  readonly intensityModel: 'kinematic' | 'structure-factor';
 }
 
 export interface EnumerateOptions {
@@ -37,6 +40,12 @@ export interface PowderOptions {
   readonly minDSpacing: number;
   readonly centering?: LatticeCentering;
   readonly maxReflections?: number;
+  /**
+   * Optional full document. When provided and every site has a verified
+   * scattering factor, intensities are weighted by |F(hkl)|²; otherwise the
+   * pattern degrades uniformly to the kinematic multiplicity-only model.
+   */
+  readonly document?: CrystalDocument;
 }
 
 const norm = (v: Vec3): number => Math.hypot(v[0], v[1], v[2]);
@@ -144,13 +153,31 @@ function lorentzPolarization(kind: RadiationType, twoThetaDeg: number): number {
 }
 
 /**
- * Simulate a kinematic powder pattern: Bragg positions from the cell, intensities
- * from multiplicity and a Lorentz(±polarization) factor, normalised to a max of 1000.
- * Structure-factor amplitudes are out of scope until site form factors land.
+ * Simulate a powder pattern: Bragg positions from the cell, intensities from
+ * multiplicity, a Lorentz(±polarization) factor, and |F(hkl)|² when a document
+ * with verified scattering factors is provided; normalised to a max of 1000.
  */
 export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): PowderPattern {
   assertPositiveFinite(options.wavelength, 'Wavelength');
   const base = enumerateReflections(cell, options);
+
+  // Decide the intensity model once: a document whose sites all have verified
+  // scattering factors enables |F|² weighting; a single missing factor (e.g. the
+  // pseudo-element X) degrades the whole pattern uniformly so intensities stay
+  // mutually comparable instead of mixing models per reflection.
+  let intensityFactor: ((hkl: MillerIndex) => number) | null = null;
+  let intensityModel: 'kinematic' | 'structure-factor' = 'kinematic';
+  if (options.document) {
+    const document = options.document;
+    try {
+      structureFactorIntensity(document, [1, 0, 0]);
+      intensityFactor = (hkl) => structureFactorIntensity(document, hkl);
+      intensityModel = 'structure-factor';
+    } catch {
+      intensityFactor = null;
+    }
+  }
+
   const reflections: PowderReflection[] = [];
   let maxRaw = 0;
   for (const reflection of base) {
@@ -158,7 +185,9 @@ export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): P
     const twoTheta = twoThetaFor(options.wavelength, reflection.d);
     if (!(twoTheta > 0)) continue;
     const multiplicity = cubicMultiplicity(reflection.hkl[0], reflection.hkl[1], reflection.hkl[2]);
-    const raw = multiplicity * lorentzPolarization(options.kind, twoTheta);
+    const raw = multiplicity
+      * lorentzPolarization(options.kind, twoTheta)
+      * (intensityFactor ? intensityFactor(reflection.hkl) : 1);
     if (!Number.isFinite(raw) || raw < 0) continue;
     reflections.push({ ...reflection, twoTheta, intensity: raw, multiplicity });
     if (raw > maxRaw) maxRaw = raw;
@@ -168,5 +197,6 @@ export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): P
     kind: options.kind,
     wavelength: options.wavelength,
     reflections: reflections.map((r) => ({ ...r, intensity: r.intensity * scale })),
+    intensityModel,
   };
 }

@@ -27,6 +27,7 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
         kind: radiation.id,
         wavelength: radiation.wavelength,
         minDSpacing,
+        document,
       });
       return { pattern } as const;
     } catch (error) {
@@ -76,7 +77,7 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
         ) : (
           <div data-testid="crystal-diffraction-result">
             <p role="status" data-testid="crystal-diffraction-status">
-              {outcome.pattern.reflections.length.toLocaleString()} reflections · {radiation.name} · λ = {radiation.wavelength} Å
+              {outcome.pattern.reflections.length.toLocaleString()} reflections · {radiation.name} · λ = {radiation.wavelength} Å · {outcome.pattern.intensityModel === 'structure-factor' ? '|F|²-weighted' : 'kinematic'} intensities
             </p>
             <svg
               data-testid="crystal-diffraction-plot"
