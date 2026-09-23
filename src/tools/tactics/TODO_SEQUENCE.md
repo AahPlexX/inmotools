@@ -1,9 +1,9 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-22
+**Updated:** 2026-09-23
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `e17304c6457fd5b329339ec22537c0a77a18bebc`
+**Code tip described by this queue before this documentation commit:** `02f740565bdc2322eeac98fd64f7e5f97766c19b`
 
 ## Purpose and source-of-truth roles
 
@@ -83,18 +83,15 @@
 - **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
 - **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** ACTIVE — forward agent `/root`, started 2026-09-22
+- **Status:** ACTIVE — engine foundation complete; authoring UI/browser proof remains
 - **Depends on:** T04-01 DONE
-- **Primary files:** `src/tools/tactics/timeline-engine.ts`, new tactical motion/action modules, canonical tactics types only when required, Tactical workspace timeline UI, focused Tactical tests
-- **Action:** integer-time scenes/tracks/keyframes, easing, Bézier paths, visibility spans, offsets, markers, coordinated actions, linked units, possession/handoffs, conflict review.
-- **Implemented at `f2d3565`:** immutable integer-time keyframe insertion/order; normalized position/rotation sampling; linear, smooth, ease-in/out/in-out, hold and cubic-bezier timing easing; stepped visibility spans; immutable track offsets; sorted/unique bounded markers.
-- **Implemented at `11acadf`:** unique one-track-per-target ownership, deterministic multi-track sampling, loop/clamp playhead behavior, active-scene sampling, structural timeline validation, and `validateTacticalProject` delegation so timestamp rules have one implementation.
-- **Current evidence:** current timeline/project Tactical suites pass **40/40** and TypeScript is clean. A consolidated repository unit run passed **1318/1319**; the sole failure is the unrelated Markdown Chicago author-date citation timeout in `tests/unit/markdown-citation.test.ts`.
-- **Implemented at `e17304c`:** canonical quadratic/cubic spatial Bézier segment paths, normalized control validation, immutable keyframe-segment attachment, deterministic path sampling through timeline easing progress, and mirror/flip preservation of control geometry.
-- **Remaining sequence:** (1) coordinated action templates; (2) linked units; (3) ball possession/handoffs; (4) path-conflict review; (5) timeline/motion authoring UI including interactive Bézier handles, then focused desktop/mobile browser evidence.
-- **Exit evidence:** deterministic interpolation/sequencing/motion invariants + complete browser authoring workflow for accepted rows 16–26.
-- **Reverse-safe:** no; these primary files remain reserved while ACTIVE.
-
+- **Primary files:** Tactical timeline/motion UI, tool-scoped CSS, focused Tactical browser tests; engine files only for defects exposed by UI integration
+- **Action:** finish interactive timeline/path authoring over the existing deterministic engine foundation, then run focused desktop/mobile/accessibility evidence.
+- **Implemented engine commits:** `f2d3565` timeline primitives; `11acadf` multi-track/project validation; `e17304c` spatial Bézier paths; `b8995f4` coordinated action templates; `1c00a1c` linked units; `6f860b2` possession/handoffs; `02f7405` physical-distance path-conflict review.
+- **Current focused evidence:** action/unit/possession/conflict/timeline suites pass **23/23** together and TypeScript is clean after `02f7405`. Earlier timeline/motion focused suites remain green; no Task 5 browser/build completion claim is made yet.
+- **Remaining sequence:** (1) timeline/playhead/marker/visibility/offset authoring UI; (2) interactive Bézier path controls; (3) coordinated-action/linked-unit/possession/conflict controls; (4) focused desktop/mobile browser, keyboard, Axe and reflow evidence; (5) reconcile rows 16–26 without promoting partial behavior.
+- **Exit evidence:** deterministic engine invariants plus complete responsive/browser authoring workflow for accepted rows 16–26.
+- **Reverse-safe:** no; Tactical timeline UI/browser files are reserved while ACTIVE.
 ### T06-01 — Spatial analysis
 - **Status:** BLOCKED
 - **Depends on:** T05-01

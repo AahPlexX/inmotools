@@ -30,10 +30,10 @@
 | 20 | Temporal Visibility Spans | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Stepped visibility inheritance and deterministic visible/hidden span derivation are unit-covered. Timeline span authoring UI remains. |
 | 21 | Stagger, Offset & Group Timing Controls | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Immutable whole-track integer offsets with negative-time protection exist. Multi-track stagger/group timing operations and UI remain. |
 | 22 | Timeline Markers & Coaching Triggers | in-progress | `timeline-engine.ts`, `tests/unit/tactics-timeline.test.ts` | Sorted, unique, duration-bounded timeline marker primitives exist. Trigger/action semantics and marker authoring UI remain. |
-| 23 | Coordinated Tactical Action Templates | planned | — | — |
-| 24 | Linked Defensive / Midfield / Attacking Units | planned | — | — |
-| 25 | Ball Attachment, Possession & Handoff | planned | — | — |
-| 26 | Potential Path-Conflict Indicator | planned | — | — |
+| 23 | Coordinated Tactical Action Templates | in-progress | `action-engine.ts`, `tests/unit/tactics-actions.test.ts` | Deterministic reusable action-template materialization is unit-covered at `b8995f4`; authoring/application UI and browser evidence remain. |
+| 24 | Linked Defensive / Midfield / Attacking Units | in-progress | `unit-engine.ts`, `tests/unit/tactics-units.test.ts` | Deterministic linked-unit translation with normalized bounds is unit-covered at `1c00a1c`; unit authoring/selection UI and browser evidence remain. |
+| 25 | Ball Attachment, Possession & Handoff | in-progress | `possession-engine.ts`, `timeline-engine.ts`, `tactics-types.ts`, `tests/unit/tactics-possession.test.ts` | Sorted possession events, release/handoff semantics, holder sampling and canonical validation are green at `6f860b2`; authoring UI/browser evidence remain. |
+| 26 | Potential Path-Conflict Indicator | in-progress | `conflict-engine.ts`, `tests/unit/tactics-conflicts.test.ts` | Deterministic sampled pairwise proximity in physical pitch metres is green at `02f7405`; threshold/target controls, presentation and browser evidence remain. |
 | 27 | Geometric Voronoi Territory View | planned | — | — |
 | 28 | Team Convex Hull & Compactness Geometry | planned | — | — |
 | 29 | Geometric Passing-Lane Clearance | planned | — | — |
