@@ -26,3 +26,14 @@ test.describe('Crystal Lattice Studio phase 3 — diffraction', () => {
     await expect(page.getByTestId('crystal-diffraction-status')).toContainText('positive');
   });
 });
+
+test.describe('Crystal Lattice Studio phase 3 — reciprocal space', () => {
+  test('renders the reciprocal-space panel with pole figure and Brillouin zone', async ({ page }) => {
+    await page.goto('./#/tools/crystal-lattice-studio');
+    await expect(page.getByTestId('crystal-workspace')).toBeVisible();
+    await expect(page.getByTestId('crystal-reciprocal-panel')).toBeVisible();
+    await expect(page.getByTestId('crystal-reciprocal-status')).toContainText('poles');
+    await expect(page.getByTestId('crystal-pole-figure')).toBeVisible();
+    await expect(page.getByTestId('crystal-bz-wireframe')).toBeVisible();
+  });
+});
