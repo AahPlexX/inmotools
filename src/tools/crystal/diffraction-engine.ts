@@ -153,18 +153,14 @@ function lorentzPolarization(kind: RadiationType, twoThetaDeg: number): number {
 }
 
 /**
- * Simulate a powder pattern: Bragg positions from the cell, intensities from
- * multiplicity, a Lorentz(±polarization) factor, and |F(hkl)|² when a document
- * with verified scattering factors is provided; normalised to a max of 1000.
+ * Simulate a powder pattern: Bragg positions from the cell, multiplicity and
+ * Lorentz(±polarization), and |F(hkl)|² when a document with verified
+ * scattering factors is provided; normalised to a max of 1000.
  */
 export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): PowderPattern {
   assertPositiveFinite(options.wavelength, 'Wavelength');
   const base = enumerateReflections(cell, options);
 
-  // Decide the intensity model once: a document whose sites all have verified
-  // scattering factors enables |F|² weighting; a single missing factor (e.g. the
-  // pseudo-element X) degrades the whole pattern uniformly so intensities stay
-  // mutually comparable instead of mixing models per reflection.
   let intensityFactor: ((hkl: MillerIndex) => number) | null = null;
   let intensityModel: 'kinematic' | 'structure-factor' = 'kinematic';
   if (options.document) {
@@ -181,7 +177,7 @@ export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): P
   const reflections: PowderReflection[] = [];
   let maxRaw = 0;
   for (const reflection of base) {
-    if (options.wavelength >= 2 * reflection.d) continue; // beyond Bragg limit
+    if (options.wavelength >= 2 * reflection.d) continue;
     const twoTheta = twoThetaFor(options.wavelength, reflection.d);
     if (!(twoTheta > 0)) continue;
     const multiplicity = cubicMultiplicity(reflection.hkl[0], reflection.hkl[1], reflection.hkl[2]);
@@ -199,4 +195,72 @@ export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): P
     reflections: reflections.map((r) => ({ ...r, intensity: r.intensity * scale })),
     intensityModel,
   };
+}
+
+export type PowderProfileShape = 'gaussian' | 'lorentzian' | 'pseudo-voigt';
+
+export interface ProfileOptions {
+  readonly profileShape: PowderProfileShape;
+  /** Full width at half maximum in degrees 2theta. */
+  readonly fwhm: number;
+  /** Sampling step in degrees 2theta. */
+  readonly step: number;
+  /** Pseudo-Voigt mixing factor (0 = pure Gaussian, 1 = pure Lorentzian). */
+  readonly eta?: number;
+  readonly maxPoints?: number;
+}
+
+export interface ProfilePoint {
+  readonly twoTheta: number;
+  readonly intensity: number;
+}
+
+const DEFAULT_MAX_PROFILE_POINTS = 20_000;
+
+/**
+ * Convolve a stick pattern with a peak-shape function into a continuous
+ * profile, sampled over [min(2theta) - 5*FWHM, max(2theta) + 5*FWHM]. Bounded
+ * by maxPoints (default 20k); exceeding the cap raises rather than truncating.
+ */
+export function broadenPowderPattern(pattern: PowderPattern, options: ProfileOptions): readonly ProfilePoint[] {
+  assertPositiveFinite(options.fwhm, 'Profile FWHM');
+  assertPositiveFinite(options.step, 'Profile step');
+  const eta = options.eta ?? 0.5;
+  if (options.profileShape === 'pseudo-voigt' && (eta < 0 || eta > 1)) {
+    throw new RangeError('Pseudo-Voigt mixing factor eta must be between 0 and 1.');
+  }
+  const maxPoints = options.maxPoints ?? DEFAULT_MAX_PROFILE_POINTS;
+  if (!Number.isSafeInteger(maxPoints) || maxPoints <= 0) {
+    throw new RangeError('Profile point limit must be a positive integer.');
+  }
+  if (pattern.reflections.length === 0) return [];
+
+  const gaussian = (x: number): number => Math.exp((-4 * Math.LN2 * x * x) / (options.fwhm * options.fwhm));
+  const lorentzian = (x: number): number => 1 / (1 + (4 * x * x) / (options.fwhm * options.fwhm));
+  const shape = (x: number): number => {
+    switch (options.profileShape) {
+      case 'gaussian': return gaussian(x);
+      case 'lorentzian': return lorentzian(x);
+      case 'pseudo-voigt': return eta * lorentzian(x) + (1 - eta) * gaussian(x);
+    }
+  };
+
+  const positions = pattern.reflections.map((r) => r.twoTheta);
+  const start = Math.max(0, Math.min(...positions) - 5 * options.fwhm);
+  const end = Math.max(...positions) + 5 * options.fwhm;
+  const pointCount = Math.ceil((end - start) / options.step) + 1;
+  if (pointCount > maxPoints) {
+    throw new RangeError(`Profile would contain ${pointCount.toLocaleString()} points, exceeding the ${maxPoints.toLocaleString()}-point limit; increase the step.`);
+  }
+
+  const points: ProfilePoint[] = new Array<ProfilePoint>(pointCount);
+  for (let i = 0; i < pointCount; i += 1) {
+    const twoTheta = start + i * options.step;
+    let intensity = 0;
+    for (const reflection of pattern.reflections) {
+      intensity += reflection.intensity * shape(twoTheta - reflection.twoTheta);
+    }
+    points[i] = { twoTheta, intensity };
+  }
+  return points;
 }
