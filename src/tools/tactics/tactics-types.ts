@@ -208,6 +208,11 @@ export interface TimelineMarker {
   label: string;
 }
 
+export interface BallPossessionEvent {
+  id: string;
+  timeMs: number;
+  holderTargetId: string | null;
+}
 export interface TacticalTimeline {
   playheadMs: number;
   durationMs: number;
@@ -215,6 +220,7 @@ export interface TacticalTimeline {
   playbackRate: number;
   tracks: TimelineTrack[];
   markers: TimelineMarker[];
+  possessionEvents?: BallPossessionEvent[];
 }
 
 export interface FormationState {

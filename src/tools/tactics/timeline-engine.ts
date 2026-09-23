@@ -8,11 +8,13 @@ import type {
   TimelineTrack,
 } from './tactics-types';
 import { createMotionPath, sampleMotionPath } from './motion-engine';
+import { getPossessionHolderAtTime } from './possession-engine';
 
 export interface SampledTimelineState {
   position?: NormalizedPoint;
   rotationDeg?: number;
   visible?: boolean;
+  attachmentTargetId?: string | null;
 }
 
 export interface TimelineVisibilitySpan {
@@ -248,6 +250,17 @@ export function sampleTacticalTimeline(
     if (result[valid.targetId]) throw new Error(`Timeline target ${valid.targetId} has multiple tracks.`);
     result[valid.targetId] = sampleTimelineTrack(valid, timeMs);
   }
+  if ((timeline.possessionEvents?.length ?? 0) > 0) {
+    const holderTargetId = getPossessionHolderAtTime(timeline, timeMs);
+    const ballState = result.ball ?? {};
+    ballState.attachmentTargetId = holderTargetId;
+    if (holderTargetId) {
+      const holder = result[holderTargetId];
+      if (!holder?.position) throw new Error(`Possession holder target ${holderTargetId} has no sampled position.`);
+      ballState.position = { ...holder.position };
+    }
+    result.ball = ballState;
+  }
   return result;
 }
 
@@ -316,6 +329,23 @@ export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
       errors.push(`Timeline marker ${marker.id} time must be a non-negative integer millisecond value.`);
     } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && marker.timeMs > timeline.durationMs) {
       errors.push(`Timeline marker ${marker.id} time ${marker.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+    }
+  }
+  const possessionIds = new Set<string>();
+  const possessionTimes = new Set<number>();
+  for (const event of timeline.possessionEvents ?? []) {
+    if (!event.id.trim()) errors.push('Possession event id is required.');
+    if (possessionIds.has(event.id)) errors.push(`Possession event id ${event.id} is duplicated.`);
+    if (possessionTimes.has(event.timeMs)) errors.push(`Possession event time ${event.timeMs} is duplicated.`);
+    possessionIds.add(event.id);
+    possessionTimes.add(event.timeMs);
+    if (!Number.isInteger(event.timeMs) || event.timeMs < 0) {
+      errors.push(`Possession event ${event.id} time must be a non-negative integer millisecond value.`);
+    } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && event.timeMs > timeline.durationMs) {
+      errors.push(`Possession event ${event.id} time ${event.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+    }
+    if (event.holderTargetId && !targetIds.has(event.holderTargetId)) {
+      errors.push(`Possession holder target ${event.holderTargetId} does not exist in the timeline.`);
     }
   }
   return errors;
