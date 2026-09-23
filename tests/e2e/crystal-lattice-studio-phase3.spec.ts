@@ -25,6 +25,16 @@ test.describe('Crystal Lattice Studio phase 3 — diffraction', () => {
     await page.getByTestId('crystal-diffraction-mind').fill('0');
     await expect(page.getByTestId('crystal-diffraction-status')).toContainText('positive');
   });
+
+  test('overlays a local observed pattern onto the simulated stick pattern', async ({ page }) => {
+    await expect(page.getByTestId('crystal-diffraction-observed-status')).toContainText('No observed pattern loaded.');
+    await page.getByTestId('crystal-diffraction-observed-input').setInputFiles({
+      name: 'observed.xy',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('20 120\n26.5 980\n44.5 410\n'),
+    });
+    await expect(page.getByTestId('crystal-diffraction-observed-status')).toContainText('3 observed peaks');
+  });
 });
 
 test.describe('Crystal Lattice Studio phase 3 — reciprocal space', () => {

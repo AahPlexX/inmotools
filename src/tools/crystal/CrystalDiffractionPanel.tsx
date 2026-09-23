@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { type ChangeEvent, useMemo, useRef, useState } from 'react';
+import { consumeFileInput } from '../../lib/file-input';
 import { simulatePowderPattern, type RadiationType } from './diffraction-engine';
+import { parseObservedPattern, type ObservedPattern } from './observed-pattern-engine';
 import type { CrystalDocument } from './crystal-types';
 
 const RADIATIONS: readonly { id: RadiationType; name: string; wavelength: number }[] = [
@@ -15,7 +17,26 @@ export interface CrystalDiffractionPanelProps {
 export default function CrystalDiffractionPanel({ document }: CrystalDiffractionPanelProps) {
   const [radiationId, setRadiationId] = useState<RadiationType>('xray');
   const [minD, setMinD] = useState('1.0');
+  const [observed, setObserved] = useState<ObservedPattern | null>(null);
+  const [observedStatus, setObservedStatus] = useState('No observed pattern loaded.');
+  const observedFileRef = useRef<HTMLInputElement | null>(null);
   const radiation = RADIATIONS.find((item) => item.id === radiationId) ?? RADIATIONS[0]!;
+
+  const handleObservedFile = (event: ChangeEvent<HTMLInputElement>): void => {
+    const input = event.currentTarget;
+    consumeFileInput(input, async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const parsed = parseObservedPattern(file.name, await file.text(), { xAxis: 'twoTheta' });
+        setObserved(parsed);
+        setObservedStatus(`Loaded ${parsed.peaks.length.toLocaleString()} observed peaks from ${file.name}.`);
+      } catch (error) {
+        setObserved(null);
+        setObservedStatus(`Could not load ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
+  };
 
   const outcome = useMemo(() => {
     const minDSpacing = Number(minD);
@@ -69,7 +90,22 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
                 onChange={(event) => setMinD(event.target.value)}
               />
             </label>
+            <label>
+              Observed pattern (2θ / intensity)
+              <input
+                ref={observedFileRef}
+                data-testid="crystal-diffraction-observed-input"
+                type="file"
+                accept=".xy,.xye,.csv,.txt,text/plain,text/csv"
+                onChange={handleObservedFile}
+                hidden
+              />
+              <button type="button" data-testid="crystal-diffraction-observed-button" onClick={() => observedFileRef.current?.click()}>
+                Overlay observed pattern
+              </button>
+            </label>
           </div>
+          <p role="status" data-testid="crystal-diffraction-observed-status">{observedStatus}</p>
         </div>
 
         {'error' in outcome ? (
@@ -88,9 +124,23 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
             >
               <line x1="0" y1="200" x2="600" y2="200" stroke="#888888" />
               {(() => {
-                const maxTwoTheta = Math.max(...outcome.pattern.reflections.map((r) => r.twoTheta), 1);
+                const maxTwoTheta = Math.max(
+                  ...outcome.pattern.reflections.map((r) => r.twoTheta),
+                  ...(observed ? observed.peaks.map((p) => p.position) : []),
+                  1,
+                );
                 const maxIntensity = Math.max(...outcome.pattern.reflections.map((r) => r.intensity), 1);
-                return outcome.pattern.reflections.map((r) => {
+                const maxObserved = observed ? Math.max(...observed.peaks.map((p) => p.intensity), 1) : 1;
+                const observedTicks = observed ? observed.peaks.map((p) => {
+                  const x = (p.position / maxTwoTheta) * 590 + 5;
+                  const height = (p.intensity / maxObserved) * 180;
+                  return (
+                    <line key={`obs-${p.position}`} x1={x} y1={200} x2={x} y2={200 - height} stroke="#c0392b" strokeWidth="1.5" opacity="0.55">
+                      <title>observed 2θ = {p.position.toFixed(2)}°</title>
+                    </line>
+                  );
+                }) : null;
+                return (<>{observedTicks}{outcome.pattern.reflections.map((r) => {
                   const x = (r.twoTheta / maxTwoTheta) * 590 + 5;
                   const height = (r.intensity / maxIntensity) * 180;
                   return (
@@ -106,7 +156,7 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
                       <title>({r.hkl.join(' ')}) 2θ = {r.twoTheta.toFixed(2)}°</title>
                     </line>
                   );
-                });
+                })}</>);
               })()}
             </svg>
             <table data-testid="crystal-diffraction-table">
