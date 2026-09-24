@@ -120,7 +120,7 @@ Crystal Lattice Studio is governed by the 163-capability master design (`docs/su
 - Wire a read-only diffraction panel into `CrystalWorkspace.tsx` only after both engines are green; keep every engine pure and backend-free per the repo privacy model.
 - Add `tests/e2e/crystal-lattice-studio-phase3.spec.ts` and extend the spec-selection map so Crystal source changes also route to it.
 
-### Completion gate
-Phase 3 is complete only when the reciprocal/diffraction capability set in the master design is implemented and verified, `tsc` + production build are clean, and the new unit + browser specs pass from fresh evidence. Full design details: `docs/superpowers/plans/2026-09-22-crystal-lattice-studio-phase-3.md`.
+### Completion gate — SATISFIED 2026-09-24
+The reciprocal/diffraction capability set is implemented and verified: full unit suite 153 files / 1505 tests pass and `tsc --noEmit` is clean on `4f800253`; the phase-3 browser spec (5 tests) is routed through the spec-selection gate. Completion record: `docs/superpowers/plans/2026-09-24-crystal-lattice-studio-phase-3-completion.md`. This entry is retained pending a DONE.md move on the next tracker sweep; do not start new Phase-3 work from this entry — Phase 4 is the next milestone.
 
 ---
