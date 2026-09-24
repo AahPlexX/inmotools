@@ -2,9 +2,9 @@
 
 **Date:** 2026-09-15
 **Design:** `docs/superpowers/specs/2026-09-15-transcode-workstation-design.md`
-**Branch:** session working branch `arena/01a0a5c8-inmotools` (this session is pinned to it; it
-serves as the dedicated development branch for this tool). No merge to `main` until every
-milestone below is complete and verified.
+**Integration:** F01–F36 shipped to `origin/main` through PR #33 (merge commit
+`c923512a753b15c2086e3e22f7c189c42fd4ca59`). The original working branch
+`arena/01a0a5c8-inmotools` is retired and no Transcode-only branch remains.
 
 ## Deterministic completion goal
 
@@ -46,11 +46,27 @@ before every ledger item is green or explicitly moved to `NEXT.md`/`BACKLOG.md` 
 | M5 | complete 2026-09-15 | F24–F35 implemented: WOFF1 pure-JS codec + WOFF2 wasm + SVG-font→TTF compiler + inline glyph subsetting (F24–F27); ZIP/TAR/TAR.GZ extract+build, bz2/7z/RAR via libarchive.js worker, Base64/hex/data-URI both directions (F28–F30); GeoJSON↔KML/KMZ/GPX/WKT/CSV/SVG-map (F31–F33); full image metadata editing at export — PNG tEXt, JPEG EXIF (piexifjs), pure-JS XMP packet surgery, and IPTC-IIM APP13 writer/reader (F34); audio tags written natively into WAV/OGG/FLAC/AAC plus ID3v2 for MP3 (F35). Edge-completeness guard proves every FORMAT_MATRIX edge is registered |
 | M6 | complete 2026-09-15 | tests/e2e/transcode.spec.ts: 11 scenarios (CSV→JSON download bytes, JSON→SQL options, WKT→GeoJSON, PNG→BMP, batch ZIP, Base64, Markdown→HTML5, Markdown→PDF, GeoJSON→SVG map, ZIP→Binary unpacking with fflate fixture, PNG→JPEG quality) × 2 projects = 22 Playwright tests; browser execution delegated to CI since the sandbox has no browser binaries |
 
-## Per-execution checklist
+## Completion evidence and maintenance handoff
 
-1. Re-read this plan and the design ledger; update the ledger before coding when scope changes.
-2. Implement the smallest complete slice for the current milestone.
-3. Add/extend unit tests in the same cycle; run `pnpm test:unit` (focused spec) and record result.
-4. Run `pnpm build` before finishing an execution cycle that touches imports or config.
-5. Update the progress ledger and `.tasks/IN_PROGRESS.md` milestone line in the same cycle.
-6. Commit with a scoped message; push only to the session branch.
+- **Product integration:** PR #33 merged the complete F01–F36 implementation to `origin/main`
+  as `c923512a753b15c2086e3e22f7c189c42fd4ca59`; the former Transcode working branch is
+  retired.
+- **Focused verification:** the integrated Transcode revision was re-verified on 2026-09-21
+  with 124 focused unit tests, a clean production build, and all 22 Transcode browser cases
+  passing across desktop and mobile Chromium.
+- **Fresh main verification:** on 2026-09-23, current product revision
+  `4f800253b29493d69fac21cbd1b665080ee3ca64` passed the repository unit-test and production
+  build steps in Pages run `35914410493`. That run executed all 22
+  `tests/e2e/transcode.spec.ts` cases (11 desktop + 11 mobile) with zero Transcode failures;
+  its 13 browser failures were in unrelated workspaces. The Pages artifact build and deployment
+  both succeeded from the same revision.
+- **Static closure audit:** no Transcode `FIXME` markers or remote `fetch`,
+  `XMLHttpRequest`, or `WebSocket` paths were found. Apparent `TODO` hits are the
+  `markdownToDocx` identifier; apparent “placeholder” hits are normal form placeholder text
+  and the TAR checksum field before its checksum is written.
+
+For future maintenance, start from current `origin/main`, preserve the F01–F36 contract and
+documented exclusions, reuse the existing focused tests, and add new tests only for behavior
+that changes. New Transcode scope must enter the repository task-state system before
+implementation; do not revive the retired branch or reopen this completed workstream merely for
+speculative enhancements.

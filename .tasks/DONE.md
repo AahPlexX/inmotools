@@ -1,5 +1,29 @@
 # Done
 
+## Transcode Workstation — F01–F36 complete
+
+The local-first Transcode Workstation is complete against its 36-capability design ledger and
+integrated on `origin/main` through PR #33 (merge commit
+`c923512a753b15c2086e3e22f7c189c42fd4ca59`). The retired branch
+`arena/01a0a5c8-inmotools` no longer exists, so no completed Transcode work is stranded off
+`main`.
+
+Closure evidence was refreshed against current product revision
+`4f800253b29493d69fac21cbd1b665080ee3ca64`: Pages run `35914410493` passed the full
+unit-test step and production build, executed all 22 Transcode Playwright cases (11 desktop and
+11 mobile) with zero Transcode failures, and successfully built and deployed the Pages artifact.
+The run's 13 browser failures were confined to unrelated workspaces and do not change the
+Transcode workstream result. The prior focused Transcode gate also passed 124 focused unit tests,
+the production build, and 22/22 desktop/mobile browser cases after integration.
+
+A final static closure audit found no Transcode `FIXME` debt and no remote `fetch`,
+`XMLHttpRequest`, or `WebSocket` path. Search hits for `TODO` were the
+`markdownToDocx` identifier, while “placeholder” hits were normal form hints and the temporary
+TAR checksum field used while constructing a header. The design's legacy `.xlsb`/`.xls`
+ingest and additional legacy text encoders are explicitly non-ledger future scope; capability-
+dependent animated WebP remains governed by F14's documented “where supported” contract. Any
+new Transcode scope must re-enter `.tasks` before implementation.
+
 ## TASK-021: Close the Sightline Velocity Studio audit findings
 
 Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); this closes the remaining audit findings found against it. The dedicated validation workflow only triggered on pushes to `feat/sightline-velocity`, so it never validated `main` or any `fix/sightline-*` branch — widened to `[main, feat/sightline-velocity, 'fix/sightline-*']`. Clearing local reading history, document history, and the word bank was a single click with no confirmation and no way back; it now asks first and names exactly what it removes. Loading multiple files reported the *last selected* file as "active" even when that file failed to load and an earlier one succeeded instead; failures and successes are now tracked separately and the status names the file that is genuinely active. The workspace never released its IndexedDB handle, audio context, or an in-flight speech-synthesis utterance on unmount, and the metronome allocated a `AudioContext` even when set to a visual-only channel; both are fixed. `clearWarehouse`'s result was previously discarded, so a failed clear silently reported success — it's now surfaced to the user instead.

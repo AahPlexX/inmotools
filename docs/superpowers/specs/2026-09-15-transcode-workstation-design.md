@@ -1,7 +1,9 @@
 # Transcode Workstation — Design Specification
 
 **Date:** 2026-09-15
-**Status:** Active design record for the Transcode Workstation workstream.
+**Status:** Complete — F01–F36 shipped on `origin/main` through PR #33
+(`c923512a753b15c2086e3e22f7c189c42fd4ca59`). This remains the maintenance scope and
+behavior record.
 
 ## Purpose
 
@@ -184,15 +186,16 @@ fast-xml-parser 5.11.1, jszip 3.10.1, exifreader 4.44.0, katex 0.18.5, opentype.
 woff2-encoder 2.0.0, pdf-lib 1.17.1, @duckdb/duckdb-wasm 1.32.0, docx 9.7.1,
 unified/remark/rehype stack.
 
-## Gaps tracked for later milestones
+## Documented non-ledger limitations and future scope
 
-- **Legacy `.xlsb`/`.xls` read.** The current official SheetJS distribution is published on
-  the SheetJS CDN (version 0.20.3, docs.sheetjs.com, checked 2026-09-15); the npm registry
-  copy is stale at 0.18.5. The CDN is not reachable from the current build sandbox, so XLSX
-  coverage ships via exceljs and the legacy binary workbook ingest is queued for the
-  milestone where vendoring can be verified end-to-end.
-- **Shift-JIS/Windows-1252 *encoding* targets** beyond the bundled Windows-1252 table:
-  queued behind F19 completion if a maintained in-browser encoder library verifies cleanly.
+- **Legacy `.xlsb`/`.xls` read.** F04's approved requirement is `.xlsx` workbook
+  transcoding, which ships via ExcelJS. Legacy binary workbook ingest is not part of the
+  completed F01–F36 ledger. The 2026-09-15 dependency investigation found the current SheetJS
+  CE distribution outside the npm-registry path used by this build; any future legacy-format
+  expansion must be accepted into `.tasks` and re-verified before implementation.
+- **Additional legacy encoding targets.** F19's required encoders are UTF-8, UTF-16LE/BE,
+  ASCII, and Windows-1252; those are the completed contract. Additional encoders such as
+  Shift-JIS are future scope and must enter `.tasks` before implementation.
 - **Animated WebP encoding** is capability-detected (Chromium only) and degrades to a clear
   unsupported message elsewhere.
 
