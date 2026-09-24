@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import TacticalCoordinationControls from './TacticalCoordinationControls';
+import TacticalTimingControls from './TacticalTimingControls';
 import { createMotionPath, setKeyframeMotionPath } from './motion-engine';
 import { createNormalizedPoint } from './pitch-engine';
 import {
@@ -18,6 +19,7 @@ import type {
 
 export interface TacticalTimelinePanelProps {
   project: TacticalProject;
+  activeSceneId: string;
   onEdit: (
     label: string,
     updater: (current: TacticalProject) => TacticalProject,
@@ -31,6 +33,12 @@ function nextId(prefix: string, existing: string[]): string {
   while (occupied.has(`${prefix}-${index}`)) index += 1;
   return `${prefix}-${index}`;
 }
+function trackTimingLabel(track: TimelineTrack): string {
+  if (!track.keyframes.length) return '0 keyframes';
+  const times = track.keyframes.map((keyframe) => keyframe.timeMs);
+  return track.keyframes.length + ' keyframes, ' + Math.min(...times) + '-' + Math.max(...times) + ' ms';
+}
+
 function initialTargetPosition(project: TacticalProject, targetId: string) {
   if (targetId === 'ball') return { ...project.ball.position };
   const token = project.playerTokens.find((candidate) => candidate.id === targetId);
@@ -103,7 +111,7 @@ function withMotionSegment(
   return { ...project, timeline };
 }
 
-export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimelinePanelProps) {
+export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }: TacticalTimelinePanelProps) {
   const targets = useMemo(
     () => [...project.playerTokens.map((token) => token.id), 'ball'],
     [project.playerTokens],
@@ -188,7 +196,7 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
           <label>Marker time (ms)<input name="markerTimeMs" type="number" min="0" step="1" max={project.timeline.durationMs} required /></label>
           <button type="submit">Add timeline marker</button>
           {project.timeline.markers.length ? (
-            <ul>{project.timeline.markers.map((marker) => <li key={marker.id}>{marker.timeMs} ms â€” {marker.label}</li>)}</ul>
+            <ul>{project.timeline.markers.map((marker) => <li key={marker.id}>{marker.timeMs} ms - {marker.label}</li>)}</ul>
           ) : <p>No timeline markers yet.</p>}
         </form>
 
@@ -214,8 +222,8 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
             Motion path
             <select value={pathKind} onChange={(event) => setPathKind(event.target.value as TacticalMotionPathKind)}>
               <option value="linear">Linear</option>
-              <option value="quadratic-bezier">Quadratic BÃ©zier</option>
-              <option value="cubic-bezier">Cubic BÃ©zier</option>
+              <option value="quadratic-bezier">Quadratic Bezier</option>
+              <option value="cubic-bezier">Cubic Bezier</option>
             </select>
           </label>
           {pathKind !== 'linear' ? (
@@ -233,6 +241,8 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
           <button type="submit">Author motion segment</button>
         </form>
 
+        <TacticalTimingControls project={project} activeSceneId={activeSceneId} onEdit={onEdit} />
+
         <TacticalCoordinationControls project={project} onEdit={onEdit} />
 
         <section aria-labelledby="timeline-tracks-heading">
@@ -240,7 +250,7 @@ export default function TacticalTimelinePanel({ project, onEdit }: TacticalTimel
           {project.timeline.tracks.length ? (
             <ul>
               {project.timeline.tracks.map((track) => (
-                <li key={track.id}>{track.targetId}: {track.keyframes.length} keyframes</li>
+                <li key={track.id}>{track.targetId}: {trackTimingLabel(track)}</li>
               ))}
             </ul>
           ) : <p>No authored motion tracks yet.</p>}

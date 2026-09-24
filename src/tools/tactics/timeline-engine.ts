@@ -167,6 +167,43 @@ export function offsetTimelineTrack(track: TimelineTrack, deltaMs: number): Time
   });
   return { ...track, keyframes };
 }
+export function offsetTimelineGroup(
+  timeline: TacticalTimeline,
+  targetIds: string[],
+  baseOffsetMs: number,
+  staggerStepMs = 0,
+): TacticalTimeline {
+  if (!Number.isInteger(baseOffsetMs) || !Number.isInteger(staggerStepMs)) {
+    throw new RangeError('Group timing offsets must use integer millisecond values.');
+  }
+  const targets = targetIds.map((targetId) => targetId.trim()).filter(Boolean);
+  if (!targets.length) throw new Error('Select at least one timeline target for grouped timing.');
+  if (new Set(targets).size !== targets.length) {
+    throw new Error('Grouped timing cannot contain duplicate targets.');
+  }
+
+  const byTarget = new Map(timeline.tracks.map((track) => [track.targetId, track] as const));
+  const shiftedById = new Map<string, TimelineTrack>();
+  targets.forEach((targetId, index) => {
+    const track = byTarget.get(targetId);
+    if (!track) throw new Error(`Timeline target ${targetId} does not exist.`);
+    const shifted = offsetTimelineTrack(track, baseOffsetMs + staggerStepMs * index);
+    if (shifted.keyframes.some((keyframe) => keyframe.timeMs > timeline.durationMs)) {
+      throw new RangeError(`Grouped timing for ${targetId} exceeds timeline duration.`);
+    }
+    shiftedById.set(track.id, shifted);
+  });
+
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => shiftedById.get(track.id) ?? {
+      ...track,
+      keyframes: track.keyframes.map(cloneKeyframe),
+    }),
+    markers: timeline.markers.map(cloneMarker),
+    possessionEvents: timeline.possessionEvents?.map((event) => ({ ...event })),
+  };
+}
 export function getVisibilitySpans(
   track: TimelineTrack,
   durationMs: number,
@@ -272,6 +309,31 @@ export function setTimelinePlayhead(timeline: TacticalTimeline, timeMs: number):
   return { ...timeline, playheadMs };
 }
 
+export function addTimelineScene(
+  scenes: TacticalScene[],
+  rawScene: TacticalScene,
+): TacticalScene[] {
+  const id = rawScene.id.trim();
+  const name = rawScene.name.trim();
+  if (!id) throw new Error('Scene id is required.');
+  if (!name) throw new Error('Scene name is required.');
+  requireIntegerTime(rawScene.startMs, `Scene ${id} start`);
+  requireIntegerTime(rawScene.durationMs, `Scene ${id} duration`);
+  if (scenes.some((scene) => scene.id === id)) {
+    throw new Error(`Scene id ${id} already exists.`);
+  }
+  const clone = (scene: TacticalScene): TacticalScene => ({
+    ...scene,
+    layers: scene.layers.map((layer) => ({ ...layer })),
+    objects: scene.objects.map((object) => ({
+      ...object,
+      position: { ...object.position },
+    })),
+  });
+  const next = clone({ ...rawScene, id, name });
+  return [...scenes.map(clone), next]
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
+}
 export function activeScenesAtTime(scenes: TacticalScene[], timeMs: number): TacticalScene[] {
   requireIntegerTime(timeMs, 'Scene sample time');
   return scenes

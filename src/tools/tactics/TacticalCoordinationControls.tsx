@@ -248,7 +248,7 @@ export default function TacticalCoordinationControls({
         {project.timeline.possessionEvents?.length ? (
           <ul>
             {project.timeline.possessionEvents.map((item) => (
-              <li key={item.id}>{item.timeMs} ms → {item.holderTargetId ?? 'released'}</li>
+              <li key={item.id}>{item.timeMs} ms -&gt; {item.holderTargetId ?? 'released'}</li>
             ))}
           </ul>
         ) : <p>No possession events yet.</p>}
@@ -267,7 +267,7 @@ export default function TacticalCoordinationControls({
             <ul>
               {conflicts.slice(0, 8).map((conflict) => (
                 <li key={`${conflict.targetA}-${conflict.targetB}-${conflict.timeMs}`}>
-                  {conflict.timeMs} ms — {conflict.targetA} / {conflict.targetB} — {conflict.distanceMeters.toFixed(2)} m
+                  {conflict.timeMs} ms - {conflict.targetA} / {conflict.targetB} - {conflict.distanceMeters.toFixed(2)} m
                 </li>
               ))}
             </ul>

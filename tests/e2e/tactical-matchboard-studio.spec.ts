@@ -214,7 +214,7 @@ test('authors timeline markers and a curved player motion segment', async ({ pag
   await page.getByLabel('Marker label').fill('Press trigger');
   await page.getByLabel('Marker time (ms)').fill('1200');
   await page.getByRole('button', { name: 'Add timeline marker' }).click();
-  await expect(page.getByText('1200 ms — Press trigger')).toBeVisible();
+  await expect(page.getByText(/1200 ms - Press trigger/)).toBeVisible();
 
   await page.getByLabel('Motion target').selectOption('token-1');
   await page.getByLabel('Motion start (ms)').fill('1200');
@@ -256,7 +256,7 @@ test('authors coordinated actions, linked units, possession, and conflict review
   await page.getByLabel('Possession holder').selectOption('token-1');
   await page.getByLabel('Possession time (ms)').fill('500');
   await page.getByRole('button', { name: 'Add possession event' }).click();
-  await expect(page.getByText('500 ms → token-1')).toBeVisible();
+  await expect(page.getByText(/500 ms -> token-1/)).toBeVisible();
 
   await page.getByLabel('Conflict step (ms)').fill('500');
   await page.getByLabel('Conflict threshold (m)').fill('100');
@@ -297,6 +297,7 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
     const undersizedTargets = await page.locator([
       '.tactical-setup > summary',
       '.tactical-command-bar button',
+      '.tactical-command-bar select',
       '.tactical-player-list button',
       '.tactical-dpad button',
       '.tactical-coordinate-form button',
@@ -315,4 +316,48 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
       }));
     expect(undersizedTargets, `${viewport.name} essential target size`).toEqual([]);
   }
+});
+
+
+test('authors scene sequencing, visibility, offsets, and grouped stagger timing', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  await page.getByLabel('Motion target').selectOption('token-2');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  await page.getByLabel('Scene name').fill('Press phase');
+  await page.getByLabel('Scene start (ms)').fill('1000');
+  await page.getByLabel('Scene duration (ms)').fill('1500');
+  await page.getByRole('button', { name: 'Add scene' }).click();
+  await expect(page.getByText('1000-2500 ms - Press phase')).toBeVisible();
+  await page.getByLabel('Scene view').selectOption('scene-2');
+  await page.getByText('Rules, formations & restarts', { exact: true }).click();
+  await expect(page.getByText('Placed-player, goalkeeper, roster-assignment, and profile counts agree.')).toBeVisible();
+  await page.getByLabel('Scene view').selectOption('scene-1');
+
+  await page.getByLabel('Visibility target').selectOption('token-1');
+  await page.getByLabel('Visibility time (ms)').fill('750');
+  await page.getByLabel('Visibility state').selectOption('hidden');
+  await page.getByRole('button', { name: 'Add visibility change' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Visibility change added');
+
+  await page.getByLabel('Offset target').selectOption('token-1');
+  await page.getByLabel('Track offset (ms)').fill('200');
+  await page.getByRole('button', { name: 'Offset track' }).click();
+  await expect(page.getByText(/token-1: 3 keyframes.*200-1200 ms/i)).toBeVisible();
+
+  await page.getByLabel('Group targets').selectOption(['token-1', 'token-2']);
+  await page.getByLabel('Group base offset (ms)').fill('100');
+  await page.getByLabel('Stagger step (ms)').fill('400');
+  await page.getByRole('button', { name: 'Apply group timing' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Grouped timeline timing applied');
+  await expect(page.getByText(/token-1: 3 keyframes.*300-1300 ms/i)).toBeVisible();
+  await expect(page.getByText(/token-2: 2 keyframes.*500-1500 ms/i)).toBeVisible();
 });

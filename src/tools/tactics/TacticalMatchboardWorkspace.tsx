@@ -107,7 +107,7 @@ export default function TacticalMatchboardWorkspace() {
   const [setup, setSetup] = useState<SetupState>(INITIAL_SETUP);
   const [setupOpen, setSetupOpen] = useState(true);
   const [history, setHistory] = useState(() => createTacticalHistory(projectFromSetup(INITIAL_SETUP)));
-  const [selectedTokenId, setSelectedTokenId] = useState(() => history.present.playerTokens[0]?.id);
+  const [selectedTokenId, setSelectedTokenId] = useState<string | undefined>(() => history.present.playerTokens[0]?.id);
   const [mode, setMode] = useState<InteractionMode>('move');
   const [arrowStart, setArrowStart] = useState<NormalizedPoint | null>(null);
   const [arrowLabel, setArrowLabel] = useState('');
@@ -125,12 +125,15 @@ export default function TacticalMatchboardWorkspace() {
   const [fromPhaseId, setFromPhaseId] = useState('');
   const [toPhaseId, setToPhaseId] = useState('');
   const [morphPercent, setMorphPercent] = useState('50');
+  const [activeSceneId, setActiveSceneId] = useState('scene-1');
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
 
   const project = history.present;
-  const sceneId = project.scenes[0]?.id ?? '';
-  const layerId = project.scenes[0]?.layers[0]?.id ?? '';
-  const selectedToken = project.playerTokens.find((token) => token.id === selectedTokenId);
+  const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
+  const sceneId = activeScene?.id ?? '';
+  const layerId = activeScene?.layers[0]?.id ?? '';
+  const sceneTokens = project.playerTokens.filter((token) => token.sceneId === sceneId);
+  const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId);
   const availableFormations = useMemo(
     () => [...FORMATION_TEMPLATES, ...customFormations],
     [customFormations],
@@ -150,8 +153,8 @@ export default function TacticalMatchboardWorkspace() {
     [project, selectedRestartTemplate],
   );
   const legalityIssues = useMemo(
-    () => reviewFormationLegality(project, activeFormation),
-    [activeFormation, project],
+    () => reviewFormationLegality(project, activeFormation, sceneId),
+    [activeFormation, project, sceneId],
   );
 
   function applyEdit(label: string, updater: (current: TacticalProject) => TacticalProject, message: string) {
@@ -170,6 +173,7 @@ export default function TacticalMatchboardWorkspace() {
       const nextProject = projectFromSetup(setup, selectedFormation);
       setHistory(createTacticalHistory(nextProject));
       setActiveFormation(selectedFormation);
+      setActiveSceneId(nextProject.scenes[0]?.id ?? '');
       setSelectedTokenId(nextProject.playerTokens[0]?.id);
       setMode('move');
       setArrowStart(null);
@@ -228,7 +232,7 @@ export default function TacticalMatchboardWorkspace() {
     const dimensions = selectedRulesProfile.dimensions ?? project.pitch.dimensions;
     setRulesDraft({
       id: `${selectedRulesProfile.id}-local`,
-      label: `${selectedRulesProfile.label} â€” local copy`,
+      label: selectedRulesProfile.label + ' \u2014 local copy',
       format: selectedRulesProfile.format,
       teamSize: selectedRulesProfile.teamSize,
       lengthMeters: dimensions.lengthMeters,
@@ -472,7 +476,7 @@ export default function TacticalMatchboardWorkspace() {
               {selectedFormation?.provenance ? (
                 <small>
                   {selectedFormation.provenance.sourceTitle}
-                  {selectedFormation.provenance.note ? ` â€” ${selectedFormation.provenance.note}` : ''}
+                  {selectedFormation.provenance.note ? ' \u2014 ' + selectedFormation.provenance.note : ''}
                 </small>
               ) : null}
             </label>
@@ -548,7 +552,7 @@ export default function TacticalMatchboardWorkspace() {
                 <small>
                   {selectedRulesProfile.provenance.sourceTitle}
                   {selectedRulesProfile.provenance.sourceVersion ? ` (${selectedRulesProfile.provenance.sourceVersion})` : ''}
-                  {selectedRulesProfile.provenance.note ? ` â€” ${selectedRulesProfile.provenance.note}` : ''}
+                  {selectedRulesProfile.provenance.note ? ' \u2014 ' + selectedRulesProfile.provenance.note : ''}
                 </small>
               ) : null}
             </section>
@@ -653,9 +657,25 @@ export default function TacticalMatchboardWorkspace() {
         </details>
 
 
-        <TacticalTimelinePanel project={project} onEdit={applyEdit} />
+        <TacticalTimelinePanel project={project} activeSceneId={sceneId} onEdit={applyEdit} />
 
         <div className="tactical-command-bar" aria-label="Board commands">
+          <label className="tactical-arrow-label tactical-scene-picker">
+            Scene view
+            <select
+              aria-label="Scene view"
+              value={sceneId}
+              onChange={(event) => {
+                const nextSceneId = event.target.value;
+                setActiveSceneId(nextSceneId);
+                setSelectedTokenId(project.playerTokens.find((token) => token.sceneId === nextSceneId)?.id);
+                setArrowStart(null);
+                setStatus('Scene view changed.');
+              }}
+            >
+              {project.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+            </select>
+          </label>
           <button
             className={`action-button ${mode === 'move' ? '' : 'secondary'}`}
             type="button"
@@ -698,7 +718,7 @@ export default function TacticalMatchboardWorkspace() {
           <aside className="tactical-inspector" aria-label="Player precision controls">
             <h3>Players</h3>
             <div className="tactical-player-list">
-              {project.playerTokens.map((token) => {
+              {sceneTokens.map((token) => {
                 const team = project.teams.find((candidate) => candidate.id === token.teamId);
                 const player = team?.roster.find((candidate) => candidate.id === token.playerId);
                 return (
@@ -709,7 +729,7 @@ export default function TacticalMatchboardWorkspace() {
                     aria-pressed={token.id === selectedTokenId}
                     onClick={() => setSelectedTokenId(token.id)}
                   >
-                    <strong>{player?.jerseyNumber ?? 'â€”'}</strong>
+                    <strong>{player?.jerseyNumber ?? '\u2014'}</strong>
                     <span>{player?.displayName ?? token.id}</span>
                   </button>
                 );
@@ -718,10 +738,10 @@ export default function TacticalMatchboardWorkspace() {
 
             <h3>Precision move</h3>
             <div className="tactical-dpad" role="group" aria-label="Nudge selected player">
-              <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up">â†‘</button>
-              <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left">â†</button>
-              <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right">â†’</button>
-              <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down">â†“</button>
+              <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up">\u2191</button>
+              <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left">\u2190</button>
+              <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right">\u2192</button>
+              <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down">\u2193</button>
             </div>
 
             {selectedToken ? (

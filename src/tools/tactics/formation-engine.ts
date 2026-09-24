@@ -5,7 +5,7 @@ const US_SOCCER_FORMATION_SOURCE: SourceProvenance = {
   kind: 'recommendation',
   authoritative: false,
   organization: 'U.S. Soccer',
-  sourceTitle: 'The U.S. Way — Formations',
+  sourceTitle: 'The U.S. Way - Formations',
   sourceUrl: 'https://www.ussoccer.com/us-way/player-development/game/formations',
   sourceDate: '2026-09-21',
   note: 'U.S. Soccer identifies these as examples; other formations may be used.',
@@ -43,10 +43,10 @@ function template(
 
 export const FORMATION_TEMPLATES: FormationTemplate[] = [
   template('tool-3v3-1-1-1', '3v3 1-1-1 starter', 3, 0, [1, 1, 1], '1-1-1', false),
-  template('ussf-4v4-1-2-1', 'U.S. Soccer U7–U8 4v4 example', 4, 0, [1, 2, 1], '1-2-1', false, US_SOCCER_FORMATION_SOURCE),
+  template('ussf-4v4-1-2-1', 'U.S. Soccer U7-U8 4v4 example', 4, 0, [1, 2, 1], '1-2-1', false, US_SOCCER_FORMATION_SOURCE),
   template('tool-5v5-1-2-1-1', '5v5 1-2-1-1 starter', 5, 1, [2, 1, 1], '1-2-1-1', true),
-  template('ussf-7v7-1-3-2-1', 'U.S. Soccer U9–U10 7v7 example', 7, 1, [3, 2, 1], '1-3-2-1', true, US_SOCCER_FORMATION_SOURCE),
-  template('ussf-9v9-1-3-2-3', 'U.S. Soccer U11–U12 9v9 example', 9, 1, [3, 2, 3], '1-3-2-3', true, US_SOCCER_FORMATION_SOURCE),
+  template('ussf-7v7-1-3-2-1', 'U.S. Soccer U9-U10 7v7 example', 7, 1, [3, 2, 1], '1-3-2-1', true, US_SOCCER_FORMATION_SOURCE),
+  template('ussf-9v9-1-3-2-3', 'U.S. Soccer U11-U12 9v9 example', 9, 1, [3, 2, 3], '1-3-2-3', true, US_SOCCER_FORMATION_SOURCE),
   template('ussf-11v11-1-4-3-3', 'U.S. Soccer U13+ 11v11 example', 11, 1, [4, 3, 3], '1-4-3-3', true, US_SOCCER_FORMATION_SOURCE),
   template('tool-11v11-1-4-2-3-1', '11v11 1-4-2-3-1 starter', 11, 1, [4, 2, 3, 1], '1-4-2-3-1', true),
   template('tool-11v11-1-3-5-2', '11v11 1-3-5-2 starter', 11, 1, [3, 5, 2], '1-3-5-2', true),
@@ -132,9 +132,16 @@ export function createCustomFormationTemplate(input: CustomFormationInput): Form
 export function reviewFormationLegality(
   project: TacticalProject,
   formation: FormationTemplate,
+  sceneId?: string,
 ): string[] {
   const issues = validateFormationTemplate(formation);
-  const visibleTokens = project.playerTokens.filter((token) => token.visible);
+  if (sceneId && !project.scenes.some((scene) => scene.id === sceneId)) {
+    issues.push(`Scene "${sceneId}" does not exist.`);
+    return issues;
+  }
+  const visibleTokens = project.playerTokens.filter(
+    (token) => token.visible && (!sceneId || token.sceneId === sceneId),
+  );
   if (visibleTokens.length !== formation.teamSize) {
     issues.push(`Formation expects ${formation.teamSize} placed players; the board has ${visibleTokens.length}.`);
   }
