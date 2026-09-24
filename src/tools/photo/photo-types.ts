@@ -1,4 +1,4 @@
-export type PhotoOutputMime = 'image/jpeg' | 'image/png' | 'image/webp';
+export type PhotoOutputMime = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/tiff';
 
 export interface NormalizedCrop {
   x: number;
@@ -450,6 +450,8 @@ export interface PhotoCapabilities {
   jpeg: boolean;
   png: boolean;
   webp: boolean;
+  /** TIFF is written by Photo Studio itself, so it never depends on the browser encoder. */
+  tiff: boolean;
   maxCanvasEdge: number;
   maxCanvasArea: number;
 }

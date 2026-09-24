@@ -2,6 +2,9 @@ import { normalizeRecipe, sampleHistogram, type PhotoLayerPixels } from './photo
 import { warpPhotoGeometryPixels } from './photo-geometry';
 import { warpPhotoMeshLiquifyPixels } from './photo-warp';
 import { preparePhotoRaster } from './photo-import';
+import { normalizeResamplingKernel, resamplePixels, type PhotoResamplingKernel } from './photo-resample';
+import { encodePhotoTiff, hasTransparency } from './photo-tiff-writer';
+import { TEXT_LAYER_PADDING } from './photo-layers';
 import type {
   PhotoCapabilities,
   PhotoHistogram,
@@ -26,6 +29,8 @@ export interface PhotoRenderRequest {
   requestedHeight?: number;
   maxPreviewEdge?: number;
   jpegBackground?: string;
+  /** Final-resize kernel for exports; previews always use the browser scaler for speed. */
+  resampling?: PhotoResamplingKernel;
 }
 
 export interface PhotoRenderResult {
@@ -40,6 +45,9 @@ export interface PhotoRenderResult {
   outputMime: string;
   proofBaseBlob?: Blob;
   gamutWarningPixels: number;
+  /** Kernel actually used for the final resize (`browser` when no resize was needed or the
+   * unscaled frame exceeded safe canvas limits). */
+  resampling: PhotoResamplingKernel;
 }
 
 interface LayerBufferPayload {
@@ -150,7 +158,6 @@ async function decodeImageLayerPixels(layer: { id: string; sourceDataUrl: string
   }
 }
 
-const TEXT_LAYER_PADDING = 24;
 const SHAPE_LAYER_SIZE = 400;
 
 /** Renders a text layer to an offscreen canvas at its natural size (canvas dimensions become the
@@ -296,6 +303,7 @@ export async function probePhotoCapabilities(): Promise<PhotoCapabilities> {
     jpeg,
     png,
     webp,
+    tiff: true,
     maxCanvasEdge: VERIFIED_SAFE_EDGE,
     maxCanvasArea: VERIFIED_SAFE_AREA,
   };
@@ -501,9 +509,25 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       }
     }
 
-    const canvas = drawGeometry(bitmap, recipe, target.width, target.height);
+    const requestedKernel = request.mode === 'export' ? normalizeResamplingKernel(request.resampling) : 'browser';
+    const resizing = target.width !== natural.width || target.height !== natural.height;
+    let resampling: PhotoResamplingKernel = 'browser';
+    let canvas: HTMLCanvasElement | OffscreenCanvas;
+    let imageData: ImageData;
+    if (requestedKernel !== 'browser' && resizing && canvasCanRender(natural.width, natural.height)) {
+      // Draw crop/rotation at natural size, then resize with the deterministic kernel so the
+      // selected filter (not the browser's scaler) determines the final pixels.
+      const naturalCanvas = drawGeometry(bitmap, recipe, natural.width, natural.height);
+      const naturalPixels = getContext2d(naturalCanvas).getImageData(0, 0, natural.width, natural.height).data;
+      const resized = resamplePixels(naturalPixels, natural.width, natural.height, target.width, target.height, requestedKernel);
+      canvas = createCanvas(target.width, target.height);
+      imageData = new ImageData(resized, target.width, target.height);
+      resampling = requestedKernel;
+    } else {
+      canvas = drawGeometry(bitmap, recipe, target.width, target.height);
+      imageData = getContext2d(canvas).getImageData(0, 0, target.width, target.height);
+    }
     const context = getContext2d(canvas);
-    const imageData = context.getImageData(0, 0, target.width, target.height);
     const lensPerspectivePixels = warpPhotoGeometryPixels(
       imageData.data,
       target.width,
@@ -552,7 +576,9 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
 
     const outputCanvas = canvas;
     const quality = Math.min(1, Math.max(0.01, request.quality ?? 0.92));
-    let blob = await canvasToBlob(outputCanvas, mime, quality);
+    let blob = mime === 'image/tiff'
+      ? new Blob([encodePhotoTiff(ownedPixels, target.width, target.height, { alpha: hasTransparency(ownedPixels) }) as Uint8Array<ArrayBuffer>], { type: 'image/tiff' })
+      : await canvasToBlob(outputCanvas, mime, quality);
     if (blob.type !== mime) {
       if (request.mode === 'export') throw new Error(`${mime} export is not supported by this browser.`);
       blob = await canvasToBlob(outputCanvas, 'image/png', 1);
@@ -570,6 +596,7 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       outputMime: blob.type,
       proofBaseBlob,
       gamutWarningPixels: processed.gamutWarningPixels,
+      resampling,
     };
   } finally {
     bitmap.close();

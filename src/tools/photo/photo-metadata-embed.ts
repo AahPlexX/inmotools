@@ -1,3 +1,4 @@
+import { withPhotoTiffExtras } from './photo-tiff-writer';
 import type { PhotoIccProfile, PhotoOutputMime } from './photo-types';
 import { photoIccProfileBytes } from './color/photo-color-management';
 
@@ -10,6 +11,8 @@ const PNG_XMP_KEYWORD = encoder.encode('XML:com.adobe.xmp');
 export interface PhotoMetadataEmbeddingOptions {
   width: number;
   height: number;
+  /** Pixels per inch; TIFF stores it in its resolution tags alongside the XMP packet. */
+  ppi?: number;
 }
 
 function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
@@ -369,6 +372,7 @@ export function embedPhotoXmpBytes(
   if (mime === 'image/jpeg') return embedJpegXmp(source, xmpBytes);
   if (mime === 'image/png') return embedPngXmp(source, xmpBytes);
   if (mime === 'image/webp') return embedWebpXmp(source, xmpBytes, options);
+  if (mime === 'image/tiff') return withPhotoTiffExtras(source, { xmp: xmpBytes, ppi: options.ppi });
   const unsupported: never = mime;
   throw new Error(`Unsupported metadata container: ${String(unsupported)}`);
 }
@@ -398,6 +402,7 @@ export async function embedPhotoIcc(
   if (mime === 'image/jpeg') embedded = embedJpegIcc(input, profileBytes);
   else if (mime === 'image/png') embedded = await embedPngIcc(input, profileBytes, profile.description);
   else if (mime === 'image/webp') embedded = embedWebpIcc(input, profileBytes, options);
+  else if (mime === 'image/tiff') embedded = withPhotoTiffExtras(input, { icc: profileBytes });
   else {
     const unsupported: never = mime;
     throw new Error(`Unsupported ICC container: ${String(unsupported)}`);

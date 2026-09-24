@@ -17,7 +17,7 @@ export interface PhotoExportServices {
     source: Blob,
     mime: PhotoOutputMime,
     xmp: string,
-    options: { width: number; height: number },
+    options: { width: number; height: number; ppi?: number },
   ) => Promise<Blob>;
   embedIcc?: typeof embedPhotoIcc;
 }
@@ -123,7 +123,8 @@ export async function createPhotoExport(
   if (options.metadataPolicy !== 'strip') {
     try {
       const xmp = serializePhotoXmp(photoMetadataForPolicy(options.metadata, options.metadataPolicy));
-      blob = await services.embed(blob, options.outputMime, xmp, { width: rendered.width, height: rendered.height });
+      const reviewed = photoMetadataForPolicy(options.metadata, options.metadataPolicy);
+      blob = await services.embed(blob, options.outputMime, xmp, { width: rendered.width, height: rendered.height, ppi: reviewed.ppi });
       metadataEmbedded = true;
     } catch (error) {
       metadataError = error instanceof Error ? error.message : String(error);

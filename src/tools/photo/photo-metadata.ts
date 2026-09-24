@@ -4,6 +4,7 @@ const MIME_EXTENSIONS: Record<PhotoOutputMime, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'image/tiff': 'tif',
 };
 
 function escapeXml(value: string): string {
@@ -42,7 +43,7 @@ function formatGps(value: number | undefined): string | undefined {
   return value.toFixed(7);
 }
 
-function safeFilenameStem(value: string): string {
+export function safeFilenameStem(value: string): string {
   return value
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
     .replace(/\s+/g, ' ')

@@ -115,6 +115,9 @@ function baseLayer(id: string, name: string): Omit<PhotoLayer, 'role' | 'sourceD
   };
 }
 
+/** Padding (px) around rendered text-layer glyphs; shared by the renderer and watermark planning. */
+export const TEXT_LAYER_PADDING = 24;
+
 export function createImageLayer(id: string, name: string, sourceDataUrl: string, sourceWidth: number, sourceHeight: number, isWatermark = false): PhotoLayer {
   return { ...baseLayer(id, name), role: 'image', sourceDataUrl, sourceWidth, sourceHeight, isWatermark };
 }
