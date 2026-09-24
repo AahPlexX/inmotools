@@ -28,6 +28,7 @@ export type PhotoMergeDiagnosticCode =
   | 'engine-unavailable'
   | 'invalid-request'
   | 'timeout'
+  | 'cancelled'
   | 'worker-failed';
 
 export interface PhotoMergeDiagnostic {
@@ -58,11 +59,58 @@ export interface PhotoFrameRegistration {
   lowConfidence: boolean;
 }
 
+export type PhotoPanoramaProjection = 'planar' | 'cylindrical';
+
+/** Alignment applied before a stack/bracket merge; `none` is for tripod-locked frames. */
+export type PhotoMergeAlignment = PhotoRegistrationModel | 'none';
+
+export interface PhotoPanoramaOptions {
+  projection: PhotoPanoramaProjection;
+  /** Horizontal field of view of one frame in degrees; only used by the cylindrical projection. */
+  fieldOfView: number;
+  gainCompensation: boolean;
+}
+
+/** Operation parameters. Only the block matching the operation is read; the plain-data shape
+ * crosses the worker boundary by structured clone. */
+export interface PhotoMergeOptions {
+  alignment: PhotoMergeAlignment;
+  /** Crop the result to the largest rectangle every frame covers, instead of keeping transparent edges. */
+  cropToCoverage: boolean;
+  fusion: { contrast: number; saturation: number; exposure: number };
+  hdr: {
+    exposureTimes: number[];
+    operator: 'reinhard' | 'drago' | 'mantiuk';
+    gamma: number;
+    intensity: number;
+    lightAdaptation: number;
+    colorAdaptation: number;
+    bias: number;
+    scale: number;
+    saturation: number;
+  };
+  focus: { radius: number; selectivity: number };
+  panorama: PhotoPanoramaOptions;
+}
+
+/** Output ceiling for a merged result. A panorama may exceed one source frame, so it gets a larger
+ * edge limit than the per-source ceiling, with the same 16-megapixel area bound. */
+export const PHOTO_MERGE_OUTPUT_LIMITS = { maxEdge: 8192, maxPixels: 16 * 1024 * 1024 } as const;
+
 export type PhotoMergeRequest =
   | { id: number; type: 'register'; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] }
-  | { id: number; type: 'align'; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] };
+  | { id: number; type: 'align'; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] }
+  | { id: number; type: 'merge'; operation: PhotoMergeOperation; referenceIndex: number; sources: PhotoMergeRaster[]; options: PhotoMergeOptions };
+
+export interface PhotoMergeOutcome {
+  result: PhotoMergeRaster;
+  registrations: PhotoFrameRegistration[];
+  /** Plain-language facts about what the merge did (scaling, cropping, exposure equalisation). */
+  notes: string[];
+}
 
 export type PhotoMergeResponse =
   | { id: number; ok: true; type: 'register'; registrations: PhotoFrameRegistration[] }
   | { id: number; ok: true; type: 'align'; registrations: PhotoFrameRegistration[]; aligned: PhotoMergeRaster[] }
+  | ({ id: number; ok: true; type: 'merge' } & PhotoMergeOutcome)
   | { id: number; ok: false; diagnostic: PhotoMergeDiagnostic };

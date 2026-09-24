@@ -11,6 +11,7 @@ import { downloadBlob } from '../../lib/download';
 import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } from './PhotoCanvas';
 import type { PhotoCompositionOverlay } from './PhotoCropOverlay';
 import PhotoExportDialog from './PhotoExportDialog';
+import PhotoMergePanel from './PhotoMergePanel';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
 import PhotoRawControls from './PhotoRawControls';
 import { suggestAutoTone, suggestAutoWhiteBalance } from './photo-analysis';
@@ -104,7 +105,7 @@ import type {
 } from './photo-types';
 import './photo.css';
 
-type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'detail' | 'inspect';
+type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'detail' | 'merge' | 'inspect';
 type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
 type MixerOutputChannel = 'red' | 'green' | 'blue';
 type WatermarkAnchor = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
@@ -383,6 +384,9 @@ export default function PhotoWorkspace() {
   const [liquifyStrength, setLiquifyStrength] = useState(0.6);
   const userPresetMutationRef = useRef(false);
   const autoAnalysisRevisionRef = useRef(0);
+  // A message that the first preview of a newly opened source should show instead of the generic
+  // "Preview updated", so a result summary (for example from a merge) is not overwritten.
+  const pendingSourceAnnouncementRef = useRef<{ file: File; message: string } | null>(null);
   const analysisHistogramCacheRef = useRef<{ file: File; histogram: PhotoHistogram } | null>(null);
 
   const recipe = history.present;
@@ -530,7 +534,11 @@ export default function PhotoWorkspace() {
         proofBaseUrlRef.current = proofBaseUrl ?? null;
         setPreview({ url, proofBaseUrl, result });
         setPreviewBusy(false);
-        if (importRevisionAtStart === importRevisionRef.current) {
+        const announcement = pendingSourceAnnouncementRef.current;
+        if (announcement?.file === source.file) {
+          pendingSourceAnnouncementRef.current = null;
+          setStatus(announcement.message);
+        } else if (importRevisionAtStart === importRevisionRef.current) {
           if (result.scaledForSafety) {
             setStatus(`Preview rendered at ${result.width} × ${result.height} for responsive editing; full export remains available within device limits.`);
           } else {
@@ -2615,7 +2623,26 @@ export default function PhotoWorkspace() {
     );
   }
 
+  async function openMergedPhoto(file: File, message: string) {
+    const importRevision = beginImport();
+    pendingSourceAnnouncementRef.current = { file, message };
+    await openPhoto({ file, source: 'file-input' }, importRevision);
+    const opened = sourceRef.current?.file === file;
+    if (opened) setStatus(message);
+    else if (pendingSourceAnnouncementRef.current?.file === file) pendingSourceAnnouncementRef.current = null;
+    return opened;
+  }
+
   function renderInspector() {
+    if (panel === 'merge') {
+      return (
+        <PhotoMergePanel
+          onOpenResult={openMergedPhoto}
+          onStatus={setStatus}
+          currentPhoto={!source ? 'none' : projectSaveState === 'saved' && autosaveEnabled ? 'saved' : 'unsaved'}
+        />
+      );
+    }
     if (panel === 'geometry') return renderGeometryPanel();
     if (panel === 'local') return renderLocalPanel();
     if (panel === 'retouch') return renderRetouchPanel();
@@ -2737,6 +2764,7 @@ export default function PhotoWorkspace() {
             ['retouch', 'Retouch'],
             ['layers', 'Layers'],
             ['detail', 'Warp & detail'],
+            ['merge', 'Merge'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
             <button

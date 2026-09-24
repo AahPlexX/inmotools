@@ -21,7 +21,9 @@ scope.onmessage = (event: MessageEvent<unknown>) => {
         diagnostic: { code: 'worker-failed', message: error instanceof Error ? error.message : 'Alignment stopped unexpectedly.' },
       };
     }
-    const transfer = response.ok && response.type === 'align' ? response.aligned.map((raster) => raster.buffer) : [];
+    const transfer = !response.ok ? []
+      : response.type === 'align' ? response.aligned.map((raster) => raster.buffer)
+        : response.type === 'merge' ? [response.result.buffer] : [];
     scope.postMessage(response, transfer);
   });
 };

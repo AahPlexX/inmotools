@@ -23,6 +23,7 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/photo-copy-paste.spec.ts',
       'tests/e2e/photo-import.spec.ts',
       'tests/e2e/photo-project.spec.ts',
+      'tests/e2e/photo-merge.spec.ts',
     ]);
   });
 });

@@ -1,3 +1,4 @@
+import { fitRotation, pixelRay, rotationHomography, type CameraIntrinsics } from './photo-merge-ops';
 import { PHOTO_MERGE_LIMITS, type PhotoFrameRegistration, type PhotoMergeRaster, type PhotoRegistrationModel } from './photo-merge-types';
 
 /** The narrow slice of the OpenCV.js API this adapter uses. Typing against it (rather than the
@@ -37,6 +38,7 @@ export interface PhotoCv {
   countNonZero(mat: CvMat): number;
   exceptionFromPtr?: (pointer: number) => { msg?: string };
   CV_8UC4: number;
+  CV_8U: number;
   CV_32F: number;
   CV_64F: number;
   CV_32FC2: number;
@@ -155,19 +157,27 @@ interface CoarseEstimate {
   homography: Matrix3;
   matches: number;
   inliers: number;
+  /** Inlier correspondences in working-image coordinates: [fromX, fromY, toX, toY] per match. */
+  inlierPairs: number[][];
 }
 
 /** ORB features + cross-checked Hamming matching + RANSAC homography. OpenCV's RANSAC seeds its
  * own RNG per call, so the estimate is deterministic for identical inputs. */
-function coarseFeatureEstimate(cv: PhotoCv, scope: CvScope, reference: CvMat, target: CvMat): CoarseEstimate | null {
+function coarseFeatureEstimate(
+  cv: PhotoCv,
+  scope: CvScope,
+  reference: CvMat,
+  target: CvMat,
+  masks?: { reference: CvMat; target: CvMat },
+): CoarseEstimate | null {
   const detector = scope.track(new cv.ORB(ORB_FEATURES));
   const emptyMask = scope.track(new cv.Mat());
   const referenceKeys = scope.track(new cv.KeyPointVector());
   const targetKeys = scope.track(new cv.KeyPointVector());
   const referenceDescriptors = scope.track(new cv.Mat());
   const targetDescriptors = scope.track(new cv.Mat());
-  detector.detectAndCompute(reference, emptyMask, referenceKeys, referenceDescriptors);
-  detector.detectAndCompute(target, emptyMask, targetKeys, targetDescriptors);
+  detector.detectAndCompute(reference, masks?.reference ?? emptyMask, referenceKeys, referenceDescriptors);
+  detector.detectAndCompute(target, masks?.target ?? emptyMask, targetKeys, targetDescriptors);
   if (referenceDescriptors.empty() || targetDescriptors.empty()) return null;
 
   const matcher = scope.track(new cv.BFMatcher(cv.NORM_HAMMING, true));
@@ -198,7 +208,11 @@ function coarseFeatureEstimate(cv: PhotoCv, scope: CvScope, reference: CvMat, ta
   for (let row = 0; row < 3; row += 1) for (let col = 0; col < 3; col += 1) values.push(homography.doubleAt(row, col));
   const inliers = cv.countNonZero(inlierMask);
   if (inliers < MIN_FEATURE_MATCHES || values.some((value) => !Number.isFinite(value))) return null;
-  return { homography: normalizeHomogeneous(values as Matrix3), matches: count, inliers };
+  const inlierPairs: number[][] = [];
+  for (let index = 0; index < count; index += 1) {
+    if (inlierMask.data[index]) inlierPairs.push([fromPoints[index * 2], fromPoints[index * 2 + 1], toPoints[index * 2], toPoints[index * 2 + 1]]);
+  }
+  return { homography: normalizeHomogeneous(values as Matrix3), matches: count, inliers, inlierPairs };
 }
 
 function motionFor(cv: PhotoCv, model: PhotoRegistrationModel): number {
@@ -312,6 +326,132 @@ export function warpFrameToReference(cv: PhotoCv, target: PhotoMergeRaster, matr
     const bytes = new Uint8Array(width * height * 4);
     bytes.set(destination.data.subarray(0, bytes.length));
     return { width, height, buffer: bytes.buffer };
+  } finally {
+    scope.release();
+  }
+}
+
+/** Feature-detection mask for a frame with transparent padding (for example a cylindrically
+ * projected frame): coverage shrunk by a margin so ORB never fires on the artificial border. */
+function coverageMask(cv: PhotoCv, scope: CvScope, raster: PhotoMergeRaster, scale: number): CvMat {
+  const width = Math.max(1, Math.round(raster.width * scale));
+  const height = Math.max(1, Math.round(raster.height * scale));
+  const data = new Uint8Array(raster.buffer, 0, raster.width * raster.height * 4);
+  const margin = 12;
+  const covered = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const sx = Math.min(raster.width - 1, Math.round(x / scale));
+      const sy = Math.min(raster.height - 1, Math.round(y / scale));
+      covered[y * width + x] = data[(sy * raster.width + sx) * 4 + 3] === 255 ? 1 : 0;
+    }
+  }
+  // Separable minimum filter: a pixel is usable only if its whole margin neighbourhood is covered.
+  const rows = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let ok = 1;
+      for (let k = -margin; k <= margin && ok; k += 1) {
+        const xx = x + k;
+        if (xx < 0 || xx >= width || !covered[y * width + xx]) ok = 0;
+      }
+      rows[y * width + x] = ok;
+    }
+  }
+  const mask = scope.track(new cv.Mat(height, width, cv.CV_8U));
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let ok = 1;
+      for (let k = -margin; k <= margin && ok; k += 1) {
+        const yy = y + k;
+        if (yy < 0 || yy >= height || !rows[yy * width + x]) ok = 0;
+      }
+      mask.data[y * width + x] = ok ? 255 : 0;
+    }
+  }
+  return mask;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+export type PhotoPanoramaPairModel =
+  | { kind: 'translation' }
+  | { kind: 'rotation'; reference: CameraIntrinsics; target: CameraIntrinsics };
+
+/** Registers two neighbouring panorama frames from features alone. ECC refinement is not used
+ * here: it assumes near-complete overlap, while panorama neighbours often share only a third of
+ * the frame. RANSAC selects the consistent matches; the final model is then fitted to those
+ * inliers with few parameters so it stays well-conditioned beyond the overlap band:
+ * `translation` (cylindrically projected frames) takes the median inlier displacement, and
+ * `rotation` (planar projection) fits the 3-parameter camera rotation between viewing rays. */
+export function registerPanoramaPair(
+  cv: PhotoCv,
+  reference: PhotoMergeRaster,
+  target: PhotoMergeRaster,
+  model: PhotoPanoramaPairModel,
+  sourceIndex: number,
+): PhotoFrameRegistration {
+  const scope = createCvScope();
+  try {
+    const longEdge = Math.max(reference.width, reference.height, target.width, target.height);
+    const scale = Math.min(1, PHOTO_MERGE_LIMITS.registrationMaxEdge / longEdge);
+    const referenceGray = workingGray(cv, scope, rasterToMat(cv, scope, reference), scale);
+    const targetGray = workingGray(cv, scope, rasterToMat(cv, scope, target), scale);
+    const masks = {
+      reference: coverageMask(cv, scope, reference, referenceGray.cols / reference.width),
+      target: coverageMask(cv, scope, target, targetGray.cols / target.width),
+    };
+    let coarse: CoarseEstimate | null = null;
+    try {
+      coarse = coarseFeatureEstimate(cv, scope, referenceGray, targetGray, masks);
+    } catch (error) {
+      throw new PhotoRegistrationError(`Photos ${sourceIndex} and ${sourceIndex + 1} could not be matched (${describeCvError(cv, error)}).`, sourceIndex);
+    }
+    if (!coarse) {
+      throw new PhotoRegistrationError(
+        `Photos ${sourceIndex} and ${sourceIndex + 1} do not share enough matching detail. Panorama frames should overlap by roughly a third and be selected in shooting order.`,
+        sourceIndex,
+      );
+    }
+    const referenceScale = referenceGray.cols / reference.width;
+    const targetScale = targetGray.cols / target.width;
+    // Inlier correspondences in full-resolution pixel coordinates (inverse of the INTER_AREA
+    // pixel-centre mapping x_small = s·x + (s − 1)/2).
+    const pairs = coarse.inlierPairs.map(([fx, fy, tx, ty]) => [
+      (fx - (referenceScale - 1) / 2) / referenceScale,
+      (fy - (referenceScale - 1) / 2) / referenceScale,
+      (tx - (targetScale - 1) / 2) / targetScale,
+      (ty - (targetScale - 1) / 2) / targetScale,
+    ]);
+    let full: Matrix3;
+    if (model.kind === 'translation') {
+      const dx = median(pairs.map(([fx, , tx]) => tx - fx));
+      const dy = median(pairs.map(([, fy, , ty]) => ty - fy));
+      full = [1, 0, dx, 0, 1, dy, 0, 0, 1];
+    } else {
+      const { reference: from, target: to } = model;
+      const rotation = fitRotation(
+        pairs.map(([fx, fy]) => pixelRay(fx, fy, from.focal, from.cx, from.cy)),
+        pairs.map(([, , tx, ty]) => pixelRay(tx, ty, to.focal, to.cx, to.cy)),
+      );
+      full = rotationHomography(rotation, from, to) as Matrix3;
+    }
+    const inlierRatio = coarse.inliers / Math.max(1, coarse.matches);
+    return {
+      sourceIndex,
+      model: model.kind === 'translation' ? 'translation' : 'homography',
+      matrix: [...full],
+      coarse: 'features',
+      featureMatches: coarse.matches,
+      inliers: coarse.inliers,
+      // No ECC here, so confidence is the RANSAC inlier ratio (same 0..1 "higher is better" sense).
+      correlation: inlierRatio,
+      lowConfidence: coarse.inliers < 2 * MIN_FEATURE_MATCHES || inlierRatio < 0.25,
+    };
   } finally {
     scope.release();
   }

@@ -2,11 +2,17 @@ import {
   PHOTO_MERGE_LIMITS,
   type PhotoFrameRegistration,
   type PhotoMergeDiagnostic,
+  type PhotoMergeOperation,
+  type PhotoMergeOptions,
+  type PhotoMergeOutcome,
   type PhotoMergeRaster,
   type PhotoMergeRequest,
   type PhotoMergeResponse,
   type PhotoRegistrationModel,
 } from './photo-merge-types';
+
+/** `Omit` that keeps each member of a union distinct instead of collapsing to shared keys. */
+type RequestWithoutId = PhotoMergeRequest extends infer R ? R extends PhotoMergeRequest ? Omit<R, 'id'> : never : never;
 
 /** Rejection carrying the worker's structured diagnostic so callers can show the exact reason. */
 export class PhotoMergeFailure extends Error {
@@ -46,13 +52,15 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
   let nextId = 0;
   let queue: Promise<unknown> = Promise.resolve();
   let disposed = false;
+  // Rejects the job currently running in the worker; set while a job is in flight.
+  let abortActive: ((diagnostic: PhotoMergeDiagnostic) => void) | null = null;
 
   function discardWorker() {
     worker?.terminate();
     worker = null;
   }
 
-  function run(request: Omit<PhotoMergeRequest, 'id'>): Promise<PhotoMergeResponse & { ok: true }> {
+  function run(request: RequestWithoutId): Promise<PhotoMergeResponse & { ok: true }> {
     const task = queue.then(() => new Promise<PhotoMergeResponse & { ok: true }>((resolve, reject) => {
       if (disposed) {
         reject(new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge workspace was closed.' }));
@@ -70,9 +78,11 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
       }
       const fail = (diagnostic: PhotoMergeDiagnostic) => {
         clearTimeout(timer);
+        abortActive = null;
         discardWorker();
         reject(new PhotoMergeFailure(diagnostic));
       };
+      abortActive = fail;
       const timer = setTimeout(() => fail({
         code: 'timeout',
         message: `Merging exceeded its ${timeoutMs / 1000}-second time limit and was stopped. The selected photos are unchanged.`,
@@ -81,6 +91,7 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
         const response = event.data as PhotoMergeResponse | null;
         if (!response || typeof response !== 'object' || response.id !== id) return; // Not this job's reply.
         clearTimeout(timer);
+        abortActive = null;
         if (response.ok) resolve(response);
         else reject(new PhotoMergeFailure(response.diagnostic));
       };
@@ -106,8 +117,18 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
       if (response.type !== 'align') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
       return { registrations: response.registrations, aligned: response.aligned };
     },
+    async merge(operation: PhotoMergeOperation, referenceIndex: number, sources: PhotoMergeRaster[], options: PhotoMergeOptions): Promise<PhotoMergeOutcome> {
+      const response = await run({ type: 'merge', operation, referenceIndex, sources, options });
+      if (response.type !== 'merge') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
+      return { result: response.result, registrations: response.registrations, notes: response.notes };
+    },
+    /** Stops the running job by terminating its worker; queued jobs still run on a fresh worker. */
+    cancel() {
+      abortActive?.({ code: 'cancelled', message: 'Merge cancelled. The selected photos are unchanged.' });
+    },
     dispose() {
       disposed = true;
+      abortActive?.({ code: 'cancelled', message: 'The merge workspace was closed.' });
       discardWorker();
     },
   };
