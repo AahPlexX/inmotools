@@ -5,6 +5,9 @@
   - Completion gate: focused regressions proven red before implementation; Markdown unit/browser coverage and production build green on the integrated code; TASK-013 moved to done; TASK-014's Markdown main-thread item explicitly reconciled; no unrelated work changed.
 
 
+
+- **Typing Workstation completion audit (TASK-020 follow-up)** — active on `origin/main`; original functional ledger remains 38/38. Current milestone: remediate the verified native-input/IME/mobile-keyboard gap and Tab keyboard trap without feature expansion, harden compact touch targets/reflow, refresh Typing-only CI/handoff wording, then run the focused Typing workflow and Pages/deployment gates before closing. Source of truth: `docs/superpowers/plans/2026-09-15-typing-workstation.md`.
+
 - **Sightline Velocity UX/real-world audit remediation** — DONE. F1–F35 remain implemented; this follow-up did not expand the feature denominator. Accepted work: accurate multi-file failure accounting + in-session document switching, loaded-state source collapse, persistent reading cockpit/direct WPM, progressive disclosure of specialist controls/diagnostics/technical metadata/contents, live status semantics, nested drag-leave correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel ARIA wiring, and container/coarse-pointer/mobile responsive ergonomics. Source of truth: `docs/superpowers/plans/2026-09-15-sightline-velocity.md`.
   - 2026-09-21 verification on `origin/main` merged in: `tsc --noEmit -p tsconfig.app.json` clean; `pnpm exec vitest run tests/unit` 1465/1466 passing (the 1 failure is the unrelated, environmental `markdown-citation.test.ts` CSL-formatting timeout); `pnpm build` clean; the full `tests/e2e/sightline.spec.ts` (48 cases, including the automated accessibility sweep and full keyboard-only operability check) passes on desktop+mobile Chromium in an isolated single-worker run.
 
