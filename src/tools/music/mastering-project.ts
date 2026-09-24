@@ -10,6 +10,7 @@ export interface MasteringSourceReference {
   id: string;
   name: string;
   durationSeconds: number;
+  sampleRate: number;
 }
 
 export interface MasteringClipState {
@@ -52,6 +53,7 @@ export interface MasteringProjectHistory {
 const HISTORY_LIMIT = 100;
 const finite = (value: number, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const nonNegative = (value: number) => Math.max(0, finite(value));
+const sampleFrameTime = (seconds: number, sampleRate: number) => Math.min(Number.MAX_SAFE_INTEGER, Math.round(nonNegative(seconds) * sampleRate)) / sampleRate;
 
 function cloneDocument(document: MasteringDocument): MasteringDocument {
   return {
@@ -70,7 +72,10 @@ function cloneDocument(document: MasteringDocument): MasteringDocument {
 }
 
 export function createMasteringDocument(source: MasteringSourceReference | null = null): MasteringDocument {
-  const duration = source ? nonNegative(source.durationSeconds) : 0;
+  if (source && (!Number.isFinite(source.sampleRate) || source.sampleRate <= 0)) {
+    throw new RangeError('A mastering source requires a positive finite sample rate.');
+  }
+  const duration = source ? sampleFrameTime(source.durationSeconds, source.sampleRate) : 0;
   return {
     version: 1,
     source: source ? { ...source, durationSeconds: duration } : null,
@@ -79,13 +84,123 @@ export function createMasteringDocument(source: MasteringSourceReference | null 
     playhead: 0,
     markers: [],
     regions: [],
-    tracks: [],
+    tracks: source && duration > 0 ? [{
+      id: `${source.id}:track:1`,
+      name: 'Track 1',
+      sourceId: source.id,
+      gainDb: 0,
+      pan: 0,
+      muted: false,
+      solo: false,
+      clips: [{
+        id: `${source.id}:clip:1`,
+        sourceId: source.id,
+        timelineStartSeconds: 0,
+        sourceStartSeconds: 0,
+        sourceEndSeconds: duration,
+        gainDb: 0,
+      }],
+    }] : [],
     metadataEdits: {},
   };
 }
 
 export function createProjectHistory(document = createMasteringDocument()): MasteringProjectHistory {
   return { past: [], present: cloneDocument(document), future: [] };
+}
+
+export function splitClipRevision(
+  document: MasteringDocument,
+  clipId: string,
+  splitAtSeconds: number,
+  nextClipId: string,
+): MasteringDocument {
+  if (!nextClipId || document.tracks.some((track) => track.clips.some((clip) => clip.id === nextClipId))) {
+    return cloneDocument(document);
+  }
+  const sampleRate = document.source?.sampleRate;
+  if (!sampleRate) return cloneDocument(document);
+  const at = sampleFrameTime(splitAtSeconds, sampleRate);
+  let changed = false;
+  const tracks = document.tracks.map((track) => {
+    const index = track.clips.findIndex((clip) => clip.id === clipId);
+    if (index < 0) return track;
+    const clip = track.clips[index];
+    const clipStart = sampleFrameTime(clip.timelineStartSeconds, sampleRate);
+    const sourceStart = sampleFrameTime(clip.sourceStartSeconds, sampleRate);
+    const sourceBoundary = sourceStart + at - clipStart;
+    if (at <= clipStart || sourceBoundary >= sampleFrameTime(clip.sourceEndSeconds, sampleRate)) return track;
+    changed = true;
+    return {
+      ...track,
+      clips: [
+        ...track.clips.slice(0, index),
+        { ...clip, sourceEndSeconds: sourceBoundary },
+        { ...clip, id: nextClipId, timelineStartSeconds: at, sourceStartSeconds: sourceBoundary },
+        ...track.clips.slice(index + 1),
+      ],
+    };
+  });
+  return changed ? { ...cloneDocument(document), tracks } : cloneDocument(document);
+}
+
+export function moveClipRevision(
+  document: MasteringDocument,
+  clipId: string,
+  timelineStartSeconds: number,
+): MasteringDocument {
+  const sampleRate = document.source?.sampleRate;
+  if (!sampleRate) return cloneDocument(document);
+  const nextStart = sampleFrameTime(timelineStartSeconds, sampleRate);
+  let changed = false;
+  const tracks = document.tracks.map((track) => ({
+    ...track,
+    clips: track.clips.map((clip) => {
+      if (clip.id !== clipId || clip.timelineStartSeconds === nextStart) return clip;
+      changed = true;
+      return { ...clip, timelineStartSeconds: nextStart };
+    }),
+  }));
+  return changed ? { ...cloneDocument(document), tracks } : cloneDocument(document);
+}
+
+export function duplicateClipRevision(
+  document: MasteringDocument,
+  clipId: string,
+  nextClipId: string,
+  timelineStartSeconds?: number,
+): MasteringDocument {
+  if (!nextClipId || document.tracks.some((track) => track.clips.some((clip) => clip.id === nextClipId))) {
+    return cloneDocument(document);
+  }
+  const sampleRate = document.source?.sampleRate;
+  if (!sampleRate) return cloneDocument(document);
+  let changed = false;
+  const tracks = document.tracks.map((track) => {
+    const index = track.clips.findIndex((clip) => clip.id === clipId);
+    if (index < 0) return track;
+    changed = true;
+    const clip = track.clips[index];
+    const start = sampleFrameTime(timelineStartSeconds === undefined
+      ? clip.timelineStartSeconds + clip.sourceEndSeconds - clip.sourceStartSeconds
+      : timelineStartSeconds, sampleRate);
+    return {
+      ...track,
+      clips: [...track.clips.slice(0, index + 1), { ...clip, id: nextClipId, timelineStartSeconds: start }, ...track.clips.slice(index + 1)],
+    };
+  });
+  return changed ? { ...cloneDocument(document), tracks } : cloneDocument(document);
+}
+
+export function nudgeClipRevision(
+  document: MasteringDocument,
+  clipId: string,
+  deltaSeconds: number,
+): MasteringDocument {
+  const clip = document.tracks.flatMap((track) => track.clips).find((candidate) => candidate.id === clipId);
+  return clip
+    ? moveClipRevision(document, clipId, clip.timelineStartSeconds + finite(deltaSeconds))
+    : cloneDocument(document);
 }
 
 export function estimateDocumentDuration(document: MasteringDocument): number {

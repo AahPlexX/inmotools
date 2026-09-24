@@ -4,6 +4,10 @@ import {
   createMasteringDocument,
   createProjectHistory,
   cropProjectRevision,
+  duplicateClipRevision,
+  moveClipRevision,
+  nudgeClipRevision,
+  splitClipRevision,
   deleteRangeRevision,
   insertSilenceRevision,
   redoProjectRevision,
@@ -17,14 +21,31 @@ describe('mastering project history', () => {
       id: 'source-1',
       name: 'mix.wav',
       durationSeconds: 12,
+      sampleRate: 48_000,
     });
     expect(document).toMatchObject({
       version: 1,
-      source: { id: 'source-1', name: 'mix.wav', durationSeconds: 12 },
+      source: { id: 'source-1', name: 'mix.wav', durationSeconds: 12, sampleRate: 48_000 },
       edits: [],
       markers: [],
       regions: [],
-      tracks: [],
+      tracks: [{
+        id: 'source-1:track:1',
+        name: 'Track 1',
+        sourceId: 'source-1',
+        gainDb: 0,
+        pan: 0,
+        muted: false,
+        solo: false,
+        clips: [{
+          id: 'source-1:clip:1',
+          sourceId: 'source-1',
+          timelineStartSeconds: 0,
+          sourceStartSeconds: 0,
+          sourceEndSeconds: 12,
+          gainDb: 0,
+        }],
+      }],
       metadataEdits: {},
       selection: { startSeconds: 0, endSeconds: 12 },
       playhead: 0,
@@ -32,8 +53,13 @@ describe('mastering project history', () => {
     expect(() => JSON.stringify(document)).not.toThrow();
   });
 
+  it('rejects sources without a valid sample rate', () => {
+    expect(() => createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 1, sampleRate: 0 })).toThrow(RangeError);
+    expect(() => createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 1, sampleRate: Number.NaN })).toThrow(RangeError);
+  });
+
   it('commits, undoes, and redoes one atomic audio plus annotation revision', () => {
-    const initial = createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4 });
+    const initial = createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4, sampleRate: 48_000 });
     const history = createProjectHistory(initial);
     const changed = {
       ...history.present,
@@ -56,7 +82,7 @@ describe('mastering project history', () => {
   });
 
   it('replaces selection/playhead view state without creating an undo step', () => {
-    const history = createProjectHistory(createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4 }));
+    const history = createProjectHistory(createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4, sampleRate: 48_000 }));
     const moved = replaceProjectView(history, {
       selection: { startSeconds: 1, endSeconds: 2 },
       playhead: 1.5,
@@ -66,7 +92,7 @@ describe('mastering project history', () => {
     expect(moved.present.playhead).toBe(1.5);
   });
   it('bounds history to 100 revisions and clears redo after a divergent commit', () => {
-    let history = createProjectHistory(createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4 }));
+    let history = createProjectHistory(createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 4, sampleRate: 48_000 }));
     for (let revision = 0; revision <= 100; revision += 1) {
       history = commitProjectRevision(history, { ...history.present, metadataEdits: { revision: String(revision) } });
     }
@@ -78,9 +104,39 @@ describe('mastering project history', () => {
   });
 });
 describe('atomic timeline transforms', () => {
+  it('splits, duplicates, moves, and nudges clips while retaining source references in history', () => {
+    const original = createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 8, sampleRate: 4 });
+    const sourceClip = original.tracks[0].clips[0];
+    const split = splitClipRevision(original, sourceClip.id, 3.13, 'clip-right');
+    expect(split.tracks[0].clips).toEqual([
+      { ...sourceClip, sourceEndSeconds: 3.25 },
+      { ...sourceClip, id: 'clip-right', timelineStartSeconds: 3.25, sourceStartSeconds: 3.25 },
+    ]);
+    expect(original.tracks[0].clips).toEqual([sourceClip]);
+
+    const duplicated = duplicateClipRevision(split, 'clip-right', 'clip-copy');
+    expect(duplicated.tracks[0].clips[2]).toEqual({
+      ...split.tracks[0].clips[1],
+      id: 'clip-copy',
+      timelineStartSeconds: 8,
+    });
+    const moved = moveClipRevision(duplicated, 'clip-copy', 10);
+    const nudged = nudgeClipRevision(moved, 'clip-copy', -1);
+    expect(nudged.tracks[0].clips[2]).toMatchObject({
+      id: 'clip-copy',
+      sourceId: 's',
+      sourceStartSeconds: 3.25,
+      sourceEndSeconds: 8,
+      timelineStartSeconds: 9,
+    });
+    const history = commitProjectRevision(createProjectHistory(original), split);
+    expect(undoProjectRevision(history).present).toEqual(original);
+    expect(redoProjectRevision(undoProjectRevision(history)).present).toEqual(split);
+  });
+
   it('deletes a range and remaps markers, regions, selection, and playhead together', () => {
     const document = {
-      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10 }),
+      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10, sampleRate: 48_000 }),
       markers: [
         { id: 'before', label: 'Before', seconds: 1 },
         { id: 'removed', label: 'Removed', seconds: 4 },
@@ -108,7 +164,7 @@ describe('atomic timeline transforms', () => {
   });
   it('crops edits, markers, regions, selection, and playhead together', () => {
     const document = {
-      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10 }),
+      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10, sampleRate: 48_000 }),
       markers: [
         { id: 'before', label: 'Before', seconds: 1 },
         { id: 'inside', label: 'Inside', seconds: 4 },
@@ -129,7 +185,7 @@ describe('atomic timeline transforms', () => {
 
   it('inserts silence and shifts every affected timeline annotation atomically', () => {
     const document = {
-      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 5 }),
+      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 5, sampleRate: 48_000 }),
       markers: [{ id: 'm', label: 'Later', seconds: 3 }],
       regions: [{ id: 'r', label: 'Range', startSeconds: 1, endSeconds: 4 }],
       selection: { startSeconds: 2, endSeconds: 4 },

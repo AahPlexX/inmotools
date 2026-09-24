@@ -132,7 +132,7 @@ export default function MasteringWorkspace() {
       const pcm = bufferToPcm(decoded.buffer);
       setSourcePcm(pcm);
       setSourceInfo(decoded.info);
-      setHistory(createProjectHistory({ ...createMasteringDocument({ id: `${file.name}-${revision}`, name: file.name, durationSeconds: decoded.buffer.duration }), selection: { startSeconds: 0, endSeconds: decoded.buffer.duration }}));
+      setHistory(createProjectHistory({ ...createMasteringDocument({ id: `${file.name}-${revision}`, name: file.name, durationSeconds: decoded.buffer.duration, sampleRate: decoded.buffer.sampleRate }), selection: { startSeconds: 0, endSeconds: decoded.buffer.duration }}));
       setStatus(`Loaded ${file.name}: ${decoded.info.codec}, ${decoded.info.channelCount} channel${decoded.info.channelCount === 1 ? '' : 's'}, ${decoded.info.sampleRate.toLocaleString()} Hz.`);
     } catch (error) {
       if (revision === importRevisionRef.current && mountedRef.current) {
