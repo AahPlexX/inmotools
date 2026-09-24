@@ -1,5 +1,31 @@
 # Done
 
+## Typing Workstation completion audit — 38/38 complete
+
+The 2026-09-24 Typing follow-up is closed without expanding the original 38-capability denominator.
+Fresh source and standards review found two real interaction defects in the already-shipped tool:
+the typing surface depended on raw `keydown` text capture, which excluded reliable software-keyboard
+and IME text entry, and it intercepted `Tab` to generate a new sample instead of allowing standard
+focus traversal. The implementation now uses a native textarea input surface with
+`input`/composition handling, preserves physical `KeyboardEvent.code` metadata for raw hardware
+logs when available, supports mobile Backspace input, moves fresh-sample generation to `F2`, keeps
+`Tab` as normal focus navigation, exposes the shortcuts in visible copy, gives tag-removal targets
+a 24 CSS-pixel minimum, and reflows the virtual keyboard/panels across compact widths.
+
+Product changes landed directly on `origin/main` as
+`dea365cf61d1633db66fdcc49b8321a4f3e8ff76` and follow-up compatibility fix
+`1538148b21d7502bc181ffe7ffcf1f683beb750d`. Dedicated Typing run
+`36009754067` / job `107667101416` passed **67/67 focused unit tests**, the production
+build, Chromium installation, and **14/14 desktop/mobile browser checks**. Pages run
+`36009753871` built and deployed the same product revision successfully. Its repository-wide
+browser lane was red on 15 failures in other workspaces/infrastructure, while all 14 Typing cases
+executed and none failed. `main` subsequently advanced only through unrelated Crystal/task
+documentation before closure, and no Typing-named branch remains.
+
+The Typing plan is the maintenance handoff:
+`docs/superpowers/plans/2026-09-15-typing-workstation.md`. New Typing scope must re-enter the
+task-state system rather than reopening this completed audit implicitly.
+
 ## Transcode Workstation — F01–F36 complete
 
 The local-first Transcode Workstation is complete against its 36-capability design ledger and
