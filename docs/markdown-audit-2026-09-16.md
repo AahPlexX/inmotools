@@ -43,6 +43,18 @@ A user comparison against markdownlivepreview.com (a bare-bones reference: open/
 
 Verification: `tsc --noEmit` clean. `markdown-render.test.ts` gained 12 new cases (heading id assignment and de-duplication, id/slug parity with the Outline panel, all five alert kinds plus an unmarked-blockquote negative case, emoji conversion plus a negative case proving code fences are untouched, and a footnote-survives-sanitization check). Seven new `markdown-workbench-ux.spec.ts` browser cases cover the toolbar end-to-end, paste-to-embed, drop-to-embed, a plain `.md` drop still opening as a new document, alert rendering, emoji rendering, and the Table-of-Contents round trip landing on its real heading. Every new test passed repeatedly across multiple isolated and light-load runs on both desktop and mobile Chromium; the only failures seen were under sustained heavy concurrent/sequential load on this dev machine (the same page-load-timeout class of flake independently diagnosed for unrelated tools/branches earlier the same day), confirmed non-reproducing by isolated reruns and, in one case, by simply raising the assertion timeout. Two new dependencies were promoted from transitive to explicit and pinned to their already-resolved lockfile versions (`@lezer/highlight`, `unist-util-visit`) — no new package version entered the tree.
 
+## Final completion pass — 2026-09-24
+
+The two remaining Markdown-specific tracked gaps are closed.
+
+**Toolbar document history (TASK-013).** CodeMirror's native Ctrl/Cmd+Z stack remains the fine-grained editing history so caret and selection behavior stay native. The workspace toolbar remains a separate document-level history, but adjacent editor transactions are now coalesced by edit proximity into one meaningful toolbar step instead of one snapshot per keystroke. Explicit document operations (open, draft load, new) and toolbar undo/redo reset the coalescing boundary. The visible controls are "Undo step" and "Redo step" with explicit accessible names that distinguish them from the editor's native history.
+
+**Live table formulas (TASK-014 Markdown item).** Per-keystroke formula preparation no longer runs synchronously in React rendering. `table-formula-runner.ts` owns a reusable Worker, reuses it after completed work, terminates a busy stale worker when newer source arrives, correlates responses by request id, and falls back to synchronous evaluation only when Workers are unavailable. `table-formula.worker.ts` performs the existing closed-grammar evaluator unchanged, so formula semantics, cycle detection, and the no-`eval`/no-`Function` security property remain intact. Explicit export actions still prepare their one requested source snapshot synchronously; this does not recreate the removed typing-path stall.
+
+**Regression proof.** The first CI pass failed only because the new runner module did not yet exist, proving the worker-runner test was red for the intended reason. After the runner existed but before workspace wiring, browser regressions still failed because no formula Worker was constructed and the new toolbar labels/behavior were absent. Final pre-integration run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks on desktop and mobile Chromium. No dependency was added.
+
+Shared task-state files in this closeout were regenerated from the then-current `main` versions before the branch ref moved, preserving parallel workstream entries rather than replaying stale branch copies.
+
 ## Sources checked
 
 - Official CodeMirror language source: https://github.com/codemirror/language/blob/main/src/highlight.ts

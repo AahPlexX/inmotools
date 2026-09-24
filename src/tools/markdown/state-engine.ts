@@ -18,6 +18,12 @@ export const commitHistory = <T>(history: ProjectHistory<T>, next: T): ProjectHi
   future: [],
 });
 
+export const replaceHistoryPresent = <T>(history: ProjectHistory<T>, next: T): ProjectHistory<T> => ({
+  ...history,
+  present: next,
+  future: [],
+});
+
 export const undoHistory = <T>(history: ProjectHistory<T>): ProjectHistory<T> => {
   if (!history.past.length) return history;
   const previous = history.past[history.past.length - 1];

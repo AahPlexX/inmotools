@@ -1,5 +1,16 @@
 # Done
 
+## TASK-013: Reconcile the two undo histories in Markdown Workbench
+**Priority:** P3 | **Tags:** editor, ux | **Completed:** 2026-09-24
+
+Closed without collapsing the two history systems into one. CodeMirror keeps its native fine-grained Ctrl/Cmd+Z history and caret behavior. The workspace toolbar now exposes explicitly named document-step Undo/Redo controls and groups adjacent editor changes into one coarse snapshot by edit proximity; opening a file, loading a draft, starting a new document, or using toolbar undo/redo resets that grouping boundary. External document swaps remain excluded from CodeMirror history, so the two stacks do not fight.
+
+The same completion pass resolved TASK-014's Markdown-specific performance item: live table-formula substitution moved from the React render path to a reusable cancellable local Web Worker, with latest-request protection and a synchronous no-Worker fallback. Export actions still compute their requested exact snapshot synchronously because they are explicit operations rather than per-keystroke work.
+
+Red-first evidence was captured before implementation. Final pre-integration PR validation run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks across desktop and mobile Chromium.
+
+---
+
 ## Typing Workstation completion audit — 38/38 complete
 
 The 2026-09-24 Typing follow-up is closed without expanding the original 38-capability denominator.
