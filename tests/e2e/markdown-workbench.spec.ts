@@ -67,31 +67,31 @@ test('editing the source updates the live preview, and toggling Source view hide
   await expect(preview).toBeVisible();
 });
 
-test('undo and redo roll source edits back and forward', async ({ page }) => {
-  // History is committed per CodeMirror docChanged event (effectively per
-  // keystroke for typed input - see state-engine.ts's commitHistory), so one
-  // Undo click reverts the single most recent change, not an entire typed
-  // sequence. This test exercises that actual granularity.
+test('toolbar undo groups adjacent typing into one document step and redo restores it', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   const preview = page.locator('.markdown-workbench-preview');
   await setSource(page, '# Version one');
   await expect(preview.locator('h1')).toContainText('Version one');
 
-  const undo = page.getByRole('button', { name: 'Undo' });
-  const redo = page.getByRole('button', { name: 'Redo' });
+  const undo = page.getByRole('button', { name: 'Undo document step' });
+  const redo = page.getByRole('button', { name: 'Redo document step' });
   await expect(redo).toBeDisabled();
   await expect(undo).toBeEnabled();
 
-  await page.keyboard.press('!');
-  await expect(preview.locator('h1')).toContainText('Version one!');
+  // Let the setup edit form its own document step, then type several adjacent
+  // characters. The toolbar history should treat that burst as one meaningful
+  // document step while CodeMirror's native Ctrl/Cmd+Z remains fine-grained.
+  await page.waitForTimeout(750);
+  await page.keyboard.insertText(' next');
+  await expect(preview.locator('h1')).toContainText('Version one next');
 
   await undo.click();
   await expect(preview.locator('h1')).toContainText('Version one');
-  await expect(preview.locator('h1')).not.toContainText('Version one!');
+  await expect(preview.locator('h1')).not.toContainText('Version one next');
   await expect(redo).toBeEnabled();
 
   await redo.click();
-  await expect(preview.locator('h1')).toContainText('Version one!');
+  await expect(preview.locator('h1')).toContainText('Version one next');
 });
 
 test('evaluates a table formula and keeps a static cell untouched', async ({ page }) => {
