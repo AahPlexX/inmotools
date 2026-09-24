@@ -222,8 +222,66 @@ export function slicePcm(audio: PcmAudio, startSeconds: number, endSeconds: numb
   return { sampleRate: audio.sampleRate, channels: audio.channels.map((channel) => channel.slice(start, end)) };
 }
 
+export function resolveSampleBoundary(
+  audio: PcmAudio,
+  seconds: number,
+  snapToZeroCrossing = false,
+  radius = 2048,
+): number {
+  const sampleCount = validatePcm(audio);
+  const requested = Math.max(0, Math.min(sampleCount, Math.round(finite(seconds) * audio.sampleRate)));
+  if (!snapToZeroCrossing || requested === 0 || requested === sampleCount) return requested;
+  return findZeroCrossing(audio.channels[0], requested, radius);
+}
+
+export function splitPcmAt(
+  audio: PcmAudio,
+  seconds: number,
+  snapToZeroCrossing = false,
+  radius = 2048,
+): [PcmAudio, PcmAudio] {
+  const boundary = resolveSampleBoundary(audio, seconds, snapToZeroCrossing, radius);
+  const splitSeconds = boundary / audio.sampleRate;
+  return [slicePcm(audio, 0, splitSeconds), slicePcm(audio, splitSeconds, pcmDuration(audio))];
+}
+
+export function trimPcmStart(audio: PcmAudio, seconds: number, snapToZeroCrossing = false, radius = 2048): PcmAudio {
+  const boundary = resolveSampleBoundary(audio, seconds, snapToZeroCrossing, radius);
+  return slicePcm(audio, boundary / audio.sampleRate, pcmDuration(audio));
+}
+
+export function trimPcmEnd(audio: PcmAudio, seconds: number, snapToZeroCrossing = false, radius = 2048): PcmAudio {
+  const boundary = resolveSampleBoundary(audio, seconds, snapToZeroCrossing, radius);
+  return slicePcm(audio, 0, boundary / audio.sampleRate);
+}
+
+export function deletePcmRange(
+  audio: PcmAudio,
+  startSeconds: number,
+  endSeconds: number,
+  snapToZeroCrossing = false,
+  radius = 2048,
+): PcmAudio {
+  const sampleCount = validatePcm(audio);
+  const selected = clampSelection({ startSeconds, endSeconds }, sampleCount / audio.sampleRate);
+  const first = resolveSampleBoundary(audio, selected.startSeconds, snapToZeroCrossing, radius);
+  const second = resolveSampleBoundary(audio, selected.endSeconds, snapToZeroCrossing, radius);
+  const start = Math.min(first, second);
+  const end = Math.max(first, second);
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel) => {
+      const next = new Float32Array(start + sampleCount - end);
+      next.set(channel.subarray(0, start), 0);
+      next.set(channel.subarray(end), start);
+      return next;
+    }),
+  };
+}
+
 export type AudioEdit =
   | { type: 'crop'; startSeconds: number; endSeconds: number }
+  | { type: 'deleteRange'; startSeconds: number; endSeconds: number }
   | { type: 'gain'; gainDb: number }
   | { type: 'normalizePeak'; targetDbfs: number }
   | { type: 'removeDc' }
@@ -240,6 +298,7 @@ export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAu
   for (const edit of edits) {
     switch (edit.type) {
       case 'crop': current = slicePcm(current, edit.startSeconds, edit.endSeconds); break;
+      case 'deleteRange': current = deletePcmRange(current, edit.startSeconds, edit.endSeconds); break;
       case 'gain': current = applyGain(current, edit.gainDb); break;
       case 'normalizePeak': current = normalizePeak(current, edit.targetDbfs); break;
       case 'removeDc': current = removeDcOffset(current); break;

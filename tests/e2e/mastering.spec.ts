@@ -59,7 +59,8 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
 
   await page.getByLabel('Start (seconds)').fill('0.25');
   await page.getByLabel('End (seconds)').fill('0.75');
-  await page.getByRole('button', { name: 'Snap to zero crossings' }).click();
+  await page.getByLabel('Snap crop and delete boundaries to nearby zero crossings').check();
+  await page.getByRole('button', { name: 'Snap selection to zero crossings' }).click();
   await expect(page.locator('.status-line')).toContainText(/snapped to nearby zero crossings/i);
 
   await page.getByLabel('Marker name').fill('Intro point');
@@ -96,6 +97,13 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('2');
   await expect(levelPanel.getByLabel('Redo available')).toHaveText('0');
   await page.getByRole('button', { name: 'Reset audio edits' }).click();
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('0');
+  await page.getByLabel('Start (seconds)').fill('0.25');
+  await page.getByLabel('End (seconds)').fill('0.75');
+  await page.getByRole('button', { name: 'Delete selection' }).click();
+  await expect(levelPanel.getByLabel('Applied operations')).toHaveText('1');
+  await expect(page.locator('.status-line')).toContainText(/deleted 0:00\.250–0:00\.750/i);
+  await page.getByRole('button', { name: 'Undo edit' }).click();
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('0');
 
   const utilityPanel = page.locator('.mastering-panel').filter({ hasText: 'Repair & channel utilities' });

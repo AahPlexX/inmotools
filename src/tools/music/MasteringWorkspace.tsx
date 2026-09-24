@@ -7,6 +7,7 @@ import {
   findZeroCrossing,
   measureDcOffset,
   pcmDuration,
+  resolveSampleBoundary,
   type AudioEdit,
   type MasteringMarker,
   type MasteringRegion,
@@ -21,6 +22,7 @@ import {
   createMasteringDocument,
   createProjectHistory,
   cropProjectRevision,
+  deleteRangeRevision,
   insertSilenceRevision,
   replaceProjectView,
   redoProjectRevision,
@@ -72,6 +74,7 @@ export default function MasteringWorkspace() {
   const [markerName, setMarkerName] = useState('');
   const [regionName, setRegionName] = useState('');
   const [silenceDuration, setSilenceDuration] = useState(1);
+  const [snapEditBoundaries, setSnapEditBoundaries] = useState(false);
   const [channelIndex, setChannelIndex] = useState(0);
   const [loop, setLoop] = useState(false);
   const [gainDb, setGainDb] = useState(0);
@@ -164,15 +167,38 @@ export default function MasteringWorkspace() {
     setStatus(label);
   };
 
-  const cropToSelection = () => {
-    const selected = clampSelection(selection, duration);
+  const resolveEditRange = (range: TimeSelection) => {
+    const selected = clampSelection(range, duration);
+    if (!currentPcm) return selected;
+    const start = resolveSampleBoundary(currentPcm, selected.startSeconds, snapEditBoundaries) / currentPcm.sampleRate;
+    const end = resolveSampleBoundary(currentPcm, selected.endSeconds, snapEditBoundaries) / currentPcm.sampleRate;
+    return clampSelection({ startSeconds: start, endSeconds: end }, duration);
+  };
+
+  const cropRange = (range: TimeSelection, label: string) => {
+    const selected = resolveEditRange(range);
     if (!currentPcm || selected.endSeconds - selected.startSeconds <= 0) {
       setStatus('Choose a non-empty range before cropping.');
       return;
     }
     stopPlayback(false);
     commitDocument(cropProjectRevision(history.present, selected.startSeconds, selected.endSeconds));
-    setStatus(`Cropped to ${formatTime(selected.startSeconds)}–${formatTime(selected.endSeconds)}. Undo remains available.`);
+    setStatus(`${label} ${formatTime(selected.startSeconds)}–${formatTime(selected.endSeconds)}. Undo remains available.`);
+  };
+
+  const cropToSelection = () => cropRange(selection, 'Cropped to');
+  const trimBeforeSelection = () => cropRange({ startSeconds: selection.startSeconds, endSeconds: duration }, 'Trimmed before selection, keeping');
+  const trimAfterSelection = () => cropRange({ startSeconds: 0, endSeconds: selection.endSeconds }, 'Trimmed after selection, keeping');
+
+  const deleteSelection = () => {
+    const selected = resolveEditRange(selection);
+    if (!currentPcm || selected.endSeconds - selected.startSeconds <= 0) {
+      setStatus('Choose a non-empty range before deleting.');
+      return;
+    }
+    stopPlayback(false);
+    commitDocument(deleteRangeRevision(history.present, selected.startSeconds, selected.endSeconds));
+    setStatus(`Deleted ${formatTime(selected.startSeconds)}–${formatTime(selected.endSeconds)}. Undo remains available.`);
   };
 
   const snapSelectionToZero = () => {
@@ -424,9 +450,13 @@ export default function MasteringWorkspace() {
             <div className="field"><label htmlFor="mastering-marker-name">Marker name</label><input id="mastering-marker-name" type="text" value={markerName} onChange={(event) => setMarkerName(event.target.value)} placeholder={`Marker ${markers.length + 1}`} disabled={!canEdit} /></div>
             <div className="field"><label htmlFor="mastering-region-name">Region name</label><input id="mastering-region-name" type="text" value={regionName} onChange={(event) => setRegionName(event.target.value)} placeholder={`Region ${regions.length + 1}`} disabled={!canEdit} /></div>
           </div>
+          <label className="mastering-check"><input type="checkbox" checked={snapEditBoundaries} onChange={(event) => setSnapEditBoundaries(event.target.checked)} disabled={!canEdit} /> Snap crop and delete boundaries to nearby zero crossings</label>
           <div className="button-row">
-            <button type="button" onClick={snapSelectionToZero} disabled={!canEdit}>Snap to zero crossings</button>
+            <button type="button" onClick={snapSelectionToZero} disabled={!canEdit}>Snap selection to zero crossings</button>
             <button type="button" onClick={cropToSelection} disabled={!canEdit || boundedSelection.endSeconds <= boundedSelection.startSeconds}>Crop to selection</button>
+            <button type="button" onClick={trimBeforeSelection} disabled={!canEdit || boundedSelection.startSeconds <= 0}>Trim before selection</button>
+            <button type="button" onClick={trimAfterSelection} disabled={!canEdit || boundedSelection.endSeconds >= duration}>Trim after selection</button>
+            <button type="button" onClick={deleteSelection} disabled={!canEdit || boundedSelection.endSeconds <= boundedSelection.startSeconds}>Delete selection</button>
             <button type="button" onClick={addMarker} disabled={!canEdit}>Add marker at playhead</button>
             <button type="button" onClick={addRegion} disabled={!canEdit || boundedSelection.endSeconds <= boundedSelection.startSeconds}>Add region from selection</button>
           </div>

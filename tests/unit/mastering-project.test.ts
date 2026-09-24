@@ -4,6 +4,7 @@ import {
   createMasteringDocument,
   createProjectHistory,
   cropProjectRevision,
+  deleteRangeRevision,
   insertSilenceRevision,
   redoProjectRevision,
   replaceProjectView,
@@ -77,6 +78,34 @@ describe('mastering project history', () => {
   });
 });
 describe('atomic timeline transforms', () => {
+  it('deletes a range and remaps markers, regions, selection, and playhead together', () => {
+    const document = {
+      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10 }),
+      markers: [
+        { id: 'before', label: 'Before', seconds: 1 },
+        { id: 'removed', label: 'Removed', seconds: 4 },
+        { id: 'after', label: 'After', seconds: 8 },
+      ],
+      regions: [
+        { id: 'crossing', label: 'Crossing', startSeconds: 2, endSeconds: 5 },
+        { id: 'later', label: 'Later', startSeconds: 7, endSeconds: 9 },
+      ],
+      selection: { startSeconds: 3, endSeconds: 8 },
+      playhead: 4,
+    };
+    const deleted = deleteRangeRevision(document, 3, 6);
+    expect(deleted.edits.at(-1)).toEqual({ type: 'deleteRange', startSeconds: 3, endSeconds: 6 });
+    expect(deleted.markers).toEqual([
+      { id: 'before', label: 'Before', seconds: 1 },
+      { id: 'after', label: 'After', seconds: 5 },
+    ]);
+    expect(deleted.regions).toEqual([
+      { id: 'crossing', label: 'Crossing', startSeconds: 2, endSeconds: 3 },
+      { id: 'later', label: 'Later', startSeconds: 4, endSeconds: 6 },
+    ]);
+    expect(deleted.selection).toEqual({ startSeconds: 3, endSeconds: 5 });
+    expect(deleted.playhead).toBe(3);
+  });
   it('crops edits, markers, regions, selection, and playhead together', () => {
     const document = {
       ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 10 }),

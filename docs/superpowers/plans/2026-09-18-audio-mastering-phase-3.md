@@ -1,6 +1,6 @@
 # Audio Mastering Workstation Phase 3 Implementation Plan
 
-**Status:** Active after verified Phase 2; Task 1 (ledger 17) completed and verified on 2026-09-24; Task 2 (ledgers 11 and 13) is next.
+**Status:** Active after verified Phase 2; Task 1 (ledger 17) is complete; Task 2 (ledgers 11 and 13) is partially implemented and remains active as of 2026-09-24.
 **Branch:** `feature/audio-mastering-workstation` only; do not merge to `main`.
 **Goal:** Replace the current single-buffer/edit-stack state with an atomic project/timeline revision model, then build precise clip and multi-track editing without regressing the verified Phase 1–2 workflow.
 **Dependency baseline (2026-09-18):** MediaBunny 1.58.0 exact, React 19.2.8, TypeScript 7.0.2, Vitest 4.1.11, Playwright 1.63.0.
@@ -17,10 +17,13 @@
 
 ## Resume point — read before editing
 - Phase 2 is green: 29/29 focused Mastering/Music units, 7/7 MediaBunny-sharing video units, production build, and 2/2 desktop/mobile Mastering browser cases.
-- The deterministic completion ledger is 14/81. Functions 5 and 11 remain partial; function 17 is complete.
+- The deterministic completion ledger remains 14/81. Functions 5 and 11 remain partial; function 17 is complete. Task 2 is active and does not yet meet its ledger acceptance gate.
 - The 2026-09-24 migration consolidates source reference, audio edits, selection, markers, regions, track/clip placeholders, metadata edits, and playhead into serializable `MasteringDocument` state with bounded undo/redo.
 - Crop and silence insertion now commit their audio edit and timeline annotations together. Ordinary seek/selection/ticker updates replace view state without adding undo entries; marker/region create, rename-on-blur, and remove are project revisions.
 - Task 1 acceptance: reducer unit suite 6/6; production build/typecheck passes; Mastering desktop/mobile Chromium workflow passes 2/2, including crop undo/redo restoring annotations and selection.
+- Task 2 partial evidence (2026-09-24): engine/project units pass 27/27; `tsc --noEmit -p tsconfig.app.json` and production Vite build pass; the existing Mastering desktop/mobile Playwright workflow passes 2/2 on preview port 4175. Coverage includes exact sample-frame slicing/deletion, optional nearby zero-crossing boundaries, range-delete undo, and atomic marker/region/selection/playhead remapping.
+- Implemented so far: pure `splitPcmAt`, `trimPcmStart`, `trimPcmEnd`, and `deletePcmRange`; a reversible `deleteRange` operation; crop/trim-before/trim-after/delete selection controls; and deterministic annotation remapping when deleting a range. UI edit endpoints are normalized to sample-frame timestamps before both audio edits and project/annotation revisions; optional zero-crossing snapping adjusts those frame boundaries first.
+- Still required before Task 2 can close: represent split output as actual editable timeline clips, implement clip move/duplicate without copying immutable source PCM, provide numeric and keyboard nudge, and verify clip-level undo/redo plus boundary behavior. Do not count ledger 11 or 13 complete until these requirements and the remaining task criteria are met.
 - Preserve the existing Harmony/MIDI secondary workspace and the Phase 1–2 Mastering browser workflow.
 
 ## Task 1 — Atomic project revision history (ledger 17)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyGain,
+  deletePcmRange,
   dualMonoFromChannel,
   extractChannel,
   foldDownMono,
@@ -16,6 +17,9 @@ import {
   findZeroCrossing,
   normalizePeak,
   slicePcm,
+  splitPcmAt,
+  trimPcmEnd,
+  trimPcmStart,
   type PcmAudio,
 } from '../../src/tools/music/mastering-engine';
 
@@ -70,6 +74,31 @@ describe('waveform and edit math', () => {
     const sliced = slicePcm(pcm([0, 1, 2, 3], [4, 5, 6, 7]), 1 / 48_000, 3 / 48_000);
     expect(Array.from(sliced.channels[0])).toEqual([1, 2]);
     expect(Array.from(sliced.channels[1])).toEqual([5, 6]);
+  });
+
+  it('splits and trims every channel at the same exact frame boundary', () => {
+    const source = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3]), Float32Array.from([4, 5, 6, 7])] };
+    const [left, right] = splitPcmAt(source, 0.5);
+    const [roundedToFrame] = splitPcmAt(source, 0.26);
+    expect(roundedToFrame.channels.map((channel) => Array.from(channel))).toEqual([[0], [4]]);
+    expect(left.channels.map((channel) => Array.from(channel))).toEqual([[0, 1], [4, 5]]);
+    expect(right.channels.map((channel) => Array.from(channel))).toEqual([[2, 3], [6, 7]]);
+    expect(trimPcmStart(source, 0.5).channels.map((channel) => Array.from(channel))).toEqual([[2, 3], [6, 7]]);
+    expect(trimPcmEnd(source, 0.5).channels.map((channel) => Array.from(channel))).toEqual([[0, 1], [4, 5]]);
+  });
+
+  it('deletes an exact selected frame range across channels without mutating source PCM', () => {
+    const source = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4]), Float32Array.from([5, 6, 7, 8, 9])] };
+    const deleted = deletePcmRange(source, 0.25, 0.75);
+    expect(deleted.channels.map((channel) => Array.from(channel))).toEqual([[0, 3, 4], [5, 8, 9]]);
+    expect(source.channels.map((channel) => Array.from(channel))).toEqual([[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]);
+  });
+
+  it('snaps a range deletion to the requested channel zero crossing when enabled', () => {
+    const source = { sampleRate: 4, channels: [Float32Array.from([1, 0.5, -0.5, 0.5]), Float32Array.from([2, 3, 4, 5])] };
+    const deleted = deletePcmRange(source, 0.25, 0.75, true, 2);
+    expect(Array.from(deleted.channels[0])).toEqual([1, 0.5, 0.5]);
+    expect(Array.from(deleted.channels[1])).toEqual([2, 3, 5]);
   });
 });
 

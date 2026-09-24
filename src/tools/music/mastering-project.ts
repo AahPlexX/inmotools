@@ -94,6 +94,9 @@ export function estimateDocumentDuration(document: MasteringDocument): number {
     if (edit.type === 'crop') {
       const range = clampSelection({ startSeconds: edit.startSeconds, endSeconds: edit.endSeconds }, duration);
       duration = range.endSeconds - range.startSeconds;
+    } else if (edit.type === 'deleteRange') {
+      const range = clampSelection({ startSeconds: edit.startSeconds, endSeconds: edit.endSeconds }, duration);
+      duration -= range.endSeconds - range.startSeconds;
     } else if (edit.type === 'insertSilence') {
       duration += nonNegative(edit.durationSeconds);
     }
@@ -179,6 +182,45 @@ export function cropProjectRevision(
     }),
     selection: { startSeconds: 0, endSeconds: nextDuration },
     playhead: Math.min(nextDuration, Math.max(0, document.playhead - selected.startSeconds)),
+  };
+}
+
+export function deleteRangeRevision(
+  document: MasteringDocument,
+  startSeconds: number,
+  endSeconds: number,
+): MasteringDocument {
+  const duration = estimateDocumentDuration(document);
+  const selected = clampSelection({ startSeconds, endSeconds }, duration);
+  const removed = selected.endSeconds - selected.startSeconds;
+  if (removed <= 0) return cloneDocument(document);
+  const mapTime = (seconds: number) => seconds <= selected.startSeconds
+    ? seconds
+    : seconds >= selected.endSeconds
+      ? seconds - removed
+      : selected.startSeconds;
+  const nextDuration = duration - removed;
+  const nextSelection = clampSelection({
+    startSeconds: mapTime(document.selection.startSeconds),
+    endSeconds: mapTime(document.selection.endSeconds),
+  }, nextDuration);
+  return {
+    ...cloneDocument(document),
+    edits: [...document.edits.map((edit) => ({ ...edit })), {
+      type: 'deleteRange',
+      startSeconds: selected.startSeconds,
+      endSeconds: selected.endSeconds,
+    }],
+    markers: document.markers
+      .filter((marker) => marker.seconds <= selected.startSeconds || marker.seconds >= selected.endSeconds)
+      .map((marker) => ({ ...marker, seconds: mapTime(marker.seconds) })),
+    regions: document.regions.flatMap((region) => {
+      const start = mapTime(region.startSeconds);
+      const end = mapTime(region.endSeconds);
+      return end > start ? [{ ...region, startSeconds: start, endSeconds: end }] : [];
+    }),
+    selection: nextSelection,
+    playhead: Math.min(nextDuration, Math.max(0, mapTime(document.playhead))),
   };
 }
 
