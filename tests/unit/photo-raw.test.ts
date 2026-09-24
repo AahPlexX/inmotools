@@ -1,11 +1,12 @@
+import { normalizeRawSettings } from '../../src/tools/photo/photo-raw-settings';
 import { describe, expect, test, vi } from 'vitest';
 import { makePhotoDng } from '../fixtures/photo-dng';
-import { decodeRawPixels, detectRawSource, rawPreviewJpegGeometry } from '../../src/tools/photo/codecs/raw-decoder';
+import { applyRawExposure, decodeRawPixels, detectRawSource, rawPreviewJpegGeometry } from '../../src/tools/photo/codecs/raw-decoder';
 import { normalizePhotoImport } from '../../src/tools/photo/photo-import';
 import { DEFAULT_RECIPE, commitHistory, createHistory, normalizeRecipe, undoHistory } from '../../src/tools/photo/photo-engine';
 import type { PhotoRecipe } from '../../src/tools/photo/photo-types';
 
-const rawDefaults = { whiteBalance: 'camera', redMultiplier: 1, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd', exposureEv: 0 };
+const rawDefaults = { whiteBalance: 'camera', redMultiplier: 1, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd', exposureEv: 0, highlightPreservation: 0 };
 const develop = decodeRawPixels as (buffer: ArrayBuffer, settings?: unknown) => ReturnType<typeof decodeRawPixels>;
 
 describe('Photo Studio RAW acquisition', () => {
@@ -62,7 +63,7 @@ describe('Photo Studio RAW acquisition', () => {
   });
   test.each([
     { input: undefined, expected: rawDefaults },
-    { input: { whiteBalance: 'custom', redMultiplier: 20, blueMultiplier: -4, highlight: 'blend', demosaic: 'bilinear', exposureEv: 12 }, expected: { whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 0.25, highlight: 'blend', demosaic: 'bilinear', exposureEv: 5 } },
+    { input: { whiteBalance: 'custom', redMultiplier: 20, blueMultiplier: -4, highlight: 'blend', demosaic: 'bilinear', exposureEv: 12 }, expected: { whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 0.25, highlight: 'blend', demosaic: 'bilinear', exposureEv: 3, highlightPreservation: 0 } },
     { input: { whiteBalance: 'bad', redMultiplier: NaN, blueMultiplier: Infinity, highlight: 9, demosaic: 'uncompiled' }, expected: rawDefaults },
   ])('normalizes durable RAW options without trusting imported values: $input', ({ input, expected }) => {
     const recipe = normalizeRecipe({ ...DEFAULT_RECIPE, raw: input } as unknown as PhotoRecipe);
@@ -83,13 +84,47 @@ describe('Photo Studio RAW acquisition', () => {
       layout: 'Bayer CFA', cameraWhiteBalance: true, colorControls: true, demosaicControl: true,
     });
   });
-  test('RAW exposure EV changes LibRaw development without changing input bytes', async () => {
+  test('RAW exposure EV shifts sensor data before demosaic in both directions without changing input bytes', async () => {
     const source = makePhotoDng(); const original = source.slice();
     const neutral = await develop(source.buffer, { ...rawDefaults, exposureEv: 0 });
     const raised = await develop(source.buffer, { ...rawDefaults, exposureEv: 1 });
-    expect(raised.samples).not.toEqual(neutral.samples);
+    const lowered = await develop(source.buffer, { ...rawDefaults, exposureEv: -1 });
     expect(raised.samples[1]).toBeGreaterThan(neutral.samples[1]);
+    expect(lowered.samples[1]).toBeLessThan(neutral.samples[1]);
     expect(source).toEqual(original);
+  });
+  test('RAW exposure is repeatable and highlight preservation changes brightened highlights', async () => {
+    const source = makePhotoDng({ patterned: true });
+    const first = await develop(source.buffer, { ...rawDefaults, exposureEv: 2 });
+    const again = await develop(source.buffer, { ...rawDefaults, exposureEv: 2 });
+    expect(again.samples).toEqual(first.samples);
+    const preserved = await develop(source.buffer, { ...rawDefaults, exposureEv: 2, highlightPreservation: 1 });
+    expect(preserved.samples).not.toEqual(first.samples);
+  });
+  test('RAW exposure refuses to write when the decoder layout cannot be proven', () => {
+    // A fake decoder whose setters store fbdd_noiserd somewhere other than the documented offset.
+    const heap = new Uint8Array(4096);
+    const view = new DataView(heap.buffer);
+    const bright = 256;
+    const decoder = {
+      lr: 128,
+      setBright: (value: number) => view.setFloat32(bright, value, true),
+      setHighlight: (value: number) => view.setInt32(bright + 16, value, true),
+      setOutputBps: (value: number) => view.setInt32(bright + 52, value, true),
+      setAdjustMaximumThr: (value: number) => view.setFloat32(bright + 104, value, true),
+      setFbddNoiserd: (value: number) => view.setInt32(bright + 200, value, true),
+    };
+    expect(() => applyRawExposure({ module: { HEAPU8: heap } }, decoder, 1, 0)).toThrow(/could not be verified/);
+    expect(view.getFloat32(bright + 140, true)).toBe(0);
+    // The same fake with the documented layout is accepted and receives the shift.
+    decoder.setFbddNoiserd = (value: number) => view.setInt32(bright + 132, value, true);
+    applyRawExposure({ module: { HEAPU8: heap } }, decoder, 1, 0.5);
+    expect([view.getInt32(bright + 136, true), view.getFloat32(bright + 140, true), view.getFloat32(bright + 144, true)]).toEqual([1, 2, 0.5]);
+  });
+  test('RAW exposure settings clamp to the range LibRaw documents for exp_shift', () => {
+    expect(normalizeRawSettings({ exposureEv: -4 }).exposureEv).toBe(-2);
+    expect(normalizeRawSettings({ exposureEv: 4.5 }).exposureEv).toBe(3);
+    expect(normalizeRawSettings({ highlightPreservation: 2 }).highlightPreservation).toBe(1);
   });
   test.each([{ key: 'redMultiplier', channel: 0 }, { key: 'blueMultiplier', channel: 2 }])('custom RAW $key changes sensor development without changing input bytes', async ({ key, channel }) => {
     const source = makePhotoDng(); const original = source.slice();

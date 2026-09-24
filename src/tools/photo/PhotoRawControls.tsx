@@ -19,7 +19,7 @@ export default function PhotoRawControls({ value, source, onChange }: {
             <button type="button" disabled={settings.exposureEv === 0} aria-label="Reset RAW exposure"
               onClick={(event) => { event.preventDefault(); patch({ exposureEv: 0 }); }}>Reset</button>
           </span>
-          <input key={`exposureEv:${settings.exposureEv}`} type="number" min="-5" max="5" step="0.1" aria-label="RAW exposure (EV)" defaultValue={settings.exposureEv}
+          <input key={`exposureEv:${settings.exposureEv}`} type="number" min="-2" max="3" step="0.1" aria-label="RAW exposure (EV)" defaultValue={settings.exposureEv}
             onBlur={(event) => {
               const input = event.currentTarget;
               if (input.value !== '' && Number.isFinite(input.valueAsNumber)) patch({ exposureEv: input.valueAsNumber });
@@ -27,6 +27,23 @@ export default function PhotoRawControls({ value, source, onChange }: {
             }}
             onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
         </label>
+        <p className="photo-export-note">Shifts the sensor data before demosaicing, from −2 to +3 stops. Unlike the Light panel’s exposure, it can recover detail the camera captured beyond the default development.</p>
+        {settings.exposureEv > 0 ? (
+          <label className="photo-control photo-raw-control">
+            <span className="photo-inline-actions">
+              <span>Protect highlights when brightening</span>
+              <button type="button" disabled={settings.highlightPreservation === 0} aria-label="Reset RAW highlight protection"
+                onClick={(event) => { event.preventDefault(); patch({ highlightPreservation: 0 }); }}>Reset</button>
+            </span>
+            <input key={`highlightPreservation:${settings.highlightPreservation}`} type="number" min="0" max="1" step="0.05" aria-label="RAW highlight protection" defaultValue={settings.highlightPreservation}
+              onBlur={(event) => {
+                const input = event.currentTarget;
+                if (input.value !== '' && Number.isFinite(input.valueAsNumber)) patch({ highlightPreservation: input.valueAsNumber });
+                input.value = String(normalizeRawSettings({ ...settings, highlightPreservation: input.value !== '' && Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : settings.highlightPreservation }).highlightPreservation);
+              }}
+              onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+          </label>
+        ) : null}
         {source.colorControls ? <>
           <label className="photo-control photo-raw-control">
             <span>RAW white balance</span>

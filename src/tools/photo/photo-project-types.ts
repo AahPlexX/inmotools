@@ -13,6 +13,9 @@ export interface PhotoProjectSourceDescriptor {
   lastModified: number;
   width: number;
   height: number;
+  /** SHA-256 of the original source bytes (lowercase hex), used to spot the same photo opened
+   * again. Absent on projects saved before fingerprinting. */
+  sha256?: string;
 }
 
 export interface PhotoProjectRecord {
@@ -33,6 +36,7 @@ export interface PhotoProjectSourceInput {
   lastModified: number;
   width: number;
   height: number;
+  sha256?: string;
 }
 
 export interface PhotoProjectSaveInput {

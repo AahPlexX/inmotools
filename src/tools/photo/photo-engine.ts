@@ -1,3 +1,5 @@
+import { normalizeCanvasExpansion, normalizeCornerOffsets, normalizeFreeTransform } from './photo-transform';
+import { applySelectiveColor, isNeutralSelectiveColor, normalizeSelectiveColor } from './photo-selective-color';
 import type {
   ColorGrade,
   HslAdjustment,
@@ -9,6 +11,7 @@ import type {
   PhotoHistogram,
   PhotoHistory,
   PhotoLayer,
+  PhotoLayerGroup,
   PhotoLevels,
   PhotoLut,
   PhotoMask,
@@ -35,9 +38,52 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+const MAX_LAYER_GROUPS = 20;
+
+/** Rebuilds layer groups from untrusted input: unique ids, bounded names, clamped opacity. */
+function normalizeLayerGroups(value: unknown): PhotoLayerGroup[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const groups: PhotoLayerGroup[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const input = entry as Record<string, unknown>;
+    const id = typeof input.id === 'string' && input.id ? input.id.slice(0, 120) : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name: typeof input.name === 'string' && input.name.trim() ? input.name.trim().slice(0, 80) : 'Group',
+      visible: input.visible === undefined ? true : Boolean(input.visible),
+      opacity: typeof input.opacity === 'number' && Number.isFinite(input.opacity) ? Math.min(1, Math.max(0, input.opacity)) : 1,
+    });
+    if (groups.length >= MAX_LAYER_GROUPS) break;
+  }
+  return groups;
+}
+
+/** Normalizes layers and drops references to groups that no longer exist. */
+function normalizeLayersWithGroups(layers: PhotoLayer[], groups: unknown): PhotoLayer[] {
+  const known = new Set(normalizeLayerGroups(groups).map((group) => group.id));
+  return layers.slice(0, 50).map(normalizeLayer).map((layer) => (layer.groupId && !known.has(layer.groupId) ? { ...layer, groupId: null } : layer));
+}
+
 function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
   return {
     ...recipe,
+    freeTransform: recipe.freeTransform ? { ...recipe.freeTransform } : recipe.freeTransform,
+    perspectiveCorners: recipe.perspectiveCorners ? {
+      topLeft: { ...recipe.perspectiveCorners.topLeft },
+      topRight: { ...recipe.perspectiveCorners.topRight },
+      bottomRight: { ...recipe.perspectiveCorners.bottomRight },
+      bottomLeft: { ...recipe.perspectiveCorners.bottomLeft },
+    } : recipe.perspectiveCorners,
+    canvasExpansion: recipe.canvasExpansion ? { ...recipe.canvasExpansion } : recipe.canvasExpansion,
+    selectiveColor: recipe.selectiveColor ? {
+      mode: recipe.selectiveColor.mode,
+      ranges: Object.fromEntries(Object.entries(recipe.selectiveColor.ranges).map(([key, inks]) => [key, { ...inks }])) as NonNullable<PhotoRecipe['selectiveColor']>['ranges'],
+    } : recipe.selectiveColor,
+    layerGroups: recipe.layerGroups ? recipe.layerGroups.map((group) => ({ ...group })) : recipe.layerGroups,
     raw: recipe.raw ? { ...recipe.raw } : undefined,
     crop: { ...recipe.crop },
     toneCurve: recipe.toneCurve.map((point) => ({ ...point })),
@@ -131,6 +177,9 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   perspectiveVertical: 0,
   meshWarp: null,
   liquifyStrokes: [],
+  freeTransform: null,
+  perspectiveCorners: null,
+  canvasExpansion: null,
 
   exposure: 0,
   contrast: 0,
@@ -418,6 +467,9 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     perspectiveVertical: clamp(source.perspectiveVertical, -1, 1),
     meshWarp: normalizeMeshWarp(source.meshWarp),
     liquifyStrokes: normalizeLiquifyStrokes(source.liquifyStrokes),
+    freeTransform: normalizeFreeTransform(source.freeTransform),
+    perspectiveCorners: normalizeCornerOffsets(source.perspectiveCorners),
+    canvasExpansion: normalizeCanvasExpansion(source.canvasExpansion),
 
     exposure: clamp(source.exposure, -5, 5),
     contrast: clamp(source.contrast, -1, 1),
@@ -441,6 +493,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     shadowGrade: normalizeGrade(source.shadowGrade),
     midtoneGrade: normalizeGrade(source.midtoneGrade),
     highlightGrade: normalizeGrade(source.highlightGrade),
+    selectiveColor: normalizeSelectiveColor(source.selectiveColor),
     blackAndWhiteMix: Array.from({ length: HSL_SECTORS }, (_, index) => clamp(source.blackAndWhiteMix[index] ?? 1, 0, 2)),
 
     texture: clamp(source.texture, -1, 1),
@@ -464,7 +517,8 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     selection: normalizePhotoSelection(source.selection),
     localAdjustments: source.localAdjustments.map(normalizeLocalAdjustment),
     retouch: source.retouch.map(normalizeRetouch),
-    layers: (source.layers ?? []).slice(0, 50).map(normalizeLayer),
+    layers: normalizeLayersWithGroups(source.layers ?? [], source.layerGroups),
+    layerGroups: normalizeLayerGroups(source.layerGroups),
   };
 }
 
@@ -634,6 +688,7 @@ function isNeutralGlobal(recipe: PhotoRecipe): boolean {
     && recipe.saturation === 0
     && recipe.vibrance === 0
     && recipe.hsl.every((entry) => entry.hue === 0 && entry.saturation === 0 && entry.luminance === 0)
+    && isNeutralSelectiveColor(recipe.selectiveColor)
     && recipe.shadowGrade.saturation === 0
     && recipe.midtoneGrade.saturation === 0
     && recipe.highlightGrade.saturation === 0
@@ -677,6 +732,7 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
   const wbB = 1 + Math.max(0, -temperature) * 0.28 - Math.max(0, temperature) * 0.12 + tint * 0.04;
   const contrastSlope = 1 + recipe.contrast * 1.8 + recipe.dehaze * 0.55;
   const gamma = 2 ** (-recipe.midtone * 0.8);
+  const selectiveColor = isNeutralSelectiveColor(recipe.selectiveColor) ? null : recipe.selectiveColor!;
 
   for (let offset = 0; offset < data.length; offset += 4) {
     if (data[offset + 3] === 0) continue;
@@ -715,6 +771,7 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
     sat = clamp(sat * (1 + sector.saturation), 0, 1);
     light = clamp(light + sector.luminance * 0.25, 0, 1);
     [sr, sg, sb] = hslToRgb(hue, sat, light);
+    if (selectiveColor) [sr, sg, sb] = applySelectiveColor([sr, sg, sb], selectiveColor);
 
     luminance = clamp(sr * 0.2126 + sg * 0.7152 + sb * 0.0722, 0, 1);
     [sr, sg, sb] = applyGrade([sr, sg, sb], recipe.shadowGrade, 1 - smoothstep(0.15, 0.6, luminance));
@@ -1218,7 +1275,12 @@ function compositeOneLayer(data: Uint8ClampedArray, width: number, height: numbe
 function compositeLayers(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe, layerPixels: PhotoLayerPixels[]): void {
   if (!recipe.layers?.length) return;
   const pixelsById = new Map(layerPixels.map((entry) => [entry.layerId, entry]));
-  for (const layer of recipe.layers) {
+  const groups = new Map((recipe.layerGroups ?? []).map((group) => [group.id, group]));
+  for (const ownLayer of recipe.layers) {
+    // A group hides all of its layers and scales their opacity; ungrouped layers are unaffected.
+    const group = ownLayer.groupId ? groups.get(ownLayer.groupId) : undefined;
+    if (group && !group.visible) continue;
+    const layer = group ? { ...ownLayer, opacity: ownLayer.opacity * group.opacity } : ownLayer;
     if (!layer.visible || layer.opacity <= EPSILON) continue;
     if (layer.role === 'adjustment') {
       applyAdjustmentLayer(data, width, height, layer);

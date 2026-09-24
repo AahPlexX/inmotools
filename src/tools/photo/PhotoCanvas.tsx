@@ -196,6 +196,28 @@ export default function PhotoCanvas({
   const [navigatorViewport, setNavigatorViewport] = useState({ left: 0, top: 0, width: 100, height: 100 });
   const [compareMode, setCompareMode] = useState<PhotoCompareMode>('split');
   const [compareSplit, setCompareSplit] = useState(50);
+  // Momentary "show the original" while a button or the backslash key is held down.
+  const [holdingOriginal, setHoldingOriginal] = useState(false);
+
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null;
+      return Boolean(element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT' || element.isContentEditable));
+    };
+    const down = (event: KeyboardEvent) => {
+      if (event.key === '\\' && !event.repeat && !isTyping(event.target)) setHoldingOriginal(true);
+    };
+    const up = (event: KeyboardEvent) => { if (event.key === '\\') setHoldingOriginal(false); };
+    const release = () => setHoldingOriginal(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', release);
+    };
+  }, []);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
   const proofBaseImageRef = useRef<HTMLImageElement | null>(null);
   const clippingCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -558,7 +580,10 @@ export default function PhotoCanvas({
 
   const canvasInteractive = Boolean(interaction || samplerActive);
   const geometryActive = Boolean(geometryMode && originalUrl);
-  const comparisonActive = Boolean(!geometryActive && compare && originalUrl && previewUrl);
+  const showingOriginal = Boolean(!geometryActive && holdingOriginal && originalUrl && previewUrl);
+  const comparisonActive = Boolean(!geometryActive && (compare || showingOriginal) && originalUrl && previewUrl);
+  const effectiveCompareMode: PhotoCompareMode = showingOriginal ? 'split' : compareMode;
+  const effectiveSplit = showingOriginal ? 100 : compareSplit;
 
   function inspectionLayers() {
     return <>
@@ -650,7 +675,24 @@ export default function PhotoCanvas({
           <button type="button" onClick={() => onZoomChange(Math.min(4, zoom + 0.25))} aria-label="Zoom in">+</button>
           <button type="button" onClick={() => onZoomChange(0.75)} aria-label="Fit photo">Fit</button>
         </div>
-        {comparisonActive ? (
+        <button
+          type="button"
+          className="photo-hold-original"
+          aria-pressed={showingOriginal}
+          aria-keyshortcuts="Backslash"
+          title={'Hold to see the original (or hold the \\ key)'}
+          disabled={!previewUrl || !originalUrl || geometryActive}
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setHoldingOriginal(true); }}
+          onPointerUp={() => setHoldingOriginal(false)}
+          onPointerCancel={() => setHoldingOriginal(false)}
+          onLostPointerCapture={() => setHoldingOriginal(false)}
+          onKeyDown={(event) => { if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); setHoldingOriginal(true); } }}
+          onKeyUp={(event) => { if (event.key === ' ' || event.key === 'Enter') setHoldingOriginal(false); }}
+          onBlur={() => setHoldingOriginal(false)}
+          onContextMenu={(event) => event.preventDefault()}
+        >Hold for original</button>
+        {showingOriginal ? <span className="photo-visually-hidden" role="status">Showing the original photo</span> : null}
+        {comparisonActive && compare ? (
           <div className="photo-comparison-controls" role="group" aria-label="Before and after comparison controls">
             <div className="photo-comparison-mode-buttons">
               <button type="button" aria-pressed={compareMode === 'split'} onClick={() => setCompareMode('split')}>Split</button>
@@ -761,7 +803,7 @@ export default function PhotoCanvas({
           </div>
         ) : geometryActive ? (
           geometrySurface()
-        ) : comparisonActive && compareMode === 'side-by-side' ? (
+        ) : comparisonActive && effectiveCompareMode === 'side-by-side' ? (
           <div
             className="photo-compare-side-by-side"
             data-testid="photo-compare-side-by-side"
@@ -779,7 +821,7 @@ export default function PhotoCanvas({
         ) : (
           <div
             className={`photo-image-frame${busy ? ' is-rendering' : ''}${canvasInteractive ? ' is-interactive' : ''}`}
-            style={{ '--photo-zoom': zoom, '--photo-compare-split': `${compareSplit}%` } as React.CSSProperties}
+            style={{ '--photo-zoom': zoom, '--photo-compare-split': `${effectiveSplit}%` } as React.CSSProperties}
             data-testid="photo-image-frame"
             onPointerDown={beginGesture}
             onPointerMove={moveGesture}

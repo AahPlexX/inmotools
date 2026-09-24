@@ -186,6 +186,7 @@ export function migratePhotoProjectRecord(value: unknown): PhotoProjectRecord {
       lastModified: finiteNumber(sourceValue.lastModified),
       width: finiteNumber(sourceValue.width ?? value.width),
       height: finiteNumber(sourceValue.height ?? value.height),
+      ...(typeof sourceValue.sha256 === 'string' && /^[0-9a-f]{64}$/.test(sourceValue.sha256) ? { sha256: sourceValue.sha256 } : {}),
     },
     history: normalizedHistory(historyValue),
     snapshots: normalizedSnapshots(value.snapshots),
@@ -391,6 +392,9 @@ export function createPhotoProjectStore(
           }
           wroteSource = { key, storage };
           descriptor = { ...input.source, key, storage };
+        } else if (!descriptor.sha256 && input.source.sha256) {
+          // Same stored bytes, first time a fingerprint is known: record it for duplicate checks.
+          descriptor = { ...descriptor, sha256: input.source.sha256 };
         }
 
         const project: PhotoProjectRecord = {

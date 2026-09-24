@@ -37,6 +37,9 @@ const FIELD_GROUPS: Record<RecipeField, PhotoRecipeGroup> = {
   lensDistortion: 'crop-geometry',
   perspectiveHorizontal: 'crop-geometry',
   perspectiveVertical: 'crop-geometry',
+  freeTransform: 'crop-geometry',
+  perspectiveCorners: 'crop-geometry',
+  canvasExpansion: 'crop-geometry',
   meshWarp: 'warp',
   liquifyStrokes: 'warp',
   exposure: 'light',
@@ -58,6 +61,7 @@ const FIELD_GROUPS: Record<RecipeField, PhotoRecipeGroup> = {
   vibrance: 'color',
   dehaze: 'color',
   hsl: 'color-ranges',
+  selectiveColor: 'color-ranges',
   shadowGrade: 'grading',
   midtoneGrade: 'grading',
   highlightGrade: 'grading',
@@ -82,6 +86,7 @@ const FIELD_GROUPS: Record<RecipeField, PhotoRecipeGroup> = {
   localAdjustments: 'local',
   retouch: 'retouch',
   layers: 'layers',
+  layerGroups: 'layers',
 };
 
 export const PHOTO_RECIPE_GROUPS: Array<{ id: PhotoRecipeGroup; label: string; imageSpecific: boolean }> = [
@@ -148,7 +153,8 @@ const FIELD_LABELS: Partial<Record<RecipeField, string>> = {
   colorManagement: 'ICC color management', hsl: 'Color ranges', shadowGrade: 'Shadow grade', midtoneGrade: 'Midtone grade',
   highlightGrade: 'Highlight grade', blackAndWhiteMix: 'Black & white mix', detailFilters: 'Detail filters',
   meshWarp: 'Mesh warp', liquifyStrokes: 'Liquify strokes', selection: 'Active selection', localAdjustments: 'Local adjustments',
-  retouch: 'Retouch operations', layers: 'Layers', raw: 'RAW development',
+  retouch: 'Retouch operations', layers: 'Layers', raw: 'RAW development', freeTransform: 'Free transform',
+  perspectiveCorners: 'Corner perspective', canvasExpansion: 'Canvas size', selectiveColor: 'Selective color', layerGroups: 'Layer groups',
 };
 
 export interface PhotoRecipeDifference {
@@ -165,7 +171,7 @@ function describeValue(field: RecipeField, value: unknown): string {
   if (typeof value === 'boolean') return value ? 'On' : 'Off';
   if (value === null || value === undefined) return 'None';
   if (Array.isArray(value)) {
-    if (field === 'localAdjustments' || field === 'retouch' || field === 'layers' || field === 'liquifyStrokes') return `${value.length} item${value.length === 1 ? '' : 's'}`;
+    if (field === 'localAdjustments' || field === 'retouch' || field === 'layers' || field === 'layerGroups' || field === 'liquifyStrokes') return `${value.length} item${value.length === 1 ? '' : 's'}`;
     if (field === 'toneCurve') return `${value.length} points`;
     return 'Custom';
   }

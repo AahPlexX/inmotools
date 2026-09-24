@@ -12,6 +12,7 @@ import PhotoCanvas, { type PhotoCanvasGesture, type PhotoCanvasInteraction } fro
 import type { PhotoCompositionOverlay } from './PhotoCropOverlay';
 import PhotoExportDialog from './PhotoExportDialog';
 import PhotoMergePanel from './PhotoMergePanel';
+import PhotoDetailLoupe from './PhotoDetailLoupe';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
 import PhotoRawControls from './PhotoRawControls';
 import { suggestAutoTone, suggestAutoWhiteBalance } from './photo-analysis';
@@ -69,6 +70,7 @@ import {
 } from './photo-recipe-groups';
 import { createBrowserTemplateStore, recipeWithWatermark, type PhotoTemplateRecord } from './photo-templates';
 import { fileSystemAccess, isPickerCancel } from './photo-export-queue';
+import { findDuplicateProject, fingerprintPhotoSource, readPhotoSourceMetadata, type PhotoSourceMetadata } from './photo-source-metadata';
 import {
   appendPhotoSelection,
   clonePhotoSelection,
@@ -345,6 +347,13 @@ export default function PhotoWorkspace() {
   const [recentlyDeleted, setRecentlyDeleted] = useState<{ project: PhotoProjectRecord; sourceBlob: Blob } | null>(null);
   const [watermarkPresets, setWatermarkPresets] = useState<Array<PhotoTemplateRecord<'watermark'>>>([]);
   const [layerWatermarkId, setLayerWatermarkId] = useState('');
+  const [sourceFingerprint, setSourceFingerprint] = useState<string | null>(null);
+  const [sourceMetadata, setSourceMetadata] = useState<PhotoSourceMetadata | null>(null);
+  const [duplicateDismissed, setDuplicateDismissed] = useState(false);
+  // Only a freshly imported photo can be an accidental duplicate; loading a saved project or one of
+  // its virtual copies (which intentionally share a source) must not warn.
+  const [sourceOrigin, setSourceOrigin] = useState<'import' | 'project'>('import');
+  const [loupeOpen, setLoupeOpen] = useState(false);
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
@@ -423,6 +432,19 @@ export default function PhotoWorkspace() {
   useEffect(() => {
     setGeometryInteraction(null);
   }, [source?.originalUrl]);
+
+  // Fingerprint and read metadata from the original file in the background whenever it changes.
+  useEffect(() => {
+    setSourceFingerprint(null);
+    setSourceMetadata(null);
+    setDuplicateDismissed(false);
+    const file = source?.file;
+    if (!file) return;
+    let active = true;
+    void fingerprintPhotoSource(file).then((value) => { if (active) setSourceFingerprint(value); });
+    void readPhotoSourceMetadata(file).then((value) => { if (active) setSourceMetadata(value); });
+    return () => { active = false; };
+  }, [source?.file]);
 
   // Watermark presets are saved from the export dialog; refresh them whenever Layers opens.
   useEffect(() => {
@@ -685,6 +707,7 @@ export default function PhotoWorkspace() {
       sourceUrlRef.current = nextSourceUrl;
       const recoveredSource = { file: loaded.sourceFile, name: loaded.project.source.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice, rawSource: raster.rawSource };
       sourceRef.current = recoveredSource;
+      setSourceOrigin('project');
       setSource(recoveredSource);
       nextSourceUrl = null;
       setHistory(loaded.project.history);
@@ -890,6 +913,7 @@ export default function PhotoWorkspace() {
       sourceUrlRef.current = nextSourceUrl;
       const importedSource = { file, name: file.name, originalUrl: nextSourceUrl, width, height, codecNotice: raster.notice, rawSource: raster.rawSource };
       sourceRef.current = importedSource;
+      setSourceOrigin('import');
       setSource(importedSource);
       nextSourceUrl = null;
       const createdAt = Date.now();
@@ -934,6 +958,7 @@ export default function PhotoWorkspace() {
         lastModified: source.file.lastModified,
         width: source.width,
         height: source.height,
+        ...(sourceFingerprint ? { sha256: sourceFingerprint } : {}),
       },
       sourceBlob: source.file,
       history,
@@ -958,7 +983,7 @@ export default function PhotoWorkspace() {
       });
     projectSaveQueueRef.current = save;
     return save;
-  }, [autosaveEnabled, history, projectCreatedAt, projectId, projectName, refreshLocalProjects, refreshStorageStatus, snapshots, source]);
+  }, [autosaveEnabled, history, projectCreatedAt, projectId, projectName, refreshLocalProjects, refreshStorageStatus, snapshots, source, sourceFingerprint]);
 
   useEffect(() => {
     if (!projectStoreReady) return;
@@ -1755,6 +1780,25 @@ export default function PhotoWorkspace() {
     }
   }
 
+  /** Warning plus the 1:1 loupe toggle, shown wherever sharpening or noise is adjusted. */
+  function detailJudgementAid() {
+    if (!source) return null;
+    const frame = photoNaturalDimensions(source.width, source.height, recipe);
+    const previewScale = preview ? preview.result.width / frame.width : 1;
+    const effectiveScale = previewScale * zoom;
+    return (
+      <div className="photo-detail-aid" data-testid="photo-detail-aid">
+        {effectiveScale < 0.999 ? (
+          <p className="photo-export-note photo-detail-warning" role="note">
+            You’re seeing this photo at about {Math.max(1, Math.round(effectiveScale * 100))}% of its real pixels, where sharpening, noise, and grain look milder than they are. Check them at 100% before exporting.
+          </p>
+        ) : null}
+        <button type="button" aria-pressed={loupeOpen} onClick={() => setLoupeOpen((value) => !value)}>{loupeOpen ? 'Hide 100% view' : 'Check at 100%'}</button>
+        {loupeOpen ? <PhotoDetailLoupe file={source.file} recipe={recipe} naturalWidth={frame.width} naturalHeight={frame.height} /> : null}
+      </div>
+    );
+  }
+
   function renderEditPanel() {
     return (
       <>
@@ -1965,6 +2009,7 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section">
           <summary>Detail & noise</summary>
+          {detailJudgementAid()}
           <div className="photo-control-list">
             {DETAIL_CONTROLS.map((spec) => (
               <AdjustmentControl
@@ -2604,6 +2649,7 @@ export default function PhotoWorkspace() {
         </details>
         <details className="photo-section" open>
           <summary>Deterministic detail filters</summary>
+          {detailJudgementAid()}
           <SimpleControl label="Gaussian blur" value={filters.gaussianBlur} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, gaussianBlur: value } })} />
           <SimpleControl label="Median filter" value={filters.medianFilter} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, medianFilter: value } })} />
           <SimpleControl label="Edge-preserving smoothing" value={filters.bilateralSmoothing} min={0} max={1} step={0.02} neutral={0} onChange={(value) => patchRecipe({ detailFilters: { ...filters, bilateralSmoothing: value } })} />
@@ -2640,6 +2686,20 @@ export default function PhotoWorkspace() {
               <p>Camera white balance: {source.rawSource.cameraWhiteBalance ? 'reported' : 'not reported; decoder fallback'}</p>
               <p>Read-only source facts; not automatically copied into export metadata.</p>
             </div> : null}
+            <details data-testid="photo-source-details">
+              <summary>Original file details</summary>
+              {!sourceMetadata ? <p className="photo-export-note">Reading the original file…</p> : !sourceMetadata.found ? <p className="photo-export-note">This file carries no camera, location, or colour-profile information.</p> : (
+                <dl className="photo-source-facts">
+                  {[...sourceMetadata.camera, ...sourceMetadata.capture].map((fact) => (
+                    <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>
+                  ))}
+                  {sourceMetadata.location ? <div><dt>Location</dt><dd>{sourceMetadata.location.latitude.toFixed(5)}, {sourceMetadata.location.longitude.toFixed(5)}{sourceMetadata.location.altitude !== undefined ? ` · ${Math.round(sourceMetadata.location.altitude)} m` : ''}</dd></div> : null}
+                  <div><dt>Colour profile</dt><dd data-testid="photo-source-profile">{sourceMetadata.colorProfile ? `${sourceMetadata.colorProfile.description} · ${sourceMetadata.colorProfile.colorSpace} · ${sourceMetadata.colorProfile.deviceClass} v${sourceMetadata.colorProfile.version}` : 'None embedded (treated as sRGB)'}</dd></div>
+                </dl>
+              )}
+              {sourceMetadata?.colorProfile ? <p className="photo-export-note">Your browser uses this embedded profile when it decodes the photo. To reinterpret the pixels with a different profile, use Assign source profile in the Edit panel.</p> : null}
+              <p className="photo-export-note">These details stay with the original file. Exports only include what you choose under Metadata policy when exporting{sourceMetadata?.location ? ', so the recorded location is never shared unless you add it yourself' : ''}.</p>
+            </details>
           </div>
         ) : null}
         <details className="photo-section" open data-testid="photo-project-panel">
@@ -3053,6 +3113,24 @@ export default function PhotoWorkspace() {
           </div>
         </section>
       ) : null}
+
+      {(() => {
+        if (!source || sourceOrigin !== 'import' || duplicateDismissed || recoveryProject) return null;
+        const duplicate = findDuplicateProject(localProjects, source.file, sourceFingerprint, projectId);
+        if (!duplicate) return null;
+        return (
+          <section className="photo-recovery-banner" aria-labelledby="photo-duplicate-title" data-testid="photo-duplicate-prompt">
+            <div>
+              <strong id="photo-duplicate-title">You already have this photo in {duplicate.name}</strong>
+              <span>Last edited {new Date(duplicate.updatedAt).toLocaleString()}. Open it to carry on where you left off, or keep working on a fresh copy here.</span>
+            </div>
+            <div className="photo-inline-actions">
+              <button type="button" onClick={() => void loadLocalProject(duplicate.id, 'edit')}>Open saved project</button>
+              <button type="button" onClick={() => setDuplicateDismissed(true)}>Keep this copy</button>
+            </div>
+          </section>
+        );
+      })()}
 
       <div className="photo-workbench">
         <nav className="photo-tool-tabs" aria-label="Photo editing sections">

@@ -65,6 +65,73 @@ export function rawPreviewJpegGeometry(bytes: Uint8Array): { width: number; heig
   throw new Error('Unsupported RAW preview JPEG header.');
 }
 
+// --- Pre-demosaic exposure (LibRaw exp_correc / exp_shift / exp_preser) ---
+
+/** Byte offsets inside libraw_output_params_t relative to `bright`, following LibRaw's documented
+ * declaration order (bright, threshold, half_size … fbdd_noiserd, exp_correc, exp_shift,
+ * exp_preser) with 4-byte fields and wasm32 pointers. The pinned wrapper exposes no setter for the
+ * exposure fields, so they are written directly — but only after every anchor below has been
+ * proven by writing it through the wrapper's own official setter and reading it back here. */
+const PARAM_OFFSETS = { highlight: 16, outputBps: 52, adjustMaximumThr: 104, fbddNoiserd: 132, expCorrec: 136, expShift: 140, expPreser: 144 } as const;
+const PARAM_SCAN_BYTES = 2 * 1024 * 1024;
+
+interface LibRawInternals { module?: { HEAPU8: Uint8Array } }
+interface LibRawSetters {
+  setBright(value: number): void;
+  setHighlight(value: number): void;
+  setOutputBps(value: number): void;
+  setAdjustMaximumThr(value: number): void;
+  setFbddNoiserd(value: number): void;
+}
+
+/** Locates `bright` inside the decoder's libraw_data_t and proves the documented layout with four
+ * independent setters. Returns the heap view and `bright` offset, or throws without writing. */
+function locateOutputParams(LibRawClass: unknown, decoder: LibRawSetters): { view: DataView; bright: number } {
+  const heap = (LibRawClass as LibRawInternals).module?.HEAPU8;
+  const handle = (decoder as unknown as { lr?: unknown }).lr;
+  if (!heap || typeof handle !== 'number' || handle <= 0) throw new Error('RAW exposure is unavailable in this decoder build.');
+  const view = new DataView(heap.buffer);
+  const limit = Math.min(heap.byteLength - PARAM_OFFSETS.expPreser - 4, handle + PARAM_SCAN_BYTES);
+  const brightSentinel = Math.fround(1.2345678);
+  decoder.setBright(brightSentinel);
+  const candidates: number[] = [];
+  for (let at = handle; at <= limit; at += 4) if (view.getFloat32(at, true) === brightSentinel) candidates.push(at);
+  const verified = candidates.filter((bright) => {
+    const originals = {
+      highlight: view.getInt32(bright + PARAM_OFFSETS.highlight, true),
+      outputBps: view.getInt32(bright + PARAM_OFFSETS.outputBps, true),
+      adjust: view.getFloat32(bright + PARAM_OFFSETS.adjustMaximumThr, true),
+      fbdd: view.getInt32(bright + PARAM_OFFSETS.fbddNoiserd, true),
+    };
+    decoder.setHighlight(9);
+    decoder.setOutputBps(13);
+    decoder.setAdjustMaximumThr(0.3125);
+    decoder.setFbddNoiserd(3);
+    const matches = view.getInt32(bright + PARAM_OFFSETS.highlight, true) === 9
+      && view.getInt32(bright + PARAM_OFFSETS.outputBps, true) === 13
+      && view.getFloat32(bright + PARAM_OFFSETS.adjustMaximumThr, true) === 0.3125
+      && view.getInt32(bright + PARAM_OFFSETS.fbddNoiserd, true) === 3;
+    decoder.setHighlight(originals.highlight);
+    decoder.setOutputBps(originals.outputBps);
+    decoder.setAdjustMaximumThr(originals.adjust);
+    decoder.setFbddNoiserd(originals.fbdd);
+    return matches;
+  });
+  decoder.setBright(1);
+  if (verified.length !== 1) throw new Error('RAW exposure could not be verified for this decoder build, so it was not applied.');
+  return { view, bright: verified[0] };
+}
+
+/** Applies LibRaw's pre-demosaic exposure correction: a linear shift of the sensor data before
+ * interpolation (not output brightness scaling), with optional highlight preservation. */
+export function applyRawExposure(LibRawClass: unknown, decoder: LibRawSetters, exposureEv: number, highlightPreservation: number): void {
+  const { view, bright } = locateOutputParams(LibRawClass, decoder);
+  const enabled = exposureEv !== 0;
+  view.setInt32(bright + PARAM_OFFSETS.expCorrec, enabled ? 1 : 0, true);
+  view.setFloat32(bright + PARAM_OFFSETS.expShift, enabled ? 2 ** exposureEv : 1, true);
+  view.setFloat32(bright + PARAM_OFFSETS.expPreser, enabled ? highlightPreservation : 0, true);
+}
+
 export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: PhotoRawSettings, onPreview?: (preview: RawEmbeddedPreview) => Promise<void>): Promise<{ width: number; height: number; samples: Uint16Array; rgba: Uint8ClampedArray<ArrayBuffer>; notice: string; rawSource: PhotoRawSource }> {
   if (!buffer.byteLength || buffer.byteLength > 64 * 1024 * 1024) throw new Error('RAW input must be nonempty and no larger than 64 MiB.');
   const { LibRaw } = await import('@colorhythm/libraw-wasm');
@@ -140,7 +207,7 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
     }
     if (bayer) decoder.setDemosaic({ bilinear: 0, vng: 1, ppg: 2, ahd: 3 }[settings.demosaic]);
     decoder.setNoAutoBright(1);
-    decoder.setBright(2 ** settings.exposureEv);
+    applyRawExposure(LibRaw, decoder, settings.exposureEv, settings.highlightPreservation);
     decoder.unpack();
     decoder.dcrawProcess();
     const image = decoder.dcrawMakeMemImage();
@@ -162,7 +229,7 @@ export async function decodeRawPixels(buffer: ArrayBuffer, inputSettings?: Photo
     }
     return {
       width: image.width, height: image.height, samples, rgba, rawSource,
-      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling, exposure baseline and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. Bounded embedded camera previews appear during import when available; they are not editing or export sources.',
+      notice: 'RAW source preserved; LibRaw develops a 16-bit sRGB intermediate. Source-supported white balance, highlight handling, pre-demosaic exposure and Bayer demosaic settings run before raster editing. Editing and export use an 8-bit raster. Bounded embedded camera previews appear during import when available; they are not editing or export sources.',
     };
   } catch (error) {
     throw new Error(`RAW decoding failed: ${error instanceof Error ? error.message : 'unsupported or damaged source'}. Convert the source to TIFF or PNG if this camera/variant is unsupported.`);

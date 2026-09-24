@@ -161,6 +161,7 @@ export function createShapeLayer(id: string, name: string, shapeKind: PhotoShape
 }
 
 type NormalizableLayer = {
+  groupId?: unknown;
   id?: unknown; name?: unknown; visible?: unknown; opacity?: unknown; blendMode?: unknown;
   transform?: { x?: unknown; y?: unknown; scale?: unknown; rotation?: unknown };
   role?: unknown; sourceDataUrl?: unknown; sourceWidth?: unknown; sourceHeight?: unknown;
@@ -213,5 +214,6 @@ export function normalizeLayerFields(layer: NormalizableLayer): Omit<PhotoLayer,
     shapeColor: normalizeHexColor(layer.shapeColor, '#ffffff'),
     shapeStrokeWidth: clampRange(layer.shapeStrokeWidth, 0, 1, 0.02),
     shapeFilled: layer.shapeFilled === undefined ? true : Boolean(layer.shapeFilled),
+    groupId: typeof layer.groupId === 'string' && layer.groupId ? layer.groupId.slice(0, 120) : null,
   };
 }

@@ -1,3 +1,5 @@
+import type { PhotoCanvasExpansion, PhotoCornerOffsets, PhotoFreeTransform } from './photo-transform';
+import type { PhotoSelectiveColor } from './photo-selective-color';
 export type PhotoOutputMime = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/tiff' | 'image/avif';
 
 export interface NormalizedCrop {
@@ -254,6 +256,14 @@ export interface PhotoDetailFilters {
   hotPixelCorrection: number;
 }
 
+export interface PhotoLayerGroup {
+  id: string;
+  name: string;
+  visible: boolean;
+  /** Multiplies the opacity of every layer in the group. */
+  opacity: number;
+}
+
 export interface PhotoRecipe {
   version: 1;
   /** Optional on older version-1 recipes; normalized before decoding. */
@@ -270,6 +280,12 @@ export interface PhotoRecipe {
   meshWarp?: PhotoMeshWarpPoint[] | null;
   /** Optional on older version-1 recipes; normalized to an empty stack. */
   liquifyStrokes?: PhotoLiquifyStroke[];
+  /** Optional: offset/scale/rotation of the photo inside its frame; null when neutral. */
+  freeTransform?: PhotoFreeTransform | null;
+  /** Optional: four-corner perspective pin; null when neutral. */
+  perspectiveCorners?: PhotoCornerOffsets | null;
+  /** Optional: borders added around the finished photo; null when none. */
+  canvasExpansion?: PhotoCanvasExpansion | null;
 
   exposure: number;
   contrast: number;
@@ -295,6 +311,8 @@ export interface PhotoRecipe {
   shadowGrade: ColorGrade;
   midtoneGrade: ColorGrade;
   highlightGrade: ColorGrade;
+  /** Optional: per-family CMYK-style selective color; null when neutral. */
+  selectiveColor?: PhotoSelectiveColor | null;
   blackAndWhite: boolean;
   blackAndWhiteMix: number[];
 
@@ -323,6 +341,8 @@ export interface PhotoRecipe {
   retouch: RetouchOperation[];
   /** Optional on older version-1 recipes; normalized to an empty stack. */
   layers?: PhotoLayer[];
+  /** Optional named groups that layers can belong to. */
+  layerGroups?: PhotoLayerGroup[];
 }
 
 export type PhotoBlendMode =
@@ -367,6 +387,8 @@ export interface PhotoLayer {
   sourceHeight: number;
   /** True for an 'image' layer added via the watermark quick-action, purely for UI labeling. */
   isWatermark?: boolean;
+  /** Group this layer belongs to (see PhotoRecipe.layerGroups), or null. */
+  groupId?: string | null;
   /** 'adjustment' role. */
   effect?: LocalEffect;
   /** 'text' role. */
@@ -394,7 +416,10 @@ export interface PhotoRawSettings {
   highlight: 'clip' | 'unclip' | 'blend';
   demosaic: 'ahd' | 'bilinear' | 'vng' | 'ppg';
   /** Stops applied as LibRaw's dcraw brightness multiplier (2^EV) before raster editing. */
+  /** Pre-demosaic exposure shift in stops (LibRaw exp_shift, 0.25–8× linear = −2…+3 EV). */
   exposureEv: number;
+  /** LibRaw exp_preser: how strongly highlights are protected when brightening (0–1). */
+  highlightPreservation: number;
 }
 
 export interface PhotoRawSource {

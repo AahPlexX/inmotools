@@ -104,7 +104,7 @@ describe('Photo Studio import contract', () => {
       postMessage(message: ArrayBuffer | { buffer: ArrayBuffer; settings: unknown }, transfer: Transferable[]) {
         const buffer = message instanceof ArrayBuffer ? message : message.buffer;
         expect(transfer).toEqual([buffer]); expect(new Uint8Array(buffer)).toEqual(bytes);
-        if (!(message instanceof ArrayBuffer)) expect(message.settings).toEqual({ whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd', exposureEv: 0 });
+        if (!(message instanceof ArrayBuffer)) expect(message.settings).toEqual({ whiteBalance: 'custom', redMultiplier: 4, blueMultiplier: 1, highlight: 'clip', demosaic: 'ahd', exposureEv: 0, highlightPreservation: 0 });
         this.started = true;
       }
       terminate() {}
