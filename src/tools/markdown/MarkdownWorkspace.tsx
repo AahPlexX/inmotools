@@ -17,8 +17,8 @@ import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
 import { collectMathDiagnostics } from './math-engine';
-import { prepareDocument, toFilenameStem } from './document-pipeline';
-import { commitHistory, createHistory, redoHistory, undoHistory } from './state-engine';
+import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
+import { commitHistory, createHistory, redoHistory, replaceHistoryPresent, undoHistory } from './state-engine';
 import {
   createDraftRecord,
   createIndexedDbDraftStore,
@@ -43,6 +43,7 @@ import {
   renderDocxToBytes,
 } from './export-engine';
 import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
+import { createTableFormulaRunner, TableFormulaRunCancelled, type TableFormulaRunner } from './table-formula-runner';
 import type { CitationStyleId, DraftRecord, ProjectHistory } from './markdown-types';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
@@ -51,6 +52,7 @@ import './markdown-workbench.css';
 type ViewMode = 'source' | 'split';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+const DOCUMENT_HISTORY_COALESCE_MS = 600;
 const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
   { id: 'apa', label: 'APA 7th' },
   { id: 'ieee', label: 'IEEE' },
@@ -80,6 +82,9 @@ export default function MarkdownWorkspace() {
   const sourceRef = useRef(source);
   sourceRef.current = source;
   const fileReadRef = useRef(0);
+  const lastEditorChangeAtRef = useRef(0);
+  const formulaRunnerRef = useRef<TableFormulaRunner | null>(null);
+  const [formulaEvaluation, setFormulaEvaluation] = useState({ source: DEFAULT_SOURCE, evaluated: DEFAULT_SOURCE });
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
@@ -175,12 +180,29 @@ export default function MarkdownWorkspace() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const setSource = useCallback((next: string) => {
+  const commitSource = useCallback((next: string) => {
+    lastEditorChangeAtRef.current = 0;
     setHistory((current) => commitHistory(current, next));
   }, []);
 
-  const undo = useCallback(() => setHistory((current) => undoHistory(current)), []);
-  const redo = useCallback(() => setHistory((current) => redoHistory(current)), []);
+  const handleEditorSourceChange = useCallback((next: string) => {
+    const now = performance.now();
+    const shouldCoalesce =
+      lastEditorChangeAtRef.current > 0
+      && now - lastEditorChangeAtRef.current <= DOCUMENT_HISTORY_COALESCE_MS;
+    lastEditorChangeAtRef.current = now;
+    setHistory((current) =>
+      shouldCoalesce ? replaceHistoryPresent(current, next) : commitHistory(current, next));
+  }, []);
+
+  const undo = useCallback(() => {
+    lastEditorChangeAtRef.current = 0;
+    setHistory((current) => undoHistory(current));
+  }, []);
+  const redo = useCallback(() => {
+    lastEditorChangeAtRef.current = 0;
+    setHistory((current) => redoHistory(current));
+  }, []);
 
   const parsed = useMemo(() => parseMarkdown(source), [source]);
   const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
@@ -231,9 +253,34 @@ export default function MarkdownWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citationLibrary, citekeySignature, citationStyle]);
 
+  useEffect(() => {
+    const runner = formulaRunnerRef.current ?? createTableFormulaRunner();
+    formulaRunnerRef.current = runner;
+    let current = true;
+
+    void runner.run(source)
+      .then((evaluated) => {
+        if (current) setFormulaEvaluation({ source, evaluated });
+      })
+      .catch((error) => {
+        if (!current || error instanceof TableFormulaRunCancelled) return;
+        setFormulaEvaluation({ source, evaluated: source });
+        setStatus('Table formula preview could not be prepared in the background. Formula source is shown unchanged.');
+      });
+
+    return () => { current = false; };
+  }, [source]);
+
+  useEffect(() => () => {
+    formulaRunnerRef.current?.dispose();
+    formulaRunnerRef.current = null;
+  }, []);
+
+  const formulaPreparedSource =
+    formulaEvaluation.source === source ? formulaEvaluation.evaluated : source;
   const preparedSource = useMemo(
-    () => prepareDocument(source, citationResult?.inText),
-    [source, citationResult],
+    () => applyPreparedCitations(formulaPreparedSource, citationResult?.inText),
+    [formulaPreparedSource, citationResult],
   );
 
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
@@ -276,13 +323,13 @@ export default function MarkdownWorkspace() {
         setStatus('File opening cancelled because the document changed. Open the file again when ready.');
         return;
       }
-      setSource(text);
+      commitSource(text);
       setDocumentName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
       setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
     } catch {
       setStatus('Could not read that file in this browser.');
     }
-  }, [setSource]);
+  }, [commitSource]);
 
   const onFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -315,20 +362,21 @@ export default function MarkdownWorkspace() {
     if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
   }, []);
 
-  const buildExportBodyHtml = useCallback(async (): Promise<string> => {
-    const live = previewHostRef.current
-      ?.querySelector<HTMLElement>('.markdown-workbench-preview')
-      ?.innerHTML;
-    if (live && live.trim()) return live;
+  const prepareExportSource = useCallback(
+    () => prepareDocument(source, citationResult?.inText),
+    [source, citationResult],
+  );
 
-    // Source view has no mounted preview to scrape. Build the same rendered
-    // document in a detached DOM host and run the shared diagram pass so
-    // every HTML-derived export receives Mermaid/Graphviz SVGs consistently.
+  const buildExportBodyHtml = useCallback(async (): Promise<string> => {
+    // Export is an explicit action rather than a per-keystroke path, so it can
+    // synchronously prepare one exact snapshot without reintroducing editor
+    // jank. Rendering into a detached host also guarantees Source view and a
+    // still-settling live preview export the same current document.
     const scratch = document.createElement('div');
-    scratch.innerHTML = renderMarkdown(preparedSource).html;
+    scratch.innerHTML = renderMarkdown(prepareExportSource()).html;
     await renderDiagramBlocks(scratch);
     return scratch.innerHTML;
-  }, [preparedSource]);
+  }, [prepareExportSource]);
 
   const noteExport = (message: string) => {
     requestSupportPrompt({ key: 'markdown-workbench-export', message });
@@ -341,7 +389,7 @@ export default function MarkdownWorkspace() {
   };
 
   const exportRenderedMarkdown = () => {
-    downloadText(preparedSource, `${filenameStem}.rendered.md`);
+    downloadText(prepareExportSource(), `${filenameStem}.rendered.md`);
     setStatus(`Exported ${filenameStem}.rendered.md with table formulas evaluated and citations formatted.`);
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
@@ -366,14 +414,14 @@ export default function MarkdownWorkspace() {
   };
 
   const exportAstJson = () => {
-    downloadText(buildAstJson(parseToMdast(preparedSource)), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
+    downloadText(buildAstJson(parseToMdast(prepareExportSource())), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
     setStatus(`Exported ${filenameStem}.ast.json for the prepared document (formulas evaluated, citations formatted).`);
   };
 
   const exportDocx = async () => {
     setStatus('Generating DOCX…');
     try {
-      const bytes = await renderDocxToBytes(parseToMdast(preparedSource));
+      const bytes = await renderDocxToBytes(parseToMdast(prepareExportSource()));
       downloadBytes(bytes, `${filenameStem}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       setStatus(`Exported ${filenameStem}.docx. Code blocks, blockquotes, ordered lists, links, and image references are preserved; math remains non-editable plain text unless rasterized.`);
       noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
@@ -454,6 +502,7 @@ export default function MarkdownWorkspace() {
     }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
+    lastEditorChangeAtRef.current = 0;
     setHistory(createHistory(DEFAULT_SOURCE));
     setDocumentName('');
     setLastSavedAt(null);
@@ -475,7 +524,7 @@ export default function MarkdownWorkspace() {
     }
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
-    setSource(draft.text);
+    commitSource(draft.text);
     setDocumentName(draft.name === 'Autosave' ? '' : draft.name);
     setStatus(`Loaded local draft from ${new Date(draft.updatedAt).toLocaleString()}.`);
   };
@@ -517,8 +566,8 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-toolbar-group">
             <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
             <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
-            <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo">Undo</button>
-            <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo">Redo</button>
+            <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo document step" title="Undo one grouped document step. Ctrl/Cmd+Z inside the editor keeps CodeMirror's fine-grained text history.">Undo step</button>
+            <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo document step" title="Redo one grouped document step.">Redo step</button>
           </div>
         </div>
 
@@ -574,7 +623,7 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
             value={source}
-            onChange={setSource}
+            onChange={handleEditorSourceChange}
             onCursorLineChange={view === 'split' ? scrollPreviewToLine : undefined}
             onStatus={setStatus}
             lineWrapping={lineWrapping}
