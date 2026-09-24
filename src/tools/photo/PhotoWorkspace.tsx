@@ -61,6 +61,15 @@ import {
   suggestPhotoPresetFilename,
 } from './photo-preset-transfer';
 import {
+  ALL_RECIPE_GROUPS,
+  PHOTO_RECIPE_GROUPS,
+  applyRecipeGroups,
+  diffRecipes,
+  type PhotoRecipeGroup,
+} from './photo-recipe-groups';
+import { createBrowserTemplateStore, recipeWithWatermark, type PhotoTemplateRecord } from './photo-templates';
+import { fileSystemAccess, isPickerCancel } from './photo-export-queue';
+import {
   appendPhotoSelection,
   clonePhotoSelection,
   normalizePhotoSelection,
@@ -203,6 +212,9 @@ const PRESETS: Array<{ name: string; patch: Partial<PhotoRecipe> }> = [
 
 const PROJECT_AUTOSAVE_DEBOUNCE_MS = 800;
 
+/** Extensions offered by the File System Access open picker, derived from the shared accept list. */
+const PHOTO_OPEN_EXTENSIONS = PHOTO_FILE_ACCEPT.split(',').filter((entry) => entry.startsWith('.')).concat(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.avif', '.bmp']);
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -326,6 +338,13 @@ export default function PhotoWorkspace() {
   const [snapshots, setSnapshots] = useState<PhotoSnapshot[]>([]);
   const [snapshotName, setSnapshotName] = useState('');
   const [editClipboard, setEditClipboard] = useState<PhotoRecipe | null>(null);
+  const [clipboardGroups, setClipboardGroups] = useState<PhotoRecipeGroup[]>(ALL_RECIPE_GROUPS);
+  const [selectedCopyGroups, setSelectedCopyGroups] = useState<PhotoRecipeGroup[]>(ALL_RECIPE_GROUPS);
+  const [compareLeft, setCompareLeft] = useState('current');
+  const [compareRight, setCompareRight] = useState('');
+  const [recentlyDeleted, setRecentlyDeleted] = useState<{ project: PhotoProjectRecord; sourceBlob: Blob } | null>(null);
+  const [watermarkPresets, setWatermarkPresets] = useState<Array<PhotoTemplateRecord<'watermark'>>>([]);
+  const [layerWatermarkId, setLayerWatermarkId] = useState('');
   const [photoDragActive, setPhotoDragActive] = useState(false);
   const [customRatioWidth, setCustomRatioWidth] = useState('5');
   const [customRatioHeight, setCustomRatioHeight] = useState('4');
@@ -404,6 +423,16 @@ export default function PhotoWorkspace() {
   useEffect(() => {
     setGeometryInteraction(null);
   }, [source?.originalUrl]);
+
+  // Watermark presets are saved from the export dialog; refresh them whenever Layers opens.
+  useEffect(() => {
+    if (panel !== 'layers') return;
+    let active = true;
+    void createBrowserTemplateStore().then((store) => store.list('watermark')).then((records) => {
+      if (active) setWatermarkPresets(records);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [panel]);
 
   useEffect(() => {
     autoAnalysisRevisionRef.current += 1;
@@ -709,6 +738,12 @@ export default function PhotoWorkspace() {
       projectSaveRevisionRef.current += 1;
     }
     try {
+      // Keep an in-memory copy (record plus source bytes) so the deletion can be undone.
+      let backup: { project: PhotoProjectRecord; sourceBlob: Blob } | null = null;
+      try {
+        const loaded = await store.load(project.id);
+        backup = { project: loaded.project, sourceBlob: new Blob([await loaded.sourceFile.arrayBuffer()], { type: loaded.sourceFile.type }) };
+      } catch { backup = null; }
       const deletion = projectSaveQueueRef.current
         .catch(() => undefined)
         .then(() => store.delete(project.id));
@@ -726,8 +761,9 @@ export default function PhotoWorkspace() {
       }
       await refreshLocalProjects(store);
       refreshStorageStatus();
+      setRecentlyDeleted(backup);
       if (deletionRevision === importRevisionRef.current) {
-        setStatus(`${project.name} deleted from local browser storage.`);
+        setStatus(backup ? `${project.name} deleted from local browser storage. Use Undo delete to bring it back.` : `${project.name} deleted from local browser storage.`);
       }
     } catch (error) {
       if (deletionRevision === importRevisionRef.current) {
@@ -740,6 +776,68 @@ export default function PhotoWorkspace() {
     } finally {
       projectBeingDeletedRef.current = null;
       setProjectBeingDeletedId(null);
+    }
+  }
+
+  async function undoProjectDelete() {
+    const store = projectStoreRef.current;
+    const backup = recentlyDeleted;
+    if (!store || !backup) return;
+    try {
+      const { project, sourceBlob } = backup;
+      await store.save({
+        id: project.id,
+        name: project.name,
+        createdAt: project.createdAt,
+        source: {
+          name: project.source.name,
+          type: project.source.type,
+          size: project.source.size,
+          lastModified: project.source.lastModified,
+          width: project.source.width,
+          height: project.source.height,
+        },
+        sourceBlob,
+        history: project.history,
+        snapshots: project.snapshots,
+      });
+      setRecentlyDeleted(null);
+      await refreshLocalProjects(store);
+      refreshStorageStatus();
+      setStatus(`${project.name} restored to local projects.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
+    }
+  }
+
+  async function renameUserPreset(preset: PhotoUserPresetRecord, name: string) {
+    const store = projectStoreRef.current;
+    const trimmed = name.trim().slice(0, 80);
+    if (!store || !trimmed || trimmed === preset.name || userPresetMutationRef.current) return;
+    userPresetMutationRef.current = true;
+    try {
+      await store.savePreset({ id: preset.id, name: trimmed, recipe: preset.recipe });
+      await refreshUserPresets(store);
+      setStatus(`Preset renamed to ${trimmed}.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
+    } finally {
+      userPresetMutationRef.current = false;
+    }
+  }
+
+  async function duplicateUserPreset(preset: PhotoUserPresetRecord) {
+    const store = projectStoreRef.current;
+    if (!store || userPresetMutationRef.current) return;
+    userPresetMutationRef.current = true;
+    try {
+      const saved = await store.savePreset({ id: crypto.randomUUID?.() ?? `photo-preset-${Date.now()}`, name: `${preset.name} copy`.slice(0, 80), recipe: preset.recipe });
+      await refreshUserPresets(store);
+      setStatus(`${saved.name} created.`);
+    } catch (error) {
+      setStatus(photoProjectErrorMessage(error));
+    } finally {
+      userPresetMutationRef.current = false;
     }
   }
 
@@ -1517,15 +1615,71 @@ export default function PhotoWorkspace() {
     // immediately replacing the confirmation message under a busy renderer.
     beginImport();
     setEditClipboard(normalizeRecipe(recipe));
+    setClipboardGroups(ALL_RECIPE_GROUPS);
     setCanvasInteraction(null);
     setStatus('Edits copied. Open another photo or paste them here.');
   }
 
   function pasteEdits() {
     if (!source || !editClipboard) return;
-    commitRecipe(editClipboard);
+    commitRecipe(applyRecipeGroups(recipe, editClipboard, clipboardGroups));
     setCanvasInteraction(null);
-    setStatus('Copied edits applied as one undo step.');
+    setStatus(clipboardGroups.length === ALL_RECIPE_GROUPS.length ? 'Copied edits applied as one undo step.' : 'Copied settings applied as one undo step; everything else was left as it was.');
+  }
+
+  function copySelectedSettings() {
+    if (!source || !selectedCopyGroups.length) return;
+    beginImport();
+    setEditClipboard(normalizeRecipe(recipe));
+    setClipboardGroups([...selectedCopyGroups]);
+    setStatus(`Copied ${selectedCopyGroups.length} setting group${selectedCopyGroups.length === 1 ? '' : 's'}. Paste edits applies only those.`);
+  }
+
+  function pasteSelectedSettings() {
+    if (!source || !editClipboard || !selectedCopyGroups.length) return;
+    commitRecipe(applyRecipeGroups(recipe, editClipboard, selectedCopyGroups));
+    setCanvasInteraction(null);
+    setStatus(`Pasted ${selectedCopyGroups.length} setting group${selectedCopyGroups.length === 1 ? '' : 's'} as one undo step.`);
+  }
+
+  // --- Snapshots ---
+
+  function renameSnapshot(id: string, name: string) {
+    const trimmed = name.trim().slice(0, 80);
+    if (!trimmed) return;
+    setSnapshots((current) => current.map((snapshot) => (snapshot.id === id ? { ...snapshot, name: trimmed } : snapshot)));
+  }
+
+  function duplicateSnapshot(snapshot: PhotoSnapshot) {
+    const copy: PhotoSnapshot = {
+      id: crypto.randomUUID?.() ?? `snapshot-${Date.now()}`,
+      name: `${snapshot.name} copy`.slice(0, 80),
+      createdAt: new Date().toISOString(),
+      recipe: normalizeRecipe(snapshot.recipe),
+    };
+    setSnapshots((current) => {
+      const index = current.findIndex((item) => item.id === snapshot.id);
+      const next = [...current];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
+    setStatus(`${copy.name} created.`);
+  }
+
+  function deleteSnapshot(snapshot: PhotoSnapshot) {
+    setSnapshots((current) => current.filter((item) => item.id !== snapshot.id));
+    if (compareLeft === `snapshot:${snapshot.id}`) setCompareLeft('current');
+    if (compareRight === `snapshot:${snapshot.id}`) setCompareRight('');
+    setStatus(`${snapshot.name} deleted.`);
+  }
+
+  // --- Recipe comparison ---
+
+  function comparisonRecipe(key: string): PhotoRecipe | null {
+    if (key === 'current') return recipe;
+    if (key.startsWith('snapshot:')) return snapshots.find((item) => `snapshot:${item.id}` === key)?.recipe ?? null;
+    if (key.startsWith('project:')) return localProjects.find((item) => `project:${item.id}` === key)?.history.present ?? null;
+    return null;
   }
 
   function downloadRecipe() {
@@ -2237,6 +2391,24 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => addShapeLayer('ellipse')}>Add ellipse</button>
           <button type="button" onClick={() => addShapeLayer('line')}>Add line</button>
         </div>
+        {watermarkPresets.length ? (
+          <div className="photo-inline-actions" role="group" aria-label="Add a saved watermark">
+            <label>
+              Saved watermark
+              <select aria-label="Saved watermark preset" value={layerWatermarkId} onChange={(event) => setLayerWatermarkId(event.target.value)}>
+                <option value="">Choose…</option>
+                {watermarkPresets.map((record) => <option key={record.id} value={record.id}>{record.name}</option>)}
+              </select>
+            </label>
+            <button type="button" disabled={!source || !layerWatermarkId} onClick={() => {
+              const preset = watermarkPresets.find((record) => record.id === layerWatermarkId);
+              if (!preset || !source) return;
+              const frame = photoNaturalDimensions(source.width, source.height, recipe);
+              commitRecipe(recipeWithWatermark(recipe, preset.data, frame.width, frame.height, undefined, preset.name));
+              setStatus(`${preset.name} added as a layer you can move, resize, or remove.`);
+            }}>Add as layer</button>
+          </div>
+        ) : null}
         {layers.length ? layers.map((layer, index) => (
           <article className="photo-local-card" key={layer.id} data-testid="photo-layer">
             <header>
@@ -2516,6 +2688,13 @@ export default function PhotoWorkspace() {
             ))}
             {!localProjects.length ? <p className="photo-export-note">No local Photo projects saved yet.</p> : null}
           </div>
+          {recentlyDeleted ? (
+            <div className="photo-inline-actions" role="status" data-testid="photo-undo-delete">
+              <span>{recentlyDeleted.project.name} was deleted.</span>
+              <button type="button" onClick={() => void undoProjectDelete()}>Undo delete</button>
+              <button type="button" onClick={() => setRecentlyDeleted(null)}>Dismiss</button>
+            </div>
+          ) : null}
         </details>
         <details className="photo-section" open>
           <summary>Editable starting presets</summary>
@@ -2575,8 +2754,22 @@ export default function PhotoWorkspace() {
               <article className="photo-local-card" key={preset.id} data-testid="photo-user-preset-card">
                 <strong>{preset.name}</strong>
                 <span>Updated {new Date(preset.updatedAt).toLocaleString()}</span>
+                <label className="photo-inline-field">
+                  <span className="photo-visually-hidden">Rename preset {preset.name}</span>
+                  <input
+                    type="text"
+                    aria-label={`Rename preset ${preset.name}`}
+                    defaultValue={preset.name}
+                    key={preset.name}
+                    maxLength={80}
+                    disabled={userPresetBusy}
+                    onKeyDown={inputCommit}
+                    onBlur={(event) => void renameUserPreset(preset, event.currentTarget.value)}
+                  />
+                </label>
                 <div className="photo-inline-actions">
                   <button type="button" aria-label={`Apply preset ${preset.name}`} onClick={() => applyUserPreset(preset)} disabled={!source}>Apply preset</button>
+                  <button type="button" aria-label={`Duplicate preset ${preset.name}`} onClick={() => void duplicateUserPreset(preset)} disabled={userPresetBusy}>Duplicate preset</button>
                   <button type="button" aria-label={`Edit preset ${preset.name}`} onClick={() => editUserPreset(preset)} disabled={userPresetBusy || !source}>Edit preset</button>
                   <button type="button" aria-label={`Export preset ${preset.name}`} onClick={() => exportUserPreset(preset)}>Export preset</button>
                   <button type="button" aria-label={`Delete preset ${preset.name}`} onClick={() => void deleteUserPreset(preset)} disabled={userPresetBusy}>Delete preset</button>
@@ -2604,12 +2797,103 @@ export default function PhotoWorkspace() {
             </label>
           </div>
           <div className="photo-inline-actions"><button type="button" onClick={saveSnapshot} disabled={!source}>Save snapshot</button></div>
-          {snapshots.map((snapshot) => (
-            <button className="photo-snapshot-card" type="button" key={snapshot.id} onClick={() => restoreSnapshot(snapshot)}>
-              <strong>{snapshot.name}</strong>
-              <span>{new Date(snapshot.createdAt).toLocaleTimeString()}</span>
-            </button>
+          {snapshots.map((snapshot, index) => (
+            <div className="photo-snapshot-row" key={snapshot.id} data-testid="photo-snapshot">
+              <button className="photo-snapshot-card" type="button" onClick={() => restoreSnapshot(snapshot)}>
+                <strong>{snapshot.name}</strong>
+                <span>{new Date(snapshot.createdAt).toLocaleTimeString()}</span>
+              </button>
+              <div className="photo-inline-actions">
+                <label className="photo-inline-field">
+                  <span className="photo-visually-hidden">Rename snapshot {index + 1}</span>
+                  <input
+                    type="text"
+                    aria-label={`Rename snapshot ${index + 1}`}
+                    defaultValue={snapshot.name}
+                    key={snapshot.name}
+                    maxLength={80}
+                    onKeyDown={inputCommit}
+                    onBlur={(event) => renameSnapshot(snapshot.id, event.currentTarget.value)}
+                  />
+                </label>
+                <button type="button" aria-label={`Duplicate snapshot ${index + 1}`} onClick={() => duplicateSnapshot(snapshot)}>Duplicate</button>
+                <button type="button" aria-label={`Delete snapshot ${index + 1}`} onClick={() => deleteSnapshot(snapshot)}>Delete</button>
+              </div>
+            </div>
           ))}
+        </details>
+        <details className="photo-section" data-testid="photo-copy-settings">
+          <summary>Copy &amp; paste settings</summary>
+          <p className="photo-export-note">Pick which groups to move between photos. Crop, masks, spot fixes, and layers are tied to one frame, so they start unticked.</p>
+          <div className="photo-group-grid">
+            {PHOTO_RECIPE_GROUPS.map((group) => (
+              <label key={group.id} className="photo-check-row">
+                <input
+                  type="checkbox"
+                  checked={selectedCopyGroups.includes(group.id)}
+                  onChange={(event) => setSelectedCopyGroups((current) => event.target.checked ? [...current, group.id] : current.filter((id) => id !== group.id))}
+                />
+                {group.label}
+              </label>
+            ))}
+          </div>
+          <div className="photo-inline-actions">
+            <button type="button" onClick={() => setSelectedCopyGroups(PHOTO_RECIPE_GROUPS.filter((group) => !group.imageSpecific).map((group) => group.id))}>Look only</button>
+            <button type="button" onClick={() => setSelectedCopyGroups(ALL_RECIPE_GROUPS)}>Select all</button>
+            <button type="button" onClick={() => setSelectedCopyGroups([])}>Select none</button>
+          </div>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={!source || !selectedCopyGroups.length} onClick={copySelectedSettings}>Copy selected settings</button>
+            <button type="button" disabled={!source || !editClipboard || !selectedCopyGroups.length} onClick={pasteSelectedSettings}>Paste selected settings</button>
+          </div>
+        </details>
+        <details className="photo-section" data-testid="photo-compare-recipes">
+          <summary>Compare edits</summary>
+          <p className="photo-export-note">See exactly which settings differ between your current edits, a snapshot, or a saved project or variant.</p>
+          {(() => {
+            const options = [
+              { key: 'current', label: 'Current edits' },
+              ...snapshots.map((snapshot) => ({ key: `snapshot:${snapshot.id}`, label: `Snapshot · ${snapshot.name}` })),
+              ...localProjects.map((project) => ({ key: `project:${project.id}`, label: `Project · ${project.name}` })),
+            ];
+            const left = comparisonRecipe(compareLeft);
+            const right = comparisonRecipe(compareRight);
+            const differences = left && right ? diffRecipes(left, right) : null;
+            return (
+              <>
+                <div className="photo-metadata-grid">
+                  <label>Compare
+                    <select aria-label="Compare from" value={compareLeft} onChange={(event) => setCompareLeft(event.target.value)}>
+                      {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label>With
+                    <select aria-label="Compare with" value={compareRight} onChange={(event) => setCompareRight(event.target.value)}>
+                      <option value="">Choose…</option>
+                      {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {differences ? (
+                  differences.length ? (
+                    <table className="photo-diff-table" data-testid="photo-recipe-diff">
+                      <caption className="photo-visually-hidden">Setting differences</caption>
+                      <thead><tr><th scope="col">Setting</th><th scope="col">From</th><th scope="col">With</th></tr></thead>
+                      <tbody>
+                        {differences.map((difference) => (
+                          <tr key={difference.field}>
+                            <th scope="row"><span className="photo-diff-group">{difference.groupLabel}</span> {difference.label}</th>
+                            <td>{difference.before}</td>
+                            <td>{difference.after}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : <p className="photo-export-note" role="status">These two are identical.</p>
+                ) : <p className="photo-export-note">Choose two versions to compare.</p>}
+              </>
+            );
+          })()}
         </details>
         <details className="photo-section" open>
           <summary>Recipe transfer</summary>
@@ -2677,7 +2961,22 @@ export default function PhotoWorkspace() {
       onDrop={handlePhotoDrop}
     >
       <header className="photo-command-bar" aria-label="Photo Studio commands">
-        <label className="photo-open-label">
+        <label
+          className="photo-open-label"
+          onClick={(event) => {
+            // Progressive enhancement: the File System Access picker remembers the last folder
+            // (via its id). Everywhere else the ordinary file input below opens as usual.
+            const picker = fileSystemAccess().showOpenFilePicker;
+            if (!picker || event.target !== event.currentTarget) return;
+            event.preventDefault();
+            void picker({ id: 'photo-studio-open', multiple: false, types: [{ description: 'Photos', accept: { 'image/*': PHOTO_OPEN_EXTENSIONS } }] })
+              .then(async ([handle]) => { if (handle) await importPhotoFiles([await handle.getFile()], 'file-input'); })
+              .catch((error: unknown) => {
+                if (isPickerCancel(error)) return;
+                fileInputRef.current?.click();
+              });
+          }}
+        >
           Open photo
           <input
             ref={fileInputRef}

@@ -44,9 +44,16 @@ export function requestedPhotoDimensions(
   recipe: PhotoRecipe,
   mode: PhotoResizeMode,
   value: number,
+  allowEnlarge = true,
 ): RequestedPhotoDimensions {
   if (mode === 'original') return {};
   const natural = photoNaturalDimensions(sourceWidth, sourceHeight, recipe);
+  if (!allowEnlarge) {
+    // "Don't enlarge": a target larger than the edited frame keeps the frame's own size.
+    const requested = requestedPhotoDimensions(sourceWidth, sourceHeight, recipe, mode, value, true);
+    if ((requested.requestedWidth ?? 0) > natural.width || (requested.requestedHeight ?? 0) > natural.height) return {};
+    return requested;
+  }
 
   if (mode === 'percent') {
     const scale = Math.max(0.01, Number.isFinite(value) ? value : 100) / 100;
@@ -94,9 +101,10 @@ export function planPhotoExportSize(
   value: number,
   maxEdge: number,
   maxArea: number,
+  allowEnlarge = true,
 ): PhotoExportSizePlan {
   const natural = photoNaturalDimensions(sourceWidth, sourceHeight, recipe);
-  const requested = requestedPhotoDimensions(sourceWidth, sourceHeight, recipe, mode, value);
+  const requested = requestedPhotoDimensions(sourceWidth, sourceHeight, recipe, mode, value, allowEnlarge);
   const resolvedRequested = {
     width: requested.requestedWidth ?? natural.width,
     height: requested.requestedHeight ?? natural.height,

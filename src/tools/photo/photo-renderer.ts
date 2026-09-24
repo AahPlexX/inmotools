@@ -4,6 +4,7 @@ import { warpPhotoMeshLiquifyPixels } from './photo-warp';
 import { preparePhotoRaster } from './photo-import';
 import { normalizeResamplingKernel, resamplePixels, type PhotoResamplingKernel } from './photo-resample';
 import { encodePhotoTiff, hasTransparency } from './photo-tiff-writer';
+import { avifEncodingAvailable, encodePhotoAvif } from './codecs/avif-encoder';
 import { TEXT_LAYER_PADDING } from './photo-layers';
 import type {
   PhotoCapabilities,
@@ -31,6 +32,8 @@ export interface PhotoRenderRequest {
   jpegBackground?: string;
   /** Final-resize kernel for exports; previews always use the browser scaler for speed. */
   resampling?: PhotoResamplingKernel;
+  /** AVIF only: encode losslessly instead of at `quality`. */
+  lossless?: boolean;
 }
 
 export interface PhotoRenderResult {
@@ -304,6 +307,7 @@ export async function probePhotoCapabilities(): Promise<PhotoCapabilities> {
     png,
     webp,
     tiff: true,
+    avif: avifEncodingAvailable(),
     maxCanvasEdge: VERIFIED_SAFE_EDGE,
     maxCanvasArea: VERIFIED_SAFE_AREA,
   };
@@ -578,7 +582,9 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     const quality = Math.min(1, Math.max(0.01, request.quality ?? 0.92));
     let blob = mime === 'image/tiff'
       ? new Blob([encodePhotoTiff(ownedPixels, target.width, target.height, { alpha: hasTransparency(ownedPixels) }) as Uint8Array<ArrayBuffer>], { type: 'image/tiff' })
-      : await canvasToBlob(outputCanvas, mime, quality);
+      : mime === 'image/avif'
+        ? await encodePhotoAvif(ownedPixels, target.width, target.height, { quality, lossless: request.lossless === true })
+        : await canvasToBlob(outputCanvas, mime, quality);
     if (blob.type !== mime) {
       if (request.mode === 'export') throw new Error(`${mime} export is not supported by this browser.`);
       blob = await canvasToBlob(outputCanvas, 'image/png', 1);

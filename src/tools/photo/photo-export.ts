@@ -6,6 +6,7 @@ import {
   stripLocationMetadata,
 } from './photo-metadata';
 import { renderPhoto, type PhotoRenderRequest, type PhotoRenderResult } from './photo-renderer';
+import type { PhotoResamplingKernel } from './photo-resample';
 import type { PhotoExportMetadata, PhotoOutputMime, PhotoRecipe } from './photo-types';
 
 export type PhotoMetadataPolicy = 'strip' | 'rights' | 'custom';
@@ -36,6 +37,8 @@ export interface CreatePhotoExportOptions {
   jpegBackground?: string;
   requestedWidth?: number;
   requestedHeight?: number;
+  resampling?: PhotoResamplingKernel;
+  lossless?: boolean;
 }
 
 export interface CreatedPhotoExport {
@@ -49,6 +52,8 @@ export interface CreatedPhotoExport {
   metadataEmbedded: boolean;
   metadataError?: string;
   colorProfileEmbedded: boolean;
+  /** Final-resize kernel actually used by the render. */
+  resampling: PhotoResamplingKernel;
 }
 
 const DEFAULT_SERVICES: PhotoExportServices = {
@@ -103,6 +108,8 @@ export async function createPhotoExport(
     jpegBackground: options.jpegBackground,
     requestedWidth: options.requestedWidth,
     requestedHeight: options.requestedHeight,
+    resampling: options.resampling,
+    lossless: options.lossless,
   });
 
   let blob = rendered.blob;
@@ -142,5 +149,6 @@ export async function createPhotoExport(
     metadataEmbedded,
     metadataError,
     colorProfileEmbedded,
+    resampling: rendered.resampling ?? 'browser',
   };
 }

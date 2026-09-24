@@ -33,6 +33,7 @@
     "@gltf-transform/extensions": "4.4.2",
     "@gltf-transform/functions": "4.4.2",
     "@hpcc-js/wasm-graphviz": "1.28.0",
+    "@jsquash/avif": "2.1.1",
     "@replit/codemirror-vim": "6.4.0",
     "@techstark/opencv-js": "5.0.0-release.1",
     "@tonejs/midi": "2.0.28",

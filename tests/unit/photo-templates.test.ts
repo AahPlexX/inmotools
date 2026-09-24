@@ -138,3 +138,22 @@ describe('template store and sharing', () => {
     expect(() => parseTemplateFile('not json')).toThrow(/not valid JSON/);
   });
 });
+
+describe('AVIF export boundaries', () => {
+  test('AVIF settings keep the lossless switch and use the .avif extension', async () => {
+    const settings = normalizeExportSettings({ outputMime: 'image/avif', lossless: true });
+    expect([settings.outputMime, settings.lossless]).toEqual(['image/avif', true]);
+    expect(renderFilenamePattern('{name}', 'image/avif', { sourceName: 'beach.jpg', index: 1, total: 1 })).toBe('beach.avif');
+    expect(normalizeExportSettings({ lossless: 'yes' }).lossless).toBe(false);
+  });
+
+  test('AVIF output refuses embedded XMP and ICC instead of silently dropping them', async () => {
+    const { embedPhotoXmp, embedPhotoIcc } = await import('../../src/tools/photo/photo-metadata-embed');
+    const avif = new Blob([new Uint8Array(16)], { type: 'image/avif' });
+    await expect(embedPhotoXmp(avif, 'image/avif', '<x/>', { width: 1, height: 1 })).rejects.toThrow(/XMP sidecar/);
+    const { parsePhotoIccProfile } = await import('../../src/tools/photo/color/photo-color-management');
+    const { photoSrgbProfileFile } = await import('../fixtures/photo-srgb-profile');
+    const profile = await parsePhotoIccProfile(photoSrgbProfileFile());
+    await expect(embedPhotoIcc(avif, 'image/avif', profile, { width: 1, height: 1 })).rejects.toThrow(/Choose JPEG, PNG, WebP, or TIFF/);
+  });
+});

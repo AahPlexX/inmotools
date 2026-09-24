@@ -5,6 +5,7 @@ const MIME_EXTENSIONS: Record<PhotoOutputMime, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/tiff': 'tif',
+  'image/avif': 'avif',
 };
 
 function escapeXml(value: string): string {

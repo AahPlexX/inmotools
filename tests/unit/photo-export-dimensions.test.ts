@@ -59,3 +59,13 @@ describe('Photo Studio export dimensions', () => {
     });
   });
 });
+
+describe("don't-enlarge sizing", () => {
+  test('targets larger than the edited frame keep the frame size; smaller targets still apply', () => {
+    expect(requestedPhotoDimensions(320, 240, DEFAULT_RECIPE, 'long-edge', 400, false)).toEqual({});
+    expect(requestedPhotoDimensions(320, 240, DEFAULT_RECIPE, 'long-edge', 160, false)).toEqual({ requestedWidth: 160, requestedHeight: 120 });
+    expect(requestedPhotoDimensions(320, 240, DEFAULT_RECIPE, 'percent', 150, false)).toEqual({});
+    expect(planPhotoExportSize(320, 240, DEFAULT_RECIPE, 'width', 1920, 4096, 16_777_216, false).requested).toEqual({ width: 320, height: 240 });
+    expect(requestedPhotoDimensions(320, 240, DEFAULT_RECIPE, 'long-edge', 400)).toEqual({ requestedWidth: 400, requestedHeight: 300 });
+  });
+});

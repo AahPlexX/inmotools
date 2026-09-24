@@ -12,7 +12,11 @@ export interface PhotoExportSettings {
   quality: number;
   resizeMode: PhotoResizeMode;
   resizeValue: number;
+  /** When false, a size larger than the edited frame exports at the frame's own size instead. */
+  allowEnlarge: boolean;
   resampling: PhotoResamplingKernel;
+  /** AVIF only: lossless encoding (quality is then ignored). */
+  lossless: boolean;
   outputSharpening: PhotoOutputSharpening;
   jpegBackground: string;
   metadataPolicy: PhotoMetadataPolicy;
@@ -29,16 +33,18 @@ export const DEFAULT_EXPORT_SETTINGS: PhotoExportSettings = {
   quality: 0.92,
   resizeMode: 'original',
   resizeValue: 100,
+  allowEnlarge: true,
   resampling: 'browser',
+  lossless: false,
   outputSharpening: 'none',
   jpegBackground: '#ffffff',
   metadataPolicy: 'strip',
   metadataTemplateId: null,
   watermarkPresetId: null,
-  filenamePattern: '{name}-edited',
+  filenamePattern: '{name}',
 };
 
-const MIMES: PhotoOutputMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/tiff'];
+const MIMES: PhotoOutputMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/tiff', 'image/avif'];
 const RESIZE_MODES: PhotoResizeMode[] = ['original', 'percent', 'width', 'height', 'long-edge', 'short-edge'];
 const SHARPENING: PhotoOutputSharpening[] = ['none', 'light', 'standard', 'strong'];
 const POLICIES: PhotoMetadataPolicy[] = ['strip', 'rights', 'custom'];
@@ -62,7 +68,9 @@ export function normalizeExportSettings(value: unknown): PhotoExportSettings {
     quality: finite(input.quality, 0.01, 1, d.quality),
     resizeMode,
     resizeValue: Math.round(finite(input.resizeValue, 1, resizeMode === 'percent' ? 400 : 50_000, d.resizeValue)),
+    allowEnlarge: typeof input.allowEnlarge === 'boolean' ? input.allowEnlarge : d.allowEnlarge,
     resampling: normalizeResamplingKernel(input.resampling),
+    lossless: input.lossless === true,
     outputSharpening: pick(input.outputSharpening, SHARPENING, d.outputSharpening),
     jpegBackground: typeof input.jpegBackground === 'string' && /^#[0-9a-f]{6}$/i.test(input.jpegBackground) ? input.jpegBackground.toLowerCase() : d.jpegBackground,
     metadataPolicy: pick(input.metadataPolicy, POLICIES, d.metadataPolicy),
@@ -89,6 +97,7 @@ export const PHOTO_FORMAT_FACTS: Record<PhotoOutputMime, PhotoFormatFacts> = {
   'image/png': { label: 'PNG', compression: 'lossless', usesQuality: false, supportsTransparency: true, note: 'Lossless. Exact pixels and transparency, larger files.' },
   'image/webp': { label: 'WebP', compression: 'lossy', usesQuality: true, supportsTransparency: true, note: 'Lossy (the browser encoder has no lossless mode). Small files with transparency.' },
   'image/tiff': { label: 'TIFF', compression: 'lossless', usesQuality: false, supportsTransparency: true, note: 'Lossless, uncompressed 8-bit. Large files for print and archive workflows.' },
+  'image/avif': { label: 'AVIF', compression: 'lossy', usesQuality: true, supportsTransparency: true, note: 'Lossy by default (or lossless when ticked below). Very small files for the web; encoding big photos can take a while. Metadata travels in the XMP sidecar, and colour-managed ICC output is not available for AVIF.' },
 };
 
 // --- File name rules (capability 143) ---
@@ -113,7 +122,7 @@ export const FILENAME_TOKENS: Array<{ token: string; meaning: string }> = [
   { token: '{h}', meaning: 'output height in pixels' },
 ];
 
-const EXTENSIONS: Record<PhotoOutputMime, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/tiff': 'tif' };
+const EXTENSIONS: Record<PhotoOutputMime, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/tiff': 'tif', 'image/avif': 'avif' };
 
 function isoDate(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -132,7 +141,7 @@ export function renderFilenamePattern(pattern: string, mime: PhotoOutputMime, co
     if (token === 'w') return context.width ? String(context.width) : 'w';
     return context.height ? String(context.height) : 'h';
   });
-  const safe = safeFilenameStem(expanded.replace(/\.(jpe?g|png|webp|tiff?)$/i, '')).slice(0, 180) || 'photo';
+  const safe = safeFilenameStem(expanded.replace(/\.(jpe?g|png|webp|tiff?|avif)$/i, '')).slice(0, 180) || 'photo';
   return `${safe}.${EXTENSIONS[mime]}`;
 }
 

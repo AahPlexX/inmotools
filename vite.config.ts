@@ -52,6 +52,9 @@ export default defineConfig({
           'assets/lcms-*.wasm',
           // Multi-image alignment embeds ~15 MB of OpenCV in its worker; fetch it only for merges.
           'assets/photo-merge.worker-*.js',
+          // AVIF export ships a ~3.5 MB libavif encoder; fetch it only when someone exports AVIF.
+          'assets/avif_enc-*.wasm',
+          'assets/avif-encode.worker-*.js',
           'assets/diagram.worker-*.js',
           'assets/mermaid-parser.core-*.js',
           'assets/cytoscape.esm-*.js',
@@ -92,6 +95,15 @@ export default defineConfig({
               cacheName: 'photo-merge-engine',
               cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 2, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/assets\/(?:avif_enc-[^/]+\.wasm|avif-encode\.worker-[^/]+\.js)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'photo-avif-encoder',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 4, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },
           {
