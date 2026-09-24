@@ -1,6 +1,6 @@
 # Audio Mastering Workstation Phase 3 Implementation Plan
 
-**Status:** Next sequential milestone after verified Phase 2.
+**Status:** Active after verified Phase 2; Task 1 (ledger 17) completed and verified on 2026-09-24; Task 2 (ledgers 11 and 13) is next.
 **Branch:** `feature/audio-mastering-workstation` only; do not merge to `main`.
 **Goal:** Replace the current single-buffer/edit-stack state with an atomic project/timeline revision model, then build precise clip and multi-track editing without regressing the verified Phase 1–2 workflow.
 **Dependency baseline (2026-09-18):** MediaBunny 1.58.0 exact, React 19.2.8, TypeScript 7.0.2, Vitest 4.1.11, Playwright 1.63.0.
@@ -13,21 +13,22 @@
 - Spectral edit model: `docs/research/audio-mastering-spectral-edit-model-2026-09-19.md`. Persist semantic clip-local operations in seconds/Hz; keep STFTs, spectrogram tiles, and render blocks derived/worker-owned; require invertible deterministic processing profiles.
 - Loudness/true peak: `docs/research/audio-mastering-loudness-true-peak-2026-09-19.md`. Target the in-force ITU-R BS.1770-5 and current EBU R128/Tech 3341/3342 definitions; official EBU/ITU reference vectors are mandatory acceptance evidence.
 - Project/preset migration contract: `docs/research/audio-mastering-project-schema-migrations-2026-09-19.md`. Keep IndexedDB layout version, project document schema version, and processor preset/algorithm versions independent; restore through pure sequential migrations + current-schema validation; autosave persists present state only; reuse existing JSZip for later self-contained backups.
-- These are architecture decisions only. They do **not** advance the 13/81 implementation count or close any Phase 3 implementation checkbox.
+- These are architecture decisions only. They did not advance the ledger; verified implementation evidence currently sets progress at 14/81.
 
 ## Resume point — read before editing
 - Phase 2 is green: 29/29 focused Mastering/Music units, 7/7 MediaBunny-sharing video units, production build, and 2/2 desktop/mobile Mastering browser cases.
-- The deterministic completion ledger is 13/81. Functions 5, 11, and 17 are explicitly partial.
-- Audio edit undo/redo currently tracks only `AudioEdit[]`; marker/region shifts caused by crop or silence insertion are separate React state mutations.
-- Therefore **Task 1 is mandatory before any broader timeline feature**. Do not add more timeline mutations to the split history model.
+- The deterministic completion ledger is 14/81. Functions 5 and 11 remain partial; function 17 is complete.
+- The 2026-09-24 migration consolidates source reference, audio edits, selection, markers, regions, track/clip placeholders, metadata edits, and playhead into serializable `MasteringDocument` state with bounded undo/redo.
+- Crop and silence insertion now commit their audio edit and timeline annotations together. Ordinary seek/selection/ticker updates replace view state without adding undo entries; marker/region create, rename-on-blur, and remove are project revisions.
+- Task 1 acceptance: reducer unit suite 6/6; production build/typecheck passes; Mastering desktop/mobile Chromium workflow passes 2/2, including crop undo/redo restoring annotations and selection.
 - Preserve the existing Harmony/MIDI secondary workspace and the Phase 1–2 Mastering browser workflow.
 
 ## Task 1 — Atomic project revision history (ledger 17)
-- [ ] Define one serializable Mastering document/revision state containing source references, edit stack, selection, markers, regions, track/clip state, and metadata edits.
-- [ ] Add pure revision reducer/helpers with bounded undo/redo; divergent edits clear redo.
-- [ ] Move crop and silence annotation shifts into the same atomic revision as their audio edit.
-- [ ] Prove undo/redo restores audio edits, markers, regions, selection, and playhead together.
-- [ ] Migrate `MasteringWorkspace` from split history state without changing visible Phase 2 behavior.
+- [x] Define one serializable Mastering document/revision state containing source references, edit stack, selection, markers, regions, track/clip state, and metadata edits.
+- [x] Add pure revision reducer/helpers with bounded undo/redo; divergent edits clear redo.
+- [x] Move crop and silence annotation shifts into the same atomic revision as their audio edit.
+- [x] Prove undo/redo restores audio edits, markers, regions, selection, and playhead together.
+- [x] Migrate `MasteringWorkspace` from split history state without changing visible Phase 2 behavior.
 ## Task 2 — Precise clip editing (ledger 11 and 13)
 - [ ] Add sample-accurate split, trim start/end, range delete, and crop using zero-crossing-aware optional boundaries.
 - [ ] Introduce clip move, duplicate, and numeric/keyboard nudge without copying immutable source PCM.

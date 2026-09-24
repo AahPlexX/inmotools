@@ -76,15 +76,23 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   const levelPanel = page.locator('.mastering-panel').filter({ hasText: 'Level operations' });
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('1');
 
+  const selectionStartBeforeCrop = Number(await page.getByLabel('Start (seconds)').inputValue());
+  const selectionEndBeforeCrop = Number(await page.getByLabel('End (seconds)').inputValue());
   await page.getByRole('button', { name: 'Crop to selection' }).click();
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('2');
   const selectionPanel = page.locator('.mastering-panel').filter({ hasText: 'Selection & precision edits' });
   await expect(selectionPanel.locator('.mastering-readout')).toContainText(/0\.5\d* s/);
+  await expect(page.getByRole('heading', { name: 'Markers' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Undo edit' }).click();
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('1');
+  await expect(page.getByLabel('Marker 1 name')).toHaveValue('Intro point');
+  await page.getByRole('button', { name: /^Select / }).click();
+  await expect(page.getByLabel('Start (seconds)')).toHaveValue(String(selectionStartBeforeCrop));
+  await expect(page.getByLabel('End (seconds)')).toHaveValue(String(selectionEndBeforeCrop));
   await expect(levelPanel.getByLabel('Redo available')).toHaveText('1');
   await page.getByRole('button', { name: 'Redo edit' }).click();
+  await expect(page.getByRole('heading', { name: 'Markers' })).toHaveCount(0);
   await expect(levelPanel.getByLabel('Applied operations')).toHaveText('2');
   await expect(levelPanel.getByLabel('Redo available')).toHaveText('0');
   await page.getByRole('button', { name: 'Reset audio edits' }).click();

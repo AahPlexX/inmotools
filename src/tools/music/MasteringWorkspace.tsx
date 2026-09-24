@@ -15,6 +15,19 @@ import {
 } from './mastering-engine';
 import { bufferToPcm, decodeAudioFile, type AudioFileInfo } from './mastering-media';
 import MasteringWaveform from './MasteringWaveform';
+import {
+  appendAudioEditRevision,
+  commitProjectRevision,
+  createMasteringDocument,
+  createProjectHistory,
+  cropProjectRevision,
+  insertSilenceRevision,
+  replaceProjectView,
+  redoProjectRevision,
+  undoProjectRevision,
+  type MasteringDocument,
+  type MasteringProjectHistory,
+} from './mastering-project';
 
 type PlaybackState = 'idle' | 'starting' | 'playing' | 'paused';
 type PlaybackGraph = {
@@ -39,16 +52,27 @@ const formatTime = (seconds: number) => {
 export default function MasteringWorkspace() {
   const [sourcePcm, setSourcePcm] = useState<PcmAudio | null>(null);
   const [sourceInfo, setSourceInfo] = useState<AudioFileInfo | null>(null);
-  const [edits, setEdits] = useState<AudioEdit[]>([]);
-  const [redoEdits, setRedoEdits] = useState<AudioEdit[]>([]);
-  const [selection, setSelection] = useState<TimeSelection>({ startSeconds: 0, endSeconds: 0 });
-  const [markers, setMarkers] = useState<MasteringMarker[]>([]);
-  const [regions, setRegions] = useState<MasteringRegion[]>([]);
+  const [history, setHistory] = useState<MasteringProjectHistory>(() => createProjectHistory());
+  const { edits, selection, playhead, markers, regions } = history.present;
+  const redoEdits = history.future;
+  const commitDocument = (next: MasteringDocument) => setHistory((current) => commitProjectRevision(current, next));
+  const updateView = (patch: Partial<Pick<MasteringDocument, 'selection' | 'playhead'>>) => setHistory((current) => replaceProjectView(current, patch));
+  const renameMarker = (id: string, label: string) => {
+    const nextLabel = label.trim();
+    const current = markers.find((marker) => marker.id === id);
+    if (!current || !nextLabel || current.label === nextLabel) return;
+    commitDocument({ ...history.present, markers: markers.map((marker) => marker.id === id ? { ...marker, label: nextLabel } : marker) });
+  };
+  const renameRegion = (id: string, label: string) => {
+    const nextLabel = label.trim();
+    const current = regions.find((region) => region.id === id);
+    if (!current || !nextLabel || current.label === nextLabel) return;
+    commitDocument({ ...history.present, regions: regions.map((region) => region.id === id ? { ...region, label: nextLabel } : region) });
+  };
   const [markerName, setMarkerName] = useState('');
   const [regionName, setRegionName] = useState('');
   const [silenceDuration, setSilenceDuration] = useState(1);
   const [channelIndex, setChannelIndex] = useState(0);
-  const [playhead, setPlayhead] = useState(0);
   const [loop, setLoop] = useState(false);
   const [gainDb, setGainDb] = useState(0);
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
@@ -81,7 +105,7 @@ export default function MasteringWorkspace() {
     if (graph) releaseGraph(graph);
     if (!mountedRef.current) return;
     setPlaybackState('idle');
-    if (resetPosition) setPlayhead(0);
+    if (resetPosition) updateView({ playhead: 0 });
     if (report) setStatus('Playback stopped and the audio graph was released.');
   }, [releaseGraph]);
 
@@ -91,8 +115,7 @@ export default function MasteringWorkspace() {
   }, [stopPlayback]);
 
   useEffect(() => {
-    setSelection((current) => clampSelection(current, duration));
-    setPlayhead((current) => Math.min(duration, Math.max(0, current)));
+    setHistory((current) => replaceProjectView(current, { selection: clampSelection(current.present.selection, duration), playhead: Math.min(duration, Math.max(0, current.present.playhead)) }));
   }, [duration]);
 
   const loadFile = useCallback(async (file: File) => {
@@ -106,22 +129,13 @@ export default function MasteringWorkspace() {
       const pcm = bufferToPcm(decoded.buffer);
       setSourcePcm(pcm);
       setSourceInfo(decoded.info);
-      setEdits([]);
-      setRedoEdits([]);
-      setMarkers([]);
-      setRegions([]);
-      setSelection({ startSeconds: 0, endSeconds: decoded.buffer.duration });
-      setPlayhead(0);
+      setHistory(createProjectHistory({ ...createMasteringDocument({ id: `${file.name}-${revision}`, name: file.name, durationSeconds: decoded.buffer.duration }), selection: { startSeconds: 0, endSeconds: decoded.buffer.duration }}));
       setStatus(`Loaded ${file.name}: ${decoded.info.codec}, ${decoded.info.channelCount} channel${decoded.info.channelCount === 1 ? '' : 's'}, ${decoded.info.sampleRate.toLocaleString()} Hz.`);
     } catch (error) {
       if (revision === importRevisionRef.current && mountedRef.current) {
         setSourcePcm(null);
         setSourceInfo(null);
-        setEdits([]);
-        setRedoEdits([]);
-        setMarkers([]);
-        setRegions([]);
-        setSelection({ startSeconds: 0, endSeconds: 0 });
+        setHistory(createProjectHistory());
         setStatus(`Could not open audio: ${messageOf(error)}`);
       }
     } finally {
@@ -141,13 +155,12 @@ export default function MasteringWorkspace() {
     if (file) void loadFile(file);
   };
 
-  const updateSelection = (next: TimeSelection) => setSelection(clampSelection(next, duration));
+  const updateSelection = (next: TimeSelection) => updateView({ selection: clampSelection(next, duration) });
 
   const applyEdit = (edit: AudioEdit, label: string) => {
     if (!currentPcm) return;
     stopPlayback(false);
-    setEdits((current) => [...current, edit]);
-    setRedoEdits([]);
+    commitDocument(appendAudioEditRevision(history.present, edit));
     setStatus(label);
   };
 
@@ -157,17 +170,9 @@ export default function MasteringWorkspace() {
       setStatus('Choose a non-empty range before cropping.');
       return;
     }
-    applyEdit({ type: 'crop', startSeconds: selected.startSeconds, endSeconds: selected.endSeconds }, `Cropped to ${formatTime(selected.startSeconds)}–${formatTime(selected.endSeconds)}. Undo remains available.`);
-    setMarkers((current) => current
-      .filter((marker) => marker.seconds >= selected.startSeconds && marker.seconds <= selected.endSeconds)
-      .map((marker) => ({ ...marker, seconds: marker.seconds - selected.startSeconds })));
-    setRegions((current) => current.flatMap((region) => {
-      const startSeconds = Math.max(region.startSeconds, selected.startSeconds);
-      const endSeconds = Math.min(region.endSeconds, selected.endSeconds);
-      return endSeconds > startSeconds ? [{ ...region, startSeconds: startSeconds - selected.startSeconds, endSeconds: endSeconds - selected.startSeconds }] : [];
-    }));
-    setSelection({ startSeconds: 0, endSeconds: selected.endSeconds - selected.startSeconds });
-    setPlayhead(0);
+    stopPlayback(false);
+    commitDocument(cropProjectRevision(history.present, selected.startSeconds, selected.endSeconds));
+    setStatus(`Cropped to ${formatTime(selected.startSeconds)}–${formatTime(selected.endSeconds)}. Undo remains available.`);
   };
 
   const snapSelectionToZero = () => {
@@ -176,34 +181,28 @@ export default function MasteringWorkspace() {
     const startIndex = findZeroCrossing(first, Math.round(boundedSelection.startSeconds * currentPcm.sampleRate));
     const endIndex = findZeroCrossing(first, Math.min(first.length - 1, Math.round(boundedSelection.endSeconds * currentPcm.sampleRate)));
     const next = clampSelection({ startSeconds: startIndex / currentPcm.sampleRate, endSeconds: endIndex / currentPcm.sampleRate }, duration);
-    setSelection(next);
+    updateView({ selection: next });
     setStatus(`Selection snapped to nearby zero crossings at ${formatTime(next.startSeconds)} and ${formatTime(next.endSeconds)}.`);
   };
 
   const undoEdit = () => {
     if (!edits.length) return;
     stopPlayback(false);
-    const edit = edits[edits.length - 1];
-    setEdits((current) => current.slice(0, -1));
-    setRedoEdits((current) => [...current, edit]);
+    setHistory((current) => undoProjectRevision(current));
     setStatus('Undid the most recent audio edit.');
   };
 
   const redoEdit = () => {
     if (!redoEdits.length) return;
     stopPlayback(false);
-    const edit = redoEdits[redoEdits.length - 1];
-    setRedoEdits((current) => current.slice(0, -1));
-    setEdits((current) => [...current, edit]);
+    setHistory((current) => redoProjectRevision(current));
     setStatus('Redid the most recently undone audio edit.');
   };
 
   const resetEdits = () => {
     if (!edits.length && !redoEdits.length) return;
     stopPlayback(false, true);
-    setEdits([]);
-    setRedoEdits([]);
-    setSelection({ startSeconds: 0, endSeconds: sourcePcm ? pcmDuration(sourcePcm) : 0 });
+    commitDocument({ ...history.present, edits: [], selection: { startSeconds: 0, endSeconds: sourcePcm ? pcmDuration(sourcePcm) : 0 }, playhead: 0 });
     setStatus('All applied audio edits were reset to the imported source.');
   };
 
@@ -215,7 +214,7 @@ export default function MasteringWorkspace() {
       label,
       seconds: Math.min(duration, Math.max(0, playhead)),
     };
-    setMarkers((current) => [...current, marker]);
+    commitDocument({ ...history.present, markers: [...markers, marker] });
     setMarkerName('');
     setStatus(`Added ${marker.label} at ${formatTime(marker.seconds)}.`);
   };
@@ -232,7 +231,7 @@ export default function MasteringWorkspace() {
       startSeconds: boundedSelection.startSeconds,
       endSeconds: boundedSelection.endSeconds,
     };
-    setRegions((current) => [...current, region]);
+    commitDocument({ ...history.present, regions: [...regions, region] });
     setRegionName('');
     setStatus(`Added ${region.label} from ${formatTime(region.startSeconds)} to ${formatTime(region.endSeconds)}.`);
   };
@@ -243,18 +242,9 @@ export default function MasteringWorkspace() {
       return;
     }
     const at = Math.min(duration, Math.max(0, playhead));
-    applyEdit({ type: 'insertSilence', atSeconds: at, durationSeconds: silenceDuration }, `Inserted ${silenceDuration.toFixed(3)} seconds of silence at ${formatTime(at)}.`);
-    setMarkers((current) => current.map((marker) => marker.seconds >= at ? { ...marker, seconds: marker.seconds + silenceDuration } : marker));
-    setRegions((current) => current.map((region) => ({
-      ...region,
-      startSeconds: region.startSeconds >= at ? region.startSeconds + silenceDuration : region.startSeconds,
-      endSeconds: region.endSeconds >= at ? region.endSeconds + silenceDuration : region.endSeconds,
-    })));
-    setSelection((current) => ({
-      startSeconds: current.startSeconds >= at ? current.startSeconds + silenceDuration : current.startSeconds,
-      endSeconds: current.endSeconds >= at ? current.endSeconds + silenceDuration : current.endSeconds,
-    }));
-    setPlayhead(at + silenceDuration);
+    stopPlayback(false);
+    commitDocument(insertSilenceRevision(history.present, at, silenceDuration));
+    setStatus(`Inserted ${silenceDuration.toFixed(3)} seconds of silence at ${formatTime(at)}.`);
   };
 
   const startTicker = (graph: PlaybackGraph) => {
@@ -268,7 +258,7 @@ export default function MasteringWorkspace() {
       } else {
         next = Math.min(duration, next);
       }
-      if (mountedRef.current) setPlayhead(next);
+      if (mountedRef.current) updateView({ playhead: next });
       graph.raf = requestAnimationFrame(tick);
     };
     graph.raf = requestAnimationFrame(tick);
@@ -324,7 +314,7 @@ export default function MasteringWorkspace() {
         if (context.state !== 'closed') void context.close().catch(() => undefined);
         if (mountedRef.current) {
           setPlaybackState('idle');
-          setPlayhead(duration);
+          updateView({ playhead: duration });
           setStatus('Playback complete and the audio graph was released.');
         }
       };
@@ -352,7 +342,7 @@ export default function MasteringWorkspace() {
     sessionRef.current += 1;
     graphRef.current = null;
     releaseGraph(graph);
-    setPlayhead(Math.min(duration, pausedAt));
+    updateView({ playhead: Math.min(duration, pausedAt) });
     setPlaybackState('paused');
     setStatus(`Paused at ${formatTime(pausedAt)}. Playback resources were released.`);
   };
@@ -361,7 +351,7 @@ export default function MasteringWorkspace() {
     const next = Math.min(duration, Math.max(0, Number.isFinite(seconds) ? seconds : 0));
     const wasPlaying = playbackState === 'playing';
     stopPlayback(false);
-    setPlayhead(next);
+    updateView({ playhead: next });
     setPlaybackState(wasPlaying ? 'paused' : playbackState === 'paused' ? 'paused' : 'idle');
   };
 
@@ -504,18 +494,18 @@ export default function MasteringWorkspace() {
       {markers.length > 0 && <section className="mastering-panel" aria-labelledby="markers-heading">
         <div className="mastering-panel-heading"><div><h3 id="markers-heading">Markers</h3><p>Rename, jump to, or remove exact timeline points.</p></div></div>
         <div className="mastering-marker-list">{markers.map((marker, index) => <div key={marker.id}>
-          <input type="text" aria-label={`Marker ${index + 1} name`} value={marker.label} onChange={(event) => setMarkers((current) => current.map((candidate) => candidate.id === marker.id ? { ...candidate, label: event.target.value } : candidate))} />
+          <input type="text" aria-label={`Marker ${index + 1} name`} defaultValue={marker.label} onBlur={(event) => renameMarker(marker.id, event.currentTarget.value)} />
           <button type="button" onClick={() => seek(marker.seconds)}>Jump {formatTime(marker.seconds)}</button>
-          <button type="button" aria-label={`Remove ${marker.label || `marker ${index + 1}`}`} onClick={() => setMarkers((current) => current.filter((candidate) => candidate.id !== marker.id))}>Remove</button>
+          <button type="button" aria-label={`Remove ${marker.label || `marker ${index + 1}`}`} onClick={() => commitDocument({ ...history.present, markers: markers.filter((candidate) => candidate.id !== marker.id) })}>Remove</button>
         </div>)}</div>
       </section>}
 
       {regions.length > 0 && <section className="mastering-panel" aria-labelledby="regions-heading">
         <div className="mastering-panel-heading"><div><h3 id="regions-heading">Regions</h3><p>Named ranges can restore the exact selection and playhead in one action.</p></div></div>
         <div className="mastering-region-list">{regions.map((region, index) => <div key={region.id}>
-          <input type="text" aria-label={`Region ${index + 1} name`} value={region.label} onChange={(event) => setRegions((current) => current.map((candidate) => candidate.id === region.id ? { ...candidate, label: event.target.value } : candidate))} />
-          <button type="button" onClick={() => { setSelection({ startSeconds: region.startSeconds, endSeconds: region.endSeconds }); seek(region.startSeconds); }}>Select {formatTime(region.startSeconds)}–{formatTime(region.endSeconds)}</button>
-          <button type="button" aria-label={`Remove ${region.label || `region ${index + 1}`}`} onClick={() => setRegions((current) => current.filter((candidate) => candidate.id !== region.id))}>Remove</button>
+          <input type="text" aria-label={`Region ${index + 1} name`} defaultValue={region.label} onBlur={(event) => renameRegion(region.id, event.currentTarget.value)} />
+          <button type="button" onClick={() => { updateView({ selection: { startSeconds: region.startSeconds, endSeconds: region.endSeconds }, playhead: region.startSeconds }); seek(region.startSeconds); }}>Select {formatTime(region.startSeconds)}–{formatTime(region.endSeconds)}</button>
+          <button type="button" aria-label={`Remove ${region.label || `region ${index + 1}`}`} onClick={() => commitDocument({ ...history.present, regions: regions.filter((candidate) => candidate.id !== region.id) })}>Remove</button>
         </div>)}</div>
       </section>}
 
