@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 test('compiles collision-safe symbols, isolates bad files, previews safely, and reports viewBox uncertainty', async ({ page }) => {
@@ -251,4 +252,24 @@ test('Vector Studio exposes non-destructive clip, difference, and symmetry dupli
   await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
   await page.getByRole('button', { name: 'Symmetry duplicate horizontal' }).click();
   await expect(page.getByTestId('vector-layer')).toHaveCount(3);
+});
+
+
+test('Vector Studio keeps scrollable regions keyboard reachable and free of serious axe violations', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+
+  const canvasViewport = page.locator('.vector-canvas-scroll');
+  const inspector = page.locator('.vector-inspector');
+  await expect(canvasViewport).toHaveAttribute('tabindex', '0');
+  await expect(canvasViewport).toHaveAttribute('role', 'region');
+  await expect(inspector).toHaveAttribute('tabindex', '0');
+
+  await canvasViewport.focus();
+  await expect(canvasViewport).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+
+  const results = await new AxeBuilder({ page }).analyze();
+  const blocking = results.violations.filter((violation) =>
+    violation.impact === 'serious' || violation.impact === 'critical');
+  expect(blocking, blocking.map((item) => `${item.id}: ${item.help}`).join('\n')).toEqual([]);
 });
