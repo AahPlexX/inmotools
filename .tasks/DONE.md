@@ -1,5 +1,31 @@
 # Done
 
+## Vector Studio — 66/66 complete
+
+Vector Studio is complete against the 66-capability design ledger in
+`docs/superpowers/specs/2026-09-11-vector-studio-design.md`. The authoritative product revision
+is `e5a31cf0a01da6ede1437f15a457a54afcdf3e29` on `origin/main`.
+
+The final closure pass did not add feature-count inflation. It reconciled the historical
+`feat/vector-spec-completion` and `fix/vector-path-motion-20260916` branches against current
+`main`, proving the accepted UI/export/tests are already integrated and that the current engine
+is the completed engine plus the later SVG path-geometry translation fix. It then fixed two real
+closure defects: focused validation omitted `vector-nested-composition.spec.ts`, and the
+artboard/inspector scroll regions failed Axe's serious `scrollable-region-focusable` rule.
+Focused SVG validation now selects both Vector browser specs; scrollable Vector regions are
+keyboard reachable with visible focus and native scrolling keys preserved.
+
+Exact-main focused run `36052165692` / job `107810129727` passed the production build,
+selector step, Chromium install, and **22/22 desktop/mobile browser checks**, including the new
+serious/critical Axe regression and nested composition parity. Pages run `36052165503` passed
+repository units and production build, built the production Pages artifact, and deployed the same
+revision successfully through job `107810383399`. Static closure found no Vector
+TODO/FIXME/HACK implementation debt and no remote `fetch`, `XMLHttpRequest`, or `WebSocket`
+path under `src/tools/svg/`.
+
+Historical Vector branches are evidence only and must not be merged wholesale. New Vector scope
+must re-enter the task-state system from current `origin/main`.
+
 ## TASK-013: Reconcile the two undo histories in Markdown Workbench
 **Priority:** P3 | **Tags:** editor, ux | **Completed:** 2026-09-24
 
