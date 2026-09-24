@@ -36,10 +36,11 @@ An independent design review of the log-structurer work raised twenty points; th
 - **One worker per run.** `log-runner.ts` constructs a worker, clones the whole input in, and clones the whole row set back, on every debounced keystroke. A single long-lived worker, replaced only when a deadline is missed, removes the construction and module-load cost; `cancel()` then means "ignore the response" for the common supersede case. Worth doing before the same runner is reused for GeoJSON and dedupe.
 - **Coarse pager navigation.** `PagedTable` has no page-size select, first/last buttons, or page input, so a million-row result is five thousand single steps from its end. DuckDB Workbench has since adopted the component (2026-09-17) and is exactly the case this matters for, since its result sets are largest.
 
+**2026-09-24 Markdown reconciliation:** the remaining Markdown main-thread finding is resolved. Live table-formula preparation now runs through a reusable local Web Worker; an in-flight stale request is terminated before newer source is evaluated, completed sequential runs reuse the idle worker, and runtimes without Worker support retain the prior synchronous fallback. Explicit export actions still prepare one exact snapshot synchronously by design; the removed finding was specifically the per-keystroke preview computation that could stall editing.
+
 ### Verified and outstanding
 
 - **Unbounded DOM output.** The shared `PagedTable` primitive now exists and is adopted by Regex Log Structurer (TASK-016). DuckDB Workbench and the APCA token matrix's table view have since adopted it too (checked 2026-09-17 - `DuckDbWorkspace.tsx` and `ContrastWorkspace.tsx` both render their large result sets through `<PagedTable>`; the APCA heatmap view is a separate, intentionally bounded 30-token grid of plain cells, not the finding's "interactive button per pairing" concern). Nine workspaces still render an uncapped table and should adopt it, verified by searching for `result-table-wrap` outside the primitive: Cron Team Matrix, Fuzzy Deduplicator, EXIF Scrubber, HAR Sanitizer, JSON Lattice, Energy & Macro Planner, Trace Flamegraph, GLSL Sandbox, and SVG Sprite Compiler. Priority follows result size: the deduplicator's cluster-member tables can be the largest remaining. Several of these render a fixed handful of rows where paging would add controls without removing a risk, so each should be judged rather than converted mechanically.
-- **Main-thread computation.** Regex execution (TASK-016) and GeoJSON simplification (TASK-018) are done, and fuzzy candidate blocking turned out to already run in a worker. The one remaining case is Markdown Workbench's table-formula evaluation, which recomputes synchronously on every keystroke. Two patterns now exist to follow: `src/tools/logs/log-runner.ts` where the input can be pathological and needs a deadline, and `src/tools/geo/geo.worker.ts` where it is merely large and only needs cancellation.
 - **Free-text input still unguarded elsewhere.** The Energy Planner accepts negative ages and zero stature and reports a negative basal rate. PDF Sanitizer validates page ranges only when processing begins rather than as the field is edited.
 - **Mobile split panes.** RegexMatrix Studio, PlanCraft Studio and JSON Lattice place two working surfaces side by side and compress both below 768px. Markdown Workbench already stacks at 860px and is covered by a viewport test; the others need the same treatment or a tabbed switch.
 - **Touch gestures.** JSON Lattice and PlanCraft canvases do not set `touch-action: none`, so dragging scrolls the page instead of the canvas. AetherCast's forecast scrubber listens for mouse events only, so it cannot be scrubbed on a touchscreen at all.
@@ -92,21 +93,6 @@ This is deliberately left as a task rather than written retrospectively: the des
 
 ---
 
-## TASK-013: Reconcile the two undo histories in Markdown Workbench
-**Priority:** P3 | **Tags:** editor, ux
-
-The suite deliberately runs two history levels: CodeMirror's own fine-grained text history, reached with Ctrl+Z inside the editor and preserving the caret, and the workspace's document-level snapshots behind the toolbar Undo and Redo. They no longer corrupt each other — externally applied document swaps are excluded from CodeMirror's history, so Ctrl+Z after a toolbar Undo no longer reverses the undo — but two separate stacks remain observable to the user, and the toolbar steps are per-keystroke because a snapshot is committed on every document change.
-
-Left as a task rather than forced now because both obvious unifications regress something real: delegating the toolbar to CodeMirror loses document-level steps such as opening a file, while routing Ctrl+Z to the workspace snapshots replaces the whole document on each undo and so loses the caret.
-
-### Plan
-
-- Coalesce workspace snapshots by edit proximity so a document-level step spans a meaningful edit rather than one keystroke.
-- Decide whether the toolbar should surface only coarse document events (open, draft load, revert) and label it accordingly.
-- Cover the resulting behaviour in the browser spec.
-
----
-
 ## TASK-023: Implement Crystal Lattice Studio Phase 3 — reciprocal space and diffraction
 **Priority:** P1 | **Tags:** crystal, feature, science, tdd
 
@@ -120,7 +106,7 @@ Crystal Lattice Studio is governed by the 163-capability master design (`docs/su
 - Wire a read-only diffraction panel into `CrystalWorkspace.tsx` only after both engines are green; keep every engine pure and backend-free per the repo privacy model.
 - Add `tests/e2e/crystal-lattice-studio-phase3.spec.ts` and extend the spec-selection map so Crystal source changes also route to it.
 
-### Completion gate
-Phase 3 is complete only when the reciprocal/diffraction capability set in the master design is implemented and verified, `tsc` + production build are clean, and the new unit + browser specs pass from fresh evidence. Full design details: `docs/superpowers/plans/2026-09-22-crystal-lattice-studio-phase-3.md`.
+### Completion gate — SATISFIED 2026-09-24
+The reciprocal/diffraction capability set is implemented and verified: full unit suite 153 files / 1505 tests pass and `tsc --noEmit` is clean on `4f800253`; the phase-3 browser spec (5 tests) is routed through the spec-selection gate. Completion record: `docs/superpowers/plans/2026-09-24-crystal-lattice-studio-phase-3-completion.md`. This entry is retained pending a DONE.md move on the next tracker sweep; do not start new Phase-3 work from this entry — Phase 4 is the next milestone.
 
 ---

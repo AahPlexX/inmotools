@@ -1,5 +1,42 @@
 # Done
 
+## TASK-013: Reconcile the two undo histories in Markdown Workbench
+**Priority:** P3 | **Tags:** editor, ux | **Completed:** 2026-09-24
+
+Closed without collapsing the two history systems into one. CodeMirror keeps its native fine-grained Ctrl/Cmd+Z history and caret behavior. The workspace toolbar now exposes explicitly named document-step Undo/Redo controls and groups adjacent editor changes into one coarse snapshot by edit proximity; opening a file, loading a draft, starting a new document, or using toolbar undo/redo resets that grouping boundary. External document swaps remain excluded from CodeMirror history, so the two stacks do not fight.
+
+The same completion pass resolved TASK-014's Markdown-specific performance item: live table-formula substitution moved from the React render path to a reusable cancellable local Web Worker, with latest-request protection and a synchronous no-Worker fallback. Export actions still compute their requested exact snapshot synchronously because they are explicit operations rather than per-keystroke work.
+
+Red-first evidence was captured before implementation. Final pre-integration PR validation run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks across desktop and mobile Chromium.
+
+---
+
+## Typing Workstation completion audit — 38/38 complete
+
+The 2026-09-24 Typing follow-up is closed without expanding the original 38-capability denominator.
+Fresh source and standards review found two real interaction defects in the already-shipped tool:
+the typing surface depended on raw `keydown` text capture, which excluded reliable software-keyboard
+and IME text entry, and it intercepted `Tab` to generate a new sample instead of allowing standard
+focus traversal. The implementation now uses a native textarea input surface with
+`input`/composition handling, preserves physical `KeyboardEvent.code` metadata for raw hardware
+logs when available, supports mobile Backspace input, moves fresh-sample generation to `F2`, keeps
+`Tab` as normal focus navigation, exposes the shortcuts in visible copy, gives tag-removal targets
+a 24 CSS-pixel minimum, and reflows the virtual keyboard/panels across compact widths.
+
+Product changes landed directly on `origin/main` as
+`dea365cf61d1633db66fdcc49b8321a4f3e8ff76` and follow-up compatibility fix
+`1538148b21d7502bc181ffe7ffcf1f683beb750d`. Dedicated Typing run
+`36009754067` / job `107667101416` passed **67/67 focused unit tests**, the production
+build, Chromium installation, and **14/14 desktop/mobile browser checks**. Pages run
+`36009753871` built and deployed the same product revision successfully. Its repository-wide
+browser lane was red on 15 failures in other workspaces/infrastructure, while all 14 Typing cases
+executed and none failed. `main` subsequently advanced only through unrelated Crystal/task
+documentation before closure, and no Typing-named branch remains.
+
+The Typing plan is the maintenance handoff:
+`docs/superpowers/plans/2026-09-15-typing-workstation.md`. New Typing scope must re-enter the
+task-state system rather than reopening this completed audit implicitly.
+
 ## Transcode Workstation — F01–F36 complete
 
 The local-first Transcode Workstation is complete against its 36-capability design ledger and
@@ -29,6 +66,25 @@ new Transcode scope must re-enter `.tasks` before implementation.
 Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); this closes the remaining audit findings found against it. The dedicated validation workflow only triggered on pushes to `feat/sightline-velocity`, so it never validated `main` or any `fix/sightline-*` branch — widened to `[main, feat/sightline-velocity, 'fix/sightline-*']`. Clearing local reading history, document history, and the word bank was a single click with no confirmation and no way back; it now asks first and names exactly what it removes. Loading multiple files reported the *last selected* file as "active" even when that file failed to load and an earlier one succeeded instead; failures and successes are now tracked separately and the status names the file that is genuinely active. The workspace never released its IndexedDB handle, audio context, or an in-flight speech-synthesis utterance on unmount, and the metronome allocated a `AudioContext` even when set to a visual-only channel; both are fixed. `clearWarehouse`'s result was previously discarded, so a failed clear silently reported success — it's now surfaced to the user instead.
 
 Accepted revision `f0b6c0481c9e600ca6ec00284527216e00d433f9` on `fix/sightline-audit` (a clean descendant of `main`): `tsc --noEmit` clean, 408/408 focused unit tests across 16 `tests/unit/sightline-*.test.ts` files, production build passed, and Playwright `tests/e2e/sightline.spec.ts` 46/46 passed (one earlier run showed a single 5s-timeout flake on the catalog-navigation test, not reproducible across 6 repeated runs afterward).
+
+
+
+**UX/real-world follow-up closure — 2026-09-24.** The later reading-first remediation merged
+through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403` without changing the F1–F35
+denominator. It added accurate multi-file results and in-session document switching, loaded-state
+source collapse, a persistent reading cockpit with direct WPM control, progressive disclosure of
+specialist controls/diagnostics/metadata/contents, live status semantics, nested drag-leave
+correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel wiring,
+and narrow/coarse-pointer ergonomics.
+
+Dedicated workflow `35613856993` passed 409/409 Sightline unit assertions across 16 files, the
+production build, and 48/48 desktop/mobile Chromium browser checks, including accessibility,
+keyboard-only operation, export round trips, and desktop/tablet/phone overflow coverage. Pages
+run `35613857161` built and deployed successfully; its broad browser failures were unrelated
+to Sightline and all Sightline cases ran without a Sightline failure. A final static closure scan
+found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or WebSocket path. The
+historical `feat/sightline-velocity` branch is 0 commits ahead of `main`, so no intended
+completed Sightline work is stranded there.
 
 ## TASK-020: Add the Typing Workstation
 
