@@ -53,6 +53,8 @@ The two remaining Markdown-specific tracked gaps are closed.
 
 **Regression proof.** The first CI pass failed only because the new runner module did not yet exist, proving the worker-runner test was red for the intended reason. After the runner existed but before workspace wiring, browser regressions still failed because no formula Worker was constructed and the new toolbar labels/behavior were absent. Final pre-integration run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks on desktop and mobile Chromium. No dependency was added.
 
+Shared task-state files in this closeout were regenerated from the then-current `main` versions before the branch ref moved, preserving parallel workstream entries rather than replaying stale branch copies.
+
 ## Sources checked
 
 - Official CodeMirror language source: https://github.com/codemirror/language/blob/main/src/highlight.ts
