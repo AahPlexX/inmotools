@@ -2,7 +2,7 @@ name: Typing Workstation validation
 
 on:
   push:
-    branches: [main, feature/typing-workstation]
+    branches: [main]
     paths:
       - 'src/tools/typing/**'
       - 'tests/unit/typing-*.test.ts'

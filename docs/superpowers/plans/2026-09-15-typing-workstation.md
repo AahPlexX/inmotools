@@ -1,8 +1,8 @@
 # Typing Workstation Implementation Plan
 
 **Date:** 2026-09-15
-**Branch:** `feature/typing-workstation`
-**Last audit refresh:** 2026-09-19
+**Authority:** `origin/main` (the completed feature branch was deleted after integration)
+**Last audit refresh:** 2026-09-24
 **Design record:** this file is authoritative until a dedicated design doc is written.
 
 ## Goal
@@ -13,7 +13,7 @@ Add a local-first typing speed calculator, ergonomic touch-typing testing surfac
 
 - New workspace under `src/tools/typing/` with an isolated engine (`typing-engine.ts`), corpora (`typing-corpora.ts` plus the generated offline `typing-english-frequency.ts` ranked corpus), duration-aware target builder (`typing-target.ts`), persistence (`typing-storage.ts` — Dexie/IndexedDB), audio synthesis (`typing-audio.ts` — Web Audio API), export module (`typing-export.ts`), scoped styles (`typing-styles.css`), and a React workspace component (`TypingWorkspace.tsx`).
 - Registered via the central catalog (`src/catalog.ts`) and workspace loader (`src/tools/workspaces.tsx`), with no changes to other tools.
-- All computations and persistence run in the browser. No backend, no telemetry, no network call. Optional Web Serial / Web Bluetooth is not required — the tool measures keystrokes purely via `KeyboardEvent` timings.
+- All computations and persistence run in the browser. No backend, no telemetry, no network call. The typing surface uses native text-input/composition events so software keyboards and IMEs reach the same engine; physical control keys use `KeyboardEvent`, and timing samples use `performance.now()`.
 - The English Top 200 / Top 1,000 / Top 5,000 tiers are nested slices of a bundled 5,000-entry frequency-ranked corpus derived from the pinned FrequencyWords source documented in `src/tools/typing/THIRD_PARTY_NOTICES.md`; no corpus fetch occurs at runtime.
 
 ## Tech stack
@@ -33,7 +33,7 @@ Add a local-first typing speed calculator, ergonomic touch-typing testing surfac
 Every item below is a shipping requirement. Removal or deferral must land in `.tasks/NEXT.md` with rationale before the workstream can close.
 
 ### Core typing engine & real-time metrics
-1. Sub-millisecond keystroke capture using `performance.now()` per press.
+1. High-resolution input timing using `performance.now()` (sub-millisecond where the browser exposes it; user agents may coarsen timer precision for privacy/security).
 2. Gross WPM, Net WPM, and Raw CPM computed from the standard 5-character word unit.
 3. Multi-mode durations: time (15/30/60/120s), word count (10/25/50/100/200), quote length (short/medium/long/thicc), infinite Zen mode, and 5-minute certification exam.
 4. Six caret styles (Line, Block, Underline, Box, Pulse, Ghost).
@@ -88,10 +88,11 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 
 ## Milestones
 
-- **A. Foundation & engine — complete.** `typing-engine.ts`, exact ranked corpora, target generation, storage, audio, exports, styles, workspace UI, catalog and loader are implemented on `feature/typing-workstation`.
+- **A. Foundation & engine — complete.** `typing-engine.ts`, exact ranked corpora, target generation, storage, audio, exports, styles, workspace UI, catalog and loader are integrated on `origin/main`.
 - **B. Focused unit tests — complete.** 67 focused tests across seven convention-discovered `tests/unit/typing-*.test.ts` files cover engine behavior/metrics, correction modes, Enter/newline and Backspace replay, conventional n-gram medians, duration/target sizing, exact ranked corpora, programmer languages, layout-specific finger anchors, key-sound classification, stored/imported-record validation including coherent quote/Zen families, legacy-read sanitization, personal-best identity, case-insensitive tag filtering, CSV formula escaping, certificate eligibility, exports, and custom-text normalization.
 - **C. Focused browser spec — complete.** Seven logical scenarios run on desktop and mobile Chromium (14 checks total). They cover multiline completion; explicit side-effect-free result exports versus explicit Save; forgiving/master error behavior and certificate gating; filtered and paginated history; CSV/Markdown/JSON export; invalid-record import skipping plus immediate imported-PB refresh; CSV dictionary/raw-keystroke/PDF paths; corrupt-preference recovery and quote/Zen family coupling; bundled OpenDyslexic/modal semantics; Axe serious/critical accessibility; reduced-motion behavior; and 320 CSS-pixel reflow.
 - **D. Integration & Pages verification — Typing complete.** The post-integration hardening delta merged to `main` through PR #69 as `463ef3c0b3e002e833b8b86dff9889ee9671f3a8`. The dedicated exact-main Typing workflow passed 67/67 focused units, production build, Chromium setup, and 14/14 desktop/mobile browser checks. Pages artifact build and deployment also succeeded on that SHA. The repository-wide Pages validation job remains red only because an unrelated Crystal spec-selection unit expects one Crystal browser spec while the selector now returns two; all seven Typing unit files passed inside that broad job.
+- **E. 2026-09-24 completion audit — active.** Fresh source/standards review found two product-level gaps despite the earlier 38/38 ledger closure: the visual `div[role=textbox]` depended on raw `keydown` events (unreliable for touch software keyboards and alternate/IME text entry), and it intercepted `Tab` for “new text,” preventing standard focus traversal. The remediation keeps the 38-feature denominator unchanged: native textarea capture + input/composition handling, F2 as the fresh-sample shortcut, mobile Backspace input support, visible keyboard guidance, 24px tag-removal targets, compact keyboard reflow, focused browser regressions, and stale branch/CI wording cleanup. SEO was reviewed separately: the repository’s hash-fragment router is a shared architecture limitation, so this tool workstream does not claim independent search indexing or alter shared routing.
 
 ## Latest focused acceptance evidence
 
@@ -115,12 +116,12 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 ## Non-goals / explicit exclusions
 
 - No cloud multiplayer, no account system, no telemetry — the entire workflow is local.
-- No proprietary hardware driver integration — keystroke timing uses browser `KeyboardEvent` timestamps only.
+- No proprietary hardware driver integration — text entry uses browser input/composition events, physical control keys use `KeyboardEvent`, and elapsed timing uses `performance.now()`.
 - No AI-generated copy or features anywhere in the tool.
 
 ## Validation
 
-- `.github/workflows/typing-workstation.yml` is the focused branch gate.
+- `.github/workflows/typing-workstation.yml` is the focused `main` validation gate for Typing-scoped changes.
 - Focused Vitest coverage is convention-discovered via `tests/unit/typing-*.test.ts`, preventing new Typing unit files from being silently omitted; it verifies engine semantics/analytics, duration/target generation, exact corpus contracts, storage/import behavior, and exports without rerunning unrelated tool suites.
 - `pnpm build` verifies TypeScript and the Vite production bundle.
 - `tests/e2e/typing.spec.ts` runs the seven critical acceptance scenarios on both desktop and mobile Chromium, including completion/error semantics, all mandatory export families that can be deterministically inspected in-browser, import round-trips, bundled-font availability, modal keyboard semantics, accessibility, and 320 CSS-pixel reflow.

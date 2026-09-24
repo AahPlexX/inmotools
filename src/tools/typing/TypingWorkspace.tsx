@@ -72,7 +72,7 @@ import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMo
 // -------------------- reducer wiring --------------------
 
 interface EngineAction {
-  type: 'press' | 'reset' | 'finish' | 'restart' | 'extend';
+  type: 'press' | 'commitText' | 'reset' | 'finish' | 'restart' | 'extend';
   key?: string;
   text?: string;
   code?: string;
@@ -85,6 +85,16 @@ function reducer(state: EngineState, action: EngineAction): EngineState {
   switch (action.type) {
     case 'press':
       return pressKey(state, action.key ?? '', action.code ?? '', action.t ?? performance.now());
+    case 'commitText': {
+      const timestamp = action.t ?? performance.now();
+      const code = action.code ?? 'Input';
+      let next = state;
+      for (const character of (action.text ?? '').replace(/\r\n?/g, '\n')) {
+        if (next.finished) break;
+        next = pressKey(next, character === '\n' ? 'Enter' : character, code, timestamp);
+      }
+      return next;
+    }
     case 'reset':
     case 'restart':
       return action.initial ?? state;
@@ -316,7 +326,9 @@ export default function TypingWorkspace() {
   const [pauseUntilFocus, setPauseUntilFocus] = useState(false);
 
   const audioRef = useRef<AudioController | null>(null);
-  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLTextAreaElement | null>(null);
+  const compositionActiveRef = useRef(false);
+  const compositionCommitRef = useRef<string | null>(null);
   const wpmChartRef = useRef<HTMLCanvasElement | null>(null);
   const historyChartRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -611,36 +623,110 @@ export default function TypingWorkspace() {
     }
   }, [config, rebuildTarget, target]);
 
-  // Global key handler on the canvas.
-  const handleKey = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
+  const commitTextInput = useCallback((text: string, code = 'Input') => {
+    if (engine.finished) return;
+    const normalized = text.replace(/\r\n?/g, '\n');
+    if (!normalized) return;
+
+    const t = performance.now();
+    let preview = engine;
+    for (const character of normalized) {
+      if (preview.finished) break;
+      const key = character === '\n' ? 'Enter' : character;
+      const sound = classifyKeystrokeSound(key, preview.targetText[preview.cursor], config.caseSensitive);
+      const next = pressKey(preview, key, code, t);
+      if (next !== preview && config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
+      preview = next;
+    }
+
+    if (!running && engine.startedAt == null && preview.startedAt != null) {
+      setRunning(true);
+      setStatusText('Test started.');
+    }
+    dispatch({ type: 'commitText', text: normalized, code, t });
+  }, [engine, running, config.audioProfile, config.caseSensitive]);
+
+  const handleTextInput = useCallback((event: React.FormEvent<HTMLTextAreaElement>) => {
+    const nativeEvent = event.nativeEvent as InputEvent;
+    if (compositionActiveRef.current || nativeEvent.isComposing) return;
+
+    const committedComposition = compositionCommitRef.current;
+    if (
+      committedComposition !== null
+      && nativeEvent.inputType === 'insertCompositionText'
+      && nativeEvent.data === committedComposition
+    ) {
+      compositionCommitRef.current = null;
+      event.currentTarget.value = '';
+      return;
+    }
+    compositionCommitRef.current = null;
+
+    if (nativeEvent.inputType === 'deleteContentBackward') {
+      event.currentTarget.value = '';
+      if (!engine.finished) {
+        const t = performance.now();
+        dispatch({ type: 'press', key: 'Backspace', code: 'Backspace', t });
+        if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
+      }
+      return;
+    }
+
+    if (nativeEvent.inputType.startsWith('delete')) {
+      event.currentTarget.value = '';
+      return;
+    }
+
+    if (nativeEvent.inputType === 'insertFromPaste' || nativeEvent.inputType === 'insertFromDrop') {
+      event.currentTarget.value = '';
+      setStatusText('Paste and drop input are disabled during a typing test.');
+      return;
+    }
+
+    const text = nativeEvent.data ?? event.currentTarget.value;
+    event.currentTarget.value = '';
+    commitTextInput(text);
+  }, [commitTextInput, engine.finished, config.audioProfile]);
+
+  const handleCompositionEnd = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
+    compositionActiveRef.current = false;
+    event.currentTarget.value = '';
+    if (!event.data) return;
+    compositionCommitRef.current = event.data;
+    commitTextInput(event.data, 'IME');
+  }, [commitTextInput]);
+
+  // Keyboard events remain for physical control keys. Text itself is committed
+  // through input/composition events so touch keyboards and IMEs use the same engine.
+  const handleKey = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || compositionActiveRef.current) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
       if (running) dispatch({ type: 'finish', reason: 'aborted' });
       setRunning(false);
       setStatusText('Test aborted.');
       return;
     }
-    if (e.key === 'Tab') {
-      e.preventDefault();
+
+    if (event.key === 'F2') {
+      event.preventDefault();
       rebuildTarget();
       return;
     }
-    if (engine.finished) return;
-    const t = performance.now();
-    const commitsExpectedCharacter = e.key.length === 1 || (e.key === 'Enter' && engine.targetText[engine.cursor] === '\n');
-    if (!running && commitsExpectedCharacter) {
-      setRunning(true);
-      setStatusText('Test started.');
+
+    if (event.key === 'Backspace' && !engine.finished) {
+      event.preventDefault();
+      const t = performance.now();
+      dispatch({ type: 'press', key: 'Backspace', code: event.code || 'Backspace', t });
+      if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
     }
-    e.preventDefault();
-    const sound = classifyKeystrokeSound(e.key, engine.targetText[engine.cursor], config.caseSensitive);
-    dispatch({ type: 'press', key: e.key, code: e.code, t });
-    if (config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
-  }, [engine.finished, engine.targetText, engine.cursor, rebuildTarget, running, config.audioProfile, config.caseSensitive]);
+  }, [engine.finished, rebuildTarget, running, config.audioProfile]);
 
   const restart = useCallback(() => {
     rebuildTarget();
+    canvasRef.current?.focus({ preventScroll: true });
   }, [rebuildTarget]);
 
   const abort = useCallback(() => {
@@ -901,18 +987,41 @@ export default function TypingWorkspace() {
       )}
 
       {/* Typing canvas */}
+      <p className="tw-input-hint" id="tw-typing-input-help">
+        Click or tap the typing area, then type. <kbd>Esc</kbd> aborts, <kbd>F2</kbd> loads fresh text, and <kbd>Tab</kbd> moves to the next control.
+      </p>
       <div
-        ref={canvasRef}
         className={`tw-canvas ${config.blurUntilFocus && pauseUntilFocus ? 'blur-mode' : ''}`}
-        tabIndex={0}
-        role="textbox"
-        aria-label="Typing test canvas. Type the visible text. Press Escape to abort or Tab for a new sample."
-        aria-multiline="true"
         style={{ fontSize: `${config.fontSize}px` }}
-        onKeyDown={handleKey}
-        onFocus={() => setPauseUntilFocus(false)}
       >
-        {renderCells(engine, config.caret)}
+        <div className="tw-canvas-text" data-testid="typing-target" aria-label="Typing target text">
+          {renderCells(engine, config.caret)}
+        </div>
+        <textarea
+          ref={canvasRef}
+          className="tw-input-capture"
+          aria-label="Typing test canvas. Type the visible text. Press Escape to abort or F2 for a new sample."
+          aria-describedby="tw-typing-input-help"
+          aria-keyshortcuts="Escape F2"
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          inputMode="text"
+          spellCheck={false}
+          onKeyDown={handleKey}
+          onInput={handleTextInput}
+          onCompositionStart={() => { compositionActiveRef.current = true; }}
+          onCompositionEnd={handleCompositionEnd}
+          onPaste={(event) => {
+            event.preventDefault();
+            setStatusText('Paste input is disabled during a typing test.');
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setStatusText('Drop input is disabled during a typing test.');
+          }}
+          onFocus={() => setPauseUntilFocus(false)}
+        />
         {pauseUntilFocus && <span className="tw-visually-hidden">Focus the canvas to begin.</span>}
       </div>
 
@@ -1131,7 +1240,11 @@ export default function TypingWorkspace() {
         <CustomTextModal
           value={config.customText}
           onCancel={() => setCustomTextModalOpen(false)}
-          onApply={(text) => { setCustomTextModalOpen(false); applyConfig({ mode: 'custom', customText: text }); }}
+          onApply={(text) => {
+            applyConfig({ mode: 'custom', customText: text });
+            setCustomTextModalOpen(false);
+            canvasRef.current?.focus({ preventScroll: true });
+          }}
         />
       )}
 

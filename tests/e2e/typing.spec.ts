@@ -303,7 +303,7 @@ test('loads a CSV dictionary and exports raw keystrokes and a PDF certificate', 
   await wordCountSelect(workspace).selectOption('10');
   const expectedTarget = 'alpha beta gamma delta epsilon zeta eta theta iota kappa';
   const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
-  const renderedTarget = await canvas.evaluate((element) => (element.textContent ?? '').replace(/\u00a0/g, ' ').trim());
+  const renderedTarget = await workspace.getByTestId('typing-target').evaluate((element) => (element.textContent ?? '').replace(/\u00a0/g, ' ').trim());
   expect(renderedTarget).toBe(expectedTarget);
 
   await canvas.focus();
@@ -361,7 +361,7 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await wordsSelect.selectOption('10');
 
   const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
-  const targetWordCount = await canvas.evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
+  const targetWordCount = await workspace.getByTestId('typing-target').evaluate((element) => (element.textContent ?? '').trim().split(/\s+/).filter(Boolean).length);
   expect(targetWordCount).toBe(10);
 
   await fontSelect(workspace).selectOption('dyslexic');
@@ -436,8 +436,40 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await expect(emptyCustomDialog.getByRole('button', { name: 'Use this text' })).toBeDisabled();
 });
 
-test('has no serious or critical automated accessibility violations at rest', async ({ page }) => {
+test('supports native text input, composition-safe entry, keyboard escape, and accessibility at rest', async ({ page }) => {
   const workspace = await openWorkspace(page);
+  const input = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  const firstCharacter = await workspace.getByTestId('typing-target').locator('.tw-char').first().textContent();
+  expect(firstCharacter).toBeTruthy();
+
+  await input.focus();
+  await input.evaluate((element, character) => {
+    const textarea = element as HTMLTextAreaElement;
+    textarea.value = character;
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, data: character, inputType: 'insertText' }));
+  }, firstCharacter!);
+  await expect(workspace.getByTestId('typing-target').locator('.tw-char').first()).toHaveClass(/correct/);
+
+  await input.evaluate((element) => {
+    const textarea = element as HTMLTextAreaElement;
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+  });
+  await expect(workspace.getByTestId('typing-target').locator('.tw-char').first()).toHaveClass(/pending/);
+
+  await input.evaluate((element, character) => {
+    const textarea = element as HTMLTextAreaElement;
+    textarea.value = character;
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: character }));
+  }, firstCharacter!);
+  await expect(workspace.getByTestId('typing-target').locator('.tw-char').first()).toHaveClass(/correct/);
+
+  await input.press('Tab');
+  await expect(input).not.toBeFocused();
+  await input.focus();
+  await input.press('F2');
+  await expect(workspace).toContainText('New text ready.');
+
   const results = await new AxeBuilder({ page })
     .include('.tw-root')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -448,9 +480,11 @@ test('has no serious or critical automated accessibility violations at rest', as
   await expect(workspace.locator('.tw-caret').first()).toHaveCSS('animation-name', 'none');
 });
 
-test('reflows without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 740 });
-  await openWorkspace(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
-  expect(overflow).toBe(false);
+test('reflows without page-level horizontal overflow across compact viewports', async ({ page }) => {
+  for (const width of [320, 360, 390, 430, 768]) {
+    await page.setViewportSize({ width, height: 740 });
+    await openWorkspace(page);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+    expect(overflow, `horizontal overflow at ${width}px`).toBe(false);
+  }
 });
