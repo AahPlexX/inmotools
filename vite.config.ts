@@ -50,6 +50,8 @@ export default defineConfig({
           'assets/raw.worker-*.js',
           // ICC transforms are optional; cache LittleCMS only after a profile workflow is used.
           'assets/lcms-*.wasm',
+          // Multi-image alignment embeds ~15 MB of OpenCV in its worker; fetch it only for merges.
+          'assets/photo-merge.worker-*.js',
           'assets/diagram.worker-*.js',
           'assets/mermaid-parser.core-*.js',
           'assets/cytoscape.esm-*.js',
@@ -79,6 +81,15 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'photo-color-management',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 2, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/assets\/photo-merge\.worker-[^/]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'photo-merge-engine',
               cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 2, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
