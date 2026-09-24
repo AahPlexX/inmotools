@@ -15,15 +15,18 @@ import { substituteInTextCitations } from './citation-engine';
 //
 // Order matters: formulas are evaluated against the raw cell text first, so a
 // citation marker inside a table cell cannot change how a formula parses.
+export const applyPreparedCitations = (
+  formulaPreparedSource: string,
+  inTextCitations?: ReadonlyMap<string, string>,
+): string =>
+  inTextCitations && inTextCitations.size > 0
+    ? substituteInTextCitations(formulaPreparedSource, inTextCitations)
+    : formulaPreparedSource;
+
 export const prepareDocument = (
   source: string,
   inTextCitations?: ReadonlyMap<string, string>,
-): string => {
-  const withFormulas = substituteFormulaValues(source);
-  return inTextCitations && inTextCitations.size > 0
-    ? substituteInTextCitations(withFormulas, inTextCitations)
-    : withFormulas;
-};
+): string => applyPreparedCitations(substituteFormulaValues(source), inTextCitations);
 
 // Derives a safe filename stem from a document name. Falls back to
 // "document" so an untitled or punctuation-only name still yields a usable
