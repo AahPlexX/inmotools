@@ -30,7 +30,7 @@ const TOOL_SPECS = new Map([
   ['shader', ['tests/e2e/shader.spec.ts']],
   ['sheets', ['tests/e2e/tabular-sheet-workstation.spec.ts']],
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
-  ['svg', ['tests/e2e/svg.spec.ts']],
+  ['svg', ['tests/e2e/svg.spec.ts', 'tests/e2e/vector-nested-composition.spec.ts']],
   ['transcode', ['tests/e2e/transcode.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],
   ['video', ['tests/e2e/video.spec.ts']],

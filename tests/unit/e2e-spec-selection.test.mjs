@@ -22,5 +22,9 @@ describe('focused E2E spec selection', () => {
     expect(selectE2eSpecs(['src/tools/photo/PhotoWorkspace.tsx'])).toEqual([
       'tests/e2e/photo.spec.ts',
     ]);
+    expect(selectE2eSpecs(['src/tools/svg/VectorCanvas.tsx'])).toEqual([
+      'tests/e2e/svg.spec.ts',
+      'tests/e2e/vector-nested-composition.spec.ts',
+    ]);
   });
 });

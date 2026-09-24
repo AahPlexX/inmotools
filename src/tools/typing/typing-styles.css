@@ -106,22 +106,67 @@
   line-height: 1.7;
   letter-spacing: 0.02em;
   outline: none;
+  position: relative;
   font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
 
-.tw-canvas:focus {
+.tw-canvas:focus-within {
   border-color: #2a3d63;
   box-shadow: 0 0 0 3px rgba(42, 61, 99, 0.25);
+}
+
+.tw-canvas-text {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.tw-input-capture {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  resize: none;
+  opacity: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  cursor: text;
+  font: inherit;
+  line-height: inherit;
+  touch-action: manipulation;
+}
+
+.tw-input-hint {
+  margin: -0.45rem 0 -0.55rem;
+  color: #4b5468;
+  font-size: 0.82rem;
+}
+
+.tw-input-hint kbd {
+  padding: 0.08rem 0.3rem;
+  border: 1px solid #c5cddb;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #1f2a44;
+  font: inherit;
+  font-size: 0.78rem;
 }
 
 .tw-canvas.blur-mode {
   filter: blur(6px);
   transition: filter 0.15s ease;
 }
-.tw-canvas.blur-mode:focus,
+.tw-canvas.blur-mode:focus-within,
 .tw-canvas.blur-mode:hover {
   filter: none;
 }
@@ -256,8 +301,13 @@
 }
 
 .tw-tag button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
   background: transparent;
   border: none;
+  border-radius: 999px;
   color: #4b5468;
   cursor: pointer;
   padding: 0;
@@ -403,6 +453,48 @@
   padding: 0.6rem 0.85rem;
   background: #fff8e6; border: 1px solid #f4d47a;
   border-radius: 10px; font-size: 0.85rem; color: #6b4b00;
+}
+
+@media (max-width: 480px) {
+  .tw-canvas {
+    min-height: 220px;
+    padding: 1rem;
+  }
+
+  .tw-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tw-panel {
+    min-width: 0;
+    padding: 0.85rem;
+  }
+
+  .tw-keyboard {
+    padding: 0.5rem 0.35rem;
+  }
+
+  .tw-keyboard-row {
+    gap: 2px;
+  }
+
+  .tw-key {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 0.1rem;
+    font-size: 0.65rem;
+  }
+
+  .tw-key.space {
+    width: min(70%, 240px);
+    min-width: 0;
+    flex: 0 1 240px;
+  }
+
+  .tw-input-hint {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
 }
 
 .tw-summary {
