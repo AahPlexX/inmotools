@@ -108,6 +108,33 @@ test('evaluates a table formula and keeps a static cell untouched', async ({ pag
   await expect(row.locator('td').nth(3)).toHaveText('10');
 });
 
+test('table formula preparation runs in a background worker', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount = 0;
+    window.Worker = new Proxy(NativeWorker, {
+      construct(Target, args: ConstructorParameters<typeof Worker>) {
+        if (String(args[0]).includes('table-formula.worker')) {
+          (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount += 1;
+        }
+        return Reflect.construct(Target, args);
+      },
+    }) as typeof Worker;
+  });
+
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '| A | B |',
+    '| - | - |',
+    '| 6 | =A2*7 |',
+  ].join('\n'));
+
+  await expect(page.locator('.markdown-workbench-preview table tbody td').nth(1)).toHaveText('42');
+  await expect.poll(() => page.evaluate(() =>
+    (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount,
+  )).toBeGreaterThan(0);
+});
+
 test('resolves a pasted .bib citekey and substitutes the formatted citation into the document', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, 'See [@smith2024] for details.');
