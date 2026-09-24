@@ -6,27 +6,20 @@
 
 ## Status
 
-Core delivery is complete and integrated on `main`. All F1–F35 capabilities are implemented; the original M5 acceptance was completed before PR #41 merged the first audit-remediation pass on 2026-09-17. A follow-up UX/real-world audit is active on `fix/sightline-ux-audit-2` because completion of the feature ledger does not waive usability, accessibility, responsiveness, or regression obligations.
+Complete and integrated on `origin/main`. All F1–F35 capabilities remain implemented. The
+2026-09-19 UX/real-world follow-up was quality remediation rather than feature expansion and
+merged through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403`.
 
-### Active follow-up — 2026-09-19
+The follow-up resolved multi-document switching/failure accounting, loaded-state hierarchy,
+persistent reading controls/direct WPM, progressive disclosure, live-status semantics,
+nested drag-leave handling, simpler sample/clipboard flow, plain-language labels, explicit
+tab/tabpanel relationships, and narrow/coarse-pointer ergonomics.
 
-The follow-up audit found that the underlying capability set is stronger than the current hierarchy communicates. The remediation is quality work, not feature-count inflation. Current scope is limited to Sightline source, Sightline tests, and this tracking record.
-
-Accepted findings being resolved:
-- multi-file ingestion needs a real in-session document switcher and accurate per-file failure accounting;
-- the loaded-document state leaves source/import machinery above the primary reading task;
-- frequent reading actions need a persistent cockpit and direct rate control;
-- specialist controls need progressive disclosure rather than appearing at the same priority as normal reading;
-- touch targets and typography need coarse-pointer/mobile ergonomics plus component-driven responsive reflow;
-- async ingestion status needs an explicit live region;
-- drag-leave state can remain visually active while moving across nested children;
-- diagnostics and technical metadata are too implementation-oriented for the default surface;
-- sample selection has an unnecessary second confirmation step;
-- clipboard access is less reliable than paste and should be secondary;
-- control-tab ARIA relationships need explicit tab/tabpanel wiring;
-- several labels use specialist language where plain task language is clearer.
-
-Verification gate for this follow-up: focused Sightline units, production build, the complete desktop/mobile Sightline browser spec, responsive overflow/touch acceptance, and exact-branch CI must all be green before this entry returns to completed status.
+Closure evidence on the merged revision is green at Sightline scope: dedicated workflow
+`35613856993` passed 409/409 focused unit assertions across 16 files, the production build,
+and 48/48 desktop/mobile Chromium cases. Pages run `35613857161` built and deployed the
+production artifact successfully; its broad browser failures were confined to unrelated
+workspaces while all Sightline browser cases executed without a Sightline failure.
 
 ## Deterministic completion goal
 
@@ -82,17 +75,25 @@ Until item 1–7 hold, the workstream stays open in `IN_PROGRESS.md`.
 - F6 acceptance delta 2026-09-16: file input now accepts multi-file batches, the entire Sightline workspace accepts dropped files/text, and the built-in sample control exposes a three-item sample library. The four focused desktop/mobile F6 cases passed locally after a fresh production build and are now included in green dedicated run `35122984076` at `1d28b12b911f5a60b3f8ffe543466b4b1aa02c63`; that run passed all focused units, the production build, and 44/44 browser cases.
 
 
-## 2026-09-19 UX audit handoff
+## 2026-09-24 completion and maintenance handoff
 
-Branch: `fix/sightline-ux-audit-2`.
+PR #66 merged the full UX/real-world remediation to `origin/main` as
+`ce878ada3bdcb73f0b05eb2c0ae31b218c948403`. The former
+`fix/sightline-ux-audit-2` work is no longer an active workstream.
 
-Implementation intent: preserve every F1–F35 behavior while simplifying the default journey to open/paste → read → control/resume. Source/import options, diagnostics, technical metadata, contents, and specialist controls remain available through disclosure rather than being removed.
+Fresh closure evidence:
+- dedicated Sightline workflow `35613856993`: 409/409 focused unit assertions, production
+  build, and 48/48 desktop/mobile Chromium browser checks passed;
+- Pages run `35613857161`: repository unit/build steps and production artifact build passed,
+  and the Pages deployment succeeded; broad browser failures were outside Sightline while all
+  Sightline cases ran without a Sightline failure;
+- final source scan found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or
+  WebSocket path. The only `fetch` search matches describe local/static asset loading and
+  PDF.js auto-fetch configuration rather than user-data upload;
+- `feat/sightline-velocity` is historical only: comparison against current `main` showed
+  0 commits ahead, so no completed Sightline work is stranded there.
 
-Next sequential actions after the current commit:
-1. Run the focused render/unit suite and repair any regression at the cause.
-2. Run the complete `tests/e2e/sightline.spec.ts` desktop and mobile Chromium suite once, not piecemeal loops.
-3. Run the production build and inspect responsive narrow/medium/wide behavior for horizontal overflow and clipped controls.
-4. Run the dedicated Sightline workflow on the exact branch revision.
-5. Record exact run/commit evidence here and in `.tasks`; only then merge and move the follow-up entry out of IN_PROGRESS.
-
-Do not re-open already accepted F1–F35 implementation work unless a fresh regression proves it necessary. Do not touch unrelated tool workstreams.
+Future Sightline changes start from current `origin/main`. Preserve the F1–F35 contract,
+local-first privacy boundary, existing focused suites, accessibility/keyboard checks, export
+round-trip coverage, and responsive acceptance. New accepted scope must enter the repository
+task-state system before implementation; do not revive the retired audit handoff as active work.

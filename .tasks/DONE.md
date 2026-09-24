@@ -56,6 +56,25 @@ Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); t
 
 Accepted revision `f0b6c0481c9e600ca6ec00284527216e00d433f9` on `fix/sightline-audit` (a clean descendant of `main`): `tsc --noEmit` clean, 408/408 focused unit tests across 16 `tests/unit/sightline-*.test.ts` files, production build passed, and Playwright `tests/e2e/sightline.spec.ts` 46/46 passed (one earlier run showed a single 5s-timeout flake on the catalog-navigation test, not reproducible across 6 repeated runs afterward).
 
+
+
+**UX/real-world follow-up closure — 2026-09-24.** The later reading-first remediation merged
+through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403` without changing the F1–F35
+denominator. It added accurate multi-file results and in-session document switching, loaded-state
+source collapse, a persistent reading cockpit with direct WPM control, progressive disclosure of
+specialist controls/diagnostics/metadata/contents, live status semantics, nested drag-leave
+correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel wiring,
+and narrow/coarse-pointer ergonomics.
+
+Dedicated workflow `35613856993` passed 409/409 Sightline unit assertions across 16 files, the
+production build, and 48/48 desktop/mobile Chromium browser checks, including accessibility,
+keyboard-only operation, export round trips, and desktop/tablet/phone overflow coverage. Pages
+run `35613857161` built and deployed successfully; its broad browser failures were unrelated
+to Sightline and all Sightline cases ran without a Sightline failure. A final static closure scan
+found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or WebSocket path. The
+historical `feat/sightline-velocity` branch is 0 commits ahead of `main`, so no intended
+completed Sightline work is stranded there.
+
 ## TASK-020: Add the Typing Workstation
 
 Implemented the Typing Workstation as a local speed-typing calculator and ergonomic touch-typing tester against its 38-item feature ledger (`docs/superpowers/plans/2026-09-15-typing-workstation.md`): the engine, exact ranked corpora, target generation, IndexedDB storage, audio, CSV/JSON/PDF/Markdown exports with a bundle re-import path, styles, workspace UI, and catalog/loader registration.
