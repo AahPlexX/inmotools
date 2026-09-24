@@ -329,6 +329,7 @@ export default function TypingWorkspace() {
   const canvasRef = useRef<HTMLTextAreaElement | null>(null);
   const compositionActiveRef = useRef(false);
   const compositionCommitRef = useRef<string | null>(null);
+  const pendingPhysicalInputRef = useRef<{ code: string; t: number } | null>(null);
   const wpmChartRef = useRef<HTMLCanvasElement | null>(null);
   const historyChartRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -623,12 +624,10 @@ export default function TypingWorkspace() {
     }
   }, [config, rebuildTarget, target]);
 
-  const commitTextInput = useCallback((text: string, code = 'Input') => {
+  const commitTextInput = useCallback((text: string, code = 'Input', t = performance.now()) => {
     if (engine.finished) return;
     const normalized = text.replace(/\r\n?/g, '\n');
     if (!normalized) return;
-
-    const t = performance.now();
     let preview = engine;
     for (const character of normalized) {
       if (preview.finished) break;
@@ -657,12 +656,14 @@ export default function TypingWorkspace() {
       && nativeEvent.data === committedComposition
     ) {
       compositionCommitRef.current = null;
+      pendingPhysicalInputRef.current = null;
       event.currentTarget.value = '';
       return;
     }
     compositionCommitRef.current = null;
 
     if (nativeEvent.inputType === 'deleteContentBackward') {
+      pendingPhysicalInputRef.current = null;
       event.currentTarget.value = '';
       if (!engine.finished) {
         const t = performance.now();
@@ -673,19 +674,23 @@ export default function TypingWorkspace() {
     }
 
     if (nativeEvent.inputType.startsWith('delete')) {
+      pendingPhysicalInputRef.current = null;
       event.currentTarget.value = '';
       return;
     }
 
     if (nativeEvent.inputType === 'insertFromPaste' || nativeEvent.inputType === 'insertFromDrop') {
+      pendingPhysicalInputRef.current = null;
       event.currentTarget.value = '';
       setStatusText('Paste and drop input are disabled during a typing test.');
       return;
     }
 
+    const stagedPhysicalInput = pendingPhysicalInputRef.current;
+    pendingPhysicalInputRef.current = null;
     const text = nativeEvent.data ?? event.currentTarget.value;
     event.currentTarget.value = '';
-    commitTextInput(text);
+    commitTextInput(text, stagedPhysicalInput?.code ?? 'Input', stagedPhysicalInput?.t ?? performance.now());
   }, [commitTextInput, engine.finished, config.audioProfile]);
 
   const handleCompositionEnd = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
@@ -718,9 +723,20 @@ export default function TypingWorkspace() {
 
     if (event.key === 'Backspace' && !engine.finished) {
       event.preventDefault();
+      pendingPhysicalInputRef.current = null;
       const t = performance.now();
       dispatch({ type: 'press', key: 'Backspace', code: event.code || 'Backspace', t });
       if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
+      return;
+    }
+
+    if (
+      !engine.finished
+      && (event.key.length === 1 || event.key === 'Enter')
+      && event.code
+      && event.code !== 'Unidentified'
+    ) {
+      pendingPhysicalInputRef.current = { code: event.code, t: performance.now() };
     }
   }, [engine.finished, rebuildTarget, running, config.audioProfile]);
 
@@ -1010,7 +1026,10 @@ export default function TypingWorkspace() {
           spellCheck={false}
           onKeyDown={handleKey}
           onInput={handleTextInput}
-          onCompositionStart={() => { compositionActiveRef.current = true; }}
+          onCompositionStart={() => {
+            pendingPhysicalInputRef.current = null;
+            compositionActiveRef.current = true;
+          }}
           onCompositionEnd={handleCompositionEnd}
           onPaste={(event) => {
             event.preventDefault();
