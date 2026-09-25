@@ -83,16 +83,18 @@
 - **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
 - **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** DONE
+- **Status:** ACTIVE — Gauntlet reopened after accepted-scope audit
 - **Depends on:** T04-01 DONE
-- **Primary files:** tactical timeline/motion/scene/action/unit/possession/conflict engines; Tactical timeline/timing/coordination UI; focused unit/e2e tests
-- **Implementation:** `f2d3565` timeline primitives; `11acadf` validation; `e17304c` spatial Bézier paths; `b8995f4` coordinated actions; `1c00a1c` linked units; `6f860b2` possession/handoffs; `02f7405` conflict review; `cd2cab5`/`5ded669` authoring UI; `abcc1bc` scene/group timing; `f914ebe`/`edf1769` custom cubic-bezier timing; `0b11a61` transport sampling; `34f816e`/`4ab8d24`/`bdb28e4` transport controls, sampled preview, and responsive styling.
-- **Exit evidence:** validated source tip `bdb28e447f50cf9e2009e5ed53ed67984a727bbd` passes **35/35** Task 5-focused unit tests plus TypeScript; production/PWA build is green (`built in 12.65s`); full Tactical Playwright gate is **26 passed / 2 intentional duplicate-project skips** across desktop/mobile Chromium, including transport, easing, scenes, visibility, grouped stagger, coordinated actions, linked units, possession, and conflict review.
-- **Verified feature rows:** **16–26**. Combined deterministic numerator is **20/60**.
-- **Reverse-safe:** complete.
+- **Primary files:** Tactical timeline/motion/scene/action/unit/possession/conflict engines and UI; focused unit/e2e tests
+- **Validated complete rows:** 16, 18, 21, 25, 26.
+- **Still-open accepted semantics:** #17 interactive Bézier trajectory nodes/tangent handles; #19 scene rename/reorder/split/join; #20 generalized object/layer visibility; #22 marker/trigger kinds; #23 named coordinated action template library; #24 explicit line-shift, step/drop and width/depth linked-unit controls.
+- **Current evidence:** production/PWA build green at `f4f4cde`; full Tactical browser gate at `bdb28e4` is 26 passed / 2 intentional skips; visible possession/handoff/release is 2/2 desktop/mobile at `f4f4cde`; focused ball/possession units are 35/35.
+- **Next:** implement #17 interactive path handles first, then #19/#20/#22/#23/#24 in dependency-safe order; rerun complete Task 5 gates before closing.
+- **Exit evidence:** every row 16–26 must satisfy its exact accepted wording plus deterministic unit/build/desktop/mobile/accessibility/reflow evidence.
+- **Reverse-safe:** no; Task 5 remains active.
 
 ### T06-01 — Spatial analysis
-- **Status:** READY
+- **Status:** BLOCKED — T05-01 must close first
 - **Depends on:** T05-01 DONE
 - **Primary files:** new tactical analysis modules + Tactical analysis UI/tests; do not edit later persistence/3D/media/export surfaces.
 - **Action order:** (1) pure Euclidean Voronoi + convex hull/centroid/width/depth primitives; (2) passing-lane clearance + authored orientation/vision sectors; (3) positional grid + distance rings/dynamic tethers; (4) trajectory occupancy heat map + authored/imported speed/distance metrics; (5) analytical-honesty UI labels; (6) focused desktop/mobile/browser validation; (7) reconcile feature rows 27–34.
