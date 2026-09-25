@@ -7,10 +7,9 @@ import {
   splitTacticalScene,
 } from './scene-engine';
 import {
-  addTimelineTrack,
+  addTimelineVisibilityChange,
   offsetTimelineGroup,
   offsetTimelineTrack,
-  setTimelineVisibility,
 } from './timeline-engine';
 import type { TacticalProject } from './tactics-types';
 
@@ -153,44 +152,10 @@ export default function TacticalTimingControls({
 
     onEdit(
       'Add visibility change',
-      (current) => {
-        if (!targetId) throw new Error('Select a visibility target.');
-        if (!Number.isInteger(timeMs) || timeMs < 0 || timeMs > current.timeline.durationMs) {
-          throw new RangeError('Visibility time must be an integer within the timeline duration.');
-        }
-        const track = current.timeline.tracks.find((item) => item.targetId === targetId);
-        const visibilityId = nextId(
-          `visibility-${targetId}`,
-          track?.keyframes.map((keyframe) => keyframe.id) ?? [],
-        );
-        if (!track) {
-          return {
-            ...current,
-            timeline: addTimelineTrack(current.timeline, {
-              id: nextId('visibility-track', current.timeline.tracks.map((item) => item.id)),
-              targetId,
-              keyframes: [{
-                id: visibilityId,
-                timeMs,
-                visible,
-                interpolation: 'hold',
-              }],
-            }),
-          };
-        }
-        const updated = setTimelineVisibility(track, {
-          id: visibilityId,
-          timeMs,
-          visible,
-        });
-        return {
-          ...current,
-          timeline: {
-            ...current.timeline,
-            tracks: current.timeline.tracks.map((item) => item.id === track.id ? updated : item),
-          },
-        };
-      },
+      (current) => ({
+        ...current,
+        timeline: addTimelineVisibilityChange(current.timeline, targetId, timeMs, visible),
+      }),
       'Visibility change added.',
     );
   }
