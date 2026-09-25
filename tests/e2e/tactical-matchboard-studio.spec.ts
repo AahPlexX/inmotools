@@ -410,3 +410,33 @@ test('previews authored motion with deterministic timeline transport controls', 
   await expect(page.getByTestId('timeline-preview-time')).toHaveText('0 ms');
 });
 
+test('renders authored ball possession, handoff, and release on the timeline preview', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+
+  await page.getByLabel('Possession holder').selectOption('token-1');
+  await page.getByLabel('Possession time (ms)').fill('0');
+  await page.getByRole('button', { name: 'Add possession event' }).click();
+
+  await page.getByLabel('Possession holder').selectOption('token-2');
+  await page.getByLabel('Possession time (ms)').fill('1000');
+  await page.getByRole('button', { name: 'Add possession event' }).click();
+
+  await page.getByLabel('Possession holder').selectOption('');
+  await page.getByLabel('Possession time (ms)').fill('2000');
+  await page.getByRole('button', { name: 'Add possession event' }).click();
+
+  const ball = page.locator('[data-tactical-kind="ball"]');
+  await expect(ball).toHaveCount(1);
+
+  await page.getByLabel('Timeline scrubber').fill('0');
+  const atFirstHolder = await ball.getAttribute('transform');
+  await page.getByLabel('Timeline scrubber').fill('1000');
+  const atSecondHolder = await ball.getAttribute('transform');
+  expect(atSecondHolder).not.toBe(atFirstHolder);
+
+  await page.getByLabel('Timeline scrubber').fill('2000');
+  const released = await ball.getAttribute('transform');
+  expect(released).not.toBe(atSecondHolder);
+  await expect(page.getByText(/2000 ms -> released/)).toBeVisible();
+});
+
