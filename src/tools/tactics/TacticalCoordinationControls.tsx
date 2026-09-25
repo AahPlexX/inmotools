@@ -1,10 +1,19 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { applyCoordinatedAction, createCoordinatedActionTemplate } from './action-engine';
+import {
+  applyCoordinatedAction,
+  COORDINATED_ACTION_PRESETS,
+  createCoordinatedActionTemplate,
+} from './action-engine';
 import { findPotentialPathConflicts, type PotentialPathConflict } from './conflict-engine';
 import { addBallPossessionEvent } from './possession-engine';
 import { createNormalizedPoint } from './pitch-engine';
 import { addTimelineTrack, sampleTacticalTimeline } from './timeline-engine';
-import { applyLinkedUnitTranslation, createLinkedUnit } from './unit-engine';
+import {
+  applyLinkedUnitAdjustment,
+  applyLinkedUnitTranslation,
+  createLinkedUnit,
+  type LinkedUnitAdjustmentKind,
+} from './unit-engine';
 import type { TacticalProject, TacticalTimeline } from './tactics-types';
 
 export interface TacticalCoordinationControlsProps {
@@ -62,55 +71,85 @@ export default function TacticalCoordinationControls({
     [project.playerTokens],
   );
   const [conflicts, setConflicts] = useState<PotentialPathConflict[] | null>(null);
+  const [actionPresetId, setActionPresetId] = useState('custom');
+  const [unitOperation, setUnitOperation] = useState('translation');
+  const selectedPreset = COORDINATED_ACTION_PRESETS.find((preset) => preset.id === actionPresetId);
+
   function submitAction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const targetA = String(data.get('actionTargetA') ?? '');
     const targetB = String(data.get('actionTargetB') ?? '');
+    const targetC = String(data.get('actionTargetC') ?? '');
     const startMs = Number(data.get('actionStartMs'));
     const durationMs = Number(data.get('actionDurationMs'));
+    const targets = [targetA, targetB, targetC];
+    const endpoints = [
+      createNormalizedPoint(Number(data.get('actionAEndX')) / 100, Number(data.get('actionAEndY')) / 100),
+      createNormalizedPoint(Number(data.get('actionBEndX')) / 100, Number(data.get('actionBEndY')) / 100),
+      createNormalizedPoint(Number(data.get('actionCEndX')) / 100, Number(data.get('actionCEndY')) / 100),
+    ];
+
     onEdit(
       'Apply coordinated action',
       (current) => {
+        if (!selectedPreset) {
+          const template = createCoordinatedActionTemplate({
+            id: `ui-action-${startMs}-${targetA}-${targetB}`,
+            label: 'Custom coordinated action',
+            roles: [
+              {
+                roleId: 'a',
+                from: positionAt(current, targetA, startMs),
+                to: endpoints[0]!,
+                startOffsetMs: 0,
+                durationMs,
+                interpolation: 'smooth',
+              },
+              {
+                roleId: 'b',
+                from: positionAt(current, targetB, startMs),
+                to: endpoints[1]!,
+                startOffsetMs: 0,
+                durationMs,
+                interpolation: 'smooth',
+              },
+            ],
+          });
+          return {
+            ...current,
+            timeline: applyCoordinatedAction(
+              current.timeline,
+              template,
+              { a: targetA, b: targetB },
+              startMs,
+            ),
+          };
+        }
+
+        const assignments: Record<string, string> = {};
         const template = createCoordinatedActionTemplate({
-          id: `ui-action-${startMs}-${targetA}-${targetB}`,
-          label: 'Coordinated action',
-          roles: [
-            {
-              roleId: 'a',
-              from: positionAt(current, targetA, startMs),
-              to: createNormalizedPoint(
-                Number(data.get('actionAEndX')) / 100,
-                Number(data.get('actionAEndY')) / 100,
-              ),
-              startOffsetMs: 0,
-              durationMs,
+          id: `ui-${selectedPreset.id}-${startMs}-${targets.slice(0, selectedPreset.roles.length).join('-')}`,
+          label: selectedPreset.label,
+          roles: selectedPreset.roles.map((role, index) => {
+            const targetId = targets[index] ?? '';
+            assignments[role.roleId] = targetId;
+            return {
+              roleId: role.roleId,
+              from: positionAt(current, targetId, startMs + role.startOffsetMs),
+              to: endpoints[index]!,
+              startOffsetMs: role.startOffsetMs,
+              durationMs: Math.max(1, Math.round(durationMs * role.durationScale)),
               interpolation: 'smooth',
-            },
-            {
-              roleId: 'b',
-              from: positionAt(current, targetB, startMs),
-              to: createNormalizedPoint(
-                Number(data.get('actionBEndX')) / 100,
-                Number(data.get('actionBEndY')) / 100,
-              ),
-              startOffsetMs: 0,
-              durationMs,
-              interpolation: 'smooth',
-            },
-          ],
+            };
+          }),
         });
         return {
           ...current,
-          timeline: applyCoordinatedAction(
-            current.timeline,
-            template,
-            { a: targetA, b: targetB },
-            startMs,
-          ),
+          timeline: applyCoordinatedAction(current.timeline, template, assignments, startMs),
         };
       },
-      'Coordinated action authored.',
+      selectedPreset ? `${selectedPreset.label} action authored.` : 'Coordinated action authored.',
     );
   }
 
@@ -119,35 +158,51 @@ export default function TacticalCoordinationControls({
     const data = new FormData(event.currentTarget);
     const memberA = String(data.get('unitMemberA') ?? '');
     const memberB = String(data.get('unitMemberB') ?? '');
+    const memberC = String(data.get('unitMemberC') ?? '');
+    const members = [memberA, memberB, memberC].filter(Boolean);
     const startMs = Number(data.get('unitStartMs'));
     const durationMs = Number(data.get('unitDurationMs'));
+    const operation = String(data.get('unitOperation') ?? 'translation');
     onEdit(
-      'Translate linked unit',
+      operation === 'translation' ? 'Translate linked unit' : `Adjust linked unit: ${operation}`,
       (current) => {
         const unit = createLinkedUnit(
-          `ui-unit-${memberA}-${memberB}`,
+          `ui-unit-${members.join('-')}`,
           'Linked tactical unit',
-          [memberA, memberB],
+          members,
         );
-        return {
-          ...current,
-          timeline: applyLinkedUnitTranslation(
-            current.timeline,
-            unit,
-            {
-              [memberA]: positionAt(current, memberA, startMs),
-              [memberB]: positionAt(current, memberB, startMs),
-            },
-            {
-              x: Number(data.get('unitDeltaX')) / 100,
-              y: Number(data.get('unitDeltaY')) / 100,
-            },
-            startMs,
-            durationMs,
-          ),
-        };
+        const startPositions = Object.fromEntries(
+          members.map((member) => [member, positionAt(current, member, startMs)]),
+        );
+        const timeline = operation === 'translation'
+          ? applyLinkedUnitTranslation(
+              current.timeline,
+              unit,
+              startPositions,
+              {
+                x: Number(data.get('unitDeltaX')) / 100,
+                y: Number(data.get('unitDeltaY')) / 100,
+              },
+              startMs,
+              durationMs,
+            )
+          : applyLinkedUnitAdjustment(
+              current.timeline,
+              unit,
+              startPositions,
+              {
+                kind: operation as LinkedUnitAdjustmentKind,
+                amount: Number(data.get('unitAdjustment')) / 100,
+                direction: current.pitch.direction,
+              },
+              startMs,
+              durationMs,
+            );
+        return { ...current, timeline };
       },
-      'Linked unit translated.',
+      operation === 'translation'
+        ? 'Linked unit translated.'
+        : `Linked unit ${operation} authored.`,
     );
   }
 
@@ -172,6 +227,7 @@ export default function TacticalCoordinationControls({
       holderTargetId ? `Possession assigned to ${holderTargetId}.` : 'Ball possession released.',
     );
   }
+
   function submitConflictReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -187,11 +243,25 @@ export default function TacticalCoordinationControls({
 
   const firstTarget = playerTargets[0] ?? '';
   const secondTarget = playerTargets[1] ?? firstTarget;
+  const thirdTarget = playerTargets[2] ?? '';
 
   return (
     <>
       <form onSubmit={submitAction} aria-label="Coordinated action">
         <h3>Coordinated action</h3>
+        <label>
+          Action pattern
+          <select
+            name="actionPreset"
+            value={actionPresetId}
+            onChange={(event) => setActionPresetId(event.target.value)}
+          >
+            <option value="custom">Custom pair</option>
+            {COORDINATED_ACTION_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>{preset.label}</option>
+            ))}
+          </select>
+        </label>
         <label>
           Action target A
           <select name="actionTargetA" defaultValue={firstTarget}>
@@ -204,13 +274,40 @@ export default function TacticalCoordinationControls({
             {playerTargets.map((target) => <option key={target} value={target}>{target}</option>)}
           </select>
         </label>
+        {selectedPreset ? (
+          <label>
+            Action target C
+            <select name="actionTargetC" defaultValue={thirdTarget} required>
+              {playerTargets.map((target) => <option key={target} value={target}>{target}</option>)}
+            </select>
+          </label>
+        ) : <input name="actionTargetC" type="hidden" value="" />}
         <label>Action start (ms)<input name="actionStartMs" type="number" min="0" step="1" defaultValue="0" required /></label>
-        <label>Action duration (ms)<input name="actionDurationMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
+        <label>Action base duration (ms)<input name="actionDurationMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
         <label>Action A end X %<input name="actionAEndX" type="number" min="0" max="100" step="0.1" defaultValue="45" required /></label>
         <label>Action A end Y %<input name="actionAEndY" type="number" min="0" max="100" step="0.1" defaultValue="35" required /></label>
         <label>Action B end X %<input name="actionBEndX" type="number" min="0" max="100" step="0.1" defaultValue="55" required /></label>
         <label>Action B end Y %<input name="actionBEndY" type="number" min="0" max="100" step="0.1" defaultValue="65" required /></label>
-        <button type="submit" disabled={playerTargets.length < 2}>Apply coordinated action</button>
+        {selectedPreset ? (
+          <>
+            <label>Action C end X %<input name="actionCEndX" type="number" min="0" max="100" step="0.1" defaultValue="65" required /></label>
+            <label>Action C end Y %<input name="actionCEndY" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
+            <small>
+              Pattern timing gives you a useful starting sequence. Targets and end positions stay editable for your actual players and session.
+            </small>
+          </>
+        ) : (
+          <>
+            <input name="actionCEndX" type="hidden" value="50" />
+            <input name="actionCEndY" type="hidden" value="50" />
+          </>
+        )}
+        <button
+          type="submit"
+          disabled={playerTargets.length < (selectedPreset ? selectedPreset.roles.length : 2)}
+        >
+          Apply coordinated action
+        </button>
       </form>
 
       <form onSubmit={submitLinkedUnit} aria-label="Linked unit">
@@ -227,15 +324,62 @@ export default function TacticalCoordinationControls({
             {playerTargets.map((target) => <option key={target} value={target}>{target}</option>)}
           </select>
         </label>
+        <label>
+          Linked member C (optional)
+          <select name="unitMemberC" defaultValue="">
+            <option value="">None</option>
+            {playerTargets.map((target) => <option key={target} value={target}>{target}</option>)}
+          </select>
+        </label>
+        <label>
+          Unit operation
+          <select
+            name="unitOperation"
+            value={unitOperation}
+            onChange={(event) => setUnitOperation(event.target.value)}
+          >
+            <option value="translation">Translate together</option>
+            <option value="line-shift">Line shift</option>
+            <option value="step">Step forward</option>
+            <option value="drop">Drop</option>
+            <option value="width">Adjust width</option>
+            <option value="depth">Adjust depth</option>
+          </select>
+        </label>
         <label>Unit start (ms)<input name="unitStartMs" type="number" min="0" step="1" defaultValue="1500" required /></label>
         <label>Unit duration (ms)<input name="unitDurationMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
-        <label>Unit delta X %<input name="unitDeltaX" type="number" step="0.1" defaultValue="5" required /></label>
-        <label>Unit delta Y %<input name="unitDeltaY" type="number" step="0.1" defaultValue="0" required /></label>
-        <button type="submit" disabled={playerTargets.length < 2}>Translate linked unit</button>
+        {unitOperation === 'translation' ? (
+          <>
+            <label>Unit delta X %<input name="unitDeltaX" type="number" step="0.1" defaultValue="5" required /></label>
+            <label>Unit delta Y %<input name="unitDeltaY" type="number" step="0.1" defaultValue="0" required /></label>
+            <input name="unitAdjustment" type="hidden" value="0" />
+          </>
+        ) : (
+          <>
+            <label>
+              Unit adjustment %
+              <input
+                name="unitAdjustment"
+                type="number"
+                step="0.1"
+                defaultValue={unitOperation === 'width' || unitOperation === 'depth' ? '25' : '5'}
+                required
+              />
+            </label>
+            <input name="unitDeltaX" type="hidden" value="0" />
+            <input name="unitDeltaY" type="hidden" value="0" />
+            <small>
+              Step and drop follow the current direction of play. Width and depth scale the unit around its centre; line shift moves the unit across the pitch.
+            </small>
+          </>
+        )}
+        <button type="submit" disabled={playerTargets.length < 2}>
+          {unitOperation === 'translation' ? 'Translate linked unit' : 'Apply linked unit adjustment'}
+        </button>
       </form>
 
       <form onSubmit={submitPossession} aria-label="Ball possession">
-        <h3>Possession & handoff</h3>
+        <h3>Possession &amp; handoff</h3>
         <label>
           Possession holder
           <select name="possessionHolder" defaultValue={firstTarget}>
