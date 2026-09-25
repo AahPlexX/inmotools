@@ -1082,7 +1082,7 @@ export default function TypingWorkspace() {
             <button type="button" onClick={startTest} disabled={sessionClock.status !== 'ready' || engine.finished}>Start</button>
           )}
           <button type="button" className="subtle" onClick={pauseTest} disabled={!running}>Pause</button>
-          <button type="button" className="subtle" onClick={stopTest} disabled={!sessionActive}>Stop</button>
+          <button type="button" className="subtle" title="End and keep this partial result" onClick={stopTest} disabled={!sessionActive}>Stop</button>
           <button type="button" className="subtle" onClick={resetAttempt}>Reset attempt</button>
         </div>
       </section>
@@ -1183,7 +1183,7 @@ export default function TypingWorkspace() {
           <button type="button" className="subtle" disabled={sessionActive} onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
         )}
         <button type="button" aria-disabled={sessionActive} onClick={restart}>New text</button>
-        <button type="button" className="subtle" onClick={abort} disabled={!sessionActive}>Abort</button>
+        <button type="button" className="subtle" title="Discard this attempt without saving a result" onClick={abort} disabled={!sessionActive}>Abort &amp; discard</button>
         <button type="button" className="subtle" disabled={sessionActive} onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
       </div>
