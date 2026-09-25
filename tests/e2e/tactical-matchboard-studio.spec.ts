@@ -380,6 +380,26 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
 });
 
 
+test('temporally hides a scene layer without deleting its players', async ({ page }) => {
+  await setupPanel(page).getByRole('combobox', { name: /Formation/ }).selectOption('ussf-4v4-1-2-1');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(4);
+
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Visibility target').selectOption('layer-1');
+  await page.getByLabel('Visibility time (ms)').fill('500');
+  await page.getByLabel('Visibility state').selectOption('hidden');
+  await page.getByRole('button', { name: 'Add visibility change' }).click();
+
+  await page.getByLabel('Playhead (ms)').fill('1000');
+  await page.getByRole('button', { name: 'Set playhead' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(0);
+
+  await page.getByLabel('Playhead (ms)').fill('0');
+  await page.getByRole('button', { name: 'Set playhead' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(4);
+});
+
 test('authors scene sequencing, visibility, offsets, and grouped stagger timing', async ({ page }) => {
   await page.getByText('Timeline & motion', { exact: true }).click();
 
