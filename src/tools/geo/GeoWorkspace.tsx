@@ -80,7 +80,7 @@ export default function GeoWorkspace() {
       setResult(null);
       setView(DEFAULT_VIEW);
       setSelectedFeatureIndex(0);
-      setStatus(`${check.coordinateCount.toLocaleString()} positions loaded${check.warnings.length ? ` with ${check.warnings.length} interoperability warning${check.warnings.length === 1 ? '' : 's'}` : ''}.`);
+      setStatus(`${check.coordinateCount.toLocaleString()} coordinate positions loaded${check.warnings.length ? ` with ${check.warnings.length} interoperability warning${check.warnings.length === 1 ? '' : 's'}` : ''}.`);
     } catch (error) {
       if (token !== sourceTokenRef.current) return;
       setSource(null);

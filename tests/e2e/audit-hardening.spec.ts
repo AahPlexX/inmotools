@@ -364,9 +364,10 @@ test('Hardware Packet Inspector exposes capture and port lifecycle controls', as
   await page.locator('#packet').press('Enter');
   await expect(stream).toContainText('SIM TX 01 02 03');
 
-  // Pausing stops the log growing, and clearing empties it.
-  await page.getByRole('button', { name: 'Pause capture' }).click();
-  const resume = page.getByRole('button', { name: 'Resume capture' });
+  // Pausing freezes the visible log (capture continues underneath, as the
+  // tool's help text states), and clearing empties it.
+  await page.getByRole('button', { name: 'Pause display' }).click();
+  const resume = page.getByRole('button', { name: 'Resume live display' });
   await expect(resume).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#packet').press('Enter');
   await expect(stream).not.toContainText('SIM TX 01 02 03\nSIM TX 01 02 03');
@@ -409,6 +410,6 @@ test('GeoJSON Simplifier runs simplification off the main thread', async ({ page
   expect(Number(outputVertices)).toBeLessThan(4001);
 
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: /Download GeoJSON/ }).click();
+  await page.getByRole('button', { name: /Download generated GeoJSON/ }).click();
   expect((await download).suggestedFilename()).toBe('ring.simplified.geojson');
 });
