@@ -1,7 +1,7 @@
 import type { CadTreeProps } from './cad-workspace-types';
 
-export default function CadTree({ project, selection, onSelectFeature, onToggleSuppressed, onSelectSketch }: CadTreeProps) {
-  if (project.features.length === 0 && project.sketches.length === 0) {
+export default function CadTree({ project, selection, onSelectFeature, onSelectBody, onToggleBodyVisibility, onToggleSuppressed, onSelectSketch }: CadTreeProps) {
+  if (project.features.length === 0 && project.sketches.length === 0 && project.bodies.length === 0) {
     return <p className="cad-tree-empty">No features yet. Create a sketch or primitive to begin.</p>;
   }
 
@@ -20,6 +20,31 @@ export default function CadTree({ project, selection, onSelectFeature, onToggleS
               <span className="cad-tree-item-label">{sketch.label}</span>
               <span className="cad-tree-item-type">sketch</span>
             </button>
+          </li>
+        );
+      })}
+      {project.bodies.map((body) => {
+        const isSelected = selection?.kind === 'body' && selection.id === body.id;
+        return (
+          <li key={body.id} role="treeitem" aria-selected={isSelected}>
+            <button
+              type="button"
+              className={`cad-tree-item${isSelected ? ' cad-tree-item-selected' : ''}`}
+              onClick={() => onSelectBody(isSelected ? null : body.id)}
+              aria-current={isSelected ? 'true' : undefined}
+            >
+              <span className="cad-tree-item-label">{body.label}</span>
+              <span className="cad-tree-item-type">body</span>
+            </button>
+            <label className="cad-tree-item-suppress">
+              <input
+                type="checkbox"
+                checked={body.visible}
+                onChange={(event) => onToggleBodyVisibility(body.id, event.target.checked)}
+                aria-label={`Show ${body.label}`}
+              />
+              Visible
+            </label>
           </li>
         );
       })}

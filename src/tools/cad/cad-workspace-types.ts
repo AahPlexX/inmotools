@@ -27,6 +27,8 @@ export interface CadTreeProps {
   project: CadProject;
   selection: CadSelection | null;
   onSelectFeature(featureId: string | null): void;
+  onSelectBody(bodyId: string | null): void;
+  onToggleBodyVisibility(bodyId: string, visible: boolean): void;
   onToggleSuppressed(featureId: string, suppressed: boolean): void;
   onSelectSketch(sketchId: string | null): void;
 }

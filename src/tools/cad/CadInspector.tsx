@@ -32,10 +32,11 @@ export default function CadInspector({ project, selection, onParameterChange }: 
                   <label htmlFor={`cad-param-${feature.id}-${key}`}>{key}</label>
                 </dt>
                 <dd>
-                  {field.type === 'unsupported' ? (
+                  {field.type === 'unsupported' || key === 'kind' ? (
                     <span className="cad-inspector-parameter-readonly">{field.display}</span>
                   ) : (
                     <input
+                      key={`${feature.id}-${key}-${field.display}`}
                       id={`cad-param-${feature.id}-${key}`}
                       type={field.type}
                       defaultValue={field.display}

@@ -1,5 +1,15 @@
 import type { CadFeature, CadProject, CadProjectHistory } from './cad-types';
 
+const PRIMITIVE_DEFAULTS = {
+  box: { width: 20, depth: 10, height: 5 },
+  cylinder: { radius: 5, height: 10 },
+  sphere: { radius: 5 },
+  cone: { radius1: 5, radius2: 2, height: 10 },
+  torus: { majorRadius: 10, minorRadius: 2 },
+} as const;
+
+export type CadPrimitiveKind = keyof typeof PRIMITIVE_DEFAULTS;
+
 function createCadId(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return `cad-${uuid}`;
@@ -45,6 +55,28 @@ export function createCadProject(name = 'Untitled CAD project'): CadProject {
     snapshots: [],
     viewport: {},
     exportDefaults: {},
+  };
+}
+
+export function addPrimitiveFeature(project: CadProject, kind: CadPrimitiveKind): CadProject {
+  const bodyId = createCadId();
+  const featureId = createCadId();
+  const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${project.features.filter((feature) => feature.type === 'primitive' && feature.parameters.kind === kind).length + 1}`;
+  return {
+    ...project,
+    bodies: [...project.bodies, { id: bodyId, label, featureIds: [featureId], visible: true }],
+    features: [...project.features, {
+      id: featureId,
+      label,
+      type: 'primitive',
+      bodyId,
+      dependsOn: [],
+      topologyRefs: [],
+      parameters: { kind, ...PRIMITIVE_DEFAULTS[kind] },
+      suppressed: false,
+      status: 'dirty',
+      diagnostic: null,
+    }],
   };
 }
 
@@ -120,8 +152,8 @@ export function markFeatureDirty(project: CadProject, featureId: string): CadPro
 }
 
 export function setFeatureParameter(project: CadProject, featureId: string, key: string, value: unknown): CadProject {
-  const featureExists = project.features.some((feature) => feature.id === featureId);
-  if (!featureExists) return project;
+  const target = project.features.find((feature) => feature.id === featureId);
+  if (!target || Object.is(target.parameters[key], value)) return project;
   const withParameter: CadProject = {
     ...project,
     features: project.features.map((feature) => (
@@ -153,6 +185,15 @@ export function setFeatureSuppressed(project: CadProject, featureId: string, sup
       }
       return feature;
     }),
+  };
+}
+
+export function setBodyVisibility(project: CadProject, bodyId: string, visible: boolean): CadProject {
+  const body = project.bodies.find((item) => item.id === bodyId);
+  if (!body || body.visible === visible) return project;
+  return {
+    ...project,
+    bodies: project.bodies.map((item) => item.id === bodyId ? { ...item, visible } : item),
   };
 }
 

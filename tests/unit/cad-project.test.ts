@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addPrimitiveFeature,
   canReorderFeature,
   commitCadProject,
   createCadProject,
@@ -9,6 +10,7 @@ import {
   reorderFeature,
   setFeatureParameter,
   setFeatureSuppressed,
+  setBodyVisibility,
   undoCadProject,
 } from '../../src/tools/cad/project-engine';
 import type { CadFeature, CadProject } from '../../src/tools/cad/cad-types';
@@ -45,6 +47,31 @@ describe('CAD parametric project engine', () => {
     expect(project.bodies).toEqual([]);
     expect(project.metadata.tags).toEqual([]);
     expect(project.id).toMatch(/^cad-/);
+  });
+
+  it('creates independent editable primitive bodies without mutating the original project', () => {
+    const initial = createCadProject('Primitives');
+    const kinds = ['box', 'cylinder', 'sphere', 'cone', 'torus'] as const;
+    const created = kinds.reduce((project, kind) => addPrimitiveFeature(project, kind), initial);
+    const second = addPrimitiveFeature(created, 'box');
+
+    expect(initial.features).toEqual([]);
+    expect(initial.bodies).toEqual([]);
+    expect(second.features.map((item) => item.parameters)).toEqual([
+      { kind: 'box', width: 20, depth: 10, height: 5 },
+      { kind: 'cylinder', radius: 5, height: 10 },
+      { kind: 'sphere', radius: 5 },
+      { kind: 'cone', radius1: 5, radius2: 2, height: 10 },
+      { kind: 'torus', majorRadius: 10, minorRadius: 2 },
+      { kind: 'box', width: 20, depth: 10, height: 5 },
+    ]);
+    expect(second.features.map((item) => item.status)).toEqual(Array(6).fill('dirty'));
+    expect(new Set(second.features.map((item) => item.id)).size).toBe(6);
+    expect(new Set(second.bodies.map((item) => item.id)).size).toBe(6);
+    expect(second.bodies.map((body) => body.featureIds)).toEqual(second.features.map((item) => [item.id]));
+
+    const history = commitCadProject({ past: [], present: initial, future: [], limit: 100 }, 'Add box', (project) => addPrimitiveFeature(project, 'box'));
+    expect(undoCadProject(history).present).toBe(initial);
   });
 
   it('invalidates only the selected feature and its downstream dependency closure', () => {
@@ -109,6 +136,24 @@ describe('CAD parametric project engine', () => {
     const project = withFeatures([feature('box', 'primitive')]);
     const updated = setFeatureParameter(project, 'missing', 'width', 30);
     expect(updated).toBe(project);
+  });
+
+  it('does not add an undo step when an unchanged parameter loses focus', () => {
+    const project = withFeatures([{ ...feature('box', 'primitive'), parameters: { width: 20 } }]);
+    const history = { past: [], present: project, future: [], limit: 100 };
+    const unchanged = commitCadProject(history, 'Edit width', (current) => setFeatureParameter(current, 'box', 'width', 20));
+
+    expect(unchanged).toBe(history);
+    expect(unchanged.past).toHaveLength(0);
+  });
+
+  it('toggles body visibility immutably and leaves unknown bodies untouched', () => {
+    const project = withFeatures([feature('box', 'primitive')]);
+    const hidden = setBodyVisibility(project, 'body-main', false);
+
+    expect(project.bodies[0]?.visible).toBe(true);
+    expect(hidden.bodies[0]?.visible).toBe(false);
+    expect(setBodyVisibility(hidden, 'missing', true)).toBe(hidden);
   });
 
   it('rejects a reorder that would move a feature before one of its dependencies', () => {
