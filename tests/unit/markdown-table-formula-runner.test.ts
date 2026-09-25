@@ -103,6 +103,8 @@ describe('table formula worker runner', () => {
     const latest = runner.run('new source');
     await expect(stale).rejects.toBeInstanceOf(TableFormulaRunCancelled);
 
+    // Simulate an already-queued callback from the terminated worker. It must
+    // be inert even though a newer request is now active on another worker.
     workers[0].fail();
     expect(workers[1].terminated).toBe(false);
 
