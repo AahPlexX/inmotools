@@ -13,11 +13,13 @@ import {
   stepTimelineFrame,
   timelineKeyframeTimes,
 } from './timeline-engine';
+import { TIMELINE_MARKER_KINDS } from './tactics-types';
 import type {
   InterpolationKind,
   NormalizedPoint,
   TacticalMotionPathKind,
   TacticalProject,
+  TimelineMarkerKind,
   TimelineTrack,
 } from './tactics-types';
 
@@ -281,6 +283,7 @@ export default function TacticalTimelinePanel({
     const data = new FormData(event.currentTarget);
     const label = String(data.get('markerLabel') ?? '').trim();
     const timeMs = Number(data.get('markerTimeMs'));
+    const kind = String(data.get('markerKind') ?? 'coaching-cue') as TimelineMarkerKind;
     onEdit(
       'Add timeline marker',
       (current) => ({
@@ -288,7 +291,7 @@ export default function TacticalTimelinePanel({
         timeline: addTimelineMarker(current.timeline, {
           id: nextId('marker', current.timeline.markers.map((marker) => marker.id)),
           timeMs,
-          kind: 'coaching-trigger',
+          kind,
           label,
         }),
       }),
@@ -410,11 +413,23 @@ export default function TacticalTimelinePanel({
 
         <form onSubmit={submitMarker} aria-label="Timeline marker">
           <h3>Marker</h3>
+          <label>
+            Marker type
+            <select name="markerKind" defaultValue="coaching-cue">
+              {TIMELINE_MARKER_KINDS.map((kind) => (
+                <option key={kind} value={kind}>{kind.replaceAll('-', ' ')}</option>
+              ))}
+            </select>
+          </label>
           <label>Marker label<input name="markerLabel" required /></label>
           <label>Marker time (ms)<input name="markerTimeMs" type="number" min="0" step="1" max={project.timeline.durationMs} required /></label>
           <button type="submit">Add timeline marker</button>
           {project.timeline.markers.length ? (
-            <ul>{project.timeline.markers.map((marker) => <li key={marker.id}>{marker.timeMs} ms - {marker.label}</li>)}</ul>
+            <ul>
+              {project.timeline.markers.map((marker) => (
+                <li key={marker.id}>{marker.timeMs} ms - {marker.label} ({marker.kind.replaceAll('-', ' ')})</li>
+              ))}
+            </ul>
           ) : <p>No timeline markers yet.</p>}
         </form>
 
