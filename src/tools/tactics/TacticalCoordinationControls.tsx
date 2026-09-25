@@ -274,7 +274,7 @@ export default function TacticalCoordinationControls({
             {playerTargets.map((target) => <option key={target} value={target}>{target}</option>)}
           </select>
         </label>
-        {selectedPreset ? (
+        {selectedPreset && selectedPreset.roles.length > 2 ? (
           <label>
             Action target C
             <select name="actionTargetC" defaultValue={thirdTarget} required>
@@ -288,12 +288,12 @@ export default function TacticalCoordinationControls({
         <label>Action A end Y %<input name="actionAEndY" type="number" min="0" max="100" step="0.1" defaultValue="35" required /></label>
         <label>Action B end X %<input name="actionBEndX" type="number" min="0" max="100" step="0.1" defaultValue="55" required /></label>
         <label>Action B end Y %<input name="actionBEndY" type="number" min="0" max="100" step="0.1" defaultValue="65" required /></label>
-        {selectedPreset ? (
+        {selectedPreset && selectedPreset.roles.length > 2 ? (
           <>
             <label>Action C end X %<input name="actionCEndX" type="number" min="0" max="100" step="0.1" defaultValue="65" required /></label>
             <label>Action C end Y %<input name="actionCEndY" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
             <small>
-              Pattern timing gives you a useful starting sequence. Targets and end positions stay editable for your actual players and session.
+              Pattern timing is a local authoring starter, not a tactical recommendation. Adjust targets, end positions, and duration for your session.
             </small>
           </>
         ) : (
@@ -304,7 +304,7 @@ export default function TacticalCoordinationControls({
         )}
         <button
           type="submit"
-          disabled={playerTargets.length < (selectedPreset ? selectedPreset.roles.length : 2)}
+          disabled={playerTargets.length < (selectedPreset?.roles.length ?? 2)}
         >
           Apply coordinated action
         </button>
