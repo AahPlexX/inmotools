@@ -252,3 +252,17 @@ test('RAW exposure brightens before demosaic and is reset independently', async 
   await raw.getByRole('button', { name: 'Reset RAW exposure' }).click();
   await expect(raw.getByLabel('RAW highlight protection', { exact: true })).toHaveCount(0);
 });
+
+test('every open-source notice linked from Photo Studio is served', async ({ page, request }) => {
+  await page.goto('/inmotools/#/tools/photo-studio');
+  await page.getByRole('navigation').getByRole('button', { name: 'Inspect & workflow', exact: true }).click();
+  const notices = page.getByTestId('photo-notices');
+  await notices.locator('summary').click();
+  const links = notices.getByRole('link');
+  await expect(links).toHaveCount(5);
+  for (const href of await links.evaluateAll((anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).href))) {
+    const response = await request.get(href);
+    expect(response.status(), href).toBe(200);
+    expect(await response.text()).toMatch(/notices/i);
+  }
+});

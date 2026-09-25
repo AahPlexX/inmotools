@@ -263,6 +263,14 @@ function AdjustmentControl({
   );
 }
 
+const PHOTO_NOTICES = [
+  { file: 'raw-LICENSE.txt', label: 'LibRaw and its WebAssembly wrapper', purpose: 'opening camera RAW files' },
+  { file: 'codecs-LICENSE.txt', label: 'tiff and iobuffer', purpose: 'opening TIFF files' },
+  { file: 'lcms-LICENSE.txt', label: 'Little CMS', purpose: 'ICC colour management and soft proofing' },
+  { file: 'opencv-LICENSE.txt', label: 'OpenCV', purpose: 'aligning and merging several photos' },
+  { file: 'avif-LICENSE.txt', label: 'libavif, libaom and jSquash', purpose: 'AVIF export' },
+] as const;
+
 function isNeutralInks(inks: SelectiveColorInks): boolean {
   return inks.cyan === 0 && inks.magenta === 0 && inks.yellow === 0 && inks.black === 0;
 }
@@ -3179,6 +3187,18 @@ export default function PhotoWorkspace() {
             <button type="button" onClick={() => recipeInputRef.current?.click()}>Import edit recipe</button>
             <input ref={recipeInputRef} type="file" accept="application/json,.json" hidden onChange={importRecipe} />
           </div>
+        </details>
+        <details className="photo-section" data-testid="photo-notices">
+          <summary>Open-source components</summary>
+          <p className="photo-export-note">Photo Studio runs these open-source libraries in your browser. Each is loaded only when the feature that needs it is used. Their licence texts:</p>
+          <ul className="photo-notice-list">
+            {PHOTO_NOTICES.map((notice) => (
+              <li key={notice.file}>
+                <a href={`${import.meta.env.BASE_URL}photo-studio/${notice.file}`} target="_blank" rel="noopener noreferrer">{notice.label}</a>
+                <span> · {notice.purpose}</span>
+              </li>
+            ))}
+          </ul>
         </details>
       </>
     );

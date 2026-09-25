@@ -710,3 +710,5 @@
   min-inline-size: 0;
 }
 .photo-corner-fieldset legend { font-size: 0.8rem; padding: 0 0.25rem; }
+.photo-notice-list { margin: 0.25rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; }
+.photo-notice-list a { overflow-wrap: anywhere; }
