@@ -283,7 +283,7 @@ export default function TacticalCoordinationControls({
           </label>
         ) : <input name="actionTargetC" type="hidden" value="" />}
         <label>Action start (ms)<input name="actionStartMs" type="number" min="0" step="1" defaultValue="0" required /></label>
-        <label>Action base duration (ms)<input name="actionDurationMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
+        <label>Action duration (ms)<input name="actionDurationMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
         <label>Action A end X %<input name="actionAEndX" type="number" min="0" max="100" step="0.1" defaultValue="45" required /></label>
         <label>Action A end Y %<input name="actionAEndY" type="number" min="0" max="100" step="0.1" defaultValue="35" required /></label>
         <label>Action B end X %<input name="actionBEndX" type="number" min="0" max="100" step="0.1" defaultValue="55" required /></label>
