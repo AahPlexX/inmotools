@@ -23,6 +23,7 @@ import {
   perKeyStats,
   pressKey,
   round,
+  start as startEngine,
   weakKeys,
   wpmSeries,
   type EngineState,
@@ -42,17 +43,22 @@ import {
   type Quote,
 } from './typing-corpora';
 import {
-  clearAllTests,
+  clearTestsForTypist,
+  createTypist,
   dailyActivity,
   deleteTest,
+  ensureDefaultTypist,
   filterStoredTests,
   findPersonalBest,
   listTests,
+  listTypists,
   readPreference,
   rollingWpm,
   saveTest,
   writePreference,
+  DEFAULT_TYPIST_ID,
   type StoredTest,
+  type StoredTypist,
 } from './typing-storage';
 import {
   certificatePdf,
@@ -68,17 +74,27 @@ import {
 } from './typing-export';
 import { classifyKeystrokeSound, createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
 import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
+import {
+  createSessionClock,
+  effectiveSessionNow,
+  finishSession,
+  isSessionActive,
+  pauseSession,
+  resetSession,
+  resumeSession,
+  startSession,
+} from './typing-session';
 
 // -------------------- reducer wiring --------------------
 
 interface EngineAction {
-  type: 'press' | 'commitText' | 'reset' | 'finish' | 'restart' | 'extend';
+  type: 'press' | 'commitText' | 'reset' | 'finish' | 'restart' | 'extend' | 'start';
   key?: string;
   text?: string;
   code?: string;
   t?: number;
   initial?: EngineState;
-  reason?: 'aborted' | 'completed' | 'failed';
+  reason?: 'aborted' | 'completed' | 'failed' | 'stopped';
 }
 
 function reducer(state: EngineState, action: EngineAction): EngineState {
@@ -98,6 +114,8 @@ function reducer(state: EngineState, action: EngineAction): EngineState {
     case 'reset':
     case 'restart':
       return action.initial ?? state;
+    case 'start':
+      return startEngine(state, action.t ?? performance.now());
     case 'finish':
       return finish(state, action.reason ?? 'aborted', action.t ?? performance.now());
     case 'extend':
@@ -310,12 +328,16 @@ export default function TypingWorkspace() {
     allowExtraChars: DEFAULT_CONFIG.allowExtras,
     caseSensitive: DEFAULT_CONFIG.caseSensitive,
   }));
-  const [running, setRunning] = useState(false);
+  const [sessionClock, setSessionClock] = useState(createSessionClock);
   const [now, setNow] = useState<number>(performance.now());
   const [history, setHistory] = useState<StoredTest[]>([]);
+  const [typists, setTypists] = useState<StoredTypist[]>([]);
+  const [activeTypistId, setActiveTypistId] = useState(DEFAULT_TYPIST_ID);
+  const [addTypistModalOpen, setAddTypistModalOpen] = useState(false);
   const [filterTagText, setFilterTagText] = useState('');
   const filterTags = useMemo(() => filterTagText.split(',').map((tag) => tag.trim()).filter(Boolean), [filterTagText]);
-  const visibleHistory = useMemo(() => filterStoredTests(history, filterTags.length > 0 ? { tags: filterTags } : {}), [history, filterTags]);
+  const profileHistory = useMemo(() => filterStoredTests(history, { typistId: activeTypistId }), [history, activeTypistId]);
+  const visibleHistory = useMemo(() => filterStoredTests(profileHistory, filterTags.length > 0 ? { tags: filterTags } : {}), [profileHistory, filterTags]);
   const [personalBest, setPersonalBest] = useState<StoredTest | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -336,6 +358,13 @@ export default function TypingWorkspace() {
   const histChartRef = useRef<Chart | null>(null);
   const milestoneRef = useRef<Set<number>>(new Set());
   const zenChunkRef = useRef(0);
+
+  const running = sessionClock.status === 'running';
+  const paused = sessionClock.status === 'paused';
+  const sessionActive = isSessionActive(sessionClock);
+  const sessionNow = effectiveSessionNow(sessionClock, now);
+  const activeTypist = typists.find((profile) => profile.id === activeTypistId)
+    ?? { id: DEFAULT_TYPIST_ID, name: 'Local typist', createdAt: 0, updatedAt: 0 };
 
   const totalDurationMs = useMemo(() => {
     if (config.durationMode === 'time') return config.durationValue * 1000;
@@ -359,6 +388,12 @@ export default function TypingWorkspace() {
             caseSensitive: restored.caseSensitive,
           }) });
         }
+        const defaultTypist = await ensureDefaultTypist();
+        const profiles = await listTypists();
+        const savedTypistId = await readPreference<string>('activeTypistId', defaultTypist.id);
+        const resolvedTypistId = profiles.some((profile) => profile.id === savedTypistId) ? savedTypistId : defaultTypist.id;
+        setTypists(profiles);
+        setActiveTypistId(resolvedTypistId);
         const rows = await listTests();
         setHistory(rows);
       } catch { /* IndexedDB unavailable, keep defaults */ }
@@ -377,6 +412,11 @@ export default function TypingWorkspace() {
     void writePreference('config', normalizeSavedConfig(config)).catch(() => undefined);
   }, [config, configHydrated]);
 
+  useEffect(() => {
+    if (!configHydrated) return;
+    void writePreference('activeTypistId', activeTypistId).catch(() => undefined);
+  }, [activeTypistId, configHydrated]);
+
   // Rebuild the audio profile when it changes.
   useEffect(() => {
     audioRef.current?.setSwitch(config.audioProfile);
@@ -388,6 +428,7 @@ export default function TypingWorkspace() {
   const personalBestQuery = useMemo(() => {
     const dur = classifyDuration(config);
     return {
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -395,7 +436,7 @@ export default function TypingWorkspace() {
       layout: config.layout,
       quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
     };
-  }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
+  }, [activeTypistId, config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
 
   // Refresh the personal-best pacer when its comparison family changes.
   useEffect(() => {
@@ -418,19 +459,19 @@ export default function TypingWorkspace() {
   useEffect(() => {
     if (!running || totalDurationMs === 0) return;
     if (engine.startedAt == null) return;
-    const elapsed = now - engine.startedAt;
+    const elapsed = sessionNow - engine.startedAt;
     if (elapsed >= totalDurationMs) {
       dispatch({ type: 'finish', reason: 'completed', t: engine.startedAt + totalDurationMs });
     }
-  }, [running, now, engine.startedAt, totalDurationMs]);
+  }, [running, sessionNow, engine.startedAt, totalDurationMs]);
 
   // Finite non-timed modes finish as soon as the target is cleanly completed.
   useEffect(() => {
     if (!running || engine.finished || totalDurationMs !== 0 || config.durationMode === 'zen') return;
     if (!isTargetCompleted(engine)) return;
     const lastEvent = engine.events[engine.events.length - 1];
-    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });
-  }, [running, engine, totalDurationMs, config.durationMode]);
+    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? sessionNow });
+  }, [running, engine, totalDurationMs, config.durationMode, sessionNow]);
 
   // Zen mode replenishes the active target before the typist reaches its end.
   useEffect(() => {
@@ -447,7 +488,7 @@ export default function TypingWorkspace() {
   useEffect(() => {
     if (!running || engine.finished || config.audioProfile === 'off') return;
     const progress = totalDurationMs > 0 && engine.startedAt != null
-      ? Math.min(1, Math.max(0, (now - engine.startedAt) / totalDurationMs))
+      ? Math.min(1, Math.max(0, (sessionNow - engine.startedAt) / totalDurationMs))
       : Math.min(1, engine.cursor / Math.max(1, engine.targetText.length));
     for (const threshold of [0.25, 0.5, 0.75]) {
       if (progress >= threshold && !milestoneRef.current.has(threshold)) {
@@ -456,25 +497,27 @@ export default function TypingWorkspace() {
         break;
       }
     }
-  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, now, totalDurationMs, config.audioProfile]);
+  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, sessionNow, totalDurationMs, config.audioProfile]);
 
   // Watch for engine.finished transition.
   useEffect(() => {
-    if (engine.finished && running) {
-      setRunning(false);
-      const metrics = computeMetrics(engine);
-      if (config.audioProfile !== 'off') {
-        if (engine.finishReason === 'failed') audioRef.current?.playFail();
-        else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
-      }
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-      if (!reducedMotion && metrics.netWpm > 0 && engine.finishReason === 'completed') {
-        confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
-      }
-      setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${metrics.netWpm} WPM, ${metrics.accuracy}% accuracy.`);
-      setSaveModalOpen(true);
+    if (!engine.finished) return;
+    if (sessionClock.status === 'running' || sessionClock.status === 'paused') {
+      setSessionClock((clock) => finishSession(clock, engine.finishReason ?? 'aborted', performance.now()));
     }
-  }, [engine.finished, engine.finishReason, running, config.audioProfile]);
+    if (engine.finishReason === 'aborted') return;
+    const finalMetrics = computeMetrics(engine, sessionNow);
+    if (config.audioProfile !== 'off') {
+      if (engine.finishReason === 'failed') audioRef.current?.playFail();
+      else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
+    }
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (!reducedMotion && finalMetrics.netWpm > 0 && engine.finishReason === 'completed') {
+      confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
+    }
+    setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${finalMetrics.netWpm} WPM, ${finalMetrics.accuracy}% accuracy.`);
+    setSaveModalOpen(true);
+  }, [engine.finished, engine.finishReason]);
 
   // Live WPM chart: create once, then update data in place on each sample tick.
   useEffect(() => {
@@ -503,7 +546,7 @@ export default function TypingWorkspace() {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    const samples = wpmSeries(engine, now);
+    const samples = wpmSeries(engine, sessionNow);
     const ghost = config.ghostEnabled && personalBest?.keystrokes ? ghostSeries(personalBest.keystrokes) : [];
     const datasets: Chart['data']['datasets'] = [
       { label: 'WPM', data: samples.map((s) => s.wpm), borderColor: '#2a3d63', backgroundColor: 'rgba(42,61,99,0.15)', tension: 0.25, fill: true, pointRadius: 0 },
@@ -522,7 +565,7 @@ export default function TypingWorkspace() {
     chart.data.labels = samples.map((s) => `${s.seconds}s`);
     chart.data.datasets = datasets;
     chart.update('none');
-  }, [engine, now, personalBest, config.ghostEnabled, config.pacerEnabled, config.pacerWpm]);
+  }, [engine, sessionNow, personalBest, config.ghostEnabled, config.pacerEnabled, config.pacerWpm]);
 
   // Historical trend chart.
   useEffect(() => {
@@ -568,7 +611,7 @@ export default function TypingWorkspace() {
     };
   }, [visibleHistory]);
 
-  const metrics = useMemo(() => computeMetrics(engine, now), [engine, now]);
+  const metrics = useMemo(() => computeMetrics(engine, sessionNow), [engine, sessionNow]);
   const layoutDef = useMemo(() => findLayout(config.layout), [config.layout]);
   const homeAnchors = useMemo(() => homeRowAnchors(layoutDef), [layoutDef]);
   const keyStats = useMemo(() => perKeyStats(engine.events), [engine.events]);
@@ -577,6 +620,10 @@ export default function TypingWorkspace() {
   const weak = useMemo(() => weakKeys(engine.events, 6), [engine.events]);
 
   const rebuildTarget = useCallback((patchCfg?: Partial<Config>) => {
+    if (isSessionActive(sessionClock)) {
+      setStatusText('Stop or reset the current test before loading new text.');
+      return;
+    }
     const cfg = { ...config, ...(patchCfg ?? {}) };
     const nextSeed = Math.floor(Math.random() * 2147483647);
     const nextText = buildTargetText(cfg, nextSeed);
@@ -587,13 +634,18 @@ export default function TypingWorkspace() {
       allowExtraChars: cfg.allowExtras,
       caseSensitive: cfg.caseSensitive,
     }) });
-    setRunning(false);
+    setSessionClock(resetSession());
+    setNow(performance.now());
     milestoneRef.current.clear();
     zenChunkRef.current = 0;
     setStatusText('New text ready.');
-  }, [config]);
+  }, [config, sessionClock]);
 
   const applyConfig = useCallback((patch: Partial<Config>) => {
+    if (isSessionActive(sessionClock)) {
+      setStatusText('Stop or reset the current test before changing test settings.');
+      return;
+    }
     const normalized: Partial<Config> = { ...patch };
     if (patch.durationMode !== undefined) {
       normalized.durationValue = normalizeDurationValue(patch.durationMode, patch.durationValue ?? config.durationValue);
@@ -622,28 +674,29 @@ export default function TypingWorkspace() {
         caseSensitive: (normalized.caseSensitive ?? config.caseSensitive),
       }) });
     }
-  }, [config, rebuildTarget, target]);
+  }, [config, rebuildTarget, target, sessionClock]);
 
   const commitTextInput = useCallback((text: string, code = 'Input', t = performance.now()) => {
-    if (engine.finished) return;
+    if (engine.finished || paused) return;
     const normalized = text.replace(/\r\n?/g, '\n');
     if (!normalized) return;
+    const effectiveT = effectiveSessionNow(sessionClock, t);
     let preview = engine;
     for (const character of normalized) {
       if (preview.finished) break;
       const key = character === '\n' ? 'Enter' : character;
       const sound = classifyKeystrokeSound(key, preview.targetText[preview.cursor], config.caseSensitive);
-      const next = pressKey(preview, key, code, t);
+      const next = pressKey(preview, key, code, effectiveT);
       if (next !== preview && config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
       preview = next;
     }
 
-    if (!running && engine.startedAt == null && preview.startedAt != null) {
-      setRunning(true);
+    if (!running && !paused && engine.startedAt == null && preview.startedAt != null) {
+      setSessionClock((clock) => startSession(clock));
       setStatusText('Test started.');
     }
-    dispatch({ type: 'commitText', text: normalized, code, t });
-  }, [engine, running, config.audioProfile, config.caseSensitive]);
+    dispatch({ type: 'commitText', text: normalized, code, t: effectiveT });
+  }, [engine, running, paused, sessionClock, config.audioProfile, config.caseSensitive]);
 
   const handleTextInput = useCallback((event: React.FormEvent<HTMLTextAreaElement>) => {
     const nativeEvent = event.nativeEvent as InputEvent;
@@ -665,8 +718,8 @@ export default function TypingWorkspace() {
     if (nativeEvent.inputType === 'deleteContentBackward') {
       pendingPhysicalInputRef.current = null;
       event.currentTarget.value = '';
-      if (!engine.finished) {
-        const t = performance.now();
+      if (!engine.finished && !paused) {
+        const t = effectiveSessionNow(sessionClock, performance.now());
         dispatch({ type: 'press', key: 'Backspace', code: 'Backspace', t });
         if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
       }
@@ -691,7 +744,7 @@ export default function TypingWorkspace() {
     const text = nativeEvent.data ?? event.currentTarget.value;
     event.currentTarget.value = '';
     commitTextInput(text, stagedPhysicalInput?.code ?? 'Input', stagedPhysicalInput?.t ?? performance.now());
-  }, [commitTextInput, engine.finished, config.audioProfile]);
+  }, [commitTextInput, engine.finished, paused, sessionClock, config.audioProfile]);
 
   const handleCompositionEnd = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
     compositionActiveRef.current = false;
@@ -709,22 +762,31 @@ export default function TypingWorkspace() {
 
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (running) dispatch({ type: 'finish', reason: 'aborted' });
-      setRunning(false);
+      if (sessionActive && !engine.finished) {
+        const realNow = performance.now();
+        const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+        dispatch({ type: 'finish', reason: 'aborted', t: effectiveNow });
+        setSessionClock((clock) => finishSession(clock, 'aborted', realNow));
+        setNow(realNow);
+      }
       setStatusText('Test aborted.');
       return;
     }
 
     if (event.key === 'F2') {
       event.preventDefault();
-      rebuildTarget();
+      if (sessionActive) {
+        setStatusText('Stop or reset the current test before loading new text.');
+      } else {
+        rebuildTarget();
+      }
       return;
     }
 
-    if (event.key === 'Backspace' && !engine.finished) {
+    if (event.key === 'Backspace' && !engine.finished && !paused) {
       event.preventDefault();
       pendingPhysicalInputRef.current = null;
-      const t = performance.now();
+      const t = effectiveSessionNow(sessionClock, performance.now());
       dispatch({ type: 'press', key: 'Backspace', code: event.code || 'Backspace', t });
       if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
       return;
@@ -732,29 +794,96 @@ export default function TypingWorkspace() {
 
     if (
       !engine.finished
+      && !paused
       && (event.key.length === 1 || event.key === 'Enter')
       && event.code
       && event.code !== 'Unidentified'
     ) {
       pendingPhysicalInputRef.current = { code: event.code, t: performance.now() };
     }
-  }, [engine.finished, rebuildTarget, running, config.audioProfile]);
+  }, [engine.finished, rebuildTarget, sessionActive, sessionClock, paused, config.audioProfile]);
+
+  const startTest = useCallback(() => {
+    if (sessionClock.status !== 'ready' || engine.finished) return;
+    const realNow = performance.now();
+    const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+    dispatch({ type: 'start', t: effectiveNow });
+    setSessionClock((clock) => startSession(clock));
+    setNow(realNow);
+    setStatusText('Test started.');
+    canvasRef.current?.focus({ preventScroll: true });
+  }, [sessionClock, engine.finished]);
+
+  const pauseTest = useCallback(() => {
+    if (!running) return;
+    const realNow = performance.now();
+    setNow(realNow);
+    setSessionClock((clock) => pauseSession(clock, realNow));
+    audioRef.current?.stopMetronome();
+    setStatusText('Test paused.');
+  }, [running]);
+
+  const resumeTest = useCallback(() => {
+    if (!paused) return;
+    const realNow = performance.now();
+    setNow(realNow);
+    setSessionClock((clock) => resumeSession(clock, realNow));
+    if (config.metronomeOn) audioRef.current?.startMetronome(config.metronomeBpm);
+    setStatusText('Test resumed.');
+    canvasRef.current?.focus({ preventScroll: true });
+  }, [paused, config.metronomeOn, config.metronomeBpm]);
+
+  const stopTest = useCallback(() => {
+    if (!sessionActive || engine.finished) return;
+    const realNow = performance.now();
+    const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+    setNow(realNow);
+    dispatch({ type: 'finish', reason: 'stopped', t: effectiveNow });
+    setSessionClock((clock) => finishSession(clock, 'stopped', realNow));
+    audioRef.current?.stopMetronome();
+  }, [sessionActive, sessionClock, engine.finished]);
+
+  const resetAttempt = useCallback(() => {
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    milestoneRef.current.clear();
+    pendingPhysicalInputRef.current = null;
+    compositionCommitRef.current = null;
+    setSaveModalOpen(false);
+    setStatusText('Attempt reset. Same text is ready.');
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [target, config.errorMode, config.allowExtras, config.caseSensitive]);
 
   const restart = useCallback(() => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before loading new text.');
+      return;
+    }
     rebuildTarget();
     canvasRef.current?.focus({ preventScroll: true });
-  }, [rebuildTarget]);
+  }, [rebuildTarget, sessionActive]);
 
   const abort = useCallback(() => {
-    if (running && !engine.finished) dispatch({ type: 'finish', reason: 'aborted' });
-    setRunning(false);
-  }, [running, engine.finished]);
+    if (!sessionActive || engine.finished) return;
+    const realNow = performance.now();
+    dispatch({ type: 'finish', reason: 'aborted', t: effectiveSessionNow(sessionClock, realNow) });
+    setSessionClock((clock) => finishSession(clock, 'aborted', realNow));
+    setNow(realNow);
+    audioRef.current?.stopMetronome();
+    setStatusText('Test aborted.');
+  }, [sessionActive, sessionClock, engine.finished]);
 
   // Save flow — invoked from the finish modal.
   const handleSave = useCallback(async (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => {
     const dur = classifyDuration(config);
     const stored: StoredTest = {
       savedAt: Date.now(),
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -782,7 +911,7 @@ export default function TypingWorkspace() {
     setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
     setSaveModalOpen(false);
     setStatusText('Test saved to local history.');
-  }, [config, engine, metrics, target, personalBestQuery]);
+  }, [activeTypistId, config, engine, metrics, target, personalBestQuery]);
 
   const handleExportSingle = useCallback(async (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => {
     const dur = classifyDuration(config);
@@ -815,7 +944,7 @@ export default function TypingWorkspace() {
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
     setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);
-  }, [config, engine, metrics, target]);
+  }, [activeTypistId, config, engine, metrics, target]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
@@ -831,7 +960,7 @@ export default function TypingWorkspace() {
       const text = await file.text();
       const parsed = JSON.parse(text);
       const { tests, skipped } = parseImportedTests(parsed);
-      for (const record of tests) await saveTest(record);
+      for (const record of tests) await saveTest({ ...record, id: undefined, typistId: activeTypistId });
       setHistory(await listTests());
       setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
       const skippedText = skipped > 0 ? ` Skipped ${skipped} invalid record${skipped === 1 ? '' : 's'}.` : '';
@@ -839,7 +968,7 @@ export default function TypingWorkspace() {
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
-  }, [personalBestQuery]);
+  }, [activeTypistId, personalBestQuery]);
 
   const importCsvDictionary = useCallback(async (file: File) => {
     try {
@@ -877,7 +1006,7 @@ export default function TypingWorkspace() {
   // Rolling averages and activity reflect the same visible tag-filtered history used for exports.
   const rolling = useMemo(() => rollingWpm(visibleHistory), [visibleHistory]);
   const daily = useMemo(() => dailyActivity(visibleHistory).slice(-30), [visibleHistory]);
-  const durationRemainingMs = totalDurationMs && engine.startedAt != null ? Math.max(0, totalDurationMs - (now - engine.startedAt)) : totalDurationMs;
+  const durationRemainingMs = totalDurationMs && engine.startedAt != null ? Math.max(0, totalDurationMs - (sessionNow - engine.startedAt)) : totalDurationMs;
 
   // Blur-until-focus effect handler.
   useEffect(() => {
