@@ -404,7 +404,7 @@ export async function embedPhotoIcc(
   else if (mime === 'image/png') embedded = await embedPngIcc(input, profileBytes, profile.description);
   else if (mime === 'image/webp') embedded = embedWebpIcc(input, profileBytes, options);
   else if (mime === 'image/tiff') embedded = withPhotoTiffExtras(input, { icc: profileBytes });
-  else if (mime === 'image/avif') throw new Error('AVIF export cannot embed an ICC profile here. Choose JPEG, PNG, WebP, or TIFF for a colour-managed export.');
+  else if (mime === 'image/avif') throw new Error('AVIF export cannot embed an ICC profile here. Choose JPEG, PNG, WebP, or TIFF for a color-managed export.');
   else {
     const unsupported: never = mime;
     throw new Error(`Unsupported ICC container: ${String(unsupported)}`);

@@ -266,7 +266,7 @@ function AdjustmentControl({
 const PHOTO_NOTICES = [
   { file: 'raw-LICENSE.txt', label: 'LibRaw and its WebAssembly wrapper', purpose: 'opening camera RAW files' },
   { file: 'codecs-LICENSE.txt', label: 'tiff and iobuffer', purpose: 'opening TIFF files' },
-  { file: 'lcms-LICENSE.txt', label: 'Little CMS', purpose: 'ICC colour management and soft proofing' },
+  { file: 'lcms-LICENSE.txt', label: 'Little CMS', purpose: 'ICC color management and soft proofing' },
   { file: 'opencv-LICENSE.txt', label: 'OpenCV', purpose: 'aligning and merging several photos' },
   { file: 'avif-LICENSE.txt', label: 'libavif, libaom and jSquash', purpose: 'AVIF export' },
 ] as const;
@@ -2930,13 +2930,13 @@ export default function PhotoWorkspace() {
             </div> : null}
             <details data-testid="photo-source-details">
               <summary>Original file details</summary>
-              {!sourceMetadata ? <p className="photo-export-note">Reading the original file…</p> : !sourceMetadata.found ? <p className="photo-export-note">This file carries no camera, location, or colour-profile information.</p> : (
+              {!sourceMetadata ? <p className="photo-export-note">Reading the original file…</p> : !sourceMetadata.found ? <p className="photo-export-note">This file carries no camera, location, or color-profile information.</p> : (
                 <dl className="photo-source-facts">
                   {[...sourceMetadata.camera, ...sourceMetadata.capture].map((fact) => (
                     <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>
                   ))}
                   {sourceMetadata.location ? <div><dt>Location</dt><dd>{sourceMetadata.location.latitude.toFixed(5)}, {sourceMetadata.location.longitude.toFixed(5)}{sourceMetadata.location.altitude !== undefined ? ` · ${Math.round(sourceMetadata.location.altitude)} m` : ''}</dd></div> : null}
-                  <div><dt>Colour profile</dt><dd data-testid="photo-source-profile">{sourceMetadata.colorProfile ? `${sourceMetadata.colorProfile.description} · ${sourceMetadata.colorProfile.colorSpace} · ${sourceMetadata.colorProfile.deviceClass} v${sourceMetadata.colorProfile.version}` : 'None embedded (treated as sRGB)'}</dd></div>
+                  <div><dt>Color profile</dt><dd data-testid="photo-source-profile">{sourceMetadata.colorProfile ? `${sourceMetadata.colorProfile.description} · ${sourceMetadata.colorProfile.colorSpace} · ${sourceMetadata.colorProfile.deviceClass} v${sourceMetadata.colorProfile.version}` : 'None embedded (treated as sRGB)'}</dd></div>
                 </dl>
               )}
               {sourceMetadata?.colorProfile ? <p className="photo-export-note">Your browser uses this embedded profile when it decodes the photo. To reinterpret the pixels with a different profile, use Assign source profile in the Edit panel.</p> : null}

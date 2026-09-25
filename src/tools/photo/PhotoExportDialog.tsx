@@ -239,7 +239,7 @@ export default function PhotoExportDialog({
     'image/png': capabilities?.png ?? true,
     'image/webp': capabilities?.webp ?? true,
     'image/tiff': capabilities?.tiff ?? true,
-    // AVIF output cannot carry the ICC profile a colour-managed export requires.
+    // AVIF output cannot carry the ICC profile a color-managed export requires.
     'image/avif': (capabilities?.avif ?? true) && !recipe.colorManagement?.outputProfile,
   }), [capabilities, recipe.colorManagement?.outputProfile]);
 
@@ -877,7 +877,7 @@ export default function PhotoExportDialog({
           <div className="photo-inline-actions">
             <button type="button" disabled={!printFit} onClick={sizeExportForPrint}>Size export for this print at {targetPpi} ppi</button>
           </div>
-          <p className="photo-export-note">Photo Studio prepares print-ready files; it does not control your printer driver or its colour settings.</p>
+          <p className="photo-export-note">Photo Studio prepares print-ready files; it does not control your printer driver or its color settings.</p>
         </details>
 
         <details className="photo-batch-section">
@@ -986,7 +986,7 @@ export default function PhotoExportDialog({
             {watermarkDraft.kind === 'text' ? (
               <>
                 <label>Text<input aria-label="Watermark text" value={watermarkDraft.text} maxLength={200} onChange={(event) => setWatermarkDraft((current) => ({ ...current, text: event.target.value }))} /></label>
-                <label>Colour<input type="color" aria-label="Watermark colour" value={watermarkDraft.textColor} onChange={(event) => setWatermarkDraft((current) => ({ ...current, textColor: event.target.value }))} /></label>
+                <label>Color<input type="color" aria-label="Watermark color" value={watermarkDraft.textColor} onChange={(event) => setWatermarkDraft((current) => ({ ...current, textColor: event.target.value }))} /></label>
               </>
             ) : null}
             <div className="photo-inline-actions">

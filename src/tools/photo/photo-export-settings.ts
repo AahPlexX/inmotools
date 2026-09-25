@@ -93,11 +93,11 @@ export interface PhotoFormatFacts {
 /** What each output container actually does with pixels in this app, stated plainly. WebP is
  * lossy here because the browser canvas encoder exposes no lossless switch. */
 export const PHOTO_FORMAT_FACTS: Record<PhotoOutputMime, PhotoFormatFacts> = {
-  'image/jpeg': { label: 'JPEG', compression: 'lossy', usesQuality: true, supportsTransparency: false, note: 'Lossy. Smallest files for photos; transparent areas are filled with the background colour.' },
+  'image/jpeg': { label: 'JPEG', compression: 'lossy', usesQuality: true, supportsTransparency: false, note: 'Lossy. Smallest files for photos; transparent areas are filled with the background color.' },
   'image/png': { label: 'PNG', compression: 'lossless', usesQuality: false, supportsTransparency: true, note: 'Lossless. Exact pixels and transparency, larger files.' },
   'image/webp': { label: 'WebP', compression: 'lossy', usesQuality: true, supportsTransparency: true, note: 'Lossy (the browser encoder has no lossless mode). Small files with transparency.' },
   'image/tiff': { label: 'TIFF', compression: 'lossless', usesQuality: false, supportsTransparency: true, note: 'Lossless, uncompressed 8-bit. Large files for print and archive workflows.' },
-  'image/avif': { label: 'AVIF', compression: 'lossy', usesQuality: true, supportsTransparency: true, note: 'Lossy by default (or lossless when ticked below). Very small files for the web; encoding big photos can take a while. Metadata travels in the XMP sidecar, and colour-managed ICC output is not available for AVIF.' },
+  'image/avif': { label: 'AVIF', compression: 'lossy', usesQuality: true, supportsTransparency: true, note: 'Lossy by default (or lossless when ticked below). Very small files for the web; encoding big photos can take a while. Metadata travels in the XMP sidecar, and color-managed ICC output is not available for AVIF.' },
 };
 
 // --- File name rules (capability 143) ---

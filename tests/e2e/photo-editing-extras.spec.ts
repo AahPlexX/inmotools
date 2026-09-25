@@ -232,7 +232,7 @@ test('original file details and the duplicate prompt use the source itself', asy
   await tab(page, 'Inspect & workflow');
   const details = page.getByTestId('photo-source-details');
   await details.locator('summary').click();
-  await expect(details).toContainText('no camera, location, or colour-profile information');
+  await expect(details).toContainText('no camera, location, or color-profile information');
   await page.setInputFiles('[data-testid="photo-file-input"]', { name: 'same-bytes.png', mimeType: 'image/png', buffer: SCENE });
   const prompt = page.getByTestId('photo-duplicate-prompt');
   await expect(prompt).toContainText('You already have this photo');
