@@ -26,6 +26,9 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scrollbar-gutter: stable; }
+/* Smooth scrolling animates every programmatic scroll (focus moves, anchors,
+   scroll-into-view); people who ask for reduced motion get instant scrolling. */
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { margin: 0; min-width: 0; min-height: 100vh; background: var(--paper); color: var(--ink); }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }

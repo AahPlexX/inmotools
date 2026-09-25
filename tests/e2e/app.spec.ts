@@ -98,3 +98,11 @@ test('stale lazy chunk failures recover by refreshing onto the current deploymen
   await expect(page.getByTestId('suite-title')).toContainText('PlanCraft Studio');
   expect(blocked).toBe(true);
 });
+
+test('page scrolling is instant for people who ask for reduced motion', async ({ page }) => {
+  await page.goto('./');
+  const scrollBehavior = () => page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior);
+  expect(await scrollBehavior()).toBe('smooth');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await scrollBehavior()).toBe('auto');
+});
