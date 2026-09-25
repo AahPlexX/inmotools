@@ -19,6 +19,7 @@ import {
   reviewFormationLegality,
 } from './formation-engine';
 import { transformTacticalProject } from './pitch-engine';
+import { sampleTacticalProjectAtTime } from './timeline-engine';
 import {
   PITCH_RULE_PROFILES,
   applyPitchRuleProfile,
@@ -126,9 +127,14 @@ export default function TacticalMatchboardWorkspace() {
   const [toPhaseId, setToPhaseId] = useState('');
   const [morphPercent, setMorphPercent] = useState('50');
   const [activeSceneId, setActiveSceneId] = useState('scene-1');
+  const [previewTimeMs, setPreviewTimeMs] = useState(0);
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
 
   const project = history.present;
+  const presentationProject = useMemo(
+    () => sampleTacticalProjectAtTime(project, Math.min(previewTimeMs, project.timeline.durationMs)),
+    [previewTimeMs, project],
+  );
   const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
   const sceneId = activeScene?.id ?? '';
   const layerId = activeScene?.layers[0]?.id ?? '';
@@ -174,6 +180,7 @@ export default function TacticalMatchboardWorkspace() {
       setHistory(createTacticalHistory(nextProject));
       setActiveFormation(selectedFormation);
       setActiveSceneId(nextProject.scenes[0]?.id ?? '');
+      setPreviewTimeMs(0);
       setSelectedTokenId(nextProject.playerTokens[0]?.id);
       setMode('move');
       setArrowStart(null);
@@ -657,7 +664,14 @@ export default function TacticalMatchboardWorkspace() {
         </details>
 
 
-        <TacticalTimelinePanel project={project} activeSceneId={sceneId} onEdit={applyEdit} />
+        <TacticalTimelinePanel
+          project={project}
+          activeSceneId={sceneId}
+          previewTimeMs={Math.min(previewTimeMs, project.timeline.durationMs)}
+          onPreviewTimeChange={setPreviewTimeMs}
+          onTransportStatus={setStatus}
+          onEdit={applyEdit}
+        />
 
         <div className="tactical-command-bar" aria-label="Board commands">
           <label className="tactical-arrow-label tactical-scene-picker">
@@ -703,7 +717,7 @@ export default function TacticalMatchboardWorkspace() {
 
         <div className="tactical-editor-layout">
           <TacticalBoard
-            project={project}
+            project={presentationProject}
             sceneId={sceneId}
             selectedTokenId={selectedTokenId}
             interactionMode={mode}
