@@ -4,10 +4,10 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source tip: `feeafee9895f5c04bea650d8df7e402cef62e742`
+- Last validated source tip: `69bec32e29dbed806c4439b9a80314c918e4dda2`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
 - Milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened)**
-- Verified functional features: **15/60**
+- Verified functional features: **16/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
@@ -17,25 +17,24 @@ Documentation commits after the validated source tip do not change Tactical runt
 Continue **T05-01**. Gauntlet invalidated the prior blanket 16–26 verification.
 
 Exact order:
-1. #19 scene rename/reorder/split/join.
-2. #20 generalized object/layer temporal visibility.
-3. #22 typed markers/coaching triggers.
-4. #23 named editable coordinated-action template library.
-5. #24 linked-unit line-shift, step/drop and width/depth controls.
-6. Re-run Task 5 units, TypeScript/build, desktop/mobile browser, Axe, keyboard and reflow evidence.
-7. Only then close T05 and unlock T06.
+1. #20 generalized object/layer temporal visibility.
+2. #22 typed markers/coaching triggers.
+3. #23 named editable coordinated-action template library.
+4. #24 linked-unit line-shift, step/drop and width/depth controls.
+5. Re-run Task 5 units, TypeScript/build, desktop/mobile browser, Axe, keyboard and reflow evidence.
+6. Only then close T05 and unlock T06.
 
-Rows #16, #17, #18, #21, #25 and #26 are verified. #25 has visible ball attachment/handoff/release proof and SVG ball rendering through `f4f4cde`.
+Rows #16, #17, #18, #19, #21, #25 and #26 are verified. #25 has visible ball attachment/handoff/release proof and SVG ball rendering through `f4f4cde`.
 
 ## Task 5 closure evidence
 
-Task 5 is **ACTIVE** after Gauntlet found accepted-scope gaps. Row 17 is now closed; rows 19, 20, 22, 23 and 24 remain open.
+Task 5 is **ACTIVE** after Gauntlet found accepted-scope gaps. Rows 17 and 19 are now closed; rows 20, 22, 23 and 24 remain open.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 21, 25, 26**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 25, 26**.
 
-In progress: **3, 4, 5, 7, 8, 19, 20, 22, 23, 24, 51, 52, 55, 56, 59**.
+In progress: **3, 4, 5, 7, 8, 20, 22, 23, 24, 51, 52, 55, 56, 59**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 
