@@ -7,9 +7,10 @@ import {
   splitTacticalScene,
 } from './scene-engine';
 import {
-  addTimelineKeyframe,
+  addTimelineTrack,
   offsetTimelineGroup,
   offsetTimelineTrack,
+  setTimelineVisibility,
 } from './timeline-engine';
 import type { TacticalProject } from './tactics-types';
 
@@ -38,6 +39,33 @@ export default function TacticalTimingControls({
   const trackTargets = project.timeline.tracks.map((track) => track.targetId);
   const firstTarget = trackTargets[0] ?? '';
   const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
+  const visibilityTargets = activeScene ? [
+    ...activeScene.layers.map((layer) => ({ id: layer.id, label: `Layer: ${layer.name}` })),
+    ...project.playerTokens
+      .filter((token) => token.sceneId === activeScene.id)
+      .map((token) => {
+        const team = project.teams.find((candidate) => candidate.id === token.teamId);
+        const player = team?.roster.find((candidate) => candidate.id === token.playerId);
+        return {
+          id: token.id,
+          label: `Player: ${player?.displayName?.trim() || player?.jerseyNumber?.trim() || token.id}`,
+        };
+      }),
+    ...project.equipment
+      .filter((item) => item.sceneId === activeScene.id)
+      .map((item) => ({ id: item.id, label: `Equipment: ${item.kind}` })),
+    ...activeScene.objects.map((object) => ({ id: object.id, label: `Object: ${object.kind} (${object.id})` })),
+    ...project.annotations
+      .filter((annotation) => annotation.sceneId === activeScene.id)
+      .map((annotation) => ({
+        id: annotation.id,
+        label: `Annotation: ${annotation.label?.trim() || annotation.kind}`,
+      })),
+  ] : [];
+  const uniqueVisibilityTargets = [...new Map(
+    visibilityTargets.map((target) => [target.id, target] as const),
+  ).values()];
+  const firstVisibilityTarget = uniqueVisibilityTargets[0]?.id ?? '';
   const chronologicalScenes = [...project.scenes].sort(
     (left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id),
   );
@@ -126,13 +154,34 @@ export default function TacticalTimingControls({
     onEdit(
       'Add visibility change',
       (current) => {
+        if (!targetId) throw new Error('Select a visibility target.');
+        if (!Number.isInteger(timeMs) || timeMs < 0 || timeMs > current.timeline.durationMs) {
+          throw new RangeError('Visibility time must be an integer within the timeline duration.');
+        }
         const track = current.timeline.tracks.find((item) => item.targetId === targetId);
-        if (!track) throw new Error(`Timeline target ${targetId} does not have a track.`);
-        const updated = addTimelineKeyframe(track, {
-          id: nextId(`visibility-${targetId}`, track.keyframes.map((keyframe) => keyframe.id)),
+        const visibilityId = nextId(
+          `visibility-${targetId}`,
+          track?.keyframes.map((keyframe) => keyframe.id) ?? [],
+        );
+        if (!track) {
+          return {
+            ...current,
+            timeline: addTimelineTrack(current.timeline, {
+              id: nextId('visibility-track', current.timeline.tracks.map((item) => item.id)),
+              targetId,
+              keyframes: [{
+                id: visibilityId,
+                timeMs,
+                visible,
+                interpolation: 'hold',
+              }],
+            }),
+          };
+        }
+        const updated = setTimelineVisibility(track, {
+          id: visibilityId,
           timeMs,
           visible,
-          interpolation: 'hold',
         });
         return {
           ...current,
@@ -260,8 +309,10 @@ export default function TacticalTimingControls({
         <h3>Visibility</h3>
         <label>
           Visibility target
-          <select name="visibilityTarget" defaultValue={firstTarget}>
-            {trackTargets.map((target) => <option key={target} value={target}>{target}</option>)}
+          <select name="visibilityTarget" defaultValue={firstVisibilityTarget}>
+            {uniqueVisibilityTargets.map((target) => (
+              <option key={target.id} value={target.id}>{target.label}</option>
+            ))}
           </select>
         </label>
         <label>Visibility time (ms)<input name="visibilityTimeMs" type="number" min="0" step="1" defaultValue="750" required /></label>
@@ -272,7 +323,7 @@ export default function TacticalTimingControls({
             <option value="hidden">Hidden</option>
           </select>
         </label>
-        <button type="submit" disabled={!firstTarget}>Add visibility change</button>
+        <button type="submit" disabled={!firstVisibilityTarget}>Add visibility change</button>
       </form>
 
       <form onSubmit={submitOffset} aria-label="Track timing offset">
