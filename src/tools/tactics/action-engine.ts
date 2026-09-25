@@ -24,6 +24,103 @@ export interface CoordinatedActionTemplate {
   roles: CoordinatedActionRole[];
 }
 
+export interface CoordinatedActionPresetRole {
+  roleId: string;
+  label: string;
+  startOffsetMs: number;
+  durationScale: number;
+}
+
+export interface CoordinatedActionPreset {
+  id: 'overlap' | 'underlap' | 'third-player' | 'wall-pass' | 'switch' | 'give-and-go' | 'decoy' | 'press' | 'recovery';
+  label: string;
+  roles: CoordinatedActionPresetRole[];
+}
+
+export const COORDINATED_ACTION_PRESETS: CoordinatedActionPreset[] = [
+  {
+    id: 'overlap',
+    label: 'Overlap',
+    roles: [
+      { roleId: 'carrier', label: 'Ball carrier', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'runner', label: 'Overlapping runner', startOffsetMs: 150, durationScale: 1.15 },
+      { roleId: 'support', label: 'Support', startOffsetMs: 0, durationScale: 1 },
+    ],
+  },
+  {
+    id: 'underlap',
+    label: 'Underlap',
+    roles: [
+      { roleId: 'carrier', label: 'Ball carrier', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'runner', label: 'Underlapping runner', startOffsetMs: 150, durationScale: 1.15 },
+      { roleId: 'support', label: 'Support', startOffsetMs: 0, durationScale: 1 },
+    ],
+  },
+  {
+    id: 'third-player',
+    label: 'Third-player run',
+    roles: [
+      { roleId: 'first', label: 'First player', startOffsetMs: 0, durationScale: 0.8 },
+      { roleId: 'second', label: 'Second player', startOffsetMs: 0, durationScale: 0.8 },
+      { roleId: 'third', label: 'Third-player runner', startOffsetMs: 250, durationScale: 1.2 },
+    ],
+  },
+  {
+    id: 'wall-pass',
+    label: 'Wall pass',
+    roles: [
+      { roleId: 'passer', label: 'Passer', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'wall', label: 'Wall player', startOffsetMs: 0, durationScale: 0.75 },
+      { roleId: 'runner', label: 'Runner', startOffsetMs: 180, durationScale: 1.15 },
+    ],
+  },
+  {
+    id: 'switch',
+    label: 'Switch of play',
+    roles: [
+      { roleId: 'source', label: 'Source player', startOffsetMs: 0, durationScale: 0.9 },
+      { roleId: 'receiver', label: 'Far-side receiver', startOffsetMs: 150, durationScale: 1 },
+      { roleId: 'support', label: 'Supporting runner', startOffsetMs: 200, durationScale: 1.1 },
+    ],
+  },
+  {
+    id: 'give-and-go',
+    label: 'Give-and-go',
+    roles: [
+      { roleId: 'passer', label: 'Passer', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'returner', label: 'Return player', startOffsetMs: 0, durationScale: 0.8 },
+      { roleId: 'runner', label: 'Continuing runner', startOffsetMs: 180, durationScale: 1.15 },
+    ],
+  },
+  {
+    id: 'decoy',
+    label: 'Decoy run',
+    roles: [
+      { roleId: 'carrier', label: 'Ball carrier', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'decoy', label: 'Decoy runner', startOffsetMs: 100, durationScale: 1.1 },
+      { roleId: 'receiver', label: 'Receiver', startOffsetMs: 180, durationScale: 1 },
+    ],
+  },
+  {
+    id: 'press',
+    label: 'Coordinated press',
+    roles: [
+      { roleId: 'presser', label: 'First presser', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'cover', label: 'Cover player', startOffsetMs: 100, durationScale: 1 },
+      { roleId: 'balance', label: 'Balancing player', startOffsetMs: 100, durationScale: 1 },
+    ],
+  },
+  {
+    id: 'recovery',
+    label: 'Recovery run',
+    roles: [
+      { roleId: 'first', label: 'First recovery', startOffsetMs: 0, durationScale: 1 },
+      { roleId: 'second', label: 'Second recovery', startOffsetMs: 100, durationScale: 1.05 },
+      { roleId: 'cover', label: 'Cover player', startOffsetMs: 150, durationScale: 1 },
+    ],
+  },
+];
+
 function requireIntegerTime(value: number, label: string, allowZero = true): number {
   if (!Number.isInteger(value)) throw new RangeError(`${label} must be an integer millisecond value.`);
   if (value < 0 || (!allowZero && value === 0)) throw new RangeError(`${label} must be ${allowZero ? 'non-negative' : 'positive'}.`);
