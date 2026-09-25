@@ -802,6 +802,7 @@ describe('Tactical Matchboard SVG board contracts', () => {
     expect(svg).toContain('viewBox="0 0 1000 647.619"');
     expect(svg).toContain('>Build &amp; press &lt;session&gt;</title>');
     expect(svg).toContain('id="token-p9"');
+    expect(svg).toContain('id="tactical-ball" data-tactical-kind="ball"');
     expect(svg).toContain('transform="translate(500 323.81) rotate(0)"');
     expect(svg).toContain('tactical-arrowhead');
     expect(svg).toContain('Player &lt;9&gt;');
