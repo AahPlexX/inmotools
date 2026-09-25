@@ -162,11 +162,11 @@ describe('Tactical timeline engine', () => {
     ]);
 
     const timeline: TacticalTimeline = { playheadMs: 0, durationMs: 1200, loop: false, playbackRate: 1, tracks: [], markers: [] };
-    const withLate = addTimelineMarker(timeline, { id: 'm2', timeMs: 900, kind: 'cue', label: 'Press' });
-    const withBoth = addTimelineMarker(withLate, { id: 'm1', timeMs: 300, kind: 'cue', label: 'Go' });
+    const withLate = addTimelineMarker(timeline, { id: 'm2', timeMs: 900, kind: 'coaching-cue', label: 'Press' });
+    const withBoth = addTimelineMarker(withLate, { id: 'm1', timeMs: 300, kind: 'coaching-cue', label: 'Go' });
     expect(withBoth.markers.map((marker) => marker.id)).toEqual(['m1', 'm2']);
-    expect(() => addTimelineMarker(withBoth, { id: 'm2', timeMs: 1000, kind: 'cue', label: 'Duplicate' })).toThrow(/id/i);
-    expect(() => addTimelineMarker(withBoth, { id: 'late', timeMs: 1201, kind: 'cue', label: 'Too late' })).toThrow(/duration/i);
+    expect(() => addTimelineMarker(withBoth, { id: 'm2', timeMs: 1000, kind: 'coaching-cue', label: 'Duplicate' })).toThrow(/id/i);
+    expect(() => addTimelineMarker(withBoth, { id: 'late', timeMs: 1201, kind: 'coaching-cue', label: 'Too late' })).toThrow(/duration/i);
   });
   it('adds one deterministic track per target and samples the whole timeline by target id', () => {
     const empty: TacticalTimeline = { playheadMs: 0, durationMs: 2000, loop: false, playbackRate: 1, tracks: [], markers: [] };
@@ -253,8 +253,8 @@ describe('Tactical timeline engine', () => {
         { id: 'dup', targetId: 'token-1', keyframes: [{ id: 'b', timeMs: 200, interpolation: 'linear' }] },
       ],
       markers: [
-        { id: 'same', timeMs: 100, kind: 'cue', label: 'A' },
-        { id: 'same', timeMs: 1300, kind: 'cue', label: 'B' },
+        { id: 'same', timeMs: 100, kind: 'coaching-cue', label: 'A' },
+        { id: 'same', timeMs: 1300, kind: 'coaching-cue', label: 'B' },
       ],
     };
     const before = JSON.stringify(timeline);
