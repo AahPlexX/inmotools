@@ -380,3 +380,203 @@ export function splitTacticalScene(
       }),
   };
 }
+
+
+export function joinTacticalScenes(
+  project: TacticalProject,
+  leftSceneId: string,
+  rightSceneId: string,
+): TacticalProject {
+  const scenes = orderedScenes(project);
+  const leftIndex = scenes.findIndex((scene) => scene.id === leftSceneId);
+  const rightIndex = scenes.findIndex((scene) => scene.id === rightSceneId);
+  if (leftIndex < 0) throw new Error(`Scene ${leftSceneId} does not exist.`);
+  if (rightIndex < 0) throw new Error(`Scene ${rightSceneId} does not exist.`);
+  if (rightIndex !== leftIndex + 1) {
+    throw new Error('Scenes must be adjacent before they can be joined.');
+  }
+
+  const left = scenes[leftIndex]!;
+  const right = scenes[rightIndex]!;
+  if (left.startMs + left.durationMs !== right.startMs) {
+    throw new Error('Scenes must be contiguous before they can be joined.');
+  }
+
+  const mergedLayers = left.layers.map((layer) => ({ ...layer }));
+  const rightLayerMap = new Map<string, string>();
+  for (const rightLayer of right.layers) {
+    const equivalent = mergedLayers.find((layer) => (
+      layer.name === rightLayer.name
+      && layer.visible === rightLayer.visible
+      && layer.locked === rightLayer.locked
+    ));
+    if (equivalent) {
+      rightLayerMap.set(rightLayer.id, equivalent.id);
+    } else {
+      mergedLayers.push({ ...rightLayer });
+      rightLayerMap.set(rightLayer.id, rightLayer.id);
+    }
+  }
+  const mapRightLayer = (layerId: string): string => rightLayerMap.get(layerId) ?? layerId;
+
+  const leftTokens = project.playerTokens.filter((token) => token.sceneId === left.id);
+  const tokenRemap = new Map<string, string>();
+  const migratedRightTokens = project.playerTokens
+    .filter((token) => token.sceneId === right.id)
+    .flatMap((token) => {
+      const counterpart = leftTokens.find((candidate) => (
+        candidate.playerId === token.playerId && candidate.teamId === token.teamId
+      ));
+      if (counterpart) {
+        tokenRemap.set(token.id, counterpart.id);
+        return [];
+      }
+      return [{
+        ...token,
+        sceneId: left.id,
+        layerId: mapRightLayer(token.layerId),
+        position: { ...token.position },
+      }];
+    });
+
+  const targetOwners = sceneOwnedTargetIds(project);
+  const groupedTracks = new Map<string, {
+    id: string;
+    idPriority: number;
+    targetId: string;
+    keyframes: Map<number, { priority: number; value: TacticalProject['timeline']['tracks'][number]['keyframes'][number] }>;
+  }>();
+
+  for (const track of project.timeline.tracks) {
+    const mappedTargetId = tokenRemap.get(track.targetId) ?? track.targetId;
+    const owner = targetOwners.get(track.targetId);
+    const priority = owner === right.id ? 2 : owner === left.id ? 1 : 0;
+    const idPriority = owner === left.id ? 3 : owner === right.id ? 2 : 1;
+    const existing = groupedTracks.get(mappedTargetId);
+    const group = existing ?? {
+      id: track.id,
+      idPriority,
+      targetId: mappedTargetId,
+      keyframes: new Map(),
+    };
+    if (idPriority > group.idPriority) {
+      group.id = track.id;
+      group.idPriority = idPriority;
+    }
+    for (const keyframe of track.keyframes) {
+      const current = group.keyframes.get(keyframe.timeMs);
+      if (!current || priority >= current.priority) {
+        group.keyframes.set(keyframe.timeMs, {
+          priority,
+          value: {
+            ...keyframe,
+            position: keyframe.position ? { ...keyframe.position } : undefined,
+            motionPath: keyframe.motionPath
+              ? {
+                  ...keyframe.motionPath,
+                  controlPoints: keyframe.motionPath.controlPoints.map((point) => ({ ...point })),
+                }
+              : undefined,
+          },
+        });
+      }
+    }
+    groupedTracks.set(mappedTargetId, group);
+  }
+
+  const tracks = [...groupedTracks.values()].map((group) => ({
+    id: group.id,
+    targetId: group.targetId,
+    keyframes: [...group.keyframes.values()]
+      .map((entry) => entry.value)
+      .sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id)),
+  }));
+
+  const remapPlayerPositions = (positions: Record<string, { x: number; y: number }>) => {
+    const result: Record<string, { x: number; y: number }> = {};
+    for (const [targetId, position] of Object.entries(positions)) {
+      if (!tokenRemap.has(targetId)) result[targetId] = { ...position };
+    }
+    for (const [targetId, position] of Object.entries(positions)) {
+      const mapped = tokenRemap.get(targetId);
+      if (mapped) result[mapped] = { ...position };
+    }
+    return result;
+  };
+
+  const mergedScene: TacticalScene = {
+    ...left,
+    durationMs: left.durationMs + right.durationMs,
+    layers: mergedLayers,
+    objects: [
+      ...left.objects.map((object) => ({
+        ...object,
+        position: { ...object.position },
+      })),
+      ...right.objects.map((object) => ({
+        ...object,
+        layerId: mapRightLayer(object.layerId),
+        position: { ...object.position },
+      })),
+    ],
+  };
+
+  return {
+    ...project,
+    scenes: project.scenes
+      .filter((scene) => scene.id !== right.id)
+      .map((scene) => scene.id === left.id ? mergedScene : scene),
+    playerTokens: [
+      ...project.playerTokens
+        .filter((token) => token.sceneId !== right.id)
+        .map((token) => ({
+          ...token,
+          position: { ...token.position },
+        })),
+      ...migratedRightTokens,
+    ],
+    officials: project.officials.map((official) => official.sceneId === right.id
+      ? {
+          ...official,
+          sceneId: left.id,
+          layerId: mapRightLayer(official.layerId),
+          position: { ...official.position },
+        }
+      : { ...official, position: { ...official.position } }),
+    equipment: project.equipment.map((item) => item.sceneId === right.id
+      ? {
+          ...item,
+          sceneId: left.id,
+          layerId: mapRightLayer(item.layerId),
+          position: { ...item.position },
+        }
+      : { ...item, position: { ...item.position } }),
+    annotations: project.annotations.map((annotation) => annotation.sceneId === right.id
+      ? {
+          ...annotation,
+          sceneId: left.id,
+          layerId: mapRightLayer(annotation.layerId),
+          points: annotation.points.map((point) => ({ ...point })),
+          provenance: annotation.provenance ? { ...annotation.provenance } : undefined,
+        }
+      : {
+          ...annotation,
+          points: annotation.points.map((point) => ({ ...point })),
+          provenance: annotation.provenance ? { ...annotation.provenance } : undefined,
+        }),
+    timeline: {
+      ...project.timeline,
+      tracks,
+      possessionEvents: project.timeline.possessionEvents?.map((event) => ({
+        ...event,
+        holderTargetId: event.holderTargetId
+          ? tokenRemap.get(event.holderTargetId) ?? event.holderTargetId
+          : null,
+      })),
+    },
+    formationStates: project.formationStates.map((state) => ({
+      ...state,
+      playerPositions: remapPlayerPositions(state.playerPositions),
+    })),
+  };
+}
