@@ -3,7 +3,7 @@
 **Updated:** 2026-09-25
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`
+**Code tip described by this queue before this documentation commit:** `feeafee9895f5c04bea650d8df7e402cef62e742`
 
 ## Purpose and source-of-truth roles
 
@@ -86,10 +86,10 @@
 - **Status:** ACTIVE — Gauntlet reopened after accepted-scope audit
 - **Depends on:** T04-01 DONE
 - **Primary files:** Tactical timeline/motion/scene/action/unit/possession/conflict engines and UI; focused unit/e2e tests
-- **Validated complete rows:** 16, 18, 21, 25, 26.
-- **Still-open accepted semantics:** #17 interactive Bézier trajectory nodes/tangent handles; #19 scene rename/reorder/split/join; #20 generalized object/layer visibility; #22 marker/trigger kinds; #23 named coordinated action template library; #24 explicit line-shift, step/drop and width/depth linked-unit controls.
-- **Current evidence:** production/PWA build green at `f4f4cde`; full Tactical browser gate at `bdb28e4` is 26 passed / 2 intentional skips; visible possession/handoff/release is 2/2 desktop/mobile at `f4f4cde`; focused ball/possession units are 35/35.
-- **Next:** implement #17 interactive path handles first, then #19/#20/#22/#23/#24 in dependency-safe order; rerun complete Task 5 gates before closing.
+- **Validated complete rows:** 16, 17, 18, 21, 25, 26.
+- **Still-open accepted semantics:** #19 scene rename/reorder/split/join; #20 generalized object/layer visibility; #22 marker/trigger kinds; #23 named coordinated action template library; #24 explicit line-shift, step/drop and width/depth linked-unit controls.
+- **Current evidence:** production/PWA build and TypeScript green at `feeafee`; full Tactical browser gate at `bdb28e4` is 26 passed / 2 intentional skips; visible possession/handoff/release is 2/2 desktop/mobile at `f4f4cde`; interactive trajectory handles are 2/2 desktop/mobile at `feeafee`; focused ball/possession units are 35/35.
+- **Next:** implement #19 scene rename/reorder/split/join, then #20/#22/#23/#24 in dependency-safe order; rerun complete Task 5 gates before closing.
 - **Exit evidence:** every row 16–26 must satisfy its exact accepted wording plus deterministic unit/build/desktop/mobile/accessibility/reflow evidence.
 - **Reverse-safe:** no; Task 5 remains active.
 

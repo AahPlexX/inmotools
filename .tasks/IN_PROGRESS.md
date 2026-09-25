@@ -6,8 +6,8 @@
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
   - Current milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened).** T06 is blocked until the remaining accepted Task 5 semantics are complete.
-  - Current verified feature count: **14/60**. Verified rows: 1, 2, 9–16 except 17, plus 18, 21, 25 and 26. Rows 17, 19, 20, 22, 23 and 24 remain in progress after accepted-scope audit.
-  - Current evidence at validated source tip `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`: Task 5-focused units **35/35**, TypeScript clean, production/PWA build green (`built in 12.65s`), full Tactical Playwright **26 passed / 2 intentional duplicate-project skips** across desktop/mobile Chromium.
+  - Current verified feature count: **15/60**. Verified rows: 1, 2, 9–18, 21, 25 and 26. Rows 19, 20, 22, 23 and 24 remain in progress after accepted-scope audit.
+  - Current evidence at validated source tip `feeafee9895f5c04bea650d8df7e402cef62e742`: Task 5-focused units **35/35**, TypeScript clean, production/PWA build green, the prior full Tactical Playwright gate **26 passed / 2 intentional duplicate-project skips**, and interactive trajectory handles **2/2** across desktop/mobile Chromium.
   - Task 5 now includes sampled timeline preview/transport, custom timing easing, scene sequencing, visibility, grouped stagger, coordinated actions, linked units, possession/handoffs, and physical-metre conflict review.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the Tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
