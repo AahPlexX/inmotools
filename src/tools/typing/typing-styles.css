@@ -1,5 +1,123 @@
 /* Typing Workstation — scoped styles */
 
+.tw-session-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(300px, auto);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border: 1px solid #d5dbe6;
+  border-radius: 12px;
+}
+
+.tw-profile-picker,
+.tw-session-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tw-profile-picker label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4b5468;
+}
+
+.tw-profile-picker select {
+  min-height: 36px;
+  max-width: min(260px, 100%);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #b6bfce;
+  border-radius: 8px;
+  background: white;
+  color: #0b1220;
+}
+
+.tw-session-bar button {
+  min-height: 36px;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #1f2a44;
+  border-radius: 8px;
+  background: #1f2a44;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tw-session-bar button.subtle {
+  background: white;
+  color: #1f2a44;
+}
+
+.tw-session-bar button:disabled,
+.tw-profile-picker select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tw-session-state {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  min-width: 94px;
+}
+
+.tw-session-state small {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5468;
+}
+
+.tw-state-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #b6bfce;
+  border-radius: 999px;
+  background: #f4f6fb;
+  color: #1f2a44;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tw-state-badge.state-running {
+  border-color: #15803d;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.tw-state-badge.state-paused {
+  border-color: #b45309;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.tw-state-badge.state-finished {
+  border-color: #475569;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.tw-form-error {
+  margin: 0.25rem 0 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+
+.tw-session-bar :focus-visible,
+.tw-toolbar :focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+
 .tw-root {
   display: grid;
   gap: 1.25rem;
@@ -455,7 +573,47 @@
   border-radius: 10px; font-size: 0.85rem; color: #6b4b00;
 }
 
+@media (max-width: 768px) {
+  .tw-session-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tw-session-state {
+    justify-items: start;
+  }
+
+  .tw-profile-picker,
+  .tw-session-controls {
+    width: 100%;
+  }
+
+  .tw-session-controls button {
+    flex: 1 1 120px;
+  }
+}
+
 @media (max-width: 480px) {
+  .tw-session-bar {
+    padding: 0.75rem;
+  }
+
+  .tw-profile-picker {
+    align-items: stretch;
+  }
+
+  .tw-profile-picker label {
+    flex: 1 0 100%;
+  }
+
+  .tw-profile-picker select {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
+  .tw-session-controls button {
+    flex-basis: calc(50% - 0.25rem);
+  }
+
   .tw-canvas {
     min-height: 220px;
     padding: 1rem;
