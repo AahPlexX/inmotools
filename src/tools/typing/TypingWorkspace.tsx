@@ -417,13 +417,14 @@ export default function TypingWorkspace() {
     void writePreference('activeTypistId', activeTypistId).catch(() => undefined);
   }, [activeTypistId, configHydrated]);
 
-  // Rebuild the audio profile when it changes.
+  // Rebuild the audio profile when it changes. The metronome follows the
+  // scored session lifecycle so Ready/Paused/Finished never sound "active".
   useEffect(() => {
     audioRef.current?.setSwitch(config.audioProfile);
     audioRef.current?.setVolume(config.audioVolume);
-    if (config.metronomeOn) audioRef.current?.startMetronome(config.metronomeBpm);
+    if (config.metronomeOn && running) audioRef.current?.startMetronome(config.metronomeBpm);
     else audioRef.current?.stopMetronome();
-  }, [config.audioProfile, config.audioVolume, config.metronomeOn, config.metronomeBpm]);
+  }, [config.audioProfile, config.audioVolume, config.metronomeOn, config.metronomeBpm, running]);
 
   const personalBestQuery = useMemo(() => {
     const dur = classifyDuration(config);
@@ -819,7 +820,6 @@ export default function TypingWorkspace() {
     const realNow = performance.now();
     setNow(realNow);
     setSessionClock((clock) => pauseSession(clock, realNow));
-    audioRef.current?.stopMetronome();
     setStatusText('Test paused.');
   }, [running]);
 
@@ -828,7 +828,6 @@ export default function TypingWorkspace() {
     const realNow = performance.now();
     setNow(realNow);
     setSessionClock((clock) => resumeSession(clock, realNow));
-    if (config.metronomeOn) audioRef.current?.startMetronome(config.metronomeBpm);
     setStatusText('Test resumed.');
     canvasRef.current?.focus({ preventScroll: true });
   }, [paused, config.metronomeOn, config.metronomeBpm]);
@@ -840,7 +839,6 @@ export default function TypingWorkspace() {
     setNow(realNow);
     dispatch({ type: 'finish', reason: 'stopped', t: effectiveNow });
     setSessionClock((clock) => finishSession(clock, 'stopped', realNow));
-    audioRef.current?.stopMetronome();
   }, [sessionActive, sessionClock, engine.finished]);
 
   const resetAttempt = useCallback(() => {
@@ -874,7 +872,6 @@ export default function TypingWorkspace() {
     dispatch({ type: 'finish', reason: 'aborted', t: effectiveSessionNow(sessionClock, realNow) });
     setSessionClock((clock) => finishSession(clock, 'aborted', realNow));
     setNow(realNow);
-    audioRef.current?.stopMetronome();
     setStatusText('Test aborted.');
   }, [sessionActive, sessionClock, engine.finished]);
 
