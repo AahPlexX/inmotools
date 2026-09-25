@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25  
 **Parent workstream:** `docs/superpowers/plans/2026-09-15-typing-workstation.md`  
-**Status:** Approved expansion  
+**Status:** Complete — accepted on `main` at `7222854833f507ebfbcf00ab0c156b58ee90f335`  
 **Capability ledger:** existing 38 + F39–F47 = 47 total
 
 ## Goal
@@ -181,6 +181,12 @@ Configuration stays in the existing configuration toolbar but is disabled while 
 - Typing.com's current official documentation is used only as a real-world feature benchmark for per-student progress/history/reset expectations; this implementation remains local-first and intentionally excludes account/classroom infrastructure.
 - WCAG 2.2 keyboard access, focus visibility/non-obscuring behavior, status messages, and target-size expectations remain the accessibility benchmark.
 - MDN Performance API guidance supports continuing to use the monotonic `performance.now()` clock for session timing.
+
+## Completion validation
+
+The approved F39–F47 design is implemented on `main`. Focused Typing workflow run `36188765930` / job `108248550068` passed **76/76 focused unit tests across eight files**, the production build, Chromium setup, and **18/18 desktop/mobile browser checks**. Pages run `36188765977` built and deployed the same `722285…` product revision successfully.
+
+The final Gauntlet pass additionally challenged history/profile state during active tests. JSON history import, saved-row deletion, and selected-profile score reset are now unavailable while Running/Paused so PB/ghost/history context cannot change underneath a live attempt. The intentionally focusable New text guard also has a visible unavailable state while preserving its explanatory status behavior.
 
 ## Non-goals
 
