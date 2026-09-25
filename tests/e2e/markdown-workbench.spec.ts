@@ -294,8 +294,11 @@ test('Standalone HTML export keeps sanitized Markdown inert through the detached
   const html = await readDownload(await download);
 
   expect(html).not.toContain('<script');
-  expect(html).not.toContain('javascript:');
+  expect(html).not.toMatch(/(?:href|xlink:href)\s*=\s*["']\s*javascript:/i);
   expect(html).not.toContain('onerror');
+  // Sanitization may preserve the author's rejected Markdown as inert text;
+  // the security invariant is that it never becomes an executable URI.
+  expect(html).toContain('[unsafe](javascript:window.__markdownXss = true)');
 });
 
 test('HTML export still contains the document when exporting from Source view', async ({ page }) => {
