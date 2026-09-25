@@ -8,6 +8,7 @@ import {
   sampleTacticalProjectAtTime,
   sampleTacticalTimeline,
   setTimelinePlayhead,
+  setTimelineVisibility,
   stepTimelineFrame,
   timelineKeyframeTimes,
   validateTacticalTimeline,
@@ -70,6 +71,84 @@ describe('Tactical timeline engine', () => {
     expect(shifted.keyframes.map((keyframe) => keyframe.timeMs)).toEqual([250, 1250]);
     expect(source.keyframes[0]?.timeMs).toBe(0);
     expect(() => offsetTimelineTrack(source, -1)).toThrow(/negative/i);
+  });
+
+  it('updates visibility at an existing keyframe time without discarding authored motion', () => {
+    const source = baseTrack();
+    const updated = setTimelineVisibility(source, {
+      id: 'visibility-0',
+      timeMs: 0,
+      visible: false,
+    });
+    expect(updated.keyframes).toHaveLength(2);
+    expect(updated.keyframes[0]).toMatchObject({
+      id: 'kf-0',
+      timeMs: 0,
+      position: { x: 0.1, y: 0.2 },
+      rotationDeg: 0,
+      visible: false,
+    });
+    expect(source.keyframes[0]?.visible).toBe(true);
+
+    const inserted = setTimelineVisibility(source, {
+      id: 'visibility-500',
+      timeMs: 500,
+      visible: false,
+    });
+    expect(inserted.keyframes.map((keyframe) => keyframe.timeMs)).toEqual([0, 500, 1000]);
+  });
+
+  it('samples temporal visibility for layers and annotations without deleting canonical content', () => {
+    const project = buildBeginnerTacticalProject({
+      title: 'Visibility',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const scene = project.scenes[0]!;
+    const layer = scene.layers[0]!;
+    project.annotations.push({
+      id: 'annotation-1',
+      kind: 'arrow',
+      label: 'Temporary cue',
+      sceneId: scene.id,
+      layerId: layer.id,
+      points: [{ x: 0.2, y: 0.2 }, { x: 0.4, y: 0.4 }],
+      visible: true,
+    } as typeof project.annotations[number]);
+    project.timeline.tracks.push(
+      {
+        id: 'visibility-layer',
+        targetId: layer.id,
+        keyframes: [
+          { id: 'layer-hide', timeMs: 500, visible: false, interpolation: 'hold' },
+          { id: 'layer-show', timeMs: 1500, visible: true, interpolation: 'hold' },
+        ],
+      },
+      {
+        id: 'visibility-annotation',
+        targetId: 'annotation-1',
+        keyframes: [
+          { id: 'annotation-hide', timeMs: 500, visible: false, interpolation: 'hold' },
+          { id: 'annotation-show', timeMs: 1500, visible: true, interpolation: 'hold' },
+        ],
+      },
+    );
+
+    const hidden = sampleTacticalProjectAtTime(project, 1000);
+    expect(hidden.scenes[0]!.layers[0]!.visible).toBe(false);
+    expect((hidden.annotations[0] as typeof hidden.annotations[0] & { visible?: boolean }).visible).toBe(false);
+    expect(hidden.annotations).toHaveLength(1);
+
+    const shown = sampleTacticalProjectAtTime(project, 2000);
+    expect(shown.scenes[0]!.layers[0]!.visible).toBe(true);
+    expect((shown.annotations[0] as typeof shown.annotations[0] & { visible?: boolean }).visible).toBe(true);
+
+    expect(project.scenes[0]!.layers[0]!.visible).toBe(true);
+    expect(project.annotations).toHaveLength(1);
   });
 
   it('derives complete visibility spans and keeps markers sorted and unique', () => {
