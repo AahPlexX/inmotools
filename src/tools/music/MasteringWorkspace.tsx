@@ -162,8 +162,13 @@ export default function MasteringWorkspace() {
 
   const applyEdit = (edit: AudioEdit, label: string) => {
     if (!currentPcm) return;
+    const next = appendAudioEditRevision(history.present, edit);
+    if (next.edits.length === history.present.edits.length) {
+      setStatus('The edit range rounds to zero sample frames at the source sample rate.');
+      return;
+    }
     stopPlayback(false);
-    commitDocument(appendAudioEditRevision(history.present, edit));
+    commitDocument(next);
     setStatus(label);
   };
 
@@ -268,9 +273,15 @@ export default function MasteringWorkspace() {
       return;
     }
     const at = Math.min(duration, Math.max(0, playhead));
+    const next = insertSilenceRevision(history.present, at, silenceDuration);
+    const insertion = next.edits.at(-1);
+    if (next.edits.length === history.present.edits.length || insertion?.type !== 'insertSilence') {
+      setStatus('Silence duration rounds to zero sample frames at the source sample rate.');
+      return;
+    }
     stopPlayback(false);
-    commitDocument(insertSilenceRevision(history.present, at, silenceDuration));
-    setStatus(`Inserted ${silenceDuration.toFixed(3)} seconds of silence at ${formatTime(at)}.`);
+    commitDocument(next);
+    setStatus(`Inserted ${insertion.durationSeconds.toFixed(3)} seconds of silence at ${formatTime(insertion.atSeconds)}.`);
   };
 
   const startTicker = (graph: PlaybackGraph) => {

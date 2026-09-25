@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendAudioEditRevision,
   commitProjectRevision,
   createMasteringDocument,
   createProjectHistory,
   cropProjectRevision,
   duplicateClipRevision,
+  estimateDocumentDuration,
   moveClipRevision,
   nudgeClipRevision,
   splitClipRevision,
@@ -197,5 +199,51 @@ describe('atomic timeline transforms', () => {
     expect(inserted.regions[0]).toMatchObject({ startSeconds: 1, endSeconds: 4.5 });
     expect(inserted.selection).toEqual({ startSeconds: 2.5, endSeconds: 4.5 });
     expect(inserted.playhead).toBe(2.5);
+  });
+
+  it('stores temporal edits and annotation shifts on native sample frames', () => {
+    const document = {
+      ...createMasteringDocument({ id: 's', name: 'a.wav', durationSeconds: 2, sampleRate: 4 }),
+      markers: [
+        { id: 'before', label: 'Before', seconds: 0.24 },
+        { id: 'start', label: 'Start', seconds: 0.26 },
+        { id: 'inside', label: 'Inside', seconds: 0.5 },
+        { id: 'end', label: 'End', seconds: 0.74 },
+      ],
+      regions: [{ id: 'r', label: 'Range', startSeconds: 0.26, endSeconds: 0.74 }],
+      selection: { startSeconds: 0.26, endSeconds: 0.74 },
+      playhead: 0.26,
+    };
+
+    const reversed = appendAudioEditRevision(document, { type: 'reverse', startSeconds: 0.26, endSeconds: 0.74 });
+    expect(reversed.edits.at(-1)).toEqual({ type: 'reverse', startSeconds: 0.25, endSeconds: 0.75 });
+
+    const cropped = cropProjectRevision(document, 0.26, 0.74);
+    expect(cropped.edits.at(-1)).toEqual({ type: 'crop', startSeconds: 0.25, endSeconds: 0.75 });
+    expect(cropped.markers.map((marker) => marker.seconds)).toEqual([0, 0, 0.25, 0.5]);
+    expect(cropped.selection).toEqual({ startSeconds: 0, endSeconds: 0.5 });
+    expect(cropped.playhead).toBe(0);
+
+    const deleted = deleteRangeRevision(document, 0.26, 0.74);
+    expect(deleted.edits.at(-1)).toEqual({ type: 'deleteRange', startSeconds: 0.25, endSeconds: 0.75 });
+    expect(deleted.markers.map((marker) => marker.seconds)).toEqual([0.25, 0.25, 0.25]);
+    expect(deleted.selection).toEqual({ startSeconds: 0.25, endSeconds: 0.25 });
+    expect(deleted.playhead).toBe(0.25);
+
+    const inserted = insertSilenceRevision(document, 0.26, 0.26);
+    expect(inserted.edits.at(-1)).toEqual({ type: 'insertSilence', atSeconds: 0.25, durationSeconds: 0.25 });
+    expect(inserted.markers.map((marker) => marker.seconds)).toEqual([0.5, 0.5, 0.75, 1]);
+    expect(inserted.regions[0]).toMatchObject({ startSeconds: 0.5, endSeconds: 1 });
+    expect(inserted.selection).toEqual({ startSeconds: 0.5, endSeconds: 1 });
+    expect(inserted.playhead).toBe(0.5);
+    expect(estimateDocumentDuration(inserted)).toBe(2.25);
+    expect(document.edits).toEqual([]);
+
+    expect(estimateDocumentDuration({ ...document, edits: [{ type: 'crop', startSeconds: 0.26, endSeconds: 0.74 }] })).toBe(0.5);
+    expect(estimateDocumentDuration({ ...document, edits: [{ type: 'deleteRange', startSeconds: 0.26, endSeconds: 0.74 }] })).toBe(1.5);
+    expect(estimateDocumentDuration({ ...document, edits: [{ type: 'insertSilence', atSeconds: 0.26, durationSeconds: 0.26 }] })).toBe(2.25);
+    expect(estimateDocumentDuration({ ...document, edits: [{ type: 'crop', startSeconds: 0.26, endSeconds: 0.37 }] })).toBe(0);
+    expect(appendAudioEditRevision(document, { type: 'reverse', startSeconds: 0.26, endSeconds: 0.37 }).edits).toEqual([]);
+    expect(insertSilenceRevision(document, 0.26, 0.01).edits).toEqual([]);
   });
 });

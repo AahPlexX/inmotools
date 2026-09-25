@@ -46,6 +46,8 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('Space');
   await expect(page.locator('.status-line')).toContainText(/Paused at/i);
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect(page.getByLabel('Playhead time')).toHaveText('0:00.000');
   await page.keyboard.press('l');
   await expect(page.getByLabel('Loop')).toBeChecked();
   await page.keyboard.press('ArrowRight');

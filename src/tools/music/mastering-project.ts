@@ -203,17 +203,59 @@ export function nudgeClipRevision(
     : cloneDocument(document);
 }
 
+function sourceSampleRate(document: MasteringDocument): number | null {
+  const sampleRate = document.source?.sampleRate;
+  return typeof sampleRate === 'number' && Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : null;
+}
+
+function timelineFrameTime(document: MasteringDocument, seconds: number): number {
+  const sampleRate = sourceSampleRate(document);
+  return sampleRate ? sampleFrameTime(seconds, sampleRate) : nonNegative(seconds);
+}
+
+function timelineRange(
+  document: MasteringDocument,
+  range: TimeSelection,
+  duration: number,
+): TimeSelection {
+  const selected = clampSelection(range, duration);
+  const sampleRate = sourceSampleRate(document);
+  return sampleRate ? clampSelection({
+    startSeconds: sampleFrameTime(selected.startSeconds, sampleRate),
+    endSeconds: sampleFrameTime(selected.endSeconds, sampleRate),
+  }, duration) : selected;
+}
+
+function normalizeAudioEdit(document: MasteringDocument, edit: AudioEdit): AudioEdit | null {
+  const duration = estimateDocumentDuration(document);
+  switch (edit.type) {
+    case 'crop':
+    case 'deleteRange':
+    case 'reverse': {
+      const range = timelineRange(document, edit, duration);
+      return range.endSeconds > range.startSeconds ? { ...edit, ...range } : null;
+    }
+    case 'insertSilence': {
+      const atSeconds = Math.min(duration, timelineFrameTime(document, Math.min(duration, edit.atSeconds)));
+      const durationSeconds = timelineFrameTime(document, edit.durationSeconds);
+      return durationSeconds > 0 ? { ...edit, atSeconds, durationSeconds } : null;
+    }
+    default:
+      return { ...edit };
+  }
+}
+
 export function estimateDocumentDuration(document: MasteringDocument): number {
-  let duration = document.source ? nonNegative(document.source.durationSeconds) : 0;
+  let duration = document.source ? timelineFrameTime(document, document.source.durationSeconds) : 0;
   for (const edit of document.edits) {
     if (edit.type === 'crop') {
-      const range = clampSelection({ startSeconds: edit.startSeconds, endSeconds: edit.endSeconds }, duration);
-      duration = range.endSeconds - range.startSeconds;
+      const range = timelineRange(document, edit, duration);
+      duration = timelineFrameTime(document, range.endSeconds - range.startSeconds);
     } else if (edit.type === 'deleteRange') {
-      const range = clampSelection({ startSeconds: edit.startSeconds, endSeconds: edit.endSeconds }, duration);
-      duration -= range.endSeconds - range.startSeconds;
+      const range = timelineRange(document, edit, duration);
+      duration = timelineFrameTime(document, duration - (range.endSeconds - range.startSeconds));
     } else if (edit.type === 'insertSilence') {
-      duration += nonNegative(edit.durationSeconds);
+      duration = timelineFrameTime(document, duration + timelineFrameTime(document, edit.durationSeconds));
     }
   }
   return duration;
@@ -273,8 +315,8 @@ export function cropProjectRevision(
   endSeconds: number,
 ): MasteringDocument {
   const duration = estimateDocumentDuration(document);
-  const selected = clampSelection({ startSeconds, endSeconds }, duration);
-  const nextDuration = selected.endSeconds - selected.startSeconds;
+  const selected = timelineRange(document, { startSeconds, endSeconds }, duration);
+  const nextDuration = timelineFrameTime(document, selected.endSeconds - selected.startSeconds);
   if (nextDuration <= 0) return cloneDocument(document);
   return {
     ...cloneDocument(document),
@@ -284,11 +326,14 @@ export function cropProjectRevision(
       endSeconds: selected.endSeconds,
     }],
     markers: document.markers
+      .map((marker) => ({ ...marker, seconds: timelineFrameTime(document, marker.seconds) }))
       .filter((marker) => marker.seconds >= selected.startSeconds && marker.seconds <= selected.endSeconds)
       .map((marker) => ({ ...marker, seconds: marker.seconds - selected.startSeconds })),
     regions: document.regions.flatMap((region) => {
-      const start = Math.max(region.startSeconds, selected.startSeconds);
-      const end = Math.min(region.endSeconds, selected.endSeconds);
+      const regionStart = timelineFrameTime(document, region.startSeconds);
+      const regionEnd = timelineFrameTime(document, region.endSeconds);
+      const start = Math.max(regionStart, selected.startSeconds);
+      const end = Math.min(regionEnd, selected.endSeconds);
       return end > start ? [{
         ...region,
         startSeconds: start - selected.startSeconds,
@@ -296,7 +341,7 @@ export function cropProjectRevision(
       }] : [];
     }),
     selection: { startSeconds: 0, endSeconds: nextDuration },
-    playhead: Math.min(nextDuration, Math.max(0, document.playhead - selected.startSeconds)),
+    playhead: Math.min(nextDuration, Math.max(0, timelineFrameTime(document, document.playhead) - selected.startSeconds)),
   };
 }
 
@@ -306,18 +351,22 @@ export function deleteRangeRevision(
   endSeconds: number,
 ): MasteringDocument {
   const duration = estimateDocumentDuration(document);
-  const selected = clampSelection({ startSeconds, endSeconds }, duration);
-  const removed = selected.endSeconds - selected.startSeconds;
+  const selected = timelineRange(document, { startSeconds, endSeconds }, duration);
+  const removed = timelineFrameTime(document, selected.endSeconds - selected.startSeconds);
   if (removed <= 0) return cloneDocument(document);
-  const mapTime = (seconds: number) => seconds <= selected.startSeconds
-    ? seconds
-    : seconds >= selected.endSeconds
-      ? seconds - removed
-      : selected.startSeconds;
-  const nextDuration = duration - removed;
+  const mapTime = (seconds: number) => {
+    const frameTime = timelineFrameTime(document, seconds);
+    return frameTime <= selected.startSeconds
+      ? frameTime
+      : frameTime >= selected.endSeconds
+        ? frameTime - removed
+        : selected.startSeconds;
+  };
+  const nextDuration = timelineFrameTime(document, duration - removed);
+  const selection = timelineRange(document, document.selection, duration);
   const nextSelection = clampSelection({
-    startSeconds: mapTime(document.selection.startSeconds),
-    endSeconds: mapTime(document.selection.endSeconds),
+    startSeconds: mapTime(selection.startSeconds),
+    endSeconds: mapTime(selection.endSeconds),
   }, nextDuration);
   return {
     ...cloneDocument(document),
@@ -327,6 +376,7 @@ export function deleteRangeRevision(
       endSeconds: selected.endSeconds,
     }],
     markers: document.markers
+      .map((marker) => ({ ...marker, seconds: timelineFrameTime(document, marker.seconds) }))
       .filter((marker) => marker.seconds <= selected.startSeconds || marker.seconds >= selected.endSeconds)
       .map((marker) => ({ ...marker, seconds: mapTime(marker.seconds) })),
     regions: document.regions.flatMap((region) => {
@@ -335,7 +385,7 @@ export function deleteRangeRevision(
       return end > start ? [{ ...region, startSeconds: start, endSeconds: end }] : [];
     }),
     selection: nextSelection,
-    playhead: Math.min(nextDuration, Math.max(0, mapTime(document.playhead))),
+    playhead: Math.min(nextDuration, Math.max(0, mapTime(timelineFrameTime(document, document.playhead)))),
   };
 }
 
@@ -345,10 +395,13 @@ export function insertSilenceRevision(
   durationSeconds: number,
 ): MasteringDocument {
   const duration = estimateDocumentDuration(document);
-  const at = Math.min(duration, nonNegative(atSeconds));
-  const amount = nonNegative(durationSeconds);
+  const at = Math.min(duration, timelineFrameTime(document, Math.min(duration, nonNegative(atSeconds))));
+  const amount = timelineFrameTime(document, durationSeconds);
   if (amount <= 0) return cloneDocument(document);
-  const shift = (seconds: number) => seconds >= at ? seconds + amount : seconds;
+  const shift = (seconds: number) => {
+    const frameTime = timelineFrameTime(document, seconds);
+    return frameTime >= at ? frameTime + amount : frameTime;
+  };
   return {
     ...cloneDocument(document),
     edits: [...document.edits.map((edit) => ({ ...edit })), {
@@ -374,8 +427,9 @@ export function appendAudioEditRevision(
   document: MasteringDocument,
   edit: AudioEdit,
 ): MasteringDocument {
-  return {
+  const normalized = normalizeAudioEdit(document, edit);
+  return normalized ? {
     ...cloneDocument(document),
-    edits: [...document.edits.map((existing) => ({ ...existing })), { ...edit }],
-  };
+    edits: [...document.edits.map((existing) => ({ ...existing })), normalized],
+  } : cloneDocument(document);
 }
