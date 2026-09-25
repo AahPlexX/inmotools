@@ -878,6 +878,46 @@ export default function TypingWorkspace() {
     setStatusText('Test aborted.');
   }, [sessionActive, sessionClock, engine.finished]);
 
+  const selectTypist = useCallback((nextId: string) => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before switching typists.');
+      return;
+    }
+    const profile = typists.find((candidate) => candidate.id === nextId);
+    if (!profile) return;
+    setActiveTypistId(profile.id);
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    setPersonalBest(null);
+    setStatusText(`Switched to ${profile.name}.`);
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [sessionActive, typists, target, config.errorMode, config.allowExtras, config.caseSensitive]);
+
+  const addTypist = useCallback(async (name: string) => {
+    if (sessionActive) throw new Error('Stop or reset the current test before adding a typist.');
+    const profile = await createTypist(name);
+    const profiles = await listTypists();
+    setTypists(profiles);
+    setActiveTypistId(profile.id);
+    await writePreference('activeTypistId', profile.id);
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    setPersonalBest(null);
+    setAddTypistModalOpen(false);
+    setStatusText(`Added ${profile.name} and made it active.`);
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [sessionActive, target, config.errorMode, config.allowExtras, config.caseSensitive]);
+
   // Save flow — invoked from the finish modal.
   const handleSave = useCallback(async (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => {
     const dur = classifyDuration(config);
@@ -917,6 +957,7 @@ export default function TypingWorkspace() {
     const dur = classifyDuration(config);
     const currentTest: StoredTest = {
       savedAt: Date.now(),
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -1019,11 +1060,41 @@ export default function TypingWorkspace() {
       style={{ ['--tw-font-size' as string]: `${config.fontSize}px` }}>
       <div className="tw-visually-hidden" aria-live="polite" role="status">{config.ariaLive ? statusText : ''}</div>
 
+      <section className="tw-session-bar" aria-label="Typing session">
+        <div className="tw-profile-picker">
+          <label htmlFor="tw-active-typist">Active typist</label>
+          <select
+            id="tw-active-typist"
+            aria-label="Active typist"
+            value={activeTypistId}
+            disabled={sessionActive}
+            onChange={(event) => selectTypist(event.target.value)}
+          >
+            {typists.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+          <button type="button" className="subtle" disabled={sessionActive} onClick={() => setAddTypistModalOpen(true)}>Add typist</button>
+        </div>
+        <div className="tw-session-state" aria-label="Session status">
+          <span className={`tw-state-badge state-${sessionClock.status}`}>{sessionClock.status[0]!.toUpperCase() + sessionClock.status.slice(1)}</span>
+          <small>{activeTypist.name}</small>
+        </div>
+        <div className="tw-session-controls" aria-label="Session controls">
+          {paused ? (
+            <button type="button" onClick={resumeTest}>Resume</button>
+          ) : (
+            <button type="button" onClick={startTest} disabled={sessionClock.status !== 'ready' || engine.finished}>Start</button>
+          )}
+          <button type="button" className="subtle" onClick={pauseTest} disabled={!running}>Pause</button>
+          <button type="button" className="subtle" onClick={stopTest} disabled={!sessionActive}>Stop</button>
+          <button type="button" className="subtle" onClick={resetAttempt}>Reset attempt</button>
+        </div>
+      </section>
+
       {/* Configuration toolbar */}
       <div className="tw-toolbar" role="region" aria-label="Test configuration">
         <label>
           Mode
-          <select value={config.mode} onChange={(e) => applyConfig({ mode: e.target.value as CorpusMode })}>
+          <select disabled={sessionActive} value={config.mode} onChange={(e) => applyConfig({ mode: e.target.value as CorpusMode })}>
             <option value="words-200">Top 200 words</option>
             <option value="words-1000">Top 1,000 words</option>
             <option value="words-5000">Top 5,000 words</option>
@@ -1040,7 +1111,7 @@ export default function TypingWorkspace() {
         </label>
         <label>
           Duration
-          <select value={config.durationMode} onChange={(e) => applyConfig({ durationMode: e.target.value as DurationMode })}>
+          <select disabled={sessionActive} value={config.durationMode} onChange={(e) => applyConfig({ durationMode: e.target.value as DurationMode })}>
             <option value="time">Time</option>
             <option value="words">Words</option>
             <option value="quote">Quote</option>
@@ -1051,7 +1122,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'time' && (
           <label>
             Seconds
-            <select value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
               <option value={15}>15s</option>
               <option value={30}>30s</option>
               <option value={60}>60s</option>
@@ -1062,7 +1133,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'words' && (
           <label>
             Words
-            <select value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -1074,7 +1145,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'quote' && (
           <label>
             Length
-            <select value={config.quoteLength} onChange={(e) => applyConfig({ quoteLength: e.target.value as Quote['length'] })}>
+            <select disabled={sessionActive} value={config.quoteLength} onChange={(e) => applyConfig({ quoteLength: e.target.value as Quote['length'] })}>
               <option value="short">Short</option>
               <option value="medium">Medium</option>
               <option value="long">Long</option>
@@ -1084,19 +1155,19 @@ export default function TypingWorkspace() {
         )}
         <label>
           Language
-          <select value={config.language} onChange={(e) => applyConfig({ language: e.target.value as Language })}>
+          <select disabled={sessionActive} value={config.language} onChange={(e) => applyConfig({ language: e.target.value as Language })}>
             {Object.keys(LANGUAGE_POOLS).map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </label>
         <label>
           Layout
-          <select value={config.layout} onChange={(e) => applyConfig({ layout: e.target.value as LayoutId })}>
+          <select disabled={sessionActive} value={config.layout} onChange={(e) => applyConfig({ layout: e.target.value as LayoutId })}>
             {LAYOUTS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </label>
         <label>
           Errors
-          <select value={config.errorMode} onChange={(e) => applyConfig({ errorMode: e.target.value as ErrorMode })}>
+          <select disabled={sessionActive} value={config.errorMode} onChange={(e) => applyConfig({ errorMode: e.target.value as ErrorMode })}>
             <option value="strict">Strict</option>
             <option value="master">Master (instant fail)</option>
             <option value="forgiving">Forgiving</option>
@@ -1106,16 +1177,16 @@ export default function TypingWorkspace() {
         {config.mode === 'code' && (
           <label>
             Snippet
-            <select value={config.codeIndex} onChange={(e) => applyConfig({ codeIndex: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.codeIndex} onChange={(e) => applyConfig({ codeIndex: Number(e.target.value) })}>
               {CODE_SNIPPETS.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
             </select>
           </label>
         )}
         {config.mode === 'custom' && (
-          <button type="button" className="subtle" onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
+          <button type="button" className="subtle" disabled={sessionActive} onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
         )}
-        <button type="button" onClick={restart}>New text</button>
-        <button type="button" className="subtle" onClick={abort} disabled={!running}>Abort</button>
+        <button type="button" aria-disabled={sessionActive} onClick={restart}>New text</button>
+        <button type="button" className="subtle" onClick={abort} disabled={!sessionActive}>Abort</button>
         <button type="button" className="subtle" onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
       </div>
@@ -1133,7 +1204,7 @@ export default function TypingWorkspace() {
 
       {/* Typing canvas */}
       <p className="tw-input-hint" id="tw-typing-input-help">
-        Click or tap the typing area, then type. <kbd>Esc</kbd> aborts, <kbd>F2</kbd> loads fresh text, and <kbd>Tab</kbd> moves to the next control.
+        Press Start or simply begin typing. Pause freezes scoring time. <kbd>Esc</kbd> aborts, <kbd>F2</kbd> loads fresh text while idle, and <kbd>Tab</kbd> moves to the next control.
       </p>
       <div
         className={`tw-canvas ${config.blurUntilFocus && pauseUntilFocus ? 'blur-mode' : ''}`}
@@ -1145,7 +1216,7 @@ export default function TypingWorkspace() {
         <textarea
           ref={canvasRef}
           className="tw-input-capture"
-          aria-label="Typing test canvas. Type the visible text. Press Escape to abort or F2 for a new sample."
+          aria-label="Typing test canvas. Type the visible text. Press Escape to abort or F2 for a new sample while idle."
           aria-describedby="tw-typing-input-help"
           aria-keyshortcuts="Escape F2"
           autoCapitalize="off"
@@ -1153,6 +1224,7 @@ export default function TypingWorkspace() {
           autoCorrect="off"
           inputMode="text"
           spellCheck={false}
+          readOnly={paused}
           onKeyDown={handleKey}
           onInput={handleTextInput}
           onCompositionStart={() => {
@@ -1302,7 +1374,7 @@ export default function TypingWorkspace() {
 
       {/* History */}
       <section className="tw-panel" aria-label="Session history">
-        <h3>History &amp; longitudinal analytics</h3>
+        <h3>History &amp; longitudinal analytics — {activeTypist.name}</h3>
         <div className="tw-history-controls">
           <label>
             Filter by tag
@@ -1317,7 +1389,7 @@ export default function TypingWorkspace() {
             Load CSV dictionary
             <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
-          <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Clear history…</button>
+          <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
         </div>
         <div className="tw-stats-strip">
           <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
@@ -1372,6 +1444,7 @@ export default function TypingWorkspace() {
           onSave={handleSave}
           onExport={handleExportSingle}
           summary={metrics}
+          typistName={activeTypist.name}
           canCertificate={engine.finishReason === 'completed'}
         />
       )}
@@ -1381,6 +1454,14 @@ export default function TypingWorkspace() {
           onCancel={() => setExportModalOpen(false)}
           onExport={handleExportHistory}
           tags={filterTagText}
+          typistName={activeTypist.name}
+        />
+      )}
+
+      {addTypistModalOpen && (
+        <AddTypistModal
+          onCancel={() => setAddTypistModalOpen(false)}
+          onAdd={addTypist}
         />
       )}
 
@@ -1399,17 +1480,17 @@ export default function TypingWorkspace() {
       {confirmClear && (
         <div className="tw-modal-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="tw-clear-history-title" aria-describedby="tw-clear-history-description" onKeyDown={(event) => trapDialogKeyboard(event, () => setConfirmClear(false))}>
           <div className="tw-modal">
-            <h3 id="tw-clear-history-title">Clear local test history?</h3>
-            <p id="tw-clear-history-description">This removes every locally stored test from this browser. Exports are not affected.</p>
+            <h3 id="tw-clear-history-title">Reset {activeTypist.name} scores?</h3>
+            <p id="tw-clear-history-description">This removes {profileHistory.length} saved test{profileHistory.length === 1 ? '' : 's'} for {activeTypist.name}. Other typists, preferences, dictionaries, and drills are not affected.</p>
             <div className="row">
               <button autoFocus type="button" className="subtle" onClick={() => setConfirmClear(false)}>Cancel</button>
               <button type="button" onClick={async () => {
-                await clearAllTests();
-                setHistory([]);
+                await clearTestsForTypist(activeTypistId);
+                setHistory(await listTests());
                 setPersonalBest(null);
                 setConfirmClear(false);
-                setStatusText('Local test history cleared.');
-              }}>Clear history</button>
+                setStatusText(`${activeTypist.name} scores reset.`);
+              }}>Reset {activeTypist.name} scores</button>
             </div>
           </div>
         </div>
@@ -1536,14 +1617,15 @@ function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
 
 // -------------------- modals --------------------
 
-function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: {
+function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCertificate }: {
   onCancel: () => void;
   onSave: (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => void | Promise<void>;
   onExport: (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => void | Promise<void>;
   summary: ReturnType<typeof computeMetrics>;
+  typistName: string;
   canCertificate: boolean;
 }) {
-  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, includeKeystrokes: true });
+  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
@@ -1600,18 +1682,19 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: 
   );
 }
 
-function ExportHistoryModal({ onCancel, onExport, tags }: {
+function ExportHistoryModal({ onCancel, onExport, tags, typistName }: {
   onCancel: () => void;
   onExport: (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => void | Promise<void>;
   tags: string;
+  typistName: string;
 }) {
-  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA });
+  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName });
   const [tagInput, setTagInput] = useState('');
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-export-history-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
         <h3 id="tw-export-history-title">Export history</h3>
-        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>{tags ? `Filter by tags: ${tags}` : 'Exports every saved test.'}</p>
+        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>{tags ? `Filter by tags: ${tags}` : `Exports saved tests for ${typistName}.`}</p>
         <label htmlFor="tw-history-typist">Typist name</label>
         <input id="tw-history-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
         <label htmlFor="tw-history-organization">Organization</label>
@@ -1648,6 +1731,44 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
           <button type="button" className="subtle" onClick={() => void onExport('csv', meta)}>Export CSV</button>
           <button type="button" className="subtle" onClick={() => void onExport('md', meta)}>Export Markdown</button>
           <button type="button" onClick={() => void onExport('json', meta)}>Export JSON</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddTypistModal({ onCancel, onAdd }: {
+  onCancel: () => void;
+  onAdd: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const usableName = name.trim().replace(/\s+/g, ' ');
+  return (
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-add-typist-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
+      <div className="tw-modal">
+        <h3 id="tw-add-typist-title">Add typist</h3>
+        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Profiles stay in this browser and keep scores, averages, and personal bests separate.</p>
+        <label htmlFor="tw-add-typist-name">Typist name</label>
+        <input
+          id="tw-add-typist-name"
+          autoFocus
+          type="text"
+          value={name}
+          onChange={(event) => { setName(event.target.value); setError(''); }}
+        />
+        {error ? <p role="alert" className="tw-form-error">{error}</p> : null}
+        <div className="row">
+          <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
+          <button
+            type="button"
+            disabled={!usableName}
+            onClick={() => {
+              void onAdd(usableName).catch((caught) => setError((caught as Error).message));
+            }}
+          >
+            Add typist
+          </button>
         </div>
       </div>
     </div>
