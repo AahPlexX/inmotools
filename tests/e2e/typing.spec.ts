@@ -508,6 +508,11 @@ test('offers explicit lifecycle controls with pause-safe timing and active-sessi
   await expect(workspace.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
   await expect(workspace.getByLabel('Mode')).toBeDisabled();
   await expect(workspace.getByLabel('Active typist')).toBeDisabled();
+  const newTextButton = workspace.getByRole('button', { name: 'New text' });
+  await expect(newTextButton).toHaveAttribute('aria-disabled', 'true');
+  await expect(newTextButton).toHaveCSS('opacity', '0.55');
+  await expect(workspace.locator('input[type="file"][accept="application/json"]')).toBeDisabled();
+  await expect(workspace.getByRole('button', { name: 'Reset Local typist scores…' })).toBeDisabled();
 
   await page.waitForTimeout(1100);
   const timer = workspace.locator('.tw-stat').filter({ hasText: 'Timer' });
@@ -555,6 +560,14 @@ test('keeps saved scores, personal history, and resets isolated by local typist'
   let resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
   await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(totalTests).toContainText('1');
+
+  await workspace.getByRole('button', { name: 'Reset attempt' }).click();
+  await workspace.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(history.getByRole('button', { name: 'Delete' }).first()).toBeDisabled();
+  await expect(workspace.getByRole('button', { name: 'Reset Alex scores…' })).toBeDisabled();
+  await workspace.getByRole('button', { name: 'Stop', exact: true }).click();
+  resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await resultDialog.getByRole('button', { name: 'Discard' }).click();
 
   await workspace.getByRole('button', { name: 'Reset attempt' }).click();
   await workspace.getByLabel('Active typist').selectOption('local-default');
