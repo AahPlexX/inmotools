@@ -159,6 +159,39 @@ test('resolves a pasted .bib citekey and substitutes the formatted citation into
   await expect(preview).toContainText(/\[\d+\]/, { timeout: 15_000 });
 });
 
+test('changing citation style never shows a stale previous style while the new style loads', async ({ page }) => {
+  let releaseIeee!: () => void;
+  const ieeeGate = new Promise<void>((resolve) => { releaseIeee = resolve; });
+  let ieeeChunkIntercepted = false;
+
+  await page.route(/\/assets\/ieee-[^/]+\.js(?:\?.*)?$/, async (route) => {
+    ieeeChunkIntercepted = true;
+    await ieeeGate;
+    await route.continue();
+  });
+
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'See [@smith2024] for details.');
+  await openPanel(page, /^Citations/);
+  await page.getByLabel('Bibliography source').fill(SAMPLE_BIB);
+
+  const preview = page.locator('.markdown-workbench-preview');
+  await expect(preview).toContainText('Smith', { timeout: 15_000 });
+  await expect(preview).toContainText('2024');
+
+  await page.getByLabel('Citation style').selectOption('ieee');
+  await expect.poll(() => ieeeChunkIntercepted).toBe(true);
+
+  // The old APA result is no longer valid for the selected IEEE style. While
+  // the new formatter is intentionally held, show the original marker rather
+  // than misrepresenting the document with a stale citation.
+  await expect(preview).toContainText('[@smith2024]');
+  await expect(preview).not.toContainText('Smith');
+
+  releaseIeee();
+  await expect(preview).toContainText(/\[\d+\]/, { timeout: 15_000 });
+});
+
 test('an unresolved citekey is reported and left verbatim in the document', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, 'See [@doesnotexist] for details.');
