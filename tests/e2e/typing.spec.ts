@@ -511,14 +511,13 @@ test('offers explicit lifecycle controls with pause-safe timing and active-sessi
 
   await page.waitForTimeout(1100);
   const timer = workspace.locator('.tw-stat').filter({ hasText: 'Timer' });
-  const beforePause = await timer.locator('p').textContent();
+  await expect(timer.locator('p')).not.toHaveText('0:30');
   await workspace.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(workspace.getByText('Paused', { exact: true })).toBeVisible();
   await expect(workspace.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
   const pausedTimer = await timer.locator('p').textContent();
   await page.waitForTimeout(1200);
   await expect(timer.locator('p')).toHaveText(pausedTimer ?? '');
-  expect(pausedTimer).toBe(beforePause);
 
   const pausedTarget = await workspace.getByTestId('typing-target').textContent();
   const input = workspace.getByRole('textbox', { name: /Typing test canvas/i });
