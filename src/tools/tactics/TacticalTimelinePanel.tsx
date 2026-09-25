@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import TacticalBezierPathEditor from './TacticalBezierPathEditor';
 import TacticalCoordinationControls from './TacticalCoordinationControls';
 import TacticalTimingControls from './TacticalTimingControls';
 import { createMotionPath, setKeyframeMotionPath } from './motion-engine';
@@ -14,6 +15,7 @@ import {
 } from './timeline-engine';
 import type {
   InterpolationKind,
+  NormalizedPoint,
   TacticalMotionPathKind,
   TacticalProject,
   TimelineTrack,
@@ -130,6 +132,14 @@ export default function TacticalTimelinePanel({
     () => [...project.playerTokens.map((token) => token.id), 'ball'],
     [project.playerTokens],
   );
+  const [motionTarget, setMotionTarget] = useState(targets[0] ?? 'ball');
+  const [motionStartMs, setMotionStartMs] = useState(0);
+  const [motionEndMs, setMotionEndMs] = useState(1000);
+  const [motionEnd, setMotionEnd] = useState<NormalizedPoint>(() => createNormalizedPoint(0.6, 0.5));
+  const [pathControls, setPathControls] = useState<[NormalizedPoint, NormalizedPoint]>(() => [
+    createNormalizedPoint(0.5, 0.25),
+    createNormalizedPoint(0.65, 0.75),
+  ]);
   const [pathKind, setPathKind] = useState<TacticalMotionPathKind>('linear');
   const [interpolation, setInterpolation] = useState<InterpolationKind>('smooth');
   const [frameRate, setFrameRate] = useState(30);
@@ -140,6 +150,21 @@ export default function TacticalTimelinePanel({
   useEffect(() => {
     previewTimeRef.current = previewTimeMs;
   }, [previewTimeMs]);
+
+  useEffect(() => {
+    if (!targets.includes(motionTarget)) setMotionTarget(targets[0] ?? 'ball');
+  }, [motionTarget, targets]);
+
+  const motionStartPoint = useMemo(() => {
+    const sampled = sampleTacticalTimeline(project.timeline, motionStartMs)[motionTarget]?.position;
+    if (sampled) return createNormalizedPoint(sampled.x, sampled.y);
+    if (motionTarget === 'ball') return createNormalizedPoint(project.ball.position.x, project.ball.position.y);
+    const token = project.playerTokens.find((candidate) => candidate.id === motionTarget);
+    return token
+      ? createNormalizedPoint(token.position.x, token.position.y)
+      : createNormalizedPoint(0.5, 0.5);
+  }, [motionStartMs, motionTarget, project.ball.position, project.playerTokens, project.timeline]);
+
 
   useEffect(() => {
     if (!playing) return;
@@ -274,15 +299,11 @@ export default function TacticalTimelinePanel({
   function submitMotion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const targetId = String(data.get('motionTarget') ?? '');
     const controls = pathKind === 'linear'
       ? []
       : pathKind === 'quadratic-bezier'
-        ? [createNormalizedPoint(Number(data.get('control1X')) / 100, Number(data.get('control1Y')) / 100)]
-        : [
-            createNormalizedPoint(Number(data.get('control1X')) / 100, Number(data.get('control1Y')) / 100),
-            createNormalizedPoint(Number(data.get('control2X')) / 100, Number(data.get('control2Y')) / 100),
-          ];
+        ? [{ ...pathControls[0] }]
+        : [{ ...pathControls[0] }, { ...pathControls[1] }];
     const timingBezier = interpolation === 'cubic-bezier'
       ? [
           Number(data.get('timingX1')),
@@ -296,11 +317,11 @@ export default function TacticalTimelinePanel({
       'Author timeline motion segment',
       (current) => withMotionSegment(
         current,
-        targetId,
-        Number(data.get('motionStartMs')),
-        Number(data.get('motionEndMs')),
-        Number(data.get('motionEndX')) / 100,
-        Number(data.get('motionEndY')) / 100,
+        motionTarget,
+        motionStartMs,
+        motionEndMs,
+        motionEnd.x,
+        motionEnd.y,
         interpolation,
         pathKind,
         controls,
@@ -401,14 +422,12 @@ export default function TacticalTimelinePanel({
           <h3>Motion segment</h3>
           <label>
             Motion target
-            <select name="motionTarget" defaultValue={targets[0]}>
+            <select name="motionTarget" value={motionTarget} onChange={(event) => setMotionTarget(event.target.value)}>
               {targets.map((targetId) => <option key={targetId} value={targetId}>{targetId}</option>)}
             </select>
           </label>
-          <label>Motion start (ms)<input name="motionStartMs" type="number" min="0" step="1" defaultValue="0" required /></label>
-          <label>Motion end (ms)<input name="motionEndMs" type="number" min="1" step="1" defaultValue="1000" required /></label>
-          <label>Motion end X %<input name="motionEndX" type="number" min="0" max="100" step="0.1" defaultValue="60" required /></label>
-          <label>Motion end Y %<input name="motionEndY" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
+          <label>Motion start (ms)<input name="motionStartMs" type="number" min="0" max={project.timeline.durationMs} step="1" value={motionStartMs} onChange={(event) => setMotionStartMs(Number(event.target.value))} required /></label>
+          <label>Motion end (ms)<input name="motionEndMs" type="number" min="1" max={project.timeline.durationMs} step="1" value={motionEndMs} onChange={(event) => setMotionEndMs(Number(event.target.value))} required /></label>
           <label>
             Interpolation
             <select
@@ -435,18 +454,14 @@ export default function TacticalTimelinePanel({
               <option value="cubic-bezier">Cubic Bezier</option>
             </select>
           </label>
-          {pathKind !== 'linear' ? (
-            <>
-              <label>Control 1 X %<input name="control1X" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
-              <label>Control 1 Y %<input name="control1Y" type="number" min="0" max="100" step="0.1" defaultValue="25" required /></label>
-            </>
-          ) : null}
-          {pathKind === 'cubic-bezier' ? (
-            <>
-              <label>Control 2 X %<input name="control2X" type="number" min="0" max="100" step="0.1" defaultValue="65" required /></label>
-              <label>Control 2 Y %<input name="control2Y" type="number" min="0" max="100" step="0.1" defaultValue="75" required /></label>
-            </>
-          ) : null}
+          <TacticalBezierPathEditor
+            kind={pathKind}
+            start={motionStartPoint}
+            end={motionEnd}
+            controls={pathControls}
+            onEndChange={setMotionEnd}
+            onControlsChange={setPathControls}
+          />
           <button type="submit">Author motion segment</button>
         </form>
 
