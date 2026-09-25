@@ -82,7 +82,7 @@ test('toolbar undo groups adjacent typing into one document step and redo restor
   // characters. The toolbar history should treat that burst as one meaningful
   // document step while CodeMirror's native Ctrl/Cmd+Z remains fine-grained.
   await page.waitForTimeout(750);
-  await page.keyboard.insertText(' next');
+  await editorLocator(page).pressSequentially(' next', { delay: 20 });
   await expect(preview.locator('h1')).toContainText('Version one next');
 
   await undo.click();
@@ -241,6 +241,28 @@ test('the rendered Markdown export carries evaluated formulas while the plain ex
   const renderedText = await readDownload(await rendered);
   expect(renderedText).toContain('| 4 | 12 |');
   expect(renderedText).not.toContain('=A2*3');
+});
+
+test('Standalone HTML export keeps sanitized Markdown inert through the detached render path', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '# Safe export',
+    '',
+    '<script>window.__markdownXss = true</script>',
+    '',
+    '[unsafe](javascript:window.__markdownXss = true)',
+    '',
+    '<img src=x onerror="window.__markdownXss = true">',
+  ].join('\n'));
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
+  const html = await readDownload(await download);
+
+  expect(html).not.toContain('<script');
+  expect(html).not.toContain('javascript:');
+  expect(html).not.toContain('onerror');
 });
 
 test('HTML export still contains the document when exporting from Source view', async ({ page }) => {
