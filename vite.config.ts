@@ -23,25 +23,28 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,wasm}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,wasm,woff2}'],
         // pyodide/** and duckdb-*.wasm avoid precaching the DuckDB/Pyodide-scale
         // WASM/runtime payload for every visitor (see .tasks/NEXT.md TASK-003).
         // MarkdownWorkspace itself stays precached so an already-open client can
         // still enter the tool after a deployment replaces hashed assets. Its
         // heavy optional diagram/style/font dependencies remain lazy and can be
-        // recovered through the waiting-service-worker path if version skew is
-        // encountered while loading one of those secondary chunks.
+        // recovered through runtime caches if version skew or offline reuse occurs.
         //   - diagram.worker-*.js: the Graphviz Worker chunk; @hpcc-js/wasm-graphviz's
         //     WASM binary is inlined into this chunk rather than emitted as
         //     a separate .wasm file, so the whole chunk must be excluded.
         //   - mermaid-parser.core-*.js, cytoscape.esm-*.js, and every
         //     `*Diagram-*.js` / `diagram-*.js` chunk: Mermaid's per-diagram-type
         //     code-split chunks, only loaded when a document actually
-        //     contains that diagram type.
+        //     contains that diagram type. They are runtime-cached below.
         //   - apa-*.js, ieee-*.js, chicago-author-date-*.js, mla-*.js: the
         //     bundled CSL style XML files, loaded dynamically per style.
         //   - KaTeX_*.{woff,woff2,ttf}: KaTeX's web fonts (all formats);
         //     only needed once a document actually contains math.
+        // `.mjs` and `.woff2` are precached on purpose: the Sightline reading
+        // tool ships its six reading typefaces as woff2, and its PDF decoder
+        // loads the pdf.js module worker, both of which must be available the
+        // first time the tool is used offline.
         globIgnores: [
           'pyodide/**',
           '**/duckdb-*.wasm',
@@ -55,6 +58,9 @@ export default defineConfig({
           'assets/chicago-author-date-*.js',
           'assets/mla-*.js',
           'assets/KaTeX_*.{woff,woff2,ttf}',
+          'assets/*univer*',
+          'assets/*Univer*',
+          'assets/*preset-sheets*',
         ],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024,
         navigateFallback: 'index.html',
@@ -68,6 +74,18 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
               expiration: {
                 maxEntries: 2,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+              },
+            },
+          },
+          {
+            urlPattern: /\/assets\/(?:mermaid-parser\.core-|cytoscape\.esm-|[^/]*Diagram-|diagram-)[^/]*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mermaid-diagram-chunks',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 64,
                 maxAgeSeconds: 30 * 24 * 60 * 60,
               },
             },

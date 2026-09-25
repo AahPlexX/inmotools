@@ -20,6 +20,13 @@ declare module 'culori' {
   };
 
   export function parse(value: string): CuloriColor | undefined;
-  export function formatHex(color: CuloriColor): string;
+  export function formatHex(color: CuloriColor | string): string;
   export function converter(mode: 'rgb'): (color: CuloriColor | string) => RgbColor | undefined;
+  /** Perceptual interpolation between two or more colours. */
+  export function interpolate(
+    colors: readonly (string | CuloriColor)[],
+    mode?: string,
+  ): (position: number) => CuloriColor;
+  /** WCAG 2 contrast ratio between two colours, from 1 to 21. */
+  export function wcagContrast(first: string | CuloriColor, second: string | CuloriColor): number;
 }

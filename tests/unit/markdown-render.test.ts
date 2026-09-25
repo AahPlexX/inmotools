@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderMarkdown } from '../../src/tools/markdown/render-engine';
+import { buildOutline } from '../../src/tools/markdown/outline-engine';
+import { HEADING_ID_PREFIX } from '../../src/tools/markdown/heading-slug';
 
 describe('markdown rendering and sanitization', () => {
   it('renders a heading and paragraph to HTML', () => {
@@ -48,5 +50,54 @@ describe('markdown rendering and sanitization', () => {
     const result = renderMarkdown('| A | B |\n| - | - |\n| 1 | 2 |\n');
     expect(result.html).toContain('<table');
     expect(result.html).toContain('<td>1</td>');
+  });
+
+  it('renders a footnote reference and its body', () => {
+    const result = renderMarkdown('Text with a note.[^1]\n\n[^1]: The note body.');
+    expect(result.html).toContain('data-footnote-ref');
+    expect(result.html).toContain('The note body.');
+  });
+
+  it('gives every heading a GitHub-style anchor id, de-duplicated against repeats', () => {
+    const result = renderMarkdown('# Hello World\n\n## Hello World');
+    expect(result.html).toContain(`id="${HEADING_ID_PREFIX}hello-world"`);
+    expect(result.html).toContain(`id="${HEADING_ID_PREFIX}hello-world-1"`);
+  });
+
+  it("assigns a heading's rendered anchor id to the exact same slug the outline panel uses", () => {
+    const source = '# First Section\n\nBody.\n\n## Second Section';
+    const [first, second] = buildOutline(source);
+    const result = renderMarkdown(source);
+    expect(result.html).toContain(`id="${HEADING_ID_PREFIX}${first.id}"`);
+    expect(result.html).toContain(`id="${HEADING_ID_PREFIX}${second.id}"`);
+  });
+
+  it.each(['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION', 'note'])(
+    'renders a %s alert blockquote as a styled callout instead of a plain blockquote',
+    (kind) => {
+      const result = renderMarkdown(`> [!${kind}]\n> Pay attention.`);
+      expect(result.html).toContain(`markdown-alert-${kind.toLowerCase()}`);
+      expect(result.html).toContain('Pay attention.');
+      expect(result.html).not.toContain('<blockquote');
+      expect(result.html).not.toContain(`[!${kind}]`);
+    },
+  );
+
+  it('leaves an ordinary blockquote without a marker untouched', () => {
+    const result = renderMarkdown('> Just a quote, no marker.');
+    expect(result.html).toContain('<blockquote');
+    expect(result.html).not.toContain('markdown-alert');
+  });
+
+  it('converts a recognized emoji shortcode and leaves an unrecognized one exactly as written', () => {
+    const result = renderMarkdown('Great work! :tada: :not_a_real_shortcode:');
+    expect(result.html).toContain('🎉');
+    expect(result.html).toContain(':not_a_real_shortcode:');
+  });
+
+  it('does not convert emoji-shaped text inside inline code or a fenced code block', () => {
+    const result = renderMarkdown('Use `:tada:` in code.\n\n```\n:tada:\n```');
+    expect(result.html).not.toContain('🎉');
+    expect(result.html).toContain(':tada:');
   });
 });
