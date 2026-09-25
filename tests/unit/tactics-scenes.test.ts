@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cloneTacticalScene,
+  joinTacticalScenes,
   renameTacticalScene,
   reorderTacticalScene,
   splitTacticalScene,
@@ -189,6 +190,96 @@ describe('Tactical scene sequencing', () => {
     expect(source.scenes).toHaveLength(1);
   });
 
+
+  it('joins contiguous scenes without losing scene-owned players or authored motion', () => {
+    const base = buildBeginnerTacticalProject({
+      title: 'Scenes', teamName: 'Blue', primaryColor: '#154c79', secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const first = {
+      ...base,
+      scenes: [{ ...base.scenes[0]!, durationMs: 1000 }],
+      timeline: { ...base.timeline, durationMs: 3000 },
+    };
+    const withSecond = cloneTacticalScene(first, 'scene-1', {
+      id: 'scene-2',
+      name: 'Press phase',
+      startMs: 1000,
+      durationMs: 1000,
+    });
+    const leftToken = withSecond.playerTokens.find(
+      (token) => token.sceneId === 'scene-1' && token.playerId === withSecond.teams[0]!.roster[0]!.id,
+    )!;
+    const rightToken = withSecond.playerTokens.find(
+      (token) => token.sceneId === 'scene-2' && token.playerId === leftToken.playerId,
+    )!;
+    const project = {
+      ...withSecond,
+      timeline: {
+        ...withSecond.timeline,
+        tracks: [
+          {
+            id: 'track-left',
+            targetId: leftToken.id,
+            keyframes: [
+              { id: 'left-start', timeMs: 0, position: { ...leftToken.position }, interpolation: 'linear' as const },
+              { id: 'left-boundary', timeMs: 1000, position: { x: 0.4, y: 0.4 }, interpolation: 'hold' as const },
+            ],
+          },
+          {
+            id: 'track-right',
+            targetId: rightToken.id,
+            keyframes: [
+              { id: 'right-boundary', timeMs: 1000, position: { x: 0.6, y: 0.6 }, interpolation: 'linear' as const },
+              { id: 'right-end', timeMs: 1800, position: { x: 0.8, y: 0.2 }, interpolation: 'hold' as const },
+            ],
+          },
+        ],
+        possessionEvents: [
+          { id: 'poss-1', timeMs: 1200, holderTargetId: rightToken.id },
+        ],
+      },
+    };
+
+    const joined = joinTacticalScenes(project, 'scene-1', 'scene-2');
+
+    expect(joined.scenes).toHaveLength(1);
+    expect(joined.scenes[0]).toMatchObject({ id: 'scene-1', startMs: 0, durationMs: 2000 });
+    expect(joined.playerTokens.filter((token) => token.playerId === leftToken.playerId)).toHaveLength(1);
+    const mergedTrack = joined.timeline.tracks.find((track) => track.targetId === leftToken.id)!;
+    expect(mergedTrack.keyframes.map((keyframe) => [keyframe.id, keyframe.timeMs])).toEqual([
+      ['left-start', 0],
+      ['right-boundary', 1000],
+      ['right-end', 1800],
+    ]);
+    expect(joined.timeline.possessionEvents?.[0]?.holderTargetId).toBe(leftToken.id);
+    expect(validateTacticalProject(joined)).toEqual([]);
+    expect(project.scenes).toHaveLength(2);
+    expect(project.timeline.tracks).toHaveLength(2);
+  });
+
+  it('rejects joining scenes that are not adjacent and contiguous', () => {
+    const base = buildBeginnerTacticalProject({
+      title: 'Scenes', teamName: 'Blue', primaryColor: '#154c79', secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const first = {
+      ...base,
+      scenes: [{ ...base.scenes[0]!, durationMs: 500 }],
+      timeline: { ...base.timeline, durationMs: 3000 },
+    };
+    const gapped = cloneTacticalScene(first, 'scene-1', {
+      id: 'scene-2',
+      name: 'Press phase',
+      startMs: 1000,
+      durationMs: 500,
+    });
+    expect(() => joinTacticalScenes(gapped, 'scene-1', 'scene-2')).toThrow(/contiguous/i);
+  });
 
   it('refuses a split that would strand authored scene motion after the split point', () => {
     const source = buildBeginnerTacticalProject({
