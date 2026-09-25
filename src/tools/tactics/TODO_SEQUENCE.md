@@ -1,9 +1,9 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-23
+**Updated:** 2026-09-25
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `02f740565bdc2322eeac98fd64f7e5f97766c19b`
+**Code tip described by this queue before this documentation commit:** `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`
 
 ## Purpose and source-of-truth roles
 
@@ -83,22 +83,21 @@
 - **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
 - **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** ACTIVE — engine foundation complete; authoring UI/browser proof remains
+- **Status:** DONE
 - **Depends on:** T04-01 DONE
-- **Primary files:** Tactical timeline/motion UI, tool-scoped CSS, focused Tactical browser tests; engine files only for defects exposed by UI integration
-- **Action:** finish interactive timeline/path authoring over the existing deterministic engine foundation, then run focused desktop/mobile/accessibility evidence.
-- **Implemented engine commits:** `f2d3565` timeline primitives; `11acadf` multi-track/project validation; `e17304c` spatial Bézier paths; `b8995f4` coordinated action templates; `1c00a1c` linked units; `6f860b2` possession/handoffs; `02f7405` physical-distance path-conflict review.
-- **Current focused evidence:** action/unit/possession/conflict/timeline suites pass **23/23** together and TypeScript is clean after `02f7405`. Earlier timeline/motion focused suites remain green; no Task 5 browser/build completion claim is made yet.
-- **Remaining sequence:** (1) timeline/playhead/marker/visibility/offset authoring UI; (2) interactive Bézier path controls; (3) coordinated-action/linked-unit/possession/conflict controls; (4) focused desktop/mobile browser, keyboard, Axe and reflow evidence; (5) reconcile rows 16–26 without promoting partial behavior.
-- **Exit evidence:** deterministic engine invariants plus complete responsive/browser authoring workflow for accepted rows 16–26.
-- **Reverse-safe:** no; Tactical timeline UI/browser files are reserved while ACTIVE.
+- **Primary files:** tactical timeline/motion/scene/action/unit/possession/conflict engines; Tactical timeline/timing/coordination UI; focused unit/e2e tests
+- **Implementation:** `f2d3565` timeline primitives; `11acadf` validation; `e17304c` spatial Bézier paths; `b8995f4` coordinated actions; `1c00a1c` linked units; `6f860b2` possession/handoffs; `02f7405` conflict review; `cd2cab5`/`5ded669` authoring UI; `abcc1bc` scene/group timing; `f914ebe`/`edf1769` custom cubic-bezier timing; `0b11a61` transport sampling; `34f816e`/`4ab8d24`/`bdb28e4` transport controls, sampled preview, and responsive styling.
+- **Exit evidence:** validated source tip `bdb28e447f50cf9e2009e5ed53ed67984a727bbd` passes **35/35** Task 5-focused unit tests plus TypeScript; production/PWA build is green (`built in 12.65s`); full Tactical Playwright gate is **26 passed / 2 intentional duplicate-project skips** across desktop/mobile Chromium, including transport, easing, scenes, visibility, grouped stagger, coordinated actions, linked units, possession, and conflict review.
+- **Verified feature rows:** **16–26**. Combined deterministic numerator is **20/60**.
+- **Reverse-safe:** complete.
+
 ### T06-01 — Spatial analysis
-- **Status:** BLOCKED
-- **Depends on:** T05-01
-- **Primary files:** new tactical analysis modules + tactical UI/tests
-- **Action:** Euclidean Voronoi, hull/compactness, passing-lane clearance, orientation sectors, grids, tethers, occupancy heat maps, authored/imported distance/speed metrics.
-- **Exit evidence:** analytical-honesty labels + deterministic geometry tests + browser evidence.
-- **Reverse-safe:** no.
+- **Status:** READY
+- **Depends on:** T05-01 DONE
+- **Primary files:** new tactical analysis modules + Tactical analysis UI/tests; do not edit later persistence/3D/media/export surfaces.
+- **Action order:** (1) pure Euclidean Voronoi + convex hull/centroid/width/depth primitives; (2) passing-lane clearance + authored orientation/vision sectors; (3) positional grid + distance rings/dynamic tethers; (4) trajectory occupancy heat map + authored/imported speed/distance metrics; (5) analytical-honesty UI labels; (6) focused desktop/mobile/browser validation; (7) reconcile feature rows 27–34.
+- **Exit evidence:** deterministic geometry/metric unit invariants, source-honest labels, TypeScript/build, and complete responsive browser authoring/view workflows for rows 27–34.
+- **Reverse-safe:** yes; this is the sole READY item. A reverse-working agent must still follow the sub-order above unless taking a non-overlapping test/documentation-only slice.
 
 ### T07-01 — Persistence, interchange and session planning
 - **Status:** BLOCKED
