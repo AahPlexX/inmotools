@@ -2,6 +2,7 @@ import type {
   InterpolationKind,
   NormalizedPoint,
   TacticalKeyframe,
+  TacticalProject,
   TacticalTimeline,
   TacticalScene,
   TimelineMarker,
@@ -299,6 +300,68 @@ export function sampleTacticalTimeline(
     result.ball = ballState;
   }
   return result;
+}
+
+export function sampleTacticalProjectAtTime(
+  project: TacticalProject,
+  timeMs: number,
+): TacticalProject {
+  const timeline = setTimelinePlayhead(project.timeline, timeMs);
+  const sampled = sampleTacticalTimeline(timeline, timeline.playheadMs);
+  const applyState = <T extends { id: string; position: NormalizedPoint }>(
+    item: T,
+  ): T => {
+    const state = sampled[item.id];
+    if (!state) return { ...item, position: { ...item.position } };
+    return {
+      ...item,
+      position: state.position ? { ...state.position } : { ...item.position },
+      ...('rotationDeg' in item && state.rotationDeg !== undefined ? { rotationDeg: state.rotationDeg } : {}),
+      ...('visible' in item && state.visible !== undefined ? { visible: state.visible } : {}),
+    } as T;
+  };
+
+  const ballState = sampled.ball;
+  return {
+    ...project,
+    timeline,
+    playerTokens: project.playerTokens.map(applyState),
+    officials: project.officials.map(applyState),
+    equipment: project.equipment.map(applyState),
+    scenes: project.scenes.map((scene) => ({
+      ...scene,
+      layers: scene.layers.map((layer) => ({ ...layer })),
+      objects: scene.objects.map(applyState),
+    })),
+    ball: {
+      ...project.ball,
+      position: ballState?.position ? { ...ballState.position } : { ...project.ball.position },
+      attachedToPlayerId: ballState?.attachmentTargetId ?? project.ball.attachedToPlayerId,
+    },
+  };
+}
+
+export function stepTimelineFrame(
+  timeMs: number,
+  durationMs: number,
+  frameRate: number,
+  direction: -1 | 1,
+): number {
+  requireIntegerTime(timeMs, 'Frame-step time');
+  requireIntegerTime(durationMs, 'Timeline duration');
+  if (!Number.isFinite(frameRate) || frameRate <= 0) {
+    throw new RangeError('Frame rate must be a positive finite number.');
+  }
+  const stepMs = Math.max(1, Math.round(1000 / frameRate));
+  const next = direction > 0
+    ? (Math.floor(timeMs / stepMs) + 1) * stepMs
+    : (Math.ceil(timeMs / stepMs) - 1) * stepMs;
+  return Math.min(durationMs, Math.max(0, next));
+}
+
+export function timelineKeyframeTimes(timeline: TacticalTimeline): number[] {
+  return [...new Set(timeline.tracks.flatMap((track) => track.keyframes.map((keyframe) => keyframe.timeMs)))]
+    .sort((left, right) => left - right);
 }
 
 export function setTimelinePlayhead(timeline: TacticalTimeline, timeMs: number): TacticalTimeline {
