@@ -23,8 +23,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Markdown unit tests
         run: pnpm exec vitest run tests/unit/markdown*.test.ts
-      - name: Production build
-        run: pnpm build
+      - name: Browser fixture build
+        # The repository-wide TypeScript gate is currently blocked by parallel
+        # Typing work on main. Vite still compiles/bundles the exact Markdown
+        # runtime needed for the isolated browser challenge below.
+        run: pnpm prepare:pyodide && pnpm prepare:libarchive && pnpm exec vite build
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Markdown browser tests
