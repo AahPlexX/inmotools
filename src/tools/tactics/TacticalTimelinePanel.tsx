@@ -56,6 +56,7 @@ function withMotionSegment(
   interpolation: InterpolationKind,
   pathKind: TacticalMotionPathKind,
   controls: Array<{ x: number; y: number }>,
+  timingBezier?: [number, number, number, number],
 ): TacticalProject {
   if (!Number.isInteger(startMs) || !Number.isInteger(endMs) || startMs < 0 || endMs <= startMs) {
     throw new RangeError('Motion times must use non-negative integer milliseconds with end after start.');
@@ -73,7 +74,8 @@ function withMotionSegment(
     timeMs: startMs,
     position: startPosition,
     interpolation,
-  } as const;
+    bezier: interpolation === 'cubic-bezier' ? timingBezier : undefined,
+  };
   const endKeyframe = {
     id: endId,
     timeMs: endMs,
@@ -117,6 +119,7 @@ export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }
     [project.playerTokens],
   );
   const [pathKind, setPathKind] = useState<TacticalMotionPathKind>('linear');
+  const [interpolation, setInterpolation] = useState<InterpolationKind>('smooth');
 
   function submitPlayhead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -160,6 +163,15 @@ export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }
             createNormalizedPoint(Number(data.get('control1X')) / 100, Number(data.get('control1Y')) / 100),
             createNormalizedPoint(Number(data.get('control2X')) / 100, Number(data.get('control2Y')) / 100),
           ];
+    const timingBezier = interpolation === 'cubic-bezier'
+      ? [
+          Number(data.get('timingX1')),
+          Number(data.get('timingY1')),
+          Number(data.get('timingX2')),
+          Number(data.get('timingY2')),
+        ] as [number, number, number, number]
+      : undefined;
+
     onEdit(
       'Author timeline motion segment',
       (current) => withMotionSegment(
@@ -169,9 +181,10 @@ export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }
         Number(data.get('motionEndMs')),
         Number(data.get('motionEndX')) / 100,
         Number(data.get('motionEndY')) / 100,
-        String(data.get('motionInterpolation')) as InterpolationKind,
+        interpolation,
         pathKind,
         controls,
+        timingBezier,
       ),
       'Motion segment authored.',
     );
@@ -214,10 +227,22 @@ export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }
           <label>Motion end Y %<input name="motionEndY" type="number" min="0" max="100" step="0.1" defaultValue="50" required /></label>
           <label>
             Interpolation
-            <select name="motionInterpolation" defaultValue="smooth">
-              {['linear', 'smooth', 'ease-in', 'ease-out', 'ease-in-out', 'hold'].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+            <select
+              name="motionInterpolation"
+              value={interpolation}
+              onChange={(event) => setInterpolation(event.target.value as InterpolationKind)}
+            >
+              {['linear', 'smooth', 'ease-in', 'ease-out', 'ease-in-out', 'cubic-bezier', 'hold'].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
             </select>
           </label>
+          {interpolation === 'cubic-bezier' ? (
+            <>
+              <label>Timing control X1<input name="timingX1" type="number" min="0" max="1" step="0.01" defaultValue="0.25" required /></label>
+              <label>Timing control Y1<input name="timingY1" type="number" step="0.01" defaultValue="0.1" required /></label>
+              <label>Timing control X2<input name="timingX2" type="number" min="0" max="1" step="0.01" defaultValue="0.25" required /></label>
+              <label>Timing control Y2<input name="timingY2" type="number" step="0.01" defaultValue="1" required /></label>
+            </>
+          ) : null}
           <label>
             Motion path
             <select value={pathKind} onChange={(event) => setPathKind(event.target.value as TacticalMotionPathKind)}>
