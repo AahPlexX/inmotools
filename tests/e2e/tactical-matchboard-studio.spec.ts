@@ -440,3 +440,34 @@ test('renders authored ball possession, handoff, and release on the timeline pre
   await expect(page.getByText(/2000 ms -> released/)).toBeVisible();
 });
 
+test('edits curved trajectory handles with keyboard and pointer input', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion path').selectOption('cubic-bezier');
+
+  const firstHandle = page.getByRole('button', { name: 'Control point 1' });
+  const firstX = page.getByLabel('Control 1 X %');
+  await expect(firstHandle).toBeVisible();
+  await expect(firstX).toHaveValue('50');
+
+  await firstHandle.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(firstX).toHaveValue('51');
+
+  const editor = page.getByLabel('Interactive trajectory path editor');
+  const editorBox = await editor.boundingBox();
+  const handleBox = await firstHandle.boundingBox();
+  expect(editorBox).not.toBeNull();
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(editorBox!.x + editorBox!.width * 0.7, editorBox!.y + editorBox!.height * 0.4);
+  await page.mouse.up();
+  await expect.poll(async () => Number(await firstX.inputValue())).toBeGreaterThan(60);
+
+  await page.getByRole('button', { name: 'End trajectory node' }).focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
+});
+
