@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `719035775a201cd95a3afbbf5f947d540faa2417`
+**Last tracked implementation commit:** `5a6dc77f11ba5ff59b5eec034f6f96173028dbdc`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -130,6 +130,7 @@ A capability counts only when production behavior exists, relevant validation pa
 - G7 body visibility slice: `CadTree` now lists body records and provides an accessible visibility checkbox; `setBodyVisibility()` immutably changes only the body flag, and `CadWorkspace` filters hidden tessellations without triggering a kernel rebuild because feature/sketch dependencies are unchanged. Unit coverage verifies visibility state and unknown-body no-op behavior. Local Vite/Chromium smoke check confirmed hiding Box 1 reduces the viewport from two tessellated bodies to one, Undo restores two and checks the visibility control, and Redo hides it again. The production CAD route remains unregistered, so this is not yet the required route-level E2E gate.
 - G7 model-tree search slice: `CadTree` filters sketch, body, and feature rows by case-insensitive label or type using a local controlled search input, preserves the existing section order and selection state, and announces an empty result. Focused tests cover matching, empty queries, and the accessible field. This implements only the name/type subset of capability 193; body/component, status, suppression, visibility, warning-state, and feature-family filters remain open. The route is still unregistered, so no capability is credited.
 - G6 tube primitive slice: added the straight coaxial tube primitive (`outerRadius`, `innerRadius`, `height`) to project defaults and the existing primitive selector; the exact evaluator cuts an inner cylinder from an outer cylinder and releases both temporary shapes even when the cut fails. Feature validation rejects non-positive/non-finite dimensions and `innerRadius >= outerRadius` with feature attribution. Mocked evaluator tests cover construction, validation, and failure cleanup; a real OCCT project-evaluation test verifies shape validity, analytic volume, and bounds. CAD Studio remains unregistered; no user-facing capability is credited.
+- G7 suppression-filter slice (`5a6dc77f11ba5ff59b5eec034f6f96173028dbdc`): the model tree now offers an accessible local All/Active/Suppressed selector for feature rows, composed with existing name/type search. Sketch and body rows remain unaffected, and filtering does not mutate selection, project, or history. Added filter truth-table and default-All/accessibility tests. Focused tests (8/8), all CAD unit tests (366/366), TypeScript, and production build pass; route remains unregistered and no capability is credited.
 
 ## Freshness invariant
 
