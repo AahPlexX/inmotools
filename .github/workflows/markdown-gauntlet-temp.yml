@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Markdown unit tests
-        run: pnpm exec vitest run 'tests/unit/markdown*.test.ts'
+        run: pnpm exec vitest run tests/unit/markdown*.test.ts
       - name: Production build
         run: pnpm build
       - name: Install Playwright Chromium
