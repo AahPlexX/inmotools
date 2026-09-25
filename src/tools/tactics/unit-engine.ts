@@ -15,6 +15,14 @@ export interface LinkedTacticalUnit {
   memberTargetIds: string[];
 }
 
+export type LinkedUnitAdjustmentKind = 'line-shift' | 'step' | 'drop' | 'width' | 'depth';
+
+export interface LinkedUnitAdjustment {
+  kind: LinkedUnitAdjustmentKind;
+  amount: number;
+  direction: 'left-to-right' | 'right-to-left';
+}
+
 export function createLinkedUnit(
   idValue: string,
   labelValue: string,
@@ -67,4 +75,82 @@ export function applyLinkedUnitTranslation(
     roles,
   });
   return applyCoordinatedAction(timeline, template, assignments, startMs);
+}
+
+
+function roundedPoint(x: number, y: number): NormalizedPoint {
+  return createNormalizedPoint(Number(x.toFixed(12)), Number(y.toFixed(12)));
+}
+
+export function adjustLinkedUnitPositions(
+  rawUnit: LinkedTacticalUnit,
+  startPositions: Record<string, NormalizedPoint>,
+  adjustment: LinkedUnitAdjustment,
+): Record<string, NormalizedPoint> {
+  const unit = createLinkedUnit(rawUnit.id, rawUnit.label, rawUnit.memberTargetIds);
+  if (!Number.isFinite(adjustment.amount)) throw new RangeError('Linked unit adjustment must be finite.');
+
+  const starts = unit.memberTargetIds.map((targetId) => {
+    const point = startPositions[targetId];
+    if (!point) throw new Error(`Missing position for linked unit member ${targetId}.`);
+    return [targetId, createNormalizedPoint(point.x, point.y)] as const;
+  });
+  const centroid = {
+    x: starts.reduce((sum, [, point]) => sum + point.x, 0) / starts.length,
+    y: starts.reduce((sum, [, point]) => sum + point.y, 0) / starts.length,
+  };
+  const scale = 1 + adjustment.amount;
+  if ((adjustment.kind === 'width' || adjustment.kind === 'depth') && scale <= 0) {
+    throw new RangeError('Width and depth adjustments must keep a positive unit scale.');
+  }
+  const forwardSign = adjustment.direction === 'left-to-right' ? 1 : -1;
+
+  return Object.fromEntries(starts.map(([targetId, start]) => {
+    let x = start.x;
+    let y = start.y;
+    if (adjustment.kind === 'line-shift') y += adjustment.amount;
+    if (adjustment.kind === 'step') x += forwardSign * Math.abs(adjustment.amount);
+    if (adjustment.kind === 'drop') x -= forwardSign * Math.abs(adjustment.amount);
+    if (adjustment.kind === 'width') y = centroid.y + (start.y - centroid.y) * scale;
+    if (adjustment.kind === 'depth') x = centroid.x + (start.x - centroid.x) * scale;
+    return [targetId, roundedPoint(x, y)];
+  }));
+}
+
+export function applyLinkedUnitAdjustment(
+  timeline: TacticalTimeline,
+  rawUnit: LinkedTacticalUnit,
+  startPositions: Record<string, NormalizedPoint>,
+  adjustment: LinkedUnitAdjustment,
+  startMs: number,
+  durationMs: number,
+  interpolation: InterpolationKind = 'smooth',
+): TacticalTimeline {
+  const unit = createLinkedUnit(rawUnit.id, rawUnit.label, rawUnit.memberTargetIds);
+  const endPositions = adjustLinkedUnitPositions(unit, startPositions, adjustment);
+  const assignments: Record<string, string> = {};
+  const roles = unit.memberTargetIds.map((targetId, index) => {
+    const from = startPositions[targetId];
+    if (!from) throw new Error(`Missing position for linked unit member ${targetId}.`);
+    const roleId = `member-${index + 1}`;
+    assignments[roleId] = targetId;
+    return {
+      roleId,
+      from: createNormalizedPoint(from.x, from.y),
+      to: endPositions[targetId]!,
+      startOffsetMs: 0,
+      durationMs,
+      interpolation,
+    };
+  });
+  return applyCoordinatedAction(
+    timeline,
+    createCoordinatedActionTemplate({
+      id: `linked-${unit.id}-${adjustment.kind}`,
+      label: `${unit.label} ${adjustment.kind}`,
+      roles,
+    }),
+    assignments,
+    startMs,
+  );
 }
