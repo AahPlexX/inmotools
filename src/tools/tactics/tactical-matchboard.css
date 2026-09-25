@@ -367,3 +367,76 @@
   min-height: 44px;
 }
 
+.tactical-path-editor {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.tactical-path-editor > p {
+  margin: 4px 0 10px;
+}
+
+.tactical-path-editor svg {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  max-height: 280px;
+  border-radius: 10px;
+  touch-action: none;
+}
+
+.tactical-path-editor-surface {
+  fill: color-mix(in srgb, var(--surface) 88%, transparent);
+  stroke: var(--border);
+  stroke-width: 0.8;
+}
+
+.tactical-path-preview {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-path-tangent {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-path-anchor {
+  fill: var(--surface);
+  stroke: var(--text);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-path-handle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+  cursor: grab;
+  vector-effect: non-scaling-stroke;
+}
+
+.tactical-path-handle:active {
+  cursor: grabbing;
+}
+
+.tactical-path-handle:focus-visible {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.tactical-path-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
