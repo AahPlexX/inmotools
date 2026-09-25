@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyEdits,
   applyGain,
+  deriveSourceTimelineThroughEdits,
   mapSourceRangeThroughEdits,
   deletePcmRange,
   dualMonoFromChannel,
@@ -28,6 +30,13 @@ const pcm = (...channels: number[][]): PcmAudio => ({
   sampleRate: 48_000,
   channels: channels.map((values) => Float32Array.from(values)),
 });
+
+const expandTimeline = (source: PcmAudio, segments: ReturnType<typeof deriveSourceTimelineThroughEdits>) =>
+  segments.flatMap((segment) => segment.sourceStartFrame === null
+    ? Array(segment.outputEndFrame - segment.outputStartFrame).fill(0)
+    : Array.from({ length: segment.outputEndFrame - segment.outputStartFrame }, (_, offset) => source.channels[0][
+      segment.reversed ? segment.sourceEndFrame - offset - 1 : segment.sourceStartFrame + offset
+    ]));
 
 describe('mastering project foundation', () => {
   it('creates isolated projects with bounded default state', () => {
@@ -116,6 +125,48 @@ describe('edit stack', () => {
     ]);
   });
 
+  it('derives frame-aligned source and silence spans in chronological edit order', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([10, 20, 30, 40, 50, 60, 70, 80])] };
+    const edits = [
+      { type: 'crop' as const, startSeconds: 0.25, endSeconds: 1.75 },
+      { type: 'insertSilence' as const, atSeconds: 0.5, durationSeconds: 0.5 },
+      { type: 'reverse' as const, startSeconds: 0.25, endSeconds: 1.5 },
+      { type: 'deleteRange' as const, startSeconds: 0.25, endSeconds: 0.5 },
+    ];
+    const timeline = deriveSourceTimelineThroughEdits(source, edits);
+    expect(timeline).toEqual([
+      { outputStartFrame: 0, outputEndFrame: 1, sourceStartFrame: 1, sourceEndFrame: 2, reversed: false },
+      { outputStartFrame: 1, outputEndFrame: 2, sourceStartFrame: 3, sourceEndFrame: 4, reversed: true },
+      { outputStartFrame: 2, outputEndFrame: 4, sourceStartFrame: null, sourceEndFrame: null, reversed: false },
+      { outputStartFrame: 4, outputEndFrame: 5, sourceStartFrame: 2, sourceEndFrame: 3, reversed: true },
+      { outputStartFrame: 5, outputEndFrame: 7, sourceStartFrame: 5, sourceEndFrame: 7, reversed: false },
+    ]);
+
+    expect(expandTimeline(source, timeline)).toEqual(Array.from(applyEdits(source, edits).channels[0]));
+  });
+
+  it('preserves source orientation through nested reversals around inserted silence', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([10, 20, 30, 40, 50, 60, 70, 80])] };
+    const edits = [
+      { type: 'reverse' as const, startSeconds: 0.25, endSeconds: 1.5 },
+      { type: 'insertSilence' as const, atSeconds: 0.75, durationSeconds: 0.5 },
+      { type: 'reverse' as const, startSeconds: 0.25, endSeconds: 1.75 },
+      { type: 'reverse' as const, startSeconds: 0.25, endSeconds: 1.75 },
+    ];
+    const timeline = deriveSourceTimelineThroughEdits(source, edits);
+    const expected = [10, 60, 50, 0, 0, 40, 30, 20, 70, 80];
+
+    expect(timeline).toContainEqual({
+      outputStartFrame: 3,
+      outputEndFrame: 5,
+      sourceStartFrame: null,
+      sourceEndFrame: null,
+      reversed: false,
+    });
+    expect(expandTimeline(source, timeline)).toEqual(expected);
+    expect(Array.from(applyEdits(source, edits).channels[0])).toEqual(expected);
+  });
+
   it('maps reversed source ranges to output ranges in timeline order', () => {
     const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7])] };
     expect(mapSourceRangeThroughEdits(source, [
@@ -137,8 +188,7 @@ describe('edit stack', () => {
     ]);
   });
 
-  it('replays non-destructive operations in order', async () => {
-    const { applyEdits } = await import('../../src/tools/music/mastering-engine');
+  it('replays non-destructive operations in order', () => {
     const result = applyEdits(pcm([0.1, 0.25, -0.5, 0.25]), [
       { type: 'crop', startSeconds: 1 / 48_000, endSeconds: 4 / 48_000 },
       { type: 'gain', gainDb: 6.020599913279624 },
