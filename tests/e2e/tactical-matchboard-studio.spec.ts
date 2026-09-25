@@ -376,3 +376,37 @@ test('authors custom cubic-bezier timing easing for a motion segment', async ({ 
   await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
 });
 
+test('previews authored motion with deterministic timeline transport controls', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByLabel('Motion end X %').fill('80');
+  await page.getByLabel('Motion end Y %').fill('20');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  const token = page.locator('#token-1');
+  const before = await token.getAttribute('transform');
+
+  await page.getByLabel('Timeline scrubber').fill('500');
+  await expect.poll(() => token.getAttribute('transform')).not.toBe(before);
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('500 ms');
+
+  await page.getByRole('button', { name: 'Next keyframe' }).click();
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('1000 ms');
+  await page.getByRole('button', { name: 'Previous keyframe' }).click();
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('0 ms');
+
+  await page.getByLabel('Frame rate').selectOption('60');
+  await page.getByRole('button', { name: 'Next frame' }).click();
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('17 ms');
+
+  await page.getByLabel('Playback speed').selectOption('2');
+  await page.getByLabel('Loop playback').check();
+  await page.getByRole('button', { name: 'Play timeline' }).click();
+  await expect.poll(async () => Number((await page.getByTestId('timeline-preview-time').textContent())?.replace(' ms', ''))).toBeGreaterThan(17);
+  await page.getByRole('button', { name: 'Pause timeline' }).click();
+  await page.getByRole('button', { name: 'Stop timeline' }).click();
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('0 ms');
+});
+
