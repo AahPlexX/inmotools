@@ -11,7 +11,7 @@ describe('Tactical project timeline validation', () => {
     project.timeline.markers.push({
       id: 'late-marker',
       timeMs: project.timeline.durationMs + 2,
-      kind: 'cue',
+      kind: 'coaching-cue',
       label: 'Late',
     });
     const errors = validateTacticalProject(project);
