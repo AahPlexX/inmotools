@@ -11,10 +11,10 @@ describe('prepareDocument', () => {
     expect(prepareDocument(source)).toContain('| Widgets | 4 | 2.5 | 10 |');
   });
 
-  it('applies citations to an already formula-prepared source without re-evaluating it', () => {
-    const source = '| A | B |\n| - | - |\n| 4 | 12 |\n\nSee [@smith2024].';
+  it('applies citations without evaluating formula-shaped text in this stage', () => {
+    const source = '| A | B |\n| - | - |\n| 4 | =A2*3 |\n\nSee [@smith2024].';
     const result = applyPreparedCitations(source, new Map([['smith2024', '(Smith, 2024)']]));
-    expect(result).toContain('| 4 | 12 |');
+    expect(result).toContain('| 4 | =A2*3 |');
     expect(result).toContain('See (Smith, 2024).');
   });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   TableFormulaRunCancelled,
   createTableFormulaRunner,
@@ -24,9 +24,30 @@ class FakeWorker implements TableFormulaWorkerPort {
     const request = this.posted[this.posted.length - 1];
     this.onmessage?.({ data: { id: request.id, result } } as MessageEvent<{ id: number; result: string }>);
   }
+
+  fail() {
+    this.onerror?.();
+  }
 }
 
 describe('table formula worker runner', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back synchronously when the browser exposes Worker but construction is blocked', async () => {
+    class BlockedWorker {
+      constructor() {
+        throw new Error('worker-src blocked');
+      }
+    }
+    vi.stubGlobal('Worker', BlockedWorker as unknown as typeof Worker);
+
+    const runner = createTableFormulaRunner();
+    await expect(runner.run('| A |\n| - |\n| =1+1 |')).resolves.toContain('| 2 |');
+    runner.dispose();
+  });
+
   it('reuses an idle worker for sequential formula substitutions', async () => {
     const workers: FakeWorker[] = [];
     const runner = createTableFormulaRunner(() => {
@@ -63,6 +84,29 @@ describe('table formula worker runner', () => {
     expect(workers).toHaveLength(2);
     expect(workers[0].terminated).toBe(true);
     await expect(stale).rejects.toBeInstanceOf(TableFormulaRunCancelled);
+
+    workers[1].resolveLatest('new prepared source');
+    await expect(latest).resolves.toBe('new prepared source');
+
+    runner.dispose();
+  });
+
+  it('ignores a late error callback from a terminated stale worker', async () => {
+    const workers: FakeWorker[] = [];
+    const runner = createTableFormulaRunner(() => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      return worker;
+    });
+
+    const stale = runner.run('old source');
+    const latest = runner.run('new source');
+    await expect(stale).rejects.toBeInstanceOf(TableFormulaRunCancelled);
+
+    // Simulate an already-queued callback from the terminated worker. It must
+    // be inert even though a newer request is now active on another worker.
+    workers[0].fail();
+    expect(workers[1].terminated).toBe(false);
 
     workers[1].resolveLatest('new prepared source');
     await expect(latest).resolves.toBe('new prepared source');

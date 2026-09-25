@@ -1,0 +1,34 @@
+name: Temporary Markdown Gauntlet validation
+
+on:
+  push:
+    branches:
+      - fix/markdown-gauntlet-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Markdown unit tests
+        run: pnpm exec vitest run tests/unit/markdown*.test.ts
+      - name: Browser fixture build
+        # The repository-wide TypeScript gate is currently blocked by parallel
+        # Typing work on main. Vite still compiles/bundles the exact Markdown
+        # runtime needed for the isolated browser challenge below.
+        run: pnpm prepare:pyodide && pnpm prepare:libarchive && pnpm exec vite build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Markdown browser tests
+        run: pnpm exec playwright test tests/e2e/markdown-workbench.spec.ts tests/e2e/markdown-workbench-ux.spec.ts tests/e2e/markdown-mermaid.spec.ts
