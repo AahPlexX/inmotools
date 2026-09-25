@@ -103,6 +103,17 @@ describe('Tactical Task 5 closure contracts', () => {
       expect(preset.roles.length).toBeGreaterThanOrEqual(2);
       expect(new Set(preset.roles.map((role) => role.roleId)).size).toBe(preset.roles.length);
     }
+    const roleCounts = Object.fromEntries(
+      COORDINATED_ACTION_PRESETS.map((preset) => [preset.id, preset.roles.length]),
+    );
+    expect(roleCounts).toMatchObject({
+      overlap: 2,
+      underlap: 2,
+      'third-player': 3,
+      'wall-pass': 2,
+      switch: 3,
+      'give-and-go': 2,
+    });
 
     const editable = createCoordinatedActionTemplate({
       id: 'overlap-local',
