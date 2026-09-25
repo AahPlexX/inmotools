@@ -244,6 +244,7 @@ export interface TacticalAnnotation {
   sceneId: string;
   layerId: string;
   points: NormalizedPoint[];
+  visible?: boolean;
   startMs?: number;
   endMs?: number;
   provenance?: SourceProvenance;
