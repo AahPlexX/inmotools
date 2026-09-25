@@ -290,4 +290,18 @@ test('pages the compiled symbol table for a large icon set', async ({ page }) =>
   await table.getByRole('button', { name: 'Last' }).click();
   await expect(table.locator('tbody tr')).toHaveCount(20);
   await expect(table.locator('tbody tr').last()).toContainText('icon-119.svg');
+
+  // Previews mount two images per symbol, so they arrive in batches of 48.
+  const previews = page.getByLabel('Compiled symbol previews').locator('article');
+  await expect(previews).toHaveCount(48);
+  await expect(page.getByTestId('svg-preview-count')).toHaveText('Showing 48 of 120 previews');
+  await page.getByRole('button', { name: 'Show 48 more previews' }).click();
+  await expect(previews).toHaveCount(96);
+  await page.getByRole('button', { name: 'Show 24 more previews' }).click();
+  await expect(previews).toHaveCount(120);
+  await expect(page.getByTestId('svg-preview-count')).toHaveCount(0);
+
+  // A search narrows the previews and starts a fresh batch.
+  await page.getByLabel('Search compiled symbols').fill('icon-11');
+  await expect(previews).toHaveCount(10);
 });

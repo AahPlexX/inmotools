@@ -5,6 +5,8 @@ import { consumeFileInput } from '../../lib/file-input';
 import VectorStudio from './VectorStudio';
 import { PagedTable } from '../../components/PagedTable';
 
+const PREVIEW_BATCH = 48;
+
 type Source = { name: string; text: string };
 
 function previewDataUri(file: SvgCompiledFile, color: '#111' | '#fff'): string {
@@ -18,6 +20,9 @@ export default function SvgWorkspace() {
   const [result, setResult] = useState<ReturnType<typeof compileSvgSprite> | null>(null);
   const [status, setStatus] = useState('Choose SVG files to inspect and compile.');
   const [search, setSearch] = useState('');
+  // Each preview card mounts two decoded images, so a large icon set is shown
+  // in batches rather than all at once. The symbol table below stays complete.
+  const [previewLimit, setPreviewLimit] = useState(PREVIEW_BATCH);
 
   const visibleFiles = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -43,6 +48,7 @@ export default function SvgWorkspace() {
   function compile() {
     const output = compileSvgSprite(sources, { currentColor });
     setResult(output);
+    setPreviewLimit(PREVIEW_BATCH);
     if (!output.files.length && output.errors.length) {
       setStatus(`No symbols compiled. ${output.errors.length} file${output.errors.length === 1 ? '' : 's'} failed validation.`);
       return;
@@ -76,9 +82,9 @@ export default function SvgWorkspace() {
         {result.errors.length ? <div className="notice" data-testid="svg-errors"><strong>Files not compiled</strong><ul>{result.errors.map((error) => <li key={`${error.name}-${error.message}`}><strong>{error.name}:</strong> {error.message}</li>)}</ul></div> : null}
         {result.warnings.length ? <div className="notice" data-testid="svg-warnings"><strong>Compiled with warnings</strong><ul>{result.warnings.map((warning) => <li key={`${warning.name}-${warning.message}`}><strong>{warning.name}:</strong> {warning.message}</li>)}</ul></div> : null}
         {result.files.length ? <>
-          <div className="field" style={{ marginTop: 16, maxWidth: 420 }}><label htmlFor="svg-search">Search compiled symbols</label><input id="svg-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filename or symbol ID" /></div>
+          <div className="field" style={{ marginTop: 16, maxWidth: 420 }}><label htmlFor="svg-search">Search compiled symbols</label><input id="svg-search" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPreviewLimit(PREVIEW_BATCH); }} placeholder="Filename or symbol ID" /></div>
           <div aria-label="Compiled symbol previews" className="workspace-grid" style={{ marginTop: 16 }}>
-            {visibleFiles.map((file) => <article className="notice" key={file.id} style={{ minWidth: 0 }}>
+            {visibleFiles.slice(0, previewLimit).map((file) => <article className="notice" key={file.id} style={{ minWidth: 0 }}>
               <strong style={{ overflowWrap: 'anywhere' }}>{file.name}</strong>
               <div className="help-text" style={{ overflowWrap: 'anywhere' }}>{file.id}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10, marginTop: 10 }}>
@@ -94,6 +100,10 @@ export default function SvgWorkspace() {
               <button className="action-button secondary" type="button" style={{ marginTop: 10 }} onClick={() => void copyUse(file.id)}>Copy &lt;use&gt;</button>
             </article>)}
           </div>
+          {visibleFiles.length > previewLimit ? <div className="button-row">
+            <span className="help-text" data-testid="svg-preview-count">Showing {previewLimit} of {visibleFiles.length} previews</span>
+            <button className="action-button secondary" type="button" onClick={() => setPreviewLimit((limit) => limit + PREVIEW_BATCH)}>Show {Math.min(PREVIEW_BATCH, visibleFiles.length - previewLimit)} more previews</button>
+          </div> : null}
           <PagedTable columns={[{ key: 'name', label: 'File' }, { key: 'id', label: 'Symbol ID' }, { key: 'original', label: 'Original' }, { key: 'optimized', label: 'Optimized' }, { key: 'savings', label: 'Savings' }]} rows={visibleFiles} caption="Compiled SVG symbols" pageSize={100} rowKey={(file) => file.id} testId="svg-symbols" renderCell={(file, column) => column === 'name' ? file.name : column === 'id' ? file.id : column === 'original' ? `${file.originalBytes} B` : column === 'optimized' ? `${file.optimizedBytes} B` : `${file.originalBytes ? Math.max(0, Math.round((1 - file.optimizedBytes / file.originalBytes) * 100)) : 0}%`} />
           <pre className="code-output" tabIndex={0} aria-label="Compiled SVG sprite source">{result.sprite}</pre>
         </> : null}
