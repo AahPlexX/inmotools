@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { createNormalizedPoint } from './pitch-engine';
 import type { NormalizedPoint, TacticalMotionPathKind } from './tactics-types';
 
@@ -37,6 +37,7 @@ export default function TacticalBezierPathEditor({
   onControlsChange,
 }: TacticalBezierPathEditorProps) {
   const [activeHandle, setActiveHandle] = useState<Handle | null>(null);
+  const activeHandleRef = useRef<Handle | null>(null);
 
   function updateHandle(handle: Handle, point: NormalizedPoint) {
     if (handle === 'end') {
@@ -57,9 +58,10 @@ export default function TacticalBezierPathEditor({
   }
 
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
-    if (activeHandle === null || event.buttons === 0) return;
+    const handle = activeHandleRef.current;
+    if (handle === null) return;
     event.preventDefault();
-    updateHandle(activeHandle, pointFromPointer(event));
+    updateHandle(handle, pointFromPointer(event));
   }
 
   function handleKeyDown(handle: Handle, event: KeyboardEvent<SVGCircleElement>) {
@@ -90,10 +92,12 @@ export default function TacticalBezierPathEditor({
       aria-label={label}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
+        activeHandleRef.current = handle;
         setActiveHandle(handle);
       }}
       onPointerUp={(event) => {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        activeHandleRef.current = null;
         setActiveHandle(null);
       }}
       onKeyDown={(event) => handleKeyDown(handle, event)}
@@ -111,7 +115,10 @@ export default function TacticalBezierPathEditor({
         preserveAspectRatio="none"
         aria-label="Interactive trajectory path editor"
         onPointerMove={handlePointerMove}
-        onPointerUp={() => setActiveHandle(null)}
+        onPointerUp={() => {
+          activeHandleRef.current = null;
+          setActiveHandle(null);
+        }}
       >
         <rect x="0" y="0" width="100" height="100" rx="4" className="tactical-path-editor-surface" />
         {kind !== 'linear' ? (
