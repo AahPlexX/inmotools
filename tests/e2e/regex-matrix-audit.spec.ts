@@ -133,6 +133,9 @@ for (const viewport of [
   test(`RegexMatrix audit surface reflows without document overflow or blocking accessibility defects at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('./#/regex-matrix');
+    // The workspace is a lazily loaded chunk; measuring or scanning before it
+    // mounts checks an empty shell (axe then fails with "No elements found").
+    await expect(page.getByTestId('regex-matrix-workspace')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `document overflow at ${viewport.name}`).toBeLessThanOrEqual(1);
     const results = await new AxeBuilder({ page }).include('[data-testid="regex-matrix-workspace"]').analyze();
