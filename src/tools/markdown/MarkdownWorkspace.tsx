@@ -98,7 +98,10 @@ export default function MarkdownWorkspace() {
   const [bibliographyText, setBibliographyText] = useState('');
   const [bibliographyFormat, setBibliographyFormat] = useState<'bib' | 'json'>('bib');
   const [citationStyle, setCitationStyle] = useState<CitationStyleId>('apa');
-  const [citationResult, setCitationResult] = useState<FormattedCitations | null>(null);
+  const [citationSnapshot, setCitationSnapshot] = useState<{
+    readonly key: string;
+    readonly result: FormattedCitations;
+  } | null>(null);
 
   const [drafts, setDrafts] = useState<DraftRecord[]>([]);
   const [storageUsage, setStorageUsage] = useState<{ usageBytes: number | null; quotaBytes: number | null }>({
@@ -239,19 +242,41 @@ export default function MarkdownWorkspace() {
 
   const citekeys = useMemo(() => extractCitekeys(source), [source]);
   const citekeySignature = citekeys.join('\u0000');
+  const citationRequestKey = useMemo(
+    () => JSON.stringify([bibliographyFormat, bibliographyText, citationStyle, citekeySignature]),
+    [bibliographyFormat, bibliographyText, citationStyle, citekeySignature],
+  );
+  // A formatting result is valid only for the exact bibliography/style/key
+  // inputs that produced it. This makes stale async results unusable during
+  // the render immediately following a style or bibliography change, before
+  // the effect below has even had a chance to start the replacement request.
+  const citationResult =
+    citationLibrary && citationSnapshot?.key === citationRequestKey
+      ? citationSnapshot.result
+      : null;
 
   useEffect(() => {
     if (!citationLibrary || citekeys.length === 0) {
-      setCitationResult(null);
+      setCitationSnapshot(null);
       return;
     }
     let cancelled = false;
+    const requestKey = citationRequestKey;
     formatCitations(citationLibrary, citekeys, citationStyle)
-      .then((result) => { if (!cancelled) setCitationResult(result); })
-      .catch(() => { if (!cancelled) setStatus('Citation formatting failed for the selected style.'); });
+      .then((result) => {
+        if (!cancelled) setCitationSnapshot({ key: requestKey, result });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCitationSnapshot(null);
+          setStatus('Citation formatting failed for the selected style.');
+        }
+      });
     return () => { cancelled = true; };
+    // citekeys is represented by citekeySignature so an equivalent key set
+    // does not restart formatting merely because the source array identity changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [citationLibrary, citekeySignature, citationStyle]);
+  }, [citationLibrary, citationRequestKey, citekeySignature, citationStyle]);
 
   useEffect(() => {
     const runner = formulaRunnerRef.current ?? createTableFormulaRunner();
