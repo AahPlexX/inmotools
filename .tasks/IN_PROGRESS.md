@@ -5,8 +5,8 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
-  - Current milestone: **Task 6 — spatial analysis.** T05 is DONE; T06-01 is the sole READY task. Later tasks remain dependency-blocked.
-  - Current verified feature count: **20/60**. Verified rows are 1, 2, and 9–26. Rows 3, 4, 5, 7, 8, 51, 52, 55, 56, and 59 remain in progress.
+  - Current milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened).** T06 is blocked until the remaining accepted Task 5 semantics are complete.
+  - Current verified feature count: **14/60**. Verified rows: 1, 2, 9–16 except 17, plus 18, 21, 25 and 26. Rows 17, 19, 20, 22, 23 and 24 remain in progress after accepted-scope audit.
   - Current evidence at validated source tip `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`: Task 5-focused units **35/35**, TypeScript clean, production/PWA build green (`built in 12.65s`), full Tactical Playwright **26 passed / 2 intentional duplicate-project skips** across desktop/mobile Chromium.
   - Task 5 now includes sampled timeline preview/transport, custom timing easing, scene sequencing, visibility, grouped stagger, coordinated actions, linked units, possession/handoffs, and physical-metre conflict review.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
