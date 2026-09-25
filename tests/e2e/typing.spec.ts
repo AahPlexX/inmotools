@@ -125,9 +125,9 @@ test('completes a multiline word-count custom target, persists it, and exports t
   const pbPanel = reloadedWorkspace.getByRole('heading', { name: 'Personal best / pacer' }).locator('..');
   await expect(pbPanel).toContainText('Best');
 
-  await reloadedWorkspace.getByRole('button', { name: 'Clear history…' }).click();
-  const clearDialog = reloadedWorkspace.getByRole('alertdialog', { name: 'Clear local test history?' });
-  await clearDialog.getByRole('button', { name: 'Clear history' }).click();
+  await reloadedWorkspace.getByRole('button', { name: 'Reset Local typist scores…' }).click();
+  const clearDialog = reloadedWorkspace.getByRole('alertdialog', { name: 'Reset Local typist scores?' });
+  await clearDialog.getByRole('button', { name: 'Reset Local typist scores' }).click();
   await expect(totalTests).toContainText('0');
   await expect(pbPanel).toContainText('No comparable personal best yet.');
 });
@@ -379,10 +379,10 @@ test('normalizes duration families, honors exact word count, bundles fonts, and 
   await page.keyboard.press('Escape');
   await expect(exportDialog).toBeHidden();
 
-  await workspace.getByRole('button', { name: 'Clear history…' }).click();
-  const clearDialog = workspace.getByRole('alertdialog', { name: 'Clear local test history?' });
+  await workspace.getByRole('button', { name: 'Reset Local typist scores…' }).click();
+  const clearDialog = workspace.getByRole('alertdialog', { name: 'Reset Local typist scores?' });
   await expect(clearDialog).toBeVisible();
-  await expect(clearDialog).toContainText('This removes every locally stored test from this browser.');
+  await expect(clearDialog).toContainText('Other typists, preferences, dictionaries, and drills are not affected.');
   await page.keyboard.press('Escape');
   await expect(clearDialog).toBeHidden();
 
@@ -467,6 +467,12 @@ test('supports native text input, composition-safe entry, keyboard escape, and a
   await input.press('Tab');
   await expect(input).not.toBeFocused();
   await input.focus();
+  const activeTarget = await workspace.getByTestId('typing-target').textContent();
+  await input.press('F2');
+  await expect(workspace.getByTestId('typing-target')).toHaveText(activeTarget ?? '');
+  await expect(workspace).toContainText('Stop or reset the current test before loading new text.');
+
+  await workspace.getByRole('button', { name: 'Reset attempt' }).click();
   await input.press('F2');
   await expect(workspace).toContainText('New text ready.');
 
@@ -489,23 +495,36 @@ test('reflows without page-level horizontal overflow across compact viewports', 
   }
 });
 
-test('offers explicit session controls and profile-scoped score reset', async ({ page }) => {
+test('offers explicit lifecycle controls with pause-safe timing and active-session guardrails', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
 
   await expect(workspace.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await expect(workspace.getByText('Ready', { exact: true })).toBeVisible();
   await expect(workspace.getByLabel('Active typist')).toHaveValue('local-default');
-  await expect(workspace.getByRole('button', { name: 'Add typist' })).toBeVisible();
 
   await workspace.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(workspace.getByText('Running', { exact: true })).toBeVisible();
   await expect(workspace.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
   await expect(workspace.getByLabel('Mode')).toBeDisabled();
+  await expect(workspace.getByLabel('Active typist')).toBeDisabled();
 
+  await page.waitForTimeout(1100);
+  const timer = workspace.locator('.tw-stat').filter({ hasText: 'Timer' });
+  const beforePause = await timer.locator('p').textContent();
   await workspace.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(workspace.getByText('Paused', { exact: true })).toBeVisible();
   await expect(workspace.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
+  const pausedTimer = await timer.locator('p').textContent();
+  await page.waitForTimeout(1200);
+  await expect(timer.locator('p')).toHaveText(pausedTimer ?? '');
+  expect(pausedTimer).toBe(beforePause);
+
+  const pausedTarget = await workspace.getByTestId('typing-target').textContent();
+  const input = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  await input.focus();
+  await input.press('F2');
+  await expect(workspace.getByTestId('typing-target')).toHaveText(pausedTarget ?? '');
 
   await workspace.getByRole('button', { name: 'Resume', exact: true }).click();
   await workspace.getByRole('button', { name: 'Stop', exact: true }).click();
@@ -516,11 +535,49 @@ test('offers explicit session controls and profile-scoped score reset', async ({
 
   await workspace.getByRole('button', { name: 'Reset attempt' }).click();
   await expect(workspace.getByText('Ready', { exact: true })).toBeVisible();
+  await expect(timer.locator('p')).toHaveText('0:30');
+});
+
+test('keeps saved scores, personal history, and resets isolated by local typist', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  const history = workspace.getByRole('region', { name: 'Session history' });
+  const totalTests = history.locator('.tw-stat').filter({ hasText: 'Total tests' });
 
   await workspace.getByRole('button', { name: 'Add typist' }).click();
   const profileDialog = workspace.getByRole('dialog', { name: 'Add typist' });
   await profileDialog.getByLabel('Typist name').fill('Alex');
   await profileDialog.getByRole('button', { name: 'Add typist', exact: true }).click();
   await expect(workspace.getByLabel('Active typist')).toContainText('Alex');
-  await expect(workspace.getByRole('button', { name: /Reset Alex scores/ })).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Start', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Stop', exact: true }).click();
+  let resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(totalTests).toContainText('1');
+
+  await workspace.getByRole('button', { name: 'Reset attempt' }).click();
+  await workspace.getByLabel('Active typist').selectOption('local-default');
+  await expect(totalTests).toContainText('0');
+
+  await workspace.getByRole('button', { name: 'Start', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Stop', exact: true }).click();
+  resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await resultDialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(totalTests).toContainText('1');
+
+  const alexOption = await workspace.getByLabel('Active typist').locator('option', { hasText: 'Alex' }).getAttribute('value');
+  expect(alexOption).toBeTruthy();
+  await workspace.getByRole('button', { name: 'Reset attempt' }).click();
+  await workspace.getByLabel('Active typist').selectOption(alexOption!);
+  await expect(totalTests).toContainText('1');
+
+  await workspace.getByRole('button', { name: 'Reset Alex scores…' }).click();
+  const resetDialog = workspace.getByRole('alertdialog', { name: 'Reset Alex scores?' });
+  await expect(resetDialog).toContainText('Other typists, preferences, dictionaries, and drills are not affected.');
+  await resetDialog.getByRole('button', { name: 'Reset Alex scores' }).click();
+  await expect(totalTests).toContainText('0');
+
+  await workspace.getByLabel('Active typist').selectOption('local-default');
+  await expect(totalTests).toContainText('1');
 });
