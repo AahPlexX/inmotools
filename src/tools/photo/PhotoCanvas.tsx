@@ -839,7 +839,7 @@ export default function PhotoCanvas({
           <button
             type="button"
             aria-pressed={guidesVisible}
-            aria-controls="photo-guide-controls"
+            aria-controls={guidesVisible ? 'photo-guide-controls' : undefined}
             disabled={!previewUrl}
             onClick={() => setGuidesVisible((value) => !value)}
           >Rulers &amp; guides</button>

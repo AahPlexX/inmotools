@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { makePhotoDng } from '../fixtures/photo-dng';
 import { encodePng, texturedScenePng } from '../fixtures/photo-png';
@@ -264,5 +265,37 @@ test('every open-source notice linked from Photo Studio is served', async ({ pag
     const response = await request.get(href);
     expect(response.status(), href).toBe(200);
     expect(await response.text()).toMatch(/notices/i);
+  }
+});
+
+test('every Photo panel, with every section expanded, has no serious or critical axe violations', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openPhoto(page);
+  const panels = ['Edit', 'Crop & geometry', 'Local adjustments', 'Retouch', 'Layers', 'Warp & detail', 'Merge', 'Inspect & workflow'];
+  const problems: string[] = [];
+  for (const name of panels) {
+    await tab(page, name);
+    await page.locator('.photo-inspector details:not([open]) > summary').evaluateAll((summaries) => summaries.forEach((summary) => (summary as HTMLElement).click()));
+    await settled(page);
+    const results = await new AxeBuilder({ page }).include('.photo-studio').analyze();
+    for (const violation of results.violations) {
+      if (violation.impact !== 'serious' && violation.impact !== 'critical') continue;
+      problems.push(`${name} · ${violation.id}: ${violation.help} → ${violation.nodes.slice(0, 3).map((node) => node.target.join(' ')).join(' | ')}`);
+    }
+  }
+  expect(problems, problems.join('\n')).toEqual([]);
+});
+
+test('at 320 CSS px every panel reflows without horizontal page scrolling', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 320, height: 720 });
+  await openPhoto(page);
+  await page.getByRole('button', { name: 'Rulers & guides' }).click();
+  await page.getByTestId('photo-guide-controls').getByRole('button', { name: 'Add vertical guide' }).click();
+  for (const name of ['Edit', 'Crop & geometry', 'Local adjustments', 'Retouch', 'Layers', 'Warp & detail', 'Merge', 'Inspect & workflow']) {
+    await tab(page, name);
+    await page.locator('.photo-inspector details:not([open]) > summary').evaluateAll((summaries) => summaries.forEach((summary) => (summary as HTMLElement).click()));
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${name} overflows by ${overflow}px`).toBeLessThanOrEqual(0);
   }
 });
