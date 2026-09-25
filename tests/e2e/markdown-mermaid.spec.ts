@@ -21,6 +21,23 @@ const readDownloadBytes = async (download: import('@playwright/test').Download):
   return Buffer.concat(chunks);
 };
 
+test('Graphviz output cannot inject an active javascript URL into the preview', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '# Graphviz safety',
+    '',
+    '```dot',
+    'digraph { unsafe [label="Click", URL="javascript:window.__graphvizXss = true"] }',
+    '```',
+  ].join('\n'));
+
+  const diagram = page.locator('.markdown-workbench-diagram').first();
+  await expect(diagram.locator('svg')).toBeVisible({ timeout: 15_000 });
+  await expect(diagram).not.toContainText('javascript:');
+  const markup = await diagram.innerHTML();
+  expect(markup).not.toMatch(/(?:href|xlink:href)=["']\s*javascript:/i);
+});
+
 test('renders Mermaid in the real browser integration and preserves its source anchor', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Diagram\n\n```mermaid\nflowchart LR\nA[Start] --> B[Done]\n```\n\n## After');
