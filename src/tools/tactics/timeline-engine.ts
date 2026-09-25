@@ -162,7 +162,11 @@ export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): Sampl
   requireIntegerTime(timeMs, 'Sample time');
   const keyframes = sortedKeyframes(track);
   if (!keyframes.length) return {};
-  if (timeMs <= keyframes[0]!.timeMs) return inheritedState(keyframes, 0);
+  if (timeMs < keyframes[0]!.timeMs) {
+    const future = inheritedState(keyframes, 0);
+    return { ...future, visible: undefined };
+  }
+  if (timeMs === keyframes[0]!.timeMs) return inheritedState(keyframes, 0);
   const lastIndex = keyframes.length - 1;
   if (timeMs >= keyframes[lastIndex]!.timeMs) return inheritedState(keyframes, lastIndex);
   let leftIndex = 0;
