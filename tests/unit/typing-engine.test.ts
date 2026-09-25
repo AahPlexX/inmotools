@@ -10,6 +10,7 @@ import {
   ngramLatencies,
   perKeyStats,
   pressKey,
+  start,
   weakKeys,
   wpmSeries,
 } from '../../src/tools/typing/typing-engine';
