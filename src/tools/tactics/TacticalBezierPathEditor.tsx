@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { createNormalizedPoint } from './pitch-engine';
 import type { NormalizedPoint, TacticalMotionPathKind } from './tactics-types';
 
@@ -36,7 +36,6 @@ export default function TacticalBezierPathEditor({
   onEndChange,
   onControlsChange,
 }: TacticalBezierPathEditorProps) {
-  const [activeHandle, setActiveHandle] = useState<Handle | null>(null);
   const activeHandleRef = useRef<Handle | null>(null);
 
   function updateHandle(handle: Handle, point: NormalizedPoint) {
@@ -93,12 +92,10 @@ export default function TacticalBezierPathEditor({
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         activeHandleRef.current = handle;
-        setActiveHandle(handle);
       }}
       onPointerUp={(event) => {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
         activeHandleRef.current = null;
-        setActiveHandle(null);
       }}
       onKeyDown={(event) => handleKeyDown(handle, event)}
     >
@@ -117,7 +114,6 @@ export default function TacticalBezierPathEditor({
         onPointerMove={handlePointerMove}
         onPointerUp={() => {
           activeHandleRef.current = null;
-          setActiveHandle(null);
         }}
       >
         <rect x="0" y="0" width="100" height="100" rx="4" className="tactical-path-editor-surface" />
