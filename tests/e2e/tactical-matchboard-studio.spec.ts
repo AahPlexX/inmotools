@@ -264,6 +264,62 @@ test('authors coordinated actions, linked units, possession, and conflict review
   await expect(page.getByText(/Potential conflicts found:/)).toBeVisible();
 });
 
+test('authors typed triggers, named action patterns, and linked-unit tactical adjustments', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+
+  await page.getByLabel('Marker type').selectOption('press');
+  await page.getByLabel('Marker label').fill('Press now');
+  await page.getByLabel('Marker time (ms)').fill('250');
+  await page.getByRole('button', { name: 'Add timeline marker' }).click();
+  await expect(page.getByText(/250 ms - Press now \(press\)/)).toBeVisible();
+
+  await page.getByLabel('Action pattern').selectOption('third-player');
+  await page.getByLabel('Action target A').selectOption('token-1');
+  await page.getByLabel('Action target B').selectOption('token-2');
+  await page.getByLabel('Action target C').selectOption('token-3');
+  await page.getByLabel('Action start (ms)').fill('1000');
+  await page.getByLabel('Action duration (ms)').fill('500');
+  await page.getByLabel('Action A end X %').fill('45');
+  await page.getByLabel('Action A end Y %').fill('35');
+  await page.getByLabel('Action B end X %').fill('55');
+  await page.getByLabel('Action B end Y %').fill('65');
+  await page.getByLabel('Action C end X %').fill('70');
+  await page.getByLabel('Action C end Y %').fill('50');
+  await page.getByRole('button', { name: 'Apply coordinated action' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Third-player run action authored');
+
+  await page.getByLabel('Linked member A').selectOption('token-1');
+  await page.getByLabel('Linked member B').selectOption('token-2');
+  await page.getByLabel('Linked member C (optional)').selectOption('token-3');
+  await page.getByLabel('Unit operation').selectOption('step');
+  await page.getByLabel('Unit start (ms)').fill('2500');
+  await page.getByLabel('Unit duration (ms)').fill('500');
+  await page.getByLabel('Unit adjustment %').fill('5');
+  await page.getByRole('button', { name: 'Apply linked unit adjustment' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Linked unit step authored');
+
+  const actionOptions = await page.getByLabel('Action pattern').locator('option').evaluateAll(
+    (options) => options.map((option) => (option as HTMLOptionElement).value),
+  );
+  expect(actionOptions).toEqual([
+    'custom',
+    'overlap',
+    'underlap',
+    'third-player',
+    'wall-pass',
+    'switch',
+    'give-and-go',
+    'decoy',
+    'press',
+    'recovery',
+  ]);
+
+  const unitOptions = await page.getByLabel('Unit operation').locator('option').evaluateAll(
+    (options) => options.map((option) => (option as HTMLOptionElement).value),
+  );
+  expect(unitOptions).toEqual(['translation', 'line-shift', 'step', 'drop', 'width', 'depth']);
+});
+
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
   await page.getByText('Rules, formations & restarts', { exact: true }).click();
