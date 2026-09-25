@@ -241,7 +241,7 @@ export default function TacticalTimingControls({
           />
         </label>
         <label>
-          New phase title
+          New scene name
           <input name="sceneSplitName" defaultValue="Next phase" required />
         </label>
         <div className="tactical-authoring-actions">
