@@ -10,6 +10,41 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-11-vector-studio-design.md`
 
+## Completion status — 2026-09-24
+
+**Complete: 66/66 design capabilities are implemented on `origin/main`.** The authoritative
+product revision is `e5a31cf0a01da6ede1437f15a457a54afcdf3e29`.
+
+Final closure work found and resolved two material validation/accessibility issues rather than
+adding speculative feature scope:
+
+1. focused SVG validation selected only `tests/e2e/svg.spec.ts` and silently omitted the
+   already-integrated nested-composition regression; `scripts/select-e2e-specs.mjs` now maps
+   SVG source changes to both Vector browser specs, with a selector-unit regression;
+2. the shared Axe route sweep found a serious `scrollable-region-focusable` issue on the
+   artboard viewport and active inspector. Scrollable Vector regions are now keyboard-focusable,
+   visibly focused, and preserve native Arrow/Page/Home/End scrolling when the region itself owns
+   focus. The existing SVG browser spec now carries the same serious/critical Axe sweep so the
+   focused Vector lane protects this behavior directly.
+
+Exact-main evidence:
+- focused run `36052165692` / job `107810129727`: production build, selector step, Chromium
+  install, and **22/22 browser checks passed** — 10 `svg.spec.ts` scenarios plus the
+  nested-composition scenario on both desktop and mobile Chromium;
+- Pages run `36052165503`: repository unit tests and production build passed; the Pages artifact
+  built successfully and deployment job `107810383399` succeeded on the same revision;
+- static closure scan: no Vector TODO/FIXME/HACK implementation markers and no `fetch`,
+  `XMLHttpRequest`, or `WebSocket` path under `src/tools/svg/`;
+- branch reconciliation: the historical `feat/vector-spec-completion` UI/export/test blobs are
+  already present on `main`, while current `vector-engine.ts` is a strict superset with the
+  later path-motion fix. `fix/vector-path-motion-20260916` is historical and must not be merged
+  wholesale.
+
+Future Vector work starts from current `origin/main`. New scope must enter the repository task
+state before implementation. A future shared-suite failure reopens Vector only if it identifies a
+Vector-specific regression.
+
+
 ## Global Constraints
 
 - Work from and integrate back to `origin/main` without destructive history edits.
@@ -32,9 +67,9 @@
 
 **Produces:** typed document/elements, starter document, immutable element creation/update/removal, selection helpers, grouping, ordering, duplication, transforms, alignment/distribution, snapping, freehand simplification, polygon/star generation, repeat/mirror helpers, history reducer.
 
-- [ ] Define the vector document and element types with stable IDs, artboard settings, metadata, swatches, and reusable definitions.
-- [ ] Add focused unit tests for creation, transform, grouping, ordering, alignment/distribution, snapping, repetition, history, and path helpers.
-- [ ] Implement the pure engine until the focused tests pass.
+- [x] Define the vector document and element types with stable IDs, artboard settings, metadata, swatches, and reusable definitions.
+- [x] Add focused unit tests for creation, transform, grouping, ordering, alignment/distribution, snapping, repetition, history, and path helpers.
+- [x] Implement the pure engine until the focused tests pass.
 
 ### Task 2: Standards-native serialization and export
 
@@ -46,10 +81,10 @@
 
 **Produces:** safe SVG serialization, optimized SVG, project JSON, embed/data-URI helpers, raster renderer, and PDF export.
 
-- [ ] Test escaping, title/description/metadata output, gradients/patterns/symbols, visibility/locking semantics, dimensions/viewBox, project round-trip, and optimized output.
-- [ ] Serialize deterministic SVG with standards-native descriptive metadata.
-- [ ] Add browser-local PNG/JPEG/WebP rendering and PDF generation using existing dependencies.
-- [ ] Add copy/embed/data-URI utilities without external network calls.
+- [x] Test escaping, title/description/metadata output, gradients/patterns/symbols, visibility/locking semantics, dimensions/viewBox, project round-trip, and optimized output.
+- [x] Serialize deterministic SVG with standards-native descriptive metadata.
+- [x] Add browser-local PNG/JPEG/WebP rendering and PDF generation using existing dependencies.
+- [x] Add copy/embed/data-URI utilities without external network calls.
 
 ### Task 3: Interactive canvas
 
@@ -60,10 +95,10 @@
 
 **Produces:** native SVG artboard with object rendering, selection, direct move, freehand/pen creation, shape creation, smart/grid snapping feedback, pointer coordinates, keyboard nudge/delete/undo-redo shortcuts, and responsive pan/zoom.
 
-- [ ] Render all supported vector element kinds with reusable defs.
-- [ ] Implement pointer-safe select/multi-select and creation tools.
-- [ ] Implement move/pan/freehand interactions with pointer capture and explicit callbacks.
-- [ ] Keep canvas manipulation optional by providing equivalent inspector/tool actions.
+- [x] Render all supported vector element kinds with reusable defs.
+- [x] Implement pointer-safe select/multi-select and creation tools.
+- [x] Implement move/pan/freehand interactions with pointer capture and explicit callbacks.
+- [x] Keep canvas manipulation optional by providing equivalent inspector/tool actions.
 
 ### Task 4: Inspector, layers, appearance, and export UI
 
@@ -75,11 +110,11 @@
 
 **Produces:** complete editor shell, tool rail, artboard controls, appearance/style controls, layer list, precision transforms, alignment/order/group/repeat operations, metadata/export dialog, import actions, status feedback, and responsive reflow.
 
-- [ ] Build accessible labeled tool groups and shortcuts.
-- [ ] Expose at least the complete capability set defined in the design spec with meaningful behavior.
-- [ ] Add non-drag layer ordering and numeric transform alternatives.
-- [ ] Add project/SVG/image import and export controls with editable metadata/tags.
-- [ ] Reflow to a single-column/mobile editor without clipped text or page-level horizontal overflow.
+- [x] Build accessible labeled tool groups and shortcuts.
+- [x] Expose at least the complete capability set defined in the design spec with meaningful behavior.
+- [x] Add non-drag layer ordering and numeric transform alternatives.
+- [x] Add project/SVG/image import and export controls with editable metadata/tags.
+- [x] Reflow to a single-column/mobile editor without clipped text or page-level horizontal overflow.
 
 ### Task 5: Integrate with the existing SVG tool without regressions
 
@@ -90,9 +125,9 @@
 
 **Produces:** Vector Studio as primary experience plus the existing Sprite Compiler as a compatibility/pro workflow on the same route.
 
-- [ ] Mount `VectorStudio` before the existing compiler UI.
-- [ ] Keep existing IDs, labels, buttons, output behavior, and sprite security controls.
-- [ ] Update catalog display copy/audience/steps/outputs to describe the expanded local vector workspace without changing the slug.
+- [x] Mount `VectorStudio` before the existing compiler UI.
+- [x] Keep existing IDs, labels, buttons, output behavior, and sprite security controls.
+- [x] Update catalog display copy/audience/steps/outputs to describe the expanded local vector workspace without changing the slug.
 
 ### Task 6: Browser coverage, task tracking, and integration gate
 
@@ -104,8 +139,8 @@
 
 **Produces:** focused critical-path evidence and repository traceability.
 
-- [ ] Add browser coverage for creating/editing artwork, keyboard/non-drag transforms, responsive reflow, SVG import, metadata editing, and export-source generation while retaining existing sprite tests.
-- [ ] Run/obtain fresh PR CI evidence: all unit tests, TypeScript production build, and selected SVG browser tests (or full suite if global catalog changes trigger it).
-- [ ] Perform Gauntlet domain and adversarial review; fix at least the highest-value material defect and revalidate.
-- [ ] Merge only after the PR gate is green.
-- [ ] Verify both main-branch validation workflows and GitHub Pages deployment, then close task tracking with the actual evidence.
+- [x] Add browser coverage for creating/editing artwork, keyboard/non-drag transforms, responsive reflow, SVG import, metadata editing, and export-source generation while retaining existing sprite tests.
+- [x] Run/obtain fresh PR CI evidence: all unit tests, TypeScript production build, and selected SVG browser tests (or full suite if global catalog changes trigger it).
+- [x] Perform Gauntlet domain and adversarial review; fix at least the highest-value material defect and revalidate.
+- [x] Reconcile integration against current `origin/main`; historical Vector branches are evidence only and are not merge sources.
+- [x] Verify exact-main focused Vector validation plus repository unit/build and GitHub Pages artifact/deployment evidence, then close task tracking with the actual evidence.

@@ -1,0 +1,367 @@
+.logic-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.logic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border: 1px solid #d7dee7;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.logic-toolbar button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #1f2933;
+}
+
+.logic-toolbar button[aria-pressed="true"] {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.logic-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.logic-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: #e2e8f0;
+  margin: 0 0.15rem;
+}
+
+.logic-mobile-only { display: none; }
+
+.logic-hazard-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 0.82rem;
+}
+
+.logic-workspace-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.logic-palette,
+.logic-inspector-shell {
+  border: 1px solid #d7dee7;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.65rem;
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}
+
+.logic-palette-hint {
+  font-size: 0.78rem;
+  color: #1d4ed8;
+  margin: 0 0 0.5rem;
+}
+
+.logic-palette-group h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.logic-palette-group:first-child h3 { margin-top: 0; }
+
+/* Only reachable via the mobile slide-over sheets (max-width: 900px below);
+   the full-screen .logic-mobile-backdrop button remains the click-outside
+   dismissal, but its own bounding box is often mostly covered by the open
+   sheet's own opaque content (a sheet can reach 65vh tall), leaving too
+   little of the backdrop exposed to reliably tap. This header gives every
+   sheet its own always-reachable close control regardless of sheet height. */
+.logic-sheet-header {
+  display: none;
+}
+
+.logic-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.logic-palette-button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.4rem 0.3rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.logic-palette-button.active {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.logic-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.8rem;
+}
+
+.logic-field input,
+.logic-field select,
+.logic-field textarea {
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.logic-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logic-inspector-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.logic-dock {
+  border: 1px solid #d7dee7;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+.logic-dock-message {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.logic-truth-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 100%;
+}
+
+.logic-truth-table th,
+.logic-truth-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.3rem 0.55rem;
+  text-align: center;
+}
+
+.logic-boolean-expressions {
+  margin-top: 0.65rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+}
+
+.logic-erc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.logic-erc-item {
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #7f1d1d;
+  font-size: 0.82rem;
+}
+
+.logic-shortcut-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.logic-shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 260px) 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.logic-shortcut-row dt {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.logic-shortcut-row dd {
+  margin: 0;
+  color: #475569;
+}
+
+@media (max-width: 640px) {
+  .logic-shortcut-row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
+
+.logic-mobile-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .logic-workspace-body {
+    grid-template-columns: 1fr;
+  }
+
+  .logic-mobile-only {
+    display: inline-flex;
+  }
+
+  .logic-palette,
+  .logic-inspector-shell {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 65vh;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(105%);
+    transition: transform 0.22s ease;
+    z-index: 20;
+    box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.25);
+  }
+
+  .logic-palette.sheet-open,
+  .logic-inspector-shell.sheet-open {
+    transform: translateY(0%);
+  }
+
+  .logic-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    border: none;
+    z-index: 15;
+  }
+
+  .logic-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.65rem;
+    margin: -0.65rem -0.65rem 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+  }
+
+  .logic-sheet-close {
+    appearance: none;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+    min-height: 32px;
+  }
+}
+
+/*
+ * The surrounding chrome follows the workstation's own theme picker
+ * (data-theme, set from LogicDocument.theme) rather than the OS color
+ * scheme, so it always matches the canvas rendered by THEME_PALETTES in
+ * render-engine.ts. Falling back to prefers-color-scheme here would let a
+ * user's explicit "Light" choice look dark (or vice versa) whenever it
+ * disagreed with the OS setting.
+ */
+.logic-workspace[data-theme="dark"] .logic-toolbar,
+.logic-workspace[data-theme="dark"] .logic-palette,
+.logic-workspace[data-theme="dark"] .logic-inspector-shell,
+.logic-workspace[data-theme="dark"] .logic-dock,
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar,
+.logic-workspace[data-theme="high-contrast"] .logic-palette,
+.logic-workspace[data-theme="high-contrast"] .logic-inspector-shell,
+.logic-workspace[data-theme="high-contrast"] .logic-dock {
+  background: #111827;
+  border-color: #1e293b;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-toolbar button,
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-palette-button,
+.logic-workspace[data-theme="high-contrast"] .logic-palette-button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar,
+.logic-workspace[data-theme="high-contrast"] .logic-palette,
+.logic-workspace[data-theme="high-contrast"] .logic-inspector-shell,
+.logic-workspace[data-theme="high-contrast"] .logic-dock {
+  background: #000000;
+  border-color: #333333;
+}
+
+.logic-workspace[data-theme="high-contrast"] .logic-toolbar button,
+.logic-workspace[data-theme="high-contrast"] .logic-palette-button {
+  background: #000000;
+  border-color: #ffff00;
+  color: #ffffff;
+}
+
+/* .logic-dock-message and .logic-shortcut-row dd set their own muted-gray
+   text color for the light theme, which the dark/high-contrast overrides
+   above don't reach (a child's own color declaration wins over the
+   inherited one), leaving dark-on-dark text that is difficult or
+   impossible to read once the dock background switches to near-black. */
+.logic-workspace[data-theme="dark"] .logic-dock-message,
+.logic-workspace[data-theme="dark"] .logic-shortcut-row dd,
+.logic-workspace[data-theme="high-contrast"] .logic-dock-message,
+.logic-workspace[data-theme="high-contrast"] .logic-shortcut-row dd {
+  color: #94a3b8;
+}
+
+.logic-workspace[data-theme="dark"] .logic-shortcut-row dt,
+.logic-workspace[data-theme="high-contrast"] .logic-shortcut-row dt {
+  color: #e2e8f0;
+}

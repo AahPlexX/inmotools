@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { CrystalProjection } from './project-engine';
 import type { CrystalDocument } from './crystal-types';
 import {
   buildCrystalRenderModel,
   defaultRenderOptions,
+  type CrystalRenderOptions,
   type CrystalRepresentation,
 } from './viewport-model';
 
-type ProjectionMode = 'perspective' | 'orthographic';
 type ViewAxis = 'x' | 'y' | 'z';
 
 interface SavedCameraState {
@@ -27,8 +29,12 @@ interface ViewRuntime {
 export interface CrystalViewportProps {
   readonly document: CrystalDocument;
   readonly representation: CrystalRepresentation;
+  readonly projection: CrystalProjection;
   readonly selectedSiteIds: ReadonlySet<string>;
   readonly onSelectionChange: (ids: ReadonlySet<string>) => void;
+  readonly onProjectionChange: (projection: CrystalProjection) => void;
+  readonly onCanvasChange?: (canvas: HTMLCanvasElement | null) => void;
+  readonly renderOptions?: Partial<CrystalRenderOptions>;
 }
 
 const SELECTED_COLOR = new THREE.Color('#FFD166');
@@ -81,23 +87,27 @@ function setLinePositions(
 export default function CrystalViewport({
   document,
   representation,
+  projection,
   selectedSiteIds,
   onSelectionChange,
+  onProjectionChange,
+  onCanvasChange,
+  renderOptions,
 }: CrystalViewportProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewRuntime | null>(null);
   const savedCameraRef = useRef<SavedCameraState | null>(null);
-  const [projection, setProjection] = useState<ProjectionMode>('perspective');
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const currentStructureKey = useMemo(() => structureKey(document), [document]);
   const model = useMemo(
     () => buildCrystalRenderModel(document, {
       ...defaultRenderOptions,
+      ...renderOptions,
       representation,
       selectedSiteIds,
     }),
-    [document, representation, selectedSiteIds],
+    [document, representation, selectedSiteIds, renderOptions],
   );
 
   useEffect(() => {
@@ -106,12 +116,13 @@ export default function CrystalViewport({
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       setRenderError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'WebGL is unavailable in this browser.';
       setRenderError(message);
       runtimeRef.current = null;
+      onCanvasChange?.(null);
       return;
     }
 
@@ -120,6 +131,7 @@ export default function CrystalViewport({
     renderer.domElement.className = 'crystal-viewport__canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
     host.appendChild(renderer.domElement);
+    onCanvasChange?.(renderer.domElement);
 
     const scene = new THREE.Scene();
     const camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = projection === 'perspective'
@@ -176,6 +188,59 @@ export default function CrystalViewport({
     const cellMaterial = new THREE.LineBasicMaterial({ color: 0x4a5568, transparent: true, opacity: 0.8 });
     const cellLines = new THREE.LineSegments(cellGeometry, cellMaterial);
     scene.add(cellLines);
+
+    renderer.clippingPlanes = renderOptions?.clip
+      ? [new THREE.Plane(new THREE.Vector3(...renderOptions.clip.normal).normalize(), -renderOptions.clip.offset)]
+      : [];
+
+    const polyhedronMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8fa8c8,
+      transparent: true,
+      opacity: 0.42,
+      roughness: 0.72,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    });
+    const polyhedronGeometryList: THREE.BufferGeometry[] = [];
+    const polyhedronGroup = new THREE.Group();
+    for (const polyhedron of model.polyhedra) {
+      const geometry = new ConvexGeometry(polyhedron.vertices.map((vertex) => new THREE.Vector3(...vertex)));
+      polyhedronGeometryList.push(geometry);
+      polyhedronGroup.add(new THREE.Mesh(geometry, polyhedronMaterial));
+    }
+    if (polyhedronGroup.children.length > 0) scene.add(polyhedronGroup);
+
+    const ellipsoidGeometry = new THREE.SphereGeometry(1, 20, 14);
+    const ellipsoidMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc8d6e5,
+      transparent: true,
+      opacity: 0.55,
+      roughness: 0.6,
+      metalness: 0.03,
+    });
+    const ellipsoidGroup = new THREE.Group();
+    const atomById = new Map(model.atoms.map((atom) => [atom.siteId, atom] as const));
+    for (const ellipsoid of model.ellipsoids) {
+      const atom = atomById.get(ellipsoid.siteId);
+      if (!atom) continue;
+      const mesh = new THREE.Mesh(ellipsoidGeometry, ellipsoidMaterial);
+      mesh.position.set(...atom.position);
+      mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().set(
+        ellipsoid.orientation[0][0], ellipsoid.orientation[0][1], ellipsoid.orientation[0][2], 0,
+        ellipsoid.orientation[1][0], ellipsoid.orientation[1][1], ellipsoid.orientation[1][2], 0,
+        ellipsoid.orientation[2][0], ellipsoid.orientation[2][1], ellipsoid.orientation[2][2], 0,
+        0, 0, 0, 1,
+      ));
+      mesh.scale.set(...ellipsoid.axes);
+      ellipsoidGroup.add(mesh);
+    }
+    if (ellipsoidGroup.children.length > 0) scene.add(ellipsoidGroup);
+
+    const vectorGeometry = new THREE.BufferGeometry();
+    setLinePositions(vectorGeometry, model.vectors.map((vector) => [vector.start, vector.end] as const));
+    const vectorMaterial = new THREE.LineBasicMaterial({ color: 0xff7f50 });
+    const vectorLines = new THREE.LineSegments(vectorGeometry, vectorMaterial);
+    if (model.vectors.length > 0) scene.add(vectorLines);
 
     const bounds = sceneBounds(model);
     const center = bounds.getCenter(new THREE.Vector3());
@@ -287,6 +352,7 @@ export default function CrystalViewport({
         zoom: camera.zoom,
       };
       runtimeRef.current = null;
+      onCanvasChange?.(null);
       cancelAnimationFrame(animationFrame);
       observer.disconnect();
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
@@ -297,10 +363,16 @@ export default function CrystalViewport({
       bondMaterial.dispose();
       cellGeometry.dispose();
       cellMaterial.dispose();
+      for (const geometry of polyhedronGeometryList) geometry.dispose();
+      polyhedronMaterial.dispose();
+      ellipsoidGeometry.dispose();
+      ellipsoidMaterial.dispose();
+      vectorGeometry.dispose();
+      vectorMaterial.dispose();
       renderer.dispose();
       if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement);
     };
-  }, [currentStructureKey, model, onSelectionChange, projection, representation, selectedSiteIds]);
+  }, [currentStructureKey, model, onCanvasChange, onSelectionChange, projection, representation, selectedSiteIds]);
 
   return (
     <section className="crystal-viewport-shell" aria-labelledby="crystal-viewport-heading">
@@ -317,7 +389,7 @@ export default function CrystalViewport({
           <button type="button" onClick={() => runtimeRef.current?.preset('z')}>+Z</button>
           <button
             type="button"
-            onClick={() => setProjection((current) => current === 'perspective' ? 'orthographic' : 'perspective')}
+            onClick={() => onProjectionChange(projection === 'perspective' ? 'orthographic' : 'perspective')}
           >
             {projection === 'perspective' ? 'Use orthographic projection' : 'Use perspective projection'}
           </button>

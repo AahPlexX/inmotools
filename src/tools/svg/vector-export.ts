@@ -97,6 +97,59 @@ function descriptiveMarkup(element: VectorElement): string {
   return `${title}${description}`;
 }
 
+function cutoutTransform(element: VectorElement): string {
+  const transform = elementTransform(element);
+  return transform ? ` transform="${escapeAttribute(transform)}"` : '';
+}
+
+function serializeDifferenceCutout(element: VectorElement, definitions: string[]): string {
+  if (!element.visible) return '';
+  const id = escapeAttribute(safeId(element.id));
+  const transform = cutoutTransform(element);
+  switch (element.type) {
+    case 'rect':
+      return `<rect id="${id}" fill="#000000" opacity="1"${transform} x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" rx="${number(Math.max(0, element.cornerRadius))}"/>`;
+    case 'ellipse':
+      return `<ellipse id="${id}" fill="#000000" opacity="1"${transform} cx="${number(element.x + element.width / 2)}" cy="${number(element.y + element.height / 2)}" rx="${number(Math.abs(element.width / 2))}" ry="${number(Math.abs(element.height / 2))}"/>`;
+    case 'line': {
+      const width = Math.max(1, element.stroke.width);
+      return `<line id="${id}" fill="none" stroke="#000000" stroke-width="${number(width)}" stroke-linecap="${element.stroke.linecap}" stroke-linejoin="${element.stroke.linejoin}" opacity="1"${transform} x1="${number(element.x)}" y1="${number(element.y)}" x2="${number(element.x2)}" y2="${number(element.y2)}"/>`;
+    }
+    case 'path': {
+      const stroke = element.stroke.width > 0 ? ` stroke="#000000" stroke-width="${number(element.stroke.width)}" stroke-linecap="${element.stroke.linecap}" stroke-linejoin="${element.stroke.linejoin}"` : '';
+      const fill = element.fill.kind === 'solid' && element.fill.color === 'none' ? 'none' : '#000000';
+      return `<path id="${id}" fill="${fill}"${stroke} opacity="1"${transform} d="${escapeAttribute(element.d)}"/>`;
+    }
+    case 'text':
+      return `<text id="${id}" fill="#000000" opacity="1"${transform} font-family="${escapeAttribute(element.fontFamily)}" font-size="${number(element.fontSize)}" font-weight="${number(element.fontWeight)}" letter-spacing="${number(element.letterSpacing)}" text-anchor="${element.textAnchor}" x="${number(element.x)}" y="${number(element.y + element.fontSize)}">${escapeText(element.text)}</text>`;
+    case 'image':
+      return `<image id="${id}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" opacity="1"${transform} href="${escapeAttribute(element.href)}" preserveAspectRatio="${escapeAttribute(element.preserveAspectRatio)}"/>`;
+    case 'group': {
+      const children = element.children.map((child) => serializeDifferenceCutout(child, definitions)).join('');
+      let compositionAttribute = '';
+      if (element.composition) {
+        const nestedId = `cutout-${element.composition.mode === 'clip' ? 'clip' : 'mask'}-${safeId(element.id)}`;
+        if (element.composition.mode === 'clip') {
+          const shape = serializeElement({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          definitions.push(`<clipPath id="${escapeAttribute(nestedId)}">${shape}</clipPath>`);
+          compositionAttribute = ` clip-path="url(#${escapeAttribute(nestedId)})"`;
+        } else {
+          const shape = serializeDifferenceCutout({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          const width = Math.max(1, element.width);
+          const height = Math.max(1, element.height);
+          definitions.push(`<mask id="${escapeAttribute(nestedId)}" maskUnits="userSpaceOnUse" x="${number(element.x)}" y="${number(element.y)}" width="${number(width)}" height="${number(height)}" style="mask-type:luminance"><rect x="${number(element.x)}" y="${number(element.y)}" width="${number(width)}" height="${number(height)}" fill="#ffffff"/>${shape}</mask>`);
+          compositionAttribute = ` mask="url(#${escapeAttribute(nestedId)})"`;
+        }
+      }
+      return `<g id="${id}" opacity="1"${transform}${compositionAttribute}>${children}</g>`;
+    }
+    case 'symbol-instance':
+      return `<use id="${id}" fill="#000000" stroke="#000000" opacity="1"${transform} href="#${escapeAttribute(safeId(element.symbolId))}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}"/>`;
+    default:
+      return '';
+  }
+}
+
 function serializeElement(element: VectorElement, definitions: string[]): string {
   if (!element.visible) return '';
   const paint = serializeFill(element.fill, element.id);
@@ -127,7 +180,24 @@ function serializeElement(element: VectorElement, definitions: string[]): string
     case 'group': {
       const children = element.children.map((child) => serializeElement(child, definitions)).join('');
       const transform = elementTransform(element);
-      return `<g id="${id}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''}${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}>${description}${children}</g>`;
+      let compositionAttribute = '';
+      if (element.composition) {
+        const compositionId = `${element.composition.mode === 'clip' ? 'clip' : 'mask'}-${safeId(element.id)}`;
+        if (element.composition.mode === 'clip') {
+          const shape = serializeElement({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          definitions.push(`<clipPath id="${escapeAttribute(compositionId)}">${shape}</clipPath>`);
+          compositionAttribute = ` clip-path="url(#${escapeAttribute(compositionId)})"`;
+        } else {
+          const maskShape = serializeDifferenceCutout({ ...element.composition.shape, visible: true } as VectorElement, definitions);
+          const maskX = element.x;
+          const maskY = element.y;
+          const maskWidth = Math.max(1, element.width);
+          const maskHeight = Math.max(1, element.height);
+          definitions.push(`<mask id="${escapeAttribute(compositionId)}" maskUnits="userSpaceOnUse" x="${number(maskX)}" y="${number(maskY)}" width="${number(maskWidth)}" height="${number(maskHeight)}" style="mask-type:luminance"><rect x="${number(maskX)}" y="${number(maskY)}" width="${number(maskWidth)}" height="${number(maskHeight)}" fill="#ffffff"/>${maskShape}</mask>`);
+          compositionAttribute = ` mask="url(#${escapeAttribute(compositionId)})"`;
+        }
+      }
+      return `<g id="${id}" opacity="${number(element.opacity)}"${transform ? ` transform="${escapeAttribute(transform)}"` : ''}${element.blendMode !== 'normal' ? ` style="mix-blend-mode:${element.blendMode}"` : ''}${compositionAttribute}>${description}${children}</g>`;
     }
     case 'symbol-instance':
       return `<use ${common} href="#${escapeAttribute(safeId(element.symbolId))}" x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}">${description}</use>`;

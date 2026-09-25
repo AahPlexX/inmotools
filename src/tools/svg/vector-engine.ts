@@ -83,6 +83,17 @@ export function updateElement(document: VectorDocument, id: string, patch: Parti
   };
 }
 
+function containsElementId(element: VectorElement, id: string): boolean {
+  if (element.id === id) return true;
+  if (element.type !== 'group') return false;
+  if (element.children.some((child) => containsElementId(child, id))) return true;
+  return element.composition ? containsElementId(element.composition.shape, id) : false;
+}
+
+export function topLevelSelectionId(document: VectorDocument, elementId: string): string | null {
+  return document.elements.find((element) => containsElementId(element, elementId))?.id ?? null;
+}
+
 function mapElements(document: VectorDocument, ids: ReadonlySet<string>, mapper: (element: VectorElement) => VectorElement): VectorDocument {
   return { ...document, elements: document.elements.map((element) => ids.has(element.id) ? mapper(element) : element) };
 }
@@ -92,6 +103,56 @@ export function removeSelection(document: VectorDocument, selection: readonly st
   return { ...document, elements: document.elements.filter((element) => !selected.has(element.id)) };
 }
 
+const PATH_COMMAND_ARITY: Record<string, number> = { m: 2, l: 2, t: 2, h: 1, v: 1, c: 6, s: 4, q: 4, a: 7, z: 0 };
+
+function translatePathCoordGroup(lower: string, group: number[], dx: number, dy: number): number[] {
+  if (lower === 'h') return [group[0]! + dx];
+  if (lower === 'v') return [group[0]! + dy];
+  if (lower === 'a') return [group[0]!, group[1]!, group[2]!, group[3]!, group[4]!, group[5]! + dx, group[6]! + dy];
+  const translated = group.slice();
+  for (let i = 0; i < translated.length; i += 2) {
+    translated[i] = translated[i]! + dx;
+    translated[i + 1] = translated[i + 1]! + dy;
+  }
+  return translated;
+}
+
+/**
+ * Translates the absolute coordinates embedded in an SVG path `d` string by
+ * (dx, dy), leaving relative commands untouched. A path's rendered geometry
+ * comes entirely from `d` (it has no x/y SVG attribute), so moving a path
+ * element requires transforming `d` itself, not just its cached x/y bounds.
+ * The very first moveto's coordinates are always treated as absolute per the
+ * SVG spec, even when written lowercase, since there is no prior point yet.
+ */
+function translatePathData(d: string, dx: number, dy: number): string {
+  const tokens = d.match(/[MLHVCSQTAZmlhvcsqtaz][^MLHVCSQTAZmlhvcsqtaz]*/g);
+  if (!tokens) return d;
+  let isFirst = true;
+  const out: string[] = [];
+  for (const token of tokens) {
+    const letter = token[0]!;
+    const lower = letter.toLowerCase();
+    if (lower === 'z') {
+      out.push(letter);
+      isFirst = false;
+      continue;
+    }
+    const isAbsolute = letter !== lower;
+    const arity = PATH_COMMAND_ARITY[lower]!;
+    const nums = (token.slice(1).match(/-?\d*\.?\d+(?:[eE][-+]?\d+)?/g) ?? []).map(Number);
+    const groups: number[][] = [];
+    for (let i = 0; i < nums.length; i += arity) groups.push(nums.slice(i, i + arity));
+    const transformed = groups.map((group, groupIndex) => {
+      const treatAsAbsolute = isAbsolute || (isFirst && groupIndex === 0 && lower === 'm');
+      return treatAsAbsolute ? translatePathCoordGroup(lower, group, dx, dy) : group;
+    });
+    out.push(`${letter} ${transformed.map((group) => group.join(' ')).join(' ')}`);
+    isFirst = false;
+  }
+  return out.join(' ');
+}
+
 function moveElement(element: VectorElement, dx: number, dy: number): VectorElement {
   if (element.type === 'group') {
     return {
@@ -99,10 +160,16 @@ function moveElement(element: VectorElement, dx: number, dy: number): VectorElem
       x: element.x + dx,
       y: element.y + dy,
       children: element.children.map((child) => moveElement(child, dx, dy)),
+      composition: element.composition
+        ? { ...element.composition, shape: moveElement(element.composition.shape, dx, dy) }
+        : undefined,
     };
   }
   if (element.type === 'line') {
     return { ...element, x: element.x + dx, y: element.y + dy, x2: element.x2 + dx, y2: element.y2 + dy };
+  }
+  if (element.type === 'path') {
+    return { ...element, x: element.x + dx, y: element.y + dy, d: translatePathData(element.d, dx, dy) };
   }
   return { ...element, x: element.x + dx, y: element.y + dy };
 }
@@ -112,17 +179,24 @@ export function moveSelection(document: VectorDocument, selection: readonly stri
   return mapElements(document, ids, (element) => element.locked ? element : moveElement(element, dx, dy));
 }
 
-function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
-  const moved = moveElement(element, dx, dy);
-  if (moved.type === 'group') {
+function reidentifyElement(element: VectorElement): VectorElement {
+  if (element.type === 'group') {
     return {
-      ...moved,
+      ...element,
       id: createVectorId('group'),
-      name: `${element.name} copy`,
-      children: moved.children.map((child) => ({ ...child, id: createVectorId(child.type) } as VectorElement)),
+      children: element.children.map(reidentifyElement),
+      composition: element.composition
+        ? { ...element.composition, shape: reidentifyElement(element.composition.shape) }
+        : undefined,
     };
   }
-  return { ...moved, id: createVectorId(element.type), name: `${element.name} copy` } as VectorElement;
+  return { ...element, id: createVectorId(element.type) } as VectorElement;
+}
+
+function cloneElement(element: VectorElement, dx: number, dy: number): VectorElement {
+  const moved = moveElement(element, dx, dy);
+  const clone = reidentifyElement(moved);
+  return { ...clone, name: `${element.name} copy` } as VectorElement;
 }
 
 export function duplicateSelection(document: VectorDocument, selection: readonly string[], dx = 12, dy = 12): VectorSelectionResult {
@@ -164,6 +238,14 @@ export function selectionBounds(document: VectorDocument, selection: readonly st
   return { x, y, right, bottom, width: right - x, height: bottom - y, cx: (x + right) / 2, cy: (y + bottom) / 2 };
 }
 
+export function fitZoomForViewport(contentWidth: number, contentHeight: number, viewportWidth: number, viewportHeight: number, totalPadding = 64): number {
+  const width = Math.max(1, contentWidth);
+  const height = Math.max(1, contentHeight);
+  const availableWidth = Math.max(1, viewportWidth - Math.max(0, totalPadding));
+  const availableHeight = Math.max(1, viewportHeight - Math.max(0, totalPadding));
+  return Math.max(0.2, Math.min(3, availableWidth / width, availableHeight / height));
+}
+
 export function groupSelection(document: VectorDocument, selection: readonly string[]): VectorSelectionResult {
   const selected = new Set(selection);
   const children = document.elements.filter((element) => selected.has(element.id));
@@ -182,14 +264,36 @@ export function groupSelection(document: VectorDocument, selection: readonly str
   return { document: { ...document, elements: remaining }, selection: [group.id] };
 }
 
+export function composeSelection(document: VectorDocument, selection: readonly string[], mode: 'clip' | 'difference'): VectorSelectionResult {
+  const selectedIds = new Set(selection);
+  const selected = document.elements.filter((element) => selectedIds.has(element.id));
+  if (selected.length < 2) return { document, selection: [...selection] };
+  const bounds = selectionBounds(document, selection);
+  if (!bounds) return { document, selection: [...selection] };
+  const shape = selected[selected.length - 1];
+  const children = selected.slice(0, -1);
+  const firstIndex = document.elements.findIndex((element) => selectedIds.has(element.id));
+  const group: VectorElement = {
+    ...baseElement('group', mode === 'clip' ? 'Clip composition' : 'Difference composition', bounds.x, bounds.y, bounds.width, bounds.height),
+    type: 'group',
+    fill: { kind: 'solid', color: 'none' },
+    children,
+    composition: { mode, shape },
+  };
+  const remaining = document.elements.filter((element) => !selectedIds.has(element.id));
+  remaining.splice(Math.max(0, firstIndex), 0, group);
+  return { document: { ...document, elements: remaining }, selection: [group.id] };
+}
+
 export function ungroupSelection(document: VectorDocument, groupId: string): VectorSelectionResult {
   const index = document.elements.findIndex((element) => element.id === groupId && element.type === 'group');
   if (index < 0) return { document, selection: [] };
   const group = document.elements[index];
   if (group.type !== 'group') return { document, selection: [] };
+  const released = group.composition ? [...group.children, group.composition.shape] : group.children;
   const elements = [...document.elements];
-  elements.splice(index, 1, ...group.children);
-  return { document: { ...document, elements }, selection: group.children.map((child) => child.id) };
+  elements.splice(index, 1, ...released);
+  return { document: { ...document, elements }, selection: released.map((child) => child.id) };
 }
 
 export type Alignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -359,6 +463,21 @@ export function mirrorSelection(document: VectorDocument, selection: readonly st
       ? ({ ...element, flipX: !Boolean(element.flipX), flipY: Boolean(element.flipY) } as VectorElement)
       : ({ ...element, flipX: Boolean(element.flipX), flipY: !Boolean(element.flipY) } as VectorElement);
   });
+}
+
+export function mirrorDuplicateSelection(document: VectorDocument, selection: readonly string[], axis: 'horizontal' | 'vertical', center: VectorPoint): VectorSelectionResult {
+  const ids = new Set(selection);
+  const originals = document.elements.filter((element) => ids.has(element.id));
+  const copies = originals.map((original) => {
+    const bounds = elementBounds(original);
+    const reflectedX = axis === 'horizontal' ? center.x * 2 - bounds.right : bounds.x;
+    const reflectedY = axis === 'vertical' ? center.y * 2 - bounds.bottom : bounds.y;
+    const clone = cloneElement(original, reflectedX - bounds.x, reflectedY - bounds.y);
+    return axis === 'horizontal'
+      ? ({ ...clone, flipX: !Boolean(clone.flipX), flipY: Boolean(clone.flipY) } as VectorElement)
+      : ({ ...clone, flipX: Boolean(clone.flipX), flipY: !Boolean(clone.flipY) } as VectorElement);
+  });
+  return { document: { ...document, elements: [...document.elements, ...copies] }, selection: copies.map((element) => element.id) };
 }
 
 export function createHistory(document: VectorDocument, limit = 80): VectorHistory {

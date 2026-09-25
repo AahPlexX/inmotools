@@ -3,6 +3,7 @@ import type { ToolDefinition, ToolSlug } from '../catalog';
 import { ToolLayout } from '../components/ToolLayout';
 
 const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType }>> = {
+  'web-layout-studio': () => import('./web-layout/WebLayoutWorkspace'),
   'photo-studio': () => import('./photo/PhotoWorkspace'),
   'exif-scrubber': () => import('./exif/ExifWorkspace'),
   'duckdb-workbench': () => import('./duckdb/DuckDbWorkspace'),
@@ -31,6 +32,11 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'aethercast': () => import('./aethercast/AetherCastWorkspace'),
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
+  'transcode-workstation': () => import('./transcode/TranscodeWorkspace'),
+  'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
+  'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
+  'typing-workstation': () => import('./typing/TypingWorkspace'),
+  'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

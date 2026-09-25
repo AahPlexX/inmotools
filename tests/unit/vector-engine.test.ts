@@ -2,13 +2,16 @@ import { describe, expect, test } from 'vitest';
 import {
   addElement,
   alignSelection,
+  composeSelection,
   createHistory,
   createPolygonPath,
   createStarPath,
   createVectorDocument,
   distributeSelection,
   duplicateSelection,
+  fitZoomForViewport,
   groupSelection,
+  mirrorDuplicateSelection,
   mirrorSelection,
   moveSelection,
   pushHistory,
@@ -113,6 +116,45 @@ describe('vector document engine', () => {
 
     const restored = mirrorSelection(both, ['a'], 'horizontal');
     expect(restored.elements[0]).toMatchObject({ flipX: false, flipY: true });
+  });
+
+  test('creates a separate symmetry duplicate reflected around a requested axis', () => {
+    const document = addElement(createVectorDocument(), rect('a', 100, 120, 80, 40));
+    const source = structuredClone(document.elements[0]);
+    const mirrored = mirrorDuplicateSelection(document, ['a'], 'horizontal', { x: 300, y: 300 });
+    expect(mirrored.document.elements).toHaveLength(2);
+    expect(mirrored.selection).toHaveLength(1);
+    expect(mirrored.document.elements[0]).toEqual(source);
+    expect(mirrored.document.elements[1]).toMatchObject({ x: 420, y: 120, flipX: true, flipY: false });
+  });
+
+  test('builds non-destructive clip and difference compositions that release back to source objects', () => {
+    let document = createVectorDocument();
+    document = addElement(document, rect('art', 40, 40, 240, 180));
+    document = addElement(document, rect('shape', 100, 80, 90, 90));
+
+    const clipped = composeSelection(document, ['art', 'shape'], 'clip');
+    expect(clipped.selection).toHaveLength(1);
+    const composition = clipped.document.elements[0];
+    expect(composition.type).toBe('group');
+    if (composition.type !== 'group') throw new Error('Expected composition group');
+    expect(composition.composition).toMatchObject({ mode: 'clip', shape: { id: 'shape' } });
+    expect(composition.children.map((child) => child.id)).toEqual(['art']);
+
+    const released = ungroupSelection(clipped.document, composition.id);
+    expect(released.document.elements.map((element) => element.id)).toEqual(['art', 'shape']);
+
+    const differenced = composeSelection(document, ['art', 'shape'], 'difference');
+    const difference = differenced.document.elements[0];
+    expect(difference.type).toBe('group');
+    if (difference.type !== 'group') throw new Error('Expected difference group');
+    expect(difference.composition?.mode).toBe('difference');
+  });
+
+  test('calculates bounded artboard and selection fit zoom from real viewport dimensions', () => {
+    expect(fitZoomForViewport(1200, 800, 600, 500, 64)).toBeCloseTo(0.4467, 3);
+    expect(fitZoomForViewport(100, 50, 1200, 800, 64)).toBe(3);
+    expect(fitZoomForViewport(1200, 800, 20, 20, 64)).toBe(0.2);
   });
 
   test('snaps to grid and nearby object guides with deterministic thresholds', () => {

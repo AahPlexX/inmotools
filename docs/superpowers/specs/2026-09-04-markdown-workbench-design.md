@@ -75,13 +75,15 @@ Diagram rendering is asynchronous while the document keeps changing, so each pas
 
 The evaluator is a hand-written tokeniser, recursive-descent parser, and dependency-ordered evaluator with cycle detection. It uses neither `eval` nor the `Function` constructor: introducing a dynamic code-execution surface for a small closed arithmetic grammar is an avoidable risk. Cyclic cells resolve to a labelled `#REF!` value rather than hanging or throwing.
 
+Live preview formula preparation is dispatched to a reusable dedicated Worker so formula parsing/evaluation no longer competes with typing on the main thread. If a newer document revision arrives while a run is still active, the stale worker is terminated before the new source is submitted; completed sequential runs reuse the idle worker. Environments without Worker support fall back to the same synchronous evaluator. Explicit exports synchronously prepare one exact requested snapshot so downloaded formats never depend on whether the asynchronous preview has settled.
+
 ### Editor configuration is reconfigured, not rebuilt
 
 Every user-toggleable editor setting lives in a CodeMirror `Compartment`. Rebuilding the view on each change discarded the caret, selection, scroll position, and the editor's undo history, which made the font-size slider unusable because each step of a drag reconstructed the editor.
 
 ### Two history levels, deliberately separated
 
-CodeMirror's own fine-grained text history serves Ctrl+Z inside the editor and preserves the caret. The workspace keeps document-level snapshots behind the toolbar. An externally applied document swap — undo, redo, draft load, file open — is excluded from CodeMirror's history so the two cannot fight; without that, Ctrl+Z immediately after a toolbar Undo would reinstate the newer text. Unifying them is tracked as TASK-013, because both obvious unifications regress something real.
+CodeMirror's own fine-grained text history serves Ctrl/Cmd+Z inside the editor and preserves the caret. The workspace keeps a deliberately separate coarse document history behind the toolbar. Adjacent editor changes within the configured proximity window are coalesced into one toolbar step instead of creating a snapshot for every keystroke; explicit document operations and toolbar undo/redo reset that boundary. Externally applied document swaps remain excluded from CodeMirror's history, so the two stacks cannot undo each other. This resolves TASK-013 without sacrificing either document-level operations or native caret-preserving text undo.
 
 ## Interface
 

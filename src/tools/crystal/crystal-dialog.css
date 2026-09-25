@@ -1,0 +1,289 @@
+.crystal-workspace__document-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.crystal-workspace__document-actions h3,
+.crystal-dialog h2,
+.crystal-dialog h3,
+.crystal-dialog p {
+  margin: 0;
+}
+
+.crystal-workspace__document-actions > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: min(100%, 22rem);
+}
+
+.crystal-workspace__document-actions > div:first-child p,
+.crystal-dialog__header p,
+.crystal-dialog__section > div:first-child > p,
+.crystal-dialog__muted,
+.crystal-dialog__section-heading p,
+.crystal-export-diff-grid p {
+  color: var(--muted);
+}
+
+.crystal-workspace__document-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.crystal-dialog {
+  width: min(54rem, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(90vh, 56rem);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.28);
+}
+
+.crystal-dialog::backdrop {
+  background: rgb(0 0 0 / 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.crystal-dialog__header,
+.crystal-dialog__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 18px;
+  padding: 16px 18px;
+  background: var(--surface-strong);
+}
+
+.crystal-dialog__header {
+  border-bottom: 1px solid var(--line);
+}
+
+.crystal-dialog__header > div:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.crystal-dialog__footer {
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+}
+
+.crystal-dialog__body {
+  display: grid;
+  gap: 18px;
+  max-height: calc(min(90vh, 56rem) - 9rem);
+  padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.crystal-dialog__section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.crystal-dialog__section > div:first-child,
+.crystal-dialog__section-heading > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.crystal-dialog__section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.crystal-metadata-grid,
+.crystal-export-settings,
+.crystal-export-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.crystal-metadata-grid label,
+.crystal-export-settings label,
+.crystal-custom-tag-row label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.crystal-metadata-grid input,
+.crystal-metadata-grid textarea,
+.crystal-export-settings input,
+.crystal-export-settings select,
+.crystal-custom-tag-row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.crystal-dialog__wide-field {
+  grid-column: 1 / -1;
+}
+
+.crystal-custom-tags {
+  display: grid;
+  gap: 10px;
+}
+
+.crystal-custom-tag-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1.4fr) auto;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.crystal-custom-tag-row button {
+  min-height: 40px;
+}
+
+.crystal-source-cif-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crystal-source-cif-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.crystal-source-cif-list span {
+  color: var(--muted);
+}
+
+.crystal-export-preserve-option {
+  grid-column: 1 / -1;
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px !important;
+}
+
+.crystal-export-preserve-option input {
+  width: auto;
+  margin: 0;
+}
+
+.crystal-export-diff-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.crystal-export-diff-grid p {
+  overflow-wrap: anywhere;
+}
+
+.crystal-export-preview {
+  max-height: 19rem;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .crystal-workspace__document-actions {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .crystal-workspace__document-buttons {
+    width: 100%;
+  }
+
+  .crystal-workspace__document-buttons > button {
+    flex: 1 1 10rem;
+  }
+
+  .crystal-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .crystal-dialog__body {
+    max-height: calc(100vh - 9rem - 20px);
+    padding: 12px;
+  }
+
+  .crystal-dialog__header,
+  .crystal-dialog__footer {
+    padding: 12px;
+  }
+
+  .crystal-metadata-grid,
+  .crystal-export-settings,
+  .crystal-export-diff-grid,
+  .crystal-custom-tag-row {
+    grid-template-columns: 1fr;
+  }
+
+  .crystal-dialog__wide-field,
+  .crystal-export-preserve-option {
+    grid-column: auto;
+  }
+
+  .crystal-custom-tag-row button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .crystal-dialog__header {
+    align-items: stretch;
+  }
+
+  .crystal-dialog__header,
+  .crystal-dialog__footer {
+    flex-direction: column;
+  }
+
+  .crystal-dialog__footer button {
+    width: 100%;
+  }
+}

@@ -11,13 +11,14 @@ import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
+import { renderDiagramBlocks } from './diagram-renderer';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
 import { collectMathDiagnostics } from './math-engine';
-import { prepareDocument, toFilenameStem } from './document-pipeline';
-import { commitHistory, createHistory, redoHistory, undoHistory } from './state-engine';
+import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
+import { commitHistory, createHistory, redoHistory, replaceHistoryPresent, undoHistory } from './state-engine';
 import {
   createDraftRecord,
   createIndexedDbDraftStore,
@@ -42,6 +43,7 @@ import {
   renderDocxToBytes,
 } from './export-engine';
 import { bundleHtmlImages, inlineStylesheetAssets } from './export-assets';
+import { createTableFormulaRunner, TableFormulaRunCancelled, type TableFormulaRunner } from './table-formula-runner';
 import type { CitationStyleId, DraftRecord, ProjectHistory } from './markdown-types';
 import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
@@ -50,6 +52,7 @@ import './markdown-workbench.css';
 type ViewMode = 'source' | 'split';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+const DOCUMENT_HISTORY_COALESCE_MS = 600;
 const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
   { id: 'apa', label: 'APA 7th' },
   { id: 'ieee', label: 'IEEE' },
@@ -59,7 +62,7 @@ const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
 
 const DEFAULT_SOURCE = `# Untitled document
 
-Start writing here. This workbench supports **GFM** tables, math like $E = mc^2$, diagrams, and citations.
+Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, and citations.
 
 | Item | Qty | Price | Total |
 | - | - | - | - |
@@ -76,6 +79,12 @@ export default function MarkdownWorkspace() {
   const [view, setView] = useState<ViewMode>('split');
   const [history, setHistory] = useState<ProjectHistory<string>>(() => createHistory(DEFAULT_SOURCE));
   const source = history.present;
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+  const fileReadRef = useRef(0);
+  const lastEditorChangeAtRef = useRef(0);
+  const formulaRunnerRef = useRef<TableFormulaRunner | null>(null);
+  const [formulaEvaluation, setFormulaEvaluation] = useState({ source: DEFAULT_SOURCE, evaluated: DEFAULT_SOURCE });
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
@@ -123,7 +132,7 @@ export default function MarkdownWorkspace() {
 
   const persistDraft = useCallback((text: string, name?: string) => {
     const store = draftStoreRef.current;
-    if (!store) return Promise.resolve();
+    if (!store) return Promise.resolve(false);
     const now = Date.now();
     const draft = draftIdRef.current
       ? updateDraftRecord(
@@ -135,14 +144,17 @@ export default function MarkdownWorkspace() {
     draftIdRef.current = draft.id;
     return saveDraft(store, draft)
       .then(() => {
-        persistedTextRef.current = text;
-        setIsDirty(false);
-        setLastSavedAt(now);
+        if (draftIdRef.current === draft.id) {
+          persistedTextRef.current = text;
+          setIsDirty(sourceRef.current !== text);
+          setLastSavedAt(now);
+        }
         return listDrafts(store);
       })
       .then(setDrafts)
       .then(refreshStorageEstimate)
-      .catch(() => setStatus('Local autosave failed; your work is still in the editor.'));
+      .then(() => true)
+      .catch(() => { setStatus('Local autosave failed; your work is still in the editor.'); return false; });
   }, [refreshStorageEstimate]);
 
   useEffect(() => {
@@ -168,12 +180,29 @@ export default function MarkdownWorkspace() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const setSource = useCallback((next: string) => {
+  const commitSource = useCallback((next: string) => {
+    lastEditorChangeAtRef.current = 0;
     setHistory((current) => commitHistory(current, next));
   }, []);
 
-  const undo = useCallback(() => setHistory((current) => undoHistory(current)), []);
-  const redo = useCallback(() => setHistory((current) => redoHistory(current)), []);
+  const handleEditorSourceChange = useCallback((next: string) => {
+    const now = performance.now();
+    const shouldCoalesce =
+      lastEditorChangeAtRef.current > 0
+      && now - lastEditorChangeAtRef.current <= DOCUMENT_HISTORY_COALESCE_MS;
+    lastEditorChangeAtRef.current = now;
+    setHistory((current) =>
+      shouldCoalesce ? replaceHistoryPresent(current, next) : commitHistory(current, next));
+  }, []);
+
+  const undo = useCallback(() => {
+    lastEditorChangeAtRef.current = 0;
+    setHistory((current) => undoHistory(current));
+  }, []);
+  const redo = useCallback(() => {
+    lastEditorChangeAtRef.current = 0;
+    setHistory((current) => redoHistory(current));
+  }, []);
 
   const parsed = useMemo(() => parseMarkdown(source), [source]);
   const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
@@ -224,9 +253,34 @@ export default function MarkdownWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citationLibrary, citekeySignature, citationStyle]);
 
+  useEffect(() => {
+    const runner = formulaRunnerRef.current ?? createTableFormulaRunner();
+    formulaRunnerRef.current = runner;
+    let current = true;
+
+    void runner.run(source)
+      .then((evaluated) => {
+        if (current) setFormulaEvaluation({ source, evaluated });
+      })
+      .catch((error) => {
+        if (!current || error instanceof TableFormulaRunCancelled) return;
+        setFormulaEvaluation({ source, evaluated: source });
+        setStatus('Table formula preview could not be prepared in the background. Formula source is shown unchanged.');
+      });
+
+    return () => { current = false; };
+  }, [source]);
+
+  useEffect(() => () => {
+    formulaRunnerRef.current?.dispose();
+    formulaRunnerRef.current = null;
+  }, []);
+
+  const formulaPreparedSource =
+    formulaEvaluation.source === source ? formulaEvaluation.evaluated : source;
   const preparedSource = useMemo(
-    () => prepareDocument(source, citationResult?.inText),
-    [source, citationResult],
+    () => applyPreparedCitations(formulaPreparedSource, citationResult?.inText),
+    [formulaPreparedSource, citationResult],
   );
 
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
@@ -260,15 +314,22 @@ export default function MarkdownWorkspace() {
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
+    const request = ++fileReadRef.current;
+    const original = sourceRef.current;
     try {
       const text = await file.text();
-      setSource(text);
+      if (request !== fileReadRef.current) return;
+      if (sourceRef.current !== original) {
+        setStatus('File opening cancelled because the document changed. Open the file again when ready.');
+        return;
+      }
+      commitSource(text);
       setDocumentName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
       setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
     } catch {
       setStatus('Could not read that file in this browser.');
     }
-  }, [setSource]);
+  }, [commitSource]);
 
   const onFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -301,13 +362,21 @@ export default function MarkdownWorkspace() {
     if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
   }, []);
 
-  const buildExportBodyHtml = useCallback((): { html: string; usedFallback: boolean } => {
-    const live = previewHostRef.current
-      ?.querySelector<HTMLElement>('.markdown-workbench-preview')
-      ?.innerHTML;
-    if (live && live.trim()) return { html: live, usedFallback: false };
-    return { html: renderMarkdown(preparedSource).html, usedFallback: true };
-  }, [preparedSource]);
+  const prepareExportSource = useCallback(
+    () => prepareDocument(source, citationResult?.inText),
+    [source, citationResult],
+  );
+
+  const buildExportBodyHtml = useCallback(async (): Promise<string> => {
+    // Export is an explicit action rather than a per-keystroke path, so it can
+    // synchronously prepare one exact snapshot without reintroducing editor
+    // jank. Rendering into a detached host also guarantees Source view and a
+    // still-settling live preview export the same current document.
+    const scratch = document.createElement('div');
+    scratch.innerHTML = renderMarkdown(prepareExportSource()).html;
+    await renderDiagramBlocks(scratch);
+    return scratch.innerHTML;
+  }, [prepareExportSource]);
 
   const noteExport = (message: string) => {
     requestSupportPrompt({ key: 'markdown-workbench-export', message });
@@ -320,7 +389,7 @@ export default function MarkdownWorkspace() {
   };
 
   const exportRenderedMarkdown = () => {
-    downloadText(preparedSource, `${filenameStem}.rendered.md`);
+    downloadText(prepareExportSource(), `${filenameStem}.rendered.md`);
     setStatus(`Exported ${filenameStem}.rendered.md with table formulas evaluated and citations formatted.`);
     noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
@@ -328,7 +397,7 @@ export default function MarkdownWorkspace() {
   const exportHtml = async () => {
     setStatus('Preparing standalone HTML and bundling its assets…');
     await waitForPreviewSettled();
-    const { html: bodyHtml, usedFallback } = buildExportBodyHtml();
+    const bodyHtml = await buildExportBodyHtml();
     const [images, katexCss] = await Promise.all([
       bundleHtmlImages(bodyHtml, document.baseURI, 'inline'),
       inlineStylesheetAssets(katexExportCss, document.baseURI),
@@ -340,21 +409,19 @@ export default function MarkdownWorkspace() {
     }
     const html = buildStandaloneMarkdownHtml(effectiveTitle, images.html, { additionalCss: katexCss.css });
     downloadText(html, `${filenameStem}.html`, 'text/html;charset=utf-8');
-    setStatus(usedFallback
-      ? `Exported ${filenameStem}.html as a self-contained file from source. Open Split view first if you need rendered diagrams included.`
-      : `Exported ${filenameStem}.html as a self-contained offline file with KaTeX fonts and images bundled.`);
+    setStatus(`Exported ${filenameStem}.html as a self-contained offline file with rendered diagrams, KaTeX fonts, and images bundled.`);
     noteExport('Exported a self-contained offline HTML file locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
   };
 
   const exportAstJson = () => {
-    downloadText(buildAstJson(parseToMdast(preparedSource)), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
+    downloadText(buildAstJson(parseToMdast(prepareExportSource())), `${filenameStem}.ast.json`, 'application/json;charset=utf-8');
     setStatus(`Exported ${filenameStem}.ast.json for the prepared document (formulas evaluated, citations formatted).`);
   };
 
   const exportDocx = async () => {
     setStatus('Generating DOCX…');
     try {
-      const bytes = await renderDocxToBytes(parseToMdast(preparedSource));
+      const bytes = await renderDocxToBytes(parseToMdast(prepareExportSource()));
       downloadBytes(bytes, `${filenameStem}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       setStatus(`Exported ${filenameStem}.docx. Code blocks, blockquotes, ordered lists, links, and image references are preserved; math remains non-editable plain text unless rasterized.`);
       noteExport('Exported your document locally with no upload step. If Markdown Workbench saved you a subscription, support independent local-first tooling with a coffee.');
@@ -367,7 +434,7 @@ export default function MarkdownWorkspace() {
     setStatus('Packaging EPUB and bundling referenced images…');
     try {
       await waitForPreviewSettled();
-      const { html: bodyHtml } = buildExportBodyHtml();
+      const bodyHtml = await buildExportBodyHtml();
       const bundled = await bundleHtmlImages(bodyHtml, document.baseURI, 'epub');
       if (bundled.unresolved.length > 0) {
         setStatus(`EPUB export stopped: ${bundled.unresolved.length} referenced image${bundled.unresolved.length === 1 ? '' : 's'} could not be bundled.`);
@@ -417,22 +484,47 @@ export default function MarkdownWorkspace() {
       setStatus('Local draft storage is unavailable in this browser.');
       return;
     }
-    void persistDraft(source, effectiveTitleRef.current).then(() => setStatus('Saved a local draft.'));
+    void persistDraft(source, effectiveTitleRef.current).then((saved) => { if (saved) setStatus('Saved a local draft.'); });
   }, [persistDraft, source]);
 
-  const startNewDraft = () => {
+  const startNewDraft = async () => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before starting a new document.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose New again when ready.');
+      return;
+    }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
+    lastEditorChangeAtRef.current = 0;
     setHistory(createHistory(DEFAULT_SOURCE));
     setDocumentName('');
     setLastSavedAt(null);
     setStatus('Started a new document. The previous draft is still listed below.');
   };
 
-  const loadDraft = (draft: DraftRecord) => {
+  const loadDraft = async (draft: DraftRecord) => {
+    const request = ++fileReadRef.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    const previous = sourceRef.current;
+    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+      setStatus('Could not save the current document. Download Markdown before switching drafts.');
+      return;
+    }
+    if (request !== fileReadRef.current) return;
+    if (sourceRef.current !== previous) {
+      setStatus('Document changed while saving. Choose the draft again when ready.');
+      return;
+    }
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
-    setSource(draft.text);
+    commitSource(draft.text);
     setDocumentName(draft.name === 'Autosave' ? '' : draft.name);
     setStatus(`Loaded local draft from ${new Date(draft.updatedAt).toLocaleString()}.`);
   };
@@ -474,8 +566,8 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-toolbar-group">
             <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
             <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
-            <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo">Undo</button>
-            <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo">Redo</button>
+            <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo document step" title="Undo one grouped document step. Ctrl/Cmd+Z inside the editor keeps CodeMirror's fine-grained text history.">Undo step</button>
+            <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo document step" title="Redo one grouped document step.">Redo step</button>
           </div>
         </div>
 
@@ -523,7 +615,7 @@ export default function MarkdownWorkspace() {
         <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">Exports as <code>{filenameStem}.*</code></span>
         <div className="markdown-workbench-toolbar-group">
           <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')}>Copy Markdown</button>
-          <button type="button" onClick={() => void copyToClipboard(buildExportBodyHtml().html, 'the rendered HTML')}>Copy HTML</button>
+          <button type="button" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }}>Copy HTML</button>
         </div>
       </div>
 
@@ -531,8 +623,9 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
             value={source}
-            onChange={setSource}
+            onChange={handleEditorSourceChange}
             onCursorLineChange={view === 'split' ? scrollPreviewToLine : undefined}
+            onStatus={setStatus}
             lineWrapping={lineWrapping}
             fontSize={fontSize}
             vimMode={vimMode}
