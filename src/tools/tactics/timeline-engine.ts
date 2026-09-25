@@ -1,3 +1,4 @@
+import { TIMELINE_MARKER_KINDS } from './tactics-types';
 import type {
   InterpolationKind,
   NormalizedPoint,
@@ -276,6 +277,9 @@ function cloneMarker(marker: TimelineMarker): TimelineMarker {
 
 export function addTimelineMarker(timeline: TacticalTimeline, marker: TimelineMarker): TacticalTimeline {
   requireIntegerTime(marker.timeMs, 'Marker time');
+  if (!TIMELINE_MARKER_KINDS.includes(marker.kind)) {
+    throw new Error(`Unsupported timeline marker kind ${String(marker.kind)}.`);
+  }
   if (marker.timeMs > timeline.durationMs) throw new RangeError('Marker time cannot exceed timeline duration.');
   if (timeline.markers.some((item) => item.id === marker.id)) throw new Error(`Marker id ${marker.id} already exists.`);
   const next = cloneMarker(marker);
@@ -497,6 +501,9 @@ export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
   for (const marker of timeline.markers) {
     if (markerIds.has(marker.id)) errors.push(`Timeline marker id ${marker.id} is duplicated.`);
     markerIds.add(marker.id);
+    if (!TIMELINE_MARKER_KINDS.includes(marker.kind)) {
+      errors.push(`Timeline marker ${marker.id} has unsupported marker kind ${String(marker.kind)}.`);
+    }
     if (!Number.isInteger(marker.timeMs) || marker.timeMs < 0) {
       errors.push(`Timeline marker ${marker.id} time must be a non-negative integer millisecond value.`);
     } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && marker.timeMs > timeline.durationMs) {
