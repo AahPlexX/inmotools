@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import CadTree, { matchesCadTreeSearch } from '../../src/tools/cad/CadTree';
+import CadTree, { matchesCadTreeSearch, matchesCadTreeSuppressionFilter } from '../../src/tools/cad/CadTree';
 import { createCadProject } from '../../src/tools/cad/project-engine';
 
 describe('CAD model tree bodies', () => {
@@ -48,5 +48,37 @@ describe('CAD model tree bodies', () => {
     }));
 
     expect(html).toContain('type="search" aria-label="Search tree"');
+  });
+
+  it('filters feature suppression state independently of name and type search', () => {
+    expect(matchesCadTreeSuppressionFilter(false, 'all')).toBe(true);
+    expect(matchesCadTreeSuppressionFilter(true, 'all')).toBe(true);
+    expect(matchesCadTreeSuppressionFilter(false, 'active')).toBe(true);
+    expect(matchesCadTreeSuppressionFilter(true, 'active')).toBe(false);
+    expect(matchesCadTreeSuppressionFilter(false, 'suppressed')).toBe(false);
+    expect(matchesCadTreeSuppressionFilter(true, 'suppressed')).toBe(true);
+  });
+
+  it('renders an accessible suppression filter with all features shown by default', () => {
+    const project = {
+      ...createCadProject('Tree fixture'),
+      features: [
+        { id: 'active', label: 'Active feature', type: 'extrude' as const, bodyId: 'body-1', dependsOn: [], topologyRefs: [], parameters: {}, suppressed: false, status: 'clean' as const, diagnostic: null },
+        { id: 'suppressed', label: 'Suppressed feature', type: 'fillet' as const, bodyId: 'body-1', dependsOn: [], topologyRefs: [], parameters: {}, suppressed: true, status: 'suppressed' as const, diagnostic: null },
+      ],
+    };
+    const html = renderToStaticMarkup(createElement(CadTree, {
+      project,
+      selection: null,
+      onSelectFeature: vi.fn(),
+      onSelectBody: vi.fn(),
+      onToggleBodyVisibility: vi.fn(),
+      onToggleSuppressed: vi.fn(),
+      onSelectSketch: vi.fn(),
+    }));
+
+    expect(html).toContain('aria-label="Feature suppression filter"');
+    expect(html).toContain('Active feature');
+    expect(html).toContain('Suppressed feature');
   });
 });

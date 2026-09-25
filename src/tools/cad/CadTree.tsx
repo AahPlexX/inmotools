@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import type { CadTreeProps } from './cad-workspace-types';
 
+type CadTreeSuppressionFilter = 'all' | 'active' | 'suppressed';
+
 export function matchesCadTreeSearch(label: string, type: string, query: string): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   return normalizedQuery.length === 0 || `${label} ${type}`.toLowerCase().includes(normalizedQuery);
 }
 
+export function matchesCadTreeSuppressionFilter(suppressed: boolean, filter: CadTreeSuppressionFilter): boolean {
+  return filter === 'all' || suppressed === (filter === 'suppressed');
+}
+
 export default function CadTree({ project, selection, onSelectFeature, onSelectBody, onToggleBodyVisibility, onToggleSuppressed, onSelectSketch }: CadTreeProps) {
   const [search, setSearch] = useState('');
+  const [suppressionFilter, setSuppressionFilter] = useState<CadTreeSuppressionFilter>('all');
 
   if (project.features.length === 0 && project.sketches.length === 0 && project.bodies.length === 0) {
     return <p className="cad-tree-empty">No features yet. Create a sketch or primitive to begin.</p>;
@@ -15,7 +22,10 @@ export default function CadTree({ project, selection, onSelectFeature, onSelectB
 
   const sketches = project.sketches.filter((sketch) => matchesCadTreeSearch(sketch.label, 'sketch', search));
   const bodies = project.bodies.filter((body) => matchesCadTreeSearch(body.label, 'body', search));
-  const features = project.features.filter((feature) => matchesCadTreeSearch(feature.label, feature.type, search));
+  const features = project.features.filter((feature) => (
+    matchesCadTreeSearch(feature.label, feature.type, search)
+    && matchesCadTreeSuppressionFilter(feature.suppressed, suppressionFilter)
+  ));
   const hasMatches = sketches.length + bodies.length + features.length > 0;
 
   return (
@@ -28,6 +38,17 @@ export default function CadTree({ project, selection, onSelectFeature, onSelectB
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
+      <label htmlFor="cad-tree-suppression-filter">Feature state</label>
+      <select
+        id="cad-tree-suppression-filter"
+        aria-label="Feature suppression filter"
+        value={suppressionFilter}
+        onChange={(event) => setSuppressionFilter(event.target.value as CadTreeSuppressionFilter)}
+      >
+        <option value="all">All features</option>
+        <option value="active">Active</option>
+        <option value="suppressed">Suppressed</option>
+      </select>
       {hasMatches ? (
         <ul className="cad-tree" role="tree" aria-label="Feature tree">
           {sketches.map((sketch) => {
