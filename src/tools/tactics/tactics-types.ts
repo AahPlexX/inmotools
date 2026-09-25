@@ -201,10 +201,22 @@ export interface TimelineTrack {
   keyframes: TacticalKeyframe[];
 }
 
+export const TIMELINE_MARKER_KINDS = [
+  'pass',
+  'press',
+  'line-break',
+  'switch',
+  'shot',
+  'transition',
+  'coaching-cue',
+] as const;
+
+export type TimelineMarkerKind = (typeof TIMELINE_MARKER_KINDS)[number];
+
 export interface TimelineMarker {
   id: string;
   timeMs: number;
-  kind: string;
+  kind: TimelineMarkerKind;
   label: string;
 }
 
