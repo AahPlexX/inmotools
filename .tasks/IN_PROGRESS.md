@@ -1,5 +1,12 @@
 # In Progress
 
+- **Typing Workstation traditional controls & local typist profiles — F39–F47 expansion** — approved 2026-09-25; extends the completed 38-capability workstation to 47 without changing the local-first/no-account architecture.
+  - Design: `docs/superpowers/specs/2026-09-25-typing-session-profiles-design.md`.
+  - Plan: `docs/superpowers/plans/2026-09-25-typing-session-profiles.md`.
+  - Current milestone: Task 1 — explicit lifecycle/paused-time clock, followed by profile persistence, UI wiring, then Gauntlet adversarial validation.
+  - Scope: `src/tools/typing/**`, `tests/unit/typing-*.test.ts`, `tests/e2e/typing.spec.ts`, Typing docs/task records only. Preserve unrelated workstreams on current `origin/main`.
+  - Completion gate: F39–F47 implemented, legacy scores preserved, profile isolation/pause timing/session guardrails verified, focused Typing units + production build + desktop/mobile browser checks green on exact integrated `main`, then tracker closure with actual evidence.
+
 - **Digital Logic Workstation** — local-first digital logic circuit simulator, schematic capture, and electronic-prototyping workstation governed by a 34-capability ledger.
   - Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
