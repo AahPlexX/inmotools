@@ -4,58 +4,39 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully validated source tip: `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`
+- Last validated source tip: `f4f4cdec43507ad9bf995264c95716dd04b9be44`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 6 — spatial analysis**
-- Verified functional features: **20/60**
+- Milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened)**
+- Verified functional features: **14/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-Open `src/tools/tactics/TODO_SEQUENCE.md` and execute **T06-01**. It is the sole READY item.
+Continue **T05-01**. Gauntlet invalidated the prior blanket 16–26 verification.
 
-T06-01 order is deterministic:
-1. Pure Euclidean Voronoi plus convex hull/centroid/width/depth geometry.
-2. Passing-lane clearance plus authored orientation/vision sectors.
-3. Positional grid plus distance rings/dynamic tethers.
-4. Trajectory occupancy heat map plus authored/imported speed and distance metrics.
-5. Add explicit analytical-honesty labels to the UI.
-6. Run focused unit, TypeScript/build, desktop/mobile browser, keyboard/Axe/reflow evidence.
-7. Reconcile feature rows 27–34 before unlocking T07.
+Exact order:
+1. #17 interactive Bézier path nodes/tangent handles with pointer + keyboard/numeric alternatives.
+2. #19 scene rename/reorder/split/join.
+3. #20 generalized object/layer temporal visibility.
+4. #22 typed markers/coaching triggers.
+5. #23 named editable coordinated-action template library.
+6. #24 linked-unit line-shift, step/drop and width/depth controls.
+7. Re-run Task 5 units, TypeScript/build, desktop/mobile browser, Axe, keyboard and reflow evidence.
+8. Only then close T05 and unlock T06.
 
-Do not start Dexie/persistence, 3D, local video, professional export, final QoL hardening, branch reconciliation, or deployment while T06 is incomplete.
+Rows #16, #18, #21, #25 and #26 are verified. #25 has visible ball attachment/handoff/release proof and SVG ball rendering through `f4f4cde`.
 
 ## Task 5 closure evidence
 
-Task 5 is DONE at validated source tip `bdb28e447f50cf9e2009e5ed53ed67984a727bbd`.
-
-- Focused Task 5 engine gate: **35/35 passed** plus TypeScript exit 0.
-- Production/PWA build: green; Vite transformed 6,619 modules and reported `built in 12.65s`.
-- Full Tactical Playwright gate: **26 passed / 2 intentional duplicate-project skips** across desktop and mobile Chromium.
-- Accessibility/reflow evidence remains green: focused Axe has no serious/critical violations; phone portrait/landscape, tablet, laptop, and desktop widths preserve no page overflow and 44px essential targets.
-- The two browser skips intentionally avoid rerunning the same shared-DOM Axe and CSS-width matrices in the emulated mobile project; mobile user workflows execute independently.
-- Existing repository-wide Vite browser-externalization and large-chunk warnings are not Tactical failures.
-
-Task 5 verified rows **16–26**:
-- multi-track timeline, sampled presentation, and deterministic transport;
-- spatial quadratic/cubic Bézier motion authoring;
-- preset and custom cubic-bezier timing easing;
-- multi-scene sequencing with independent scene-owned clones and scene-local legality;
-- temporal visibility spans;
-- single-track offset plus grouped stagger timing;
-- coaching-trigger markers;
-- coordinated tactical actions;
-- linked units;
-- possession/release/handoffs;
-- physical-metre potential path-conflict review.
+Task 5 is **ACTIVE** after Gauntlet found accepted-scope gaps in rows 17, 19, 20, 22, 23 and 24.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 18, 21, 25, 26**.
 
-In progress: **3, 4, 5, 7, 8, 51, 52, 55, 56, 59**.
+In progress: **3, 4, 5, 7, 8, 17, 19, 20, 22, 23, 24, 51, 52, 55, 56, 59**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 
