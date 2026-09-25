@@ -30,6 +30,7 @@ export const EMPTY_EXPORT_METADATA: ExportMetadata = {
 export function testsToCsv(tests: StoredTest[], meta?: ExportMetadata): string {
   const rows = tests.map((t) => ({
     saved_at_iso: new Date(t.savedAt).toISOString(),
+    typist_id: t.typistId ?? '',
     mode: t.mode,
     duration_mode: t.durationMode,
     duration_value: t.durationValue,

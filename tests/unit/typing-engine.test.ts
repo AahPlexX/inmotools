@@ -25,6 +25,21 @@ function typeString(text: string, target: string, startAtT = 0, dtMs = 100) {
 }
 
 describe('typing engine — reducer', () => {
+  it('explicitly starts the timer without creating a keystroke and is idempotent', () => {
+    const initial = initState('hello');
+    const started = start(initial, 125);
+    expect(started.startedAt).toBe(125);
+    expect(started.events).toHaveLength(0);
+    expect(start(started, 500)).toBe(started);
+  });
+
+  it('records an intentional stopped finish separately from aborts and failures', () => {
+    const stopped = finish(start(initState('hello'), 100), 'stopped', 600);
+    expect(stopped.finished).toBe(true);
+    expect(stopped.finishReason).toBe('stopped');
+    expect(stopped.endedAt).toBe(600);
+  });
+
   it('advances the cursor on correct keystrokes and reports clean completion', () => {
     const { state, endT } = typeString('hello', 'hello');
     expect(state.cursor).toBe(5);
