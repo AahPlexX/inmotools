@@ -488,3 +488,39 @@ test('reflows without page-level horizontal overflow across compact viewports', 
     expect(overflow, `horizontal overflow at ${width}px`).toBe(false);
   }
 });
+
+test('offers explicit session controls and profile-scoped score reset', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await expect(workspace.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+  await expect(workspace.getByText('Ready', { exact: true })).toBeVisible();
+  await expect(workspace.getByLabel('Active typist')).toHaveValue('local-default');
+  await expect(workspace.getByRole('button', { name: 'Add typist' })).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Start', exact: true }).click();
+  await expect(workspace.getByText('Running', { exact: true })).toBeVisible();
+  await expect(workspace.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+  await expect(workspace.getByLabel('Mode')).toBeDisabled();
+
+  await workspace.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(workspace.getByText('Paused', { exact: true })).toBeVisible();
+  await expect(workspace.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Resume', exact: true }).click();
+  await workspace.getByRole('button', { name: 'Stop', exact: true }).click();
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  await expect(resultDialog.getByRole('button', { name: 'PDF certificate' })).toHaveCount(0);
+  await resultDialog.getByRole('button', { name: 'Discard' }).click();
+
+  await workspace.getByRole('button', { name: 'Reset attempt' }).click();
+  await expect(workspace.getByText('Ready', { exact: true })).toBeVisible();
+
+  await workspace.getByRole('button', { name: 'Add typist' }).click();
+  const profileDialog = workspace.getByRole('dialog', { name: 'Add typist' });
+  await profileDialog.getByLabel('Typist name').fill('Alex');
+  await profileDialog.getByRole('button', { name: 'Add typist', exact: true }).click();
+  await expect(workspace.getByLabel('Active typist')).toContainText('Alex');
+  await expect(workspace.getByRole('button', { name: /Reset Alex scores/ })).toBeVisible();
+});
