@@ -340,7 +340,7 @@ export default function LatticeWorkspace() {
       </section>
 
       <section className="lattice-graph-panel" aria-label="Interactive JSON graph">
-        <div className="lattice-panel-heading"><div><h2>Graph workspace</h2><p>Drag to pan · wheel to zoom · double-click primitives to edit.</p></div>{layoutError ? <span className="lattice-bad">Layout error</span> : <span className="lattice-good">ELK worker</span>}</div>
+        <div className="lattice-panel-heading"><div><h2>Graph workspace</h2><p>Drag to pan · scroll or use − / + to zoom · double-click a value to edit it.</p></div>{layoutError ? <span className="lattice-bad">Layout error</span> : <span className="lattice-good">ELK worker</span>}</div>
         <LatticeViewport graph={graph} layout={layout} collapsedPaths={collapsedPaths} searchMatches={searchMatches} activePath={activePath} onToggleCollapse={toggleCollapse} onEditPrimitive={editPrimitive} onSelect={setActivePath} />
         {layoutError ? <div className="lattice-error" role="alert">{layoutError}</div> : null}
       </section>

@@ -172,3 +172,34 @@ test('reflows after real content load in phone portrait, phone landscape, and ta
     await expect(page.getByRole('button', { name: 'Export JSON' })).toBeVisible();
   }
 });
+
+test('touch users can pan the graph and zoom it with the on-screen controls', async ({ page }) => {
+  await page.goto('./#/tools/json-lattice');
+  const viewport = page.locator('.lattice-viewport');
+  await expect(page.getByRole('button', { name: 'Fit graph' })).toBeVisible();
+  // The canvas claims touch gestures itself instead of letting them scroll the page.
+  expect(await viewport.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+
+  const zoomLabel = page.getByRole('group', { name: 'Graph zoom' }).locator('span');
+  const before = Number((await zoomLabel.textContent())!.replace('%', ''));
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBeGreaterThan(before);
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBeLessThan(before);
+  // Fit graph sits in the same pannable area and must also receive its click.
+  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBe(before);
+
+  // A real one-finger drag on empty canvas pans the graph (Chromium touch input via CDP).
+  const world = page.locator('.lattice-world');
+  const startTransform = await world.evaluate((element) => (element as HTMLElement).style.transform);
+  await viewport.scrollIntoViewIfNeeded();
+  const box = (await viewport.boundingBox())!;
+  const client = await page.context().newCDPSession(page);
+  const x = box.x + 14; const y = box.y + box.height - 14;
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [20, 40, 60, 80]) await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => world.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(startTransform);
+});

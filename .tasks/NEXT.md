@@ -47,6 +47,13 @@ An independent design review of the log-structurer work raised twenty points; th
 - Verify each remaining finding against the code before acting on it, and record any that do not reproduce.
 - Add a regression test with every fix; prove it fails against the unfixed code before accepting it.
 
+**2026-09-25 reconciliation (branch `claude/photo-tool-completion-ama1g1`, PR #78).** Each finding in "Verified and outstanding" was re-checked against current source and in the browser before any change:
+- *Free-text input* no longer reproduces. Energy & Macro Planner rejects negative ages and zero or tiny stature with inline field errors and withholds the plan (`validateEnergyPlanInput`; covered by `nutrition.spec.ts` "blocks ages outside…"). PDF Sanitizer validates page lists as they are typed (`aria-invalid` plus an inline message, output count shows "—"); regression test added to `pdf.spec.ts`.
+- *Mobile split panes* no longer reproduces. RegexMatrix Studio, PlanCraft Studio, and JSON Lattice each stack to a single column at 390 px and 700 px with no document overflow (inspected with screenshots; existing reflow tests in `regex-matrix.spec.ts`, `floorplan.spec.ts`, `lattice.spec.ts`).
+- *Touch gestures* no longer reproduces as written: `.plancraft-overlay` and `.lattice-viewport` set `touch-action: none` in `src/styles.css`, and AetherCast's scrubber uses pointer events with `touch-action: pan-y` (horizontal drag scrubs, vertical swipe still scrolls). Regression tests added to `aethercast.spec.ts` and `lattice.spec.ts`.
+- Found and fixed while verifying: JSON Lattice had no way to zoom without a mouse wheel, so touch and keyboard users could not zoom at all. It now has − / + zoom buttons beside **Fit graph**. The same check exposed a real bug: pressing any button inside the graph area started a pan and captured the pointer, so **Fit graph** never received its click (reproduced on the unfixed build: 119 % stayed 119 %). Pans now ignore presses on controls. Covered by `lattice.spec.ts` "touch users can pan the graph and zoom it…".
+- Still outstanding and deliberately not started on this branch: *Unbounded DOM output* (PagedTable adoption in nine tools) and the TASK-016 carryovers (coarse pager, one worker per run). `src/components/PagedTable.tsx`, `src/tools/logs/`, and `src/tools/dedupe/` have diverged on `main` since this branch's base, so that work must start from integrated `main`. *Per-tool quality of life* remains an unenumerated set; it needs its concrete items listed before it can be worked or closed.
+
 ---
 
 ## TASK-005: Harden the shared scrollable regions for keyboard users
