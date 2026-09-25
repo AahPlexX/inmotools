@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-15
 **Authority:** `origin/main` (the completed feature branch was deleted after integration)
-**Last audit refresh:** 2026-09-24
-**Design record:** this file is authoritative until a dedicated design doc is written.
+**Last audit refresh:** 2026-09-25
+**Design record:** F1–F38 remain authoritative here; the approved F39–F47 expansion is specified in `docs/superpowers/specs/2026-09-25-typing-session-profiles-design.md`.
 
 ## Goal
 
@@ -86,6 +86,17 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 37. JSON test-bundle import that merges into local history.
 38. Editable tags/notes at export (both single-test and bulk history).
 
+### Traditional session lifecycle & local typist profiles
+39. Explicit **Start** control while preserving first-character implicit start for backward-compatible fast entry.
+40. True **Pause** that freezes scored time and blocks text mutation without discarding the attempt.
+41. **Resume** from the exact paused cursor/state with paused wall-clock time excluded from scoring.
+42. **Stop** with a scored partial result using `finishReason: "stopped"`; stopped attempts may save/export but cannot become a personal best or certificate.
+43. **Reset attempt** clears current score/events/timer/pause state while preserving target, configuration, and active typist.
+44. Persistent browser-local typist profiles with a stable default profile and locally persisted active-profile selection.
+45. Profile-scoped saved scores, history, rolling averages, daily activity, charting, personal best/ghost, imports, and exports.
+46. Profile-specific score reset that leaves other typists, preferences, dictionaries, and drills intact.
+47. Session-state guardrails and clear Ready/Running/Paused/Finished UX: target/config/profile/history mutations cannot silently corrupt an active attempt, keyboard/focus semantics remain accessible, and compact layouts remain responsive.
+
 ## Milestones
 
 - **A. Foundation & engine — complete.** `typing-engine.ts`, exact ranked corpora, target generation, storage, audio, exports, styles, workspace UI, catalog and loader are integrated on `origin/main`.
@@ -93,8 +104,14 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 - **C. Focused browser spec — complete.** Seven logical scenarios run on desktop and mobile Chromium (14 checks total). They cover multiline completion; explicit side-effect-free result exports versus explicit Save; forgiving/master error behavior and certificate gating; filtered and paginated history; CSV/Markdown/JSON export; invalid-record import skipping plus immediate imported-PB refresh; CSV dictionary/raw-keystroke/PDF paths; corrupt-preference recovery and quote/Zen family coupling; bundled OpenDyslexic/modal semantics; native input plus composition-safe entry; physical-key raw-log metadata; normal Tab focus escape plus F2 fresh-text behavior; Axe serious/critical accessibility; reduced-motion behavior; and compact reflow checks at 320, 360, 390, 430, and 768 CSS pixels.
 - **D. Integration & Pages verification — Typing complete.** The post-integration hardening delta merged to `main` through PR #69 as `463ef3c0b3e002e833b8b86dff9889ee9671f3a8`. The dedicated exact-main Typing workflow passed 67/67 focused units, production build, Chromium setup, and 14/14 desktop/mobile browser checks. Pages artifact build and deployment also succeeded on that SHA. The repository-wide Pages validation job remains red only because an unrelated Crystal spec-selection unit expects one Crystal browser spec while the selector now returns two; all seven Typing unit files passed inside that broad job.
 - **E. 2026-09-24 completion audit — complete.** Fresh source/standards review found two product-level gaps despite the earlier 38/38 ledger closure: the visual `div[role=textbox]` depended on raw `keydown` events (unreliable for touch software keyboards and alternate/IME text entry), and it intercepted `Tab` for “new text,” preventing standard focus traversal. The shipped remediation keeps the 38-feature denominator unchanged: native textarea capture + input/composition handling, preservation of physical `KeyboardEvent.code` metadata when hardware key events precede text input, F2 as the fresh-sample shortcut, normal Tab traversal, mobile Backspace input support, visible keyboard guidance, 24px tag-removal targets, compact keyboard reflow, focused browser regressions, and stale branch/CI wording cleanup. SEO was reviewed separately: the repository’s hash-fragment router is a shared architecture limitation, so this tool workstream does not claim independent search indexing or alter shared routing.
+- **F. 2026-09-25 traditional controls & local typist expansion — complete.** Approved F39–F47 adds an explicit Ready/Running/Paused/Finished lifecycle, pause-safe effective timing, Start/Pause/Resume/Stop/Reset controls, browser-local typist profiles, profile-owned scores/history/PBs/exports, profile-specific score reset, and active-session mutation guardrails. A Gauntlet adversarial pass found that saved-history import/delete/profile-reset operations could still mutate PB/history context during a live attempt and that the focusable guarded New text action did not visually read as unavailable. Those defects were fixed before closure without expanding the 47-function denominator.
 
 ## Latest focused acceptance evidence
+
+- **2026-09-25 F39–F47 accepted product revision:** `7222854833f507ebfbcf00ab0c156b58ee90f335` on `main`. It includes the explicit lifecycle/profile implementation plus the final Gauntlet history-integrity repair: history JSON import, row deletion, and selected-profile score reset are unavailable while Running/Paused, and the focusable guarded New text action has a visible unavailable state while retaining its explanatory action-boundary guard.
+- **Final dedicated Typing gate:** run `36188765930`, job `108248550068`, passed **76/76 focused unit tests across eight files**, production build, Chromium setup, and **18/18 desktop/mobile browser checks**. The browser matrix now includes explicit lifecycle/pause timing, active-session guardrails, two-profile score isolation, profile-specific reset, native input/composition, Axe serious/critical checks, and the 320/360/390/430/768px compact-width sweep.
+- **Pages/deployment evidence:** run `36188765977` built the production Pages artifact and deployed the exact same `722285…` revision successfully (build-pages job `108248527083`, deploy job `108248730794`). The broad repository validate lane is independent of the focused Typing acceptance gate and was still running when the product deployment completed.
+- **Gauntlet verdict:** PASS for the Typing-scoped expansion. The material adversarial finding was remediated and the exact integrated product tip re-passed the focused unit/build/browser gate.
 
 - **2026-09-24 completion-audit product revision:** `dea365cf61d1633db66fdcc49b8321a4f3e8ff76` introduced native textarea/input/composition capture, F2 fresh-text behavior, Tab focus escape, mobile Backspace handling, visible shortcut guidance, 24px tag controls, compact keyboard reflow, browser regressions, and main-only Typing CI wording. The first dedicated browser run correctly exposed one compatibility regression: physical `KeyboardEvent.code` values such as `KeyA` were being replaced by the generic `Input` code in raw keystroke exports.
 - **Accepted completion-audit revision:** `1538148b21d7502bc181ffe7ffcf1f683beb750d` preserves staged physical key code/timestamp metadata for the immediately following native input event while retaining `Input`/IME fallback semantics for software keyboards and composition.
@@ -117,7 +134,7 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 - The first local browser attempt for this follow-up accidentally reused a stale Vite preview on port 4173 from a different checkout because Playwright permits `reuseExistingServer` outside CI. Every scenario therefore landed on the home catalog. The stale process was identified by command line, only that process was stopped, and an isolated `CI=1` rerun against the current checkout passed all 14 checks. Permanent CI then independently passed the same 14 checks in 43.6s.
 - Exact ranked English corpus data remains bundled/offline and derived from FrequencyWords commit `525f9b560de45753a5ea01069454e72e9aa541c6`; attribution/transformation details remain in `src/tools/typing/THIRD_PARTY_NOTICES.md`.
 - **Containment closure:** PR #69 integrated the complete post-integration Typing delta into `main`. No unrelated tool source was part of the branch-only diff at merge time. GitHub automatically deleted `feature/typing-workstation` after the merge, verified by branch search, so there is no stale Typing feature branch left to reconcile.
-- **Functional ledger status:** 38/38 implemented, focused-gate accepted, integrated on `main`, and deployed through Pages. The only red evidence on the integration SHA is the unrelated Crystal selector assertion in the repository-wide validation job.
+- **Functional ledger status:** 47/47 implemented, focused-gate accepted on `7222854833f507ebfbcf00ab0c156b58ee90f335`, integrated directly on `main`, and deployed through Pages. F1–F38 remain intact; F39–F47 are the approved traditional session/profile expansion.
 
 ## Non-goals / explicit exclusions
 
@@ -130,5 +147,5 @@ Every item below is a shipping requirement. Removal or deferral must land in `.t
 - `.github/workflows/typing-workstation.yml` is the focused `main` validation gate for Typing-scoped changes.
 - Focused Vitest coverage is convention-discovered via `tests/unit/typing-*.test.ts`, preventing new Typing unit files from being silently omitted; it verifies engine semantics/analytics, duration/target generation, exact corpus contracts, storage/import behavior, and exports without rerunning unrelated tool suites.
 - `pnpm build` verifies TypeScript and the Vite production bundle.
-- `tests/e2e/typing.spec.ts` runs the seven critical acceptance scenarios on both desktop and mobile Chromium, including completion/error semantics, all mandatory export families that can be deterministically inspected in-browser, import round-trips, bundled-font availability, modal keyboard semantics, native input/composition handling, keyboard focus escape/shortcut behavior, accessibility, and compact-width reflow from 320 through 768 CSS pixels.
+- `tests/e2e/typing.spec.ts` runs nine critical acceptance scenarios on both desktop and mobile Chromium, including completion/error semantics, all mandatory export families that can be deterministically inspected in-browser, import round-trips, bundled-font availability, modal keyboard semantics, native input/composition handling, keyboard focus escape/shortcut behavior, accessibility, and compact-width reflow from 320 through 768 CSS pixels.
 - Milestone E is closed for Typing: exact-main run `36009754067` passed the focused units/build and 14/14 desktop/mobile browser checks; Pages run `36009753871` built and deployed the same product revision successfully. Its broad browser failures are outside Typing, and the broad run itself executed every Typing desktop/mobile case without a Typing failure.
