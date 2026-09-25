@@ -104,6 +104,21 @@ test('provides privacy, diff, schema, JSONPath, and local DuckDB query workflows
   await expect(page.getByTestId('sql-results')).toContainText('paid');
 });
 
+test('pages a large local SQL result instead of mounting every row', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('./#/json-lattice');
+  await page.locator('details').filter({ hasText: 'JSONPath & DuckDB' }).locator('summary').click();
+  await page.getByLabel('SQL query').fill('SELECT range AS n FROM range(1000)');
+  await page.getByRole('button', { name: 'Run SQL' }).click();
+
+  const results = page.getByTestId('sql-results');
+  await expect(page.getByTestId('sql-results-range')).toContainText('Rows 1–100 of 1000', { timeout: 30_000 });
+  await expect(results.locator('tbody tr')).toHaveCount(100);
+  await results.getByRole('button', { name: 'Last' }).click();
+  await expect(page.getByTestId('sql-results-range')).toContainText('Rows 901–1000 of 1000');
+  await expect(results.locator('tbody tr').last()).toContainText('999');
+});
+
 test('blocks exports while source edits are pending or invalid instead of exporting the last valid revision', async ({ page }) => {
   await page.goto('./#/json-lattice');
   await setSource(page, SAMPLE);

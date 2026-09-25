@@ -111,6 +111,45 @@ test('Regex Log Structurer survives a catastrophically backtracking pattern', as
   await expect(page.getByTestId('log-status')).toContainText('1 matched line', { timeout: 20_000 });
 });
 
+test('PagedTable jumps to the first, last, or a typed page instead of stepping one page at a time', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('./#/tools/regex-log-structurer');
+
+  const lines = Array.from({ length: 1500 }, (_, index) => `2026-08-29 INFO event ${index}`).join('\n');
+  await page.locator('#log-input').fill(lines);
+  await expect(page.getByTestId('log-status')).toContainText('1500 matched lines', { timeout: 20_000 });
+
+  const table = page.getByTestId('log-table');
+  const range = page.getByTestId('log-table-range');
+  await expect(range).toContainText('Rows 1–200 of 1500 · page 1 of 8');
+
+  await table.getByRole('button', { name: 'Last' }).click();
+  await expect(range).toContainText('Rows 1401–1500 of 1500 · page 8 of 8');
+  await expect(table.locator('tbody tr')).toHaveCount(100);
+  await expect(table.getByRole('button', { name: 'Last' })).toHaveAttribute('aria-disabled', 'true');
+
+  await table.getByRole('button', { name: 'First' }).click();
+  await expect(range).toContainText('Rows 1–200 of 1500 · page 1 of 8');
+
+  // A typed page is committed on Enter, not on every keystroke.
+  const jump = table.getByLabel('Go to page');
+  await jump.fill('5');
+  await expect(range).toContainText('page 1 of 8');
+  await jump.press('Enter');
+  await expect(range).toContainText('Rows 801–1000 of 1500 · page 5 of 8');
+
+  // Out-of-range input clamps instead of producing an impossible range.
+  await jump.fill('99');
+  await jump.press('Enter');
+  await expect(range).toContainText('page 8 of 8');
+  await expect(jump).toHaveValue('8');
+
+  // Escape abandons a draft and shows the current page again.
+  await jump.fill('3');
+  await jump.press('Escape');
+  await expect(jump).toHaveValue('8');
+});
+
 test('Regex Log Structurer pages a large result instead of mounting every row', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('./#/tools/regex-log-structurer');

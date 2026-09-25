@@ -3,6 +3,7 @@ import { downloadText } from '../../lib/download';
 import { compileSvgSprite, type SvgCompiledFile } from './svg-engine';
 import { consumeFileInput } from '../../lib/file-input';
 import VectorStudio from './VectorStudio';
+import { PagedTable } from '../../components/PagedTable';
 
 type Source = { name: string; text: string };
 
@@ -93,7 +94,7 @@ export default function SvgWorkspace() {
               <button className="action-button secondary" type="button" style={{ marginTop: 10 }} onClick={() => void copyUse(file.id)}>Copy &lt;use&gt;</button>
             </article>)}
           </div>
-          <div className="result-table-wrap" role="region" aria-label="Compiled SVG symbols" tabIndex={0}><table><thead><tr><th scope="col">File</th><th scope="col">Symbol ID</th><th scope="col">Original</th><th scope="col">Optimized</th><th scope="col">Savings</th></tr></thead><tbody>{visibleFiles.map((file) => <tr key={file.id}><td>{file.name}</td><td>{file.id}</td><td>{file.originalBytes} B</td><td>{file.optimizedBytes} B</td><td>{file.originalBytes ? Math.max(0, Math.round((1 - file.optimizedBytes / file.originalBytes) * 100)) : 0}%</td></tr>)}</tbody></table></div>
+          <PagedTable columns={[{ key: 'name', label: 'File' }, { key: 'id', label: 'Symbol ID' }, { key: 'original', label: 'Original' }, { key: 'optimized', label: 'Optimized' }, { key: 'savings', label: 'Savings' }]} rows={visibleFiles} caption="Compiled SVG symbols" pageSize={100} rowKey={(file) => file.id} testId="svg-symbols" renderCell={(file, column) => column === 'name' ? file.name : column === 'id' ? file.id : column === 'original' ? `${file.originalBytes} B` : column === 'optimized' ? `${file.optimizedBytes} B` : `${file.originalBytes ? Math.max(0, Math.round((1 - file.optimizedBytes / file.originalBytes) * 100)) : 0}%`} />
           <pre className="code-output" tabIndex={0} aria-label="Compiled SVG sprite source">{result.sprite}</pre>
         </> : null}
       </> : null}

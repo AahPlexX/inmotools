@@ -273,3 +273,21 @@ test('Vector Studio keeps scrollable regions keyboard reachable and free of seri
     violation.impact === 'serious' || violation.impact === 'critical');
   expect(blocking, blocking.map((item) => `${item.id}: ${item.help}`).join('\n')).toEqual([]);
 });
+
+test('pages the compiled symbol table for a large icon set', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  const files = Array.from({ length: 120 }, (_, index) => ({
+    name: `icon-${String(index).padStart(3, '0')}.svg`,
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from(`<svg viewBox="0 0 10 10"><path d="M0 0h${(index % 9) + 1}v10z"/></svg>`),
+  }));
+  await page.locator('#svg-files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Compile sprite' }).click();
+
+  const table = page.getByTestId('svg-symbols');
+  await expect(page.getByTestId('svg-symbols-range')).toContainText('Rows 1–100 of 120');
+  await expect(table.locator('tbody tr')).toHaveCount(100);
+  await table.getByRole('button', { name: 'Last' }).click();
+  await expect(table.locator('tbody tr')).toHaveCount(20);
+  await expect(table.locator('tbody tr').last()).toContainText('icon-119.svg');
+});
