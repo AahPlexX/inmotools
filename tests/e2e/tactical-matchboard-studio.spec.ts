@@ -361,3 +361,18 @@ test('authors scene sequencing, visibility, offsets, and grouped stagger timing'
   await expect(page.getByText(/token-1: 3 keyframes.*300-1300 ms/i)).toBeVisible();
   await expect(page.getByText(/token-2: 2 keyframes.*500-1500 ms/i)).toBeVisible();
 });
+
+test('authors custom cubic-bezier timing easing for a motion segment', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByLabel('Interpolation').selectOption('cubic-bezier');
+  await page.getByLabel('Timing control X1').fill('0.25');
+  await page.getByLabel('Timing control Y1').fill('0.1');
+  await page.getByLabel('Timing control X2').fill('0.25');
+  await page.getByLabel('Timing control Y2').fill('1');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
+});
+
