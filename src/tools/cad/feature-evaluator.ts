@@ -352,6 +352,25 @@ function primitive(feature: CadFeature, kernel: CadFeatureKernel): CadKernelShap
       }
       return kernel.torus(majorRadius, minorRadius);
     }
+    case 'tube': {
+      const outerRadius = parameterNumber(feature, 'outerRadius');
+      const innerRadius = parameterNumber(feature, 'innerRadius');
+      const height = parameterNumber(feature, 'height');
+      if (outerRadius <= innerRadius) {
+        throw new CadFeatureEvaluationError(feature.id, `${feature.label} outerRadius must be greater than innerRadius.`);
+      }
+
+      let outer: CadKernelShape | null = null;
+      let inner: CadKernelShape | null = null;
+      try {
+        outer = kernel.cylinder(outerRadius, height);
+        inner = kernel.cylinder(innerRadius, height);
+        return kernel.cut(outer, inner);
+      } finally {
+        if (inner) kernel.release(inner);
+        if (outer) kernel.release(outer);
+      }
+    }
     default:
       throw new CadFeatureEvaluationError(feature.id, `${feature.label} has unsupported primitive kind '${String(kind)}'.`);
   }

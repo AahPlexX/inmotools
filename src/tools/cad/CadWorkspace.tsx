@@ -120,6 +120,7 @@ export default function CadWorkspace({ workerFactory }: CadWorkspaceProps = {}) 
           <option value="sphere">Sphere</option>
           <option value="cone">Cone</option>
           <option value="torus">Torus</option>
+          <option value="tube">Tube</option>
         </select>
         <button className="action-button" type="button" onClick={addPrimitive}>Add {primitiveKind}</button>
       </div>

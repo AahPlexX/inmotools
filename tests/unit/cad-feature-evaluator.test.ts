@@ -48,6 +48,8 @@ function fakeKernel() {
     sphere: token('sphere'),
     cone: token('cone'),
     torus: token('torus'),
+    tubeOuter: token('tube-outer'),
+    tubeInner: token('tube-inner'),
     cut: token('cut'),
     cut2: token('cut2'),
   };
@@ -88,6 +90,51 @@ describe('CAD exact feature evaluator', () => {
     expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'box-1', shape: shapes.box }]);
     expect(result.warnings).toEqual([]);
     expect(kernel.release).not.toHaveBeenCalled();
+  });
+
+  it('builds a tube by cutting coaxial cylinders and releases both temporary shapes', () => {
+    const { kernel, shapes } = fakeKernel();
+    vi.mocked(kernel.cylinder)
+      .mockReturnValueOnce(shapes.tubeOuter)
+      .mockReturnValueOnce(shapes.tubeInner);
+
+    const result = evaluateCadFeatures(project([
+      feature('tube-1', 'primitive', { kind: 'tube', outerRadius: 8, innerRadius: 4, height: 12 }),
+    ]), kernel);
+
+    expect(kernel.cylinder).toHaveBeenNthCalledWith(1, 8, 12);
+    expect(kernel.cylinder).toHaveBeenNthCalledWith(2, 4, 12);
+    expect(kernel.cut).toHaveBeenCalledWith(shapes.tubeOuter, shapes.tubeInner);
+    expect(result.bodies).toEqual([{ bodyId: 'body-main', sourceFeatureId: 'tube-1', shape: shapes.cut }]);
+    expect(kernel.release).toHaveBeenCalledTimes(2);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.tubeOuter);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.tubeInner);
+  });
+
+  it('rejects a tube whose inner radius is not smaller than its outer radius', () => {
+    const { kernel } = fakeKernel();
+
+    expect(() => evaluateCadFeatures(project([
+      feature('bad-tube', 'primitive', { kind: 'tube', outerRadius: 4, innerRadius: 4, height: 12 }),
+    ]), kernel)).toThrowError(expect.objectContaining({ featureId: 'bad-tube' }));
+    expect(kernel.cylinder).not.toHaveBeenCalled();
+  });
+
+  it('releases both tube cylinders when the exact cut fails', () => {
+    const { kernel, shapes } = fakeKernel();
+    vi.mocked(kernel.cylinder)
+      .mockReturnValueOnce(shapes.tubeOuter)
+      .mockReturnValueOnce(shapes.tubeInner);
+    vi.mocked(kernel.cut).mockImplementation(() => {
+      throw new Error('kernel cut failed');
+    });
+
+    expect(() => evaluateCadFeatures(project([
+      feature('tube-1', 'primitive', { kind: 'tube', outerRadius: 8, innerRadius: 4, height: 12 }),
+    ]), kernel)).toThrowError(expect.objectContaining({ featureId: 'tube-1' }));
+    expect(kernel.release).toHaveBeenCalledTimes(2);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.tubeOuter);
+    expect(kernel.release).toHaveBeenCalledWith(shapes.tubeInner);
   });
 
   it('skips suppressed features without constructing native geometry', () => {

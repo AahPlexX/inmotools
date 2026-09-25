@@ -51,7 +51,7 @@ describe('CAD parametric project engine', () => {
 
   it('creates independent editable primitive bodies without mutating the original project', () => {
     const initial = createCadProject('Primitives');
-    const kinds = ['box', 'cylinder', 'sphere', 'cone', 'torus'] as const;
+    const kinds = ['box', 'cylinder', 'sphere', 'cone', 'torus', 'tube'] as const;
     const created = kinds.reduce((project, kind) => addPrimitiveFeature(project, kind), initial);
     const second = addPrimitiveFeature(created, 'box');
 
@@ -63,11 +63,12 @@ describe('CAD parametric project engine', () => {
       { kind: 'sphere', radius: 5 },
       { kind: 'cone', radius1: 5, radius2: 2, height: 10 },
       { kind: 'torus', majorRadius: 10, minorRadius: 2 },
+      { kind: 'tube', outerRadius: 8, innerRadius: 4, height: 12 },
       { kind: 'box', width: 20, depth: 10, height: 5 },
     ]);
-    expect(second.features.map((item) => item.status)).toEqual(Array(6).fill('dirty'));
-    expect(new Set(second.features.map((item) => item.id)).size).toBe(6);
-    expect(new Set(second.bodies.map((item) => item.id)).size).toBe(6);
+    expect(second.features.map((item) => item.status)).toEqual(Array(7).fill('dirty'));
+    expect(new Set(second.features.map((item) => item.id)).size).toBe(7);
+    expect(new Set(second.bodies.map((item) => item.id)).size).toBe(7);
     expect(second.bodies.map((body) => body.featureIds)).toEqual(second.features.map((item) => [item.id]));
 
     const history = commitCadProject({ past: [], present: initial, future: [], limit: 100 }, 'Add box', (project) => addPrimitiveFeature(project, 'box'));

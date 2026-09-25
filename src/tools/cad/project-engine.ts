@@ -6,6 +6,7 @@ const PRIMITIVE_DEFAULTS = {
   sphere: { radius: 5 },
   cone: { radius1: 5, radius2: 2, height: 10 },
   torus: { majorRadius: 10, minorRadius: 2 },
+  tube: { outerRadius: 8, innerRadius: 4, height: 12 },
 } as const;
 
 export type CadPrimitiveKind = keyof typeof PRIMITIVE_DEFAULTS;

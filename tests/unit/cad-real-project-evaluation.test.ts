@@ -553,4 +553,28 @@ describe('CAD real project evaluation', () => {
       kernel.release(finalBody.shape);
     }
   });
+
+  it('evaluates an exact straight tube with analytic volume and expected bounds', () => {
+    const project: CadProject = {
+      ...createCadProject('Tube primitive fixture'),
+      sketches: [],
+      features: [feature({
+        id: 'tube-1',
+        type: 'primitive',
+        parameters: { kind: 'tube', outerRadius: 8, innerRadius: 4, height: 12 },
+      })],
+      bodies: [{ id: 'body-main', label: 'Tube', featureIds: ['tube-1'], visible: true }],
+    };
+
+    const result = evaluateCadFeatures(project, kernel);
+    const shape = result.bodies[0]!.shape;
+
+    try {
+      expect(kernel.isValid(shape)).toBe(true);
+      expect(kernel.volume(shape)).toBeCloseTo(Math.PI * (8 ** 2 - 4 ** 2) * 12, 5);
+      expect(kernel.bounds(shape)).toEqual({ min: [-8, -8, 0], max: [8, 8, 12] });
+    } finally {
+      kernel.release(shape);
+    }
+  });
 });
