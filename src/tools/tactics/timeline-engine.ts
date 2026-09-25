@@ -74,6 +74,40 @@ export function addTimelineKeyframe(track: TimelineTrack, keyframe: TacticalKeyf
   return { ...track, keyframes: [...track.keyframes.map(cloneKeyframe), next].sort((a, b) => a.timeMs - b.timeMs) };
 }
 
+export interface SetTimelineVisibilityInput {
+  id: string;
+  timeMs: number;
+  visible: boolean;
+}
+
+export function setTimelineVisibility(
+  track: TimelineTrack,
+  input: SetTimelineVisibilityInput,
+): TimelineTrack {
+  requireIntegerTime(input.timeMs, 'Visibility time');
+  const id = input.id.trim();
+  if (!id) throw new Error('Visibility keyframe id is required.');
+
+  const existingIndex = track.keyframes.findIndex((keyframe) => keyframe.timeMs === input.timeMs);
+  if (existingIndex >= 0) {
+    return {
+      ...track,
+      keyframes: track.keyframes
+        .map((keyframe, index) => index === existingIndex
+          ? validateKeyframe({ ...cloneKeyframe(keyframe), visible: input.visible })
+          : cloneKeyframe(keyframe))
+        .sort((left, right) => left.timeMs - right.timeMs || left.id.localeCompare(right.id)),
+    };
+  }
+
+  return addTimelineKeyframe(track, {
+    id,
+    timeMs: input.timeMs,
+    visible: input.visible,
+    interpolation: 'hold',
+  });
+}
+
 function cubicCoordinate(t: number, first: number, second: number): number {
   const inverse = 1 - t;
   return 3 * inverse * inverse * t * first + 3 * inverse * t * t * second + t * t * t;
@@ -330,8 +364,17 @@ export function sampleTacticalProjectAtTime(
     equipment: project.equipment.map(applyState),
     scenes: project.scenes.map((scene) => ({
       ...scene,
-      layers: scene.layers.map((layer) => ({ ...layer })),
+      layers: scene.layers.map((layer) => ({
+        ...layer,
+        visible: sampled[layer.id]?.visible ?? layer.visible,
+      })),
       objects: scene.objects.map(applyState),
+    })),
+    annotations: project.annotations.map((annotation) => ({
+      ...annotation,
+      visible: sampled[annotation.id]?.visible ?? annotation.visible,
+      points: annotation.points.map((point) => ({ ...point })),
+      provenance: annotation.provenance ? { ...annotation.provenance } : undefined,
     })),
     ball: {
       ...project.ball,
