@@ -44,7 +44,6 @@ export const COORDINATED_ACTION_PRESETS: CoordinatedActionPreset[] = [
     roles: [
       { roleId: 'carrier', label: 'Ball carrier', startOffsetMs: 0, durationScale: 1 },
       { roleId: 'runner', label: 'Overlapping runner', startOffsetMs: 150, durationScale: 1.15 },
-      { roleId: 'support', label: 'Support', startOffsetMs: 0, durationScale: 1 },
     ],
   },
   {
@@ -53,7 +52,6 @@ export const COORDINATED_ACTION_PRESETS: CoordinatedActionPreset[] = [
     roles: [
       { roleId: 'carrier', label: 'Ball carrier', startOffsetMs: 0, durationScale: 1 },
       { roleId: 'runner', label: 'Underlapping runner', startOffsetMs: 150, durationScale: 1.15 },
-      { roleId: 'support', label: 'Support', startOffsetMs: 0, durationScale: 1 },
     ],
   },
   {
@@ -71,7 +69,6 @@ export const COORDINATED_ACTION_PRESETS: CoordinatedActionPreset[] = [
     roles: [
       { roleId: 'passer', label: 'Passer', startOffsetMs: 0, durationScale: 1 },
       { roleId: 'wall', label: 'Wall player', startOffsetMs: 0, durationScale: 0.75 },
-      { roleId: 'runner', label: 'Runner', startOffsetMs: 180, durationScale: 1.15 },
     ],
   },
   {
@@ -89,7 +86,6 @@ export const COORDINATED_ACTION_PRESETS: CoordinatedActionPreset[] = [
     roles: [
       { roleId: 'passer', label: 'Passer', startOffsetMs: 0, durationScale: 1 },
       { roleId: 'returner', label: 'Return player', startOffsetMs: 0, durationScale: 0.8 },
-      { roleId: 'runner', label: 'Continuing runner', startOffsetMs: 180, durationScale: 1.15 },
     ],
   },
   {
