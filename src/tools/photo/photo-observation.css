@@ -176,3 +176,30 @@
   .photo-scopes { grid-template-columns: minmax(0, 1fr); }
   .photo-navigator { width: 6.5rem; height: 4.5rem; }
 }
+
+/* Rulers and guides: a view-only aid layered over the preview. */
+.photo-guide-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.photo-ruler {
+  position: absolute;
+  background: rgb(15 23 42 / 0.55);
+  color: #f8fafc;
+  font-size: 10px;
+  line-height: 1;
+}
+.photo-ruler-top { inset: 0 0 auto 0; height: 14px; }
+.photo-ruler-left { inset: 0 auto 0 0; width: 14px; }
+.photo-ruler span { position: absolute; }
+.photo-ruler-top span { top: 0; height: 100%; border-left: 1px solid rgb(248 250 252 / 0.8); padding-left: 2px; }
+.photo-ruler-left span { left: 0; width: 100%; border-top: 1px solid rgb(248 250 252 / 0.8); writing-mode: vertical-rl; transform: rotate(180deg); }
+.photo-guide { position: absolute; background: #22d3ee; box-shadow: 0 0 0 1px rgb(15 23 42 / 0.45); }
+.photo-guide-vertical { top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); }
+.photo-guide-horizontal { left: 0; right: 0; height: 1px; transform: translateY(-0.5px); }
+.photo-guide-controls ol { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.photo-guide-controls li { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
+.photo-guide-controls label { display: grid; gap: 0.2rem; min-width: 0; }
+.photo-guide-controls input { width: 6.5rem; }

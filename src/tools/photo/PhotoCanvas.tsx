@@ -12,12 +12,12 @@ import './photo-comparison.css';
 import './photo-observation.css';
 
 export interface PhotoCanvasInteraction {
-  kind: 'local' | 'retouch' | 'selection' | 'layer-mask' | 'warp';
+  kind: 'local' | 'retouch' | 'selection' | 'layer-mask' | 'warp' | 'white-balance';
   id: string;
   label: string;
   mode: 'radial' | 'linear' | 'brush' | 'red-eye' | 'retouch-source' | 'retouch-target'
     | 'selection-rectangle' | 'selection-ellipse' | 'selection-lasso' | 'selection-color'
-    | 'layer-radial' | 'layer-linear' | 'layer-brush' | 'warp-mesh' | 'warp-liquify';
+    | 'layer-radial' | 'layer-linear' | 'layer-brush' | 'warp-mesh' | 'warp-liquify' | 'white-balance-pick';
 }
 
 export interface PhotoCanvasGesture {
@@ -50,6 +50,34 @@ interface PhotoCanvasProps {
   onCropCommit?: (crop: NormalizedCrop) => void;
   onStraightenCommit?: (degrees: number) => void;
   onZoomChange: (zoom: number) => void;
+  /** Where the photo sits inside an expanded canvas, as fractions of the rendered preview's width
+   * (left/right) and height (top/bottom). Masks, retouch spots, layers, and selections are stored
+   * relative to the photo, so on-canvas input and overlays are mapped through this inset. */
+  photoInset?: PhotoInset | null;
+  /** Full-resolution output size, used to label the rulers in real pixels. */
+  outputSize?: { width: number; height: number } | null;
+}
+
+interface PhotoGuide { id: number; axis: 'vertical' | 'horizontal'; /** 0–100 % of the preview. */ position: number }
+
+export interface PhotoInset { top: number; right: number; bottom: number; left: number }
+
+/** Converts a point on the rendered preview (0–1) into photo-frame coordinates (0–1, may fall outside). */
+function previewToFrame(x: number, y: number, inset: PhotoInset | null | undefined) {
+  if (!inset) return { x, y };
+  return {
+    x: (x - inset.left) / Math.max(1e-6, 1 - inset.left - inset.right),
+    y: (y - inset.top) / Math.max(1e-6, 1 - inset.top - inset.bottom),
+  };
+}
+
+/** Converts a photo-frame point back to preview coordinates, for sampling the rendered image. */
+function frameToPreview(x: number, y: number, inset: PhotoInset | null | undefined) {
+  if (!inset) return { x, y };
+  return {
+    x: inset.left + x * (1 - inset.left - inset.right),
+    y: inset.top + y * (1 - inset.top - inset.bottom),
+  };
 }
 
 interface GestureState {
@@ -88,11 +116,14 @@ function histogramPath(values: number[], width = 256, height = 56): string {
   }).join(' ');
 }
 
-function pointerPoint(event: ReactPointerEvent<HTMLElement>) {
+function pointerPoint(event: ReactPointerEvent<HTMLElement>, inset?: PhotoInset | null) {
   const image = event.currentTarget.querySelector<HTMLElement>('.photo-preview-image');
   const rect = (image ?? event.currentTarget).getBoundingClientRect();
-  const x = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
-  const y = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+  const { x, y } = previewToFrame(
+    rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5,
+    rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5,
+    inset,
+  );
   return {
     x: Math.min(1, Math.max(0, x)),
     y: Math.min(1, Math.max(0, y)),
@@ -133,14 +164,21 @@ function PhotoOverlays({
   retouch,
   layers,
   activeId,
+  inset,
 }: {
   localAdjustments: LocalAdjustment[];
   retouch: RetouchOperation[];
   layers?: PhotoLayer[];
   activeId?: string;
+  inset?: PhotoInset | null;
 }) {
+  // Shapes are drawn in photo-frame units (0–100); widening the view box by the canvas border
+  // places them over the photo inside an expanded canvas without touching each shape.
+  const spanX = inset ? 100 / Math.max(1e-6, 1 - inset.left - inset.right) : 100;
+  const spanY = inset ? 100 / Math.max(1e-6, 1 - inset.top - inset.bottom) : 100;
+  const viewBox = inset ? `${-inset.left * spanX} ${-inset.top * spanY} ${spanX} ${spanY}` : '0 0 100 100';
   return (
-    <svg className="photo-edit-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <svg className="photo-edit-overlay" viewBox={viewBox} preserveAspectRatio="none" aria-hidden="true">
       {localAdjustments.map((adjustment) => adjustment.enabled ? maskShape(adjustment.id, adjustment.mask, adjustment.id === activeId) : null)}
       {(layers ?? []).map((layer) => layer.visible && layer.mask ? maskShape(layer.id, layer.mask, layer.id === activeId) : null)}
       {retouch.map((operation) => {
@@ -185,6 +223,8 @@ export default function PhotoCanvas({
   onCropCommit,
   onStraightenCommit,
   onZoomChange,
+  photoInset = null,
+  outputSize = null,
 }: PhotoCanvasProps) {
   const [gesture, setGesture] = useState<GestureState | null>(null);
   const [straightenGesture, setStraightenGesture] = useState<StraightenGesture | null>(null);
@@ -198,6 +238,10 @@ export default function PhotoCanvas({
   const [compareSplit, setCompareSplit] = useState(50);
   // Momentary "show the original" while a button or the backslash key is held down.
   const [holdingOriginal, setHoldingOriginal] = useState(false);
+  // Rulers and guides are a viewing aid only: they are never saved in the recipe or exported.
+  const [guidesVisible, setGuidesVisible] = useState(false);
+  const [guides, setGuides] = useState<PhotoGuide[]>([]);
+  const guideIdRef = useRef(0);
 
   useEffect(() => {
     const isTyping = (target: EventTarget | null) => {
@@ -224,6 +268,19 @@ export default function PhotoCanvas({
   const selectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const localMaskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const interactionKey = interaction ? `${interaction.kind}:${interaction.id}:${interaction.mode}` : '';
+
+  // On narrow screens the controls stack below the photo, so arming a canvas tool from them would
+  // leave the photo off-screen. Bring it back into view whenever a new tool is armed.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!interactionKey || !scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    const visible = rect.bottom > 48 && rect.top < window.innerHeight - 48;
+    if (visible) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    scroller.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }, [interactionKey]);
   const nextSampleIdRef = useRef(1);
 
   useEffect(() => {
@@ -348,10 +405,12 @@ export default function PhotoCanvas({
       }
       for (let pixel = 0; pixel < canvas.width * canvas.height; pixel += 1) {
         const offset = pixel * 4;
-        const weight = photoSelectionWeight(
+        const framePoint = previewToFrame((pixel % canvas.width + 0.5) / canvas.width, (Math.floor(pixel / canvas.width) + 0.5) / canvas.height, photoInset);
+        const insideFrame = framePoint.x >= 0 && framePoint.x <= 1 && framePoint.y >= 0 && framePoint.y <= 1;
+        const weight = !insideFrame ? 0 : photoSelectionWeight(
           selection,
-          (pixel % canvas.width + 0.5) / canvas.width,
-          (Math.floor(pixel / canvas.width) + 0.5) / canvas.height,
+          framePoint.x,
+          framePoint.y,
           pixels.data[offset],
           pixels.data[offset + 1],
           pixels.data[offset + 2],
@@ -366,7 +425,7 @@ export default function PhotoCanvas({
     if (image.complete) draw();
     else image.addEventListener('load', draw, { once: true });
     return () => image.removeEventListener('load', draw);
-  }, [selection, previewUrl]);
+  }, [selection, previewUrl, photoInset]);
 
   useEffect(() => {
     const visibleMasks = localAdjustments
@@ -499,7 +558,7 @@ export default function PhotoCanvas({
   function beginGesture(event: ReactPointerEvent<HTMLDivElement>) {
     if (!interaction || !onGesture || !previewUrl) return;
     event.preventDefault();
-    const point = pointerPoint(event);
+    const point = pointerPoint(event, photoInset);
     event.currentTarget.setPointerCapture(event.pointerId);
     setGesture({ pointerId: event.pointerId, start: point, path: [point] });
   }
@@ -507,7 +566,7 @@ export default function PhotoCanvas({
   function moveGesture(event: ReactPointerEvent<HTMLDivElement>) {
     if (!gesture || gesture.pointerId !== event.pointerId || !interaction) return;
     event.preventDefault();
-    const point = pointerPoint(event);
+    const point = pointerPoint(event, photoInset);
     setGesture((current) => current ? { ...current, path: [...current.path, point].slice(-5000) } : current);
   }
 
@@ -519,10 +578,11 @@ export default function PhotoCanvas({
     }
     if (!gesture || gesture.pointerId !== event.pointerId || !interaction || !onGesture) return;
     event.preventDefault();
-    const end = pointerPoint(event);
+    const end = pointerPoint(event, photoInset);
     const path = gesture.path.length ? [...gesture.path, end] : [gesture.start, end];
+    const samplePoint = frameToPreview(end.x, end.y, photoInset);
     const sample = interaction.mode === 'selection-color' && previewImageRef.current
-      ? readPixelAtNormalized(previewImageRef.current, end.x, end.y)
+      ? readPixelAtNormalized(previewImageRef.current, samplePoint.x, samplePoint.y)
       : null;
     onGesture({
       start: gesture.start,
@@ -585,8 +645,33 @@ export default function PhotoCanvas({
   const effectiveCompareMode: PhotoCompareMode = showingOriginal ? 'split' : compareMode;
   const effectiveSplit = showingOriginal ? 100 : compareSplit;
 
+  function guideLayer() {
+    if (!guidesVisible) return null;
+    const ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const label = (percent: number, total?: number) => (total ? `${Math.round(total * percent / 100)}` : `${percent}%`);
+    return (
+      <div className="photo-guide-layer" data-testid="photo-guide-layer" aria-hidden="true">
+        <div className="photo-ruler photo-ruler-top">
+          {ticks.map((tick) => <span key={tick} style={{ left: `${tick}%` }}>{tick % 20 === 0 && tick > 0 && tick < 100 ? label(tick, outputSize?.width) : ''}</span>)}
+        </div>
+        <div className="photo-ruler photo-ruler-left">
+          {ticks.map((tick) => <span key={tick} style={{ top: `${tick}%` }}>{tick % 20 === 0 && tick > 0 && tick < 100 ? label(tick, outputSize?.height) : ''}</span>)}
+        </div>
+        {guides.map((guide) => (
+          <span
+            key={guide.id}
+            className={`photo-guide photo-guide-${guide.axis}`}
+            data-testid="photo-guide"
+            style={guide.axis === 'vertical' ? { left: `${guide.position}%` } : { top: `${guide.position}%` }}
+          />
+        ))}
+      </div>
+    );
+  }
+
   function inspectionLayers() {
     return <>
+      {guideLayer()}
       {overlayMode ? <canvas ref={clippingCanvasRef} className="photo-clipping-overlay" data-testid={`photo-${overlayMode}-overlay`} aria-hidden="true" /> : null}
       {selection ? <canvas ref={selectionCanvasRef} className="photo-selection-overlay" data-testid="photo-selection-overlay" aria-hidden="true" /> : null}
       {localAdjustments.some((adjustment) => normalizePhotoMaskOverlay(adjustment.overlay).visible) ? <canvas ref={localMaskCanvasRef} className="photo-mask-overlay" data-testid="photo-mask-overlay" aria-hidden="true" /> : null}
@@ -620,7 +705,7 @@ export default function PhotoCanvas({
           draggable={false}
         />
         {inspectionLayers()}
-        <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} />
+        <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} inset={photoInset} />
         {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
       </div>
     );
@@ -751,6 +836,13 @@ export default function PhotoCanvas({
             disabled={!previewUrl}
             onClick={() => setScopesVisible((value) => !value)}
           >Scopes</button>
+          <button
+            type="button"
+            aria-pressed={guidesVisible}
+            aria-controls="photo-guide-controls"
+            disabled={!previewUrl}
+            onClick={() => setGuidesVisible((value) => !value)}
+          >Rulers &amp; guides</button>
           <label className="photo-canvas-background-control">
             <span>Background</span>
             <select aria-label="Canvas background" value={background} onChange={(event) => setBackground(event.target.value as PhotoCanvasBackground)}>
@@ -771,7 +863,7 @@ export default function PhotoCanvas({
         ) : null}
       </div>
 
-      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · {interaction.mode === 'selection-color' || interaction.mode === 'red-eye' || interaction.mode.startsWith('retouch-') ? 'click or tap the photo to place it' : 'drag on the photo to place it'}</div> : null}
+      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · {interaction.mode === 'white-balance-pick' ? 'click or tap something that should be neutral gray or white' : interaction.mode === 'selection-color' || interaction.mode === 'red-eye' || interaction.mode.startsWith('retouch-') ? 'click or tap the photo to place it' : 'drag on the photo to place it'}</div> : null}
       {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry.</div> : null}
       {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below.</div> : null}
       {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to pin up to eight rendered pixels</div> : null}
@@ -791,6 +883,40 @@ export default function PhotoCanvas({
       ) : null}
 
       {scopesVisible && previewUrl ? <PhotoScopes previewUrl={previewUrl} /> : null}
+
+      {guidesVisible && previewUrl ? (
+        <section id="photo-guide-controls" className="photo-guide-controls" aria-label="Guides" data-testid="photo-guide-controls">
+          <div className="photo-inline-actions">
+            <button type="button" disabled={guides.length >= 12} onClick={() => setGuides((current) => [...current, { id: ++guideIdRef.current, axis: 'vertical', position: 50 }])}>Add vertical guide</button>
+            <button type="button" disabled={guides.length >= 12} onClick={() => setGuides((current) => [...current, { id: ++guideIdRef.current, axis: 'horizontal', position: 50 }])}>Add horizontal guide</button>
+            <button type="button" disabled={!guides.length} onClick={() => setGuides([])}>Clear guides</button>
+          </div>
+          {guides.length ? (
+            <ol>
+              {guides.map((guide, index) => (
+                <li key={guide.id}>
+                  <label>
+                    {guide.axis === 'vertical' ? 'Vertical' : 'Horizontal'} guide {index + 1} position %
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={guide.position}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (!Number.isFinite(value)) return;
+                        setGuides((current) => current.map((item) => (item.id === guide.id ? { ...item, position: Math.min(100, Math.max(0, value)) } : item)));
+                      }}
+                    />
+                  </label>
+                  <button type="button" aria-label={`Remove ${guide.axis} guide ${index + 1}`} onClick={() => setGuides((current) => current.filter((item) => item.id !== guide.id))}>Remove</button>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="photo-export-note">Guides help line things up while you edit. They are never exported.</p>}
+        </section>
+      ) : null}
 
       {proofBaseUrl ? <img ref={proofBaseImageRef} data-testid="photo-proof-base" src={proofBaseUrl} alt="" hidden aria-hidden="true" /> : null}
 
@@ -846,7 +972,7 @@ export default function PhotoCanvas({
               </>
             ) : null}
             {inspectionLayers()}
-            <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} />
+            <PhotoOverlays localAdjustments={localAdjustments} retouch={retouch} layers={layers} activeId={interaction?.id} inset={photoInset} />
             {busy ? <span className="photo-render-badge" role="status">Rendering preview…</span> : null}
           </div>
         )}

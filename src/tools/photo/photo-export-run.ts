@@ -1,5 +1,6 @@
 import { createPhotoExport, photoMetadataForPolicy } from './photo-export';
 import { requestedPhotoDimensions, photoNaturalDimensions } from './photo-export-dimensions';
+import { expansionLayout } from './photo-transform';
 import { renderFilenamePattern, type PhotoExportSettings } from './photo-export-settings';
 import { PHOTO_FORMAT_FACTS } from './photo-export-settings';
 import { applyMetadataTemplate, recipeWithWatermark, type PhotoTemplateRecord } from './photo-templates';
@@ -49,7 +50,9 @@ export async function runPhotoExport(job: PhotoExportJob): Promise<PhotoExportJo
 
   const watermark = settings.watermarkPresetId ? job.templates.watermark.find((record) => record.id === settings.watermarkPresetId) : undefined;
   if (settings.watermarkPresetId && !watermark) throw new Error('The watermark preset this export uses was deleted. Choose another watermark or none.');
-  const recipe = watermark ? recipeWithWatermark(job.recipe, watermark.data, frameWidth, frameHeight) : job.recipe;
+  // Layers sit on the photo itself, so the watermark is sized against the photo inside any canvas border.
+  const photoFrame = expansionLayout(frameWidth, frameHeight, job.recipe.canvasExpansion).inner;
+  const recipe = watermark ? recipeWithWatermark(job.recipe, watermark.data, photoFrame.width, photoFrame.height) : job.recipe;
 
   const template = settings.metadataTemplateId ? job.templates.metadata.find((record) => record.id === settings.metadataTemplateId) : undefined;
   if (settings.metadataTemplateId && !template) throw new Error('The metadata template this export uses was deleted. Choose another template or none.');

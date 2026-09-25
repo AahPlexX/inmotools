@@ -9,6 +9,7 @@ import {
   normalizeFreeTransform,
   padPhotoCanvas,
   squareToQuad,
+  trimExpansion,
   warpPhotoTransformPixels,
 } from '../../src/tools/photo/photo-transform';
 
@@ -111,5 +112,24 @@ describe('canvas expansion', () => {
     const clear = padPhotoCanvas(photo, layout, { ...expansion, fill: 'transparent' });
     expect(px(clear, 4, 0, 0)).toEqual([0, 0, 0, 0]);
     expect(() => padPhotoCanvas(photo, { ...layout, inner: { ...layout.inner, width: 3 } }, expansion)).toThrow(/wrong size/);
+  });
+});
+
+describe('trimming', () => {
+  test('negative sides trim the finished photo and the setting scales with export size', () => {
+    const width = 10; const height = 4;
+    const source = gradient(width, height);
+    // Opaque content occupies columns 2–7 and rows 1–2.
+    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) if (x < 2 || x > 7 || y < 1 || y > 2) source[(y * width + x) * 4 + 3] = 0;
+    const trim = trimExpansion(width, height, { x: 2, y: 1, width: 6, height: 2 })!;
+    expect(trim).toMatchObject({ left: -0.2, right: -0.2, top: -0.25, bottom: -0.25 });
+    expect(expandedDimensions(width, height, trim)).toEqual({ width: 6, height: 2 });
+    const layout = expansionLayout(6, 2, trim);
+    expect(layout.inner).toEqual({ x: -2, y: -1, width: 10, height: 4 });
+    const trimmed = padPhotoCanvas(source, layout, trim);
+    expect(px(trimmed, 6, 0, 0)).toEqual(px(source, width, 2, 1));
+    expect(px(trimmed, 6, 5, 1)).toEqual(px(source, width, 7, 2));
+    // At double the export size the same setting keeps the same content.
+    expect(expandedDimensions(20, 8, trim)).toEqual({ width: 12, height: 4 });
   });
 });

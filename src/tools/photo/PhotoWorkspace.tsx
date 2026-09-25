@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -15,7 +16,19 @@ import PhotoMergePanel from './PhotoMergePanel';
 import PhotoDetailLoupe from './PhotoDetailLoupe';
 import PhotoToneCurveControl from './PhotoToneCurveControl';
 import PhotoRawControls from './PhotoRawControls';
-import { suggestAutoTone, suggestAutoWhiteBalance } from './photo-analysis';
+import PhotoSliderControl, { inputCommit, readNumber } from './PhotoSliderControl';
+import PhotoTransformControls from './PhotoTransformControls';
+import {
+  neutralSelectiveColor,
+  normalizeSelectiveColor,
+  SELECTIVE_COLOR_FAMILIES,
+  type PhotoSelectiveColor,
+  type SelectiveColorFamily,
+  type SelectiveColorInks,
+} from './photo-selective-color';
+import { trimExpansion } from './photo-transform';
+import { opaqueBounds } from './merge/photo-merge-ops';
+import { sampleNeutralPatch, solveNeutralWhiteBalance, suggestAutoTone, suggestAutoWhiteBalance } from './photo-analysis';
 import {
   DEFAULT_RECIPE,
   commitHistory,
@@ -24,7 +37,7 @@ import {
   redoHistory,
   undoHistory,
 } from './photo-engine';
-import { photoNaturalDimensions } from './photo-export-dimensions';
+import { photoFrameDimensions, photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLayerMaskGesture, applyLiquifyStroke, applyLocalGesture, applyMeshWarpDrag, placeRetouchPoint } from './photo-interaction';
 import { NEUTRAL_DETAIL_FILTERS } from './photo-detail-filters';
 import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
@@ -103,6 +116,7 @@ import type {
   PhotoHistogram,
   PhotoHistory,
   PhotoLayer,
+  PhotoLayerGroup,
   PhotoLiquifyMode,
   PhotoMask,
   PhotoRecipe,
@@ -223,16 +237,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function readNumber(value: string, fallback: number): number {
-  if (value.trim() === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function inputCommit(event: ReactKeyboardEvent<HTMLInputElement>) {
-  if (event.key === 'Enter') event.currentTarget.blur();
-}
-
 function AdjustmentControl({
   spec,
   value,
@@ -244,44 +248,23 @@ function AdjustmentControl({
   onChange: (value: number) => void;
   onReset?: () => void;
 }) {
-  const neutral = spec.neutral ?? 0;
   return (
-    <label className="photo-control">
-      <span className="photo-inline-actions">
-        <span>{spec.label}</span>
-        {onReset ? (
-          <button
-            type="button"
-            aria-label={`Reset ${spec.label}`}
-            disabled={Math.abs(value - neutral) < 1e-9}
-            onClick={(event) => {
-              event.preventDefault();
-              onReset();
-            }}
-          >Reset</button>
-        ) : null}
-      </span>
-      <input
-        type="range"
-        min={spec.min}
-        max={spec.max}
-        step={spec.step}
-        value={value}
-        aria-label={`${spec.label} slider`}
-        onChange={(event) => onChange(readNumber(event.target.value, value))}
-      />
-      <input
-        type="number"
-        min={spec.min}
-        max={spec.max}
-        step={spec.step}
-        value={value}
-        aria-label={`${spec.label} value`}
-        onChange={(event) => onChange(readNumber(event.target.value, value))}
-        onKeyDown={inputCommit}
-      />
-    </label>
+    <PhotoSliderControl
+      label={spec.label}
+      value={value}
+      min={spec.min}
+      max={spec.max}
+      step={spec.step}
+      neutral={spec.neutral ?? 0}
+      resettable={Boolean(onReset)}
+      onReset={onReset}
+      onChange={onChange}
+    />
   );
+}
+
+function isNeutralInks(inks: SelectiveColorInks): boolean {
+  return inks.cyan === 0 && inks.magenta === 0 && inks.yellow === 0 && inks.black === 0;
 }
 
 function SimpleControl({
@@ -420,6 +403,29 @@ export default function PhotoWorkspace() {
   const recipe = history.present;
   const recipeRef = useRef(recipe);
   recipeRef.current = recipe;
+  const canvasExpansion = recipe.canvasExpansion ?? null;
+  // Where the photo sits inside an expanded (or trimmed) canvas, as fractions of the preview.
+  const photoInset = useMemo(() => {
+    if (!canvasExpansion) return null;
+    const spanX = 1 + canvasExpansion.left + canvasExpansion.right;
+    const spanY = 1 + canvasExpansion.top + canvasExpansion.bottom;
+    return {
+      left: canvasExpansion.left / spanX,
+      right: canvasExpansion.right / spanX,
+      top: canvasExpansion.top / spanY,
+      bottom: canvasExpansion.bottom / spanY,
+    };
+  }, [canvasExpansion]);
+  const [selectiveFamily, setSelectiveFamily] = useState<SelectiveColorFamily>('reds');
+  // An all-zero setting normalizes to null, so the chosen method is remembered here until an ink
+  // moves; choosing "Absolute" first and then adjusting a slider behaves as expected.
+  const [selectiveModeDraft, setSelectiveModeDraft] = useState<PhotoSelectiveColor['mode']>('relative');
+  const selectiveSettings = recipe.selectiveColor ?? { ...neutralSelectiveColor(), mode: selectiveModeDraft };
+
+  function patchSelectiveColor(patch: Partial<PhotoSelectiveColor>) {
+    if (patch.mode) setSelectiveModeDraft(patch.mode);
+    patchRecipe({ selectiveColor: normalizeSelectiveColor({ ...selectiveSettings, ...patch }) });
+  }
   const parsedCustomRatioWidth = Number(customRatioWidth);
   const parsedCustomRatioHeight = Number(customRatioHeight);
   const customRatioIsValid = Number.isFinite(parsedCustomRatioWidth)
@@ -1412,9 +1418,68 @@ export default function PhotoWorkspace() {
     setStatus('Selection converted to an editable local mask as one undo step.');
   }
 
+  /** Renders the photo with only geometry, warp, RAW, and input-profile settings (everything that
+   * happens before white balance), averages a 5 × 5 patch at the picked point, and solves the
+   * temperature and tint that make it neutral. */
+  async function pickNeutralWhiteBalance(point: { x: number; y: number }) {
+    const current = source;
+    if (!current) return;
+    const recipeAtStart = recipeRef.current;
+    setStatus('Measuring the picked point…');
+    try {
+      const upstream = applyRecipeGroups(DEFAULT_RECIPE, recipeAtStart, ['crop-geometry', 'warp', 'raw']);
+      const assigned = recipeAtStart.colorManagement?.assignedProfile;
+      const result = await renderPhoto({
+        file: current.file,
+        recipe: {
+          ...upstream,
+          canvasExpansion: null,
+          colorManagement: assigned && recipeAtStart.colorManagement
+            ? { ...recipeAtStart.colorManagement, outputProfile: null, proofProfile: null, softProof: false, gamutWarning: false }
+            : undefined,
+        },
+        revision: 0,
+        mode: 'preview',
+        outputMime: 'image/png',
+      });
+      const bitmap = await createImageBitmap(result.blob);
+      let pixels: Uint8ClampedArray;
+      try {
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('this browser could not read the rendered photo');
+        context.drawImage(bitmap, 0, 0);
+        pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      } finally {
+        bitmap.close();
+      }
+      if (recipeRef.current !== recipeAtStart) {
+        setStatus('White balance was not changed because the edit changed while the point was measured.');
+        return;
+      }
+      const patch = sampleNeutralPatch(pixels, result.width, result.height, point.x * result.width - 0.5, point.y * result.height - 0.5);
+      if (!patch.count) {
+        setStatus('That spot is transparent. Pick a point on the photo itself.');
+        return;
+      }
+      const solved = solveNeutralWhiteBalance(patch);
+      patchRecipe({ temperature: solved.temperature, tint: solved.tint });
+      setStatus(solved.limited
+        ? `White balance set as close to neutral as the controls allow · temperature ${solved.temperature.toFixed(2)} · tint ${solved.tint.toFixed(2)}. Very dark, clipped, or strongly tinted spots can't be fully neutralized; try a mid-gray area.`
+        : `White balance set from the picked neutral · temperature ${solved.temperature.toFixed(2)} · tint ${solved.tint.toFixed(2)}.`);
+    } catch (error) {
+      setStatus(`The picked point could not be measured: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+  }
+
   function handleCanvasGesture(gesture: PhotoCanvasGesture) {
     if (!canvasInteraction) return;
     const interaction = canvasInteraction;
+    if (interaction.kind === 'white-balance') {
+      setCanvasInteraction(null);
+      void pickNeutralWhiteBalance(gesture.end);
+      return;
+    }
     setHistory((current) => {
       let next: PhotoRecipe;
       if (interaction.kind === 'local') {
@@ -1993,8 +2058,17 @@ export default function PhotoWorkspace() {
               disabled={!source || autoAnalysisBusy !== null}
               onClick={() => void applyAutomaticSuggestion('white-balance')}
             >{autoAnalysisBusy === 'white-balance' ? 'Analyzing white balance…' : 'Auto white balance'}</button>
+            <button
+              type="button"
+              disabled={!source}
+              aria-pressed={canvasInteraction?.kind === 'white-balance'}
+              onClick={() => {
+                setGeometryInteraction(null);
+                setCanvasInteraction((current) => current?.kind === 'white-balance' ? null : { kind: 'white-balance', id: 'white-balance', mode: 'white-balance-pick', label: 'Pick a neutral' });
+              }}
+            >Pick neutral point</button>
           </div>
-          <p className="photo-export-note">Uses deterministic gray-world analysis of the neutral source; temperature and tint remain editable.</p>
+          <p className="photo-export-note">Auto uses gray-world analysis of the whole photo. Pick neutral point sets temperature and tint so the spot you click (a gray card, white wall, or cloud) comes out neutral. Both stay editable.</p>
           <div className="photo-control-list">
             {COLOR_CONTROLS.map((spec) => (
               <AdjustmentControl
@@ -2033,6 +2107,36 @@ export default function PhotoWorkspace() {
                 <SimpleControl label={`${HSL_LABELS[index]} luminance`} value={entry.luminance} min={-1} max={1} step={0.02} onChange={(value) => updateHsl(index, 'luminance', value)} />
               </div>
             ))}
+          </div>
+        </details>
+        <details className="photo-section" data-testid="photo-selective-color">
+          <summary>Selective color</summary>
+          <p className="photo-export-note">Adjust the cyan, magenta, yellow, and black behind one family of colors, the way a print retoucher would. Unlike color ranges, this changes how much of each ink a color contains without rotating its hue.</p>
+          <label className="photo-control">
+            <span>Colors</span>
+            <select aria-label="Selective color family" value={selectiveFamily} onChange={(event) => setSelectiveFamily(event.target.value as SelectiveColorFamily)}>
+              {SELECTIVE_COLOR_FAMILIES.map((family) => <option key={family.id} value={family.id}>{family.label}{isNeutralInks(selectiveSettings.ranges[family.id]) ? '' : ' •'}</option>)}
+            </select>
+          </label>
+          {(['cyan', 'magenta', 'yellow', 'black'] as const).map((ink) => (
+            <SimpleControl
+              key={ink}
+              label={`${ink[0].toUpperCase()}${ink.slice(1)} %`}
+              value={Math.round(selectiveSettings.ranges[selectiveFamily][ink] * 100)}
+              min={-100}
+              max={100}
+              step={1}
+              onChange={(value) => patchSelectiveColor({ ranges: { ...selectiveSettings.ranges, [selectiveFamily]: { ...selectiveSettings.ranges[selectiveFamily], [ink]: value / 100 } } })}
+            />
+          ))}
+          <fieldset className="photo-corner-fieldset">
+            <legend>Method</legend>
+            <label className="photo-check-row"><input type="radio" name="photo-selective-mode" checked={selectiveSettings.mode === 'relative'} onChange={() => patchSelectiveColor({ mode: 'relative' })} />Relative (scales the ink already there)</label>
+            <label className="photo-check-row"><input type="radio" name="photo-selective-mode" checked={selectiveSettings.mode === 'absolute'} onChange={() => patchSelectiveColor({ mode: 'absolute' })} />Absolute (adds or removes a fixed amount)</label>
+          </fieldset>
+          <div className="photo-inline-actions">
+            <button type="button" disabled={isNeutralInks(selectiveSettings.ranges[selectiveFamily])} onClick={() => patchSelectiveColor({ ranges: { ...selectiveSettings.ranges, [selectiveFamily]: { cyan: 0, magenta: 0, yellow: 0, black: 0 } } })}>Reset {SELECTIVE_COLOR_FAMILIES.find((family) => family.id === selectiveFamily)?.label.toLowerCase()}</button>
+            <button type="button" disabled={!recipe.selectiveColor} onClick={() => patchRecipe({ selectiveColor: null })}>Reset all selective color</button>
           </div>
         </details>
         <details className="photo-section">
@@ -2078,6 +2182,47 @@ export default function PhotoWorkspace() {
         </details>
       </>
     );
+  }
+
+  /** Renders the finished photo at full size without any canvas change, finds the fully
+   * transparent edges, and replaces Canvas size with a trim that removes them. */
+  async function trimTransparentEdges(): Promise<string> {
+    const current = source;
+    if (!current) return 'Open a photo first.';
+    const recipeAtStart = recipeRef.current;
+    const frame = photoFrameDimensions(current.width, current.height, recipeAtStart);
+    const result = await renderPhoto({
+      file: current.file,
+      recipe: { ...recipeAtStart, canvasExpansion: null },
+      revision: 0,
+      mode: 'export',
+      outputMime: 'image/png',
+      requestedWidth: frame.width,
+      requestedHeight: frame.height,
+    });
+    const bitmap = await createImageBitmap(result.blob);
+    let pixels: Uint8ClampedArray;
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('This browser could not read the rendered photo.');
+      context.drawImage(bitmap, 0, 0);
+      pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    } finally {
+      bitmap.close();
+    }
+    const bounds = opaqueBounds({ width: result.width, height: result.height, buffer: pixels.buffer as ArrayBuffer });
+    if (recipeRef.current !== recipeAtStart) return 'The photo changed while its edges were being measured. Try again.';
+    if (!bounds) return 'Every pixel is transparent, so there is nothing to keep.';
+    const trim = trimExpansion(result.width, result.height, bounds);
+    const hadCanvas = Boolean(recipeAtStart.canvasExpansion);
+    if (!trim) {
+      if (hadCanvas) patchRecipe({ canvasExpansion: null });
+      return hadCanvas ? 'The photo has no transparent edges. The canvas change was removed.' : 'The photo has no transparent edges to trim.';
+    }
+    patchRecipe({ canvasExpansion: trim });
+    const kept = photoNaturalDimensions(current.width, current.height, { ...recipeAtStart, canvasExpansion: trim });
+    return `Trimmed to ${kept.width} × ${kept.height} px${hadCanvas ? ', replacing the earlier canvas change' : ''}.`;
   }
 
   function renderGeometryPanel() {
@@ -2181,6 +2326,14 @@ export default function PhotoWorkspace() {
           <button type="button" onClick={() => patchRecipe({ flipX: !recipe.flipX })}>{recipe.flipX ? 'Unflip horizontal' : 'Flip horizontal'}</button>
           <button type="button" onClick={() => patchRecipe({ flipY: !recipe.flipY })}>{recipe.flipY ? 'Unflip vertical' : 'Flip vertical'}</button>
         </div>
+        <PhotoTransformControls
+          freeTransform={recipe.freeTransform ?? null}
+          perspectiveCorners={recipe.perspectiveCorners ?? null}
+          canvasExpansion={recipe.canvasExpansion ?? null}
+          frame={source ? photoFrameDimensions(source.width, source.height, recipe) : null}
+          onChange={patchRecipe}
+          onTrimTransparent={trimTransparentEdges}
+        />
       </>
     );
   }
@@ -2397,6 +2550,7 @@ export default function PhotoWorkspace() {
 
   function renderLayersPanel() {
     const layers = recipe.layers ?? [];
+    const layerGroups = recipe.layerGroups ?? [];
     return (
       <>
         <div className="photo-inspector-header">
@@ -2448,11 +2602,65 @@ export default function PhotoWorkspace() {
             <button type="button" disabled={!source || !layerWatermarkId} onClick={() => {
               const preset = watermarkPresets.find((record) => record.id === layerWatermarkId);
               if (!preset || !source) return;
-              const frame = photoNaturalDimensions(source.width, source.height, recipe);
+              const frame = photoFrameDimensions(source.width, source.height, recipe);
               commitRecipe(recipeWithWatermark(recipe, preset.data, frame.width, frame.height, undefined, preset.name));
               setStatus(`${preset.name} added as a layer you can move, resize, or remove.`);
             }}>Add as layer</button>
           </div>
+        ) : null}
+        {layers.length ? (
+          <details className="photo-section" data-testid="photo-layer-groups" open={layerGroups.length > 0 || undefined}>
+            <summary>Layer groups ({layerGroups.length})</summary>
+            <p className="photo-export-note">Group related layers, such as a logo and its caption, to show, hide, or fade them together. A group’s opacity multiplies each member’s own opacity.</p>
+            <div className="photo-inline-actions">
+              <button type="button" disabled={layerGroups.length >= 20} onClick={() => {
+                const id = crypto.randomUUID?.() ?? `group-${Date.now()}-${layerGroups.length}`;
+                patchRecipe({ layerGroups: [...layerGroups, { id, name: `Group ${layerGroups.length + 1}`, visible: true, opacity: 1 }] });
+                setStatus(`Group ${layerGroups.length + 1} created. Choose it in a layer’s Group menu to add that layer.`);
+              }}>New group</button>
+            </div>
+            {layerGroups.map((group) => {
+              const members = layers.filter((layer) => layer.groupId === group.id).length;
+              const patchGroup = (patch: Partial<PhotoLayerGroup>) => patchRecipe({ layerGroups: layerGroups.map((item) => (item.id === group.id ? { ...item, ...patch } : item)) });
+              return (
+                <article className="photo-local-card" key={group.id} data-testid="photo-layer-group">
+                  <header>
+                    <strong>{group.name}</strong>
+                    <span className="photo-export-note">{members} layer{members === 1 ? '' : 's'}</span>
+                  </header>
+                  <label>
+                    Group name
+                    <input
+                      type="text"
+                      aria-label={`Rename ${group.name}`}
+                      defaultValue={group.name}
+                      maxLength={80}
+                      onKeyDown={inputCommit}
+                      onBlur={(event) => {
+                        const name = event.currentTarget.value.trim().slice(0, 80) || group.name;
+                        event.currentTarget.value = name;
+                        if (name !== group.name) patchGroup({ name });
+                      }}
+                    />
+                  </label>
+                  <label className="photo-check">
+                    <input type="checkbox" checked={group.visible} onChange={(event) => patchGroup({ visible: event.target.checked })} />
+                    Visible
+                  </label>
+                  <SimpleControl label={`${group.name} group opacity`} value={group.opacity} min={0} max={1} step={0.02} neutral={1} onChange={(opacity) => patchGroup({ opacity })} />
+                  <div className="photo-inline-actions">
+                    <button type="button" onClick={() => {
+                      patchRecipe({
+                        layerGroups: layerGroups.filter((item) => item.id !== group.id),
+                        layers: layers.map((layer) => (layer.groupId === group.id ? { ...layer, groupId: null } : layer)),
+                      });
+                      setStatus(`${group.name} ungrouped. Its layers are unchanged.`);
+                    }}>Ungroup</button>
+                  </div>
+                </article>
+              );
+            })}
+          </details>
         ) : null}
         {layers.length ? layers.map((layer, index) => (
           <article className="photo-local-card" key={layer.id} data-testid="photo-layer">
@@ -2478,6 +2686,15 @@ export default function PhotoWorkspace() {
               <input type="checkbox" checked={layer.visible} onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, visible: event.target.checked }))} />
               Visible
             </label>
+            {layerGroups.length ? (
+              <label>
+                Group
+                <select aria-label={`${layer.name} group`} value={layer.groupId ?? ''} onChange={(event) => updateLayer(layer.id, (item) => ({ ...item, groupId: event.target.value || null }))}>
+                  <option value="">No group</option>
+                  {layerGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+              </label>
+            ) : null}
             <label>
               Blend mode
               <select
@@ -3188,6 +3405,8 @@ export default function PhotoWorkspace() {
             setStatus(`Straighten set to ${degrees.toFixed(1)}°.`);
           }}
           onZoomChange={setZoom}
+          photoInset={photoInset}
+          outputSize={naturalDimensions}
         />
 
         <aside className="photo-inspector" aria-label="Photo controls">

@@ -25,7 +25,9 @@ export interface PhotoCornerOffsets {
 }
 
 export interface PhotoCanvasExpansion {
-  /** Border sizes as fractions of the photo's own width (left/right) or height (top/bottom), 0…2. */
+  /** Border sizes as fractions of the photo's own width (left/right) or height (top/bottom),
+   * −0.45…2. Positive values add canvas around the finished photo; negative values trim that much
+   * off the finished photo (used by "Trim transparent edges"). */
   top: number;
   right: number;
   bottom: number;
@@ -90,14 +92,14 @@ export function normalizeCanvasExpansion(value: unknown): PhotoCanvasExpansion |
   if (!value || typeof value !== 'object') return null;
   const input = value as Record<string, unknown>;
   const expansion: PhotoCanvasExpansion = {
-    top: clamp(input.top, 0, 2, 0),
-    right: clamp(input.right, 0, 2, 0),
-    bottom: clamp(input.bottom, 0, 2, 0),
-    left: clamp(input.left, 0, 2, 0),
+    top: clamp(input.top, -0.45, 2, 0),
+    right: clamp(input.right, -0.45, 2, 0),
+    bottom: clamp(input.bottom, -0.45, 2, 0),
+    left: clamp(input.left, -0.45, 2, 0),
     fill: input.fill === 'color' ? 'color' : 'transparent',
     color: typeof input.color === 'string' && /^#[0-9a-f]{6}$/i.test(input.color) ? input.color.toLowerCase() : '#ffffff',
   };
-  return expansion.top + expansion.right + expansion.bottom + expansion.left < EPSILON ? null : expansion;
+  return Math.abs(expansion.top) + Math.abs(expansion.right) + Math.abs(expansion.bottom) + Math.abs(expansion.left) < EPSILON ? null : expansion;
 }
 
 // --- Homography for corner pinning ---
@@ -222,10 +224,12 @@ export function expansionLayout(width: number, height: number, expansion: PhotoC
   if (!expansion) return { inner: { x: 0, y: 0, width, height }, width, height };
   const innerWidth = Math.max(1, Math.round(width / (1 + expansion.left + expansion.right)));
   const innerHeight = Math.max(1, Math.round(height / (1 + expansion.top + expansion.bottom)));
-  const spareX = width - innerWidth; const spareY = height - innerHeight;
-  const x = expansion.left + expansion.right > 0 ? Math.round(spareX * (expansion.left / (expansion.left + expansion.right))) : 0;
-  const y = expansion.top + expansion.bottom > 0 ? Math.round(spareY * (expansion.top / (expansion.top + expansion.bottom))) : 0;
-  return { inner: { x, y, width: innerWidth, height: innerHeight }, width, height };
+  // Offsets are the left/top border in photo pixels; negative when that edge is trimmed.
+  return {
+    inner: { x: Math.round(innerWidth * expansion.left), y: Math.round(innerHeight * expansion.top), width: innerWidth, height: innerHeight },
+    width,
+    height,
+  };
 }
 
 /** Places processed photo pixels into the expanded canvas filled with the border colour or transparency. */
@@ -237,8 +241,25 @@ export function padPhotoCanvas(pixels: Uint8ClampedArray, layout: ExpansionLayou
     const r = parseInt(expansion.color.slice(1, 3), 16); const g = parseInt(expansion.color.slice(3, 5), 16); const b = parseInt(expansion.color.slice(5, 7), 16);
     for (let p = 0; p < width * height; p += 1) { out[p * 4] = r; out[p * 4 + 1] = g; out[p * 4 + 2] = b; out[p * 4 + 3] = 255; }
   }
-  for (let row = 0; row < inner.height; row += 1) {
-    out.set(pixels.subarray(row * inner.width * 4, (row + 1) * inner.width * 4), ((row + inner.y) * width + inner.x) * 4);
+  // Copy only the overlap, so trimmed (negative) sides simply drop the photo pixels beyond the canvas.
+  const firstColumn = Math.max(0, -inner.x);
+  const lastColumn = Math.min(inner.width, width - inner.x);
+  if (lastColumn <= firstColumn) return out;
+  for (let row = Math.max(0, -inner.y); row < Math.min(inner.height, height - inner.y); row += 1) {
+    const from = (row * inner.width + firstColumn) * 4;
+    out.set(pixels.subarray(from, from + (lastColumn - firstColumn) * 4), ((row + inner.y) * width + inner.x + firstColumn) * 4);
   }
   return out;
+}
+
+/** Canvas-size setting that trims a finished photo of `width` × `height` down to `bounds`,
+ * expressed as negative per-side fractions so it scales with any export size. */
+export function trimExpansion(width: number, height: number, bounds: { x: number; y: number; width: number; height: number }): PhotoCanvasExpansion | null {
+  return normalizeCanvasExpansion({
+    left: -bounds.x / width,
+    top: -bounds.y / height,
+    right: -(width - bounds.x - bounds.width) / width,
+    bottom: -(height - bounds.y - bounds.height) / height,
+    fill: 'transparent',
+  });
 }

@@ -522,7 +522,17 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
   };
 }
 
-function srgbToLinear(value: number): number {
+/** Linear-light channel gains for the recipe's temperature and tint (both −1…1). Shared with the
+ * white-balance eyedropper so a picked neutral solves against exactly what the renderer applies. */
+export function whiteBalanceMultipliers(temperature: number, tint: number): [number, number, number] {
+  return [
+    1 + Math.max(0, temperature) * 0.28 - Math.max(0, -temperature) * 0.12 + tint * 0.04,
+    1 - tint * 0.16,
+    1 + Math.max(0, -temperature) * 0.28 - Math.max(0, temperature) * 0.12 + tint * 0.04,
+  ];
+}
+
+export function srgbToLinear(value: number): number {
   const normalized = value / 255;
   return normalized <= 0.04045
     ? normalized / 12.92
@@ -727,9 +737,7 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
   const exposureScale = 2 ** recipe.exposure;
   const temperature = recipe.temperature;
   const tint = recipe.tint;
-  const wbR = 1 + Math.max(0, temperature) * 0.28 - Math.max(0, -temperature) * 0.12 + tint * 0.04;
-  const wbG = 1 - tint * 0.16;
-  const wbB = 1 + Math.max(0, -temperature) * 0.28 - Math.max(0, temperature) * 0.12 + tint * 0.04;
+  const [wbR, wbG, wbB] = whiteBalanceMultipliers(temperature, tint);
   const contrastSlope = 1 + recipe.contrast * 1.8 + recipe.dehaze * 0.55;
   const gamma = 2 ** (-recipe.midtone * 0.8);
   const selectiveColor = isNeutralSelectiveColor(recipe.selectiveColor) ? null : recipe.selectiveColor!;

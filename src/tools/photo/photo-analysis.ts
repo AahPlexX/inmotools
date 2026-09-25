@@ -1,3 +1,4 @@
+import { srgbToLinear, whiteBalanceMultipliers } from './photo-engine';
 import type { PhotoHistogram, PhotoRecipe } from './photo-types';
 
 export type AutoToneSuggestion = Pick<PhotoRecipe,
@@ -85,5 +86,71 @@ export function suggestAutoWhiteBalance(histogram: PhotoHistogram): AutoWhiteBal
   return {
     temperature: roundHundredth(clamp((blue - red) * 1.5, -1, 1)),
     tint: roundHundredth(clamp((green - (red + blue) / 2) * 2, -1, 1)),
+  };
+}
+
+// --- White-balance eyedropper (capability 64) ---
+
+export interface NeutralPatch {
+  /** Mean linear-light red, green, blue of the sampled patch (0–1). */
+  red: number;
+  green: number;
+  blue: number;
+  /** Pixels that contributed (transparent pixels are skipped). */
+  count: number;
+}
+
+/** Averages a square patch in linear light around (x, y) in pixels. Averaging linear values, not
+ * encoded ones, is what makes the mean describe the light actually reflected by the target. */
+export function sampleNeutralPatch(pixels: Uint8ClampedArray, width: number, height: number, x: number, y: number, radius = 2): NeutralPatch {
+  let red = 0; let green = 0; let blue = 0; let count = 0;
+  const cx = Math.round(x); const cy = Math.round(y);
+  for (let py = Math.max(0, cy - radius); py <= Math.min(height - 1, cy + radius); py += 1) {
+    for (let px = Math.max(0, cx - radius); px <= Math.min(width - 1, cx + radius); px += 1) {
+      const offset = (py * width + px) * 4;
+      if (pixels[offset + 3] === 0) continue;
+      red += srgbToLinear(pixels[offset]);
+      green += srgbToLinear(pixels[offset + 1]);
+      blue += srgbToLinear(pixels[offset + 2]);
+      count += 1;
+    }
+  }
+  return count ? { red: red / count, green: green / count, blue: blue / count, count } : { red: 0, green: 0, blue: 0, count: 0 };
+}
+
+export interface NeutralWhiteBalance extends AutoWhiteBalanceSuggestion {
+  /** True when the target is too dark, clipped, or outside the slider range to neutralize fully. */
+  limited: boolean;
+}
+
+function neutralError(patch: NeutralPatch, temperature: number, tint: number): number {
+  const [wr, wg, wb] = whiteBalanceMultipliers(temperature, tint);
+  const r = Math.log(patch.red * wr); const g = Math.log(patch.green * wg); const b = Math.log(patch.blue * wb);
+  return (r - g) ** 2 + (b - g) ** 2;
+}
+
+/** Temperature and tint that make the sampled patch neutral (equal red, green, blue after white
+ * balance). The renderer's gains are piecewise linear in temperature, so a coarse grid followed by
+ * two refinements finds the global minimum exactly enough for the slider's 0.01 precision. */
+export function solveNeutralWhiteBalance(patch: NeutralPatch): NeutralWhiteBalance {
+  const floor = 1 / 4096;
+  if (patch.count === 0 || Math.min(patch.red, patch.green, patch.blue) < floor) return { temperature: 0, tint: 0, limited: true };
+  let best = { temperature: 0, tint: 0, error: neutralError(patch, 0, 0) };
+  let span = 1; let step = 0.05;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const centre = { ...best };
+    for (let t = Math.max(-1, centre.temperature - span); t <= Math.min(1, centre.temperature + span) + 1e-9; t += step) {
+      for (let n = Math.max(-1, centre.tint - span); n <= Math.min(1, centre.tint + span) + 1e-9; n += step) {
+        const error = neutralError(patch, t, n);
+        if (error < best.error) best = { temperature: t, tint: n, error };
+      }
+    }
+    span = step * 2; step /= 10;
+  }
+  const clipped = Math.max(patch.red, patch.green, patch.blue) > 0.98;
+  return {
+    temperature: roundHundredth(clamp(best.temperature, -1, 1)),
+    tint: roundHundredth(clamp(best.tint, -1, 1)),
+    limited: clipped || best.error > 1e-4,
   };
 }

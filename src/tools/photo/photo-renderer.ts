@@ -1,6 +1,8 @@
 import { normalizeRecipe, sampleHistogram, type PhotoLayerPixels } from './photo-engine';
 import { warpPhotoGeometryPixels } from './photo-geometry';
 import { warpPhotoMeshLiquifyPixels } from './photo-warp';
+import { photoNaturalDimensions } from './photo-export-dimensions';
+import { expansionLayout, padPhotoCanvas, warpPhotoTransformPixels } from './photo-transform';
 import { preparePhotoRaster } from './photo-import';
 import { normalizeResamplingKernel, resamplePixels, type PhotoResamplingKernel } from './photo-resample';
 import { encodePhotoTiff, hasTransparency } from './photo-tiff-writer';
@@ -405,19 +407,6 @@ async function processPixels(
   }
 }
 
-function naturalOutputDimensions(
-  sourceWidth: number,
-  sourceHeight: number,
-  recipe: PhotoRecipe,
-): { width: number; height: number } {
-  const cropWidth = Math.max(1, Math.round(sourceWidth * recipe.crop.width));
-  const cropHeight = Math.max(1, Math.round(sourceHeight * recipe.crop.height));
-  const quarterTurns = normalizeQuarterTurns(recipe.rotateQuarterTurns);
-  return quarterTurns % 2 === 0
-    ? { width: cropWidth, height: cropHeight }
-    : { width: cropHeight, height: cropWidth };
-}
-
 function requestedDimensions(
   naturalWidth: number,
   naturalHeight: number,
@@ -502,7 +491,7 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
     colorSpaceConversion: recipe.colorManagement?.assignedProfile ? 'none' : 'default',
   });
   try {
-    const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);
+    const natural = photoNaturalDimensions(bitmap.width, bitmap.height, recipe);
     const desired = requestedDimensions(natural.width, natural.height, request);
     let target = { ...desired, scaled: false };
 
@@ -513,37 +502,46 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       }
     }
 
+    // Canvas expansion is an output border: every stage below works on the photo frame (`frame`),
+    // and the border is added last so adjustments, masks, and layers never touch it.
+    const layout = expansionLayout(target.width, target.height, recipe.canvasExpansion);
+    const frame = layout.inner;
+    const naturalLayout = expansionLayout(natural.width, natural.height, recipe.canvasExpansion);
+    const naturalFrame = naturalLayout.inner;
+
     const requestedKernel = request.mode === 'export' ? normalizeResamplingKernel(request.resampling) : 'browser';
-    const resizing = target.width !== natural.width || target.height !== natural.height;
+    const resizing = frame.width !== naturalFrame.width || frame.height !== naturalFrame.height;
     let resampling: PhotoResamplingKernel = 'browser';
-    let canvas: HTMLCanvasElement | OffscreenCanvas;
-    let imageData: ImageData;
-    if (requestedKernel !== 'browser' && resizing && canvasCanRender(natural.width, natural.height)) {
+    let frameImage: ImageData;
+    if (requestedKernel !== 'browser' && resizing && canvasCanRender(naturalFrame.width, naturalFrame.height)) {
       // Draw crop/rotation at natural size, then resize with the deterministic kernel so the
       // selected filter (not the browser's scaler) determines the final pixels.
-      const naturalCanvas = drawGeometry(bitmap, recipe, natural.width, natural.height);
-      const naturalPixels = getContext2d(naturalCanvas).getImageData(0, 0, natural.width, natural.height).data;
-      const resized = resamplePixels(naturalPixels, natural.width, natural.height, target.width, target.height, requestedKernel);
-      canvas = createCanvas(target.width, target.height);
-      imageData = new ImageData(resized, target.width, target.height);
+      const naturalCanvas = drawGeometry(bitmap, recipe, naturalFrame.width, naturalFrame.height);
+      const naturalPixels = getContext2d(naturalCanvas).getImageData(0, 0, naturalFrame.width, naturalFrame.height).data;
+      const resized = resamplePixels(naturalPixels, naturalFrame.width, naturalFrame.height, frame.width, frame.height, requestedKernel);
+      frameImage = new ImageData(resized, frame.width, frame.height);
       resampling = requestedKernel;
     } else {
-      canvas = drawGeometry(bitmap, recipe, target.width, target.height);
-      imageData = getContext2d(canvas).getImageData(0, 0, target.width, target.height);
+      const geometryCanvas = drawGeometry(bitmap, recipe, frame.width, frame.height);
+      frameImage = getContext2d(geometryCanvas).getImageData(0, 0, frame.width, frame.height);
     }
-    const context = getContext2d(canvas);
     const lensPerspectivePixels = warpPhotoGeometryPixels(
-      imageData.data,
-      target.width,
-      target.height,
+      frameImage.data,
+      frame.width,
+      frame.height,
       recipe.lensDistortion,
       recipe.perspectiveHorizontal,
       recipe.perspectiveVertical,
     );
+    // Corner pin and free transform follow the lens/perspective sliders and precede mesh warp and
+    // liquify, whose control points are placed on the frame as it looks after these moves.
+    const transformedPixels = recipe.freeTransform || recipe.perspectiveCorners
+      ? warpPhotoTransformPixels(lensPerspectivePixels, frame.width, frame.height, recipe.freeTransform, recipe.perspectiveCorners)
+      : lensPerspectivePixels;
     const geometryPixels = warpPhotoMeshLiquifyPixels(
-      lensPerspectivePixels,
-      target.width,
-      target.height,
+      transformedPixels,
+      frame.width,
+      frame.height,
       recipe.meshWarp,
       recipe.liquifyStrokes,
     );
@@ -557,23 +555,33 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       .map((entry) => ({ layerId: entry.layerId, data: new Uint8ClampedArray(entry.buffer), width: entry.width, height: entry.height }));
     const processed = await processPixels(
       geometryPixels,
-      target.width,
-      target.height,
+      frame.width,
+      frame.height,
       recipe,
       request.mode === 'export' ? 'export' : 'preview',
       jpegBackground,
       layerPixels,
     );
-    const ownedPixels = new Uint8ClampedArray(processed.pixels.length);
-    ownedPixels.set(processed.pixels);
-    const processedImage = new ImageData(ownedPixels, target.width, target.height);
-    context.putImageData(processedImage, 0, 0);
-    const histogram = sampleHistogram(ownedPixels);
+    const framePixels = new Uint8ClampedArray(processed.pixels.length);
+    framePixels.set(processed.pixels);
+    const expansion = recipe.canvasExpansion;
+    // A JPEG has no alpha, so a transparent border is flattened onto the export background, the same
+    // colour transparent photo pixels were flattened onto above.
+    const borderFill = expansion && jpegBackground && expansion.fill === 'transparent'
+      ? { ...expansion, fill: 'color' as const, color: `#${jpegBackground.map((value) => value.toString(16).padStart(2, '0')).join('')}` }
+      : expansion;
+    const ownedPixels = borderFill ? padPhotoCanvas(framePixels, layout, borderFill) : framePixels;
+    const canvas = createCanvas(target.width, target.height);
+    const context = getContext2d(canvas);
+    context.putImageData(new ImageData(ownedPixels, target.width, target.height), 0, 0);
+    // The histogram describes the photo, not a solid border that would spike one bin.
+    const histogram = sampleHistogram(framePixels);
     let proofBaseBlob: Blob | undefined;
     if (processed.proofBasePixels) {
       const proofCanvas = createCanvas(target.width, target.height);
       const proofContext = getContext2d(proofCanvas);
-      const proofOwned = new Uint8ClampedArray(processed.proofBasePixels);
+      const proofFrame = new Uint8ClampedArray(processed.proofBasePixels);
+      const proofOwned = borderFill ? padPhotoCanvas(proofFrame, layout, borderFill) : proofFrame;
       proofContext.putImageData(new ImageData(proofOwned, target.width, target.height), 0, 0);
       proofBaseBlob = await canvasToBlob(proofCanvas, 'image/png', 1);
     }

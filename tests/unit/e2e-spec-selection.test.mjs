@@ -25,6 +25,7 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/photo-project.spec.ts',
       'tests/e2e/photo-merge.spec.ts',
       'tests/e2e/photo-workflow.spec.ts',
+      'tests/e2e/photo-editing-extras.spec.ts',
     ]);
   });
 });

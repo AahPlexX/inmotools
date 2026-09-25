@@ -701,3 +701,12 @@
   outline: 2px solid var(--accent, #4f46e5);
   outline-offset: 2px;
 }
+
+.photo-corner-fieldset {
+  border: 1px solid var(--photo-border, rgb(148 163 184 / 0.35));
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem 0.25rem;
+  margin: 0 0 0.5rem;
+  min-inline-size: 0;
+}
+.photo-corner-fieldset legend { font-size: 0.8rem; padding: 0 0.25rem; }

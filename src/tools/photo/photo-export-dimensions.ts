@@ -1,4 +1,5 @@
 import type { PhotoRecipe } from './photo-types';
+import { expandedDimensions } from './photo-transform';
 
 export type PhotoResizeMode = 'original' | 'percent' | 'width' | 'height' | 'long-edge' | 'short-edge';
 
@@ -18,7 +19,9 @@ export interface PhotoExportSizePlan {
   requiresSafetyScaling: boolean;
 }
 
-export function photoNaturalDimensions(
+/** Size of the edited photo itself (crop and quarter turns applied), before any canvas expansion.
+ * Layers, masks, and retouch positions are all relative to this frame. */
+export function photoFrameDimensions(
   sourceWidth: number,
   sourceHeight: number,
   recipe: PhotoRecipe,
@@ -27,6 +30,16 @@ export function photoNaturalDimensions(
   const height = Math.max(1, Math.round(sourceHeight * recipe.crop.height));
   const turns = ((Math.round(recipe.rotateQuarterTurns) % 4) + 4) % 4;
   return turns % 2 ? { width: height, height: width } : { width, height };
+}
+
+/** Full output size at 100 %: the photo frame plus any canvas expansion border. */
+export function photoNaturalDimensions(
+  sourceWidth: number,
+  sourceHeight: number,
+  recipe: PhotoRecipe,
+): PhotoDimensions {
+  const frame = photoFrameDimensions(sourceWidth, sourceHeight, recipe);
+  return expandedDimensions(frame.width, frame.height, recipe.canvasExpansion);
 }
 
 function scaledDimensions(natural: PhotoDimensions, target: number, basis: number): RequestedPhotoDimensions {
