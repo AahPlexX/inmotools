@@ -9,6 +9,8 @@ import { LANGUAGE_POOLS, LAYOUTS, type CorpusMode, type Language, type LayoutId,
 export interface StoredTest {
   id?: number;
   savedAt: number; // epoch ms
+  /** Stable local typist owner. Optional only at the legacy/import normalization boundary. */
+  typistId?: string;
   mode: CorpusMode;
   durationMode: 'time' | 'words' | 'quote' | 'zen' | 'certification';
   durationValue: number;
@@ -16,7 +18,7 @@ export interface StoredTest {
   language: Language;
   layout: LayoutId;
   targetText: string;
-  finishReason: 'completed' | 'failed' | 'aborted';
+  finishReason: 'completed' | 'failed' | 'aborted' | 'stopped';
   netWpm: number;
   grossWpm: number;
   rawCpm: number;
@@ -32,6 +34,16 @@ export interface StoredTest {
   // Full keystroke log is optional to keep large tests manageable.
   keystrokes?: KeystrokeEvent[];
 }
+
+export interface StoredTypist {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const DEFAULT_TYPIST_ID = 'local-default';
+export const DEFAULT_TYPIST_NAME = 'Local typist';
 
 export interface StoredDictionary {
   id?: number;
@@ -55,6 +67,7 @@ export interface StoredDrill {
 }
 
 export interface PersonalBestQuery {
+  typistId?: string;
   mode: CorpusMode;
   durationMode: StoredTest['durationMode'];
   durationValue: number;
@@ -65,6 +78,7 @@ export interface PersonalBestQuery {
 
 class TypingDb extends Dexie {
   tests!: Table<StoredTest, number>;
+  typists!: Table<StoredTypist, string>;
   dictionaries!: Table<StoredDictionary, number>;
   preferences!: Table<StoredPreference, string>;
   drills!: Table<StoredDrill, number>;
@@ -73,6 +87,13 @@ class TypingDb extends Dexie {
     super('inmotools-typing-workstation');
     this.version(1).stores({
       tests: '++id, savedAt, mode, language, layout, netWpm, *tags',
+      dictionaries: '++id, name, language, createdAt',
+      preferences: 'key',
+      drills: '++id, name, createdAt',
+    });
+    this.version(2).stores({
+      tests: '++id, savedAt, typistId, mode, language, layout, netWpm, *tags',
+      typists: 'id, name, updatedAt',
       dictionaries: '++id, name, language, createdAt',
       preferences: 'key',
       drills: '++id, name, createdAt',
@@ -95,7 +116,7 @@ const CORPUS_MODES = new Set<CorpusMode>([
   'medical', 'legal', 'kids', 'quote', 'zen', 'custom',
 ]);
 const DURATION_MODES = new Set<StoredTest['durationMode']>(['time', 'words', 'quote', 'zen', 'certification']);
-const FINISH_REASONS = new Set<StoredTest['finishReason']>(['completed', 'failed', 'aborted']);
+const FINISH_REASONS = new Set<StoredTest['finishReason']>(['completed', 'failed', 'aborted', 'stopped']);
 const QUOTE_LENGTHS = new Set<Quote['length']>(['short', 'medium', 'long', 'thicc']);
 const LANGUAGES = new Set<Language>(Object.keys(LANGUAGE_POOLS) as Language[]);
 const LAYOUT_IDS = new Set<LayoutId>(LAYOUTS.map((layout) => layout.id));
@@ -138,7 +159,8 @@ export function normalizeStoredTest(value: unknown, fallbackSavedAt = Date.now()
   const savedAt = record.savedAt === undefined ? fallbackSavedAt : record.savedAt;
   if (!finiteNumber(savedAt)) return null;
   if (record.id !== undefined && (!Number.isInteger(record.id) || record.id <= 0)) return null;
-  return { ...(record as StoredTest), savedAt, tags: record.tags ?? [], notes: record.notes ?? '' };
+  if (record.typistId !== undefined && (typeof record.typistId !== 'string' || record.typistId.trim() === '')) return null;
+  return { ...(record as StoredTest), savedAt, typistId: record.typistId?.trim(), tags: record.tags ?? [], notes: record.notes ?? '' };
 }
 
 export async function saveTest(test: StoredTest): Promise<number> {
@@ -168,6 +190,7 @@ export async function listTests(): Promise<StoredTest[]> {
 }
 
 export interface TestFilterOptions {
+  typistId?: string;
   tags?: string[];
   mode?: CorpusMode;
   language?: Language;
@@ -178,6 +201,7 @@ export interface TestFilterOptions {
 export function filterStoredTests(tests: StoredTest[], opts: TestFilterOptions): StoredTest[] {
   const wantedTags = (opts.tags ?? []).map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean);
   return tests.filter((test) => {
+    if (opts.typistId && test.typistId !== opts.typistId) return false;
     if (opts.mode && test.mode !== opts.mode) return false;
     if (opts.language && test.language !== opts.language) return false;
     if (opts.layout && test.layout !== opts.layout) return false;
@@ -198,7 +222,8 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
   const rows = await getDb().tests
     .where('mode').equals(query.mode)
     .filter((t) => (
-      t.durationMode === query.durationMode
+      (!query.typistId || t.typistId === query.typistId)
+      && t.durationMode === query.durationMode
       && (query.durationMode === 'quote' || query.durationMode === 'zen' || t.durationValue === query.durationValue)
       && t.language === query.language
       && t.layout === query.layout
@@ -217,6 +242,50 @@ export async function findPersonalBest(query: PersonalBestQuery): Promise<Stored
 
 export async function clearAllTests(): Promise<void> {
   await getDb().tests.clear();
+}
+
+export async function clearTestsForTypist(typistId: string): Promise<void> {
+  await getDb().tests.where('typistId').equals(typistId).delete();
+}
+
+export async function listTestsForTypist(typistId: string): Promise<StoredTest[]> {
+  return filterStoredTests(await listTests(), { typistId });
+}
+
+// --------------------------------------------------------------------
+// Typists
+// --------------------------------------------------------------------
+
+export async function ensureDefaultTypist(): Promise<StoredTypist> {
+  const db = getDb();
+  const now = Date.now();
+  let profile = await db.typists.get(DEFAULT_TYPIST_ID);
+  if (!profile) {
+    profile = { id: DEFAULT_TYPIST_ID, name: DEFAULT_TYPIST_NAME, createdAt: now, updatedAt: now };
+    await db.typists.put(profile);
+  }
+  await db.tests.filter((test) => !test.typistId).modify({ typistId: DEFAULT_TYPIST_ID });
+  return profile;
+}
+
+export async function listTypists(): Promise<StoredTypist[]> {
+  await ensureDefaultTypist();
+  return getDb().typists.orderBy('name').toArray();
+}
+
+export async function createTypist(name: string): Promise<StoredTypist> {
+  const normalizedName = name.trim().replace(/\s+/g, ' ');
+  if (!normalizedName) throw new Error('Typist name is required.');
+  const existing = await listTypists();
+  if (existing.some((profile) => profile.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
+    throw new Error('A typist with that name already exists.');
+  }
+  const now = Date.now();
+  const randomId = globalThis.crypto?.randomUUID?.()
+    ?? `typist-${now}-${Math.random().toString(36).slice(2, 10)}`;
+  const profile: StoredTypist = { id: randomId, name: normalizedName, createdAt: now, updatedAt: now };
+  await getDb().typists.add(profile);
+  return profile;
 }
 
 // --------------------------------------------------------------------
