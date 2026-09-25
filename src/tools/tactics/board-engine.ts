@@ -165,7 +165,11 @@ export function serializeTacticalBoardSvg(project: TacticalProject, sceneId: str
   }
 
   for (const annotation of project.annotations) {
-    if (annotation.sceneId !== scene.id || !layerIsVisible(scene, annotation.layerId)) continue;
+    if (
+      annotation.sceneId !== scene.id
+      || annotation.visible === false
+      || !layerIsVisible(scene, annotation.layerId)
+    ) continue;
     parts.push(serializeAnnotation(annotation, height, markerId));
   }
 
