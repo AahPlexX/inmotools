@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyGain,
+  mapSourceRangeThroughEdits,
   deletePcmRange,
   dualMonoFromChannel,
   extractChannel,
@@ -103,6 +104,39 @@ describe('waveform and edit math', () => {
 });
 
 describe('edit stack', () => {
+  it('maps source ranges through crop, deletion, and inserted silence', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7])] };
+    expect(mapSourceRangeThroughEdits(source, [
+      { type: 'crop', startSeconds: 0.25, endSeconds: 1.75 },
+      { type: 'deleteRange', startSeconds: 0.25, endSeconds: 1.25 },
+      { type: 'insertSilence', atSeconds: 0.25, durationSeconds: 0.5 },
+    ], 0, 2)).toEqual([
+      { sourceStartFrame: 1, sourceEndFrame: 2, outputStartFrame: 0, outputEndFrame: 1, reversed: false },
+      { sourceStartFrame: 6, sourceEndFrame: 7, outputStartFrame: 3, outputEndFrame: 4, reversed: false },
+    ]);
+  });
+
+  it('maps reversed source ranges to output ranges in timeline order', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7])] };
+    expect(mapSourceRangeThroughEdits(source, [
+      { type: 'reverse', startSeconds: 0.5, endSeconds: 1.5 },
+    ], 0.25, 0.75)).toEqual([
+      { sourceStartFrame: 1, sourceEndFrame: 2, outputStartFrame: 1, outputEndFrame: 2, reversed: false },
+      { sourceStartFrame: 2, sourceEndFrame: 3, outputStartFrame: 5, outputEndFrame: 6, reversed: true },
+    ]);
+  });
+
+  it('keeps the source mapping through channel and amplitude operations', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7])] };
+    expect(mapSourceRangeThroughEdits(source, [
+      { type: 'gain', gainDb: 3 },
+      { type: 'invertPolarity' },
+      { type: 'foldDownMono' },
+    ], 0.5, 1)).toEqual([
+      { sourceStartFrame: 2, sourceEndFrame: 4, outputStartFrame: 2, outputEndFrame: 4, reversed: false },
+    ]);
+  });
+
   it('replays non-destructive operations in order', async () => {
     const { applyEdits } = await import('../../src/tools/music/mastering-engine');
     const result = applyEdits(pcm([0.1, 0.25, -0.5, 0.25]), [
