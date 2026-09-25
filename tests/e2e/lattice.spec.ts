@@ -120,24 +120,35 @@ test('pages a large local SQL result instead of mounting every row', async ({ pa
 });
 
 test('blocks exports while source edits are pending or invalid instead of exporting the last valid revision', async ({ page }) => {
+  // The pending state lasts one parse debounce (140 ms). With real time a
+  // polling assertion can miss that window entirely, so time only moves when
+  // the test advances it.
+  await page.clock.install();
   await page.goto('./#/json-lattice');
   await setSource(page, SAMPLE);
   await expect(page.getByTestId('visible-node-count')).toHaveText('11');
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i);
+  // Freeze page time from here on; it moves only through runFor below.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000));
 
   const normalizedExports = ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export protected JSON'];
   const editor = page.locator('[aria-label="JSON Lattice source"]');
   await editor.fill('{"status":"pending"}');
+  // CodeMirror applies typed DOM changes on its next animation frame; run
+  // that far but stay well inside the parse debounce.
+  await page.clock.runFor(40);
   await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
   await expectButtonsDisabledNow(page, normalizedExports);
   const rawExport = page.getByRole('button', { name: 'Export raw source' });
   await expect(rawExport).toBeEnabled();
 
+  await page.clock.runFor(300);
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
   await expect(page.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Export protected JSON' })).toBeEnabled();
 
   await editor.fill('{');
+  await page.clock.runFor(300);
   await expect(page.getByTestId('revision-status')).toContainText(/invalid/i, { timeout: 2_000 });
   for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
   await expect(rawExport).toBeEnabled();
