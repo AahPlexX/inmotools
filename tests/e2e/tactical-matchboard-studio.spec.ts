@@ -314,6 +314,11 @@ test('authors typed triggers, named action patterns, and linked-unit tactical ad
     'recovery',
   ]);
 
+  await page.getByLabel('Action pattern').selectOption('wall-pass');
+  await expect(page.getByLabel('Action target C')).toHaveCount(0);
+  await page.getByLabel('Action pattern').selectOption('third-player');
+  await expect(page.getByLabel('Action target C')).toBeVisible();
+
   const unitOptions = await page.getByLabel('Unit operation').locator('option').evaluateAll(
     (options) => options.map((option) => (option as HTMLOptionElement).value),
   );
