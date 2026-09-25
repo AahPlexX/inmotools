@@ -1187,7 +1187,7 @@ export default function TypingWorkspace() {
         )}
         <button type="button" aria-disabled={sessionActive} onClick={restart}>New text</button>
         <button type="button" className="subtle" onClick={abort} disabled={!sessionActive}>Abort</button>
-        <button type="button" className="subtle" onClick={launchDrill}>Weak-key drill</button>
+        <button type="button" className="subtle" disabled={sessionActive} onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
       </div>
 
@@ -1332,10 +1332,10 @@ export default function TypingWorkspace() {
             <input type="checkbox" checked={config.ariaLive} onChange={(e) => setConfig((c) => ({ ...c, ariaLive: e.target.checked }))} /> Screen-reader announcements
           </label>
           <label>
-            <input type="checkbox" checked={config.caseSensitive} onChange={(e) => applyConfig({ caseSensitive: e.target.checked })} /> Case sensitive
+            <input type="checkbox" disabled={sessionActive} checked={config.caseSensitive} onChange={(e) => applyConfig({ caseSensitive: e.target.checked })} /> Case sensitive
           </label>
           <label>
-            <input type="checkbox" checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
+            <input type="checkbox" disabled={sessionActive} checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
           </label>
         </div>
         <div className="tw-panel">
@@ -1385,9 +1385,9 @@ export default function TypingWorkspace() {
             Import JSON
             <input type="file" accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
           </label>
-          <label className="subtle" style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
             Load CSV dictionary
-            <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
           <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
         </div>
