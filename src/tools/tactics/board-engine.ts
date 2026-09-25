@@ -193,6 +193,11 @@ export function serializeTacticalBoardSvg(project: TacticalProject, sceneId: str
     );
   }
 
+  const ballPoint = toBoardPoint(project.ball.position, height);
+  parts.push(
+    `<g id="tactical-ball" data-tactical-kind="ball" transform="translate(${number(ballPoint.x)} ${number(ballPoint.y)})"><circle cx="0" cy="0" r="11" fill="#ffffff" stroke="#111827" stroke-width="2"/><title>Ball</title></g>`,
+  );
+
   parts.push('</svg>');
   return `${parts.join('')}\n`;
 }
