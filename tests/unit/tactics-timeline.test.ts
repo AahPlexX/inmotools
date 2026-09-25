@@ -5,13 +5,17 @@ import {
   addTimelineTrack,
   getVisibilitySpans,
   offsetTimelineTrack,
+  sampleTacticalProjectAtTime,
   sampleTacticalTimeline,
   setTimelinePlayhead,
+  stepTimelineFrame,
+  timelineKeyframeTimes,
   validateTacticalTimeline,
   activeScenesAtTime,
   sampleTimelineTrack,
 } from '../../src/tools/tactics/timeline-engine';
 import type { TacticalTimeline, TimelineTrack } from '../../src/tools/tactics/tactics-types';
+import { buildBeginnerTacticalProject } from '../../src/tools/tactics/workspace-engine';
 
 const baseTrack = (): TimelineTrack => ({
   id: 'track-player-1',
@@ -121,6 +125,44 @@ describe('Tactical timeline engine', () => {
     expect(activeScenesAtTime(scenes, 1499).map((scene) => scene.id)).toEqual(['scene-b']);
     expect(activeScenesAtTime(scenes, 1500).map((scene) => scene.id)).toEqual(['scene-c']);
   });
+  it('samples a project presentation without mutating canonical state and steps transport deterministically', () => {
+    const project = buildBeginnerTacticalProject({
+      title: 'Playback',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const token = project.playerTokens[0]!;
+    const start = { ...token.position };
+    const target = {
+      x: Math.min(1, start.x + 0.2),
+      y: Math.min(1, start.y + 0.1),
+    };
+    project.timeline = addTimelineTrack(project.timeline, {
+      id: 'track-playback',
+      targetId: token.id,
+      keyframes: [
+        { id: 'playback-0', timeMs: 0, position: start, interpolation: 'linear' },
+        { id: 'playback-1000', timeMs: 1000, position: target, interpolation: 'hold' },
+      ],
+    });
+
+    const sampled = sampleTacticalProjectAtTime(project, 500);
+    const sampledToken = sampled.playerTokens.find((candidate) => candidate.id === token.id)!;
+    expect(sampled).not.toBe(project);
+    expect(sampledToken.position.x).toBeCloseTo((start.x + target.x) / 2, 12);
+    expect(sampledToken.position.y).toBeCloseTo((start.y + target.y) / 2, 12);
+    expect(project.playerTokens[0]!.position).toEqual(start);
+
+    expect(stepTimelineFrame(0, project.timeline.durationMs, 60, 1)).toBe(17);
+    expect(stepTimelineFrame(20, project.timeline.durationMs, 60, -1)).toBe(17);
+    expect(stepTimelineFrame(0, project.timeline.durationMs, 60, -1)).toBe(0);
+    expect(timelineKeyframeTimes(project.timeline)).toEqual([0, 1000]);
+  });
+
   it('reports structural timeline errors without mutating the source timeline', () => {
     const timeline: TacticalTimeline = {
       playheadMs: 1300,
