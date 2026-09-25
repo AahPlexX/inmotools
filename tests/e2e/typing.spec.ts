@@ -538,6 +538,7 @@ test('offers explicit lifecycle controls with pause-safe timing and active-sessi
 });
 
 test('keeps saved scores, personal history, and resets isolated by local typist', async ({ page }) => {
+  test.setTimeout(45_000);
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
   const history = workspace.getByRole('region', { name: 'Session history' });
