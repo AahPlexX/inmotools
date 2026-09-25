@@ -471,3 +471,32 @@ test('edits curved trajectory handles with keyboard and pointer input', async ({
   await expect(page.locator('.status-line').last()).toContainText('Motion segment authored');
 });
 
+test('splits, renames, and reorders non-overlapping tactical scenes', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+
+  const originalRangeText = await page.getByText(/^\d+-\d+ ms - Scene 1$/).textContent();
+  const rangeMatch = originalRangeText?.match(/^(\d+)-(\d+) ms/);
+  expect(rangeMatch).not.toBeNull();
+  const originalStart = Number(rangeMatch![1]);
+  const originalEnd = Number(rangeMatch![2]);
+  const splitMs = Number(await page.getByLabel('Split at (ms)').inputValue());
+  expect(splitMs).toBeGreaterThan(originalStart);
+  expect(splitMs).toBeLessThan(originalEnd);
+
+  await page.getByLabel('New scene name').fill('Second half');
+  await page.getByRole('button', { name: 'Split scene' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Timeline scene split');
+  await expect(page.getByText(`${splitMs}-${originalEnd} ms - Second half`)).toBeVisible();
+
+  await page.getByLabel('Scene view').selectOption('scene-2');
+  await page.getByLabel('Rename scene to').fill('Press phase');
+  await page.getByRole('button', { name: 'Rename scene' }).click();
+  await expect(page.getByText(`${splitMs}-${originalEnd} ms - Press phase`)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Move scene earlier' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Timeline scene moved earlier');
+  const rightDuration = originalEnd - splitMs;
+  const leftDuration = splitMs - originalStart;
+  await expect(page.getByText(`${originalStart}-${originalStart + rightDuration} ms - Press phase`)).toBeVisible();
+  await expect(page.getByText(`${originalStart + rightDuration}-${originalStart + rightDuration + leftDuration} ms - Scene 1`)).toBeVisible();
+});

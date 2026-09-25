@@ -1,5 +1,10 @@
-import { type FormEvent } from 'react';
-import { cloneTacticalScene } from './scene-engine';
+import { type FormEvent, type MouseEvent } from 'react';
+import {
+  cloneTacticalScene,
+  renameTacticalScene,
+  reorderTacticalScene,
+  splitTacticalScene,
+} from './scene-engine';
 import {
   addTimelineKeyframe,
   offsetTimelineGroup,
@@ -31,6 +36,11 @@ export default function TacticalTimingControls({
 }: TacticalTimingControlsProps) {
   const trackTargets = project.timeline.tracks.map((track) => track.targetId);
   const firstTarget = trackTargets[0] ?? '';
+  const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
+  const defaultSplitMs = activeScene
+    ? activeScene.startMs + Math.max(1, Math.floor(activeScene.durationMs / 2))
+    : 1;
+
   function submitScene(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -47,6 +57,47 @@ export default function TacticalTimingControls({
         durationMs,
       }),
       'Timeline scene cloned.',
+    );
+  }
+
+  function submitSceneRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const sceneId = String(data.get('sceneEditId') ?? '');
+    const name = String(data.get('sceneEditName') ?? '');
+    onEdit(
+      'Rename timeline scene',
+      (current) => renameTacticalScene(current, sceneId, name),
+      'Timeline scene renamed.',
+    );
+  }
+
+  function moveScene(event: MouseEvent<HTMLButtonElement>, direction: -1 | 1) {
+    const form = event.currentTarget.form;
+    if (!form) return;
+    const sceneId = String(new FormData(form).get('sceneEditId') ?? '');
+    onEdit(
+      direction < 0 ? 'Move timeline scene earlier' : 'Move timeline scene later',
+      (current) => reorderTacticalScene(current, sceneId, direction),
+      direction < 0 ? 'Timeline scene moved earlier.' : 'Timeline scene moved later.',
+    );
+  }
+
+  function splitScene(event: MouseEvent<HTMLButtonElement>) {
+    const form = event.currentTarget.form;
+    if (!form) return;
+    const data = new FormData(form);
+    const sceneId = String(data.get('sceneEditId') ?? '');
+    const splitMs = Number(data.get('sceneSplitMs'));
+    const rightName = String(data.get('sceneSplitName') ?? '').trim();
+    onEdit(
+      'Split timeline scene',
+      (current) => splitTacticalScene(current, sceneId, {
+        rightId: nextId('scene', current.scenes.map((scene) => scene.id)),
+        rightName,
+        splitMs,
+      }),
+      'Timeline scene split.',
     );
   }
 
@@ -144,6 +195,46 @@ export default function TacticalTimingControls({
             </li>
           ))}
         </ul>
+      </form>
+      <form key={`scene-edit-${activeSceneId}`} onSubmit={submitSceneRename} aria-label="Scene editing">
+        <h3>Scene editing</h3>
+        <p>Editing {activeScene?.name ?? activeSceneId}. Choose another scene with the Scene view control.</p>
+        <input name="sceneEditId" type="hidden" value={activeSceneId} />
+        <label>
+          Rename scene to
+          <input name="sceneEditName" defaultValue={activeScene?.name ?? ''} required />
+        </label>
+        <button type="submit">Rename scene</button>
+        <div className="tactical-authoring-actions">
+          <button type="button" onClick={(event) => moveScene(event, -1)} disabled={project.scenes.length < 2}>
+            Move scene earlier
+          </button>
+          <button type="button" onClick={(event) => moveScene(event, 1)} disabled={project.scenes.length < 2}>
+            Move scene later
+          </button>
+        </div>
+        <label>
+          Split at (ms)
+          <input
+            name="sceneSplitMs"
+            type="number"
+            min={(activeScene?.startMs ?? 0) + 1}
+            max={Math.max((activeScene?.startMs ?? 0) + 1, (activeScene?.startMs ?? 0) + (activeScene?.durationMs ?? 0) - 1)}
+            step="1"
+            defaultValue={defaultSplitMs}
+            required
+          />
+        </label>
+        <label>
+          New scene name
+          <input name="sceneSplitName" defaultValue="Next phase" required />
+        </label>
+        <button type="button" onClick={splitScene} disabled={!activeScene || activeScene.durationMs < 2}>
+          Split scene
+        </button>
+        <small>
+          Splitting is blocked when authored scene motion continues past the split point so motion is never silently stranded.
+        </small>
       </form>
       <form onSubmit={submitVisibility} aria-label="Temporal visibility">
         <h3>Visibility</h3>
