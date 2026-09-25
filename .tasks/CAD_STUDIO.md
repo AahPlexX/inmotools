@@ -7,7 +7,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `5e3447a34171feb69434b7bdb012a16e24efd3d6`
+**Last tracked implementation commit:** `f0cdd7f54274bcd9632ffbc200566476fc67c819`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
@@ -127,6 +127,7 @@ A capability counts only when production behavior exists, relevant validation pa
 - G7 follow-up in progress: the workspace now offers box, cylinder, sphere, cone, and torus creation, backed by one atomic project-engine operation that appends a uniquely identified exact primitive feature and owning body through undoable history. Project-engine unit coverage verifies default parameters for each kind, repeated creation, non-mutation, undo, and no-op parameter blurs; the inspector refreshes committed values after history/selection changes. A local Vite/Chromium smoke check mounted the unregistered component and observed tessellated box/cylinder bodies, Add/Undo/Redo, width 25 -> Undo 20 -> Redo 25, and an independent second box at width 20 without errors. The CAD route remains unregistered and deployed-browser interaction is unverified, so this does not yet credit a user-facing capability.
 - G7 inspector hardening: primitive `kind` is now read-only metadata; numeric parameters remain editable. This prevents changing the evaluator's dispatch discriminator through a generic text field. `cad-inspector.test.tsx` verifies the read-only kind and editable width markup.
 - G7 body visibility slice: `CadTree` now lists body records and provides an accessible visibility checkbox; `setBodyVisibility()` immutably changes only the body flag, and `CadWorkspace` filters hidden tessellations without triggering a kernel rebuild because feature/sketch dependencies are unchanged. Unit coverage verifies visibility state and unknown-body no-op behavior. Local Vite/Chromium smoke check confirmed hiding Box 1 reduces the viewport from two tessellated bodies to one, Undo restores two and checks the visibility control, and Redo hides it again. The production CAD route remains unregistered, so this is not yet the required route-level E2E gate.
+- G7 model-tree search slice: `CadTree` filters sketch, body, and feature rows by case-insensitive label or type using a local controlled search input, preserves the existing section order and selection state, and announces an empty result. Focused tests cover matching, empty queries, and the accessible field. This implements only the name/type subset of capability 193; body/component, status, suppression, visibility, warning-state, and feature-family filters remain open. The route is still unregistered, so no capability is credited.
 
 ## Freshness invariant
 
