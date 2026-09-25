@@ -499,4 +499,9 @@ test('splits, renames, and reorders non-overlapping tactical scenes', async ({ p
   const leftDuration = splitMs - originalStart;
   await expect(page.getByText(`${originalStart}-${originalStart + rightDuration} ms - Press phase`)).toBeVisible();
   await expect(page.getByText(`${originalStart + rightDuration}-${originalStart + rightDuration + leftDuration} ms - Scene 1`)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Join with next scene' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Timeline scenes joined');
+  await expect(page.getByText(`${originalStart}-${originalEnd} ms - Press phase`)).toBeVisible();
+  await expect(page.getByLabel('Scene view').locator('option')).toHaveCount(1);
 });
