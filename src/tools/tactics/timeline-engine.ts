@@ -159,6 +159,54 @@ function interpolateNumber(left: number | undefined, right: number | undefined, 
   return left + (right - left) * progress;
 }
 
+
+export function layerTimelineTarget(sceneIdValue: string, layerIdValue: string): string {
+  const sceneId = sceneIdValue.trim();
+  const layerId = layerIdValue.trim();
+  if (!sceneId || !layerId) throw new Error('Scene and layer ids are required for timeline visibility.');
+  return layerId;
+}
+
+export function addTimelineVisibilityChange(
+  timeline: TacticalTimeline,
+  targetIdValue: string,
+  timeMs: number,
+  visible: boolean,
+  _defaultVisible = true,
+): TacticalTimeline {
+  const targetId = targetIdValue.trim();
+  if (!targetId) throw new Error('Visibility target is required.');
+  requireIntegerTime(timeMs, 'Visibility time');
+  if (timeMs > timeline.durationMs) throw new RangeError('Visibility time cannot exceed timeline duration.');
+
+  const keyframeId = `visibility-${targetId}-${timeMs}-${visible ? 'show' : 'hide'}`;
+  const existing = timeline.tracks.find((track) => track.targetId === targetId);
+  if (!existing) {
+    return addTimelineTrack(timeline, {
+      id: `visibility-track-${targetId}`,
+      targetId,
+      keyframes: [{
+        id: keyframeId,
+        timeMs,
+        visible,
+        interpolation: 'hold',
+      }],
+    });
+  }
+
+  const updated = setTimelineVisibility(existing, {
+    id: keyframeId,
+    timeMs,
+    visible,
+  });
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => track.id === existing.id ? updated : track),
+    markers: timeline.markers.map(cloneMarker),
+    possessionEvents: timeline.possessionEvents?.map((event) => ({ ...event })),
+  };
+}
+
 export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): SampledTimelineState {
   requireIntegerTime(timeMs, 'Sample time');
   const keyframes = sortedKeyframes(track);
