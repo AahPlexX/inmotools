@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import TacticalCoordinationControls from './TacticalCoordinationControls';
 import TacticalTimingControls from './TacticalTimingControls';
 import { createMotionPath, setKeyframeMotionPath } from './motion-engine';
@@ -9,6 +9,8 @@ import {
   addTimelineTrack,
   sampleTacticalTimeline,
   setTimelinePlayhead,
+  stepTimelineFrame,
+  timelineKeyframeTimes,
 } from './timeline-engine';
 import type {
   InterpolationKind,
@@ -20,6 +22,9 @@ import type {
 export interface TacticalTimelinePanelProps {
   project: TacticalProject;
   activeSceneId: string;
+  previewTimeMs: number;
+  onPreviewTimeChange: (timeMs: number) => void;
+  onTransportStatus: (message: string) => void;
   onEdit: (
     label: string,
     updater: (current: TacticalProject) => TacticalProject,
@@ -113,17 +118,132 @@ function withMotionSegment(
   return { ...project, timeline };
 }
 
-export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }: TacticalTimelinePanelProps) {
+export default function TacticalTimelinePanel({
+  project,
+  activeSceneId,
+  previewTimeMs,
+  onPreviewTimeChange,
+  onTransportStatus,
+  onEdit,
+}: TacticalTimelinePanelProps) {
   const targets = useMemo(
     () => [...project.playerTokens.map((token) => token.id), 'ball'],
     [project.playerTokens],
   );
   const [pathKind, setPathKind] = useState<TacticalMotionPathKind>('linear');
   const [interpolation, setInterpolation] = useState<InterpolationKind>('smooth');
+  const [frameRate, setFrameRate] = useState(30);
+  const [playing, setPlaying] = useState(false);
+  const previewTimeRef = useRef(previewTimeMs);
+  const keyframeTimes = useMemo(() => timelineKeyframeTimes(project.timeline), [project.timeline]);
+
+  useEffect(() => {
+    previewTimeRef.current = previewTimeMs;
+  }, [previewTimeMs]);
+
+  useEffect(() => {
+    if (!playing) return;
+    const durationMs = project.timeline.durationMs;
+    if (durationMs <= 0) {
+      setPlaying(false);
+      return;
+    }
+
+    let animationFrame = 0;
+    let previousTimestamp = performance.now();
+    const tick = (timestamp: number) => {
+      const elapsedMs = (timestamp - previousTimestamp) * project.timeline.playbackRate;
+      previousTimestamp = timestamp;
+      let nextTime = previewTimeRef.current + elapsedMs;
+
+      if (nextTime >= durationMs) {
+        if (project.timeline.loop) {
+          nextTime %= durationMs;
+        } else {
+          previewTimeRef.current = durationMs;
+          onPreviewTimeChange(durationMs);
+          setPlaying(false);
+          onTransportStatus('Playback reached the end of the timeline.');
+          return;
+        }
+      }
+
+      const integerTime = Math.max(0, Math.min(durationMs, Math.round(nextTime)));
+      previewTimeRef.current = integerTime;
+      onPreviewTimeChange(integerTime);
+      animationFrame = requestAnimationFrame(tick);
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) return;
+      setPlaying(false);
+      onTransportStatus('Playback paused while this tab is hidden.');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    animationFrame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [
+    onPreviewTimeChange,
+    onTransportStatus,
+    playing,
+    project.timeline.durationMs,
+    project.timeline.loop,
+    project.timeline.playbackRate,
+  ]);
+
+  function setPreviewTime(timeMs: number) {
+    const next = setTimelinePlayhead({ ...project.timeline, loop: false }, Math.round(timeMs)).playheadMs;
+    previewTimeRef.current = next;
+    onPreviewTimeChange(next);
+  }
+
+  function play() {
+    if (project.timeline.durationMs <= 0) return;
+    if (previewTimeRef.current >= project.timeline.durationMs && !project.timeline.loop) {
+      setPreviewTime(0);
+    }
+    setPlaying(true);
+    onTransportStatus('Timeline playback started.');
+  }
+
+  function pause() {
+    setPlaying(false);
+    onTransportStatus('Timeline playback paused.');
+  }
+
+  function stop() {
+    setPlaying(false);
+    setPreviewTime(0);
+    onTransportStatus('Timeline playback stopped.');
+  }
+
+  function moveToKeyframe(direction: -1 | 1) {
+    const current = previewTimeRef.current;
+    const next = direction > 0
+      ? keyframeTimes.find((time) => time > current) ?? project.timeline.durationMs
+      : [...keyframeTimes].reverse().find((time) => time < current) ?? 0;
+    setPreviewTime(next);
+    onTransportStatus(direction > 0 ? 'Moved to next keyframe.' : 'Moved to previous keyframe.');
+  }
+
+  function stepFrame(direction: -1 | 1) {
+    const next = stepTimelineFrame(
+      previewTimeRef.current,
+      project.timeline.durationMs,
+      frameRate,
+      direction,
+    );
+    setPreviewTime(next);
+    onTransportStatus(direction > 0 ? 'Moved forward one frame.' : 'Moved back one frame.');
+  }
 
   function submitPlayhead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const timeMs = Number(new FormData(event.currentTarget).get('playheadMs'));
+    setPreviewTime(timeMs);
     onEdit(
       'Set timeline playhead',
       (current) => ({ ...current, timeline: setTimelinePlayhead(current.timeline, timeMs) }),
@@ -194,6 +314,70 @@ export default function TacticalTimelinePanel({ project, activeSceneId, onEdit }
     <details className="tactical-setup tactical-authoring">
       <summary>Timeline &amp; motion</summary>
       <div className="tactical-authoring-grid">
+        <section className="tactical-transport" aria-labelledby="timeline-transport-heading">
+          <h3 id="timeline-transport-heading">Transport</h3>
+          <div className="tactical-transport-status">
+            <strong data-testid="timeline-preview-time">{previewTimeMs} ms</strong>
+            <span>{playing ? 'Playing' : 'Paused'}</span>
+          </div>
+          <label>
+            Timeline scrubber
+            <input
+              type="range"
+              min="0"
+              max={project.timeline.durationMs}
+              step="1"
+              value={previewTimeMs}
+              onChange={(event) => setPreviewTime(Number(event.target.value))}
+            />
+          </label>
+          <div className="tactical-transport-actions" role="group" aria-label="Timeline transport">
+            <button type="button" aria-label="Previous keyframe" onClick={() => moveToKeyframe(-1)}>Previous keyframe</button>
+            <button type="button" aria-label="Previous frame" onClick={() => stepFrame(-1)}>Previous frame</button>
+            <button type="button" aria-label="Play timeline" disabled={playing} onClick={play}>Play</button>
+            <button type="button" aria-label="Pause timeline" disabled={!playing} onClick={pause}>Pause</button>
+            <button type="button" aria-label="Stop timeline" onClick={stop}>Stop</button>
+            <button type="button" aria-label="Next frame" onClick={() => stepFrame(1)}>Next frame</button>
+            <button type="button" aria-label="Next keyframe" onClick={() => moveToKeyframe(1)}>Next keyframe</button>
+          </div>
+          <label>
+            Playback speed
+            <select
+              value={project.timeline.playbackRate}
+              onChange={(event) => {
+                const playbackRate = Number(event.target.value);
+                onEdit(
+                  'Set timeline playback speed',
+                  (current) => ({ ...current, timeline: { ...current.timeline, playbackRate } }),
+                  `Playback speed set to ${playbackRate}×.`,
+                );
+              }}
+            >
+              {[0.25, 0.5, 1, 1.5, 2].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+            </select>
+          </label>
+          <label className="tactical-loop-control">
+            <input
+              type="checkbox"
+              checked={project.timeline.loop}
+              onChange={(event) => {
+                const loop = event.target.checked;
+                onEdit(
+                  'Set timeline loop',
+                  (current) => ({ ...current, timeline: { ...current.timeline, loop } }),
+                  loop ? 'Timeline looping enabled.' : 'Timeline looping disabled.',
+                );
+              }}
+            />
+            Loop playback
+          </label>
+          <label>
+            Frame rate
+            <select value={frameRate} onChange={(event) => setFrameRate(Number(event.target.value))}>
+              {[24, 25, 30, 50, 60].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
+            </select>
+          </label>
+        </section>
         <form onSubmit={submitPlayhead} aria-label="Timeline playhead">
           <h3>Playhead</h3>
           <label>
