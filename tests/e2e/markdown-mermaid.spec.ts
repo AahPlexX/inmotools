@@ -27,7 +27,7 @@ test('Graphviz output cannot inject an active javascript URL into the preview', 
     '# Graphviz safety',
     '',
     '```dot',
-    'digraph { unsafe [label="Click", URL="javascript:window.__graphvizXss = true"] }',
+    'digraph { unsafe [label="Unsafe", URL="javascript:window.__graphvizXss = true"]; safe [label="Safe", URL="https://example.com/docs"] }',
     '```',
   ].join('\n'));
 
@@ -36,6 +36,13 @@ test('Graphviz output cannot inject an active javascript URL into the preview', 
   await expect(diagram).not.toContainText('javascript:');
   const markup = await diagram.innerHTML();
   expect(markup).not.toMatch(/(?:href|xlink:href)=["']\s*javascript:/i);
+
+  const safeLink = diagram.locator('a').filter({ hasText: 'Safe' });
+  await expect(safeLink).toHaveCount(1);
+  await expect.poll(() => safeLink.evaluate((element) =>
+    element.getAttribute('href')
+      ?? element.getAttributeNS('http://www.w3.org/1999/xlink', 'href'),
+  )).toBe('https://example.com/docs');
 });
 
 test('renders Mermaid in the real browser integration and preserves its source anchor', async ({ page }) => {
