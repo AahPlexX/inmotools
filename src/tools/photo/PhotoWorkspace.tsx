@@ -705,6 +705,23 @@ export default function PhotoWorkspace() {
     return () => window.removeEventListener('keydown', handler);
   }, [redo, undo]);
 
+  // Escape disarms whatever canvas tool is active (brush, picker, crop, straighten…) so keyboard
+  // users are never stuck in a mode. Dialogs and text fields keep their own Escape behaviour.
+  const toolActive = Boolean(canvasInteraction || geometryInteraction);
+  useEffect(() => {
+    if (!toolActive) return undefined;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('dialog, [role="dialog"]') || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT') return;
+      setCanvasInteraction(null);
+      setGeometryInteraction(null);
+      setStatus('Tool cancelled.');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toolActive]);
+
   const openStoredProject = useCallback(async (loaded: LoadedPhotoProject, importRevision: number) => {
     let nextSourceUrl: string | null = null;
     try {

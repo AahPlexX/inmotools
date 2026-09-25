@@ -299,3 +299,20 @@ test('at 320 CSS px every panel reflows without horizontal page scrolling', asyn
     expect(overflow, `${name} overflows by ${overflow}px`).toBeLessThanOrEqual(0);
   }
 });
+
+test('Escape disarms an active canvas tool from the keyboard', async ({ page }) => {
+  await openPhoto(page);
+  const picker = page.getByRole('button', { name: 'Pick neutral point' });
+  await picker.click();
+  await expect(picker).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.photo-tool-hint')).toContainText('Esc to cancel');
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.photo-tool-hint')).toHaveCount(0);
+  await tab(page, 'Crop & geometry');
+  const crop = page.getByRole('button', { name: 'Edit crop on photo' });
+  await crop.click();
+  await expect(crop).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(crop).toHaveAttribute('aria-pressed', 'false');
+});

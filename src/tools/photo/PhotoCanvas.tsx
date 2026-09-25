@@ -863,9 +863,9 @@ export default function PhotoCanvas({
         ) : null}
       </div>
 
-      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · {interaction.mode === 'white-balance-pick' ? 'click or tap something that should be neutral gray or white' : interaction.mode === 'selection-color' || interaction.mode === 'red-eye' || interaction.mode.startsWith('retouch-') ? 'click or tap the photo to place it' : 'drag on the photo to place it'}</div> : null}
-      {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry.</div> : null}
-      {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below.</div> : null}
+      {interaction ? <div className="photo-tool-hint" role="status">{interaction.label} · {interaction.mode === 'white-balance-pick' ? 'click or tap something that should be neutral gray or white' : interaction.mode === 'selection-color' || interaction.mode === 'red-eye' || interaction.mode.startsWith('retouch-') ? 'click or tap the photo to place it' : 'drag on the photo to place it'} · Esc to cancel</div> : null}
+      {geometryMode === 'crop' ? <div className="photo-tool-hint" role="status">Crop editing active · drag the frame or its handles. The numerical crop controls remain available for precise keyboard entry. Esc to finish.</div> : null}
+      {geometryMode === 'straighten' ? <div className="photo-tool-hint" role="status">Straighten active · drag along a horizon or vertical reference. The measured correction remains editable below. Esc to cancel.</div> : null}
       {samplerActive && !geometryActive ? <div className="photo-tool-hint" role="status">Color sampler active · click or tap the photo to pin up to eight rendered pixels</div> : null}
       {samples.length ? (
         <section className="photo-color-readout" role="status" aria-label="Sampled color readout">
