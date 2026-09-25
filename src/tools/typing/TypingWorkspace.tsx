@@ -994,6 +994,10 @@ export default function TypingWorkspace() {
 
   // Import handlers.
   const importJson = useCallback(async (file: File) => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before importing score history.');
+      return;
+    }
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
@@ -1006,7 +1010,7 @@ export default function TypingWorkspace() {
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
-  }, [activeTypistId, personalBestQuery]);
+  }, [activeTypistId, personalBestQuery, sessionActive]);
 
   const importCsvDictionary = useCallback(async (file: File) => {
     try {
@@ -1378,15 +1382,15 @@ export default function TypingWorkspace() {
             <input type="text" placeholder="e.g. morning,code" value={filterTagText} onChange={(e) => setFilterTagText(e.target.value)} />
           </label>
           <button className="subtle" type="button" onClick={async () => setHistory(await listTests())}>Refresh</button>
-          <label className="subtle" style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
             Import JSON
-            <input type="file" accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
           </label>
           <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
             Load CSV dictionary
             <input type="file" disabled={sessionActive} accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
-          <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
+          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
         </div>
         <div className="tw-stats-strip">
           <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
@@ -1418,7 +1422,11 @@ export default function TypingWorkspace() {
             if (columnKey === 'tags') return test.tags.join(', ');
             if (columnKey === 'actions') {
               return (
-                <button type="button" className="subtle" onClick={async () => {
+                <button type="button" className="subtle" disabled={sessionActive} onClick={async () => {
+                  if (sessionActive) {
+                    setStatusText('Stop or reset the current test before changing saved score history.');
+                    return;
+                  }
                   if (test.id != null) {
                     await deleteTest(test.id);
                     setHistory(await listTests());

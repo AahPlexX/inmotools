@@ -1,5 +1,11 @@
 # Done
 
+## Typing Workstation — 47/47 complete
+
+The approved 2026-09-25 traditional-controls/local-typist expansion is complete on top of the original 38-capability workstation. F39–F47 add explicit Start/Pause/Resume/Stop/Reset lifecycle controls, paused-time-excluded scoring, persistent browser-local typist profiles, profile-scoped history/averages/PBs/imports/exports, profile-specific score reset, and active-session mutation guardrails while preserving implicit first-character start and the existing native input/IME path.
+
+The Gauntlet adversarial pass found and fixed one remaining state-integrity/affordance gap: score-history import, saved-result deletion, and selected-profile score reset could still change history/PB context while Running/Paused, and the guarded focusable New text action lacked a visible unavailable state. Accepted product tip `7222854833f507ebfbcf00ab0c156b58ee90f335` passed dedicated run `36188765930` / job `108248550068`: **76/76 focused Typing units across eight files**, production build, and **18/18 desktop/mobile browser checks**. Pages run `36188765977` built and deployed the same product revision successfully.
+
 ## Vector Studio — 66/66 complete
 
 Vector Studio is complete against the 66-capability design ledger in
