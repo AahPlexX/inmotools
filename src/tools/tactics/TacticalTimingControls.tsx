@@ -1,6 +1,7 @@
 import { type FormEvent, type MouseEvent } from 'react';
 import {
   cloneTacticalScene,
+  joinTacticalScenes,
   renameTacticalScene,
   reorderTacticalScene,
   splitTacticalScene,
@@ -37,6 +38,11 @@ export default function TacticalTimingControls({
   const trackTargets = project.timeline.tracks.map((track) => track.targetId);
   const firstTarget = trackTargets[0] ?? '';
   const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
+  const chronologicalScenes = [...project.scenes].sort(
+    (left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id),
+  );
+  const activeSceneIndex = chronologicalScenes.findIndex((scene) => scene.id === activeScene?.id);
+  const nextScene = activeSceneIndex >= 0 ? chronologicalScenes[activeSceneIndex + 1] : undefined;
   const defaultSplitMs = activeScene
     ? activeScene.startMs + Math.max(1, Math.floor(activeScene.durationMs / 2))
     : 1;
@@ -98,6 +104,15 @@ export default function TacticalTimingControls({
         splitMs,
       }),
       'Timeline scene split.',
+    );
+  }
+
+  function joinNextScene() {
+    if (!activeScene || !nextScene) return;
+    onEdit(
+      'Join timeline scenes',
+      (current) => joinTacticalScenes(current, activeScene.id, nextScene.id),
+      'Timeline scenes joined.',
     );
   }
 
@@ -226,14 +241,19 @@ export default function TacticalTimingControls({
           />
         </label>
         <label>
-          New scene name
+          New phase title
           <input name="sceneSplitName" defaultValue="Next phase" required />
         </label>
-        <button type="button" onClick={splitScene} disabled={!activeScene || activeScene.durationMs < 2}>
-          Split scene
-        </button>
+        <div className="tactical-authoring-actions">
+          <button type="button" onClick={splitScene} disabled={!activeScene || activeScene.durationMs < 2}>
+            Split scene
+          </button>
+          <button type="button" onClick={joinNextScene} disabled={!activeScene || !nextScene}>
+            Join with next scene
+          </button>
+        </div>
         <small>
-          Splitting is blocked when authored scene motion continues past the split point so motion is never silently stranded.
+          Splitting is blocked when authored scene motion continues past the split point. Joining is available only for the next contiguous phase and preserves authored scene data.
         </small>
       </form>
       <form onSubmit={submitVisibility} aria-label="Temporal visibility">
