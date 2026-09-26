@@ -113,12 +113,15 @@ export default function CrystalSymmetryPanel({ document, history, onHistoryChang
         <div className="crystal-editor-card__heading crystal-editor-card__heading--wrap">
           <div>
             <h4 id="crystal-symmetry-detection-heading">Detection</h4>
-            <p role="status" data-testid="crystal-symmetry-status">
+            <p role="status" className="crystal-symmetry-status" data-testid="crystal-symmetry-status">
+              {/* Work in progress and errors outrank the stale-detection note:
+                  inspecting a break is done precisely after an edit, so the
+                  structure is always "changed" while it runs. */}
               {status === 'pending' ? 'Analyzing symmetry…' : null}
               {status === 'error' ? error : null}
               {status === 'ready' && !result ? 'Symmetry sweep ready.' : null}
               {status === 'idle' && !isStale ? 'No symmetry analysis has been run yet.' : null}
-              {isStale ? 'Structure changed since detection; re-run Detect symmetry.' : null}
+              {isStale && status !== 'pending' && status !== 'error' ? 'Structure changed since detection; re-run Detect symmetry.' : null}
             </p>
           </div>
           <div className="crystal-symmetry-buttons">

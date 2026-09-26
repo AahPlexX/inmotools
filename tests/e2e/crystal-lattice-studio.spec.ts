@@ -453,6 +453,27 @@ test('inspects a symmetry break after perturbing a site', async ({ page }) => {
   await expect(page.getByTestId('crystal-symmetry-break')).toContainText('Fe2');
 });
 
+test('symmetry actions stay in place when a site edit commits and the status text changes', async ({ page }) => {
+  // A site edit commits on blur, i.e. on the same tap that presses a symmetry
+  // action. If the status text above the buttons grows at that moment, the
+  // button moves between press and release and the tap is lost.
+  await page.goto('./#/tools/crystal-lattice-studio');
+  await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');
+  await page.getByRole('button', { name: 'Detect symmetry' }).click();
+  await expect(page.getByTestId('crystal-symmetry-result')).toContainText('Im-3m');
+  // Position relative to the panel, so page scrolling does not count.
+  const offset = () => page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent === 'Inspect symmetry break')!;
+    const panel = document.querySelector('[data-testid="crystal-symmetry-panel"]')!;
+    return button.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+  });
+  const before = await offset();
+  await page.getByLabel(/Fe2 fractional x/).fill('0.51');
+  await page.getByLabel(/Fe2 fractional x/).blur();
+  await expect(page.getByTestId('crystal-symmetry-status')).toContainText('Structure changed since detection');
+  expect(Math.abs((await offset()) - before)).toBeLessThanOrEqual(1);
+});
+
 test('previews and applies a standardized symmetry cell', async ({ page }) => {
   await page.goto('./#/tools/crystal-lattice-studio');
   await page.getByRole('combobox', { name: /Starter structure/ }).selectOption('bcc');

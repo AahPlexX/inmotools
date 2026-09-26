@@ -1,4 +1,13 @@
-import { applyPixelAdjustments, normalizeRecipe, sampleHistogram } from './photo-engine';
+import { normalizeRecipe, sampleHistogram, type PhotoLayerPixels } from './photo-engine';
+import { warpPhotoGeometryPixels } from './photo-geometry';
+import { warpPhotoMeshLiquifyPixels } from './photo-warp';
+import { photoNaturalDimensions } from './photo-export-dimensions';
+import { expansionLayout, padPhotoCanvas, warpPhotoTransformPixels } from './photo-transform';
+import { preparePhotoRaster } from './photo-import';
+import { normalizeResamplingKernel, resamplePixels, type PhotoResamplingKernel } from './photo-resample';
+import { encodePhotoTiff, hasTransparency } from './photo-tiff-writer';
+import { avifEncodingAvailable, encodePhotoAvif } from './codecs/avif-encoder';
+import { TEXT_LAYER_PADDING } from './photo-layers';
 import type {
   PhotoCapabilities,
   PhotoHistogram,
@@ -23,6 +32,10 @@ export interface PhotoRenderRequest {
   requestedHeight?: number;
   maxPreviewEdge?: number;
   jpegBackground?: string;
+  /** Final-resize kernel for exports; previews always use the browser scaler for speed. */
+  resampling?: PhotoResamplingKernel;
+  /** AVIF only: encode losslessly instead of at `quality`. */
+  lossless?: boolean;
 }
 
 export interface PhotoRenderResult {
@@ -35,6 +48,18 @@ export interface PhotoRenderResult {
   scaledForSafety: boolean;
   histogram: PhotoHistogram;
   outputMime: string;
+  proofBaseBlob?: Blob;
+  gamutWarningPixels: number;
+  /** Kernel actually used for the final resize (`browser` when no resize was needed or the
+   * unscaled frame exceeded safe canvas limits). */
+  resampling: PhotoResamplingKernel;
+}
+
+interface LayerBufferPayload {
+  layerId: string;
+  buffer: ArrayBuffer;
+  width: number;
+  height: number;
 }
 
 interface RenderWorkerResponse {
@@ -43,16 +68,28 @@ interface RenderWorkerResponse {
   width: number;
   height: number;
   buffer?: ArrayBuffer;
+  proofBaseBuffer?: ArrayBuffer;
+  gamutWarningPixels?: number;
   message?: string;
 }
 
+interface ProcessedPixelBuffers {
+  pixels: Uint8ClampedArray;
+  proofBasePixels?: Uint8ClampedArray;
+  gamutWarningPixels: number;
+}
+
 interface PendingWorkerRequest {
-  resolve: (pixels: Uint8ClampedArray) => void;
+  resolve: (result: ProcessedPixelBuffers) => void;
   reject: (error: Error) => void;
 }
 
 let worker: Worker | null = null;
 let workerBroken = false;
+let nextWorkerRequestId = 0;
+// Keyed by an internally generated id (not the caller-supplied revision), since
+// multiple callers (preview + export) each keep their own independent revision
+// counters and could otherwise collide on the same key.
 const pendingWorkerRequests = new Map<number, PendingWorkerRequest>();
 
 export function normalizeQuarterTurns(value: number): number {
@@ -103,16 +140,120 @@ function getContext2d(canvas: HTMLCanvasElement | OffscreenCanvas): CanvasRender
   return context as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 }
 
+/** Decodes one layer's self-contained data URL to raw pixels for compositing. A layer with no
+ * image yet (still being added) or an image this browser cannot decode is skipped rather than
+ * failing the whole render, matching how the engine already treats an undecoded layer as a
+ * no-op. */
+async function decodeImageLayerPixels(layer: { id: string; sourceDataUrl: string }): Promise<LayerBufferPayload | null> {
+  if (!layer.sourceDataUrl) return null;
+  try {
+    const blob = await (await fetch(layer.sourceDataUrl)).blob();
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas = createCanvas(bitmap.width, bitmap.height);
+      const context = getContext2d(canvas);
+      context.drawImage(bitmap, 0, 0);
+      const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width: bitmap.width, height: bitmap.height };
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+const SHAPE_LAYER_SIZE = 400;
+
+/** Renders a text layer to an offscreen canvas at its natural size (canvas dimensions become the
+ * layer's own pixel-buffer size, which compositeOneLayer then scales/positions like any image
+ * layer). An empty string renders nothing rather than failing the layer. */
+function renderTextLayerPixels(layer: { id: string; text?: string; textColor?: string; fontSize?: number }): LayerBufferPayload | null {
+  const text = layer.text?.trim();
+  if (!text) return null;
+  const fontSize = Math.max(8, layer.fontSize ?? 48);
+  const measuringCanvas = createCanvas(1, 1);
+  const measuringContext = getContext2d(measuringCanvas);
+  measuringContext.font = `${fontSize}px sans-serif`;
+  const metrics = measuringContext.measureText(text);
+  const width = Math.max(1, Math.ceil(metrics.width) + TEXT_LAYER_PADDING * 2);
+  const height = Math.max(1, Math.ceil(fontSize * 1.4) + TEXT_LAYER_PADDING);
+  const canvas = createCanvas(width, height);
+  const context = getContext2d(canvas);
+  context.clearRect(0, 0, width, height);
+  context.font = `${fontSize}px sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = layer.textColor ?? '#ffffff';
+  context.fillText(text, width / 2, height / 2);
+  const imageData = context.getImageData(0, 0, width, height);
+  return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width, height };
+}
+
+/** Renders a shape layer (rectangle/ellipse/line) to a fixed-size offscreen canvas; transform.scale
+ * on the layer is what a user then resizes it with, matching text and image layers. */
+function renderShapeLayerPixels(layer: { id: string; shapeKind?: string; shapeColor?: string; shapeStrokeWidth?: number; shapeFilled?: boolean }): LayerBufferPayload | null {
+  const size = SHAPE_LAYER_SIZE;
+  const canvas = createCanvas(size, size);
+  const context = getContext2d(canvas);
+  context.clearRect(0, 0, size, size);
+  const color = layer.shapeColor ?? '#ffffff';
+  const strokeWidth = Math.max(0, layer.shapeStrokeWidth ?? 0.02) * size;
+  const filled = layer.shapeFilled ?? true;
+  const inset = Math.max(strokeWidth / 2, 4);
+  context.fillStyle = color;
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(1, strokeWidth);
+  if (layer.shapeKind === 'ellipse') {
+    context.beginPath();
+    context.ellipse(size / 2, size / 2, size / 2 - inset, size / 2 - inset, 0, 0, Math.PI * 2);
+    if (filled) context.fill(); else context.stroke();
+  } else if (layer.shapeKind === 'line') {
+    context.beginPath();
+    context.moveTo(inset, size / 2);
+    context.lineTo(size - inset, size / 2);
+    context.stroke();
+  } else {
+    if (filled) context.fillRect(inset, inset, size - inset * 2, size - inset * 2);
+    else context.strokeRect(inset, inset, size - inset * 2, size - inset * 2);
+  }
+  const imageData = context.getImageData(0, 0, size, size);
+  return { layerId: layer.id, buffer: imageData.data.buffer as ArrayBuffer, width: size, height: size };
+}
+
+interface RenderableLayer {
+  id: string;
+  role: string;
+  sourceDataUrl: string;
+  text?: string;
+  textColor?: string;
+  fontSize?: number;
+  shapeKind?: string;
+  shapeColor?: string;
+  shapeStrokeWidth?: number;
+  shapeFilled?: boolean;
+}
+
+/** Produces a pixel buffer for any layer role that composites as pixels ('image', 'text', 'shape').
+ * An 'adjustment' layer has no pixel buffer of its own — the engine applies it directly to the
+ * pixels beneath it — so it resolves to null here and is skipped by the caller. */
+async function decodeLayerPixels(layer: RenderableLayer): Promise<LayerBufferPayload | null> {
+  if (layer.role === 'text') return renderTextLayerPixels(layer);
+  if (layer.role === 'shape') return renderShapeLayerPixels(layer);
+  if (layer.role === 'adjustment') return null;
+  return decodeImageLayerPixels(layer);
+}
+
 async function canvasToBlob(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   mime: PhotoOutputMime,
   quality: number,
 ): Promise<Blob> {
-  if (canvas instanceof OffscreenCanvas) {
+  if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
     return canvas.convertToBlob({ type: mime, quality: mime === 'image/png' ? undefined : quality });
   }
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
+    (canvas as HTMLCanvasElement).toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error('The browser could not encode this image.')),
       mime,
       mime === 'image/png' ? undefined : quality,
@@ -167,6 +308,8 @@ export async function probePhotoCapabilities(): Promise<PhotoCapabilities> {
     jpeg,
     png,
     webp,
+    tiff: true,
+    avif: avifEncodingAvailable(),
     maxCanvasEdge: VERIFIED_SAFE_EDGE,
     maxCanvasArea: VERIFIED_SAFE_AREA,
   };
@@ -186,9 +329,15 @@ function ensureWorker(): Worker | null {
         pending.reject(new Error(message.message || 'Photo render worker failed.'));
         return;
       }
-      pending.resolve(new Uint8ClampedArray(message.buffer));
+      pending.resolve({
+        pixels: new Uint8ClampedArray(message.buffer),
+        proofBasePixels: message.proofBaseBuffer ? new Uint8ClampedArray(message.proofBaseBuffer) : undefined,
+        gamutWarningPixels: message.gamutWarningPixels ?? 0,
+      });
     });
     worker.addEventListener('error', () => {
+      // Intentionally permanent: once broken, fall back to main-thread processing
+      // for the rest of the session rather than risking a crash-loop retry.
       workerBroken = true;
       for (const pending of pendingWorkerRequests.values()) pending.reject(new Error('Photo render worker failed.'));
       pendingWorkerRequests.clear();
@@ -207,46 +356,55 @@ async function processPixels(
   width: number,
   height: number,
   recipe: PhotoRecipe,
-  revision: number,
-): Promise<Uint8ClampedArray> {
+  mode: 'preview' | 'export',
+  jpegBackground?: readonly [number, number, number],
+  layerPixels: PhotoLayerPixels[] = [],
+): Promise<ProcessedPixelBuffers> {
   const activeWorker = ensureWorker();
   if (!activeWorker) {
-    applyPixelAdjustments(pixels, width, height, recipe);
-    return pixels;
+    const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground, layerPixels);
   }
 
+  const requestId = nextWorkerRequestId++;
   const transferable = new Uint8ClampedArray(pixels);
+  // Copies, not the caller's own buffers, so layerPixels stays valid for the main-thread
+  // fallback below if the worker attempt fails after these have already been transferred away.
+  const transferableLayers: LayerBufferPayload[] = layerPixels.map((entry) => ({
+    layerId: entry.layerId,
+    buffer: new Uint8ClampedArray(entry.data).buffer as ArrayBuffer,
+    width: entry.width,
+    height: entry.height,
+  }));
   try {
-    const result = await new Promise<Uint8ClampedArray>((resolve, reject) => {
-      pendingWorkerRequests.set(revision, { resolve, reject });
+    const result = await new Promise<ProcessedPixelBuffers>((resolve, reject) => {
+      pendingWorkerRequests.set(requestId, { resolve, reject });
       activeWorker.postMessage({
         type: 'process',
-        revision,
+        revision: requestId,
         width,
         height,
         buffer: transferable.buffer,
+        layers: transferableLayers,
         recipe,
-      }, [transferable.buffer]);
+        mode,
+        jpegBackground,
+      }, [transferable.buffer, ...transferableLayers.map((entry) => entry.buffer)]);
     });
     return result;
-  } catch {
-    pendingWorkerRequests.delete(revision);
-    applyPixelAdjustments(pixels, width, height, recipe);
-    return pixels;
+  } catch (error) {
+    pendingWorkerRequests.delete(requestId);
+    const color = recipe.colorManagement;
+    const colorManaged = Boolean(color?.assignedProfile
+      || (mode === 'export' && color?.outputProfile)
+      || (mode === 'preview' && color?.softProof && color.proofProfile));
+    if (colorManaged) {
+      const message = error instanceof Error ? error.message : 'unknown worker error';
+      throw new Error(`Color-managed render failed without a main-thread retry: ${message}`);
+    }
+    const { processPhotoColorPipeline } = await import('./color/photo-color-pipeline');
+    return processPhotoColorPipeline(pixels, width, height, recipe, mode, jpegBackground, layerPixels);
   }
-}
-
-function naturalOutputDimensions(
-  sourceWidth: number,
-  sourceHeight: number,
-  recipe: PhotoRecipe,
-): { width: number; height: number } {
-  const cropWidth = Math.max(1, Math.round(sourceWidth * recipe.crop.width));
-  const cropHeight = Math.max(1, Math.round(sourceHeight * recipe.crop.height));
-  const quarterTurns = normalizeQuarterTurns(recipe.rotateQuarterTurns);
-  return quarterTurns % 2 === 0
-    ? { width: cropWidth, height: cropHeight }
-    : { width: cropHeight, height: cropWidth };
 }
 
 function requestedDimensions(
@@ -314,24 +472,26 @@ function drawGeometry(
   return canvas;
 }
 
-function fillJpegBackground(
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-  background: string,
-): HTMLCanvasElement | OffscreenCanvas {
-  const output = createCanvas(canvas.width, canvas.height);
+function resolveJpegBackground(background: string): readonly [number, number, number] {
+  const output = createCanvas(1, 1);
   const context = getContext2d(output);
+  context.fillStyle = '#ffffff';
   context.fillStyle = background;
-  context.fillRect(0, 0, output.width, output.height);
-  context.drawImage(canvas, 0, 0);
-  return output;
+  context.fillRect(0, 0, 1, 1);
+  const pixel = context.getImageData(0, 0, 1, 1).data;
+  return [pixel[0], pixel[1], pixel[2]];
 }
 
 export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult> {
   if (typeof createImageBitmap !== 'function') throw new Error('This browser cannot decode images for Photo Studio.');
   const recipe = normalizeRecipe(request.recipe);
-  const bitmap = await createImageBitmap(request.file, { imageOrientation: 'from-image' });
+  const raster = await preparePhotoRaster(request.file, recipe.raw);
+  const bitmap = await createImageBitmap(raster.blob, {
+    imageOrientation: 'from-image',
+    colorSpaceConversion: recipe.colorManagement?.assignedProfile ? 'none' : 'default',
+  });
   try {
-    const natural = naturalOutputDimensions(bitmap.width, bitmap.height, recipe);
+    const natural = photoNaturalDimensions(bitmap.width, bitmap.height, recipe);
     const desired = requestedDimensions(natural.width, natural.height, request);
     let target = { ...desired, scaled: false };
 
@@ -342,22 +502,97 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       }
     }
 
-    const canvas = drawGeometry(bitmap, recipe, target.width, target.height);
-    const context = getContext2d(canvas);
-    const imageData = context.getImageData(0, 0, target.width, target.height);
-    const processed = await processPixels(imageData.data, target.width, target.height, recipe, request.revision);
-    const ownedPixels = new Uint8ClampedArray(processed.length);
-    ownedPixels.set(processed);
-    const processedImage = new ImageData(ownedPixels, target.width, target.height);
-    context.putImageData(processedImage, 0, 0);
-    const histogram = sampleHistogram(ownedPixels);
+    // Canvas expansion is an output border: every stage below works on the photo frame (`frame`),
+    // and the border is added last so adjustments, masks, and layers never touch it.
+    const layout = expansionLayout(target.width, target.height, recipe.canvasExpansion);
+    const frame = layout.inner;
+    const naturalLayout = expansionLayout(natural.width, natural.height, recipe.canvasExpansion);
+    const naturalFrame = naturalLayout.inner;
 
+    const requestedKernel = request.mode === 'export' ? normalizeResamplingKernel(request.resampling) : 'browser';
+    const resizing = frame.width !== naturalFrame.width || frame.height !== naturalFrame.height;
+    let resampling: PhotoResamplingKernel = 'browser';
+    let frameImage: ImageData;
+    if (requestedKernel !== 'browser' && resizing && canvasCanRender(naturalFrame.width, naturalFrame.height)) {
+      // Draw crop/rotation at natural size, then resize with the deterministic kernel so the
+      // selected filter (not the browser's scaler) determines the final pixels.
+      const naturalCanvas = drawGeometry(bitmap, recipe, naturalFrame.width, naturalFrame.height);
+      const naturalPixels = getContext2d(naturalCanvas).getImageData(0, 0, naturalFrame.width, naturalFrame.height).data;
+      const resized = resamplePixels(naturalPixels, naturalFrame.width, naturalFrame.height, frame.width, frame.height, requestedKernel);
+      frameImage = new ImageData(resized, frame.width, frame.height);
+      resampling = requestedKernel;
+    } else {
+      const geometryCanvas = drawGeometry(bitmap, recipe, frame.width, frame.height);
+      frameImage = getContext2d(geometryCanvas).getImageData(0, 0, frame.width, frame.height);
+    }
+    const lensPerspectivePixels = warpPhotoGeometryPixels(
+      frameImage.data,
+      frame.width,
+      frame.height,
+      recipe.lensDistortion,
+      recipe.perspectiveHorizontal,
+      recipe.perspectiveVertical,
+    );
+    // Corner pin and free transform follow the lens/perspective sliders and precede mesh warp and
+    // liquify, whose control points are placed on the frame as it looks after these moves.
+    const transformedPixels = recipe.freeTransform || recipe.perspectiveCorners
+      ? warpPhotoTransformPixels(lensPerspectivePixels, frame.width, frame.height, recipe.freeTransform, recipe.perspectiveCorners)
+      : lensPerspectivePixels;
+    const geometryPixels = warpPhotoMeshLiquifyPixels(
+      transformedPixels,
+      frame.width,
+      frame.height,
+      recipe.meshWarp,
+      recipe.liquifyStrokes,
+    );
     const mime = request.outputMime ?? 'image/png';
-    const outputCanvas = mime === 'image/jpeg'
-      ? fillJpegBackground(canvas, request.jpegBackground ?? '#ffffff')
-      : canvas;
+    const jpegBackground = request.mode === 'export' && mime === 'image/jpeg'
+      ? resolveJpegBackground(request.jpegBackground ?? '#ffffff')
+      : undefined;
+    const decodedLayers = await Promise.all((recipe.layers ?? []).map(decodeLayerPixels));
+    const layerPixels: PhotoLayerPixels[] = decodedLayers
+      .filter((entry): entry is LayerBufferPayload => entry !== null)
+      .map((entry) => ({ layerId: entry.layerId, data: new Uint8ClampedArray(entry.buffer), width: entry.width, height: entry.height }));
+    const processed = await processPixels(
+      geometryPixels,
+      frame.width,
+      frame.height,
+      recipe,
+      request.mode === 'export' ? 'export' : 'preview',
+      jpegBackground,
+      layerPixels,
+    );
+    const framePixels = new Uint8ClampedArray(processed.pixels.length);
+    framePixels.set(processed.pixels);
+    const expansion = recipe.canvasExpansion;
+    // A JPEG has no alpha, so a transparent border is flattened onto the export background, the same
+    // colour transparent photo pixels were flattened onto above.
+    const borderFill = expansion && jpegBackground && expansion.fill === 'transparent'
+      ? { ...expansion, fill: 'color' as const, color: `#${jpegBackground.map((value) => value.toString(16).padStart(2, '0')).join('')}` }
+      : expansion;
+    const ownedPixels = borderFill ? padPhotoCanvas(framePixels, layout, borderFill) : framePixels;
+    const canvas = createCanvas(target.width, target.height);
+    const context = getContext2d(canvas);
+    context.putImageData(new ImageData(ownedPixels, target.width, target.height), 0, 0);
+    // The histogram describes the photo, not a solid border that would spike one bin.
+    const histogram = sampleHistogram(framePixels);
+    let proofBaseBlob: Blob | undefined;
+    if (processed.proofBasePixels) {
+      const proofCanvas = createCanvas(target.width, target.height);
+      const proofContext = getContext2d(proofCanvas);
+      const proofFrame = new Uint8ClampedArray(processed.proofBasePixels);
+      const proofOwned = borderFill ? padPhotoCanvas(proofFrame, layout, borderFill) : proofFrame;
+      proofContext.putImageData(new ImageData(proofOwned, target.width, target.height), 0, 0);
+      proofBaseBlob = await canvasToBlob(proofCanvas, 'image/png', 1);
+    }
+
+    const outputCanvas = canvas;
     const quality = Math.min(1, Math.max(0.01, request.quality ?? 0.92));
-    let blob = await canvasToBlob(outputCanvas, mime, quality);
+    let blob = mime === 'image/tiff'
+      ? new Blob([encodePhotoTiff(ownedPixels, target.width, target.height, { alpha: hasTransparency(ownedPixels) }) as Uint8Array<ArrayBuffer>], { type: 'image/tiff' })
+      : mime === 'image/avif'
+        ? await encodePhotoAvif(ownedPixels, target.width, target.height, { quality, lossless: request.lossless === true })
+        : await canvasToBlob(outputCanvas, mime, quality);
     if (blob.type !== mime) {
       if (request.mode === 'export') throw new Error(`${mime} export is not supported by this browser.`);
       blob = await canvasToBlob(outputCanvas, 'image/png', 1);
@@ -373,6 +608,9 @@ export async function renderPhoto(request: PhotoRenderRequest): Promise<PhotoRen
       scaledForSafety: target.scaled || target.width !== desired.width || target.height !== desired.height,
       histogram,
       outputMime: blob.type,
+      proofBaseBlob,
+      gamutWarningPixels: processed.gamutWarningPixels,
+      resampling,
     };
   } finally {
     bitmap.close();

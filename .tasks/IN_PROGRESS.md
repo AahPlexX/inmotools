@@ -48,7 +48,7 @@
 - **Photo Studio** — local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
   - Design: `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
-  - Current milestone: A — foundation and global editor
+  - Current milestone (2026-09-25): all 164 ledger capabilities are implemented and browser-verified on `claude/photo-tool-completion-ama1g1` (continuation of `feat/photo-studio`, PR #78), including the RAW exposure baseline that closes Phase 1 / Task 1.5. Phase 7 audit is done, `origin/main` is merged into the branch, and PR #78 is green on the full Pages workflow at `873f29f` (run 36192897759). What remains is merging PR #78 to `main`, Pages deployment proof, and tracker closure. Authoritative boundaries, evidence, remaining IDs, and next-agent instructions: `.tasks/PHOTO_STUDIO.md`.
 
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.

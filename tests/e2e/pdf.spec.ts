@@ -67,3 +67,15 @@ test('blocks unsupported editable-form preservation and verifies flattened outpu
   expect(output.getForm().getFields()).toHaveLength(0);
   await expect(page.locator('.status-line')).toContainText(/1 source form field flattened; output inspection found 0 editable fields/i);
 });
+
+test('flags an impossible page range while it is typed, before any processing', async ({ page }) => {
+  await page.goto('./#/tools/pdf-sanitizer');
+  await page.getByLabel('Add PDF files').setInputFiles([{ name: 'short.pdf', mimeType: 'application/pdf', buffer: await plainPdf(100) }]);
+  const pages = page.getByLabel('Pages', { exact: true });
+  await pages.fill('1-5');
+  await expect(pages).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByText('Output pages').locator('..')).toContainText('—');
+  await pages.fill('1');
+  await expect(pages).toHaveAttribute('aria-invalid', 'false');
+  await expect(page.getByText('Output pages').locator('..')).toContainText('1');
+});

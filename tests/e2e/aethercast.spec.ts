@@ -320,3 +320,23 @@ for (const viewport of [
     expect(serious, serious.map((violation) => `${violation.id}: ${violation.description}`).join('\n')).toEqual([]);
   });
 }
+
+test('AetherCast chart scrubs with a touch drag while vertical swipes still scroll the page', async ({ page }) => {
+  await loadFixture(page);
+  const canvas = page.locator('.aethercast-canvas').first();
+  await canvas.scrollIntoViewIfNeeded();
+  expect(await canvas.evaluate((element) => getComputedStyle(element).touchAction)).toBe('pan-y');
+  const snapshot = page.getByRole('region', { name: 'Selected snapshot' });
+  const box = (await canvas.boundingBox())!;
+  const touchAt = (ratio: number, type: 'pointerdown' | 'pointermove') => canvas.evaluate((element, { clientX, clientY, eventType }) => {
+    element.dispatchEvent(new PointerEvent(eventType, {
+      pointerId: 5, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true,
+      button: 0, buttons: 1, clientX, clientY,
+    }));
+  }, { clientX: box.x + box.width * ratio, clientY: box.y + box.height / 2, eventType: type });
+  await touchAt(0.02, 'pointerdown');
+  const first = await snapshot.innerText();
+  await touchAt(0.5, 'pointermove');
+  await touchAt(0.98, 'pointermove');
+  await expect.poll(() => snapshot.innerText()).not.toBe(first);
+});

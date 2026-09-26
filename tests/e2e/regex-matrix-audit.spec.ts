@@ -48,6 +48,10 @@ test('RegexMatrix explanation pagination makes tokens after the initial slice re
 });
 
 test('RegexMatrix saved-session pagination and deletion expose every locally retained snapshot', async ({ page }) => {
+  // With the app's smooth scrolling, each of the 13 saves below waited ~2 s
+  // for the footer button to stop moving on a phone viewport and the test
+  // overran its timeout. Pagination and deletion do not depend on motion.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./#/regex-matrix');
   const pattern = page.getByRole('textbox', { name: 'Pattern', exact: true });
   for (let index = 0; index < 13; index += 1) {
@@ -75,7 +79,9 @@ test('Python exposes JavaScript-compatible UTF-16 offsets and separates runtime 
   await page.getByRole('button', { name: 'Run pattern' }).click();
   await selectStudioViewWhenSegmented(page, 'Matches');
 
-  await expect(page.getByTestId('match-inspector')).toContainText('2–3');
+  // The first Python run includes the Pyodide cold start (4.5-6.2 s measured
+  // under parallel load; the runtime bounds it at 30 s).
+  await expect(page.getByTestId('match-inspector')).toContainText('2–3', { timeout: 30_000 });
   const timing = page.getByTestId('runtime-timing');
   await expect(timing).toContainText(/startup/i);
   await expect(timing).toContainText(/execution/i);
@@ -93,7 +99,8 @@ test('Python and Oniguruma report the shared 5,000-record limit instead of silen
     await page.getByLabel('Test subject').fill('a'.repeat(5_001));
     await page.getByRole('button', { name: 'Run pattern' }).click();
     await selectStudioViewWhenSegmented(page, 'Matches');
-    await expect(page.getByTestId('match-count')).toHaveText('5001');
+    // Allows for the Pyodide cold start on the Python pass.
+    await expect(page.getByTestId('match-count')).toHaveText('5001', { timeout: 30_000 });
     await expect(page.getByTestId('match-limit-status')).toContainText('omitted 1 remaining match');
   }
 });
@@ -133,6 +140,9 @@ for (const viewport of [
   test(`RegexMatrix audit surface reflows without document overflow or blocking accessibility defects at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('./#/regex-matrix');
+    // The workspace is a lazily loaded chunk; measuring or scanning before it
+    // mounts checks an empty shell (axe then fails with "No elements found").
+    await expect(page.getByTestId('regex-matrix-workspace')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `document overflow at ${viewport.name}`).toBeLessThanOrEqual(1);
     const results = await new AxeBuilder({ page }).include('[data-testid="regex-matrix-workspace"]').analyze();

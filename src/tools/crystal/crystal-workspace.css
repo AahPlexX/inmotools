@@ -401,6 +401,15 @@
   gap: 8px;
 }
 
+/* The status text appears and changes length as work runs; reserving two
+   lines keeps the action buttons below it from moving between a pointer
+   press and release (which cancels the click on narrow layouts, e.g. when a
+   site edit commits on blur as the user taps "Inspect symmetry break"). */
+.crystal-symmetry-status {
+  min-height: 3em;
+  min-height: 2lh;
+}
+
 .crystal-defect-buttons,
 .crystal-symmetry-buttons {
   display: flex;

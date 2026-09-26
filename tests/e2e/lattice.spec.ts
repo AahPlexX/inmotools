@@ -104,25 +104,51 @@ test('provides privacy, diff, schema, JSONPath, and local DuckDB query workflows
   await expect(page.getByTestId('sql-results')).toContainText('paid');
 });
 
+test('pages a large local SQL result instead of mounting every row', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('./#/json-lattice');
+  await page.locator('details').filter({ hasText: 'JSONPath & DuckDB' }).locator('summary').click();
+  await page.getByLabel('SQL query').fill('SELECT range AS n FROM range(1000)');
+  await page.getByRole('button', { name: 'Run SQL' }).click();
+
+  const results = page.getByTestId('sql-results');
+  await expect(page.getByTestId('sql-results-range')).toContainText('Rows 1–100 of 1000', { timeout: 30_000 });
+  await expect(results.locator('tbody tr')).toHaveCount(100);
+  await results.getByRole('button', { name: 'Last' }).click();
+  await expect(page.getByTestId('sql-results-range')).toContainText('Rows 901–1000 of 1000');
+  await expect(results.locator('tbody tr').last()).toContainText('999');
+});
+
 test('blocks exports while source edits are pending or invalid instead of exporting the last valid revision', async ({ page }) => {
+  // The pending state lasts one parse debounce (140 ms). With real time a
+  // polling assertion can miss that window entirely, so time only moves when
+  // the test advances it.
+  await page.clock.install();
   await page.goto('./#/json-lattice');
   await setSource(page, SAMPLE);
   await expect(page.getByTestId('visible-node-count')).toHaveText('11');
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i);
+  // Freeze page time from here on; it moves only through runFor below.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000));
 
   const normalizedExports = ['Export SVG', 'Export PNG', 'Export JPEG', 'Export CSV', 'Export JSON', 'Export YAML', 'Export TOML', 'Export protected JSON'];
   const editor = page.locator('[aria-label="JSON Lattice source"]');
   await editor.fill('{"status":"pending"}');
+  // CodeMirror applies typed DOM changes on its next animation frame; run
+  // that far but stay well inside the parse debounce.
+  await page.clock.runFor(40);
   await expect(page.getByTestId('revision-status')).toContainText(/pending|uncommitted/i);
   await expectButtonsDisabledNow(page, normalizedExports);
   const rawExport = page.getByRole('button', { name: 'Export raw source' });
   await expect(rawExport).toBeEnabled();
 
+  await page.clock.runFor(300);
   await expect(page.getByTestId('revision-status')).toContainText(/current|synced/i, { timeout: 2_000 });
   await expect(page.getByRole('button', { name: 'Export JSON' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Export protected JSON' })).toBeEnabled();
 
   await editor.fill('{');
+  await page.clock.runFor(300);
   await expect(page.getByTestId('revision-status')).toContainText(/invalid/i, { timeout: 2_000 });
   for (const name of normalizedExports) await expect(page.getByRole('button', { name })).toBeDisabled();
   await expect(rawExport).toBeEnabled();
@@ -171,4 +197,35 @@ test('reflows after real content load in phone portrait, phone landscape, and ta
     await expect(page.getByRole('button', { name: 'Export raw source' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Export JSON' })).toBeVisible();
   }
+});
+
+test('touch users can pan the graph and zoom it with the on-screen controls', async ({ page }) => {
+  await page.goto('./#/tools/json-lattice');
+  const viewport = page.locator('.lattice-viewport');
+  await expect(page.getByRole('button', { name: 'Fit graph' })).toBeVisible();
+  // The canvas claims touch gestures itself instead of letting them scroll the page.
+  expect(await viewport.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+
+  const zoomLabel = page.getByRole('group', { name: 'Graph zoom' }).locator('span');
+  const before = Number((await zoomLabel.textContent())!.replace('%', ''));
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBeGreaterThan(before);
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await page.getByRole('button', { name: 'Zoom out' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBeLessThan(before);
+  // Fit graph sits in the same pannable area and must also receive its click.
+  await page.getByRole('button', { name: 'Fit graph' }).click();
+  await expect.poll(async () => Number((await zoomLabel.textContent())!.replace('%', ''))).toBe(before);
+
+  // A real one-finger drag on empty canvas pans the graph (Chromium touch input via CDP).
+  const world = page.locator('.lattice-world');
+  const startTransform = await world.evaluate((element) => (element as HTMLElement).style.transform);
+  await viewport.scrollIntoViewIfNeeded();
+  const box = (await viewport.boundingBox())!;
+  const client = await page.context().newCDPSession(page);
+  const x = box.x + 14; const y = box.y + box.height - 14;
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [20, 40, 60, 80]) await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => world.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(startTransform);
 });

@@ -21,6 +21,15 @@ describe('focused E2E spec selection', () => {
     ]);
     expect(selectE2eSpecs(['src/tools/photo/PhotoWorkspace.tsx'])).toEqual([
       'tests/e2e/photo.spec.ts',
+      'tests/e2e/photo-controls.spec.ts',
+      'tests/e2e/photo-geometry.spec.ts',
+      'tests/e2e/photo-compare.spec.ts',
+      'tests/e2e/photo-copy-paste.spec.ts',
+      'tests/e2e/photo-import.spec.ts',
+      'tests/e2e/photo-project.spec.ts',
+      'tests/e2e/photo-merge.spec.ts',
+      'tests/e2e/photo-workflow.spec.ts',
+      'tests/e2e/photo-editing-extras.spec.ts',
     ]);
     expect(selectE2eSpecs(['src/tools/svg/VectorCanvas.tsx'])).toEqual([
       'tests/e2e/svg.spec.ts',

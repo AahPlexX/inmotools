@@ -37,9 +37,9 @@ test('a slower previous file read cannot overwrite a newer GeoJSON selection',as
  const fast={type:'LineString',coordinates:[[0,0],[1,1],[2,2],[3,3]]};
  await input.setInputFiles({name:'slow.geojson',mimeType:'application/geo+json',buffer:Buffer.from(JSON.stringify(slow))});
  await input.setInputFiles({name:'fast.geojson',mimeType:'application/geo+json',buffer:Buffer.from(JSON.stringify(fast))});
- await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 positions loaded');
+ await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 coordinate positions loaded');
  await page.waitForTimeout(400);
- await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 positions loaded');
+ await expect(page.locator('.workspace-body .status-line[role="status"]')).toContainText('4 coordinate positions loaded');
 });
 
 test('all interoperability warnings remain reachable instead of silently truncating after twenty',async({page})=>{
