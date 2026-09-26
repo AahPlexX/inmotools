@@ -38,7 +38,7 @@
     "@formulajs/formulajs": "4.6.1",
     "@gltf-transform/core": "4.4.2",
     "@gltf-transform/extensions": "4.4.2",
-    "@gltf-transform/functions": "4.4.2",
+    "@gltf-transform/functions": "4.5.0",
     "@hpcc-js/wasm-graphviz": "1.28.0",
     "@jsquash/avif": "2.1.1",
     "@lezer/highlight": "1.2.3",
