@@ -1,46 +1,61 @@
 # Photo Studio — Authoritative Completion Tracker
 
-> This file is the single source of truth for Photo Studio completion state while `feat/photo-studio` is active. Update it whenever a Photo Studio commit changes a gate, remaining task, verification result, integration state, or deployment state. Do not claim completion from the implementation plan alone.
+> This file is the authoritative completion and maintenance record for Photo Studio. The original implementation branches and PRs are historical only; future accepted Photo scope must start from current `origin/main` and re-enter the repository task-state system.
 
 ## Deterministic completion goal
 
 Photo Studio is **COMPLETE** only when every gate below is checked on the same final integrated `origin/main` SHA and there are no unresolved Photo Studio release blockers.
 
-- [ ] **Feature contract** — at least 30 genuinely functional, non-destructive editing capabilities are exposed in the production UI and each maps to recipe state plus real preview/export behavior; no inert controls.
-- [ ] **Direct editing contract** — local masks and retouch operations can be placed directly on the rendered photo with image-space coordinates that remain correct across supported zoom levels; gestures commit as coherent undo steps.
-- [ ] **Geometry/detail contract** — crop/rotation/flip/straighten, lens distortion, horizontal/vertical perspective, texture/clarity/sharpening, luminance/chroma denoise, chromatic-aberration correction, and tone curve are usable and export through the same renderer as preview.
-- [ ] **Export contract** — JPEG/PNG/WebP capability probing prevents MIME mislabeling; safe canvas limits are enforced; filename, quality, resize, background, output sharpening, and metadata policy are user-controllable.
-- [ ] **Metadata contract** — reviewed metadata can be serialized to XMP; JPEG/PNG/WebP exports attempt standards-compatible embedded XMP where supported; metadata packaging failure never destroys the rendered pixel export; XMP sidecar remains available.
-- [ ] **Batch/project contract** — batch processing is sequential and failure-isolated, does not retain all full-resolution outputs in memory, uses the same export policy as single-file export, and recipe JSON import/export round-trips through normalization/version validation.
-- [ ] **History/persistence contract** — undo/redo, snapshots/presets/recipe state used by the UI remain deterministic and reversible; stale asynchronous render results cannot replace newer revisions.
-- [ ] **Responsive/accessibility contract** — production UI has no page-level horizontal overflow at 320 CSS px, remains keyboard operable for core editing/export flows, exposes meaningful labels/status, and respects reduced-motion behavior.
-- [ ] **Focused verification contract** — fresh Photo Studio unit tests, production build, and the complete focused Photo Studio browser matrix pass against the exact final merge state.
-- [ ] **Integration contract** — branch is reconciled non-destructively with the then-current `origin/main`; changed-file review confirms no unrelated tool regressions or private/internal prompt leakage; PR merge state is green.
-- [ ] **Deployment contract** — the exact integrated `origin/main` SHA is published by GitHub Pages and an uncached live check confirms `/#/tools/photo-studio` loads the intended production workspace.
-- [ ] **Tracking closure contract** — this file records the final SHA/evidence, Photo Studio is moved out of `.tasks/IN_PROGRESS.md`, closure is recorded in `.tasks/DONE.md`/`.tasks/WORK_LOG.md`, and any intentionally deferred decoder enhancement is explicitly recorded rather than silently omitted.
+- [x] **Feature contract** — at least 30 genuinely functional, non-destructive editing capabilities are exposed in the production UI and each maps to recipe state plus real preview/export behavior; no inert controls.
+- [x] **Direct editing contract** — local masks and retouch operations can be placed directly on the rendered photo with image-space coordinates that remain correct across supported zoom levels; gestures commit as coherent undo steps.
+- [x] **Geometry/detail contract** — crop/rotation/flip/straighten, lens distortion, horizontal/vertical perspective, texture/clarity/sharpening, luminance/chroma denoise, chromatic-aberration correction, and tone curve are usable and export through the same renderer as preview.
+- [x] **Export contract** — JPEG/PNG/WebP capability probing prevents MIME mislabeling; safe canvas limits are enforced; filename, quality, resize, background, output sharpening, and metadata policy are user-controllable.
+- [x] **Metadata contract** — reviewed metadata can be serialized to XMP; JPEG/PNG/WebP exports attempt standards-compatible embedded XMP where supported; metadata packaging failure never destroys the rendered pixel export; XMP sidecar remains available.
+- [x] **Batch/project contract** — batch processing is sequential and failure-isolated, does not retain all full-resolution outputs in memory, uses the same export policy as single-file export, and recipe JSON import/export round-trips through normalization/version validation.
+- [x] **History/persistence contract** — undo/redo, snapshots/presets/recipe state used by the UI remain deterministic and reversible; stale asynchronous render results cannot replace newer revisions.
+- [x] **Responsive/accessibility contract** — production UI has no page-level horizontal overflow at 320 CSS px, remains keyboard operable for core editing/export flows, exposes meaningful labels/status, and respects reduced-motion behavior.
+- [x] **Focused verification contract** — fresh Photo Studio unit tests, production build, and the complete focused Photo Studio browser matrix pass against the exact final merge state.
+- [x] **Integration contract** — branch is reconciled non-destructively with the then-current `origin/main`; changed-file review confirms no unrelated tool regressions or private/internal prompt leakage; PR merge state is green.
+- [x] **Deployment contract** — the exact integrated `origin/main` SHA is published by GitHub Pages and an uncached live check confirms `/#/tools/photo-studio` loads the intended production workspace.
+- [x] **Tracking closure contract** — this file records the final SHA/evidence, Photo Studio is moved out of `.tasks/IN_PROGRESS.md`, closure is recorded in `.tasks/DONE.md`/`.tasks/WORK_LOG.md`, and any intentionally deferred decoder enhancement is explicitly recorded rather than silently omitted.
 
 If any box above is unchecked, Photo Studio is not complete.
 
 ## Current state
 
-- Status: **IN PROGRESS**
-- Working branch: `feat/photo-studio`
-- Pull request: `#29`
-- Working branch for continuation (2026-09-24): `claude/photo-tool-completion-ama1g1`, created from `feat/photo-studio` at `1e74011d` so all Photo history stays in one lineage. `feat/photo-studio` / PR `#29` were not modified; when the continuation branch merges into `main`, PR `#29`'s commits are contained in it.
-- Current phase: **Phases 1 and 3–6 are complete, and all 164 ledger capabilities are implemented and browser-verified (2026-09-25). Remaining: Phase 7 only (audit, notices link, integration with `main`, Pages proof, tracker closure).**
-- Current verification state (2026-09-25, integrated with `main`): PR #78 head `873f29f` passes the repository's full Pages workflow on the PR merge state (run 36192897759: unit tests, production build, and the complete desktop + mobile Chromium browser suite, all green). `main` was merged in at `c290290` and again at `a1963e4`; the five browser-suite failures inherited from `main` and the flakes CI retries were absorbing were root-caused and fixed on this PR (see `.tasks/NEXT.md`, TASK-014 2026-09-25 continuation). Remaining gates: merge to `main`, Pages deployment proof, tracker closure.
-- Previous verification state (2026-09-25, scattered capabilities): Photo unit suite plus selector **41 files / 445 tests** pass; `tsc` clean; production build clean; focused Photo browser matrix **210/210** (the 9 prior specs, 184, plus `photo-editing-extras.spec.ts`, 13 cases × desktop/mobile) passes on desktop and mobile Chromium. Phase 7 audit so far: an axe scan of every panel with every section expanded reports no serious or critical violations (it caught and fixed a dangling `aria-controls` on the guides toggle), and every panel reflows at 320 CSS px without horizontal scrolling. Escape now disarms any active canvas tool (brush, picker, crop, straighten), and the tool hints say so.
-- Previous verification state (2026-09-24, Phase 6): Photo unit suite plus selector **37 files / 419 tests** pass; `tsc` clean; production build emits the AVIF encoder (`assets/avif-encode.worker-*.js` 20 kB, `assets/avif_enc-*.wasm` 3.49 MB) outside precache with the `photo-avif-encoder` runtime rule; the full 9-file focused Photo browser matrix **184/184** passes on desktop and mobile Chromium.
-- Previous verification state (2026-09-24, Tasks 5.2–5.4): full Photo-prefixed unit suite plus selector **31 files / 366 tests** pass; `tsc` clean; production build emits `assets/photo-merge.worker-*.js` (15.59 MB) outside precache (136 entries / 14,410.44 KiB; `sw.js` references the engine only through the `photo-merge-engine` runtime rule); the full 8-file focused Photo browser matrix **156/156** passes on desktop and mobile Chromium with two workers.
-- Local browser runs in the hosted container use an untracked Playwright override (`playwright.local.config.ts`, listed in `.git/info/exclude`) that sets `launchOptions.executablePath` to the preinstalled Chromium, because the pinned Playwright expects a browser build the container does not ship. CI uses the committed `playwright.config.ts` unchanged.
-- Latest inspected branch/PR context (2026-09-17): PR `#29` remains open/draft and reports `DIRTY` against the moving base; its inspected remote head before this runtime/documentation batch was `1ef0c8a3f3b497facd823ab18ce0151d5b0a266d`. The local Photo runtime head is `8934f1c9771f087a4008787908e27bdc319a0464`; latest fetched `origin/main` is `b27cf8cbc51c38a1942c2ba9410d9b37879745f7` (`docs(markdown): record audit verification and remaining scope`), an unrelated workstream commit. Main was not merged, rebased, rewritten, or pushed by this Photo batch. Local exact-head GREEN is not an integrated-release claim.
-- Test-count correction: the earlier recorded 110-case Photo unit/selector total was not the exact Photo namespace count. PR run `34974201415` establishes 93 before TIFF; TIFF adds 28, yielding 121; RAW acquisition adds 20, yielding 141; RAW development adds 17, yielding 158; embedded previews add 15, yielding 173; Task 2.1 direct crop/straighten geometry adds 8, yielding 181; Task 2.2 advanced tone/color adds 4, yielding 185; Task 2.3 deterministic analysis adds 3, yielding 188; Task 2.4 LUT workflow adds 5, yielding 193; Task 2.5 ICC color management adds 8, yielding 201; Task 2.6 inspection scopes adds 5, yielding 206; Task 3.1 selection adds 8, yielding the current tracked total of 214. No tracked tests were removed. For a clean checkout, run the Photo-prefixed unit files plus `tests/unit/e2e-spec-selection.test.mjs` sequentially with Vitest and `--maxWorkers=1`.
-- Workspace ownership note (2026-09-17): the local worktree contains a separately owned, unstaged `tests/unit/photo-raw.test.ts` exposure-baseline RED change. It is intentionally excluded from `8934f1c9771f087a4008787908e27bdc319a0464` and from the 214-test tracked-branch total. A fresh run of that working-tree file produced 45 maintained passes plus the expected failure of the separately owned exposure assertion because the binding returns identical samples for neutral and +1 EV. Do not discard, stage, or rewrite this file without first reconciling ownership; it describes the still-open LibRaw exposure blocker rather than implemented behavior.
-- Prior PR workflow context: run `34726437963` passed all 722 repository unit tests and the production build at earlier Photo head `93a3535252c843cc27146030373e377b9e35f12a`, then failed the expanded 502-case repository browser suite. Its two Photo-specific failures were test-contract defects (an unscoped page-level status locator and mouse-only range dragging under touch emulation), both corrected at `5612412d8e0416f62f14bd82d351d4c76ac77966`; unrelated tool failures remain outside Photo Studio scope.
-- Current verified merge-state evidence: PR workflow run `34706122558` completed successfully for earlier Photo head `5394c88b560af6ab5933968771334502da9c207e`; the repository unit suite, production build, and the complete focused Photo Studio browser matrix all passed on that PR merge state.
-- Most recent intentional RED evidence: workflow run `34706499377` for head `8682b9a5b241c6d9ec9899f722a0b31de3ab7ed6` passed repository unit tests and the production build, then failed browser validation at the new copy/paste contract because the production `Copy edits` / `Paste edits` behavior did not yet exist.
-- Task 1.1 local RED evidence: the import unit/selector contract first failed because `photo-import.ts` and focused spec selection did not exist; browser contracts then failed for the missing drop target and clipboard controls. Independent review regressions additionally reproduced stale clipboard replacement, outside-root paste loss, premature URL revocation, inaccessible hidden-input focus, misleading extension fallback, and preview-status races before their fixes.
-- Historical exact-head CI evidence: workflow run `34662031647` completed successfully for `735f9f915cf8427c95444d3296ce065e688a2ea0`; all 661 repository unit tests, production build, and all 24 focused Photo Studio browser tests succeeded on that earlier PR merge state.
+- Status: **COMPLETE — 164/164 capabilities**
+- Authoritative integrated product revision: `4740cca77eb946801e09a78dec8022d448aac67a` on `origin/main`.
+- Integration: PR #78 (`claude/photo-tool-completion-ama1g1`) merged by squash to `main`; its final head
+  `7d6a67e950e41bd4187f58ccf3f1b340b355ed85` and the integrated main commit have the identical
+  Git tree `a1b3fedc3e6e5e023491bfe116a3c450fe46db37`. The older draft PR #29 was closed as superseded.
+- Capability evidence: every ID in the 164-capability expansion ledger is implemented and browser-verified.
+  Phase 7 accessibility/reflow audit is complete, including all-panel Axe checks at serious/critical impact,
+  320 CSS-pixel reflow, Escape tool disarm, and visible-copy cleanup.
+- Full merged-tree verification: PR Pages run `36195289978` / validate job `108269628093` passed frozen
+  install, the complete repository unit suite, production build, Chromium install, and the full desktop +
+  mobile browser suite. The tested PR head and integrated main product revision are byte-for-byte identical
+  trees, so this is validation of the exact integrated product content rather than a nearby branch state.
+- Exact-main release evidence: Pages run `36204814286` on `4740cca77eb946801e09a78dec8022d448aac67a`
+  passed frozen install, repository unit tests, production build, production Pages artifact build/upload,
+  and deployment job `108299095824`. Its duplicate full browser sweep may complete after this record; it
+  is not the sole browser evidence because the identical merged tree already passed the complete suite.
+- Live deployment evidence: a forced uncached fetch of
+  `https://aahplexx.github.io/inmotools/#/tools/photo-studio` returned HTTP 200 after deployment and
+  rendered the completed Photo Studio surface, including TIFF/camera RAW input, multi-photo merge copy,
+  TIFF/AVIF output, contact-sheet output, and the editor controls.
+- Focused historical evidence: Photo unit + selector suites reached 41 files / 445 tests, and the complete
+  focused Photo browser matrix reached 210/210 desktop/mobile checks before final integration.
+- Dependency policy: Photo's five added runtime dependencies remain exact-pinned at their current published
+  versions as verified on 2026-09-25: `@colorhythm/libraw-wasm@1.1.1`, `@jsquash/avif@2.1.1`,
+  `@techstark/opencv-js@5.0.0-release.1`, `lcms-wasm@1.0.5`, and `tiff@7.1.3`. The package-security
+  audit found no known vulnerabilities across the 136 scanned packages/dependencies.
+- Static/privacy closure: no Photo TODO/FIXME/HACK implementation markers, remote `fetch`,
+  `XMLHttpRequest`, `WebSocket`, internal prompt text, confidence text, or chain-of-thought text remain
+  under `src/tools/photo/`.
+- Branch containment: the PR #78 branch is identical to integrated `main`; `feat/photo-studio` is
+  historical and hundreds of commits behind current `main`. Neither branch is a future merge source.
+- Deferred scope: none of the 164 accepted capabilities is deferred. Any new codec, editing, workflow, or
+  interoperability feature is new scope and must be explicitly tracked before implementation.
 
 ## Verified progress
 

@@ -1,5 +1,38 @@
 # Done
 
+## Photo Studio — 164/164 complete
+
+Photo Studio is complete against its authoritative 164-capability ledger and integrated on
+`origin/main` through merged PR #78 at product revision
+`4740cca77eb946801e09a78dec8022d448aac67a`. The final PR head
+`7d6a67e950e41bd4187f58ccf3f1b340b355ed85` and the integrated main commit share the
+identical Git tree `a1b3fedc3e6e5e023491bfe116a3c450fe46db37`; old draft PR #29 was closed
+as superseded.
+
+The completed product includes local JPEG/PNG/WebP/TIFF/camera-RAW acquisition, reversible global and
+local editing, crop/transform/perspective/detail/color workflows, selections and masks, retouching, layers
+and compositing, warp/liquify and deterministic filters, HDR/exposure-fusion/panorama/focus/average/median
+multi-image merges, project/preset/snapshot/version workflows, TIFF/AVIF and metadata-aware export,
+resampling, print/contact sheets, and progressive File System Access—all within the static/local-first
+architecture.
+
+Final evidence:
+- full merged-tree Pages validation run `36195289978` / job `108269628093` passed frozen install,
+  repository units, production build, Chromium installation, and the complete desktop/mobile browser suite;
+- exact-main Pages run `36204814286` passed frozen install, repository units and production build,
+  built/uploaded the production Pages artifact, and deployment job `108299095824` succeeded;
+- a forced uncached live fetch of `/#/tools/photo-studio` returned HTTP 200 and rendered the completed
+  production workspace after deployment;
+- the focused Photo matrix previously reached 210/210 desktop/mobile browser checks and 41 unit/selector
+  files / 445 tests;
+- all five Photo-specific runtime dependencies are current exact pins and the dependency audit found zero
+  known vulnerabilities across 136 scanned packages/dependencies;
+- static closure found no Photo TODO/FIXME/HACK implementation debt, remote network path, or internal
+  prompt/confidence/chain-of-thought leakage.
+
+No accepted capability is deferred. Future Photo scope must start from current `origin/main` and re-enter
+the task-state system.
+
 ## Typing Workstation — 47/47 complete
 
 The approved 2026-09-25 traditional-controls/local-typist expansion is complete on top of the original 38-capability workstation. F39–F47 add explicit Start/Pause/Resume/Stop/Reset lifecycle controls, paused-time-excluded scoring, persistent browser-local typist profiles, profile-scoped history/averages/PBs/imports/exports, profile-specific score reset, and active-session mutation guardrails while preserving implicit first-character start and the existing native input/IME path.
