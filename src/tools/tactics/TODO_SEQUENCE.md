@@ -3,7 +3,7 @@
 **Updated:** 2026-09-25
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Candidate code tip described by this queue before this documentation commit:** `c6550af2a0b32f970983e2aed2c70fed68817346`
+**Validated Task 5 runtime tip:** `c6550af2a0b32f970983e2aed2c70fed68817346`
 
 ## Purpose and source-of-truth roles
 
@@ -83,23 +83,19 @@
 - **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
 - **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** ACTIVE — implementation complete; exact browser gate pending
+- **Status:** DONE
 - **Depends on:** T04-01 DONE
-- **Primary files:** Tactical timeline/motion/scene/action/unit/possession/conflict engines and UI; focused unit/e2e tests
-- **Validated complete rows:** 16, 17, 18, 19, 21, 25, 26.
-- **Implemented / verification-pending rows:** 20, 22, 23, 24.
-- **Current evidence:** candidate `c6550af2a0b32f970983e2aed2c70fed68817346` passes the repository unit suite and production/PWA build. It includes generalized object/layer temporal visibility, typed tactical/coaching markers, the nine named editable coordinated-action patterns, and linked-unit translation/line-shift/step/drop/width/depth controls. Workflow run `36204645295` is executing the exact-source browser matrix.
-- **Next:** inspect run `36204645295`; repair any Tactical failure test-first. If Tactical desktop/mobile/Axe/keyboard/reflow evidence is clean, promote rows 20/22/23/24, mark T05 DONE, set the verified numerator to 20/60, and unlock T06.
-- **Exit evidence:** every row 16–26 satisfies its accepted wording plus deterministic unit/build/desktop/mobile/accessibility/reflow evidence.
-- **Reverse-safe:** no; T06 remains blocked until this validation gate closes.
+- **Verified rows:** 16–26.
+- **Closure evidence:** runtime source `c6550af2a0b32f970983e2aed2c70fed68817346` passes repository units and production/PWA build. Workflow run `36204645295` executed all 19 Tactical scenarios across desktop/mobile Chromium with **36 passed / 2 intentional mobile duplicate Axe/reflow skips / 0 Tactical failures**. The 12 workflow failures were unrelated repository tests.
+- **Reverse-safe:** complete.
 
 ### T06-01 — Spatial analysis
-- **Status:** BLOCKED — T05-01 must close first
+- **Status:** ACTIVE
 - **Depends on:** T05-01 DONE
 - **Primary files:** new tactical analysis modules + Tactical analysis UI/tests; do not edit later persistence/3D/media/export surfaces.
 - **Action order:** (1) pure Euclidean Voronoi + convex hull/centroid/width/depth primitives; (2) passing-lane clearance + authored orientation/vision sectors; (3) positional grid + distance rings/dynamic tethers; (4) trajectory occupancy heat map + authored/imported speed/distance metrics; (5) analytical-honesty UI labels; (6) focused desktop/mobile/browser validation; (7) reconcile feature rows 27–34.
 - **Exit evidence:** deterministic geometry/metric unit invariants, source-honest labels, TypeScript/build, and complete responsive browser authoring/view workflows for rows 27–34.
-- **Reverse-safe:** yes; this is the sole READY item. A reverse-working agent must still follow the sub-order above unless taking a non-overlapping test/documentation-only slice.
+- **Reverse-safe:** no while ACTIVE; its primary Tactical analysis/UI/test files are reserved for this dependency-ordered slice.
 
 ### T07-01 — Persistence, interchange and session planning
 - **Status:** BLOCKED
