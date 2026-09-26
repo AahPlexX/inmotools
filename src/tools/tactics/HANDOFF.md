@@ -4,7 +4,7 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last validated source tip: `69bec32e29dbed806c4439b9a80314c918e4dda2`
+- Last fully browser-validated source tip: `69bec32e29dbed806c4439b9a80314c918e4dda2`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
 - Milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened)**
 - Verified functional features: **16/60**
@@ -14,27 +14,25 @@ Documentation commits after the validated source tip do not change Tactical runt
 
 ## Exact next sequential action
 
-Continue **T05-01**. Gauntlet invalidated the prior blanket 16–26 verification.
+Finish the exact-source **T05-01 validation gate** at `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
-Exact order:
-1. #20 generalized object/layer temporal visibility.
-2. #22 typed markers/coaching triggers.
-3. #23 named editable coordinated-action template library.
-4. #24 linked-unit line-shift, step/drop and width/depth controls.
-5. Re-run Task 5 units, TypeScript/build, desktop/mobile browser, Axe, keyboard and reflow evidence.
-6. Only then close T05 and unlock T06.
+1. Read workflow run `36204645295` after completion.
+2. Confirm the full Tactical Matchboard browser matrix has no tactical failures across desktop/mobile Chromium, including Axe, keyboard, pointer/touch-equivalent, reflow and target checks.
+3. If Tactical is clean, promote rows #20, #22, #23 and #24 from `implemented` to `verified`, raising the deterministic count from 16/60 to 20/60.
+4. Mark T05 DONE and T06 spatial analysis ACTIVE; then implement rows #27–#34 in the dependency order already recorded in `TODO_SEQUENCE.md`.
+5. If any Tactical failure remains, repair it test-first before changing the verified numerator or unlocking T06.
 
-Rows #16, #17, #18, #19, #21, #25 and #26 are verified. #25 has visible ball attachment/handoff/release proof and SVG ball rendering through `f4f4cde`.
+Rows #16, #17, #18, #19, #21, #25 and #26 are already verified. Rows #20, #22, #23 and #24 are implemented at the candidate tip and are verification-pending.
 
 ## Task 5 closure evidence
 
-Task 5 is **ACTIVE** after Gauntlet found accepted-scope gaps. Rows 17 and 19 are now closed; rows 20, 22, 23 and 24 remain open.
+Task 5 is **ACTIVE — exact browser validation pending**. The previously reopened accepted semantics for rows 20, 22, 23 and 24 are implemented. At `c6550af`, repository units and production/PWA build pass; browser run `36204645295` is the remaining closure gate.
 
 ## Current verified feature rows
 
 Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 25, 26**.
 
-In progress: **3, 4, 5, 7, 8, 20, 22, 23, 24, 51, 52, 55, 56, 59**.
+In progress/verification-pending: **3, 4, 5, 7, 8, 20, 22, 23, 24, 51, 52, 55, 56, 59**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 

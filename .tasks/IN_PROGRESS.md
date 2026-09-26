@@ -5,10 +5,10 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
-  - Current milestone: **Task 5 — timeline, trajectories and coordinated motion (Gauntlet reopened).** T06 is blocked until the remaining accepted Task 5 semantics are complete.
-  - Current verified feature count: **16/60**. Verified rows: 1, 2, 9–19, 21, 25 and 26. Rows 20, 22, 23 and 24 remain in progress after accepted-scope audit.
-  - Current evidence through validated source tip `69bec32e29dbed806c4439b9a80314c918e4dda2`: prior Task 5 gates remain valid; multi-scene sequencing adds 9/9 focused scene units, TypeScript/production build green, and 2/2 isolated desktop/mobile Chromium workflow checks for split, rename, reorder and lossless join.
-  - Task 5 now includes sampled timeline preview/transport, custom timing easing, scene sequencing, visibility, grouped stagger, coordinated actions, linked units, possession/handoffs, and physical-metre conflict review.
+  - Current milestone: **Task 5 — implementation complete; exact browser validation pending.** T06 remains blocked until the current Tactical browser gate closes.
+  - Current verified feature count: **16/60**. Verified rows: 1, 2, 9–19, 21, 25 and 26. Rows 20, 22, 23 and 24 are implemented at `c6550af` but remain verification-pending.
+  - Current evidence: exact candidate `c6550af2a0b32f970983e2aed2c70fed68817346` passes repository unit tests and the production/PWA build; workflow run `36204645295` is executing the browser matrix. The prior row-19 scene-editing browser evidence remains green at `69bec32`.
+  - Task 5 implementation now includes sampled transport, editable Bézier trajectories/easing, full scene sequencing, generalized temporal visibility, grouped stagger, typed coaching/tactical markers, nine named coordinated-action patterns, linked-unit translation/line-shift/step/drop/width/depth controls, possession/handoffs, and physical-metre conflict review.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the Tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 

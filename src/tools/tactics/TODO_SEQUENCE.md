@@ -3,7 +3,7 @@
 **Updated:** 2026-09-25
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Code tip described by this queue before this documentation commit:** `69bec32e29dbed806c4439b9a80314c918e4dda2`
+**Candidate code tip described by this queue before this documentation commit:** `c6550af2a0b32f970983e2aed2c70fed68817346`
 
 ## Purpose and source-of-truth roles
 
@@ -83,15 +83,15 @@
 - **Verified feature rows:** **1, 2, 9, 10, 11, 12, 13, 14, 15**. The deterministic numerator is **9/60**.
 - **Reverse-safe:** complete.
 ### T05-01 — Timeline, trajectories and coordinated motion
-- **Status:** ACTIVE — Gauntlet reopened after accepted-scope audit
+- **Status:** ACTIVE — implementation complete; exact browser gate pending
 - **Depends on:** T04-01 DONE
 - **Primary files:** Tactical timeline/motion/scene/action/unit/possession/conflict engines and UI; focused unit/e2e tests
 - **Validated complete rows:** 16, 17, 18, 19, 21, 25, 26.
-- **Still-open accepted semantics:** #20 generalized object/layer visibility; #22 marker/trigger kinds; #23 named coordinated action template library; #24 explicit line-shift, step/drop and width/depth linked-unit controls.
-- **Current evidence:** production/PWA build and TypeScript green at `69bec32`; prior transport/easing/timing/conflict, possession and trajectory evidence remains valid; complete multi-scene sequencing now has 9/9 scene units and 2/2 isolated desktop/mobile browser workflow checks.
-- **Next:** implement #20 generalized object/layer temporal visibility, then #22/#23/#24 in dependency-safe order; rerun complete Task 5 gates before closing.
-- **Exit evidence:** every row 16–26 must satisfy its exact accepted wording plus deterministic unit/build/desktop/mobile/accessibility/reflow evidence.
-- **Reverse-safe:** no; Task 5 remains active.
+- **Implemented / verification-pending rows:** 20, 22, 23, 24.
+- **Current evidence:** candidate `c6550af2a0b32f970983e2aed2c70fed68817346` passes the repository unit suite and production/PWA build. It includes generalized object/layer temporal visibility, typed tactical/coaching markers, the nine named editable coordinated-action patterns, and linked-unit translation/line-shift/step/drop/width/depth controls. Workflow run `36204645295` is executing the exact-source browser matrix.
+- **Next:** inspect run `36204645295`; repair any Tactical failure test-first. If Tactical desktop/mobile/Axe/keyboard/reflow evidence is clean, promote rows 20/22/23/24, mark T05 DONE, set the verified numerator to 20/60, and unlock T06.
+- **Exit evidence:** every row 16–26 satisfies its accepted wording plus deterministic unit/build/desktop/mobile/accessibility/reflow evidence.
+- **Reverse-safe:** no; T06 remains blocked until this validation gate closes.
 
 ### T06-01 — Spatial analysis
 - **Status:** BLOCKED — T05-01 must close first
