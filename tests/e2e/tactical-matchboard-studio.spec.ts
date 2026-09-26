@@ -413,7 +413,7 @@ test('authors scene sequencing, visibility, offsets, and grouped stagger timing'
   await page.getByLabel('Motion end (ms)').fill('1000');
   await page.getByRole('button', { name: 'Author motion segment' }).click();
 
-  await page.getByLabel('Scene name').fill('Press phase');
+  await page.getByRole('textbox', { name: 'Scene name', exact: true }).fill('Press phase');
   await page.getByLabel('Scene start (ms)').fill('1000');
   await page.getByLabel('Scene duration (ms)').fill('1500');
   await page.getByRole('button', { name: 'Add scene' }).click();
@@ -536,13 +536,18 @@ test('edits curved trajectory handles with keyboard and pointer input', async ({
   await expect(firstX).toHaveValue('51');
 
   const editor = page.getByLabel('Interactive trajectory path editor');
+  await firstHandle.scrollIntoViewIfNeeded();
   const editorBox = await editor.boundingBox();
   const handleBox = await firstHandle.boundingBox();
   expect(editorBox).not.toBeNull();
   expect(handleBox).not.toBeNull();
   await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
   await page.mouse.down();
-  await page.mouse.move(editorBox!.x + editorBox!.width * 0.7, editorBox!.y + editorBox!.height * 0.4);
+  await page.mouse.move(
+    editorBox!.x + editorBox!.width * 0.7,
+    editorBox!.y + editorBox!.height * 0.4,
+    { steps: 8 },
+  );
   await page.mouse.up();
   await expect.poll(async () => Number(await firstX.inputValue())).toBeGreaterThan(60);
 
