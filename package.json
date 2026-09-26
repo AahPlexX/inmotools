@@ -46,7 +46,7 @@
     "@mediabunny/flac-encoder": "1.55.4",
     "@mediabunny/mp3-encoder": "1.55.4",
     "@replit/codemirror-vim": "6.4.0",
-    "@spglib/moyo-wasm": "0.16.0",
+    "@spglib/moyo-wasm": "0.19.0",
     "@techstark/opencv-js": "5.0.0-release.1",
     "@tonejs/midi": "2.0.28",
     "@univerjs/preset-sheets-core": "0.25.1",
