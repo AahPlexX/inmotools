@@ -167,6 +167,46 @@ describe('edit stack', () => {
     expect(Array.from(applyEdits(source, edits).channels[0])).toEqual(expected);
   });
 
+  it('maps each source frame to every surviving output frame across ordered temporal edits', () => {
+    const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([1, 2, 3, 4, 5, 6, 7, 8])] };
+    const editSequences: AudioEdit[][] = [
+      [
+        { type: 'insertSilence', atSeconds: 0.5, durationSeconds: 0.5 },
+        { type: 'reverse', startSeconds: 0.25, endSeconds: 1.75 },
+      ],
+      [
+        { type: 'reverse', startSeconds: 0.25, endSeconds: 1.75 },
+        { type: 'insertSilence', atSeconds: 0.5, durationSeconds: 0.5 },
+      ],
+      [
+        { type: 'crop', startSeconds: 0.25, endSeconds: 1.75 },
+        { type: 'deleteRange', startSeconds: 0.5, endSeconds: 0.75 },
+        { type: 'reverse', startSeconds: 0, endSeconds: 1.25 },
+      ],
+      [
+        { type: 'deleteRange', startSeconds: 0.25, endSeconds: 0.5 },
+        { type: 'insertSilence', atSeconds: 0.5, durationSeconds: 0.25 },
+        { type: 'reverse', startSeconds: 0.25, endSeconds: 1.75 },
+        { type: 'crop', startSeconds: 0.25, endSeconds: 1.5 },
+      ],
+    ];
+
+    for (const edits of editSequences) {
+      const rendered = applyEdits(source, edits).channels[0];
+      for (let sourceFrame = 0; sourceFrame < source.channels[0].length; sourceFrame += 1) {
+        const ranges = mapSourceRangeThroughEdits(source, edits, sourceFrame / 4, (sourceFrame + 1) / 4);
+        const mappedFrames = ranges.flatMap((range) => Array.from(
+          { length: range.outputEndFrame - range.outputStartFrame },
+          (_, offset) => range.outputStartFrame + offset,
+        ));
+        const renderedFrames = Array.from(rendered, (sample, frame) => sample === source.channels[0][sourceFrame] ? frame : -1)
+          .filter((frame) => frame >= 0);
+
+        expect(mappedFrames, `source frame ${sourceFrame} through ${JSON.stringify(edits)}`).toEqual(renderedFrames);
+      }
+    }
+  });
+
   it('maps reversed source ranges to output ranges in timeline order', () => {
     const source: PcmAudio = { sampleRate: 4, channels: [Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7])] };
     expect(mapSourceRangeThroughEdits(source, [
