@@ -48,7 +48,7 @@
 - **Photo Studio** — local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
   - Design: `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
-  - Current milestone (2026-09-26): integrated and deployed. PR #78 squash-merged to `main` as `4740cca`; Pages run `36204814286` on that SHA passed units, build, and the full desktop + mobile browser suite, then deployed successfully. 11 of 12 completion gates in `.tasks/PHOTO_STUDIO.md` are checked. **Remaining:** an uncached live load of `/#/tools/photo-studio` on the deployed site (the agent network policy blocks `aahplexx.github.io`), then the move to `DONE.md`/`WORK_LOG.md`. PR #29 is superseded by PR #78.
+  - Current milestone (2026-09-26): integrated and deployed. PR #78 squash-merged to `main` as `4740cca`; Pages run `36204814286` on that SHA passed units, build, and the full desktop + mobile browser suite, then deployed successfully. 10 of 12 completion gates in `.tasks/PHOTO_STUDIO.md` are checked (deployment live check and tracker closure remain). **Remaining:** an uncached live load of `/#/tools/photo-studio` on the deployed site (the agent network policy blocks `aahplexx.github.io`), then the move to `DONE.md`/`WORK_LOG.md`. PR #29 is superseded by PR #78.
 
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
