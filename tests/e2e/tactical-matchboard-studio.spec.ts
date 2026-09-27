@@ -753,3 +753,23 @@ test('lists, loads, and removes browser-local saved projects', async ({ page }) 
   await page.getByRole('button', { name: 'Remove saved project Training board' }).click();
   await expect(page.locator('.status-line').last()).toContainText('Saved project and its snapshots removed');
 });
+
+
+test('preserves crash recovery across reload before starter autosave can overwrite it', async ({ page }) => {
+  const before = Number(await coordinateInput(page, 'X').inputValue());
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  const moved = Number(await coordinateInput(page, 'X').inputValue());
+  expect(moved).toBeGreaterThan(before);
+
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Restore latest autosave' })).toBeEnabled();
+
+  await page.reload();
+  await expect(page.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(before, 1);
+
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await expect(page.getByText('Recovery available', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore latest autosave' }).first().click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(moved, 1);
+});
