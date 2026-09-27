@@ -103,3 +103,41 @@ A post-completion adversarial pass closed four hardening contracts without expan
 - SVG 2 linking/external resources: https://www.w3.org/TR/SVG/linking.html
 
 Research date: 2026-09-26 local / 2026-09-27 UTC. `GOVERNANCE.md` was read and not modified.
+
+
+## Real-world remediation pass — 2026-09-27
+
+Status at implementation commit: **ACTIVE — validation pending**.
+
+The prior completion record remains historical evidence, not a waiver for newly reproduced real-world defects. This pass started from `origin/main` at `48257af167d4296552ccb4e4b09570e0aee0a45d`; the pre-write focused-tool and Pages workflows on that revision were green. Scope is restricted to Markdown Workbench source, its browser regression suite, this handoff record, and the additive task-state entry.
+
+### Seven-function acceptance ledger
+
+- **F01 — dirty-safe file replacement:** opening or dropping another Markdown/plain-text document saves the current dirty document first. A failed save blocks replacement rather than discarding editor state.
+- **F02 — imported-file draft isolation:** a document opened from disk receives a fresh browser-local draft identity, so its next autosave cannot overwrite the draft that was active before the open.
+- **F03 — durable draft metadata:** autosave preserves the current effective document title instead of silently renaming a saved draft to "Autosave"; changing only the document name is dirty state and is autosaved; restoring a draft restores its saved timestamp.
+- **F04 — hash-safe preview anchors:** same-document fragment links (including generated TOCs and footnotes) navigate inside the live preview without replacing the application's `#/tools/markdown-workbench` route. Standalone exports keep ordinary HTML fragment behavior.
+- **F05 — Preview view:** Source, Split, and Preview are first-class modes. Preview uses the full workspace width while CodeMirror stays mounted, preserving its native selection/history across mode switches; Print/PDF accepts Split or Preview.
+- **F06 — real file validation:** the picker hint is backed by runtime validation for `.md`, `.markdown`, `.txt`, `text/markdown`, and `text/plain`; unsupported selections are rejected without replacing the current document.
+- **F07 — conventional formatting shortcuts:** CodeMirror handles Ctrl/Cmd+B, I, E, and K for bold, italic, inline code, and link insertion through the same formatting primitive used by the visible toolbar. Toolbar controls remain available for touch/pointer use and expose `aria-keyshortcuts`.
+
+### Root causes closed in this pass
+
+1. `loadMarkdownFile` replaced editor state after `File.text()` without first flushing a dirty document and without clearing `draftIdRef`. The first behavior could lose edits inside the 1.2-second autosave window; the second could make a later autosave of the imported file update the previously active draft record.
+2. The generic autosave path called `persistDraft(source)`; the optional name parameter therefore collapsed an existing named draft back to "Autosave", and `documentName` changes alone never scheduled persistence.
+3. The app is hash-routed, while rendered Markdown legitimately contains `#fragment` anchors. The preview previously let those anchors use browser-default hash navigation, which competes with the router's own `window.location.hash`. Preview-only click handling now keeps fragment navigation local to the rendered document.
+4. The file input's `accept` list was only a picker hint; no runtime file-kind check existed.
+5. Common Markdown keyboard formatting conventions were absent despite equivalent visible toolbar actions already existing.
+
+### Current primary references
+
+- GitHub Docs — Keyboard shortcuts: https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts
+- GitHub Docs — Basic writing and formatting syntax: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
+- MDN — `accept` HTML attribute: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept
+- MDN — `Location.hash`: https://developer.mozilla.org/en-US/docs/Web/API/Location/hash
+- CodeMirror 6 guide/reference — keymaps and command precedence: https://codemirror.net/docs/guide/ and https://codemirror.net/docs/ref/
+- W3C — WCAG 2.2: https://www.w3.org/TR/WCAG22/
+
+### Validation contract
+
+The implementation is not complete until the production TypeScript/Vite build, Markdown desktop/mobile browser regression set, and integrated `origin/main` workflows are green on the exact product revision. The new browser regressions cover F01/F02 together plus F03, F05, F06, F07, and an actual click of a generated TOC link for F04. If validation exposes a defect, update this section and the live task-state entry before any completion claim.

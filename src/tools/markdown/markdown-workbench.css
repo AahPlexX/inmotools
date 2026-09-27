@@ -273,3 +273,16 @@
     align-items: flex-start;
   }
 }
+
+
+/* Preview-only mode keeps the CodeMirror instance mounted (so its native
+   selection/history survives view switches) while giving the rendered
+   document the full workspace width. */
+.markdown-workbench-view-preview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.markdown-workbench-view-preview .markdown-workbench-editor-pane {
+  display: none;
+  border-right: 0;
+}

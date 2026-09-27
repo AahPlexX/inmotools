@@ -12,6 +12,15 @@ const setSource = async (page: import('@playwright/test').Page, value: string) =
   if (value) await editor.pressSequentially(value);
 };
 
+const openPanel = async (page: import('@playwright/test').Page, name: RegExp) => {
+  const panel = page.locator('details').filter({ hasText: name }).first();
+  if (!await panel.evaluate((node) => (node as HTMLDetailsElement).open)) {
+    await panel.locator('summary').first().click();
+  }
+  await expect(panel).toHaveAttribute('open', '');
+  return panel;
+};
+
 test('markdown page copy reads like product guidance rather than implementation notes', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await expect(page.getByTestId('suite-title')).toContainText('Write, Preview & Export Markdown');
@@ -350,6 +359,106 @@ test('a recognized emoji shortcode renders as its emoji in the live preview', as
   await expect(page.locator('.markdown-workbench-preview p')).toContainText('Ship it 🚀');
 });
 
+
+test('opening a file saves dirty work first and gives the imported file a separate draft identity', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Working draft\n\nKeep this before opening another file.');
+
+  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+    name: 'Imported document.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# Imported document\n\nNew file body.'),
+  });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Opened Imported document.md locally');
+  await expect(page.locator('.markdown-workbench-preview h1')).toHaveText('Imported document');
+
+  await page.waitForTimeout(1400);
+  const panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Working draft —/ })).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: /Imported document —/ })).toHaveCount(1);
+
+  await panel.getByRole('button', { name: /Working draft —/ }).click();
+  await expect(editorLocator(page)).toContainText('Keep this before opening another file.');
+});
+
+test('document names survive autosave and a name-only edit is persisted', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Draft body');
+  await page.getByLabel('Document name').fill('Project Alpha');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Saved a local draft');
+
+  const editor = editorLocator(page);
+  await editor.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' updated');
+  await page.waitForTimeout(1400);
+
+  let panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Project Alpha —/ })).toHaveCount(1);
+  await expect(panel).not.toContainText('Autosave —');
+
+  await page.getByLabel('Document name').fill('Project Beta');
+  await page.waitForTimeout(1400);
+  panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Project Beta —/ })).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: /Project Alpha —/ })).toHaveCount(0);
+});
+
+test('file selection validates Markdown or plain text instead of trusting accept alone', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Keep this document');
+
+  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+    name: 'wrong.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-not-really-a-markdown-document'),
+  });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('is not a Markdown or plain-text document');
+  await expect(editorLocator(page)).toContainText('# Keep this document');
+});
+
+test('Preview view is full-width, responsive, and returns to the mounted editor without losing text', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Narrow preview\n\nText that must survive the view switch.');
+
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Preview', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.markdown-workbench-preview')).toBeVisible();
+  await expect(editorLocator(page)).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+  await page.getByRole('button', { name: 'Split', exact: true }).click();
+  await expect(editorLocator(page)).toBeVisible();
+  await expect(editorLocator(page)).toContainText('Text that must survive the view switch.');
+});
+
+test('common Markdown formatting shortcuts match the visible toolbar actions', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const editor = editorLocator(page);
+  const shortcutCases = [
+    { key: 'ControlOrMeta+b', expected: '**selected**' },
+    { key: 'ControlOrMeta+i', expected: '*selected*' },
+    { key: 'ControlOrMeta+e', expected: '`selected`' },
+    { key: 'ControlOrMeta+k', expected: '[selected](https://example.com)' },
+  ];
+
+  for (const shortcut of shortcutCases) {
+    await setSource(page, 'selected');
+    await editor.press('ControlOrMeta+a');
+    await editor.press(shortcut.key);
+    await expect(editor).toContainText(shortcut.expected);
+  }
+
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+B Meta+B');
+  await expect(page.getByRole('button', { name: 'Italic', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+I Meta+I');
+  await expect(page.getByRole('button', { name: 'Inline code', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+E Meta+E');
+  await expect(page.getByRole('button', { name: 'Link', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+K Meta+K');
+});
+
 test('inserting a table of contents links to and lands on the actual rendered heading', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Intro\n\nHello.\n\n## Details\n\nMore.');
@@ -363,4 +472,8 @@ test('inserting a table of contents links to and lands on the actual rendered he
   const tocLink = page.locator('.markdown-workbench-preview a', { hasText: 'Details' });
   await expect(tocLink).toHaveAttribute('href', '#user-content-details');
   await expect(page.locator('.markdown-workbench-preview h2#user-content-details')).toContainText('Details');
+
+  const routeHash = await page.evaluate(() => window.location.hash);
+  await tocLink.click();
+  expect(await page.evaluate(() => window.location.hash)).toBe(routeHash);
 });

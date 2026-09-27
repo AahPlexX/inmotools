@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { renderMarkdown } from './render-engine';
 import { scheduleIdle } from './diagram-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
@@ -28,6 +28,43 @@ const measureAnchors = (
 export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const generationRef = useRef(0);
+
+  const handlePreviewClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const origin = event.target;
+    if (!(origin instanceof Element)) return;
+    const anchor = origin.closest<HTMLAnchorElement>('a[href^="#"]');
+    if (!anchor || !event.currentTarget.contains(anchor)) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.length <= 1) return;
+    let targetId = href.slice(1);
+    try {
+      targetId = decodeURIComponent(targetId);
+    } catch {
+      return;
+    }
+
+    const destination = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('[id]'),
+    ).find((node) => node.id === targetId);
+    if (!destination) return;
+
+    event.preventDefault();
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    destination.scrollIntoView({
+      block: 'start',
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  };
 
   useEffect(() => {
     const { html, anchors } = renderMarkdown(preparedSource);
@@ -85,6 +122,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       role="region"
       aria-label="Rendered markdown preview"
       tabIndex={0}
+      onClick={handlePreviewClick}
     />
   );
 }

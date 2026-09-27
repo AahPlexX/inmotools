@@ -38,6 +38,24 @@ const readImageAsDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+const insertPatternAtSelection = (
+  view: EditorView,
+  before: string,
+  after: string,
+  fallback: string,
+  useSelection = true,
+): boolean => {
+  const { from, to } = view.state.selection.main;
+  const selected = (useSelection ? view.state.sliceDoc(from, to) : '') || fallback;
+  view.dispatch({
+    changes: { from, to, insert: before + selected + after },
+    selection: { anchor: from + before.length, head: from + before.length + selected.length },
+    userEvent: 'input',
+  });
+  view.focus();
+  return true;
+};
+
 export interface MarkdownEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -163,7 +181,17 @@ export default function MarkdownEditor({
         syntaxHighlighting(defaultHighlightStyle),
         wrapCompartment.of(lineWrappingRef.current ? EditorView.lineWrapping : []),
         suggestionsCompartment.of(buildSuggestions(syntaxSuggestionsRef.current)),
-        keymap.of([...closeBracketsKeymap, ...markdownKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+        keymap.of([
+          { key: 'Mod-b', run: (view) => insertPatternAtSelection(view, '**', '**', 'bold text') },
+          { key: 'Mod-i', run: (view) => insertPatternAtSelection(view, '*', '*', 'italic text') },
+          { key: 'Mod-e', run: (view) => insertPatternAtSelection(view, '`', '`', 'code') },
+          { key: 'Mod-k', run: (view) => insertPatternAtSelection(view, '[', '](https://example.com)', 'link text') },
+          ...closeBracketsKeymap,
+          ...markdownKeymap,
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...searchKeymap,
+        ]),
         attributesCompartment.of(buildAttributes(fontSizeRef.current, spellcheckRef.current)),
         // Pasting or dropping an image embeds it as a data URI at the drop
         // point/selection. A non-image paste returns false so the browser's
@@ -291,13 +319,7 @@ export default function MarkdownEditor({
 
   const insertPattern = (before: string, after: string, fallback: string, useSelection = true) => {
     const view = viewRef.current;
-    if (!view) return;
-    const { from, to } = view.state.selection.main;
-    const selected = (useSelection ? view.state.sliceDoc(from, to) : '') || fallback;
-    view.dispatch({ changes: { from, to, insert: before + selected + after },
-      selection: { anchor: from + before.length, head: from + before.length + selected.length },
-      userEvent: 'input' });
-    view.focus();
+    if (view) insertPatternAtSelection(view, before, after, fallback, useSelection);
   };
 
   // Lines touched by the current selection (or just the caret's line when
@@ -409,16 +431,16 @@ export default function MarkdownEditor({
     <div className="markdown-workbench-format-actions" role="group" aria-label="Insert Markdown">
       <button type="button" onClick={cycleHeading}>Heading</button>
       <button type="button" onClick={insertTableOfContents}>Table of contents</button>
-      <button type="button" onClick={() => insertPattern('**', '**', 'bold text')}>Bold</button>
-      <button type="button" onClick={() => insertPattern('*', '*', 'italic text')}>Italic</button>
+      <button type="button" onClick={() => insertPattern('**', '**', 'bold text')} aria-keyshortcuts="Control+B Meta+B" title="Bold (Ctrl/Cmd+B)">Bold</button>
+      <button type="button" onClick={() => insertPattern('*', '*', 'italic text')} aria-keyshortcuts="Control+I Meta+I" title="Italic (Ctrl/Cmd+I)">Italic</button>
       <button type="button" onClick={() => insertPattern('~~', '~~', 'deleted text')}>Strikethrough</button>
-      <button type="button" onClick={() => insertPattern('`', '`', 'code')}>Inline code</button>
+      <button type="button" onClick={() => insertPattern('`', '`', 'code')} aria-keyshortcuts="Control+E Meta+E" title="Inline code (Ctrl/Cmd+E)">Inline code</button>
       <button type="button" onClick={() => insertPattern('```\n', '\n```', 'code block', false)}>Code block</button>
       <button type="button" onClick={() => toggleLinePrefix('> ')}>Blockquote</button>
       <button type="button" onClick={() => toggleLinePrefix('- ')}>Bullet list</button>
       <button type="button" onClick={toggleOrderedList}>Numbered list</button>
       <button type="button" onClick={insertHorizontalRule}>Horizontal rule</button>
-      <button type="button" onClick={() => insertPattern('[', '](https://example.com)', 'link text')}>Link</button>
+      <button type="button" onClick={() => insertPattern('[', '](https://example.com)', 'link text')} aria-keyshortcuts="Control+K Meta+K" title="Link (Ctrl/Cmd+K)">Link</button>
       <button type="button" onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')}>Image</button>
       <button type="button" onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')}>Task</button>
       <button type="button" onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)}>Table</button>
