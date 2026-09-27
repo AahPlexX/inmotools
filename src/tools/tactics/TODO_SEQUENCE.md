@@ -90,20 +90,19 @@
 - **Reverse-safe:** complete.
 
 ### T06-01 — Spatial analysis
-- **Status:** ACTIVE
+- **Status:** DONE
 - **Depends on:** T05-01 DONE
-- **Primary files:** new tactical analysis modules + Tactical analysis UI/tests; do not edit later persistence/3D/media/export surfaces.
-- **Action order:** (1) pure Euclidean Voronoi + convex hull/centroid/width/depth primitives; (2) passing-lane clearance + authored orientation/vision sectors; (3) positional grid + distance rings/dynamic tethers; (4) trajectory occupancy heat map + authored/imported speed/distance metrics; (5) analytical-honesty UI labels; (6) focused desktop/mobile/browser validation; (7) reconcile feature rows 27–34.
-- **Exit evidence:** deterministic geometry/metric unit invariants, source-honest labels, TypeScript/build, and complete responsive browser authoring/view workflows for rows 27–34.
-- **Reverse-safe:** no while ACTIVE; its primary Tactical analysis/UI/test files are reserved for this dependency-ordered slice.
+- **Verified rows:** 27–34.
+- **Closure evidence:** exact source `c41fe4704f3710a919912264f9a37f663b761f4e` passes 10/10 focused analysis units, TypeScript/production/PWA build, and the complete Tactical Playwright spec with **40 passed / 2 intentional mobile duplicate Axe/reflow skips / 0 failures**. The contract covers physical-Euclidean Voronoi/hull/clearance geometry, authored orientation/vision, grid/rings/tethers, authored-span occupancy/trajectory metrics, source-honest labels, keyboard operation, Axe, five-width reflow and target sizes. GitHub run `36284500497` independently passes repository units/build on the same tip.
+- **Reverse-safe:** complete.
 
 ### T07-01 — Persistence, interchange and session planning
-- **Status:** BLOCKED
-- **Depends on:** T06-01
+- **Status:** ACTIVE
+- **Depends on:** T06-01 DONE
 - **Primary files:** tactical persistence/import/session modules + tests
 - **Action:** Dexie vault, autosave/snapshots/recovery, migration, safe JSON/ZIP round-trip, assets, trajectory import/export, session plans.
-- **Exit evidence:** corrupt-import preservation and deterministic round-trip tests.
-- **Reverse-safe:** no.
+- **Exit evidence:** corrupt-import preservation and deterministic round-trip tests plus responsive browser-local persistence/import/session workflows.
+- **Reverse-safe:** no while ACTIVE; its persistence/import/session files are reserved.
 
 ### T08-01 — Synchronized 3D presentation
 - **Status:** BLOCKED

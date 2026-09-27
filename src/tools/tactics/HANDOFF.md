@@ -4,25 +4,29 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `c6550af2a0b32f970983e2aed2c70fed68817346`
+- Last fully browser-validated source tip: `c41fe4704f3710a919912264f9a37f663b761f4e`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 6 — spatial analysis**
-- Verified functional features: **20/60**
+- Milestone: **Task 7 — persistence, interchange and session planning**
+- Verified functional features: **28/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-Execute **T06-01 — spatial analysis** in the recorded dependency order:
+Execute **T07-01 — persistence, interchange and session planning** in dependency order:
 
-1. RED tests for physical-Euclidean Voronoi territory and team convex-hull/centroid/width/depth geometry.
-2. GREEN pure analysis engine with no new dependency.
-3. Passing-lane clearance and authored orientation/vision sectors.
-4. Configurable positional grid, distance rings and dynamic tethers.
-5. Timeline occupancy heat map plus source-labelled authored/imported trajectory distance/speed metrics.
-6. Source-honest responsive UI/SVG overlays with text equivalents; no probability, GPS, intent or officiating claims.
-7. Run focused units, TypeScript/build, desktop/mobile browser, Axe, keyboard and reflow evidence before promoting rows 27–34.
+1. Audit existing pinned Dexie/ZIP/import dependencies before adding anything.
+2. RED tests for local project vault lifecycle, autosave/recovery, snapshot/version retention and schema migration.
+3. Safe deterministic project JSON/ZIP import/export with corrupt-import preservation and asset references.
+4. Trajectory CSV/JSON import/export with explicit provenance feeding the already-verified analysis engine.
+5. Editable coaching/session plans and local project/session round-trip.
+6. Responsive accessible persistence/import/session UI with browser-local storage honesty and failure states.
+7. Run focused units, TypeScript/build, desktop/mobile browser, accessibility/reflow and round-trip evidence before reconciling the corresponding feature rows.
+
+## Task 6 closure evidence
+
+Task 6 is **DONE** at runtime source `c41fe4704f3710a919912264f9a37f663b761f4e`. Fresh exact-source local verification passes **10/10** spatial-analysis units, production/PWA build, and the full Tactical browser spec with **40 passed / 2 intentional mobile duplicate Axe/reflow skips / 0 failures**. That browser contract explicitly covers keyboard operation, Axe, five responsive widths, 44px targets, all eight spatial overlays, authored orientation, metric/imperial tethers, and authored trajectory duration/speed/occupancy. GitHub run `36284500497` on the same tip independently passes repository units and build while its full repository browser matrix continues.
 
 ## Task 5 closure evidence
 
@@ -30,9 +34,9 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34**.
 
-In progress: **3, 4, 5, 7, 8, 27, 51, 52, 55, 56, 59**.
+In progress: **3, 4, 5, 7, 8, 35, 51, 52, 55, 56, 59**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 
