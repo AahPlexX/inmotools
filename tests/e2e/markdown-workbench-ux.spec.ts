@@ -147,6 +147,19 @@ test('syntax suggestions are on by default, context-aware, and can be disabled',
   await expect(completion).toBeHidden();
 });
 
+test('Copy HTML preserves fenced-code token classes in the copied rendered fragment', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  await page.getByRole('button', { name: 'Copy HTML', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Copied the rendered HTML');
+  const html = await page.evaluate(() => navigator.clipboard.readText());
+
+  expect(html).toContain('tok-keyword');
+  expect(html).toContain('markdown-workbench-code-highlighted');
+});
+
 test('standalone HTML export preserves fenced-code syntax colors with self-contained CSS', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
