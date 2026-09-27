@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import JSZip from 'jszip';
 
 const editorLocator = (page: import('@playwright/test').Page) =>
   page.locator('[aria-label="Markdown source"]');
@@ -9,7 +10,8 @@ const setSource = async (page: import('@playwright/test').Page, value: string) =
   await editor.click();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
   await page.keyboard.press('Backspace');
-  if (value) await editor.pressSequentially(value);
+  if (value.length > 1_000) await page.keyboard.insertText(value);
+  else if (value) await editor.pressSequentially(value);
 };
 
 const openPanel = async (page: import('@playwright/test').Page, name: RegExp) => {
@@ -19,6 +21,13 @@ const openPanel = async (page: import('@playwright/test').Page, name: RegExp) =>
   }
   await expect(panel).toHaveAttribute('open', '');
   return panel;
+};
+
+const readDownloadBytes = async (download: import('@playwright/test').Download): Promise<Buffer> => {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
 };
 
 test('markdown page copy reads like product guidance rather than implementation notes', async ({ page }) => {
@@ -136,6 +145,43 @@ test('syntax suggestions are on by default, context-aware, and can be disabled',
   await editor.click();
   await page.keyboard.type('#');
   await expect(completion).toBeHidden();
+});
+
+test('standalone HTML export preserves fenced-code syntax colors with self-contained CSS', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
+  const html = (await readDownloadBytes(await downloadPromise)).toString('utf8');
+
+  expect(html).toContain('tok-keyword');
+  expect(html).toMatch(/\.tok-keyword[^}]*color:/);
+});
+
+test('EPUB export packages the fenced-code token stylesheet with highlighted markup', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'EPUB (structural)', exact: true }).click();
+  const zip = await JSZip.loadAsync(await readDownloadBytes(await downloadPromise));
+  const chapter = await zip.file('OEBPS/chapter1.xhtml')?.async('string');
+  const stylesheet = await zip.file('OEBPS/styles/markdown.css')?.async('string');
+
+  expect(chapter).toContain('tok-keyword');
+  expect(stylesheet).toMatch(/\.tok-keyword[^}]*color:/);
+});
+
+test('an oversized recognized fence remains readable without running cosmetic syntax highlighting', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const hugeFence = '~~~javascript\n' + 'const answer = 42;\n'.repeat(1_200) + '~~~';
+  await setSource(page, hugeFence);
+
+  const code = page.locator('.markdown-workbench-preview pre > code.language-javascript');
+  await expect(code).toBeVisible();
+  await expect(code).toContainText('const answer = 42;');
+  await expect(code.locator('[class*="tok-"]')).toHaveCount(0);
 });
 
 test('fenced code blocks are colored by language in the live preview', async ({ page }) => {

@@ -12,6 +12,7 @@ import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
+import { highlightCodeBlocks } from './code-highlight-engine';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
@@ -452,6 +453,7 @@ export default function MarkdownWorkspace() {
     // still-settling live preview export the same current document.
     const scratch = document.createElement('div');
     scratch.innerHTML = renderMarkdown(prepareExportSource()).html;
+    await highlightCodeBlocks(scratch);
     await renderDiagramBlocks(scratch);
     return scratch.innerHTML;
   }, [prepareExportSource]);

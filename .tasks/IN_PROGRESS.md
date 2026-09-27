@@ -1,5 +1,12 @@
 # In Progress
 
+- **Markdown Workbench historical-branch reconciliation (2026-09-27)** — ACTIVE on `main`; extends the verified real-world ledger from F01–F07 to F01–F10 after reconciling `claude/markdown-tool-audit-docs-lwrb3w` against current source rather than merging its stale tree.
+  - F08: highlighted fenced code must retain syntax colors in standalone HTML, Copy HTML markup, and structural EPUB through stable export-safe token classes.
+  - F09: cosmetic fenced-code highlighting is bounded at 20,000 source characters per fence; oversized fences remain readable as plain code instead of repeatedly parsing on each edit.
+  - F10: remove the unused contradictory `markdown-types.ts` `ExportAsset` shape; the authoritative asset contract remains in `export-assets.ts`.
+  - Current milestone: implementation and focused regressions are integrated atomically; exact-main build + Markdown desktop/mobile browser checks + Pages deployment remain the completion gate.
+  - Branch policy: the historical branch has no open PR and is not being merged wholesale; current `main` keeps its broader lazy/cached language loader and receives only behavior proven still missing.
+
 - **Universal Site Intelligence Analyzer** — final-completion pass on the existing draft PR #44 (`feature/site-analysis-workstation`); local-first URL/domain forensics, DNS/network, registration/history, TLS/security, email-auth, performance telemetry, scoring, export, and browser-local vault.
   - Tool SSOT: `src/tools/site-intel/TRACKING.md` on PR #44. Current ledger: 38 accepted features; most are implemented, with Feature 13 missing its GeoIP minimap UI, Feature 6 still requiring an explicit client-safe redirect-resolution decision, and Features 11/17/19/28 carrying documented external/platform substitutions or blockers.
   - Verified branch baseline: unit and production-build stages passed in PR run `35345670947`; Site Intelligence unit files and both desktop/mobile browser cases ran successfully, and the shared accessibility route produced no Site Intelligence failure. That run was red only in unrelated repository suites.

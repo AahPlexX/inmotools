@@ -4,6 +4,7 @@ import { scheduleIdle } from './diagram-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
 import { highlightCodeBlocks } from './code-highlight-engine';
 import type { ScrollAnchor } from './markdown-types';
+import './code-highlight.css';
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;

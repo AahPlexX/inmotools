@@ -1,13 +1,13 @@
 // Feature (Markdown audit follow-up) — preview fenced-code language coloring.
 //
-// Reuses the exact highlighting infrastructure already applied to the source
-// editor (`defaultHighlightStyle` from @codemirror/language, the same style
-// MarkdownEditor.tsx mounts via `syntaxHighlighting(defaultHighlightStyle)`)
-// so preview tokens carry the same CSS classes and colors as the editor,
-// rather than introducing a second highlighting library/theme. Mermaid and
-// Graphviz fences are excluded: diagram-renderer.ts replaces those blocks
-// entirely with a rendered diagram. An unrecognized fence language is left
-// as plain, un-colored text rather than guessed at.
+// Reuses CodeMirror/Lezer's syntax trees while emitting Lezer's stable
+// `tok-*` classes through `classHighlighter`. Those classes are styled by
+// code-highlight.css in both the live preview and HTML-derived exports, so a
+// downloaded document keeps the same syntax-coloring semantics instead of
+// relying on CodeMirror's editor-only generated style module. Mermaid and
+// Graphviz fences are excluded because diagram-renderer.ts replaces them
+// with rendered diagrams. Unrecognized or deliberately bounded fences stay
+// plain, escaped text rather than being guessed at.
 //
 // Each language's CodeMirror 5 "legacy mode" stream parser is loaded lazily
 // (one dynamic import per distinct language actually present, cached across
@@ -16,8 +16,8 @@
 // documented approach for applying CodeMirror highlighting outside of a live
 // editor (https://codemirror.net/examples/styling/#highlighting-in-html).
 
-import { StreamLanguage, defaultHighlightStyle, type StreamParser } from '@codemirror/language';
-import { highlightCode } from '@lezer/highlight';
+import { StreamLanguage, type StreamParser } from '@codemirror/language';
+import { classHighlighter, highlightCode } from '@lezer/highlight';
 
 type Loader = () => Promise<StreamParser<unknown>>;
 
@@ -107,6 +107,11 @@ const LOADERS: Record<string, Loader> = {
   jl: async () => (await import('@codemirror/legacy-modes/mode/julia')).julia,
 };
 
+// Highlighting is cosmetic and reruns while an author edits. Keep a single
+// very large fence from monopolizing the main thread on every update; beyond
+// this boundary the source remains fully visible, simply without coloring.
+export const MAX_HIGHLIGHT_SOURCE_CHARS = 20_000;
+
 const languageCache = new Map<string, StreamLanguage<unknown> | null>();
 
 async function loadLanguage(rawName: string): Promise<StreamLanguage<unknown> | null> {
@@ -148,6 +153,9 @@ export interface HighlightedSnippet {
  * wiring). `highlightCodeBlocks` below is the DOM-facing caller.
  */
 export async function highlightSnippet(code: string, lang: string): Promise<HighlightedSnippet> {
+  if (code.length > MAX_HIGHLIGHT_SOURCE_CHARS) {
+    return { recognized: false, html: escapeHtml(code) };
+  }
   const language = await loadLanguage(lang);
   if (!language) return { recognized: false, html: escapeHtml(code) };
 
@@ -156,7 +164,7 @@ export async function highlightSnippet(code: string, lang: string): Promise<High
   highlightCode(
     code,
     tree,
-    defaultHighlightStyle,
+    classHighlighter,
     (text, classes) => {
       out += classes ? `<span class="${classes}">${escapeHtml(text)}</span>` : escapeHtml(text);
     },

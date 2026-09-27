@@ -1,6 +1,8 @@
 # Done
 
-## Markdown Workbench real-world remediation — 7/7 complete
+## Markdown Workbench real-world remediation — 7/7 pass complete
+
+> Historical pass record: F01–F07 are complete. A later same-day stale-branch reconciliation opened F08–F10; see `.tasks/IN_PROGRESS.md` until that scoped follow-up is verified and closed.
 
 The 2026-09-27 real-world remediation is complete on `origin/main` at product revision
 `14099c3c476d74bce943abc8a4623ced9435a9c7`. The seven accepted functions are closed: dirty-safe file replacement,

@@ -147,3 +147,26 @@ The prior completion record remains historical evidence, not a waiver for newly 
 - The focused run directly exercises F01/F02 together plus F03, F05, F06, F07, the name-only transition race guard, and an actual click of a generated TOC link for F04 on both configured Chromium projects.
 
 This seven-function remediation is therefore closed. Any future Markdown work must be based on a newly verified defect or explicitly approved new scope rather than reopening this completed ledger.
+
+
+## Historical branch reconciliation — 2026-09-27
+
+Status: **ACTIVE — F08–F10 implemented; exact-main validation pending.**
+
+After F01–F07 closed, the old branch `claude/markdown-tool-audit-docs-lwrb3w` was compared against current `origin/main` before branch cleanup. It has no open pull request and is far behind current main, so its tree is not safe to merge. Three behaviors in its unique commits were nevertheless still valid when re-verified against the newer production implementation:
+
+- **F08 — export-safe fenced-code coloring.** Current main highlighted the live preview only. Detached HTML/EPUB export rendering called `renderMarkdown` and diagrams but never `highlightCodeBlocks`, so recognized fences exported as plain code. The current lazy/cached language loader is retained; highlighting now emits Lezer `classHighlighter`'s stable `tok-*` classes, live preview imports `code-highlight.css`, detached export runs the same highlighting pass, standalone HTML embeds the CSS when needed, and EPUB packages it in `styles/markdown.css`.
+- **F09 — bounded cosmetic highlighting.** A recognized fence had no size bound even though highlighting is cosmetic and reruns during editing. `MAX_HIGHLIGHT_SOURCE_CHARS = 20_000` now returns the existing safe plain-code fallback before loading/parsing a grammar.
+- **F10 — one authoritative export-asset contract.** `markdown-types.ts` still declared an unused `ExportAsset { filename, mimeType }` while the actual export pipeline uses `export-assets.ts`'s `ExportAsset { path, mediaType, data }`. The dead contradictory type is removed.
+
+### Reconciliation evidence to run
+
+- focused unit regression for the oversized-fence fallback;
+- live browser regression proving recognized fences still receive visible token colors;
+- real downloaded standalone HTML proving highlighted markup and its token CSS travel together;
+- real downloaded EPUB proving the chapter and packaged stylesheet travel together;
+- oversized-fence browser regression proving the source remains visible without token spans;
+- exact-main production build and complete Markdown desktop/mobile browser matrix;
+- exact-main Pages unit/build/artifact/deploy gate.
+
+No dependency is added. Current official Lezer documentation describes `classHighlighter` as the highlighter that emits stable predictable token classes for external CSS; CodeMirror's own styling guidance uses static highlighting for non-editor HTML. The stale branch is treated as evidence only, not as an integration source of truth.
