@@ -77,7 +77,6 @@ async function installAudioProbe(page: Page) {
 
 async function gotoHarmony(page: Page) {
   await page.goto('./#/tools/midi-harmony-lab');
-  await page.getByRole('tab', { name: 'Harmony & MIDI' }).click();
   await expect(page.getByRole('heading', { name: /Harmony and voice-leading lab/i })).toBeVisible();
 }
 

@@ -24,11 +24,8 @@ function makeMonoPcm16Wav(seconds = 2, sampleRate = 48_000, frequency = 220) {
   return bytes;
 }
 test('imports, auditions, edits, marks, and undoes a local master', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
-  const masteringTab = page.getByRole('tab', { name: 'Mastering & audio editor' });
-  await expect(masteringTab).toBeVisible({ timeout: 20_000 });
-  await expect(masteringTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible();
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
 
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeDisabled();
   await page.locator('.mastering-file-button input[type="file"]').setInputFiles({
@@ -136,7 +133,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
 });
 
 test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-file-button input[type="file"]').setInputFiles([
     { name: 'drums.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 110) },
@@ -194,7 +191,7 @@ test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', a
 });
 
 test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and the sample pen', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 200) });
   await expect(page.locator('.status-line')).toContainText(/Loaded voice\.wav/);
@@ -261,7 +258,7 @@ test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and 
 });
 
 test('runs every restoration tool on a clip or a selection', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'interview.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 180) });
   await expect(page.locator('.status-line')).toContainText(/Loaded interview\.wav/);
@@ -314,7 +311,7 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
 });
 
 test('masters the mix with the realtime chain, meters, monitoring, and an offline render', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(6, 48_000, 440) });
   await expect(page.locator('.status-line')).toContainText(/Loaded song\.wav/);
@@ -366,7 +363,7 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
 });
 
 test('shows a synced spectrogram and repairs a painted region', async ({ page }) => {
-  await page.goto('./#/tools/midi-harmony-lab');
+  await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'birdsong.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 2000) });
   await expect(page.locator('.status-line')).toContainText(/Loaded birdsong\.wav/);

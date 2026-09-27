@@ -125,7 +125,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 
 ## Rules for whoever continues
 
-- Keep the Harmony & MIDI tab working; `tests/e2e/music.spec.ts` must stay green.
+- The workstation has its own route and catalog entry, `#/tools/audio-mastering` (entry `src/tools/music/MusicWorkspace.tsx`). MIDI Harmony Lab stays at `#/tools/midi-harmony-lab` (`HarmonyWorkspace.tsx`), unchanged from `main`. Do not merge them back behind one route: the audited Harmony Lab specs (`tests/e2e/music.spec.ts`, the MIDI cases in `tests/e2e/audit-hardening.spec.ts`) expect the chord editor on first load, and each suite needs its own title and address.
 - Unit tests go at pure seams (edit math, mix, DSP kernels, schema). Browser coverage extends `tests/e2e/mastering.spec.ts`; add a new spec only for a distinct failure mode.
 - Exact dependency pins only. MediaBunny core and any `@mediabunny/*` extension must share one version.
 - Every control needs a keyboard or numeric path; no hover-only information; 44 px targets on touch layouts.

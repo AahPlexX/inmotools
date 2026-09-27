@@ -1,9 +1,5 @@
-/* Music workstation: surface tabs and the Audio Mastering workspace.
+/* Audio Mastering workspace.
    Loaded with the tool's lazy chunk. Uses the global design tokens from src/styles.css. */
-
-.music-surface-tabs { display:flex; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--surface-strong); }
-.music-surface-tabs button { min-height:44px; padding:9px 14px; border:1px solid var(--line-strong); border-radius:999px; background:var(--surface); color:var(--ink); font-weight:720; }
-.music-surface-tabs button[aria-selected="true"] { border-color:var(--signal); background:var(--signal-soft); color:var(--signal-strong); }
 
 .mastering-workspace { display:grid; gap:18px; }
 .mastering-header { align-items:flex-start; }
@@ -168,8 +164,6 @@
   .mastering-columns { grid-template-columns:1fr; }
 }
 @media (max-width:600px) {
-  .music-surface-tabs { display:grid; grid-template-columns:1fr 1fr; padding-inline:12px; }
-  .music-surface-tabs button { min-width:0; padding-inline:8px; border-radius:var(--radius-sm); }
   .mastering-header { align-items:stretch; }
   .mastering-local-badge { align-self:flex-start; }
   .mastering-import { align-items:stretch; flex-direction:column; }

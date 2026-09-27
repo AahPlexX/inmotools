@@ -1,19 +1,12 @@
-import { useState } from 'react';
-import HarmonyWorkspace from './HarmonyWorkspace';
+/**
+ * @file MusicWorkspace.tsx — route entry for the `audio-mastering` suite.
+ * @description Loads the tool-scoped stylesheet with the lazy chunk and renders the mastering
+ * workstation. The harmony and MIDI lab keeps its own `midi-harmony-lab` route
+ * (HarmonyWorkspace.tsx) so each suite has a distinct address, title and first screen.
+ */
 import MasteringWorkspace from './MasteringWorkspace';
 import './mastering.css';
 
-type Surface = 'mastering' | 'harmony';
-
 export default function MusicWorkspace() {
-  const [surface, setSurface] = useState<Surface>('mastering');
-  return <>
-    <div className="music-surface-tabs" role="tablist" aria-label="Music workspace">
-      <button type="button" role="tab" id="music-tab-mastering" aria-selected={surface === 'mastering'} aria-controls="music-panel-mastering" onClick={() => setSurface('mastering')}>Mastering & audio editor</button>
-      <button type="button" role="tab" id="music-tab-harmony" aria-selected={surface === 'harmony'} aria-controls="music-panel-harmony" onClick={() => setSurface('harmony')}>Harmony & MIDI</button>
-    </div>
-    <div role="tabpanel" id={surface === 'mastering' ? 'music-panel-mastering' : 'music-panel-harmony'} aria-labelledby={surface === 'mastering' ? 'music-tab-mastering' : 'music-tab-harmony'}>
-      {surface === 'mastering' ? <MasteringWorkspace /> : <HarmonyWorkspace />}
-    </div>
-  </>;
+  return <MasteringWorkspace />;
 }
