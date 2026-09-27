@@ -370,21 +370,22 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await expect(status).toContainText(/Master rendered offline: .* LUFS integrated/);
 
   await page.getByRole('tab', { name: 'Meters' }).click();
-  await expect(page.getByRole('radio', { name: 'Reference' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Reference' })).toBeDisabled();
   await page.getByRole('tabpanel', { name: 'Meters' }).locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
   await expect(status).toContainText(/Loaded reference\.wav as the reference/);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
   await expect(status).not.toContainText(/without the master chain/);
-  await page.getByRole('radio', { name: 'Reference' }).click();
+  await page.getByRole('button', { name: 'Reference' }).click();
   await expect(status).toContainText(/reference track, loudness-matched/);
   await expect(page.getByLabel('Integrated loudness', { exact: true })).not.toHaveText('— LUFS', { timeout: 10_000 });
-  await page.getByRole('radio', { name: 'Original' }).click();
+  await page.getByRole('button', { name: 'Original' }).click();
   await expect(status).toContainText(/original mix, loudness-matched/);
-  await page.getByRole('radio', { name: 'Difference' }).click();
+  await page.getByRole('button', { name: 'Difference' }).click();
   await page.getByLabel('Mono check (sum to mono)').check();
   await page.getByRole('radio', { name: 'Side only', exact: true }).check();
-  await page.getByRole('radio', { name: 'Processed' }).click();
+  await page.getByRole('button', { name: 'Processed' }).click();
+  await expect(page.getByRole('button', { name: 'Processed' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('meter', { name: 'Phase correlation' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(status).toContainText(/Paused at/);
@@ -400,7 +401,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(overlay).toHaveAttribute('aria-label', /Spectrogram from 0:00\.000 to 0:03\.000/);
   await expect(page.locator('.mastering-spectrogram .mastering-busy')).toHaveCount(0, { timeout: 15_000 });
 
-  await page.getByRole('radio', { name: 'Paint regions' }).click();
+  await page.getByRole('button', { name: 'Paint regions' }).click();
   await overlay.scrollIntoViewIfNeeded();
   const box = await overlay.boundingBox();
   if (!box) throw new Error('spectrogram missing');
@@ -415,7 +416,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByLabel('Clip edits')).toHaveText('0');
 
-  await page.getByRole('radio', { name: 'Select time' }).click();
+  await page.getByRole('button', { name: 'Select time' }).click();
   await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5, { steps: 3 });
@@ -641,6 +642,13 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     { name: 'pad.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 44_100, 110) },
   ]);
   await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+  const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number').evaluateAll((elements) =>
+    elements
+      .filter((element) => (element as HTMLElement).offsetParent !== null)
+      .map((element) => ({ label: (element.textContent || (element as HTMLInputElement).ariaLabel || element.tagName).trim().slice(0, 80), height: element.getBoundingClientRect().height }))
+      .filter((entry) => entry.height < 43.5),
+  );
+  expect(undersizedTargets).toEqual([]);
   for (const tab of ['Edit', 'Arrange', 'Time & pitch', 'Repair', 'Master', 'Meters', 'Export', 'Project']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
     const panel = page.getByRole('tabpanel', { name: tab, exact: true });
