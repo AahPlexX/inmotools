@@ -148,7 +148,7 @@ describe('Open tactical trajectory interchange', () => {
     expect(() => applyTrajectoryImport(project, [
       ...samples,
       { targetId: 'missing-token', timeMs: 2000, position: { x: 2, y: 0.4 } },
-    ], 'trajectory-json', 'bad.json')).toThrow(/target|position|normalized/i);
+    ], 'trajectory-json', 'bad.json')).toThrow(/target|position|normalized|within/i);
     expect(JSON.stringify(project)).toBe(before);
   });
 });
