@@ -1,0 +1,71 @@
+/**
+ * Small shared UI pieces for the Mastering workspace: formatting helpers, id
+ * creation, and a numeric field that commits once per edit.
+ *
+ * Committed values become undo steps, so fields must not commit on every
+ * keystroke. `CommitNumberField` keeps a local draft and commits on Enter or
+ * blur; Escape restores the committed value.
+ */
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+
+export const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error || 'unknown error');
+
+export const formatBytes = (bytes: number) => bytes < 1024
+  ? `${bytes} B`
+  : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+
+/** `m:ss.mmm`, the precision edit fields and readouts share. */
+export const formatTime = (seconds: number) => {
+  const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
+  const minutes = Math.floor(safe / 60);
+  return `${minutes}:${(safe % 60).toFixed(3).padStart(6, '0')}`;
+};
+
+export const formatDb = (value: number, digits = 1) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(digits)} dB`;
+
+/** Human wording for a pan/balance value in [-1, 1]. */
+export const formatPan = (pan: number) => Math.abs(pan) < 0.005 ? 'Centre' : `${Math.round(Math.abs(pan) * 100)}% ${pan < 0 ? 'left' : 'right'}`;
+
+export const newId = (prefix: string) => typeof crypto !== 'undefined' && 'randomUUID' in crypto
+  ? `${prefix}-${crypto.randomUUID()}`
+  : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+interface CommitNumberFieldProps {
+  label: string;
+  value: number;
+  onCommit: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  suffix?: string;
+  hint?: string;
+  /** Digits shown when the committed value is displayed. */
+  digits?: number;
+}
+
+export function CommitNumberField({ label, value, onCommit, min, max, step = 0.1, disabled, suffix, hint, digits = 3 }: CommitNumberFieldProps) {
+  const id = useId();
+  const shown = Number.isFinite(value) ? String(Number(value.toFixed(digits))) : '0';
+  const [draft, setDraft] = useState(shown);
+  useEffect(() => { setDraft(shown); }, [shown]);
+
+  const commit = () => {
+    const parsed = Number(draft);
+    if (draft.trim() === '' || !Number.isFinite(parsed)) { setDraft(shown); return; }
+    const bounded = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, parsed));
+    if (bounded !== value) onCommit(bounded);
+    setDraft(String(Number(bounded.toFixed(digits))));
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') { event.preventDefault(); commit(); }
+    else if (event.key === 'Escape') { event.preventDefault(); setDraft(shown); }
+  };
+  return <div className="field">
+    <label htmlFor={id}>{label}{suffix ? <span className="mastering-unit"> ({suffix})</span> : null}</label>
+    <input id={id} type="number" inputMode="decimal" min={min} max={max} step={step} value={draft} disabled={disabled}
+      onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={onKeyDown}
+      aria-describedby={hint ? `${id}-hint` : undefined} />
+    {hint && <small id={`${id}-hint`}>{hint}</small>}
+  </div>;
+}

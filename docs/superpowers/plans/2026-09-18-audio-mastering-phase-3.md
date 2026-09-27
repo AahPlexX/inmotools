@@ -1,5 +1,7 @@
 # Audio Mastering Workstation Phase 3 Implementation Plan
 
+> **Superseded 2026-09-27.** Execution continues in `2026-09-27-audio-mastering-completion.md` on branch `claude/music-editing-tool-b9w0pq`. The unchecked Task 2–7 boxes below are historical; that file holds current status.
+
 **Status:** Active after verified Phase 2; Task 1 (ledger 17) is complete; Task 2 (ledgers 11 and 13) is partially implemented and remains active as of 2026-09-25.
 **Branch:** `feature/audio-mastering-workstation` only; do not merge to `main`.
 **Goal:** Replace the current single-buffer/edit-stack state with an atomic project/timeline revision model, then build precise clip and multi-track editing without regressing the verified Phase 1–2 workflow.

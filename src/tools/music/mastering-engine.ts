@@ -21,36 +21,7 @@ export interface MasteringRegion {
   endSeconds: number;
 }
 
-export interface MasteringTrack {
-  id: string;
-  name: string;
-  sourceId: string;
-  durationSeconds: number;
-  gainDb: number;
-  pan: number;
-  muted: boolean;
-  solo: boolean;
-}
-
-export interface MasteringProject {
-  version: 1;
-  tracks: MasteringTrack[];
-  selection: TimeSelection;
-  markers: MasteringMarker[];
-  regions: MasteringRegion[];
-  loopEnabled: boolean;
-}
-
 export interface PeakBucket { min: number; max: number }
-
-export const createProject = (): MasteringProject => ({
-  version: 1,
-  tracks: [],
-  selection: { startSeconds: 0, endSeconds: 0 },
-  markers: [],
-  regions: [],
-  loopEnabled: false,
-});
 
 const finite = (value: number, fallback = 0) => Number.isFinite(value) ? value : fallback;
 
@@ -293,208 +264,6 @@ export type AudioEdit =
   | { type: 'extractChannel'; channelIndex: number }
   | { type: 'dualMono'; channelIndex: number };
 
-export interface SourceOutputRange {
-  sourceStartFrame: number;
-  sourceEndFrame: number;
-  outputStartFrame: number;
-  outputEndFrame: number;
-  reversed: boolean;
-}
-
-type TimelineSpan = {
-  sourceStartFrame: number;
-  sourceEndFrame: number;
-  reversed: boolean;
-} | {
-  sourceStartFrame: null;
-  sourceEndFrame: null;
-  reversed: false;
-  frameCount: number;
-};
-
-const spanLength = (span: TimelineSpan) => span.sourceStartFrame === null
-  ? span.frameCount
-  : span.sourceEndFrame - span.sourceStartFrame;
-
-function splitTimelineAt(spans: TimelineSpan[], frame: number): [TimelineSpan[], TimelineSpan[]] {
-  const left: TimelineSpan[] = [];
-  const right: TimelineSpan[] = [];
-  let position = 0;
-  for (const span of spans) {
-    const length = spanLength(span);
-    const boundary = position + length;
-    if (boundary <= frame) left.push(span);
-    else if (position >= frame) right.push(span);
-    else {
-      const before = frame - position;
-      const after = length - before;
-      if (span.sourceStartFrame === null) {
-        if (before > 0) left.push({ ...span, frameCount: before });
-        if (after > 0) right.push({ ...span, frameCount: after });
-      } else {
-        const leftSpan: TimelineSpan = span.reversed
-          ? { ...span, sourceStartFrame: span.sourceEndFrame - before }
-          : { ...span, sourceEndFrame: span.sourceStartFrame + before };
-        const rightSpan: TimelineSpan = span.reversed
-          ? { ...span, sourceEndFrame: span.sourceEndFrame - before }
-          : { ...span, sourceStartFrame: span.sourceStartFrame + before };
-        if (before > 0) left.push(leftSpan);
-        if (after > 0) right.push(rightSpan);
-      }
-    }
-    position = boundary;
-  }
-  return [left, right];
-}
-
-function timelineFrame(seconds: number, sampleRate: number, length: number): number {
-  return Math.max(0, Math.min(length, Math.round(finite(seconds) * sampleRate)));
-}
-
-/**
- * A half-open segment of the edited single-source timeline. Null source frames
- * identify inserted silence; reversed source segments read from end to start.
- */
-export type SourceTimelineSegment =
-  | {
-    outputStartFrame: number;
-    outputEndFrame: number;
-    sourceStartFrame: number;
-    sourceEndFrame: number;
-    reversed: boolean;
-  }
-  | {
-    outputStartFrame: number;
-    outputEndFrame: number;
-    sourceStartFrame: null;
-    sourceEndFrame: null;
-    reversed: false;
-  };
-
-/**
- * Derives the source and silence spans produced by the ordered AudioEdit stack.
- * All edit times are interpreted on the output timeline produced by prior edits.
- * This metadata does not render PCM or represent track/clip arrangement order.
- */
-export function deriveSourceTimelineThroughEdits(
-  source: PcmAudio,
-  edits: readonly AudioEdit[],
-): SourceTimelineSegment[] {
-  const sourceLength = validatePcm(source);
-  let spans: TimelineSpan[] = sourceLength
-    ? [{ sourceStartFrame: 0, sourceEndFrame: sourceLength, reversed: false }]
-    : [];
-  const length = () => spans.reduce((total, span) => total + spanLength(span), 0);
-
-  for (const edit of edits) {
-    const currentLength = length();
-    if (edit.type === 'crop') {
-      const start = timelineFrame(edit.startSeconds, source.sampleRate, currentLength);
-      const end = timelineFrame(edit.endSeconds, source.sampleRate, currentLength);
-      const lower = Math.min(start, end);
-      const [, afterStart] = splitTimelineAt(spans, lower);
-      const [selected] = splitTimelineAt(afterStart, Math.max(start, end) - lower);
-      spans = selected;
-    } else if (edit.type === 'deleteRange') {
-      const start = timelineFrame(edit.startSeconds, source.sampleRate, currentLength);
-      const end = timelineFrame(edit.endSeconds, source.sampleRate, currentLength);
-      const lower = Math.min(start, end);
-      const [before, afterStart] = splitTimelineAt(spans, lower);
-      const [, after] = splitTimelineAt(afterStart, Math.max(start, end) - lower);
-      spans = [...before, ...after];
-    } else if (edit.type === 'insertSilence') {
-      const at = timelineFrame(edit.atSeconds, source.sampleRate, currentLength);
-      const silenceLength = Math.max(0, Math.round(finite(edit.durationSeconds) * source.sampleRate));
-      const [before, after] = splitTimelineAt(spans, at);
-      if (silenceLength > 0) {
-        spans = [...before, {
-          sourceStartFrame: null,
-          sourceEndFrame: null,
-          reversed: false,
-          frameCount: silenceLength,
-        }, ...after];
-      } else {
-        spans = [...before, ...after];
-      }
-    } else if (edit.type === 'reverse') {
-      const start = timelineFrame(edit.startSeconds, source.sampleRate, currentLength);
-      const end = timelineFrame(edit.endSeconds, source.sampleRate, currentLength);
-      const lower = Math.min(start, end);
-      const upper = Math.max(start, end);
-      const [before, afterStart] = splitTimelineAt(spans, lower);
-      const [selected, after] = splitTimelineAt(afterStart, upper - lower);
-      spans = [...before, ...selected.reverse().map((span) => span.sourceStartFrame === null
-        ? span
-        : { ...span, reversed: !span.reversed }), ...after];
-    }
-  }
-
-  const result: SourceTimelineSegment[] = [];
-  let outputStartFrame = 0;
-  for (const span of spans) {
-    const outputEndFrame = outputStartFrame + spanLength(span);
-    if (span.sourceStartFrame === null) {
-      result.push({
-        outputStartFrame,
-        outputEndFrame,
-        sourceStartFrame: null,
-        sourceEndFrame: null,
-        reversed: false,
-      });
-    } else {
-      result.push({
-        outputStartFrame,
-        outputEndFrame,
-        sourceStartFrame: span.sourceStartFrame,
-        sourceEndFrame: span.sourceEndFrame,
-        reversed: span.reversed,
-      });
-    }
-    outputStartFrame = outputEndFrame;
-  }
-  return result;
-}
-
-/**
- * Maps an original-source half-open range to its surviving edited-output ranges.
- * Results are ordered on the output timeline; inserted silence has no source range.
- */
-export function mapSourceRangeThroughEdits(
-  source: PcmAudio,
-  edits: readonly AudioEdit[],
-  startSeconds: number,
-  endSeconds: number,
-): SourceOutputRange[] {
-  const timeline = deriveSourceTimelineThroughEdits(source, edits);
-  const sourceLength = source.channels[0].length;
-  const requested = clampSelection({ startSeconds, endSeconds }, sourceLength / source.sampleRate);
-  const sourceStart = timelineFrame(requested.startSeconds, source.sampleRate, sourceLength);
-  const sourceEnd = timelineFrame(requested.endSeconds, source.sampleRate, sourceLength);
-  const result: SourceOutputRange[] = [];
-
-  if (sourceStart === sourceEnd) return result;
-  for (const segment of timeline) {
-    if (segment.sourceStartFrame === null) continue;
-    const overlapStart = Math.max(sourceStart, segment.sourceStartFrame);
-    const overlapEnd = Math.min(sourceEnd, segment.sourceEndFrame);
-    if (overlapStart >= overlapEnd) continue;
-    const startOffset = segment.reversed
-      ? segment.sourceEndFrame - overlapEnd
-      : overlapStart - segment.sourceStartFrame;
-    const endOffset = segment.reversed
-      ? segment.sourceEndFrame - overlapStart
-      : overlapEnd - segment.sourceStartFrame;
-    result.push({
-      sourceStartFrame: overlapStart,
-      sourceEndFrame: overlapEnd,
-      outputStartFrame: segment.outputStartFrame + startOffset,
-      outputEndFrame: segment.outputStartFrame + endOffset,
-      reversed: segment.reversed,
-    });
-  }
-  return result;
-}
-
 export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAudio {
   let current: PcmAudio = { sampleRate: source.sampleRate, channels: source.channels.map((channel) => channel.slice()) };
   for (const edit of edits) {
@@ -517,3 +286,34 @@ export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAu
 }
 
 export const pcmDuration = (audio: PcmAudio): number => audio.channels.length ? audio.channels[0].length / audio.sampleRate : 0;
+
+/** Timeline seconds rounded to the nearest frame, clamped to `[0, length]`; the same rule `applyEdits` uses. */
+const editFrame = (seconds: number, sampleRate: number, length: number) =>
+  Math.max(0, Math.min(length, Math.round(finite(seconds) * sampleRate)));
+
+/**
+ * Predicts the frame count `applyEdits` produces without touching PCM.
+ *
+ * Document operations (ripple, clip placement, timeline duration) need clip
+ * lengths while the decoded audio lives in the DSP worker. This mirrors the
+ * renderer's frame rounding for every length-changing edit, so the document and
+ * the rendered material can never disagree about where a clip ends.
+ */
+export function estimateEditedFrameCount(sourceFrames: number, sampleRate: number, edits: readonly AudioEdit[]): number {
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) throw new RangeError('Sample rate must be a positive finite number.');
+  let length = Math.max(0, Math.trunc(finite(sourceFrames)));
+  for (const edit of edits) {
+    if (edit.type === 'crop') {
+      const first = editFrame(edit.startSeconds, sampleRate, length);
+      const second = editFrame(edit.endSeconds, sampleRate, length);
+      length = Math.abs(second - first);
+    } else if (edit.type === 'deleteRange') {
+      const first = editFrame(edit.startSeconds, sampleRate, length);
+      const second = editFrame(edit.endSeconds, sampleRate, length);
+      length -= Math.abs(second - first);
+    } else if (edit.type === 'insertSilence') {
+      length += Math.max(0, Math.round(finite(edit.durationSeconds) * sampleRate));
+    }
+  }
+  return length;
+}

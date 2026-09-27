@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HarmonyWorkspace from './HarmonyWorkspace';
 import MasteringWorkspace from './MasteringWorkspace';
+import './mastering.css';
 
 type Surface = 'mastering' | 'harmony';
 
