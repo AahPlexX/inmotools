@@ -30,6 +30,8 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
   const [snapshots, setSnapshots] = useState<TacticalSnapshotRecord[]>([]);
   const [recovery, setRecovery] = useState<TacticalSnapshotRecord>();
   const [savedProjects, setSavedProjects] = useState<TacticalProject[]>([]);
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
+  const [autosaveEnabled, setAutosaveEnabled] = useState(false);
 
   const refresh = useCallback(async () => {
     const [nextSnapshots, nextRecovery, nextProjects] = await Promise.all([
@@ -40,10 +42,23 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
     setSnapshots(nextSnapshots);
     setRecovery(nextRecovery);
     setSavedProjects(nextProjects);
+    return nextRecovery;
   }, [project.id, vault]);
 
-  useEffect(() => { void refresh().catch((error) => onStatus(message(error))); }, [onStatus, refresh]);
   useEffect(() => {
+    let active = true;
+    void refresh()
+      .then((initialRecovery) => {
+        if (!active) return;
+        setRecoveryChecked(true);
+        setAutosaveEnabled(!initialRecovery);
+      })
+      .catch((error) => onStatus(message(error)));
+    return () => { active = false; };
+  }, [onStatus, refresh]);
+
+  useEffect(() => {
+    if (!recoveryChecked || !autosaveEnabled) return;
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -56,7 +71,7 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
       })();
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [onStatus, project, refresh, vault]);
+  }, [autosaveEnabled, onStatus, project, recoveryChecked, refresh, vault]);
   useEffect(() => () => vault.close(), [vault]);
 
   async function createSnapshot(event: FormEvent<HTMLFormElement>) {
@@ -73,8 +88,14 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
     try {
       const restored = await vault.restoreSnapshot(snapshot.id);
       if (!restored) throw new Error('The selected snapshot is no longer available.');
+      setAutosaveEnabled(true);
       onReplaceProject(restored, 'Restored snapshot ' + snapshot.label + '.');
     } catch (error) { onStatus(message(error)); }
+  }
+
+  function keepCurrentAndResumeAutosave() {
+    setAutosaveEnabled(true);
+    onStatus('Current board kept. Local autosave resumed.');
   }
 
   async function loadSavedProject(projectId: string) {
@@ -153,6 +174,16 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
         <section aria-labelledby="tactical-vault-heading">
           <h3 id="tactical-vault-heading">Local project vault</h3>
           <p>Projects, autosaves, and snapshots are stored only in this browser using IndexedDB. Nothing is uploaded.</p>
+          {recoveryChecked && recovery && !autosaveEnabled ? (
+            <div className="tactical-legality notice" role="status">
+              <strong>Recovery available</strong>
+              <p>A previous autosave is available. Autosave is paused so the starter board cannot replace that recovery before you choose.</p>
+              <div className="tactical-inline-actions">
+                <button type="button" onClick={() => void restore(recovery)}>Restore latest autosave</button>
+                <button type="button" className="secondary" onClick={keepCurrentAndResumeAutosave}>Keep current board</button>
+              </div>
+            </div>
+          ) : null}
           <div className="tactical-inline-actions">
             <button type="button" onClick={() => void vault.saveProject(project).then(refresh).then(() => onStatus('Project saved to this browser.')).catch((error) => onStatus(message(error)))}>Save to device</button>
             <button type="button" disabled={!recovery} onClick={() => recovery && void restore(recovery)}>Restore latest autosave</button>
