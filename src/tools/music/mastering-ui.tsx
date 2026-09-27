@@ -98,6 +98,8 @@ export interface MasteringPanelContext {
   playhead: number;
   selection: TimeSelection;
   render: RenderResult | null;
+  /** True while the worker renders a newer revision; `render` still holds the previous one. */
+  rendering: boolean;
   canEdit: boolean;
   client: MasteringDspClient | null;
   commit: (next: MasteringDocument, status: string) => void;

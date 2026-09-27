@@ -291,7 +291,7 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
   await page.getByRole('button', { name: 'De-ess' }).click();
   await open('Hiss gate');
   await page.getByRole('button', { name: 'Gate hiss' }).click();
-  await page.getByLabel('Selection only', { exact: false }).check();
+  await page.getByRole('tabpanel', { name: 'Repair' }).getByLabel('Selection only', { exact: false }).check();
   await open('De-clip');
   await page.getByRole('button', { name: 'De-clip' }).click();
   await expect(status).toContainText(/Rebuilt clipped peaks on 0:00\.200–0:00\.900/);
@@ -343,7 +343,7 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
 
   await page.getByRole('tab', { name: 'Meters' }).click();
   await expect(page.getByRole('radio', { name: 'Reference' })).toBeDisabled();
-  await page.locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
+  await page.getByRole('tabpanel', { name: 'Meters' }).locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
   await expect(status).toContainText(/Loaded reference\.wav as the reference/);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
@@ -393,4 +393,124 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5, { steps: 3 });
   await page.mouse.up();
   await expect(page.getByLabel('Selection start (seconds)')).not.toHaveValue('0');
+});
+
+// --- SECTION: export round trips ---
+
+function riffChunks(bytes: Buffer): Map<string, Buffer> {
+  expect(bytes.toString('ascii', 0, 4)).toBe('RIFF');
+  expect(bytes.toString('ascii', 8, 12)).toBe('WAVE');
+  const chunks = new Map<string, Buffer>();
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const size = bytes.readUInt32LE(offset + 4);
+    chunks.set(bytes.toString('ascii', offset, offset + 4), bytes.subarray(offset + 8, offset + 8 + size));
+    offset += 8 + size + (size & 1);
+  }
+  return chunks;
+}
+
+async function exportDownload(page: import('@playwright/test').Page, scope: import('@playwright/test').Locator, button: string | RegExp) {
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), scope.getByRole('button', { name: button }).click()]);
+  const path = await download.path();
+  const { readFile } = await import('node:fs/promises');
+  return { name: download.suggestedFilename(), bytes: await readFile(path) };
+}
+
+test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZIP', async ({ page }) => {
+  test.setTimeout(180_000);
+  const tone = makeMonoPcm16Wav(1, 48_000, 440);
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: tone });
+  await expect(page.locator('.status-line')).toContainText(/Loaded tone\.wav/);
+
+  await page.getByRole('tab', { name: 'Export' }).click();
+  const panel = page.getByRole('tabpanel', { name: 'Export' });
+  await expect(panel.getByTestId('export-format-note')).toContainText('Uncompressed');
+  await expect(panel.getByLabel('File name')).toHaveValue('tone');
+  await panel.getByLabel('Apply the master chain').uncheck();
+  await panel.getByLabel('Bit depth').selectOption('16');
+  await panel.getByLabel(/Add TPDF dither/).uncheck();
+  await panel.getByText('Tags and cover art').click();
+  await panel.getByLabel('Title', { exact: true }).fill('Test Tone');
+  await panel.getByLabel('Artist', { exact: true }).fill('Café Band');
+  await expect(panel.getByLabel('Lyrics')).toBeDisabled();
+
+  // Unprocessed, undithered 16-bit at the source rate must give back the source samples exactly.
+  const wav = await exportDownload(page, panel, 'Export WAV');
+  expect(wav.name).toBe('tone.wav');
+  const chunks = riffChunks(wav.bytes);
+  expect(chunks.get('fmt ')!.readUInt16LE(0)).toBe(1);
+  expect(chunks.get('fmt ')!.readUInt32LE(4)).toBe(48_000);
+  expect(chunks.get('fmt ')!.readUInt16LE(14)).toBe(16);
+  expect(chunks.get('data')!.equals(tone.subarray(44))).toBe(true);
+  const info = chunks.get('LIST')!;
+  expect(info.toString('latin1')).toContain('Test Tone');
+  expect(info.toString('latin1')).toContain('Café Band');
+  expect(chunks.get('bext')!.readInt16LE(412)).toBeLessThan(0);
+  await expect(page.locator('.status-line')).toContainText(/Exported tone\.wav: -?\d+\.\d LUFS integrated/);
+  await expect(panel.getByRole('heading', { name: 'Last export' })).toBeVisible();
+
+  const [csv] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Download loudness CSV' }).click()]);
+  const { readFile } = await import('node:fs/promises');
+  expect((await readFile(await csv.path())).toString('utf8')).toMatch(/^file,duration_s,sample_rate_hz,integrated_lufs/);
+  const [png] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'PNG' }).click()]);
+  expect((await readFile(await png.path())).subarray(1, 4).toString('ascii')).toBe('PNG');
+
+  // Compressed formats: each file starts with its container's signature and carries the title.
+  await panel.getByLabel('FLAC').check();
+  await expect(panel.getByTestId('export-format-note')).toContainText('Writes FLAC', { timeout: 30_000 });
+  await expect(panel.getByLabel('Lyrics')).toBeEnabled();
+  const cover = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  await panel.locator('input[type="file"][accept="image/jpeg,image/png"]').setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: cover });
+  await expect(panel.getByRole('img', { name: 'Cover art: cover.png' })).toBeVisible();
+  const flac = await exportDownload(page, panel, 'Export FLAC');
+  expect(flac.bytes.includes(cover)).toBe(true);
+  expect(flac.name).toBe('tone.flac');
+  expect(flac.bytes.subarray(0, 4).toString('ascii')).toBe('fLaC');
+  expect(flac.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+
+  await panel.getByLabel('MP3').check();
+  await expect(panel.getByTestId('export-format-note')).toContainText('Writes MP3');
+  const mp3 = await exportDownload(page, panel, 'Export MP3');
+  expect(mp3.bytes.includes(cover)).toBe(true);
+  expect(mp3.bytes.subarray(0, 3).toString('ascii')).toBe('ID3');
+  expect(mp3.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+
+  await panel.getByLabel('AAC (M4A)').check();
+  await expect(panel.getByTestId('export-format-note')).toContainText('Writes AAC-LC in MPEG-4');
+  const m4a = await exportDownload(page, panel, 'Export AAC (M4A)');
+  expect(m4a.name).toBe('tone.m4a');
+  expect(m4a.bytes.subarray(4, 8).toString('ascii')).toBe('ftyp');
+  expect(m4a.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+
+  await panel.getByLabel('Ogg').check();
+  await expect(panel.getByTestId('export-format-note')).toContainText(/Writes (Opus|Vorbis) in Ogg/);
+  const ogg = await exportDownload(page, panel, 'Export Ogg');
+  expect(ogg.bytes.subarray(0, 4).toString('ascii')).toBe('OggS');
+  expect(ogg.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+  await panel.getByLabel('MP3').check();
+
+  // Stems: a second track, then one file per track plus reports in one ZIP.
+  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'bass.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 110) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded bass\.wav/);
+  await panel.getByLabel(/Each track as a stem \(2\)/).check();
+  await expect(panel.getByLabel('Apply the master chain')).toHaveCount(0);
+  const zip = await exportDownload(page, panel, 'Export ZIP');
+  expect(zip.name).toBe('tone stems.zip');
+  const { default: JSZip } = await import('jszip');
+  const archive = await JSZip.loadAsync(zip.bytes);
+  const names = Object.keys(archive.files).filter((name) => !archive.files[name].dir).sort();
+  expect(names).toEqual([
+    'tone stems/reports/loudness.csv',
+    'tone stems/reports/loudness.json',
+    'tone stems/reports/tone - Track 1 spectrum.png',
+    'tone stems/reports/tone - Track 2 spectrum.png',
+    'tone stems/tone - Track 1.mp3',
+    'tone stems/tone - Track 2.mp3',
+  ]);
+  const report = JSON.parse(await archive.file('tone stems/reports/loudness.json')!.async('string')) as { files: Array<{ file: string }> };
+  expect(report.files.map((file) => file.file)).toEqual(['tone - Track 1.mp3', 'tone - Track 2.mp3']);
+  await expect(page.locator('.status-line')).toContainText(/Exported 2 files with loudness and spectrum reports in tone stems\.zip/);
 });

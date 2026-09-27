@@ -34,6 +34,7 @@ import {
 } from './mastering-project';
 import { formatTime, messageOf, newId, type MasteringPanelContext } from './mastering-ui';
 import MasteringTabs from './MasteringTabs';
+import MasteringExportTab from './MasteringExportTab';
 import MasteringEditTab from './MasteringEditTab';
 import MasteringTimePitchTab from './MasteringTimePitchTab';
 import MasteringRepairTab from './MasteringRepairTab';
@@ -588,6 +589,7 @@ export default function MasteringWorkspace() {
     playhead,
     selection: boundedSelection,
     render,
+    rendering,
     canEdit,
     client: clientRef.current,
     commit: commitWithStatus,
@@ -694,6 +696,7 @@ export default function MasteringWorkspace() {
           onResetMeters={() => { graphRef.current?.master?.port.postMessage({ type: 'resetMeters' } satisfies WorkletInbound); setMeters(null); setStatus('Meters reset.'); }}
           timelineAt={(time) => lastGraphRef.current ? timelinePosition(lastGraphRef.current, time, duration) : null}
           onJump={seek} /> },
+        { id: 'export', label: 'Export', render: (active) => <MasteringExportTab ctx={ctx} active={active} /> },
       ]} />}
 
       <p className={`status-line ${/^Could not|failed|could not start/i.test(status) ? 'error' : ''}`} role="status" aria-live="polite">{status}</p>

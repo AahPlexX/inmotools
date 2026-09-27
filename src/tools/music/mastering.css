@@ -100,6 +100,9 @@
 .mastering-band-row { border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
 .mastering-band-row summary { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; min-height:44px; padding:10px 12px; cursor:pointer; }
 .mastering-stage + .mastering-stage, .mastering-panel + .mastering-stage, .mastering-stage + .mastering-panel { margin-top:0; }
+.mastering-table-scroll { overflow-x:auto; }
+.mastering-artwork { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.mastering-artwork img { width:96px; height:96px; object-fit:cover; border:1px solid var(--line); border-radius:var(--radius-sm); }
 .mastering-report { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
 .mastering-report caption { text-align:left; color:var(--muted); font-size:12px; padding-bottom:6px; }
 .mastering-report th, .mastering-report td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; font-variant-numeric:tabular-nums; }

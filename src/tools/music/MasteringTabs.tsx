@@ -12,7 +12,8 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 export interface WorkbenchTab {
   id: string;
   label: string;
-  render: () => ReactNode;
+  /** `active` lets a panel defer costly first-use work (a codec probe) until it is first shown. */
+  render: (active: boolean) => ReactNode;
 }
 
 const STORAGE_KEY = 'inmotools.mastering.tab';
@@ -65,7 +66,7 @@ export default function MasteringTabs({ tabs, label }: { tabs: WorkbenchTab[]; l
     </div>
     {tabs.map((tab) => <div key={tab.id} role="tabpanel" id={`${baseId}-${tab.id}-panel`} aria-labelledby={`${baseId}-${tab.id}-tab`}
       className="mastering-tabpanel" hidden={tab.id !== active.id}>
-      {tab.render()}
+      {tab.render(tab.id === active.id)}
     </div>)}
   </div>;
 }
