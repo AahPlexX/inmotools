@@ -38,6 +38,8 @@ import MasteringEditTab from './MasteringEditTab';
 import MasteringTimePitchTab from './MasteringTimePitchTab';
 import MasteringRepairTab from './MasteringRepairTab';
 import MasteringMasterTab from './MasteringMasterTab';
+import MasteringSpectrogram from './MasteringSpectrogram';
+import type { Spectrogram } from './dsp/spectrogram';
 import MasteringMeters, { type MonitorState } from './MasteringMeters';
 import masterWorkletUrl from './mastering-master.worklet.ts?worker&url';
 import type { ListenSource, WorkletInbound, WorkletMeterMessage } from './mastering-worklet-protocol';
@@ -119,6 +121,9 @@ export default function MasteringWorkspace() {
   const [reference, setReference] = useState<{ name: string; buffer: AudioBuffer } | null>(null);
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [loudnessTarget, setLoudnessTarget] = useState(-14);
+  const [showSpectrogram, setShowSpectrogram] = useState(false);
+  const [spectrogram, setSpectrogram] = useState<Spectrogram | null>(null);
+  const [spectrogramLoading, setSpectrogramLoading] = useState(false);
   const clientRef = useRef<MasteringDspClient | null>(null);
   const graphRef = useRef<PlaybackGraph | null>(null);
   /** Timing of the most recent playback session, kept after stop so logged excursions still map to the timeline. */
@@ -192,6 +197,22 @@ export default function MasteringWorkspace() {
       return showedAll || current.spanSeconds > duration ? { startSeconds: 0, spanSeconds: duration } : clampViewport(current, duration, document.sampleRate);
     });
   }, [duration, document.sampleRate]);
+
+  // The spectrogram is analysed only while shown, once per new render; older results are ignored.
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!showSpectrogram || !render || !client || !render.mix.channels[0]?.length) { if (!render) setSpectrogram(null); return; }
+    let cancelled = false;
+    setSpectrogramLoading(true);
+    client.spectrogram().then((result) => {
+      if (!cancelled && mountedRef.current) setSpectrogram(result);
+    }).catch((error: unknown) => {
+      if (!cancelled && mountedRef.current) setStatus(`Could not draw the spectrogram: ${messageOf(error)}`);
+    }).finally(() => {
+      if (!cancelled && mountedRef.current) setSpectrogramLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [render, showSpectrogram]);
 
   // --- SECTION: playback ---
 
@@ -647,6 +668,10 @@ export default function MasteringWorkspace() {
         onSelect={updateSelection}
         onActivateClip={(clipId) => { updateView({ activeClipId: clipId }); }}
       />
+
+      {hasAudio && <label className="mastering-check mastering-spectrogram-toggle"><input type="checkbox" checked={showSpectrogram} onChange={(event) => setShowSpectrogram(event.target.checked)} /> Show spectrogram</label>}
+      {hasAudio && showSpectrogram && <MasteringSpectrogram ctx={ctx} spectrogram={spectrogram} loading={spectrogramLoading}
+        viewport={clampViewport(viewport, duration, document.sampleRate)} onSelect={updateSelection} onSeek={seek} />}
 
       {hasAudio && <MasteringTabs label="Workbench" tabs={[
         { id: 'edit', label: 'Edit', render: () => <MasteringEditTab ctx={ctx} sourceInfo={sourceInfo} onAddMarker={addMarker} /> },

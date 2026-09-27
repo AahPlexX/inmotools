@@ -364,3 +364,36 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(status).toContainText(/Paused at/);
 });
+
+test('shows a synced spectrogram and repairs a painted region', async ({ page }) => {
+  await page.goto('./#/tools/midi-harmony-lab');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'birdsong.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 2000) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded birdsong\.wav/);
+  await page.getByLabel('Show spectrogram').check();
+  const overlay = page.locator('.mastering-spectrogram-overlay');
+  await expect(overlay).toHaveAttribute('aria-label', /Spectrogram from 0:00\.000 to 0:03\.000/);
+  await expect(page.locator('.mastering-spectrogram .mastering-busy')).toHaveCount(0, { timeout: 15_000 });
+
+  await page.getByRole('radio', { name: 'Paint regions' }).click();
+  await overlay.scrollIntoViewIfNeeded();
+  const box = await overlay.boundingBox();
+  if (!box) throw new Error('spectrogram missing');
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByRole('list', { name: 'Painted regions' }).getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Attenuate painted regions' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Lowered 1 painted region by 18 dB/);
+  await expect(page.getByRole('list', { name: 'Painted regions' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByLabel('Clip edits')).toHaveText('0');
+
+  await page.getByRole('radio', { name: 'Select time' }).click();
+  await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5, { steps: 3 });
+  await page.mouse.up();
+  await expect(page.getByLabel('Selection start (seconds)')).not.toHaveValue('0');
+});

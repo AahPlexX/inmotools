@@ -119,6 +119,15 @@
 .mastering-meter-canvas { display:block; width:100%; border-radius:var(--radius-sm); }
 .mastering-file-secondary { background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
 
+/* Spectrogram */
+.mastering-spectrogram { display:grid; gap:8px; }
+.mastering-spectrogram-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.mastering-spectrogram-view { position:relative; border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden; background:#04040f; }
+.mastering-spectrogram-base, .mastering-spectrogram-overlay { display:block; width:100%; }
+.mastering-spectrogram-overlay { position:absolute; inset:0; touch-action:pan-y; }
+.mastering-spectrogram-toggle { justify-self:start; margin-top:-8px; }
+.mastering-paint-tools { display:grid; gap:8px; }
+
 /* Panels */
 .mastering-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 .mastering-panel { min-width:0; padding:16px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }

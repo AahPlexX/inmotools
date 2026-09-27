@@ -76,6 +76,11 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
         post({ type: 'masterResult', requestId: request.requestId, result }, result.channels.map((channel) => channel.buffer));
         break;
       }
+      case 'spectrogram': {
+        const spectrogram = engine.spectrogram();
+        post({ type: 'spectrogramResult', requestId: request.requestId, spectrogram }, [spectrogram.data.buffer]);
+        break;
+      }
       case 'measureMix':
         post({ type: 'mixMeasured', requestId: request.requestId, loudness: engine.measureMix() });
         break;

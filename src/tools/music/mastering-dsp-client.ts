@@ -94,6 +94,10 @@ export class MasteringDspClient {
     return MasteringDspClient.unwrap(await this.request({ type: 'master', settings, startSeconds, endSeconds }), 'masterResult').result;
   }
 
+  async spectrogram() {
+    return MasteringDspClient.unwrap(await this.request({ type: 'spectrogram' }), 'spectrogramResult').spectrogram;
+  }
+
   async measureMix() {
     return MasteringDspClient.unwrap(await this.request({ type: 'measureMix' }), 'mixMeasured').loudness;
   }

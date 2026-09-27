@@ -51,7 +51,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 3 | Source metadata reader | done | Phase 1 |
 | 4 | Bounded multi-track timeline (8) | done | S1: `addSourceTracksRevision` bound + lanes; unit + browser |
 | 5 | Peak pyramid + zoom/pan | done | S2: `dsp/peaks.ts`, canvas timeline, buttons/slider/Ctrl-wheel/pinch; stale renders superseded in worker |
-| 6 | Spectrogram | open | S8 |
+| 6 | Spectrogram | done | S8: `dsp/spectrogram.ts` (log rows, 8-bit), synced viewport/playhead/selection, select or paint drag |
 | 7 | Transport + keyboard | done | Phase 2 |
 | 8 | Numeric range selection | done | Phase 2 |
 | 9 | Named markers/regions | done | Phase 2 |
@@ -88,7 +88,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 40 | Multi-band hiss gate | done | S5: phase-compensated 3-band LR4 split, per-band threshold/release |
 | 41 | De-clip | done | S5: AR reconstruction constrained to exceed the clip level |
 | 42 | Burst repair | done | S5: AR interpolation of a selected span up to 200 ms |
-| 43 | Spectral brush attenuate | partial | S5: region attenuation engine + numeric band-in-selection control; painting on the spectrogram arrives with S8 |
+| 43 | Spectral brush attenuate | done | S5 engine + S8 painting on the spectrogram (multiple regions, one undo step) |
 | 44 | Spectral heal | done | S5: magnitude interpolation from neighbouring frames, phases kept; band-in-selection control |
 | 45 | Ten-band parametric EQ | done | S6: `dsp/master-chain.ts` + EQ graph and band table |
 | 46 | Seven filter shapes | done | S6: bell, shelves, HP, LP, notch, band-pass (0 dB-normalized) |
@@ -121,7 +121,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 73–80 | Export formats, metadata, artwork, batch | open | S9 |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 68/81 done** (2026-09-27, after S6/S7: 109 mastering unit tests in 11 files; mastering browser spec 10/10 and music spec 10/10 across desktop/mobile Chromium).
+**Count: 70/81 done** (2026-09-27, after S8: 111 mastering unit tests in 12 files; mastering browser spec 12/12 and music spec 10/10 across desktop/mobile Chromium).
 
 ## Rules for whoever continues
 

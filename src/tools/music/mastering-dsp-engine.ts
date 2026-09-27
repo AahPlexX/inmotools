@@ -14,6 +14,7 @@ import { buildPeakPyramid, type PeakPyramid } from './dsp/peaks';
 import { averageSpectrum, findResonances, type Resonance, type Spectrum } from './dsp/analysis';
 import { measureLoudness, LoudnessMeter, type LoudnessReading } from './dsp/loudness';
 import { renderMaster, type MasterSettings } from './dsp/master-chain';
+import { buildSpectrogram, type Spectrogram } from './dsp/spectrogram';
 import { resamplePcm } from './dsp/resample';
 
 export interface ClipRenderInfo {
@@ -140,6 +141,12 @@ export class MasteringDspEngine {
       meter.process(channels.map((channel) => channel.subarray(offset, offset + size)), size);
     }
     return { channels, sampleRate: mix.sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+  }
+
+  /** Spectrogram of the whole mix (ledger 6). */
+  spectrogram(): Spectrogram {
+    const { mix } = this.mixRange();
+    return buildSpectrogram(mix.channels, mix.sampleRate);
   }
 
   /** Loudness reading of the unprocessed mix, for before/after comparison. */

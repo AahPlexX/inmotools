@@ -6,6 +6,7 @@ import type { MasterRenderResult, RenderResult } from './mastering-dsp-engine';
 import type { MasterSettings } from './dsp/master-chain';
 import type { Resonance, Spectrum } from './dsp/analysis';
 import type { LoudnessReading } from './dsp/loudness';
+import type { Spectrogram } from './dsp/spectrogram';
 import type { MasteringDocument } from './mastering-project';
 
 export type DspRequest =
@@ -17,7 +18,8 @@ export type DspRequest =
   | { type: 'slice'; requestId: number; document: MasteringDocument; clipId: string; startFrame: number; frameCount: number }
   | { type: 'spectrum'; requestId: number; startSeconds?: number; endSeconds?: number }
   | { type: 'master'; requestId: number; settings: MasterSettings; startSeconds?: number; endSeconds?: number }
-  | { type: 'measureMix'; requestId: number };
+  | { type: 'measureMix'; requestId: number }
+  | { type: 'spectrogram'; requestId: number };
 
 export type DspResponse =
   | { type: 'sourceLoaded'; requestId: number; frameCount: number; channelCount: number }
@@ -29,4 +31,5 @@ export type DspResponse =
   | { type: 'spectrumResult'; requestId: number; spectrum: Spectrum; resonances: Resonance[] }
   | { type: 'masterResult'; requestId: number; result: MasterRenderResult }
   | { type: 'mixMeasured'; requestId: number; loudness: LoudnessReading }
+  | { type: 'spectrogramResult'; requestId: number; spectrogram: Spectrogram }
   | { type: 'error'; requestId: number; message: string };
