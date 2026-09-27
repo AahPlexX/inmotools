@@ -591,3 +591,46 @@ test('splits, renames, and reorders non-overlapping tactical scenes', async ({ p
   await expect(page.getByText(`${originalStart}-${originalEnd} ms - Press phase`)).toBeVisible();
   await expect(page.getByLabel('Scene view').locator('option')).toHaveCount(1);
 });
+
+
+test('renders source-honest spatial analysis overlays with readable metric summaries', async ({ page }) => {
+  await page.getByText('Spatial analysis', { exact: true }).click();
+
+  await page.getByLabel('Voronoi territory').check();
+  await page.getByLabel('Team hulls').check();
+  await page.getByLabel('Passing lane to ball').check();
+  await page.getByLabel('Orientation sector').check();
+  await page.getByLabel('Positional grid').check();
+  await page.getByLabel('Distance ring').check();
+  await page.getByLabel('Tether to ball').check();
+
+  await expect(page.locator('[data-analysis-kind="voronoi-cell"]')).toHaveCount(4);
+  await expect(page.locator('[data-analysis-kind="team-hull"]')).toHaveCount(1);
+  await expect(page.locator('[data-analysis-kind="passing-lane"]')).toHaveCount(1);
+  await expect(page.locator('[data-analysis-kind="vision-sector"]')).toHaveCount(1);
+  await expect(page.locator('[data-analysis-kind="grid-line"]')).toHaveCount(6);
+  await expect(page.locator('[data-analysis-kind="distance-ring"]')).toHaveCount(1);
+  await expect(page.locator('[data-analysis-kind="tether"]')).toHaveCount(1);
+
+  await expect(page.getByTestId('team-geometry-summary')).toContainText(/width.*m/i);
+  await expect(page.getByTestId('passing-lane-summary')).toContainText(/clearance.*m/i);
+  await expect(page.getByText(/Geometric analysis only/i)).toBeVisible();
+});
+
+test('derives occupancy and speed metrics only from authored trajectory samples', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByLabel('Motion end X %').fill('80');
+  await page.getByLabel('Motion end Y %').fill('20');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  await page.getByText('Spatial analysis', { exact: true }).click();
+  await page.getByLabel('Occupancy heat map').check();
+
+  await expect(page.locator('[data-analysis-kind="heat-cell"]')).not.toHaveCount(0);
+  await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/authored trajectory/i);
+  await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/distance.*m/i);
+  await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/average speed.*m\/s/i);
+});
