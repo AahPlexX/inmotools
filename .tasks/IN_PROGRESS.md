@@ -1,5 +1,10 @@
 # In Progress
 
+- **Markdown Workbench Gauntlet hardening** — adversarial async-race and generated-SVG safety follow-up for the already-complete Markdown Workbench.
+  - Pull request: #79 (`fix/markdown-gauntlet-20260925` → `main`). Do not open a second PR.
+  - Scope: stale citation-format results, table-formula Worker lifecycle/cancellation, detached standalone-export sanitization, Graphviz SVG navigation/resource sanitization, and their focused regressions only.
+  - Current evidence: branch head `43721c0151dd0b0d2869d49bdb0d664c651c1140`; focused run `36283681892` passed 20 Markdown unit files / 215 tests, browser fixture build, and 106/106 desktop+mobile Chromium cases. The Graphviz regression now checks the SVG DOM contract directly: the HTTPS link is retained, the `javascript:` link loses its `href`, and no active `javascript:` URL remains in the rendered markup.
+  - Completion gate: temporary validation workflow removed before integration, PR #79 reconciled non-destructively with current `main`, normal repository validation green for the final PR content, merged to `origin/main`, exact-main Pages deployment green, and this entry moved to DONE/WORK_LOG with final evidence.
 - **Digital Logic Workstation** — local-first digital logic circuit simulator, schematic capture, and electronic-prototyping workstation governed by a 34-capability ledger.
   - Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
