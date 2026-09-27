@@ -328,6 +328,8 @@ test('authors typed triggers, named action patterns, and linked-unit tactical ad
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
   await page.getByText('Rules, formations & restarts', { exact: true }).click();
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save to device' })).toBeVisible();
   const spatialSummary = page.getByText('Spatial analysis', { exact: true });
   await spatialSummary.focus();
   await page.keyboard.press('Enter');
@@ -360,6 +362,7 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
     await expect(page.locator('.tactical-board')).toBeVisible();
     await page.getByText('Rules, formations & restarts', { exact: true }).click();
     await page.getByText('Spatial analysis', { exact: true }).click();
+    await page.getByText('Project vault & interchange', { exact: true }).click();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${viewport.name} document overflow`).toBeLessThanOrEqual(1);

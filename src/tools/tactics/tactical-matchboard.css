@@ -541,3 +541,43 @@
     stroke: CanvasText;
   }
 }
+
+
+.tactical-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tactical-vault-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tactical-vault-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 8px;
+  border-top: 1px solid var(--border-color, #cbd5e1);
+}
+
+.tactical-vault-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .tactical-inline-actions > button,
+  .tactical-vault-row > button,
+  .tactical-vault-row > .tactical-inline-actions {
+    width: 100%;
+  }
+
+  .tactical-vault-row > .tactical-inline-actions > button {
+    flex: 1 1 100%;
+  }
+}
