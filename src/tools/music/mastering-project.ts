@@ -337,10 +337,21 @@ export function updateClipRevision(document: MasteringDocument, clipId: string, 
   return next;
 }
 
+/**
+ * Keeps a track's clip list in timeline order (stable for equal starts), so lists
+ * built from it, such as the Arrange panel's clip buttons, read in playback order.
+ */
+function orderClips(track: MasteringTrack) {
+  track.clips.sort((a, b) => a.startSeconds - b.startSeconds);
+}
+
 export function moveClipRevision(document: MasteringDocument, clipId: string, startSeconds: number): MasteringDocument {
   const next = cloneDocument(document);
   const found = findClip(next, clipId);
-  if (found) found.clip.startSeconds = frameTime(next, startSeconds);
+  if (found) {
+    found.clip.startSeconds = frameTime(next, startSeconds);
+    orderClips(found.track);
+  }
   return next;
 }
 
@@ -357,6 +368,7 @@ export function moveClipToTrackRevision(document: MasteringDocument, clipId: str
   if (!found || !target || found.track.id === trackId) return next;
   found.track.clips.splice(found.clipIndex, 1);
   target.clips.push(found.clip);
+  orderClips(target);
   return next;
 }
 
@@ -374,6 +386,7 @@ export function duplicateClipRevision(document: MasteringDocument, clipId: strin
   copy.name = `${found.clip.name} copy`.slice(0, 120);
   copy.startSeconds = frameTime(next, startSeconds ?? clipEndSeconds(next, found.clip));
   found.track.clips.splice(found.clipIndex + 1, 0, copy);
+  orderClips(found.track);
   next.activeClipId = nextClipId;
   return next;
 }

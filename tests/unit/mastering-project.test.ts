@@ -269,6 +269,19 @@ describe('clip range edits', () => {
 });
 
 describe('clip placement, fades, and crossfades', () => {
+  it('keeps each track\'s clips in timeline order after moves and duplicates', () => {
+    let document = addSourceTracksRevision(createMasteringDocument(), [
+      { source: source('a', 2), trackId: 't1', clipId: 'a' },
+      { source: source('b', 2), trackId: 't2', clipId: 'b' },
+    ]);
+    document = duplicateClipRevision(document, 'a', 'a2');
+    document = moveClipRevision(document, 'a', 5);
+    expect(document.tracks[0].clips.map((clip) => clip.id)).toEqual(['a2', 'a']);
+    document = moveClipRevision(document, 'b', 3);
+    document = moveClipToTrackRevision(document, 'b', 't1');
+    expect(document.tracks[0].clips.map((clip) => clip.id)).toEqual(['a2', 'b', 'a']);
+  });
+
   it('splits into two frame-exact halves, then duplicates, moves, nudges, and restores through history', () => {
     const original = single(8, 4);
     const split = splitClipRevision(original, 'c1', 3.13, 'right');
@@ -283,7 +296,9 @@ describe('clip placement, fades, and crossfades', () => {
     expect(duplicated.tracks[0].clips[2]).toMatchObject({ id: 'copy', startSeconds: 8, sourceId: 's', name: 's.wav copy' });
     const nudged = nudgeClipRevision(moveClipRevision(duplicated, 'copy', 10.1), 'copy', -1);
     expect(nudged.tracks[0].clips[2].startSeconds).toBe(9);
-    expect(moveClipRevision(nudged, 'copy', -5).tracks[0].clips[2].startSeconds).toBe(0);
+    // Clamped to the timeline start; the stable order keeps the original clip ahead of an equal start.
+    const toStart = moveClipRevision(nudged, 'copy', -5).tracks[0].clips;
+    expect(toStart.map((clip) => [clip.id, clip.startSeconds])).toEqual([['c1', 0], ['copy', 0], ['right', 3.25]]);
 
     const history = commitProjectRevision(createProjectHistory(original), split);
     expect(undoProjectRevision(history).present).toEqual(original);
