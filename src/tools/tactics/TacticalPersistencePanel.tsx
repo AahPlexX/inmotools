@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { TacticalProjectVault, type TacticalSnapshotRecord } from './persistence-engine';
 import {
@@ -32,6 +32,7 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
   const [savedProjects, setSavedProjects] = useState<TacticalProject[]>([]);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useState(false);
+  const pendingAutosaveRef = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {
     const [nextSnapshots, nextRecovery, nextProjects] = await Promise.all([
@@ -62,7 +63,7 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
   useEffect(() => {
     if (!recoveryChecked || !autosaveEnabled) return;
     const timer = window.setTimeout(() => {
-      void (async () => {
+      const operation = (async () => {
         try {
           await vault.saveProject(project);
           await vault.saveAutosave(project);
@@ -71,10 +72,19 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
           onStatus('Local autosave unavailable: ' + message(error));
         }
       })();
+      pendingAutosaveRef.current = operation;
+      void operation.finally(() => {
+        if (pendingAutosaveRef.current === operation) pendingAutosaveRef.current = null;
+      });
     }, 600);
     return () => window.clearTimeout(timer);
   }, [autosaveEnabled, onStatus, project, recoveryChecked, refresh, vault]);
-  useEffect(() => () => vault.close(), [vault]);
+
+  useEffect(() => () => {
+    const pending = pendingAutosaveRef.current;
+    if (pending) void pending.finally(() => vault.close());
+    else vault.close();
+  }, [vault]);
 
   async function createSnapshot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,7 +129,10 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
 
   async function removeSavedProject(projectId: string) {
     try {
-      if (projectId === project.id) setAutosaveEnabled(false);
+      if (projectId === project.id) {
+        setAutosaveEnabled(false);
+        await pendingAutosaveRef.current;
+      }
       await vault.deleteProject(projectId);
       await refresh();
       onStatus(
