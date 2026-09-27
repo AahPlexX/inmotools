@@ -27,6 +27,7 @@ import {
   replaceProjectView,
   splitClipRevision,
   undoProjectRevision,
+  updateMasterRevision,
   type MasteringDocument,
   type MasteringProjectHistory,
   type SourcePlacement,
@@ -36,18 +37,44 @@ import MasteringTabs from './MasteringTabs';
 import MasteringEditTab from './MasteringEditTab';
 import MasteringTimePitchTab from './MasteringTimePitchTab';
 import MasteringRepairTab from './MasteringRepairTab';
+import MasteringMasterTab from './MasteringMasterTab';
+import MasteringMeters, { type MonitorState } from './MasteringMeters';
+import masterWorkletUrl from './mastering-master.worklet.ts?worker&url';
+import type { ListenSource, WorkletInbound, WorkletMeterMessage } from './mastering-worklet-protocol';
+import type { MasterSettings } from './dsp/master-chain';
 
 type PlaybackState = 'idle' | 'starting' | 'playing' | 'paused';
 type PlaybackGraph = {
   session: number;
   context: AudioContext;
   source: AudioBufferSourceNode;
+  /** Realtime master chain; null when AudioWorklet could not load (direct output fallback). */
+  master: AudioWorkletNode | null;
+  reference: AudioBufferSourceNode | null;
+  pre: AnalyserNode;
+  post: AnalyserNode;
   startedAt: number;
   offset: number;
   loopStart: number;
   loopEnd: number;
+  /** Seconds the processed audio lags the source (chain latency), from worklet reports. */
+  latencySeconds: number;
   raf: number | null;
 };
+
+/** Timeline position heard at a context time, accounting for loops and chain latency. */
+function timelinePosition(graph: PlaybackGraph, contextTime: number, duration: number): number {
+  let position = graph.offset + Math.max(0, contextTime - graph.startedAt - graph.latencySeconds);
+  if (graph.source.loop && graph.loopEnd > graph.loopStart && position >= graph.loopEnd) {
+    position = graph.loopStart + ((position - graph.loopStart) % (graph.loopEnd - graph.loopStart));
+  }
+  return Math.min(duration, position);
+}
+
+/** An AudioContext at the project rate avoids resampling on playback; browsers that refuse the rate get their default. */
+function createPlaybackContext(sampleRate: number): AudioContext {
+  try { return new AudioContext({ sampleRate, latencyHint: 'playback' }); } catch { return new AudioContext({ latencyHint: 'playback' }); }
+}
 
 const ACCEPTED_AUDIO = 'audio/*,.wav,.wave,.mp3,.flac,.ogg,.oga,.opus,.m4a,.aac,.aiff,.aif,.caf,.webm';
 
@@ -85,14 +112,30 @@ export default function MasteringWorkspace() {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [masterPreview, setMasterPreview] = useState<MasterSettings | null>(null);
+  const [monitor, setMonitor] = useState<MonitorState>({ listen: 'processed', monitor: 'stereo', mono: false, matchLoudness: true, excursionThresholdDb: -1 });
+  const [meters, setMeters] = useState<WorkletMeterMessage | null>(null);
+  const [analysers, setAnalysers] = useState<{ pre: AnalyserNode; post: AnalyserNode } | null>(null);
+  const [reference, setReference] = useState<{ name: string; buffer: AudioBuffer } | null>(null);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+  const [loudnessTarget, setLoudnessTarget] = useState(-14);
   const clientRef = useRef<MasteringDspClient | null>(null);
   const graphRef = useRef<PlaybackGraph | null>(null);
+  /** Timing of the most recent playback session, kept after stop so logged excursions still map to the timeline. */
+  const lastGraphRef = useRef<PlaybackGraph | null>(null);
   const sessionRef = useRef(0);
   const mountedRef = useRef(true);
   const importRevisionRef = useRef(0);
 
   const commitDocument = useCallback((next: MasteringDocument) => setHistory((current) => commitProjectRevision(current, next)), []);
   const updateView = useCallback((patch: Partial<Pick<MasteringDocument, 'selection' | 'playhead' | 'activeClipId'>>) => setHistory((current) => replaceProjectView(current, patch)), []);
+
+  // The worklet always runs the live settings: a control being dragged, otherwise the committed ones.
+  const liveMaster = masterPreview ?? document.master;
+  const liveMasterRef = useRef(liveMaster);
+  liveMasterRef.current = liveMaster;
+  const monitorRef = useRef(monitor);
+  monitorRef.current = monitor;
 
   const duration = estimateDocumentDuration(document);
   const clip = findActiveClip(document);
@@ -155,9 +198,16 @@ export default function MasteringWorkspace() {
   const releaseGraph = useCallback((graph: PlaybackGraph) => {
     if (graph.raf !== null) cancelAnimationFrame(graph.raf);
     graph.raf = null;
-    try { graph.source.onended = null; graph.source.stop(); } catch { /* source may already have ended */ }
-    try { graph.source.disconnect(); } catch { /* already disconnected */ }
+    for (const node of [graph.source, graph.reference]) {
+      if (!node) continue;
+      try { node.onended = null; node.stop(); } catch { /* source may already have ended */ }
+    }
+    if (graph.master) graph.master.port.onmessage = null;
+    for (const node of [graph.source, graph.reference, graph.master, graph.pre, graph.post]) {
+      try { node?.disconnect(); } catch { /* already disconnected */ }
+    }
     if (graph.context.state !== 'closed') void graph.context.close().catch(() => undefined);
+    if (mountedRef.current) setAnalysers(null);
   }, []);
 
   const stopPlayback = useCallback((report = true, resetPosition = false) => {
@@ -181,14 +231,7 @@ export default function MasteringWorkspace() {
   const startTicker = (graph: PlaybackGraph, mixDuration: number) => {
     const tick = () => {
       if (graphRef.current !== graph || sessionRef.current !== graph.session) return;
-      const elapsed = Math.max(0, graph.context.currentTime - graph.startedAt);
-      let next = graph.offset + elapsed;
-      if (graph.source.loop && graph.loopEnd > graph.loopStart) {
-        if (next >= graph.loopEnd) next = graph.loopStart + ((next - graph.loopStart) % (graph.loopEnd - graph.loopStart));
-      } else {
-        next = Math.min(mixDuration, next);
-      }
-      if (mountedRef.current) updateView({ playhead: next });
+      if (mountedRef.current) updateView({ playhead: timelinePosition(graph, graph.context.currentTime, mixDuration) });
       graph.raf = requestAnimationFrame(tick);
     };
     graph.raf = requestAnimationFrame(tick);
@@ -204,7 +247,7 @@ export default function MasteringWorkspace() {
     const session = sessionRef.current + 1;
     sessionRef.current = session;
     const mixDuration = mix.channels[0].length / mix.sampleRate;
-    const context = new AudioContext();
+    const context = createPlaybackContext(mix.sampleRate);
     const buffer = context.createBuffer(mix.channels.length, mix.channels[0].length, mix.sampleRate);
     mix.channels.forEach((channel, index) => { const owned = new Float32Array(channel.length); owned.set(channel); buffer.copyToChannel(owned, index); });
     const source = context.createBufferSource();
@@ -216,22 +259,53 @@ export default function MasteringWorkspace() {
     source.loopEnd = hasLoopRange ? selected.endSeconds : mixDuration;
     let offset = playhead >= mixDuration ? 0 : Math.max(0, playhead);
     if (hasLoopRange && (offset < source.loopStart || offset >= source.loopEnd)) offset = source.loopStart;
-    source.connect(context.destination);
-    const graph: PlaybackGraph = { session, context, source, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, raf: null };
+    const pre = context.createAnalyser();
+    const post = context.createAnalyser();
+    for (const analyser of [pre, post]) { analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.75; }
+    const graph: PlaybackGraph = { session, context, source, master: null, reference: null, pre, post, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, latencySeconds: 0, raf: null };
     graphRef.current = graph;
+    lastGraphRef.current = graph;
+    setMeters(null);
     setPlaybackState('starting');
     setStatus('Starting local playback…');
     try {
+      let workletError: string | null = null;
+      try {
+        await context.audioWorklet.addModule(masterWorkletUrl);
+        graph.master = new AudioWorkletNode(context, 'mastering-master', { numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [2] });
+      } catch (error) {
+        workletError = messageOf(error);
+      }
+      if (graphRef.current !== graph || sessionRef.current !== session) { releaseGraph(graph); return; }
+      source.connect(pre);
+      if (graph.master) {
+        const node = graph.master;
+        node.port.onmessage = (event: MessageEvent<WorkletMeterMessage>) => {
+          if (graphRef.current !== graph || !mountedRef.current) return;
+          graph.latencySeconds = event.data.latencyFrames / context.sampleRate;
+          setMeters(event.data);
+        };
+        node.port.postMessage({ type: 'settings', settings: liveMasterRef.current } satisfies WorkletInbound);
+        node.port.postMessage({ type: 'monitor', ...monitorRef.current } satisfies WorkletInbound);
+        source.connect(node, 0, 0);
+        if (reference) {
+          const referenceSource = context.createBufferSource();
+          referenceSource.buffer = reference.buffer;
+          referenceSource.connect(node, 0, 1);
+          graph.reference = referenceSource;
+        }
+        node.connect(post);
+      } else {
+        source.connect(post);
+      }
+      post.connect(context.destination);
       await context.resume();
       if (graphRef.current !== graph || sessionRef.current !== session) { releaseGraph(graph); return; }
       graph.startedAt = context.currentTime;
       source.onended = () => {
         if (source.loop || graphRef.current !== graph || sessionRef.current !== session) return;
         graphRef.current = null;
-        if (graph.raf !== null) cancelAnimationFrame(graph.raf);
-        graph.raf = null;
-        try { source.disconnect(); } catch { /* already disconnected */ }
-        if (context.state !== 'closed') void context.close().catch(() => undefined);
+        releaseGraph(graph);
         if (mountedRef.current) {
           setPlaybackState('idle');
           updateView({ playhead: mixDuration });
@@ -239,8 +313,12 @@ export default function MasteringWorkspace() {
         }
       };
       source.start(0, offset);
+      if (graph.reference && reference && offset < reference.buffer.duration) graph.reference.start(0, offset);
+      setAnalysers({ pre, post });
       setPlaybackState('playing');
-      setStatus(loop ? 'Playing with loop on.' : 'Playing.');
+      setStatus(workletError
+        ? `Playing without the master chain: this browser could not start the audio processor (${workletError}).`
+        : loop ? 'Playing with loop on.' : 'Playing.');
       startTicker(graph, mixDuration);
     } catch (error) {
       if (graphRef.current === graph) graphRef.current = null;
@@ -255,10 +333,7 @@ export default function MasteringWorkspace() {
   const pause = () => {
     const graph = graphRef.current;
     if (!graph || playbackState !== 'playing') return;
-    let pausedAt = graph.offset + Math.max(0, graph.context.currentTime - graph.startedAt);
-    if (graph.source.loop && graph.loopEnd > graph.loopStart && pausedAt >= graph.loopEnd) {
-      pausedAt = graph.loopStart + ((pausedAt - graph.loopStart) % (graph.loopEnd - graph.loopStart));
-    }
+    const pausedAt = timelinePosition(graph, graph.context.currentTime, duration);
     sessionRef.current += 1;
     graphRef.current = null;
     releaseGraph(graph);
@@ -273,6 +348,34 @@ export default function MasteringWorkspace() {
     stopPlayback(false);
     updateView({ playhead: next });
     setPlaybackState(wasActive ? 'paused' : 'idle');
+  };
+
+  useEffect(() => {
+    graphRef.current?.master?.port.postMessage({ type: 'settings', settings: liveMaster } satisfies WorkletInbound);
+  }, [liveMaster]);
+
+  useEffect(() => {
+    graphRef.current?.master?.port.postMessage({ type: 'monitor', ...monitor } satisfies WorkletInbound);
+  }, [monitor]);
+
+  const setListen = (listen: ListenSource) => {
+    setMonitor((current) => ({ ...current, listen }));
+    const names: Record<ListenSource, string> = { processed: 'the processed master', original: 'the original mix', delta: 'only what the master chain changes', reference: 'the reference track' };
+    setStatus(`Listening to ${names[listen]}${monitor.matchLoudness && listen !== 'processed' && listen !== 'delta' ? ', loudness-matched' : ''}.`);
+  };
+
+  const loadReference = async (file: File) => {
+    setReferenceBusy(true);
+    try {
+      const decoded = await decodeAudioFile(file);
+      if (!mountedRef.current) return;
+      setReference({ name: file.name, buffer: decoded.buffer });
+      setStatus(`Loaded ${file.name} as the reference. It joins playback the next time you press Play.`);
+    } catch (error) {
+      setStatus(`Could not open the reference: ${messageOf(error)}`);
+    } finally {
+      if (mountedRef.current) setReferenceBusy(false);
+    }
   };
 
   // --- SECTION: import and project lifecycle (ledger 1, 4, 10) ---
@@ -437,6 +540,7 @@ export default function MasteringWorkspace() {
       else if (event.key === 'Escape') { if (playbackState !== 'idle' || playhead !== 0) stopPlayback(true, true); }
       else if (event.key.toLowerCase() === 'l') { setLoop((current) => !current); setStatus('Loop toggled.'); }
       else if (event.key.toLowerCase() === 's') { event.preventDefault(); splitAtPlayhead(); }
+      else if (event.key.toLowerCase() === 'a') { event.preventDefault(); setListen(monitor.listen === 'processed' ? 'original' : 'processed'); }
       else if (event.key === 'm' || event.key === 'M') { event.preventDefault(); addMarker(); }
       else if (event.key === '+' || event.key === '=') { event.preventDefault(); setViewport((current) => zoomViewport(current, 0.5, playhead, duration, document.sampleRate)); }
       else if (event.key === '-' || event.key === '_') { event.preventDefault(); setViewport((current) => zoomViewport(current, 2, playhead, duration, document.sampleRate)); }
@@ -502,6 +606,12 @@ export default function MasteringWorkspace() {
         <label className="mastering-check"><input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} disabled={!canEdit} /> Loop</label>
         <button type="button" onClick={undo} disabled={!history.past.length}>Undo</button>
         <button type="button" onClick={redo} disabled={!history.future.length}>Redo</button>
+        <div className="mastering-listen" role="radiogroup" aria-label="Listen to">
+          {([['processed', 'Processed'], ['original', 'Original'], ['delta', 'Difference'], ['reference', 'Reference']] as const).map(([value, label]) => <button key={value} type="button" role="radio"
+            aria-checked={monitor.listen === value} disabled={value === 'reference' && !reference}
+            title={value === 'reference' && !reference ? 'Load a reference track on the Meters tab first' : undefined}
+            onClick={() => setListen(value)}>{label}</button>)}
+        </div>
         {rendering && <span className="mastering-busy" role="status">Rendering…</span>}
         <output className="mastering-time" aria-label="Playhead time">{formatTime(playhead)}</output>
       </div>
@@ -515,6 +625,7 @@ export default function MasteringWorkspace() {
           <div><dt>L</dt><dd>Loop on or off</dd></div>
           <div><dt>S</dt><dd>Split the selected clip at the playhead</dd></div>
           <div><dt>M</dt><dd>Add a marker at the playhead</dd></div>
+          <div><dt>A</dt><dd>Switch between the processed master and the original</dd></div>
           <div><dt>+ / −</dt><dd>Zoom the timeline around the playhead</dd></div>
           <div><dt>Ctrl/⌘ + Z</dt><dd>Undo</dd></div>
           <div><dt>Ctrl/⌘ + Shift + Z or Ctrl + Y</dt><dd>Redo</dd></div>
@@ -542,6 +653,16 @@ export default function MasteringWorkspace() {
         { id: 'arrange', label: 'Arrange', render: () => <MasteringArrangePanel document={document} playhead={playhead} disabled={!canEdit} onCommit={commitWithStatus} onStatus={setStatus} onActivateClip={(clipId) => updateView({ activeClipId: clipId })} onSplit={splitAtPlayhead} /> },
         { id: 'time', label: 'Time & pitch', render: () => <MasteringTimePitchTab ctx={ctx} /> },
         { id: 'repair', label: 'Repair', render: () => <MasteringRepairTab ctx={ctx} /> },
+        { id: 'master', label: 'Master', render: () => <MasteringMasterTab ctx={ctx} master={document.master} onPreview={setMasterPreview}
+          onCommit={(settings, message) => { setMasterPreview(null); commitWithStatus(updateMasterRevision(historyRef.current.present, settings), message); }} /> },
+        { id: 'meters', label: 'Meters', render: () => <MasteringMeters meters={meters} playing={playbackState === 'playing'} pre={analysers?.pre ?? null} post={analysers?.post ?? null}
+          monitor={monitor} onMonitorChange={(patch) => setMonitor((current) => ({ ...current, ...patch }))}
+          target={loudnessTarget} onTargetChange={setLoudnessTarget}
+          referenceName={reference?.name ?? null} referenceBusy={referenceBusy} onReferenceFile={(file) => void loadReference(file)}
+          onClearReference={() => { setReference(null); if (monitor.listen === 'reference') setListen('processed'); setStatus('Removed the reference track.'); }}
+          onResetMeters={() => { graphRef.current?.master?.port.postMessage({ type: 'resetMeters' } satisfies WorkletInbound); setMeters(null); setStatus('Meters reset.'); }}
+          timelineAt={(time) => lastGraphRef.current ? timelinePosition(lastGraphRef.current, time, duration) : null}
+          onJump={seek} /> },
       ]} />}
 
       <p className={`status-line ${/^Could not|failed|could not start/i.test(status) ? 'error' : ''}`} role="status" aria-live="polite">{status}</p>

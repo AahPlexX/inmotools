@@ -312,3 +312,55 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
   await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   await expect(clipEdits).toHaveText('11');
 });
+
+test('masters the mix with the realtime chain, meters, monitoring, and an offline render', async ({ page }) => {
+  await page.goto('./#/tools/midi-harmony-lab');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(6, 48_000, 440) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded song\.wav/);
+  const status = page.locator('.status-line');
+
+  await page.getByRole('tab', { name: 'Master', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Equalizer' }).click();
+  await page.getByLabel('Equalizer on').check();
+  await page.locator('summary').filter({ hasText: 'Band 6' }).click();
+  await page.getByLabel('Band 6 on').check();
+  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).fill('4');
+  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).press('Enter');
+  await expect(status).toContainText(/Band 6 gain \+4\.0 dB/);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('0');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('4');
+
+  await page.locator('summary').filter({ hasText: 'True-peak limiter' }).click();
+  await page.getByLabel('True-peak limiter on').check();
+  await page.getByRole('button', { name: 'Find resonances in whole mix' }).click();
+  await expect(page.getByRole('list', { name: /Resonances in the whole mix/ })).toBeVisible();
+  await page.getByRole('list', { name: /Resonances in the whole mix/ }).getByRole('button').first().click();
+  await expect(status).toContainText(/cut at 440 Hz/);
+
+  await page.getByRole('button', { name: 'Render and measure master' }).click();
+  await expect(page.getByRole('table').filter({ hasText: 'Integrated loudness' })).toBeVisible({ timeout: 20_000 });
+  await expect(status).toContainText(/Master rendered offline: .* LUFS integrated/);
+
+  await page.getByRole('tab', { name: 'Meters' }).click();
+  await expect(page.getByRole('radio', { name: 'Reference' })).toBeDisabled();
+  await page.locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
+  await expect(status).toContainText(/Loaded reference\.wav as the reference/);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+  await expect(status).not.toContainText(/without the master chain/);
+  await page.getByRole('radio', { name: 'Reference' }).click();
+  await expect(status).toContainText(/reference track, loudness-matched/);
+  await expect(page.getByLabel('Integrated loudness', { exact: true })).not.toHaveText('— LUFS', { timeout: 10_000 });
+  await page.getByRole('radio', { name: 'Original' }).click();
+  await expect(status).toContainText(/original mix, loudness-matched/);
+  await page.getByRole('radio', { name: 'Difference' }).click();
+  await page.getByLabel('Mono check (sum to mono)').check();
+  await page.getByRole('radio', { name: 'Side only', exact: true }).check();
+  await page.getByRole('radio', { name: 'Processed' }).click();
+  await expect(page.getByRole('meter', { name: 'Phase correlation' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(status).toContainText(/Paused at/);
+});

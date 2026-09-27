@@ -175,5 +175,8 @@ describe('spectrum analysis and resonance finder', () => {
     expect(resonances.length).toBeGreaterThan(0);
     expect(Math.abs(resonances[0].frequency - 1234)).toBeLessThan(binHz);
     expect(resonances[0].suggestedGainDb).toBeLessThan(0);
+    // A clean synthetic tone with 16-bit quantization spurs: the tone, not a spur, must lead.
+    const quantized = Float32Array.from(tone(440, 2, 0.35), (value) => Math.round(value * 32767) / 32767);
+    expect(Math.abs(findResonances(averageSpectrum([quantized], RATE, 0, quantized.length))[0].frequency - 440)).toBeLessThan(binHz);
   });
 });

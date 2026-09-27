@@ -59,10 +59,16 @@ export interface Resonance {
   suggestedQ: number;
 }
 
-/** Peaks at least `minimumProminenceDb` above the 1/3-octave average, strongest first. */
+/** Peaks at least `minimumProminenceDb` above the 1/3-octave average and within 60 dB of the loudest bin, strongest first. */
 export function findResonances(spectrum: Spectrum, count = 6, minimumProminenceDb = 4, lowHz = 30, highHz = 16_000): Resonance[] {
-  const { db, binHz } = spectrum;
-  const bins = db.length;
+  const { binHz } = spectrum;
+  const bins = spectrum.db.length;
+  // Floor the spectrum 100 dB under its peak (never below −140 dBFS): numerically
+  // silent bins would otherwise make inaudible spurs look like huge resonances.
+  let loudest = -Infinity;
+  for (const value of spectrum.db) loudest = Math.max(loudest, value);
+  const floor = Math.max(-140, loudest - 100);
+  const db = Float64Array.from(spectrum.db, (value) => Math.max(floor, value));
   const smooth = new Float64Array(bins);
   const prefix = new Float64Array(bins + 1);
   for (let bin = 0; bin < bins; bin += 1) prefix[bin + 1] = prefix[bin] + db[bin];
@@ -78,7 +84,8 @@ export function findResonances(spectrum: Spectrum, count = 6, minimumProminenceD
     if (frequency < lowHz || frequency > highHz) continue;
     if (!(db[bin] > db[bin - 1] && db[bin] >= db[bin + 1] && db[bin] > db[bin - 2] && db[bin] >= db[bin + 2])) continue;
     const prominence = db[bin] - smooth[bin];
-    if (prominence < minimumProminenceDb) continue;
+    // Only peaks within 60 dB of the loudest bin are audible enough to be worth a cut.
+    if (prominence < minimumProminenceDb || db[bin] < loudest - 60) continue;
     const [a, b, c] = [db[bin - 1], db[bin], db[bin + 1]];
     const offset = 0.5 * (a - c) / (a - 2 * b + c || 1);
     const peakFrequency = (bin + Math.max(-0.5, Math.min(0.5, offset))) * binHz;

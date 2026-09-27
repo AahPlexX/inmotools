@@ -38,7 +38,7 @@ Research for this plan (fetched 2026-09-27): ITU-R BS.1770-5 PDF (K-weighting Ta
 | S10 Durable workflow | 18, 81 | IndexedDB autosave, backup, presets, diagnostics, commands |
 | S11 Acceptance | all | Responsive, keyboard, axe, copy, browser workflow, integration |
 
-UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master, Meters, Export, and Project tabs are added by S6/S7/S9/S10. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
+UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master and Meters tabs landed with S6/S7; Export and Project tabs are added by S9/S10. The realtime path is source → AnalyserNode (pre) → `mastering-master.worklet.ts` (chain + monitoring + meters) → AnalyserNode (post) → output, in an AudioContext at the project rate. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
 
 ## Function status
 
@@ -90,15 +90,38 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 42 | Burst repair | done | S5: AR interpolation of a selected span up to 200 ms |
 | 43 | Spectral brush attenuate | partial | S5: region attenuation engine + numeric band-in-selection control; painting on the spectrogram arrives with S8 |
 | 44 | Spectral heal | done | S5: magnitude interpolation from neighbouring frames, phases kept; band-in-selection control |
-| 45–59 | EQ, dynamics, colour, stereo | open | S6 |
-| 60–64 | Monitoring and meters | open | S7 |
-| 65–67 | Loudness, true peak, peak/RMS/crest | partial | S3 kernels done and conformance-tested (EBU Tech 3341 cases 1–6, 9, 10, 12, 13, 15–23; Tech 3342 cases 1–4); UI in S7 |
-| 68–71 | A/B, matched A/B, delta, reference | open | S7 |
-| 72 | Offline master render | open | S6 |
+| 45 | Ten-band parametric EQ | done | S6: `dsp/master-chain.ts` + EQ graph and band table |
+| 46 | Seven filter shapes | done | S6: bell, shelves, HP, LP, notch, band-pass (0 dB-normalized) |
+| 47 | Minimum/linear phase | done | S6: 4095-tap FIR per mid/side path in linear mode; dynamic bands stay minimum phase |
+| 48 | Dynamic EQ per band | done | S6: band-pass side chain, threshold/ratio/attack/release/range |
+| 49 | Band solo | done | S6: band-pass audition per routing |
+| 50 | Resonance finder / spectrum grab | done | S6: `dsp/analysis.ts`, one-click cuts, click-to-add on the EQ graph |
+| 51 | Stereo/Mid/Side band routing | done | S6: EQ runs in mid/side |
+| 52 | Broadband compressor | done | S6 |
+| 53 | Three-band compressor | done | S6: LR4 phase-compensated split |
+| 54 | Expander/gate | done | S6 |
+| 55 | True-peak lookahead limiter | done | S6: BS.1770-5 interpolator detection; output true peak ≤ ceiling + 0.2 dB in tests |
+| 56 | Tape/tube saturation | done | S6: 2× oversampled, biased tanh for even harmonics, DC blocker |
+| 57 | Oversampled soft clipper | done | S6: 1/2/4× polyphase |
+| 58 | M/S width | done | S6 |
+| 59 | Bass mono | done | S6: LR4 on side, matching all-pass on mid |
+| 60 | M/S solo monitoring matrix | done | S7: worklet monitor matrix |
+| 61 | Mono sum switch | done | S7 |
+| 62 | Correlation meter | done | S7 |
+| 63 | Pre/post FFT overlay | done | S7: two AnalyserNodes around the worklet |
+| 64 | Goniometer | done | S7 |
+| 65 | BS.1770-5 / R 128 loudness telemetry | done | S3 kernel + S7 live meters and offline render report |
+| 66 | True-peak meter + excursion log | done | S7: timestamped, jumpable log |
+| 67 | Peak/RMS/crest meters | done | S7 |
+| 68 | Pop-safe A/B | done | S7: 20 ms equal-power crossfade, latency-aligned original |
+| 69 | Loudness-matched A/B | done | S7: short-term matching of original and reference |
+| 70 | Delta audition | done | S7 |
+| 71 | Reference track | done | S7: synced start offset, loudness-matched |
+| 72 | Offline master render | done | S6: worker `renderMaster`, latency-compensated, with loudness report |
 | 73–80 | Export formats, metadata, artwork, batch | open | S9 |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 40/81 done** (2026-09-27, after S5: 94 mastering unit tests in 10 files; mastering browser spec 8/8 and music spec 10/10 across desktop/mobile Chromium).
+**Count: 68/81 done** (2026-09-27, after S6/S7: 109 mastering unit tests in 11 files; mastering browser spec 10/10 and music spec 10/10 across desktop/mobile Chromium).
 
 ## Rules for whoever continues
 
