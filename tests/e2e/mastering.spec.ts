@@ -643,18 +643,22 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     { name: 'pad.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 44_100, 110) },
   ]);
   await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
-  const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number').evaluateAll((elements) =>
-    elements
-      .filter((element) => (element as HTMLElement).offsetParent !== null)
-      .map((element) => ({ label: (element.textContent || (element as HTMLInputElement).ariaLabel || element.tagName).trim().slice(0, 80), height: element.getBoundingClientRect().height }))
-      .filter((entry) => entry.height < 43.5),
-  );
-  expect(undersizedTargets).toEqual([]);
+  const assertTouchTargets = async (label: string) => {
+    const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number').evaluateAll((elements) =>
+      elements
+        .filter((element) => (element as HTMLElement).offsetParent !== null)
+        .map((element) => ({ label: (element.textContent || (element as HTMLInputElement).ariaLabel || element.tagName).trim().slice(0, 80), height: element.getBoundingClientRect().height }))
+        .filter((entry) => entry.height < 43.5),
+    );
+    expect(undersizedTargets, `${label} has authored controls below the workstation's 44px touch-target baseline`).toEqual([]);
+  };
+  await assertTouchTargets('default tab');
   for (const tab of ['Edit', 'Arrange', 'Time & pitch', 'Repair', 'Master', 'Meters', 'Export', 'Project']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
     const panel = page.getByRole('tabpanel', { name: tab, exact: true });
     await expect(panel).toBeVisible();
     await panel.locator('details').evaluateAll((elements) => elements.forEach((element) => { (element as HTMLDetailsElement).open = true; }));
+    await assertTouchTargets(tab);
     await scan(tab);
   }
 });
