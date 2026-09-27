@@ -38,41 +38,39 @@ test('every tab in the sticky section nav is reachable and shows its heading', a
 
 
 test('short-link resolution is explicit and only contacts the destination after user action', async ({ page }) => {
-  let shortenerRequests = 0;
-  await page.route('https://**', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.hostname === 'bit.ly') {
-      shortenerRequests += 1;
-      await route.fulfill({
-        status: 302,
-        headers: {
-          location: 'https://example.com/final-destination',
-          'access-control-allow-origin': '*',
-        },
-      });
-      return;
-    }
-    if (url.hostname === 'example.com') {
-      await route.fulfill({
-        status: 200,
-        headers: { 'access-control-allow-origin': '*' },
-        body: '',
-      });
-      return;
-    }
-    await route.abort();
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    Object.defineProperty(window, '__shortenerRequests', { value: 0, writable: true });
+    window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, window.location.href);
+      if (url.hostname === 'bit.ly') {
+        const state = window as typeof window & { __shortenerRequests: number };
+        state.__shortenerRequests += 1;
+        return {
+          url: 'https://example.com/final-destination',
+          redirected: true,
+        } as Response;
+      }
+      return nativeFetch(input, init);
+    }) as typeof window.fetch;
   });
+  await page.route('https://**', (route) => route.abort());
 
   await page.goto('./#/tools/site-intelligence-analyzer');
   await page.getByLabel('URL, domain, or partial address').fill('https://bit.ly/demo');
   await page.getByRole('button', { name: 'Analyze' }).click();
 
   await expect(page.getByText(/masks its true destination/i)).toBeVisible();
-  expect(shortenerRequests).toBe(0);
+  await expect.poll(() => page.evaluate(() =>
+    (window as typeof window & { __shortenerRequests: number }).__shortenerRequests,
+  )).toBe(0);
 
   await page.getByRole('button', { name: 'Resolve destination' }).click();
   await expect(page.getByText(/example\.com\/final-destination/i)).toBeVisible();
-  expect(shortenerRequests).toBe(1);
+  await expect.poll(() => page.evaluate(() =>
+    (window as typeof window & { __shortenerRequests: number }).__shortenerRequests,
+  )).toBe(1);
 });
 
 test('hosting coordinates render an accessible GeoIP distribution minimap', async ({ page }) => {
@@ -120,7 +118,7 @@ test('hosting coordinates render an accessible GeoIP distribution minimap', asyn
   await page.getByRole('button', { name: 'DNS & Network' }).click();
 
   await expect(page.getByText(/203\.0\.113\.10 → Example Network/i)).toBeVisible({ timeout: 15_000 });
-  const map = page.getByLabel('GeoIP distribution map');
+  const map = page.getByRole('region', { name: 'GeoIP distribution map' });
   await expect(map).toBeVisible();
   await expect(map.getByRole('button', { name: /203\.0\.113\.10.*Exampleville/i })).toBeVisible();
 });
