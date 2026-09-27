@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
+import TacticalPersistencePanel from './TacticalPersistencePanel';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
@@ -172,6 +173,36 @@ export default function TacticalMatchboardWorkspace() {
     } catch (error) {
       setStatus(errorMessage(error));
     }
+  }
+
+  function replaceProject(nextProject: TacticalProject, message: string) {
+    const firstSceneId = nextProject.scenes[0]?.id ?? '';
+    const firstTokenId = nextProject.playerTokens.find((token) => token.sceneId === firstSceneId)?.id
+      ?? nextProject.playerTokens[0]?.id;
+    const primaryTeam = nextProject.teams[0];
+    const matchingFormation = availableFormations.find(
+      (formation) => formation.teamSize === nextProject.ruleset.teamSize,
+    );
+
+    setHistory(createTacticalHistory(nextProject));
+    setActiveSceneId(firstSceneId);
+    setPreviewTimeMs(0);
+    setSelectedTokenId(firstTokenId);
+    setMode('move');
+    setArrowStart(null);
+    setSetup((current) => ({
+      ...current,
+      title: nextProject.metadata.title,
+      teamName: primaryTeam?.name ?? current.teamName,
+      primaryColor: primaryTeam?.primaryColor ?? current.primaryColor,
+      secondaryColor: primaryTeam?.secondaryColor ?? current.secondaryColor,
+      formationId: matchingFormation?.id ?? current.formationId,
+      lengthMeters: String(nextProject.pitch.dimensions.lengthMeters),
+      widthMeters: String(nextProject.pitch.dimensions.widthMeters),
+      direction: nextProject.pitch.direction,
+    }));
+    if (matchingFormation) setActiveFormation(matchingFormation);
+    setStatus(message);
   }
 
   function rebuildBoard(event: FormEvent<HTMLFormElement>) {
@@ -694,6 +725,13 @@ export default function TacticalMatchboardWorkspace() {
               `Player orientation set to ${degrees}°.`,
             );
           }}
+        />
+
+        <TacticalPersistencePanel
+          project={project}
+          onEdit={applyEdit}
+          onReplaceProject={replaceProject}
+          onStatus={setStatus}
         />
 
         <div className="tactical-command-bar" aria-label="Board commands">
