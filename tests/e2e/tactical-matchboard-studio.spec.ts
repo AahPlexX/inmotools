@@ -734,3 +734,24 @@ test('round-trips authored trajectory CSV through the browser interchange contro
   await page.getByText('Timeline & motion', { exact: true }).click();
   await expect(page.getByText(/token-1: 2 keyframes.*0-1000 ms/i)).toBeVisible();
 });
+
+
+test('lists, loads, and removes browser-local saved projects', async ({ page }) => {
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+
+  await page.getByRole('button', { name: 'Save to device' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Project saved to this browser');
+  await expect(page.getByLabel('Saved projects')).toContainText('Training board');
+
+  await setupPanel(page).getByLabel('Project title').fill('Temporary board');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Temporary board');
+
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByRole('button', { name: 'Load saved project Training board' }).click();
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Training board');
+
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  await page.getByRole('button', { name: 'Remove saved project Training board' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Saved project and its snapshots removed');
+});
