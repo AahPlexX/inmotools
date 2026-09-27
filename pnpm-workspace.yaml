@@ -3,6 +3,9 @@ allowBuilds:
   exifreader@4.44.0: true
   protobufjs: false
 
+minimumReleaseAgeExclude:
+  - mediabunny@1.58.0
+
 overrides:
   '@colorhythm/libraw-wasm>typed-cstruct': 0.11.0
   lodash-es: 4.18.1

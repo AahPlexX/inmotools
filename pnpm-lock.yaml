@@ -192,14 +192,14 @@ importers:
         specifier: 1.2.3
         version: 1.2.3
       '@mediabunny/aac-encoder':
-        specifier: 1.55.4
-        version: 1.55.4(mediabunny@1.55.4)
+        specifier: 1.58.0
+        version: 1.58.0(mediabunny@1.58.0)
       '@mediabunny/flac-encoder':
-        specifier: 1.55.4
-        version: 1.55.4(mediabunny@1.55.4)
+        specifier: 1.58.0
+        version: 1.58.0(mediabunny@1.58.0)
       '@mediabunny/mp3-encoder':
-        specifier: 1.55.4
-        version: 1.55.4(mediabunny@1.55.4)
+        specifier: 1.58.0
+        version: 1.58.0(mediabunny@1.58.0)
       '@replit/codemirror-vim':
         specifier: 6.4.0
         version: 6.4.0(@codemirror/commands@6.11.0)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
@@ -312,8 +312,8 @@ importers:
         specifier: 1.5.0
         version: 1.5.0
       mediabunny:
-        specifier: 1.55.4
-        version: 1.55.4
+        specifier: 1.58.0
+        version: 1.58.0
       mermaid:
         specifier: 12.0.0
         version: 12.0.0
@@ -1422,18 +1422,18 @@ packages:
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
-  '@mediabunny/aac-encoder@1.55.4':
-    resolution: {integrity: sha512-wxwuXnH+q0TGwFwvK42Xbld13RvogwSDe0ipeshfRhCNb1xTmLgqo0yzipmnPSZXn8d02TCWGFe8XDyNCtTU1w==}
+  '@mediabunny/aac-encoder@1.58.0':
+    resolution: {integrity: sha512-MK0L9q+sDXq5v+uy2fV6YTyNAYli5OTlINAf4bKfCrvCt6fMNzLTL0lCJVez8YoIZpZNvcq8LcerXaUhTQZCsA==}
     peerDependencies:
       mediabunny: ^1.0.0
 
-  '@mediabunny/flac-encoder@1.55.4':
-    resolution: {integrity: sha512-Rm5xATKLG2onP4a0YJG8hP/2m2grUjqtCumZNs7EBEXfuIPbjsuJdsnXQ6yGlvTp6/B3gASZI+4eJsgO0xw/3g==}
+  '@mediabunny/flac-encoder@1.58.0':
+    resolution: {integrity: sha512-uPxRjFEcdOIB/Z0p7KpOmibfiGwErL4bOYDRNHRfpvnZ39S4+dje6LkN2dLQLKLbqz1lMEHu6y6YuY09ipcAsQ==}
     peerDependencies:
       mediabunny: ^1.0.0
 
-  '@mediabunny/mp3-encoder@1.55.4':
-    resolution: {integrity: sha512-Ox8WUlWH/MR2gcsVPvPzZwmJk2UkjrEBJQzUsyLJ27tEqjSnVO+BhEOol1y8UVkSoeGV7wpNrN7aznm91BTgoQ==}
+  '@mediabunny/mp3-encoder@1.58.0':
+    resolution: {integrity: sha512-6d30v/uKdnshyA/st9HhuFgJ2/n/B11kSVAboAsx7FZ8bdZ6kgS6i5m/8q01lYjeIeO4/GeK9K6QlHXh/wf74A==}
     peerDependencies:
       mediabunny: ^1.0.0
 
@@ -4834,8 +4834,8 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mediabunny@1.55.4:
-    resolution: {integrity: sha512-dJDE7ScjKlt21ZA3wS0xWQtgXjoUBEkWzjbnTVX5/BdN88C4QMdQu1u+K13vPHbuEbvjKbsXdYy38M3JTtPRHw==}
+  mediabunny@1.58.0:
+    resolution: {integrity: sha512-0jW6vSDVqWwNe3+WBryrMzC2mUBfk6E5KQLGXLdKVGzclceXXIsbayEkAsNDCuoTcoMiVI62sPDnkkFDxiMjGw==}
 
   mermaid@12.0.0:
     resolution: {integrity: sha512-/wQXC9iBxoGV8p3erbvaXs9h77VyLDBH6GdayVjj3hEcSQhFU4N1WUhUppotCEqlIxI2pRMwjwBSwTB1MfZBgQ==}
@@ -7259,17 +7259,17 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.4': {}
 
-  '@mediabunny/aac-encoder@1.55.4(mediabunny@1.55.4)':
+  '@mediabunny/aac-encoder@1.58.0(mediabunny@1.58.0)':
     dependencies:
-      mediabunny: 1.55.4
+      mediabunny: 1.58.0
 
-  '@mediabunny/flac-encoder@1.55.4(mediabunny@1.55.4)':
+  '@mediabunny/flac-encoder@1.58.0(mediabunny@1.58.0)':
     dependencies:
-      mediabunny: 1.55.4
+      mediabunny: 1.58.0
 
-  '@mediabunny/mp3-encoder@1.55.4(mediabunny@1.55.4)':
+  '@mediabunny/mp3-encoder@1.58.0(mediabunny@1.58.0)':
     dependencies:
-      mediabunny: 1.55.4
+      mediabunny: 1.58.0
 
   '@mermaid-js/parser@2.0.0':
     dependencies:
@@ -11497,7 +11497,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mediabunny@1.55.4:
+  mediabunny@1.58.0:
     dependencies:
       '@types/dom-mediacapture-transform': 0.1.12
       '@types/dom-webcodecs': 0.1.13
