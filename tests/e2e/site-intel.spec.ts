@@ -118,7 +118,9 @@ test('hosting coordinates render an accessible GeoIP distribution minimap', asyn
   await page.getByRole('button', { name: 'DNS & Network' }).click();
 
   await expect(page.getByText(/203\.0\.113\.10 → Example Network/i)).toBeVisible({ timeout: 15_000 });
-  const map = page.getByRole('region', { name: 'GeoIP distribution map' });
+  const map = page.locator('.geoip-map');
   await expect(map).toBeVisible();
+  await expect(map).toHaveAttribute('role', 'region');
+  await expect(map).toHaveAttribute('aria-label', 'GeoIP distribution map');
   await expect(map.getByRole('button', { name: /203\.0\.113\.10.*Exampleville/i })).toBeVisible();
 });
