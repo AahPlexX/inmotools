@@ -38,7 +38,7 @@ Research for this plan (fetched 2026-09-27): ITU-R BS.1770-5 PDF (K-weighting Ta
 | S10 Durable workflow | 18, 81 | IndexedDB autosave, backup, presets, diagnostics, commands |
 | S11 Acceptance | all | Responsive, keyboard, axe, copy, browser workflow, integration |
 
-UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master and Meters tabs landed with S6/S7, Export with S9; a Project tab is added by S10. The realtime path is source → AnalyserNode (pre) → `mastering-master.worklet.ts` (chain + monitoring + meters) → AnalyserNode (post) → output, in an AudioContext at the project rate. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
+UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master and Meters tabs landed with S6/S7, Export with S9, Project with S10. The realtime path is source → AnalyserNode (pre) → `mastering-master.worklet.ts` (chain + monitoring + meters) → AnalyserNode (post) → output, in an AudioContext at the project rate. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
 
 ## Function status
 
@@ -63,7 +63,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 15 | Overlap crossfades | done | S1: `crossfadeClipsRevision` keeps both fades synchronized |
 | 16 | Track/clip gain, pan, mute, solo | done | S1: track and clip gain/pan/mute/solo in mixer and UI |
 | 17 | Undo/redo across operations | done | Must stay atomic as new operations land |
-| 18 | Autosave/recovery | open | S10 |
+| 18 | Autosave/recovery | done | S10: per-tab sessions (document + original audio) in IndexedDB via `mastering-persistence.ts`, saved a second after each change and flushed on pagehide/hidden in one explicitly committed transaction; the newest other session is offered on the next visit and restored by re-decoding; newest five kept |
 | 19 | Sample-pen redraw | done | S4: `MasteringSamplePen` draw + numeric set + cubic interpolate; `samplePatch` edit |
 | 20 | DC measure/remove | done | Phase 2 |
 | 21 | Polarity | done | Phase 2 |
@@ -119,9 +119,9 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 71 | Reference track | done | S7: synced start offset, loudness-matched |
 | 72 | Offline master render | done | S6: worker `renderMaster`, latency-compensated, with loudness report |
 | 73–80 | Export formats, metadata, artwork, batch | done | S9: Export tab (`MasteringExportTab.tsx`) over `mastering-export.ts` and worker `renderExport`. WAV 16/24-bit PCM with optional TPDF dither or 32-bit float, bext v2 loudness + RIFF INFO; FLAC, MP3, AAC in M4A, Ogg (Opus or Vorbis, labelled) via MediaBunny with WASM fallbacks, capability-probed on first view; per-format tag fields with "Not stored" notes; front cover in FLAC/MP3/M4A/Ogg; project, selection, regions, or stems, batches as one ZIP with loudness CSV/JSON and spectrum PNGs. Browser spec proves a bit-exact 16-bit WAV round trip, container signatures, tags, cover art, and the stems ZIP layout |
-| 81 | Backup, presets, diagnostics, commands | open | S10 |
+| 81 | Backup, presets, diagnostics, commands | done | S10: versioned backup ZIP (`project.json` + `sources/`) through one validator (`parseMasteringDocument`), openable from the empty workspace or the Project tab; master presets in the Master tab; capability report with copy and persistent-storage request; `?` opens the keyboard shortcut list |
 
-**Count: 79/81 done** (2026-09-27, after S9: 139 mastering unit tests in 14 files; mastering browser spec 14/14, music spec 10/10, and the MIDI Harmony Lab cases in `audit-hardening.spec.ts` green across desktop/mobile Chromium).
+**Count: 81/81 done** (2026-09-27, after S10: 147 mastering unit tests in 15 files; mastering browser spec 16/16, music spec 10/10, and the MIDI Harmony Lab cases in `audit-hardening.spec.ts` green across desktop/mobile Chromium). S11 acceptance and integration remain.
 
 ## Rules for whoever continues
 
