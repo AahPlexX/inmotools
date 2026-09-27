@@ -681,6 +681,19 @@ export default function TacticalMatchboardWorkspace() {
           selectedTokenId={selectedTokenId}
           settings={analysisSettings}
           onSettingsChange={setAnalysisSettings}
+          onSetOrientation={(degrees) => {
+            if (!selectedTokenId) return;
+            applyEdit(
+              'Set player orientation',
+              (current) => ({
+                ...current,
+                playerTokens: current.playerTokens.map((token) => (
+                  token.id === selectedTokenId ? { ...token, rotationDeg: degrees } : token
+                )),
+              }),
+              `Player orientation set to ${degrees}°.`,
+            );
+          }}
         />
 
         <div className="tactical-command-bar" aria-label="Board commands">
