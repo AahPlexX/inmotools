@@ -206,6 +206,13 @@ export function validateTacticalProject(project: TacticalProject): string[] {
   for (const track of project.timeline.tracks) {
     for (const keyframe of track.keyframes) {
       if (keyframe.position) validatePosition(errors, keyframe.id, keyframe.position);
+      if (keyframe.elevationMeters !== undefined
+        && (!Number.isFinite(keyframe.elevationMeters) || keyframe.elevationMeters < 0)) {
+        errors.push(`Keyframe ${keyframe.id} elevation must be a non-negative finite metre value.`);
+      }
+      if (keyframe.event !== undefined && !keyframe.event.trim()) {
+        errors.push(`Keyframe ${keyframe.id} event cannot be empty.`);
+      }
     }
   }
 

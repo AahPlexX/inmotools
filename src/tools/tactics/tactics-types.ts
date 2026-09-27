@@ -189,6 +189,8 @@ export interface TacticalKeyframe {
   timeMs: number;
   position?: NormalizedPoint;
   rotationDeg?: number;
+  elevationMeters?: number;
+  event?: string;
   visible?: boolean;
   interpolation: InterpolationKind;
   bezier?: [number, number, number, number];

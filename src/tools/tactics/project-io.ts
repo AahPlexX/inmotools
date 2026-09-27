@@ -1,9 +1,11 @@
 import JSZip from 'jszip';
-import { createNormalizedPoint } from './pitch-engine';
+import Papa from 'papaparse';
+import { createNormalizedPoint, metersToNormalized } from './pitch-engine';
 import { TACTICS_SCHEMA_VERSION, validateTacticalProject } from './tactics-engine';
 import {
   TIMELINE_MARKER_KINDS,
   type ImportProvenance,
+  type PitchDimensions,
   type TacticalKeyframe,
   type TacticalProject,
   type TimelineTrack,
@@ -18,10 +20,17 @@ const MAX_ASSET_BYTES = 128 * 1024 * 1024;
 const MAX_TRAJECTORY_SAMPLES = 100_000;
 const ZIP_DATE = new Date('1980-01-01T00:00:00.000Z');
 
+export type TrajectoryCoordinateSystem = 'normalized' | 'meters';
+
 export interface PortableTrajectorySample {
   targetId: string;
   timeMs: number;
   position: { x: number; y: number };
+  teamId?: string;
+  zMeters?: number;
+  orientationDeg?: number;
+  event?: string;
+  coordinateSystem: TrajectoryCoordinateSystem;
 }
 
 export interface TacticalZipAsset {
@@ -348,7 +357,14 @@ export async function importTacticalProjectZip(
   return { project, manifest };
 }
 
+const RICH_TRAJECTORY_COLUMNS = [
+  'timestamp_ms', 'entity_id', 'team_id', 'x', 'y', 'z',
+  'orientation_deg', 'event', 'coordinate_system',
+] as const;
+const LEGACY_TRAJECTORY_COLUMNS = ['targetId', 'timeMs', 'x', 'y'] as const;
+
 function trajectorySamples(project: TacticalProject): PortableTrajectorySample[] {
+  const teamByTarget = new Map(project.playerTokens.map((token) => [token.id, token.teamId]));
   return project.timeline.tracks
     .flatMap((track) => track.keyframes
       .filter((keyframe) => keyframe.position)
@@ -356,80 +372,124 @@ function trajectorySamples(project: TacticalProject): PortableTrajectorySample[]
         targetId: track.targetId,
         timeMs: keyframe.timeMs,
         position: { ...keyframe.position! },
+        teamId: teamByTarget.get(track.targetId),
+        zMeters: keyframe.elevationMeters,
+        orientationDeg: keyframe.rotationDeg,
+        event: keyframe.event,
+        coordinateSystem: 'normalized' as const,
       })))
     .sort((left, right) => left.targetId.localeCompare(right.targetId) || left.timeMs - right.timeMs);
 }
 
-function csvEscape(value: string): string {
-  if (!/[",\r\n]/.test(value)) return value;
-  return `"${value.replace(/"/g, '""')}"`;
+function optionalText(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  return text || undefined;
+}
+
+function optionalNumber(value: unknown, label: string): number | undefined {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined;
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new Error(`${label} must be a finite number.`);
+  return number;
 }
 
 export function exportTrajectoryCsv(project: TacticalProject): string {
-  const rows = trajectorySamples(project).map((sample) => (
-    [csvEscape(sample.targetId), sample.timeMs, sample.position.x, sample.position.y].join(',')
-  ));
-  return ['targetId,timeMs,x,y', ...rows].join('\n');
+  const rows = trajectorySamples(project).map((sample) => ({
+    timestamp_ms: sample.timeMs,
+    entity_id: sample.targetId,
+    team_id: sample.teamId ?? '',
+    x: sample.position.x,
+    y: sample.position.y,
+    z: sample.zMeters ?? '',
+    orientation_deg: sample.orientationDeg ?? '',
+    event: sample.event ?? '',
+    coordinate_system: sample.coordinateSystem,
+  }));
+  return Papa.unparse(rows, {
+    columns: [...RICH_TRAJECTORY_COLUMNS],
+    header: true,
+    newline: '\n',
+  });
 }
 
 export function exportTrajectoryJson(project: TacticalProject): string {
   return JSON.stringify({
     tool: TRAJECTORY_TOOL_ID,
     schemaVersion: TRAJECTORY_SCHEMA_VERSION,
+    mapping: {
+      timestamp: 'milliseconds',
+      coordinateSystem: 'normalized',
+      physicalUnit: 'meters',
+    },
     samples: trajectorySamples(project),
   }, null, 2);
 }
 
-function parseCsvRows(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let quoted = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]!;
-    if (quoted) {
-      if (char === '"' && text[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else if (char === '"') quoted = false;
-      else field += char;
-      continue;
-    }
-    if (char === '"') {
-      if (field) throw new Error('Trajectory CSV contains an invalid quote.');
-      quoted = true;
-    } else if (char === ',') {
-      row.push(field);
-      field = '';
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(field);
-      if (row.some((value) => value.length)) rows.push(row);
-      row = [];
-      field = '';
-    } else field += char;
-  }
-  if (quoted) throw new Error('Trajectory CSV contains an unterminated quoted field.');
-  if (field || row.length) {
-    row.push(field);
-    if (row.some((value) => value.length)) rows.push(row);
-  }
-  return rows;
+function sameColumns(actual: string[] | undefined, expected: readonly string[]): boolean {
+  return Boolean(actual)
+    && actual!.length === expected.length
+    && expected.every((column, index) => actual![index] === column);
 }
 
-function validateTrajectorySamples(samples: unknown[], sourceName: string): PortableTrajectorySample[] {
+function normalizedOrientation(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function validateTrajectorySamples(
+  samples: unknown[],
+  sourceName: string,
+  pitch?: PitchDimensions,
+): PortableTrajectorySample[] {
   if (samples.length > MAX_TRAJECTORY_SAMPLES) throw new Error('Trajectory import exceeds the sample-count limit.');
   const result = samples.map((raw, index) => {
     const record = asRecord(raw, `Trajectory sample ${index + 1}`);
-    const targetId = requireString(record.targetId, 'Trajectory target id').trim();
+    const targetId = String(record.targetId ?? record.entity_id ?? '').trim();
     if (!targetId) throw new Error('Trajectory target id cannot be empty.');
-    const timeMs = Number(record.timeMs);
-    if (!Number.isInteger(timeMs) || timeMs < 0) throw new Error(`Trajectory sample time must be a non-negative integer in ${sourceName}.`);
-    const positionRecord = record.position && typeof record.position === 'object'
+
+    const timeMs = Number(record.timeMs ?? record.timestamp_ms);
+    if (!Number.isInteger(timeMs) || timeMs < 0) {
+      throw new Error(`Trajectory sample time must be a non-negative integer in ${sourceName}.`);
+    }
+
+    const rawSystem = String(record.coordinateSystem ?? record.coordinate_system ?? 'normalized');
+    if (rawSystem !== 'normalized' && rawSystem !== 'meters') {
+      throw new Error(`Trajectory coordinate system must be normalized or meters in ${sourceName}.`);
+    }
+    const coordinateSystem: TrajectoryCoordinateSystem = rawSystem;
+    const hasCanonicalPosition = Boolean(record.position && typeof record.position === 'object');
+    const positionRecord = hasCanonicalPosition
       ? asRecord(record.position, 'Trajectory position')
       : { x: record.x, y: record.y };
-    const position = createNormalizedPoint(Number(positionRecord.x), Number(positionRecord.y));
-    return { targetId, timeMs, position };
+    const x = Number(positionRecord.x);
+    const y = Number(positionRecord.y);
+    let position: PortableTrajectorySample['position'];
+    if (hasCanonicalPosition) {
+      position = createNormalizedPoint(x, y);
+    } else if (rawSystem === 'meters') {
+      if (!pitch) throw new Error('Physical trajectory coordinates require pitch dimensions.');
+      if (x < 0 || y < 0 || x > pitch.lengthMeters || y > pitch.widthMeters) {
+        throw new Error('Physical trajectory coordinates must stay within the selected pitch dimensions.');
+      }
+      position = metersToNormalized({ xMeters: x, yMeters: y }, pitch);
+    } else {
+      position = createNormalizedPoint(x, y);
+    }
+
+    const zMeters = optionalNumber(record.zMeters ?? record.z, 'Trajectory Z');
+    if (zMeters !== undefined && zMeters < 0) throw new Error('Trajectory Z must be non-negative.');
+    const orientation = optionalNumber(record.orientationDeg ?? record.orientation_deg, 'Trajectory orientation');
+    const event = optionalText(record.event);
+    return {
+      targetId,
+      timeMs,
+      position,
+      teamId: optionalText(record.teamId ?? record.team_id),
+      zMeters,
+      orientationDeg: orientation === undefined ? undefined : normalizedOrientation(orientation),
+      event,
+      coordinateSystem,
+    };
   });
   const seen = new Set<string>();
   for (const sample of result) {
@@ -440,20 +500,35 @@ function validateTrajectorySamples(samples: unknown[], sourceName: string): Port
   return result.sort((left, right) => left.targetId.localeCompare(right.targetId) || left.timeMs - right.timeMs);
 }
 
-export function parseTrajectoryCsv(text: string, sourceName: string): PortableTrajectorySample[] {
+export function parseTrajectoryCsv(
+  text: string,
+  sourceName: string,
+  pitch?: PitchDimensions,
+): PortableTrajectorySample[] {
   if (utf8Bytes(text) > MAX_PROJECT_JSON_BYTES) throw new Error('Trajectory CSV exceeds the local import size limit.');
-  const rows = parseCsvRows(text);
-  const header = rows.shift();
-  if (!header || header.length !== 4 || header.join(',') !== 'targetId,timeMs,x,y') {
-    throw new Error('Trajectory CSV header must be targetId,timeMs,x,y.');
+  const parsed = Papa.parse<Record<string, string>>(text.replace(/^\uFEFF/, ''), {
+    header: true,
+    skipEmptyLines: 'greedy',
+  });
+  if (parsed.errors.length) {
+    throw new Error(`Trajectory CSV could not be parsed: ${parsed.errors[0]!.message}`);
   }
-  return validateTrajectorySamples(rows.map((row) => {
-    if (row.length !== 4) throw new Error('Trajectory CSV rows must contain exactly four fields.');
-    return { targetId: row[0], timeMs: row[1], x: row[2], y: row[3] };
-  }), sourceName);
+  const fields = parsed.meta.fields;
+  const rich = sameColumns(fields, RICH_TRAJECTORY_COLUMNS);
+  const legacy = sameColumns(fields, LEGACY_TRAJECTORY_COLUMNS);
+  if (!rich && !legacy) {
+    throw new Error(
+      `Trajectory CSV header must be ${RICH_TRAJECTORY_COLUMNS.join(',')} or ${LEGACY_TRAJECTORY_COLUMNS.join(',')}.`,
+    );
+  }
+  return validateTrajectorySamples(parsed.data, sourceName, pitch);
 }
 
-export function parseTrajectoryJson(text: string, sourceName: string): PortableTrajectorySample[] {
+export function parseTrajectoryJson(
+  text: string,
+  sourceName: string,
+  pitch?: PitchDimensions,
+): PortableTrajectorySample[] {
   if (utf8Bytes(text) > MAX_PROJECT_JSON_BYTES) throw new Error('Trajectory JSON exceeds the local import size limit.');
   let value: unknown;
   try {
@@ -466,7 +541,7 @@ export function parseTrajectoryJson(text: string, sourceName: string): PortableT
     throw new Error('Trajectory JSON tool or schema version is unsupported.');
   }
   if (!Array.isArray(record.samples)) throw new Error('Trajectory JSON samples must be an array.');
-  return validateTrajectorySamples(record.samples, sourceName);
+  return validateTrajectorySamples(record.samples, sourceName, pitch);
 }
 
 function knownPositionTargets(project: TacticalProject): Set<string> {
@@ -480,7 +555,10 @@ function knownPositionTargets(project: TacticalProject): Set<string> {
 }
 
 function keyframeHasNonPositionState(keyframe: TacticalKeyframe): boolean {
-  return keyframe.rotationDeg !== undefined || keyframe.visible !== undefined;
+  return keyframe.rotationDeg !== undefined
+    || keyframe.elevationMeters !== undefined
+    || keyframe.event !== undefined
+    || keyframe.visible !== undefined;
 }
 
 export function applyTrajectoryImport(
@@ -489,10 +567,19 @@ export function applyTrajectoryImport(
   sourceType: 'trajectory-csv' | 'trajectory-json',
   sourceName: string,
 ): TacticalProject {
-  const samples = validateTrajectorySamples(samplesInput, sourceName);
+  const samples = validateTrajectorySamples(samplesInput, sourceName, project.pitch.dimensions);
   const targets = knownPositionTargets(project);
   for (const sample of samples) {
     if (!targets.has(sample.targetId)) throw new Error(`Trajectory target ${sample.targetId} does not exist in this project.`);
+    if (sample.teamId) {
+      if (!project.teams.some((team) => team.id === sample.teamId)) {
+        throw new Error(`Trajectory team ${sample.teamId} does not exist in this project.`);
+      }
+      const token = project.playerTokens.find((item) => item.id === sample.targetId);
+      if (token && token.teamId !== sample.teamId) {
+        throw new Error(`Trajectory team ${sample.teamId} does not match target ${sample.targetId}.`);
+      }
+    }
   }
 
   const grouped = new Map<string, PortableTrajectorySample[]>();
@@ -524,6 +611,9 @@ export function applyTrajectoryImport(
           interpolation: index === items.length - 1 ? 'hold' : 'linear',
         }),
         position: { ...sample.position },
+        rotationDeg: sample.orientationDeg ?? preserved?.rotationDeg,
+        elevationMeters: sample.zMeters ?? preserved?.elevationMeters,
+        event: sample.event ?? preserved?.event,
         interpolation: index === items.length - 1 ? 'hold' : preserved?.interpolation ?? 'linear',
       });
     }
