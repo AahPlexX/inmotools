@@ -67,6 +67,7 @@ type PlaybackGraph = {
   loopEnd: number;
   /** Seconds the processed audio lags the source (chain latency), from worklet reports. */
   latencySeconds: number;
+  processorError: EventListener | null;
   raf: number | null;
 };
 
@@ -316,7 +317,8 @@ export default function MasteringWorkspace() {
       try { node.onended = null; node.stop(); } catch { /* source may already have ended */ }
     }
     if (graph.master) {
-      graph.master.onprocessorerror = null;
+      if (graph.processorError) graph.master.removeEventListener('processorerror', graph.processorError);
+      graph.processorError = null;
       graph.master.port.onmessage = null;
     }
     for (const node of [graph.source, graph.reference, graph.master, graph.pre, graph.post]) {
@@ -379,7 +381,7 @@ export default function MasteringWorkspace() {
     const pre = context.createAnalyser();
     const post = context.createAnalyser();
     for (const analyser of [pre, post]) { analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.75; }
-    const graph: PlaybackGraph = { session, context, source, master: null, reference: null, pre, post, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, latencySeconds: 0, raf: null };
+    const graph: PlaybackGraph = { session, context, source, master: null, reference: null, pre, post, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, latencySeconds: 0, processorError: null, raf: null };
     graphRef.current = graph;
     lastGraphRef.current = graph;
     setMeters(null);
@@ -402,7 +404,7 @@ export default function MasteringWorkspace() {
           graph.latencySeconds = event.data.latencyFrames / context.sampleRate;
           setMeters(event.data);
         };
-        node.onprocessorerror = () => {
+        graph.processorError = () => {
           if (graphRef.current !== graph || sessionRef.current !== session) return;
           const failedAt = timelinePosition(graph, context.currentTime, mixDuration);
           sessionRef.current += 1;
@@ -414,6 +416,7 @@ export default function MasteringWorkspace() {
             setStatus(`Realtime audio processor stopped unexpectedly at ${formatTime(failedAt)}. Playback was stopped; your edits are unchanged. Press Resume to try again.`);
           }
         };
+        node.addEventListener('processorerror', graph.processorError);
         node.port.postMessage({ type: 'settings', settings: liveMasterRef.current } satisfies WorkletInbound);
         node.port.postMessage({ type: 'monitor', ...monitorRef.current } satisfies WorkletInbound);
         source.connect(node, 0, 0);
