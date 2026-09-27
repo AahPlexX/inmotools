@@ -150,7 +150,7 @@ export default function MasteringMeters({ meters, playing, pre, post, monitor, o
         <div className="button-row">
           <label className="mastering-file-button mastering-file-secondary">{referenceBusy ? 'Reading…' : referenceName ? 'Replace reference' : 'Load reference track'}
             <input type="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac,.aiff,.aif" disabled={referenceBusy} onChange={onFile} /></label>
-          {referenceName && <button type="button" onClick={onClearReference}>Remove reference</button>}
+          {referenceName && <button type="button" onClick={onClearReference} disabled={referenceBusy}>Remove reference</button>}
         </div>
         {referenceName && <p className="help-text">Reference: {referenceName}. Choose “Reference” on the transport to hear it.</p>}
       </fieldset>
