@@ -569,12 +569,16 @@ export default function MarkdownWorkspace() {
     const request = ++fileReadRef.current;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
+    const previousDocumentName = documentNameRef.current;
     if (!await persistDraft(previous, effectiveTitleRef.current)) {
       setStatus('Could not save the current document. Download Markdown before starting a new document.');
       return;
     }
     if (request !== fileReadRef.current) return;
-    if (sourceRef.current !== previous) {
+    if (
+      sourceRef.current !== previous
+      || documentNameRef.current !== previousDocumentName
+    ) {
       setStatus('Document changed while saving. Choose New again when ready.');
       return;
     }
@@ -593,12 +597,16 @@ export default function MarkdownWorkspace() {
     const request = ++fileReadRef.current;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
+    const previousDocumentName = documentNameRef.current;
     if (!await persistDraft(previous, effectiveTitleRef.current)) {
       setStatus('Could not save the current document. Download Markdown before switching drafts.');
       return;
     }
     if (request !== fileReadRef.current) return;
-    if (sourceRef.current !== previous) {
+    if (
+      sourceRef.current !== previous
+      || documentNameRef.current !== previousDocumentName
+    ) {
       setStatus('Document changed while saving. Choose the draft again when ready.');
       return;
     }

@@ -232,6 +232,40 @@ test('starting a new document while its save is still pending is cancelled inste
   await expect(editor).toContainText('Content before starting a new document. Typed while New was still saving.');
 });
 
+test('starting a new document while a name-only change races its pending save is cancelled', async ({ page }) => {
+  await page.addInitScript(() => {
+    const win = window as unknown as { __delayNextSave?: boolean; __unblockSave?: () => void };
+    const originalOpen = indexedDB.open.bind(indexedDB);
+    indexedDB.open = ((...args: Parameters<typeof indexedDB.open>) => {
+      const request = originalOpen(...args);
+      if (win.__delayNextSave) {
+        win.__delayNextSave = false;
+        const realAddEventListener = request.addEventListener.bind(request);
+        const gate = new Promise<void>((resolve) => { win.__unblockSave = resolve; });
+        Object.defineProperty(request, 'onsuccess', {
+          configurable: true,
+          set(handler: (event: Event) => void) {
+            realAddEventListener('success', (event) => { void gate.then(() => handler(event)); });
+          },
+        });
+      }
+      return request;
+    }) as typeof indexedDB.open;
+  });
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'Content whose name will change.');
+  await expect(page.getByTestId('markdown-save-state')).toBeVisible();
+  await page.evaluate(() => { (window as unknown as { __delayNextSave: boolean }).__delayNextSave = true; });
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByLabel('Document name').fill('Renamed while saving');
+  await page.evaluate(() => (window as unknown as { __unblockSave: () => void }).__unblockSave());
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Document changed while saving');
+  await expect(editorLocator(page)).toContainText('Content whose name will change.');
+  await expect(page.getByLabel('Document name')).toHaveValue('Renamed while saving');
+});
+
 test('the formatting toolbar covers heading, blockquote, code, lists, rule and image insertion', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '');

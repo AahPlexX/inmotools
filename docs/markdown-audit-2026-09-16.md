@@ -126,6 +126,7 @@ The prior completion record remains historical evidence, not a waiver for newly 
 1. `loadMarkdownFile` replaced editor state after `File.text()` without first flushing a dirty document and without clearing `draftIdRef`. The first behavior could lose edits inside the 1.2-second autosave window; the second could make a later autosave of the imported file update the previously active draft record.
 2. The generic autosave path called `persistDraft(source)`; the optional name parameter therefore collapsed an existing named draft back to "Autosave", and `documentName` changes alone never scheduled persistence.
 3. The app is hash-routed, while rendered Markdown legitimately contains `#fragment` anchors. The preview previously let those anchors use browser-default hash navigation, which competes with the router's own `window.location.hash`. Preview-only click handling now keeps fragment navigation local to the rendered document.
+   The same metadata audit also extended the existing pending-save race guards for New/load-draft transitions from source text alone to source text **or document-name changes**, matching the new dirty-state contract.
 4. The file input's `accept` list was only a picker hint; no runtime file-kind check existed.
 5. Common Markdown keyboard formatting conventions were absent despite equivalent visible toolbar actions already existing.
 
