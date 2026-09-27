@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest';
 import type { LoudnessReading } from '../../src/tools/music/dsp/loudness';
 import {
   EMPTY_METADATA,
+  buildExportZip,
   buildMetadataTags,
   encodeWav,
   loudnessCsv,
   loudnessJson,
   parseReleaseDate,
+  planExportJobs,
   safeFileName,
   type ExportMetadata,
 } from '../../src/tools/music/mastering-export';
+import { addSourceTracksRevision, createMasteringDocument } from '../../src/tools/music/mastering-project';
 
 // --- SECTION: RIFF reader used to check the writer from the outside ---
 
@@ -243,5 +246,58 @@ describe('loudness reports', () => {
     expect(parsed.measuredWith).toContain('BS.1770-5');
     expect(parsed.files[0]).toMatchObject({ file: 'a, "mix".wav', durationSeconds: 12.346, integratedLufs: -14.03, truePeakDbtpPerChannel: [-1.21, -1.04] });
     expect(parsed.files[1]).toMatchObject({ integratedLufs: null, maxTruePeakDbtp: null, truePeakDbtpPerChannel: [null] });
+  });
+});
+
+// --- SECTION: batch planning and packaging ---
+
+describe('planExportJobs', () => {
+  const base = () => {
+    const doc = addSourceTracksRevision(createMasteringDocument(), [
+      { source: { id: 's', name: 's.wav', sampleRate: 100, channelCount: 1, frameCount: 1000, fileSize: 1, lastModified: 0, codec: 'pcm-s16' }, trackId: 't1', clipId: 'c1' },
+    ]);
+    return { ...doc, tracks: [...doc.tracks, { ...doc.tracks[0], id: 't2', name: doc.tracks[0].name, clips: doc.tracks[0].clips.map((clip) => ({ ...clip, id: 'c2' })) }, { ...doc.tracks[0], id: 't3', name: 'Empty', clips: [] }] };
+  };
+
+  it('exports the whole project or the selection', () => {
+    const doc = { ...base(), selection: { startSeconds: 2, endSeconds: 4 } };
+    expect(planExportJobs(doc, 'project', 'My: Song', 10)).toEqual([{ name: 'My Song' }]);
+    expect(planExportJobs(doc, 'selection', 'Song', 10)).toEqual([{ name: 'Song', startSeconds: 2, endSeconds: 4 }]);
+    expect(() => planExportJobs({ ...doc, selection: { startSeconds: 3, endSeconds: 3 } }, 'selection', 'Song', 10)).toThrow(/Select part of the timeline/);
+  });
+
+  it('names regions in timeline order, clamps them, and never repeats a file name', () => {
+    const doc = { ...base(), regions: [
+      { id: 'b', label: 'Chorus', startSeconds: 5, endSeconds: 12 },
+      { id: 'a', label: 'chorus', startSeconds: 1, endSeconds: 2 },
+      { id: 'c', label: '  ', startSeconds: 3, endSeconds: 4 },
+      { id: 'd', label: 'Past the end', startSeconds: 11, endSeconds: 12 },
+    ] };
+    expect(planExportJobs(doc, 'regions', 'Song', 10)).toEqual([
+      { name: 'Song - chorus', startSeconds: 1, endSeconds: 2 },
+      { name: 'Song - Region 2', startSeconds: 3, endSeconds: 4 },
+      { name: 'Song - Chorus 2', startSeconds: 5, endSeconds: 10 },
+    ]);
+    expect(() => planExportJobs(base(), 'regions', 'Song', 10)).toThrow(/Add at least one region/);
+  });
+
+  it('makes one stem per track that holds audio', () => {
+    const jobs = planExportJobs(base(), 'stems', 'Song', 10);
+    expect(jobs.map((job) => job.trackId)).toEqual(['t1', 't2']);
+    expect(new Set(jobs.map((job) => job.name.toLowerCase())).size).toBe(2);
+  });
+});
+
+describe('buildExportZip', () => {
+  it('puts every entry under one folder, storing audio and deflating text', async () => {
+    const { default: JSZip } = await import('jszip');
+    const bytes = await buildExportZip('My: Export', [
+      { path: 'Song.mp3', data: new Uint8Array([1, 2, 3]), compress: false },
+      { path: 'reports/loudness.csv', data: 'a,b\r\n', compress: true },
+    ]);
+    const zip = await JSZip.loadAsync(bytes);
+    expect(Object.keys(zip.files).filter((name) => !zip.files[name].dir).sort()).toEqual(['My Export/Song.mp3', 'My Export/reports/loudness.csv']);
+    expect(Array.from(await zip.file('My Export/Song.mp3')!.async('uint8array'))).toEqual([1, 2, 3]);
+    expect(await zip.file('My Export/reports/loudness.csv')!.async('string')).toBe('a,b\r\n');
   });
 });

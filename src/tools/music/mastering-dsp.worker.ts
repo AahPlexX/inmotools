@@ -80,7 +80,9 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
       }
       case 'export': {
         const result = engine.renderExport(request.document, request.request);
-        post({ type: 'exported', requestId: request.requestId, result }, result.channels.map((channel) => channel.buffer));
+        const transfer: Transferable[] = result.channels.map((channel) => channel.buffer);
+        if (result.spectrum) transfer.push(result.spectrum.db.buffer);
+        post({ type: 'exported', requestId: request.requestId, result }, transfer);
         break;
       }
       case 'spectrogram': {

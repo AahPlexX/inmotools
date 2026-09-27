@@ -418,3 +418,75 @@ export function loudnessJson(rows: readonly LoudnessReportRow[], measuredWith = 
     })),
   }, null, 2);
 }
+
+// --- SECTION: batch planning and ZIP packaging (ledger 80) ---
+
+export type ExportScope = 'project' | 'selection' | 'regions' | 'stems';
+
+/** One file to render: a timeline range of the mix, or one track as a stem. */
+export interface ExportJob {
+  /** File name without extension, unique within the batch. */
+  name: string;
+  startSeconds?: number;
+  endSeconds?: number;
+  trackId?: string;
+}
+
+/** Appends " 2", " 3", … to repeated names, case-insensitively, so no file overwrites another. */
+function uniqueNames<T extends { name: string }>(items: T[]): T[] {
+  const used = new Set<string>();
+  return items.map((item) => {
+    let name = item.name;
+    for (let suffix = 2; used.has(name.toLowerCase()); suffix += 1) name = `${item.name} ${suffix}`;
+    used.add(name.toLowerCase());
+    return { ...item, name };
+  });
+}
+
+/**
+ * Turns an export scope into the files to render, in timeline order.
+ * @throws {Error} with a plain-language reason when the scope has nothing to export.
+ */
+export function planExportJobs(document: import('./mastering-project').MasteringDocument, scope: ExportScope, baseName: string, durationSeconds: number): ExportJob[] {
+  const base = safeFileName(baseName);
+  const frame = document.sampleRate ? 1 / document.sampleRate : 0;
+  if (scope === 'project') return [{ name: base }];
+  if (scope === 'selection') {
+    const start = Math.max(0, Math.min(durationSeconds, document.selection.startSeconds));
+    const end = Math.max(0, Math.min(durationSeconds, document.selection.endSeconds));
+    if (end - start < frame || end <= start) throw new Error('Select part of the timeline first, or choose the whole project.');
+    return [{ name: base, startSeconds: start, endSeconds: end }];
+  }
+  if (scope === 'regions') {
+    const regions = [...document.regions]
+      .map((region) => ({ ...region, startSeconds: Math.max(0, region.startSeconds), endSeconds: Math.min(durationSeconds, region.endSeconds) }))
+      .filter((region) => region.endSeconds - region.startSeconds >= frame && region.endSeconds > region.startSeconds)
+      .sort((a, b) => a.startSeconds - b.startSeconds);
+    if (!regions.length) throw new Error('Add at least one region on the timeline to export regions.');
+    return uniqueNames(regions.map((region, index) => ({
+      name: safeFileName(`${base} - ${region.label.trim() || `Region ${index + 1}`}`),
+      startSeconds: region.startSeconds,
+      endSeconds: region.endSeconds,
+    })));
+  }
+  const tracks = document.tracks.filter((track) => track.clips.length > 0);
+  if (!tracks.length) throw new Error('Add audio to a track to export stems.');
+  return uniqueNames(tracks.map((track, index) => ({ name: safeFileName(`${base} - ${track.name.trim() || `Track ${index + 1}`}`), trackId: track.id })));
+}
+
+export interface ZipEntry {
+  path: string;
+  data: Uint8Array | string;
+  /** Already-compressed audio is stored; text and PCM are deflated. */
+  compress: boolean;
+}
+
+/** Packs a batch into one ZIP; every path sits under a single top-level folder. */
+export async function buildExportZip(folder: string, entries: readonly ZipEntry[]): Promise<Uint8Array> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  const root = zip.folder(safeFileName(folder, 'export'));
+  if (!root) throw new Error('Could not create the ZIP folder.');
+  for (const entry of entries) root.file(entry.path, entry.data, { compression: entry.compress ? 'DEFLATE' : 'STORE' });
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+}

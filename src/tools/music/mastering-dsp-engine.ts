@@ -39,6 +39,8 @@ export interface MasterRenderResult {
   loudness: LoudnessReading;
   /** Short-term loudness every 100 ms (for the loudness CSV/JSON report). */
   shortTermSeries: number[];
+  /** Average spectrum of the output, when an export asked for a spectrum snapshot. */
+  spectrum?: Spectrum;
 }
 
 /** What {@link MasteringDspEngine.renderExport} renders (ledgers 26, 73–80). */
@@ -57,6 +59,8 @@ export interface ExportRenderRequest {
   trackId?: string;
   /** Output sample rate; converted after processing. Omitted keeps the project rate. */
   targetRate?: number;
+  /** Also measure the output's average spectrum for the telemetry snapshot (ledger 80). */
+  analyzeSpectrum?: boolean;
 }
 
 export class MasteringDspEngine {
@@ -192,7 +196,9 @@ export class MasteringDspEngine {
       const size = Math.min(block, channels[0].length - offset);
       meter.process(channels.map((channel) => channel.subarray(offset, offset + size)), size);
     }
-    return { channels, sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+    const result: MasterRenderResult = { channels, sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+    if (request.analyzeSpectrum) result.spectrum = averageSpectrum(channels, sampleRate, 0, channels[0].length);
+    return result;
   }
 
   /** One track mixed alone, padded to the mix length and channel count. */
