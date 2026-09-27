@@ -12,6 +12,7 @@ import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
+import { highlightCodeBlocks } from './code-highlight-engine';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
@@ -49,10 +50,15 @@ import katexExportCss from 'katex/dist/katex.css?inline';
 import 'katex/dist/katex.css';
 import './markdown-workbench.css';
 
-type ViewMode = 'source' | 'split';
+type ViewMode = 'source' | 'split' | 'preview';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 const DOCUMENT_HISTORY_COALESCE_MS = 600;
+const MARKDOWN_FILE_EXTENSION = /\.(md|markdown|txt)$/i;
+const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/plain']);
+
+const isSupportedMarkdownFile = (file: File): boolean =>
+  MARKDOWN_FILE_EXTENSION.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type);
 const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
   { id: 'apa', label: 'APA 7th' },
   { id: 'ieee', label: 'IEEE' },
@@ -88,6 +94,8 @@ export default function MarkdownWorkspace() {
 
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
+  const documentNameRef = useRef(documentName);
+  documentNameRef.current = documentName;
   const [lineWrapping, setLineWrapping] = useState(true);
   const [fontSize, setFontSize] = useState(13);
   const [vimMode, setVimMode] = useState(false);
@@ -118,6 +126,7 @@ export default function MarkdownWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const bibInputRef = useRef<HTMLInputElement | null>(null);
   const persistedTextRef = useRef<string>(DEFAULT_SOURCE);
+  const persistedDocumentNameRef = useRef('');
   const previewPendingRef = useRef(false);
   const previewWaitersRef = useRef<Array<() => void>>([]);
   const [isDirty, setIsDirty] = useState(false);
@@ -133,23 +142,28 @@ export default function MarkdownWorkspace() {
     estimateStorageUsage().then(setStorageUsage).catch(() => undefined);
   }, []);
 
-  const persistDraft = useCallback((text: string, name?: string) => {
+  const persistDraft = useCallback((text: string, name: string) => {
     const store = draftStoreRef.current;
     if (!store) return Promise.resolve(false);
     const now = Date.now();
+    const documentNameSnapshot = documentNameRef.current;
     const draft = draftIdRef.current
       ? updateDraftRecord(
-        { id: draftIdRef.current, name: name ?? 'Autosave', text, updatedAt: now },
+        { id: draftIdRef.current, name, text, updatedAt: now },
         text,
         now,
       )
-      : createDraftRecord(name ?? 'Autosave', text, now);
+      : createDraftRecord(name, text, now);
     draftIdRef.current = draft.id;
     return saveDraft(store, draft)
       .then(() => {
         if (draftIdRef.current === draft.id) {
           persistedTextRef.current = text;
-          setIsDirty(sourceRef.current !== text);
+          persistedDocumentNameRef.current = documentNameSnapshot;
+          setIsDirty(
+            sourceRef.current !== text
+            || documentNameRef.current !== documentNameSnapshot,
+          );
           setLastSavedAt(now);
         }
         return listDrafts(store);
@@ -161,17 +175,11 @@ export default function MarkdownWorkspace() {
   }, [refreshStorageEstimate]);
 
   useEffect(() => {
-    if (!draftStoreRef.current) return;
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => { void persistDraft(source); }, AUTOSAVE_DEBOUNCE_MS);
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
-  }, [source, persistDraft]);
-
-  useEffect(() => {
-    setIsDirty(source !== persistedTextRef.current);
-  }, [source]);
+    setIsDirty(
+      source !== persistedTextRef.current
+      || documentName !== persistedDocumentNameRef.current,
+    );
+  }, [source, documentName]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -230,6 +238,17 @@ export default function MarkdownWorkspace() {
   const filenameStem = useMemo(() => toFilenameStem(effectiveTitle), [effectiveTitle]);
   const effectiveTitleRef = useRef(effectiveTitle);
   effectiveTitleRef.current = effectiveTitle;
+
+  useEffect(() => {
+    if (!draftStoreRef.current) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      void persistDraft(source, effectiveTitle);
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [source, documentName, effectiveTitle, persistDraft]);
 
   const citationLibrary = useMemo(() => {
     if (!bibliographyText.trim()) return null;
@@ -339,22 +358,57 @@ export default function MarkdownWorkspace() {
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
+    if (!isSupportedMarkdownFile(file)) {
+      setStatus(`"${file.name}" is not a Markdown or plain-text document. Choose a .md, .markdown, or .txt file.`);
+      return;
+    }
+
     const request = ++fileReadRef.current;
     const original = sourceRef.current;
+    const originalDocumentName = documentNameRef.current;
     try {
       const text = await file.text();
       if (request !== fileReadRef.current) return;
-      if (sourceRef.current !== original) {
+      if (
+        sourceRef.current !== original
+        || documentNameRef.current !== originalDocumentName
+      ) {
         setStatus('File opening cancelled because the document changed. Open the file again when ready.');
         return;
       }
+
+      const currentDocumentIsDirty =
+        original !== persistedTextRef.current
+        || originalDocumentName !== persistedDocumentNameRef.current;
+      if (currentDocumentIsDirty) {
+        if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+        if (!await persistDraft(original, effectiveTitleRef.current)) {
+          setStatus('Could not save the current document, so the selected file was not opened. Download Markdown before trying again.');
+          return;
+        }
+        if (request !== fileReadRef.current) return;
+        if (
+          sourceRef.current !== original
+          || documentNameRef.current !== originalDocumentName
+        ) {
+          setStatus('File opening cancelled because the document changed while it was being saved. Open the file again when ready.');
+          return;
+        }
+      }
+
+      const nextDocumentName = file.name.replace(MARKDOWN_FILE_EXTENSION, '');
+      draftIdRef.current = null;
+      persistedTextRef.current = text;
+      persistedDocumentNameRef.current = nextDocumentName;
       commitSource(text);
-      setDocumentName(file.name.replace(/\.(md|markdown|txt)$/i, ''));
+      setDocumentName(nextDocumentName);
+      setLastSavedAt(null);
+      setIsDirty(false);
       setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
     } catch {
       setStatus('Could not read that file in this browser.');
     }
-  }, [commitSource]);
+  }, [commitSource, persistDraft]);
 
   const onFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -399,6 +453,7 @@ export default function MarkdownWorkspace() {
     // still-settling live preview export the same current document.
     const scratch = document.createElement('div');
     scratch.innerHTML = renderMarkdown(prepareExportSource()).html;
+    await highlightCodeBlocks(scratch);
     await renderDiagramBlocks(scratch);
     return scratch.innerHTML;
   }, [prepareExportSource]);
@@ -486,8 +541,8 @@ export default function MarkdownWorkspace() {
       window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);
-    if (view !== 'split') {
-      setStatus('Print uses the rendered preview. Switch to Split view so the preview is available, then print again.');
+    if (view === 'source') {
+      setStatus('Print uses the rendered preview. Switch to Split or Preview view, then print again.');
       cleanup();
       return;
     }
@@ -516,21 +571,27 @@ export default function MarkdownWorkspace() {
     const request = ++fileReadRef.current;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
+    const previousDocumentName = documentNameRef.current;
     if (!await persistDraft(previous, effectiveTitleRef.current)) {
       setStatus('Could not save the current document. Download Markdown before starting a new document.');
       return;
     }
     if (request !== fileReadRef.current) return;
-    if (sourceRef.current !== previous) {
+    if (
+      sourceRef.current !== previous
+      || documentNameRef.current !== previousDocumentName
+    ) {
       setStatus('Document changed while saving. Choose New again when ready.');
       return;
     }
     draftIdRef.current = null;
     persistedTextRef.current = DEFAULT_SOURCE;
+    persistedDocumentNameRef.current = '';
     lastEditorChangeAtRef.current = 0;
     setHistory(createHistory(DEFAULT_SOURCE));
     setDocumentName('');
     setLastSavedAt(null);
+    setIsDirty(false);
     setStatus('Started a new document. The previous draft is still listed below.');
   };
 
@@ -538,19 +599,27 @@ export default function MarkdownWorkspace() {
     const request = ++fileReadRef.current;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
+    const previousDocumentName = documentNameRef.current;
     if (!await persistDraft(previous, effectiveTitleRef.current)) {
       setStatus('Could not save the current document. Download Markdown before switching drafts.');
       return;
     }
     if (request !== fileReadRef.current) return;
-    if (sourceRef.current !== previous) {
+    if (
+      sourceRef.current !== previous
+      || documentNameRef.current !== previousDocumentName
+    ) {
       setStatus('Document changed while saving. Choose the draft again when ready.');
       return;
     }
+    const restoredDocumentName = draft.name === 'Autosave' ? '' : draft.name;
     draftIdRef.current = draft.id;
     persistedTextRef.current = draft.text;
+    persistedDocumentNameRef.current = restoredDocumentName;
     commitSource(draft.text);
-    setDocumentName(draft.name === 'Autosave' ? '' : draft.name);
+    setDocumentName(restoredDocumentName);
+    setLastSavedAt(draft.updatedAt);
+    setIsDirty(false);
     setStatus(`Loaded local draft from ${new Date(draft.updatedAt).toLocaleString()}.`);
   };
 
@@ -591,6 +660,7 @@ export default function MarkdownWorkspace() {
           <div className="markdown-workbench-toolbar-group">
             <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
             <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
+            <button type="button" onClick={() => setView('preview')} aria-pressed={view === 'preview'}>Preview</button>
             <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo document step" title="Undo one grouped document step. Ctrl/Cmd+Z inside the editor keeps CodeMirror's fine-grained text history.">Undo step</button>
             <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo document step" title="Redo one grouped document step.">Redo step</button>
           </div>
@@ -599,7 +669,7 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="Document">
           <span className="markdown-workbench-toolbar-label">Document</span>
           <div className="markdown-workbench-toolbar-group">
-            <button type="button" onClick={() => fileInputRef.current?.click()}>Open .md</button>
+            <button type="button" onClick={() => fileInputRef.current?.click()}>Open document</button>
             <button type="button" onClick={startNewDraft}>New</button>
             <button type="button" onClick={saveDraftNow}>Save draft</button>
             <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileInputChange} aria-label="Open a local Markdown file" />
@@ -659,7 +729,7 @@ export default function MarkdownWorkspace() {
             revealRequest={revealRequest}
           />
         </div>
-        {view === 'split' ? (
+        {view !== 'source' ? (
           <div className="markdown-workbench-preview-pane" ref={previewHostRef}>
             <MarkdownPreview
               preparedSource={preparedSource}

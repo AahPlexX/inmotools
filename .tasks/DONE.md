@@ -1,5 +1,39 @@
 # Done
 
+## Markdown Workbench real-world remediation + historical reconciliation — 10/10 complete
+
+The 2026-09-27 Markdown real-world pass is complete on `origin/main`. F01–F07 close dirty-safe
+file replacement, imported-file draft isolation, durable names/name-only autosave, hash-safe preview
+anchors, full-width Preview mode, runtime document-file validation, and conventional formatting
+shortcuts. Reconciliation of the stale `claude/markdown-tool-audit-docs-lwrb3w` branch then closed
+F08–F10 without merging its old tree: detached Copy/HTML/EPUB rendering now uses stable export-safe
+`tok-*` syntax-highlighting classes, cosmetic highlighting is bounded at 20,000 characters per fence,
+and the dead contradictory `markdown-types.ts` `ExportAsset` declaration is removed.
+
+Product implementation revision: `63b99476f3731266c1c57f268ca4259b446fe19f`.
+Final acceptance revision: `4607159234bc84653585c4a0906a212ea8574396`. Git comparison proves the
+only changes between those revisions are the Markdown regression files (one exact size-fixture
+correction and one Copy HTML browser assertion), so shipped product source is byte-identical.
+
+Fresh evidence:
+- same-product focused run `36332490614` / job `108656984010` passed the production build and
+  **124/124** desktop/mobile Chromium checks across all three Markdown specs;
+- exact-final focused run `36332688014` / job `108657533447` passed the production build and
+  **54/54** desktop/mobile UX checks, including Copy HTML token markup, self-contained standalone
+  HTML coloring, packaged EPUB coloring, oversized-fence fallback, and the complete F01–F07 UX set;
+- exact-final Pages run `36332688074` completed its repository unit step successfully, completed its
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
+
+No dependency changed. Direct current-tree reads confirm the contradictory `ExportAsset` type is gone
+and the export-safe stylesheet is present. The historical branch has no open PR and no intended behavior
+left stranded from `main`; it is superseded evidence and must not be merged wholesale. The available
+GitHub connector exposes no branch-delete/ref-delete action, so physical deletion of that already-
+superseded ref was not performed by this workstream.
+
+The durable handoff is `docs/markdown-audit-2026-09-16.md`. Future Markdown work should reopen task
+state only for a newly verified defect or explicitly accepted scope.
+
 ## Markdown Workbench Gauntlet hardening — 4/4 complete
 
 The post-completion Markdown adversarial pass is integrated on `origin/main` at

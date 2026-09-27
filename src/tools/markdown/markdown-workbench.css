@@ -60,11 +60,9 @@
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
 
-/* Fenced code blocks share the source editor's own background (var(--surface))
-   rather than the app's usual dark .code-output convention, because
-   code-highlight-engine.ts colors tokens with the editor's own
-   defaultHighlightStyle palette — a light-background style, tuned to read
-   correctly only on the same background the editor itself uses. */
+/* Fenced code blocks share the source editor's light surface. Token colors
+   live in code-highlight.css as stable Lezer tok-* classes so the same
+   styling can be embedded into standalone HTML/EPUB exports. */
 .markdown-workbench-preview pre {
   overflow: auto;
   max-width: 100%;
@@ -272,4 +270,17 @@
   .markdown-workbench-help-header {
     align-items: flex-start;
   }
+}
+
+
+/* Preview-only mode keeps the CodeMirror instance mounted (so its native
+   selection/history survives view switches) while giving the rendered
+   document the full workspace width. */
+.markdown-workbench-view-preview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.markdown-workbench-view-preview .markdown-workbench-editor-pane {
+  display: none;
+  border-right: 0;
 }

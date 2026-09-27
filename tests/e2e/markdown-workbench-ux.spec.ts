@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import JSZip from 'jszip';
 
 const editorLocator = (page: import('@playwright/test').Page) =>
   page.locator('[aria-label="Markdown source"]');
@@ -9,7 +10,24 @@ const setSource = async (page: import('@playwright/test').Page, value: string) =
   await editor.click();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
   await page.keyboard.press('Backspace');
-  if (value) await editor.pressSequentially(value);
+  if (value.length > 1_000) await page.keyboard.insertText(value);
+  else if (value) await editor.pressSequentially(value);
+};
+
+const openPanel = async (page: import('@playwright/test').Page, name: RegExp) => {
+  const panel = page.locator('details').filter({ hasText: name }).first();
+  if (!await panel.evaluate((node) => (node as HTMLDetailsElement).open)) {
+    await panel.locator('summary').first().click();
+  }
+  await expect(panel).toHaveAttribute('open', '');
+  return panel;
+};
+
+const readDownloadBytes = async (download: import('@playwright/test').Download): Promise<Buffer> => {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
 };
 
 test('markdown page copy reads like product guidance rather than implementation notes', async ({ page }) => {
@@ -129,6 +147,56 @@ test('syntax suggestions are on by default, context-aware, and can be disabled',
   await expect(completion).toBeHidden();
 });
 
+test('Copy HTML preserves fenced-code token classes in the copied rendered fragment', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  await page.getByRole('button', { name: 'Copy HTML', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Copied the rendered HTML');
+  const html = await page.evaluate(() => navigator.clipboard.readText());
+
+  expect(html).toContain('tok-keyword');
+  expect(html).toContain('markdown-workbench-code-highlighted');
+});
+
+test('standalone HTML export preserves fenced-code syntax colors with self-contained CSS', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
+  const html = (await readDownloadBytes(await downloadPromise)).toString('utf8');
+
+  expect(html).toContain('tok-keyword');
+  expect(html).toMatch(/\.tok-keyword[^}]*color:/);
+});
+
+test('EPUB export packages the fenced-code token stylesheet with highlighted markup', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '~~~javascript\nconst answer = 42;\n~~~');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'EPUB (structural)', exact: true }).click();
+  const zip = await JSZip.loadAsync(await readDownloadBytes(await downloadPromise));
+  const chapter = await zip.file('OEBPS/chapter1.xhtml')?.async('string');
+  const stylesheet = await zip.file('OEBPS/styles/markdown.css')?.async('string');
+
+  expect(chapter).toContain('tok-keyword');
+  expect(stylesheet).toMatch(/\.tok-keyword[^}]*color:/);
+});
+
+test('an oversized recognized fence remains readable without running cosmetic syntax highlighting', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const hugeFence = '~~~javascript\n' + 'const answer = 42;\n'.repeat(1_200) + '~~~';
+  await setSource(page, hugeFence);
+
+  const code = page.locator('.markdown-workbench-preview pre > code.language-javascript');
+  await expect(code).toBeVisible();
+  await expect(code).toContainText('const answer = 42;');
+  await expect(code.locator('[class*="tok-"]')).toHaveCount(0);
+});
+
 test('fenced code blocks are colored by language in the live preview', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '```javascript\nconst answer = 42;\n```');
@@ -221,6 +289,40 @@ test('starting a new document while its save is still pending is cancelled inste
 
   await expect(page.getByTestId('markdown-status')).toContainText('Document changed while saving');
   await expect(editor).toContainText('Content before starting a new document. Typed while New was still saving.');
+});
+
+test('starting a new document while a name-only change races its pending save is cancelled', async ({ page }) => {
+  await page.addInitScript(() => {
+    const win = window as unknown as { __delayNextSave?: boolean; __unblockSave?: () => void };
+    const originalOpen = indexedDB.open.bind(indexedDB);
+    indexedDB.open = ((...args: Parameters<typeof indexedDB.open>) => {
+      const request = originalOpen(...args);
+      if (win.__delayNextSave) {
+        win.__delayNextSave = false;
+        const realAddEventListener = request.addEventListener.bind(request);
+        const gate = new Promise<void>((resolve) => { win.__unblockSave = resolve; });
+        Object.defineProperty(request, 'onsuccess', {
+          configurable: true,
+          set(handler: (event: Event) => void) {
+            realAddEventListener('success', (event) => { void gate.then(() => handler(event)); });
+          },
+        });
+      }
+      return request;
+    }) as typeof indexedDB.open;
+  });
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'Content whose name will change.');
+  await expect(page.getByTestId('markdown-save-state')).toBeVisible();
+  await page.evaluate(() => { (window as unknown as { __delayNextSave: boolean }).__delayNextSave = true; });
+
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByLabel('Document name').fill('Renamed while saving');
+  await page.evaluate(() => (window as unknown as { __unblockSave: () => void }).__unblockSave());
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Document changed while saving');
+  await expect(editorLocator(page)).toContainText('Content whose name will change.');
+  await expect(page.getByLabel('Document name')).toHaveValue('Renamed while saving');
 });
 
 test('the formatting toolbar covers heading, blockquote, code, lists, rule and image insertion', async ({ page }) => {
@@ -350,6 +452,106 @@ test('a recognized emoji shortcode renders as its emoji in the live preview', as
   await expect(page.locator('.markdown-workbench-preview p')).toContainText('Ship it 🚀');
 });
 
+
+test('opening a file saves dirty work first and gives the imported file a separate draft identity', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Working draft\n\nKeep this before opening another file.');
+
+  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+    name: 'Imported document.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from('# Imported document\n\nNew file body.'),
+  });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('Opened Imported document.md locally');
+  await expect(page.locator('.markdown-workbench-preview h1')).toHaveText('Imported document');
+
+  await page.waitForTimeout(1400);
+  const panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Working draft —/ })).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: /Imported document —/ })).toHaveCount(1);
+
+  await panel.getByRole('button', { name: /Working draft —/ }).click();
+  await expect(editorLocator(page)).toContainText('Keep this before opening another file.');
+});
+
+test('document names survive autosave and a name-only edit is persisted', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Draft body');
+  await page.getByLabel('Document name').fill('Project Alpha');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Saved a local draft');
+
+  const editor = editorLocator(page);
+  await editor.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' updated');
+  await page.waitForTimeout(1400);
+
+  let panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Project Alpha —/ })).toHaveCount(1);
+  await expect(panel).not.toContainText('Autosave —');
+
+  await page.getByLabel('Document name').fill('Project Beta');
+  await page.waitForTimeout(1400);
+  panel = await openPanel(page, /^Local drafts and storage/);
+  await expect(panel.getByRole('button', { name: /Project Beta —/ })).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: /Project Alpha —/ })).toHaveCount(0);
+});
+
+test('file selection validates Markdown or plain text instead of trusting accept alone', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Keep this document');
+
+  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+    name: 'wrong.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-not-really-a-markdown-document'),
+  });
+
+  await expect(page.getByTestId('markdown-status')).toContainText('is not a Markdown or plain-text document');
+  await expect(editorLocator(page)).toContainText('# Keep this document');
+});
+
+test('Preview view is full-width, responsive, and returns to the mounted editor without losing text', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Narrow preview\n\nText that must survive the view switch.');
+
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Preview', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.markdown-workbench-preview')).toBeVisible();
+  await expect(editorLocator(page)).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+  await page.getByRole('button', { name: 'Split', exact: true }).click();
+  await expect(editorLocator(page)).toBeVisible();
+  await expect(editorLocator(page)).toContainText('Text that must survive the view switch.');
+});
+
+test('common Markdown formatting shortcuts match the visible toolbar actions', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const editor = editorLocator(page);
+  const shortcutCases = [
+    { key: 'ControlOrMeta+b', expected: '**selected**' },
+    { key: 'ControlOrMeta+i', expected: '*selected*' },
+    { key: 'ControlOrMeta+e', expected: '`selected`' },
+    { key: 'ControlOrMeta+k', expected: '[selected](https://example.com)' },
+  ];
+
+  for (const shortcut of shortcutCases) {
+    await setSource(page, 'selected');
+    await editor.press('ControlOrMeta+a');
+    await editor.press(shortcut.key);
+    await expect(editor).toContainText(shortcut.expected);
+  }
+
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+B Meta+B');
+  await expect(page.getByRole('button', { name: 'Italic', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+I Meta+I');
+  await expect(page.getByRole('button', { name: 'Inline code', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+E Meta+E');
+  await expect(page.getByRole('button', { name: 'Link', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+K Meta+K');
+});
+
 test('inserting a table of contents links to and lands on the actual rendered heading', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Intro\n\nHello.\n\n## Details\n\nMore.');
@@ -363,4 +565,8 @@ test('inserting a table of contents links to and lands on the actual rendered he
   const tocLink = page.locator('.markdown-workbench-preview a', { hasText: 'Details' });
   await expect(tocLink).toHaveAttribute('href', '#user-content-details');
   await expect(page.locator('.markdown-workbench-preview h2#user-content-details')).toContainText('Details');
+
+  const routeHash = await page.evaluate(() => window.location.hash);
+  await tocLink.click();
+  expect(await page.evaluate(() => window.location.hash)).toBe(routeHash);
 });

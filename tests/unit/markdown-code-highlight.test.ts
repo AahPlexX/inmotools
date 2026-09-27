@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { highlightSnippet } from '../../src/tools/markdown/code-highlight-engine';
+import { MAX_HIGHLIGHT_SOURCE_CHARS, highlightSnippet } from '../../src/tools/markdown/code-highlight-engine';
 
 describe('preview fenced-code language coloring', () => {
   it('wraps a recognized language into styled spans without losing any source text', async () => {
@@ -39,5 +39,13 @@ describe('preview fenced-code language coloring', () => {
     const result = await highlightSnippet('<not a real lang>', 'not-a-real-language-xyz');
     expect(result.recognized).toBe(false);
     expect(result.html).toBe('&lt;not a real lang&gt;');
+  });
+
+  it('leaves an oversized recognized fence plain instead of parsing it for cosmetic highlighting', async () => {
+    const source = 'x'.repeat(MAX_HIGHLIGHT_SOURCE_CHARS + 1);
+    const result = await highlightSnippet(source, 'javascript');
+    expect(source.length).toBeGreaterThan(MAX_HIGHLIGHT_SOURCE_CHARS);
+    expect(result.recognized).toBe(false);
+    expect(result.html).toBe(source);
   });
 });

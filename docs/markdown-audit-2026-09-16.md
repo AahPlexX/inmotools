@@ -103,3 +103,85 @@ A post-completion adversarial pass closed four hardening contracts without expan
 - SVG 2 linking/external resources: https://www.w3.org/TR/SVG/linking.html
 
 Research date: 2026-09-26 local / 2026-09-27 UTC. `GOVERNANCE.md` was read and not modified.
+
+
+## Real-world remediation pass — 2026-09-27
+
+Status: **STAGE COMPLETE — F01–F07 verified; final workstream ledger is F01–F10 in the reconciliation section below.**
+
+The prior completion record remains historical evidence, not a waiver for newly reproduced real-world defects. This pass started from `origin/main` at `48257af167d4296552ccb4e4b09570e0aee0a45d`; the pre-write focused-tool and Pages workflows on that revision were green. Scope is restricted to Markdown Workbench source, its browser regression suite, this handoff record, and the additive task-state entry.
+
+### Seven-function acceptance ledger
+
+- **F01 — dirty-safe file replacement:** opening or dropping another Markdown/plain-text document saves the current dirty document first. A failed save blocks replacement rather than discarding editor state.
+- **F02 — imported-file draft isolation:** a document opened from disk receives a fresh browser-local draft identity, so its next autosave cannot overwrite the draft that was active before the open.
+- **F03 — durable draft metadata:** autosave preserves the current effective document title instead of silently renaming a saved draft to "Autosave"; changing only the document name is dirty state and is autosaved; restoring a draft restores its saved timestamp.
+- **F04 — hash-safe preview anchors:** same-document fragment links (including generated TOCs and footnotes) navigate inside the live preview without replacing the application's `#/tools/markdown-workbench` route. Standalone exports keep ordinary HTML fragment behavior.
+- **F05 — Preview view:** Source, Split, and Preview are first-class modes. Preview uses the full workspace width while CodeMirror stays mounted, preserving its native selection/history across mode switches; Print/PDF accepts Split or Preview.
+- **F06 — real file validation:** the picker hint is backed by runtime validation for `.md`, `.markdown`, `.txt`, `text/markdown`, and `text/plain`; unsupported selections are rejected without replacing the current document.
+- **F07 — conventional formatting shortcuts:** CodeMirror handles Ctrl/Cmd+B, I, E, and K for bold, italic, inline code, and link insertion through the same formatting primitive used by the visible toolbar. Toolbar controls remain available for touch/pointer use and expose `aria-keyshortcuts`.
+
+### Root causes closed in this pass
+
+1. `loadMarkdownFile` replaced editor state after `File.text()` without first flushing a dirty document and without clearing `draftIdRef`. The first behavior could lose edits inside the 1.2-second autosave window; the second could make a later autosave of the imported file update the previously active draft record.
+2. The generic autosave path called `persistDraft(source)`; the optional name parameter therefore collapsed an existing named draft back to "Autosave", and `documentName` changes alone never scheduled persistence.
+3. The app is hash-routed, while rendered Markdown legitimately contains `#fragment` anchors. The preview previously let those anchors use browser-default hash navigation, which competes with the router's own `window.location.hash`. Preview-only click handling now keeps fragment navigation local to the rendered document.
+   The same metadata audit also extended the existing pending-save race guards for New/load-draft transitions from source text alone to source text **or document-name changes**, matching the new dirty-state contract.
+4. The file input's `accept` list was only a picker hint; no runtime file-kind check existed.
+5. Common Markdown keyboard formatting conventions were absent despite equivalent visible toolbar actions already existing.
+
+### Current primary references
+
+- GitHub Docs — Keyboard shortcuts: https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts
+- GitHub Docs — Basic writing and formatting syntax: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
+- MDN — `accept` HTML attribute: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/accept
+- MDN — `Location.hash`: https://developer.mozilla.org/en-US/docs/Web/API/Location/hash
+- CodeMirror 6 guide/reference — keymaps and command precedence: https://codemirror.net/docs/guide/ and https://codemirror.net/docs/ref/
+- W3C — WCAG 2.2: https://www.w3.org/TR/WCAG22/
+
+### Validation evidence
+
+- Exact-product focused run `36329231897` / job `108647853700`: production TypeScript/Vite build passed; focused selection resolved to all three Markdown browser specs; **118/118** desktop/mobile Chromium checks passed.
+- Exact-product Pages run `36329231892`: **195 unit files / 1956 tests** passed, production build passed, Pages artifact build/upload passed, and deployment job `108647967903` succeeded.
+- The repository-wide Playwright sweep in that Pages run finished with **953 passed, 22 skipped, 1 flaky**. The sole flaky case was outside Markdown (`tests/e2e/typing.spec.ts:439` on mobile Chromium) and passed on retry; Playwright's documented retry classification treats a first-attempt failure that passes on retry as `flaky`. No Markdown test failed.
+- The focused run directly exercises F01/F02 together plus F03, F05, F06, F07, the name-only transition race guard, and an actual click of a generated TOC link for F04 on both configured Chromium projects.
+
+This seven-function remediation is therefore closed. Any future Markdown work must be based on a newly verified defect or explicitly approved new scope rather than reopening this completed ledger.
+
+
+## Historical branch reconciliation — 2026-09-27
+
+Status: **COMPLETE — F01–F10 verified and integrated on `origin/main`; product source `63b99476f3731266c1c57f268ca4259b446fe19f`, final acceptance revision `4607159234bc84653585c4a0906a212ea8574396`.**
+
+After F01–F07 closed, the old branch `claude/markdown-tool-audit-docs-lwrb3w` was compared against current `origin/main` before branch cleanup. It has no open pull request and is far behind current main, so its tree is not safe to merge. Three behaviors in its unique commits were nevertheless still valid when re-verified against the newer production implementation:
+
+- **F08 — export-safe fenced-code coloring.** Current main highlighted the live preview only. Detached HTML/EPUB export rendering called `renderMarkdown` and diagrams but never `highlightCodeBlocks`, so recognized fences exported as plain code. The current lazy/cached language loader is retained; highlighting now emits Lezer `classHighlighter`'s stable `tok-*` classes, live preview imports `code-highlight.css`, detached export runs the same highlighting pass, standalone HTML embeds the CSS when needed, and EPUB packages it in `styles/markdown.css`.
+- **F09 — bounded cosmetic highlighting.** A recognized fence had no size bound even though highlighting is cosmetic and reruns during editing. `MAX_HIGHLIGHT_SOURCE_CHARS = 20_000` now returns the existing safe plain-code fallback before loading/parsing a grammar.
+- **F10 — one authoritative export-asset contract.** `markdown-types.ts` still declared an unused `ExportAsset { filename, mimeType }` while the actual export pipeline uses `export-assets.ts`'s `ExportAsset { path, mediaType, data }`. The dead contradictory type is removed.
+
+### Reconciliation evidence
+
+- Product-source focused run `36332490614` / job `108656984010` selected
+  `markdown-workbench.spec.ts`, `markdown-workbench-ux.spec.ts`, and `markdown-mermaid.spec.ts`,
+  passed the production build, and passed **124/124** desktop/mobile Chromium cases.
+- Final acceptance revision `4607159234bc84653585c4a0906a212ea8574396` differs from the product
+  source revision only in Markdown test files. Its exact-final focused run `36332688014` /
+  job `108657533447` passed the production build and **54/54** desktop/mobile UX cases, including:
+  Copy HTML token classes; downloaded standalone HTML with token CSS; downloaded EPUB chapter +
+  packaged token stylesheet; oversized-fence plain-code fallback; and the earlier F01–F07 regressions.
+- Exact-final Pages run `36332688074` completed the repository unit step successfully, completed the
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
+- Direct reads at the final acceptance revision confirm `markdown-types.ts` no longer contains the
+  duplicate `ExportAsset` interface and `code-highlight.css` is present. No dependency changed.
+
+Current official Lezer documentation describes `classHighlighter` as the highlighter that emits stable
+predictable token classes for external CSS; CodeMirror's styling guidance uses static highlighting for
+non-editor HTML. The current implementation preserves main's newer lazy/cached language loader and
+integrates only the still-valid behavior from the historical branch.
+
+The historical branch `claude/markdown-tool-audit-docs-lwrb3w` has no open pull request and no
+remaining intended behavior absent from `main`; its unique commits are superseded implementation
+history and must not be merged wholesale. The connected GitHub capability does not expose branch/ref
+deletion, so the physical ref remains as non-authoritative history rather than as active or stranded
+work.
