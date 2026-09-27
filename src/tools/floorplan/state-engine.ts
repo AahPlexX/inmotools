@@ -42,6 +42,14 @@ export const commitProject = (
   return { past: nextPast, present: nextProject, future: [] };
 };
 
+/**
+ * Records an edit that was previewed live (such as a drag) as a single undo step:
+ * `before` is the project as it was when the gesture started.
+ */
+export const commitFrom = (history: ProjectHistory, label: string, before: FloorplanProject): ProjectHistory => (history.present === before
+  ? history
+  : { past: [...history.past, { label, project: before }].slice(-100), present: { ...history.present, updatedAt: stamp() }, future: [] });
+
 export const undoState = (history: ProjectHistory): ProjectHistory => {
   if (history.past.length === 0) return history;
   const snapshot = history.past[history.past.length - 1]!;
