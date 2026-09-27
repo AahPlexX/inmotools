@@ -1,11 +1,12 @@
 import JSZip from 'jszip';
 import { createNormalizedPoint } from './pitch-engine';
 import { TACTICS_SCHEMA_VERSION, validateTacticalProject } from './tactics-engine';
-import type {
-  ImportProvenance,
-  TacticalKeyframe,
-  TacticalProject,
-  TimelineTrack,
+import {
+  TIMELINE_MARKER_KINDS,
+  type ImportProvenance,
+  type TacticalKeyframe,
+  type TacticalProject,
+  type TimelineTrack,
 } from './tactics-types';
 
 const TACTICAL_PROJECT_TOOL_ID = 'inmotools-tactical-matchboard';
@@ -109,9 +110,49 @@ export function migrateTacticalProject(raw: unknown): TacticalProject {
   }
 
   if (schemaVersion === 1) {
+    const scenes = Array.isArray(source.scenes) ? source.scenes : [];
+    const firstScene = asRecord(scenes[0], 'Legacy tactical scene');
+    const sceneId = requireString(firstScene.id, 'Legacy scene id');
+    const layers = Array.isArray(firstScene.layers) ? firstScene.layers : [];
+    const firstLayer = asRecord(layers[0], 'Legacy tactical layer');
+    const layerId = requireString(firstLayer.id, 'Legacy layer id');
+
+    const withOwnership = (value: unknown, label: string): Record<string, unknown> => {
+      const item = asRecord(value, label);
+      return {
+        ...item,
+        sceneId: typeof item.sceneId === 'string' && item.sceneId ? item.sceneId : sceneId,
+        layerId: typeof item.layerId === 'string' && item.layerId ? item.layerId : layerId,
+      };
+    };
+
+    if (Array.isArray(source.playerTokens)) {
+      source.playerTokens = source.playerTokens.map((item, index) => withOwnership(item, 'Legacy player token ' + (index + 1)));
+    }
+    if (Array.isArray(source.officials)) {
+      source.officials = source.officials.map((item, index) => withOwnership(item, 'Legacy official ' + (index + 1)));
+    }
+    if (Array.isArray(source.equipment)) {
+      source.equipment = source.equipment.map((item, index) => withOwnership(item, 'Legacy equipment ' + (index + 1)));
+    }
+    if (Array.isArray(source.annotations)) {
+      source.annotations = source.annotations.map((item, index) => withOwnership(item, 'Legacy annotation ' + (index + 1)));
+    }
+
     const timeline = asRecord(source.timeline, 'Tactical project timeline');
+    const markers = Array.isArray(timeline.markers)
+      ? timeline.markers.map((value, index) => {
+          const marker = asRecord(value, 'Legacy timeline marker ' + (index + 1));
+          const rawKind = typeof marker.kind === 'string' ? marker.kind : '';
+          const kind = TIMELINE_MARKER_KINDS.includes(rawKind as (typeof TIMELINE_MARKER_KINDS)[number])
+            ? rawKind
+            : 'coaching-cue';
+          return { ...marker, kind };
+        })
+      : [];
     source.timeline = {
       ...timeline,
+      markers,
       possessionEvents: Array.isArray(timeline.possessionEvents) ? timeline.possessionEvents : [],
     };
     source.schemaVersion = 2;
