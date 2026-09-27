@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
+import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
 import { serializeTacticalBoardSvg } from './board-engine';
@@ -128,6 +129,7 @@ export default function TacticalMatchboardWorkspace() {
   const [morphPercent, setMorphPercent] = useState('50');
   const [activeSceneId, setActiveSceneId] = useState('scene-1');
   const [previewTimeMs, setPreviewTimeMs] = useState(0);
+  const [analysisSettings, setAnalysisSettings] = useState(DEFAULT_ANALYSIS_DISPLAY_SETTINGS);
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
 
   const project = history.present;
@@ -673,6 +675,14 @@ export default function TacticalMatchboardWorkspace() {
           onEdit={applyEdit}
         />
 
+        <TacticalAnalysisPanel
+          project={presentationProject}
+          sceneId={sceneId}
+          selectedTokenId={selectedTokenId}
+          settings={analysisSettings}
+          onSettingsChange={setAnalysisSettings}
+        />
+
         <div className="tactical-command-bar" aria-label="Board commands">
           <label className="tactical-arrow-label tactical-scene-picker">
             Scene view
@@ -722,6 +732,7 @@ export default function TacticalMatchboardWorkspace() {
             selectedTokenId={selectedTokenId}
             interactionMode={mode}
             arrowStart={arrowStart}
+            analysisSettings={analysisSettings}
             onSelectToken={(tokenId) => {
               setSelectedTokenId(tokenId);
               setStatus(`Selected ${tokenId}.`);
