@@ -64,3 +64,54 @@ describe('DSP engine analysis', () => {
     expect(Math.abs(resonances[0].frequency - 1000)).toBeLessThan(10);
   });
 });
+
+describe('DSP engine export render', () => {
+  const twoTracks = () => {
+    const engine = new MasteringDspEngine();
+    engine.loadSource('a', { sampleRate: 8, channels: [Float32Array.from([1, 1, 1, 1])] }, 8);
+    engine.loadSource('b', { sampleRate: 8, channels: [Float32Array.from([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]), Float32Array.from([-0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5])] }, 8);
+    let document = addSourceTracksRevision(createMasteringDocument(), [
+      { source: reference('a', 4), trackId: 't1', clipId: 'ca' },
+      { source: { ...reference('b', 8), channelCount: 2 }, trackId: 't2', clipId: 'cb' },
+    ]);
+    // Track 1 is muted and hard left; track 2 is soloed. Neither setting may leak into stems.
+    document = {
+      ...document,
+      tracks: [
+        { ...document.tracks[0], muted: true, pan: -1 },
+        { ...document.tracks[1], solo: true },
+      ],
+    };
+    engine.render(document);
+    return { engine, document };
+  };
+
+  it('copies the unprocessed mix over a range exactly', () => {
+    const { engine, document } = twoTracks();
+    const result = engine.renderExport(document, { master: null, startSeconds: 0.25, endSeconds: 0.75 });
+    expect(result.sampleRate).toBe(8);
+    expect(result.channels.map((channel) => Array.from(channel))).toEqual([[0.5, 0.5, 0.5, 0.5], [-0.5, -0.5, -0.5, -0.5]]);
+  });
+
+  it('renders a stem alone at full project length, ignoring mute and solo but keeping pan', () => {
+    const { engine, document } = twoTracks();
+    const stem = engine.renderExport(document, { master: null, trackId: 't1' });
+    expect(stem.channels.map((channel) => Array.from(channel))).toEqual([[1, 1, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]]);
+    expect(() => engine.renderExport(document, { master: null, trackId: 'gone' })).toThrow(/no longer in the project/);
+  });
+
+  it('converts to the requested rate and measures what will be written', () => {
+    const engine = new MasteringDspEngine();
+    const rate = 48_000;
+    const tone = Float32Array.from({ length: rate * 2 }, (_, n) => 0.25 * Math.sin(2 * Math.PI * 997 * n / rate));
+    engine.loadSource('a', { sampleRate: rate, channels: [tone] }, rate);
+    const document = addSourceTracksRevision(createMasteringDocument(), [{ source: { ...reference('a', rate * 2), sampleRate: rate }, trackId: 't', clipId: 'c' }]);
+    engine.render(document);
+    const same = engine.renderExport(document, { master: null });
+    const converted = engine.renderExport(document, { master: null, targetRate: 44_100 });
+    expect(converted.sampleRate).toBe(44_100);
+    expect(converted.channels[0]).toHaveLength(88_200);
+    expect(converted.loudness.integrated).toBeCloseTo(same.loudness.integrated, 1);
+    expect(() => engine.renderExport(document, { master: null, targetRate: 1000 })).toThrow(RangeError);
+  });
+});

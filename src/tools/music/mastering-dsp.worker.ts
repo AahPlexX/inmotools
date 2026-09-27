@@ -78,6 +78,11 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
         post({ type: 'masterResult', requestId: request.requestId, result }, result.channels.map((channel) => channel.buffer));
         break;
       }
+      case 'export': {
+        const result = engine.renderExport(request.document, request.request);
+        post({ type: 'exported', requestId: request.requestId, result }, result.channels.map((channel) => channel.buffer));
+        break;
+      }
       case 'spectrogram': {
         const spectrogram = engine.spectrogram();
         post({ type: 'spectrogramResult', requestId: request.requestId, spectrogram }, [spectrogram.data.buffer]);

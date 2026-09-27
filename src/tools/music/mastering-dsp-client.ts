@@ -6,7 +6,7 @@
  * `dispose` terminates the worker and rejects anything still waiting, which
  * releases the worker's source PCM when the workspace unmounts.
  */
-import type { MasterRenderResult, RenderResult } from './mastering-dsp-engine';
+import type { ExportRenderRequest, MasterRenderResult, RenderResult } from './mastering-dsp-engine';
 import type { MasterSettings } from './dsp/master-chain';
 import type { DspRequest, DspResponse } from './mastering-dsp-protocol';
 import type { MasteringDocument } from './mastering-project';
@@ -96,6 +96,11 @@ export class MasteringDspClient {
 
   async renderMaster(settings: MasterSettings, startSeconds?: number, endSeconds?: number): Promise<MasterRenderResult> {
     return MasteringDspClient.unwrap(await this.request({ type: 'master', settings, startSeconds, endSeconds }), 'masterResult').result;
+  }
+
+  /** Renders the mix or one stem for export; the returned channels are owned by the caller. */
+  async renderExport(document: MasteringDocument, request: ExportRenderRequest): Promise<MasterRenderResult> {
+    return MasteringDspClient.unwrap(await this.request({ type: 'export', document, request }), 'exported').result;
   }
 
   async spectrogram() {

@@ -128,13 +128,14 @@ export function mixChannelCount(materials: ReadonlyMap<string, PcmAudio>): 1 | 2
  *
  * @param document - The current document; clip placement, fades, gain, pan, mute, and solo are read from it.
  * @param materials - Rendered material per clip id (source with the clip's edits applied).
+ * @param channelCount - Output layout; defaults to stereo when any material is stereo. Stems pass
+ *   the full mix's layout so a mono track keeps the pan it has in the mix.
  * @returns The mixed timeline, one frame per project frame from 0 to the end of the last clip.
  * @throws {Error} when the project has no sample rate or a material's rate differs from it.
  */
-export function mixArrangement(document: MasteringDocument, materials: ReadonlyMap<string, PcmAudio>): PcmAudio {
+export function mixArrangement(document: MasteringDocument, materials: ReadonlyMap<string, PcmAudio>, channelCount: 1 | 2 = mixChannelCount(materials)): PcmAudio {
   const rate = document.sampleRate;
   if (!rate) throw new Error('The project has no audio yet.');
-  const channelCount = mixChannelCount(materials);
   let totalFrames = 0;
   for (const track of document.tracks) {
     for (const clip of track.clips) {

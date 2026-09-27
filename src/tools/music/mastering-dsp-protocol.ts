@@ -2,7 +2,7 @@
  * Message contract between the Mastering UI thread and its DSP worker.
  * Both sides import these types so a changed field fails the type check on both ends.
  */
-import type { MasterRenderResult, RenderResult } from './mastering-dsp-engine';
+import type { ExportRenderRequest, MasterRenderResult, RenderResult } from './mastering-dsp-engine';
 import type { MasterSettings } from './dsp/master-chain';
 import type { Resonance, Spectrum } from './dsp/analysis';
 import type { LoudnessReading } from './dsp/loudness';
@@ -19,6 +19,7 @@ export type DspRequest =
   | { type: 'spectrum'; requestId: number; startSeconds?: number; endSeconds?: number }
   | { type: 'master'; requestId: number; settings: MasterSettings; startSeconds?: number; endSeconds?: number }
   | { type: 'measureMix'; requestId: number }
+  | { type: 'export'; requestId: number; document: MasteringDocument; request: ExportRenderRequest }
   | { type: 'spectrogram'; requestId: number };
 
 export type DspResponse =
@@ -30,6 +31,7 @@ export type DspResponse =
   | { type: 'sliced'; requestId: number; startFrame: number; channels: Float32Array[] }
   | { type: 'spectrumResult'; requestId: number; spectrum: Spectrum; resonances: Resonance[] }
   | { type: 'masterResult'; requestId: number; result: MasterRenderResult }
+  | { type: 'exported'; requestId: number; result: MasterRenderResult }
   | { type: 'mixMeasured'; requestId: number; loudness: LoudnessReading }
   | { type: 'spectrogramResult'; requestId: number; spectrogram: Spectrogram }
   | { type: 'error'; requestId: number; message: string };

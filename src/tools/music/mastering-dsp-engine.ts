@@ -41,6 +41,24 @@ export interface MasterRenderResult {
   shortTermSeries: number[];
 }
 
+/** What {@link MasteringDspEngine.renderExport} renders (ledgers 26, 73–80). */
+export interface ExportRenderRequest {
+  /** Timeline range in project seconds; omitted bounds mean the project start or end. */
+  startSeconds?: number;
+  endSeconds?: number;
+  /** Master chain for the full mix, or null for the unprocessed mix. Ignored for stems. */
+  master: MasterSettings | null;
+  /**
+   * Renders one track alone as a stem: its gain, pan, fades, and clip mutes apply,
+   * project solo and the track's own mute do not, and the master chain is skipped
+   * because bus processing only means something on the full mix. Stems cover the
+   * full project length so every stem lines up at zero when imported together.
+   */
+  trackId?: string;
+  /** Output sample rate; converted after processing. Omitted keeps the project rate. */
+  targetRate?: number;
+}
+
 export class MasteringDspEngine {
   private readonly sources = new Map<string, PcmAudio>();
   private readonly cache = new MaterialCache();
@@ -141,6 +159,62 @@ export class MasteringDspEngine {
       meter.process(channels.map((channel) => channel.subarray(offset, offset + size)), size);
     }
     return { channels, sampleRate: mix.sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+  }
+
+  /**
+   * Renders audio for export: the mix (mastered or not) or one track's stem,
+   * over a range, at the requested rate, with a loudness reading of exactly
+   * the samples that will be written. Uses the mix from the last {@link render},
+   * so the caller renders the current document first.
+   * @throws {Error} when nothing is rendered yet, the track is unknown, or a clip's audio is missing.
+   */
+  renderExport(document: MasteringDocument, request: ExportRenderRequest): MasterRenderResult {
+    const { mix, start, end } = this.mixRange(request.startSeconds, request.endSeconds);
+    let channels: Float32Array[];
+    if (request.trackId) {
+      const stem = this.renderStem(document, request.trackId, mix);
+      channels = stem.map((channel) => channel.slice(start, end));
+    } else if (request.master) {
+      channels = renderMaster(mix.channels.map((channel) => channel.subarray(start, end)), mix.sampleRate, request.master);
+    } else {
+      channels = mix.channels.map((channel) => channel.slice(start, end));
+    }
+    let sampleRate = mix.sampleRate;
+    const target = request.targetRate;
+    if (target !== undefined && target !== sampleRate) {
+      if (!Number.isFinite(target) || target < 8000 || target > 384_000) throw new RangeError('Export sample rates run from 8,000 to 384,000 Hz.');
+      channels = resamplePcm({ sampleRate, channels }, target).channels;
+      sampleRate = target;
+    }
+    const meter = new LoudnessMeter(sampleRate, channels.length);
+    const block = 8192;
+    for (let offset = 0; offset < channels[0].length; offset += block) {
+      const size = Math.min(block, channels[0].length - offset);
+      meter.process(channels.map((channel) => channel.subarray(offset, offset + size)), size);
+    }
+    return { channels, sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+  }
+
+  /** One track mixed alone, padded to the mix length and channel count. */
+  private renderStem(document: MasteringDocument, trackId: string, mix: PcmAudio): Float32Array[] {
+    const track = document.tracks.find((candidate) => candidate.id === trackId);
+    if (!track) throw new Error('That track is no longer in the project.');
+    const materials = new Map<string, PcmAudio>();
+    for (const clip of track.clips) {
+      const material = this.clipMaterial(document, clip.id);
+      if (!material) throw new Error(`The audio for ${clip.name} is not loaded. Open the original file again to relink it.`);
+      materials.set(clip.id, material);
+    }
+    const length = mix.channels[0].length;
+    const output = mix.channels.map(() => new Float32Array(length));
+    if (!materials.size) return output;
+    const alone: MasteringDocument = {
+      ...document,
+      tracks: [{ ...track, muted: false, solo: false, clips: track.clips.map((clip) => ({ ...clip, solo: false })) }],
+    };
+    const stem = mixArrangement(alone, materials, output.length === 2 ? 2 : 1);
+    output.forEach((channel, index) => channel.set(stem.channels[index].subarray(0, Math.min(length, stem.channels[index].length))));
+    return output;
   }
 
   /** Spectrogram of the whole mix (ledger 6). */
