@@ -188,7 +188,9 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
           ) : null}
           <div className="tactical-inline-actions">
             <button type="button" onClick={() => void vault.saveProject(project).then(refresh).then(() => onStatus('Project saved to this browser.')).catch((error) => onStatus(message(error)))}>Save to device</button>
-            <button type="button" disabled={!recovery} onClick={() => recovery && void restore(recovery)}>Restore latest autosave</button>
+            {recoveryChecked && recovery && !autosaveEnabled ? null : (
+              <button type="button" disabled={!recovery} onClick={() => recovery && void restore(recovery)}>Restore latest autosave</button>
+            )}
           </div>
           <form onSubmit={(event) => void createSnapshot(event)}>
             <label>Snapshot label<input name="snapshotLabel" required maxLength={80} /></label>
