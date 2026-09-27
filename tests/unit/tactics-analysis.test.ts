@@ -11,6 +11,11 @@ import {
   measureTrajectory,
   sampleAuthoredTrajectory,
 } from '../../src/tools/tactics/analysis-engine';
+import {
+  DEFAULT_ANALYSIS_DISPLAY_SETTINGS,
+  deriveTacticalAnalysis,
+} from '../../src/tools/tactics/TacticalAnalysisPanel';
+import { buildBeginnerTacticalProject } from '../../src/tools/tactics/workspace-engine';
 import type { PitchDimensions, TimelineTrack } from '../../src/tools/tactics/tactics-types';
 
 const pitch: PitchDimensions = { lengthMeters: 100, widthMeters: 50 };
@@ -130,5 +135,66 @@ describe('Tactical spatial analysis', () => {
     expect(metrics.durationMs).toBe(3000);
     expect(metrics.averageSpeedMetersPerSecond).toBeCloseTo(20 / 3, 8);
     expect(metrics.maxSegmentSpeedMetersPerSecond).toBeCloseTo(10, 8);
+  });
+  it('keeps the selected goalkeeper active when goalkeepers are excluded from team geometry', () => {
+    const project = buildBeginnerTacticalProject({
+      title: 'Analysis board',
+      teamName: 'Team',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const settings = {
+      ...DEFAULT_ANALYSIS_DISPLAY_SETTINGS,
+      voronoi: true,
+      distanceRing: true,
+      includeGoalkeepers: false,
+    };
+
+    const view = deriveTacticalAnalysis(project, 'scene-1', 'token-1', settings);
+
+    expect(view.selectedToken?.id).toBe('token-1');
+    expect(view.voronoi).toHaveLength(3);
+    expect(view.ring?.center).toEqual(project.playerTokens.find((token) => token.id === 'token-1')?.position);
+  });
+
+  it('measures selected authored trajectory only across its authored keyframe span', () => {
+    const base = buildBeginnerTacticalProject({
+      title: 'Analysis board',
+      teamName: 'Team',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-4v4-1-2-1',
+      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      direction: 'left-to-right',
+    });
+    const start = base.playerTokens.find((token) => token.id === 'token-1')!.position;
+    const project = {
+      ...base,
+      timeline: {
+        ...base.timeline,
+        durationMs: 10_000,
+        tracks: [{
+          id: 'track-token-1',
+          targetId: 'token-1',
+          keyframes: [
+            { id: 'start', timeMs: 0, position: start, interpolation: 'linear' as const },
+            { id: 'finish', timeMs: 1000, position: { x: 0.8, y: 0.2 }, interpolation: 'hold' as const },
+          ],
+        }],
+      },
+    };
+
+    const view = deriveTacticalAnalysis(
+      project,
+      'scene-1',
+      'token-1',
+      { ...DEFAULT_ANALYSIS_DISPLAY_SETTINGS, heatMap: true, trajectoryStepMs: 250 },
+    );
+
+    expect(view.trajectoryMetrics?.durationMs).toBe(1000);
+    expect(view.heatMap?.totalSamples).toBe(5);
   });
 });
