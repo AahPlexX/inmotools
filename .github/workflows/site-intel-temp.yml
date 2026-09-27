@@ -24,7 +24,7 @@ jobs:
       - name: Site Intelligence unit tests
         run: pnpm exec vitest run tests/unit/site-intel*.test.ts
       - name: Production build
-        run: pnpm prepare:pyodide && pnpm prepare:libarchive && pnpm build
+        run: pnpm build
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Site Intelligence browser tests
