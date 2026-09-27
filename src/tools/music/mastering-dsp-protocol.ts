@@ -10,7 +10,8 @@ export type DspRequest =
   | { type: 'releaseSource'; requestId: number; sourceId: string }
   | { type: 'releaseAll'; requestId: number }
   | { type: 'render'; requestId: number; document: MasteringDocument }
-  | { type: 'snap'; requestId: number; document: MasteringDocument; clipId: string; seconds: number[]; radius?: number };
+  | { type: 'snap'; requestId: number; document: MasteringDocument; clipId: string; seconds: number[]; radius?: number }
+  | { type: 'slice'; requestId: number; document: MasteringDocument; clipId: string; startFrame: number; frameCount: number };
 
 export type DspResponse =
   | { type: 'sourceLoaded'; requestId: number; frameCount: number; channelCount: number }
@@ -18,4 +19,5 @@ export type DspResponse =
   | { type: 'rendered'; requestId: number; result: RenderResult }
   | { type: 'superseded'; requestId: number }
   | { type: 'snapped'; requestId: number; seconds: number[] }
+  | { type: 'sliced'; requestId: number; startFrame: number; channels: Float32Array[] }
   | { type: 'error'; requestId: number; message: string };

@@ -64,6 +64,11 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
       case 'snap':
         post({ type: 'snapped', requestId: request.requestId, seconds: engine.snapToZeroCrossings(request.document, request.clipId, request.seconds, request.radius) });
         break;
+      case 'slice': {
+        const slice = engine.clipSlice(request.document, request.clipId, request.startFrame, request.frameCount);
+        post({ type: 'sliced', requestId: request.requestId, ...slice }, slice.channels.map((channel) => channel.buffer));
+        break;
+      }
     }
   } catch (error) {
     post({ type: 'error', requestId: request.requestId, message: errorText(error) });

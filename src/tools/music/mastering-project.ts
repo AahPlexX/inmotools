@@ -594,24 +594,56 @@ export function insertSilenceRevision(document: MasteringDocument, atSeconds: nu
 }
 
 /** Edits whose `startSeconds`/`endSeconds` are timeline ranges that must be mapped into clip time. */
-const RANGE_EDIT_TYPES = new Set<AudioEdit['type']>(['reverse']);
+const RANGE_EDIT_TYPES = new Set<AudioEdit['type']>(['reverse', 'roomTone']);
 
 /**
  * Appends a length-preserving edit to the active clip. Range edits are given in
  * timeline seconds and mapped into the clip; ranges outside the clip or shorter
- * than one frame are rejected by returning an unchanged document.
+ * than one frame are rejected by returning an unchanged document. Room-tone
+ * edits map their capture range the same way.
  */
 export function appendAudioEditRevision(document: MasteringDocument, edit: AudioEdit): MasteringDocument {
   const context = activeContext(document);
   if (!context) return cloneDocument(document);
+  if (edit.type === 'timeStretch') return stretchClipRevision(document, edit.ratio);
   let normalized: AudioEdit = structuredEditClone(edit);
   if (RANGE_EDIT_TYPES.has(edit.type) && 'startSeconds' in edit && 'endSeconds' in edit) {
     const range = localRange(context, edit);
     if (range.endSeconds <= range.startSeconds) return cloneDocument(document);
     normalized = { ...normalized, startSeconds: range.startSeconds, endSeconds: range.endSeconds } as AudioEdit;
   }
+  if (normalized.type === 'roomTone') {
+    const capture = localRange(context, { startSeconds: normalized.captureStartSeconds, endSeconds: normalized.captureEndSeconds });
+    if (capture.endSeconds <= capture.startSeconds) return cloneDocument(document);
+    normalized = { ...normalized, captureStartSeconds: capture.startSeconds, captureEndSeconds: capture.endSeconds };
+  }
   context.clip.edits.push(normalized);
   return context.next;
+}
+
+/**
+ * Time-stretches the active clip by `ratio` (ledger 29). Later clips on the
+ * track ripple by the length change; markers, regions, selection, and playhead
+ * inside the clip scale with it, and later ones shift.
+ */
+export function stretchClipRevision(document: MasteringDocument, ratio: number): MasteringDocument {
+  const context = activeContext(document);
+  if (!context || !Number.isFinite(ratio) || ratio <= 0 || Math.abs(ratio - 1) < 1e-9) return cloneDocument(document);
+  const { next, clip, start, duration } = context;
+  const oldEnd = frameTime(next, start + duration);
+  clip.edits.push({ type: 'timeStretch', ratio });
+  const newDuration = clipDurationSeconds(next, clip);
+  if (newDuration <= 0) return cloneDocument(document);
+  const delta = newDuration - duration;
+  const scale = newDuration / duration;
+  clip.fadeIn = { ...clip.fadeIn, durationSeconds: frameTime(next, clip.fadeIn.durationSeconds * scale) };
+  clip.fadeOut = { ...clip.fadeOut, durationSeconds: frameTime(next, Math.min(clip.fadeOut.durationSeconds * scale, newDuration - clip.fadeIn.durationSeconds)) };
+  rippleTrack(context, oldEnd, delta);
+  const mapTime = (seconds: number) => seconds <= start ? seconds : seconds >= oldEnd ? frameTime(next, seconds + delta) : frameTime(next, start + (seconds - start) * scale);
+  remapAnnotations(next, mapTime, () => true);
+  next.selection = { startSeconds: mapTime(frameTime(next, document.selection.startSeconds)), endSeconds: mapTime(frameTime(next, document.selection.endSeconds)) };
+  next.playhead = mapTime(frameTime(next, document.playhead));
+  return next;
 }
 
 /** Clears the active clip's edits, restoring it to its source while keeping placement. */

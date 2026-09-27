@@ -147,8 +147,9 @@ test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', a
   await expect(page.getByRole('button', { name: /drums\.wav on Track 1/ })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByRole('button', { name: /keys\.wav on Track 2/ }).click();
-  await expect(page.getByRole('heading', { name: 'Selected clip: keys.wav' })).toBeVisible();
   await expect(page.getByText('Converted to the project rate of 48,000 Hz', { exact: false })).toBeVisible();
+  await page.getByRole('tab', { name: 'Arrange' }).click();
+  await expect(page.getByRole('heading', { name: 'Selected clip: keys.wav' })).toBeVisible();
   await page.getByRole('button', { name: /drums\.wav on Track 1/ }).click();
 
   await page.getByLabel('Track 2 name').fill('Keys');
@@ -190,4 +191,71 @@ test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', a
   await page.getByRole('button', { name: 'New project' }).click();
   await page.getByRole('button', { name: 'Confirm new project' }).click();
   await expect(page.getByText('Add audio', { exact: true })).toBeVisible();
+});
+
+test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and the sample pen', async ({ page }) => {
+  await page.goto('./#/tools/midi-harmony-lab');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 200) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded voice\.wav/);
+  const editTab = page.getByRole('tab', { name: 'Edit', exact: true });
+  await expect(editTab).toHaveAttribute('aria-selected', 'true');
+  await editTab.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Arrange' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Arrange' })).toBeFocused();
+  await page.getByRole('tab', { name: 'Arrange' }).press('ArrowLeft');
+  await expect(editTab).toHaveAttribute('aria-selected', 'true');
+
+  await page.getByLabel('Target (LUFS)').fill('-20');
+  await page.getByRole('button', { name: 'Normalize level' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Normalized to -20\.0 LUFS/);
+  await page.getByLabel('Reduce to').selectOption('8');
+  await page.getByRole('button', { name: 'Apply bit depth' }).click();
+  await expect(page.getByLabel('Clip edits')).toHaveText('2');
+
+  await page.getByRole('tab', { name: 'Time & pitch' }).click();
+  await page.getByLabel('New length (% of current, 25–400)').fill('150');
+  await expect(page.getByText(/voice\.wav: 0:02\.000 → 0:03\.000/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply time stretch' }).click();
+  await expect(page.getByLabel('Visible range')).toHaveText(/0:03\.000$/, { timeout: 20_000 });
+  await page.getByLabel('Semitones (−24 to 24)').fill('3');
+  await page.getByRole('button', { name: 'Apply pitch shift' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Shifted pitch by 3 semitones with formants preserved/);
+  await expect(page.locator('.mastering-busy')).toHaveCount(0, { timeout: 30_000 });
+
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Selection start (seconds)').fill('0.1');
+  await page.getByLabel('Selection end (seconds)').fill('0.8');
+  await page.getByRole('tab', { name: 'Repair' }).click();
+  await page.getByRole('button', { name: 'Capture selection as room tone' }).click();
+  await expect(page.getByText(/0:00\.100–0:00\.800 \(0\.70 s\)/)).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Selection start (seconds)').fill('1.5');
+  await page.getByLabel('Selection end (seconds)').fill('2');
+  await page.getByRole('tab', { name: 'Repair' }).click();
+  await page.getByRole('button', { name: 'Fill selection with room tone' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Filled 0:01\.500–0:02\.000 with room tone/);
+
+  await page.getByLabel('Sample number in clip').fill('100');
+  await page.getByLabel('New value (−1 to 1)').fill('0.25');
+  await page.getByRole('button', { name: 'Set sample' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Set sample 100 on channel 1 to 0\.25/);
+  const pen = page.locator('.mastering-pen-canvas');
+  await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
+  await pen.scrollIntoViewIfNeeded();
+  const box = await pen.boundingBox();
+  if (!box) throw new Error('pen canvas missing');
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.6, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.locator('.status-line')).toContainText(/Redrew \d+ samples with the pen/);
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Selection start (seconds)').fill('1');
+  await page.getByLabel('Selection end (seconds)').fill('1.001');
+  await page.getByRole('tab', { name: 'Repair' }).click();
+  await page.getByRole('button', { name: 'Interpolate selected samples' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Rebuilt 48 samples/);
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Clip edits')).toHaveText('8');
 });

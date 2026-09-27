@@ -38,6 +38,8 @@ Research for this plan (fetched 2026-09-27): ITU-R BS.1770-5 PDF (K-weighting Ta
 | S10 Durable workflow | 18, 81 | IndexedDB autosave, backup, presets, diagnostics, commands |
 | S11 Acceptance | all | Responsive, keyboard, axe, copy, browser workflow, integration |
 
+UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master, Meters, Export, and Project tabs are added by S6/S7/S9/S10. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
+
 ## Function status
 
 Status values: **done** (implemented, reachable in the UI, tested), **partial** (what is missing is stated), **open**.
@@ -62,30 +64,30 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 16 | Track/clip gain, pan, mute, solo | done | S1: track and clip gain/pan/mute/solo in mixer and UI |
 | 17 | Undo/redo across operations | done | Must stay atomic as new operations land |
 | 18 | Autosave/recovery | open | S10 |
-| 19 | Sample-pen redraw | open | S4 |
+| 19 | Sample-pen redraw | done | S4: `MasteringSamplePen` draw + numeric set + cubic interpolate; `samplePatch` edit |
 | 20 | DC measure/remove | done | Phase 2 |
 | 21 | Polarity | done | Phase 2 |
 | 22 | Channel utilities | done | Phase 2 |
 | 23 | Peak normalize | done | Phase 2 (target field added in S4) |
-| 24 | RMS/loudness normalize | open | S4 |
+| 24 | RMS/loudness normalize | done | S4: `normalizeLevel` edit (BS.1770-5 integrated or RMS) |
 | 25 | Reverse | done | Phase 2 |
-| 26 | Sample-rate conversion | open | S3/S4 |
-| 27 | Bit depth + TPDF dither | open | S4 |
-| 28 | Pitch shift + formant | open | S4 |
-| 29 | Time stretch 25–400% | open | S4 |
-| 30 | Duration/BPM target | open | S4 |
+| 26 | Sample-rate conversion | partial | Resampler done (S1, import); explicit export target rate lands in S9 |
+| 27 | Bit depth + TPDF dither | done | S4: `quantize` edit with seeded TPDF; export depth reuses it in S9 |
+| 28 | Pitch shift + formant | done | S4: phase vocoder + resample, cepstral formant preservation |
+| 29 | Time stretch 25–400% | done | S4: identity-phase-locked vocoder, mid/side for stereo; ripple + annotation scaling |
+| 30 | Duration/BPM target | done | S4: duration and tempo modes resolve to the same stretch ratio |
 | 31 | Exact silence insertion | done | Phase 2 |
-| 32 | Room-tone fill | open | S4 |
+| 32 | Room-tone fill | done | S4: capture + sine-window grain fill, 10 ms equal-power edges |
 | 33–44 | Restoration and spectral repair | open | S5 |
 | 45–59 | EQ, dynamics, colour, stereo | open | S6 |
 | 60–64 | Monitoring and meters | open | S7 |
-| 65–67 | Loudness, true peak, peak/RMS/crest | open | S3 kernels, S7 UI |
+| 65–67 | Loudness, true peak, peak/RMS/crest | partial | S3 kernels done and conformance-tested (EBU Tech 3341 cases 1–6, 9, 10, 12, 13, 15–23; Tech 3342 cases 1–4); UI in S7 |
 | 68–71 | A/B, matched A/B, delta, reference | open | S7 |
 | 72 | Offline master render | open | S6 |
 | 73–80 | Export formats, metadata, artwork, batch | open | S9 |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 22/81 done** (2026-09-27, after S1/S2: units 53/53 mastering, browser mastering + music 14/14 desktop/mobile).
+**Count: 29/81 done** (2026-09-27, after S4: mastering units 75/75; mastering + music browser specs 16/16 desktop/mobile).
 
 ## Rules for whoever continues
 

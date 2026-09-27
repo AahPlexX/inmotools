@@ -78,6 +78,12 @@ export class MasteringDspClient {
     return MasteringDspClient.unwrap(await this.request({ type: 'snap', document, clipId, seconds, radius }), 'snapped').seconds;
   }
 
+  /** Copies up to `frameCount` frames of a clip's rendered material, starting at a clip-local frame. */
+  async slice(document: MasteringDocument, clipId: string, startFrame: number, frameCount: number) {
+    const response = MasteringDspClient.unwrap(await this.request({ type: 'slice', document, clipId, startFrame, frameCount }), 'sliced');
+    return { startFrame: response.startFrame, channels: response.channels };
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;

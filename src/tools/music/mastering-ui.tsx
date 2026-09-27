@@ -7,6 +7,10 @@
  * blur; Escape restores the committed value.
  */
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import type { AudioEdit, TimeSelection } from './mastering-engine';
+import type { MasteringClip, MasteringDocument } from './mastering-project';
+import type { ClipRenderInfo, RenderResult } from './mastering-dsp-engine';
+import type { MasteringDspClient } from './mastering-dsp-client';
 
 export const messageOf = (error: unknown) => error instanceof Error ? error.message : String(error || 'unknown error');
 
@@ -69,3 +73,35 @@ export function CommitNumberField({ label, value, onCommit, min, max, step = 0.1
     {hint && <small id={`${id}-hint`}>{hint}</small>}
   </div>;
 }
+
+// --- SECTION: shared panel context ---
+
+
+/**
+ * What every workbench tab receives from the workspace. Tabs read the current
+ * document and return revisions through `commit`/`applyEdit`, which stop
+ * playback and create exactly one undo step each.
+ */
+export interface MasteringPanelContext {
+  document: MasteringDocument;
+  /** Reads the newest document; use after an `await` so async work never commits against a stale revision. */
+  latestDocument: () => MasteringDocument;
+  clip: MasteringClip | null;
+  clipInfo: ClipRenderInfo | undefined;
+  clipStart: number;
+  clipEnd: number;
+  duration: number;
+  playhead: number;
+  selection: TimeSelection;
+  render: RenderResult | null;
+  canEdit: boolean;
+  client: MasteringDspClient | null;
+  commit: (next: MasteringDocument, status: string) => void;
+  applyEdit: (edit: AudioEdit, status: string) => void;
+  setStatus: (status: string) => void;
+  updateView: (patch: Partial<Pick<MasteringDocument, 'selection' | 'playhead' | 'activeClipId'>>) => void;
+  seek: (seconds: number) => void;
+}
+
+/** A random 31-bit seed stored in edits that use randomness, so replay is deterministic. */
+export const newSeed = () => Math.floor(Math.random() * 0x7fffffff) + 1;

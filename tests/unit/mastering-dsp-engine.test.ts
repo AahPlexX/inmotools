@@ -38,5 +38,7 @@ describe('DSP engine', () => {
     engine.loadSource('a', { sampleRate: 8, channels: [Float32Array.from([0.4, 0.3, 0.2, 0.1, -0.1, -0.2, -0.3, -0.4])] }, 8);
     const document = moveClipRevision(addSourceTracksRevision(createMasteringDocument(), [{ source: reference('a', 8), trackId: 't', clipId: 'c' }]), 'c', 1);
     expect(engine.snapToZeroCrossings(document, 'c', [1 + 2 / 8, 0.5, 5])).toEqual([1 + 4 / 8, 0.5, 5]);
+    expect(engine.clipSlice(document, 'c', 6, 4)).toEqual({ startFrame: 4, channels: [Float32Array.from([-0.1, -0.2, -0.3, -0.4])] });
+    expect(() => engine.clipSlice(document, 'missing', 0, 1)).toThrow(/not loaded/);
   });
 });

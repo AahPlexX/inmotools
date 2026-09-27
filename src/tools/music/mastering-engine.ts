@@ -1,3 +1,6 @@
+import { fillRoomTone, normalizeLevel, patchSamples, quantizePcm, type DitherMode, type LevelMeasure } from './dsp/processors';
+import { pitchShift, stretchedLength, timeStretch } from './dsp/stretch';
+
 export interface PcmAudio {
   sampleRate: number;
   channels: Float32Array[];
@@ -262,7 +265,13 @@ export type AudioEdit =
   | { type: 'swapStereo' }
   | { type: 'foldDownMono' }
   | { type: 'extractChannel'; channelIndex: number }
-  | { type: 'dualMono'; channelIndex: number };
+  | { type: 'dualMono'; channelIndex: number }
+  | { type: 'normalizeLevel'; measure: LevelMeasure; target: number }
+  | { type: 'quantize'; bits: number; dither: DitherMode; seed: number }
+  | { type: 'samplePatch'; startFrame: number; values: number[][] }
+  | { type: 'roomTone'; captureStartSeconds: number; captureEndSeconds: number; startSeconds: number; endSeconds: number; seed: number }
+  | { type: 'timeStretch'; ratio: number }
+  | { type: 'pitchShift'; semitones: number; cents: number; preserveFormants: boolean };
 
 export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAudio {
   let current: PcmAudio = { sampleRate: source.sampleRate, channels: source.channels.map((channel) => channel.slice()) };
@@ -280,6 +289,12 @@ export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAu
       case 'foldDownMono': current = foldDownMono(current); break;
       case 'extractChannel': current = extractChannel(current, edit.channelIndex); break;
       case 'dualMono': current = dualMonoFromChannel(current, edit.channelIndex); break;
+      case 'normalizeLevel': current = normalizeLevel(current, edit.measure, edit.target); break;
+      case 'quantize': current = quantizePcm(current, edit.bits, edit.dither, edit.seed); break;
+      case 'samplePatch': current = patchSamples(current, edit.startFrame, edit.values); break;
+      case 'roomTone': current = fillRoomTone(current, edit.captureStartSeconds, edit.captureEndSeconds, edit.startSeconds, edit.endSeconds, edit.seed); break;
+      case 'timeStretch': current = timeStretch(current, edit.ratio); break;
+      case 'pitchShift': current = pitchShift(current, edit.semitones, edit.cents, edit.preserveFormants); break;
     }
   }
   return current;
@@ -313,6 +328,8 @@ export function estimateEditedFrameCount(sourceFrames: number, sampleRate: numbe
       length -= Math.abs(second - first);
     } else if (edit.type === 'insertSilence') {
       length += Math.max(0, Math.round(finite(edit.durationSeconds) * sampleRate));
+    } else if (edit.type === 'timeStretch') {
+      length = stretchedLength(length, edit.ratio);
     }
   }
   return length;

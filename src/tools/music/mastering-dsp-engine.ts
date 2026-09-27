@@ -96,6 +96,20 @@ export class MasteringDspEngine {
   }
 
   /**
+   * Copies part of a clip's material for the sample pen. The start is clamped
+   * so the slice stays inside the clip; the actual start is returned.
+   * @throws {Error} when the clip or its source is missing.
+   */
+  clipSlice(document: MasteringDocument, clipId: string, startFrame: number, frameCount: number): { startFrame: number; channels: Float32Array[] } {
+    const material = this.clipMaterial(document, clipId);
+    if (!material) throw new Error('The selected clip is not loaded.');
+    const length = material.channels[0]?.length ?? 0;
+    const count = Math.max(0, Math.min(length, Math.trunc(frameCount)));
+    const start = Math.max(0, Math.min(length - count, Math.trunc(startFrame)));
+    return { startFrame: start, channels: material.channels.map((channel) => channel.slice(start, start + count)) };
+  }
+
+  /**
    * Moves timeline times to the nearest zero crossing inside a clip's material
    * (first channel), searching `radius` frames either side (ledger 12).
    */
