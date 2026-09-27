@@ -329,12 +329,23 @@ export interface EncodeOptions {
 export async function encodeCompressed(channels: readonly Float32Array[], sampleRate: number, options: EncodeOptions): Promise<{ bytes: Uint8Array; mimeType: string; codec: string }> {
   const mediabunny = await import('mediabunny');
   const codec = options.format === 'mp3' ? 'mp3' : options.format === 'flac' ? 'flac' : options.format === 'm4a' ? 'aac' : null;
+  const quality = options.format === 'flac'
+    ? undefined
+    : new mediabunny.Quality({ bitrate: options.bitrateKbps * 1000, bitrateMode: 'constant' });
+  const encodingConfig = { numberOfChannels: channels.length, sampleRate, ...(quality ? { quality } : {}) };
   let audioCodec: import('mediabunny').AudioCodec;
   if (codec) {
     await ensureEncoder(codec);
+    if (!await mediabunny.canEncodeAudio(codec, encodingConfig)) {
+      throw new Error(`The ${codec.toUpperCase()} encoder cannot encode ${channels.length} channel${channels.length === 1 ? '' : 's'} at ${sampleRate.toLocaleString()} Hz with the selected quality.`);
+    }
     audioCodec = codec;
+  } else if (await mediabunny.canEncodeAudio('opus', encodingConfig)) {
+    audioCodec = 'opus';
+  } else if (await mediabunny.canEncodeAudio('vorbis', encodingConfig)) {
+    audioCodec = 'vorbis';
   } else {
-    audioCodec = await mediabunny.canEncodeAudio('opus', { numberOfChannels: channels.length, sampleRate }) ? 'opus' : 'vorbis';
+    throw new Error(`No Ogg encoder can encode ${channels.length} channel${channels.length === 1 ? '' : 's'} at ${sampleRate.toLocaleString()} Hz with the selected quality.`);
   }
   const format = options.format === 'mp3' ? new mediabunny.Mp3OutputFormat()
     : options.format === 'flac' ? new mediabunny.FlacOutputFormat()
@@ -344,7 +355,7 @@ export async function encodeCompressed(channels: readonly Float32Array[], sample
   const output = new mediabunny.Output({ format, target });
   const source = new mediabunny.AudioSampleSource({
     codec: audioCodec,
-    ...(options.format === 'flac' ? {} : { quality: new mediabunny.Quality({ bitrate: options.bitrateKbps * 1000, bitrateMode: 'constant' }) }),
+    ...(quality ? { quality } : {}),
   });
   output.addAudioTrack(source);
   output.setMetadataTags(buildMetadataTags(options.metadata, options.artwork, options.format));
