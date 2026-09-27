@@ -29,10 +29,17 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
   const vault = useMemo(() => new TacticalProjectVault(), []);
   const [snapshots, setSnapshots] = useState<TacticalSnapshotRecord[]>([]);
   const [recovery, setRecovery] = useState<TacticalSnapshotRecord>();
+  const [savedProjects, setSavedProjects] = useState<TacticalProject[]>([]);
 
   const refresh = useCallback(async () => {
-    setSnapshots(await vault.listNamedSnapshots(project.id));
-    setRecovery(await vault.getLatestRecovery(project.id));
+    const [nextSnapshots, nextRecovery, nextProjects] = await Promise.all([
+      vault.listNamedSnapshots(project.id),
+      vault.getLatestRecovery(project.id),
+      vault.listProjects(),
+    ]);
+    setSnapshots(nextSnapshots);
+    setRecovery(nextRecovery);
+    setSavedProjects(nextProjects);
   }, [project.id, vault]);
 
   useEffect(() => { void refresh().catch((error) => onStatus(message(error))); }, [onStatus, refresh]);
@@ -67,6 +74,22 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
       const restored = await vault.restoreSnapshot(snapshot.id);
       if (!restored) throw new Error('The selected snapshot is no longer available.');
       onReplaceProject(restored, 'Restored snapshot ' + snapshot.label + '.');
+    } catch (error) { onStatus(message(error)); }
+  }
+
+  async function loadSavedProject(projectId: string) {
+    try {
+      const stored = await vault.getProject(projectId);
+      if (!stored) throw new Error('The saved project is no longer available.');
+      onReplaceProject(stored, 'Loaded ' + stored.metadata.title + ' from this browser.');
+    } catch (error) { onStatus(message(error)); }
+  }
+
+  async function removeSavedProject(projectId: string) {
+    try {
+      await vault.deleteProject(projectId);
+      await refresh();
+      onStatus('Saved project and its snapshots removed from this browser.');
     } catch (error) { onStatus(message(error)); }
   }
 
@@ -145,6 +168,18 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
                 <button type="button" aria-label={'Restore snapshot ' + snapshot.label} onClick={() => void restore(snapshot)}>Restore</button>
               </div>
             )) : <p>No named snapshots yet.</p>}
+          </div>
+
+          <div className="tactical-vault-list" aria-label="Saved projects">
+            {savedProjects.length ? savedProjects.map((saved) => (
+              <div key={saved.id} className="tactical-vault-row">
+                <span>{saved.metadata.title}</span>
+                <div className="tactical-inline-actions">
+                  <button type="button" aria-label={'Load saved project ' + saved.metadata.title} onClick={() => void loadSavedProject(saved.id)}>Load</button>
+                  <button type="button" className="secondary" aria-label={'Remove saved project ' + saved.metadata.title} onClick={() => void removeSavedProject(saved.id)}>Remove saved copy</button>
+                </div>
+              </div>
+            )) : <p>No saved projects yet.</p>}
           </div>
         </section>
 
