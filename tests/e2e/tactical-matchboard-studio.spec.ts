@@ -654,3 +654,80 @@ test('derives occupancy and speed metrics only from authored trajectory samples'
   await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/average speed.*m\/s/i);
   await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/duration 1000 ms/i);
 });
+
+
+test('edits a coaching session and restores a named local snapshot', async ({ page }) => {
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+
+  await page.getByLabel('Session objective').fill('Create width and scan before receiving');
+  await page.getByLabel('Session duration (minutes)').fill('25');
+  await page.getByLabel('Coaching cues').fill('Scan first\nOpen body\nPlay forward');
+  await page.getByRole('button', { name: 'Save session plan' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Session plan updated');
+
+  const beforeX = Number(await coordinateInput(page, 'X').inputValue());
+  await page.getByLabel('Snapshot label').fill('Before movement');
+  await page.getByRole('button', { name: 'Create snapshot' }).click();
+  await expect(page.getByText('Before movement', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeGreaterThan(beforeX);
+
+  await page.getByRole('button', { name: 'Restore snapshot Before movement' }).click();
+  await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(beforeX, 1);
+  await expect(page.getByLabel('Session objective')).toHaveValue('Create width and scan before receiving');
+
+  await expect(page.getByRole('button', { name: 'Restore latest autosave' })).toBeEnabled();
+  await expect(page.getByText(/stored only in this browser/i)).toBeVisible();
+});
+
+test('round-trips a project ZIP and preserves the open project after corrupt JSON import', async ({ page }) => {
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+
+  const originalTitle = await setupPanel(page).getByLabel('Project title').inputValue();
+  const zipPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export project ZIP' }).click();
+  const zipDownload = await zipPromise;
+  const zipPath = await zipDownload.path();
+  expect(zipPath).not.toBeNull();
+
+  await setupPanel(page).getByLabel('Project title').fill('Changed after export');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Changed after export');
+
+  await page.getByLabel('Import project file').setInputFiles(zipPath!);
+  await expect(page.locator('.status-line').last()).toContainText('Project ZIP imported');
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue(originalTitle);
+
+  await page.getByLabel('Import project file').setInputFiles({
+    name: 'broken.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"schemaVersion":2}'),
+  });
+  await expect(page.locator('.status-line').last()).toContainText(/invalid|missing|project/i);
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue(originalTitle);
+});
+
+test('round-trips authored trajectory CSV through the browser interchange controls', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByLabel('Motion end X %').fill('80');
+  await page.getByLabel('Motion end Y %').fill('20');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+
+  await page.getByText('Project vault & interchange', { exact: true }).click();
+  const csvPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export trajectory CSV' }).click();
+  const csvDownload = await csvPromise;
+  const csvPath = await csvDownload.path();
+  expect(csvPath).not.toBeNull();
+
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await page.getByLabel('Import trajectory file').setInputFiles(csvPath!);
+  await expect(page.locator('.status-line').last()).toContainText('Trajectory CSV imported');
+
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await expect(page.getByText(/token-1: 2 keyframes.*0-1000 ms/i)).toBeVisible();
+});
