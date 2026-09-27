@@ -47,6 +47,8 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
 
   useEffect(() => {
     let active = true;
+    setRecoveryChecked(false);
+    setAutosaveEnabled(false);
     void refresh()
       .then((initialRecovery) => {
         if (!active) return;
