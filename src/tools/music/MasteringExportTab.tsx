@@ -63,7 +63,7 @@ const SCOPE_LABELS: Record<ExportScope, string> = {
 };
 
 const FIELD_LABELS: Array<{ field: keyof ExportMetadata; label: string; wide?: boolean; placeholder?: string }> = [
-  { field: 'title', label: 'Title', placeholder: 'Uses each file name when left blank' },
+  { field: 'title', label: 'Title', placeholder: 'Defaults to the file name' },
   { field: 'artist', label: 'Artist' },
   { field: 'album', label: 'Album' },
   { field: 'albumArtist', label: 'Album artist' },
@@ -72,7 +72,7 @@ const FIELD_LABELS: Array<{ field: keyof ExportMetadata; label: string; wide?: b
   { field: 'discNumber', label: 'Disc number' },
   { field: 'discsTotal', label: 'Total discs' },
   { field: 'genre', label: 'Genre' },
-  { field: 'date', label: 'Release date', placeholder: 'YYYY, YYYY-MM, or YYYY-MM-DD' },
+  { field: 'date', label: 'Release date', placeholder: 'YYYY or YYYY-MM-DD' },
   { field: 'comment', label: 'Comment', wide: true },
   { field: 'description', label: 'Description', wide: true },
   { field: 'lyrics', label: 'Lyrics', wide: true },
@@ -311,7 +311,7 @@ export default function MasteringExportTab({ ctx, active }: { ctx: MasteringPane
         </label>}
         <label className="field">
           <span className="field-label">File name</span>
-          <input value={baseName} maxLength={80} onChange={(event) => { baseNameTouched.current = true; setBaseName(event.target.value); }} disabled={Boolean(busy)} />
+          <input type="text" value={baseName} maxLength={80} onChange={(event) => { baseNameTouched.current = true; setBaseName(event.target.value); }} disabled={Boolean(busy)} />
         </label>
       </div>
       {format === 'wav' && depth !== 32 && <label className="mastering-check"><input type="checkbox" checked={dither} onChange={(event) => setDither(event.target.checked)} disabled={Boolean(busy)} /> Add TPDF dither (recommended when reducing to {depth}-bit)</label>}
@@ -323,15 +323,15 @@ export default function MasteringExportTab({ ctx, active }: { ctx: MasteringPane
           <p className="help-text">{format === 'wav'
             ? 'WAV keeps basic tags (RIFF INFO, Latin-1 text only) and Broadcast Wave details. Anything it cannot hold is listed after export instead of being written garbled.'
             : 'Fields marked "Not stored" are left out of this format rather than written somewhere players ignore.'}</p>
-          <div className="workspace-grid">
+          <div className="workspace-grid mastering-tag-grid">
             {FIELD_LABELS.map(({ field, label, wide, placeholder }) => {
               const missing = note(field);
               const id = `mastering-export-${field}`;
-              return <div key={field} className="field">
+              return <div key={field} className={wide ? 'field mastering-tag-wide' : 'field'}>
                 <label htmlFor={id}>{label}</label>
                 {wide
                   ? <textarea id={id} rows={field === 'lyrics' ? 4 : 2} value={metadata[field]} onChange={(event) => setField(field, event.target.value)} disabled={Boolean(busy) || Boolean(missing)} aria-describedby={missing ? `${id}-note` : undefined} />
-                  : <input id={id} value={metadata[field]} placeholder={placeholder} inputMode={NUMERIC_FIELDS.has(field) ? 'numeric' : undefined} onChange={(event) => setField(field, event.target.value)} disabled={Boolean(busy) || Boolean(missing)} aria-describedby={missing ? `${id}-note` : undefined} />}
+                  : <input id={id} type="text" value={metadata[field]} placeholder={placeholder} inputMode={NUMERIC_FIELDS.has(field) ? 'numeric' : undefined} onChange={(event) => setField(field, event.target.value)} disabled={Boolean(busy) || Boolean(missing)} aria-describedby={missing ? `${id}-note` : undefined} />}
                 {missing && <small id={`${id}-note`}>{missing}</small>}
               </div>;
             })}
@@ -344,14 +344,14 @@ export default function MasteringExportTab({ ctx, active }: { ctx: MasteringPane
                 <span className="mastering-wrap">{artwork.name} · {formatBytes(artwork.data.length)}</span>
                 <button type="button" onClick={() => { setArtwork(null); ctx.setStatus('Cover art removed.'); }} disabled={Boolean(busy)}>Remove cover</button>
               </div>
-              : <label className="mastering-file-button mastering-file-secondary">Choose cover image<input type="file" accept="image/jpeg,image/png" onChange={onArtwork} disabled={Boolean(busy)} /></label>}
+              : <label className="mastering-file-button mastering-file-secondary mastering-fit">Choose cover image<input type="file" accept="image/jpeg,image/png" onChange={onArtwork} disabled={Boolean(busy)} /></label>}
             {note('artwork') && <small>{note('artwork')}</small>}
           </div>
         </div>
       </details>
 
       <div className="button-row">
-        <button type="button" className="primary-action" onClick={() => void runExport()} disabled={!ready}>
+        <button type="button" className="mastering-primary" onClick={() => void runExport()} disabled={!ready}>
           {scope === 'regions' || stems ? 'Export ZIP' : `Export ${FORMAT_NAMES[format]}`}
         </button>
         {busy && <span className="mastering-busy" role="status">{busy}</span>}
