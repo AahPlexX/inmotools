@@ -37,8 +37,9 @@ test('Graphviz output cannot inject an active javascript URL into the preview', 
   const markup = await diagram.innerHTML();
   expect(markup).not.toMatch(/(?:href|xlink:href)=["']\s*javascript:/i);
 
-  const safeLink = diagram.locator('a').filter({ hasText: 'Safe' });
+  const safeLink = diagram.getByRole('link', { name: 'Safe', exact: true });
   await expect(safeLink).toHaveCount(1);
+  await expect(diagram.getByRole('link', { name: 'Unsafe', exact: true })).toHaveCount(0);
   await expect.poll(() => safeLink.evaluate((element) =>
     element.getAttribute('href')
       ?? element.getAttributeNS('http://www.w3.org/1999/xlink', 'href'),

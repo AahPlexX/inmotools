@@ -1,12 +1,10 @@
 # In Progress
 
-- **Typing Workstation traditional controls & local typist profiles — F39–F47 expansion** — approved 2026-09-25; extends the completed 38-capability workstation to 47 without changing the local-first/no-account architecture.
-  - Design: `docs/superpowers/specs/2026-09-25-typing-session-profiles-design.md`.
-  - Plan: `docs/superpowers/plans/2026-09-25-typing-session-profiles.md`.
-  - Current milestone: Task 1 — explicit lifecycle/paused-time clock, followed by profile persistence, UI wiring, then Gauntlet adversarial validation.
-  - Scope: `src/tools/typing/**`, `tests/unit/typing-*.test.ts`, `tests/e2e/typing.spec.ts`, Typing docs/task records only. Preserve unrelated workstreams on current `origin/main`.
-  - Completion gate: F39–F47 implemented, legacy scores preserved, profile isolation/pause timing/session guardrails verified, focused Typing units + production build + desktop/mobile browser checks green on exact integrated `main`, then tracker closure with actual evidence.
-
+- **Markdown Workbench Gauntlet hardening** — adversarial async-race and generated-SVG safety follow-up for the already-complete Markdown Workbench.
+  - Pull request: #79 (`fix/markdown-gauntlet-20260925` → `main`). Do not open a second PR.
+  - Scope: stale citation-format results, table-formula Worker lifecycle/cancellation, detached standalone-export sanitization, Graphviz SVG navigation/resource sanitization, and their focused regressions only.
+  - Current gate: latest branch CI proved the implementation and unit/build gates green but exposed a deterministic Playwright locator defect in the new Graphviz regression: string `hasText: 'Safe'` matched both `Safe` and `Unsafe`. The test is being corrected to accessible-role exact matching without weakening the no-`javascript:` assertion.
+  - Completion gate: focused Markdown units/build/browser matrix green on the final PR head, temporary validation workflow removed before integration, PR #79 reconciled non-destructively with current `main`, merged to `origin/main`, exact-main Pages deployment green, and this entry moved to DONE/WORK_LOG with the hardening evidence.
 - **Digital Logic Workstation** — local-first digital logic circuit simulator, schematic capture, and electronic-prototyping workstation governed by a 34-capability ledger.
   - Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
@@ -51,11 +49,6 @@
   - Current milestone: reconcile the live audit queue against merged fixes, then continue only with still-outstanding verified findings using tool-scoped regression evidence.
   - Latest integrated evidence: Tool 17 / GLSL Sandbox lifecycle and paused-redraw remediation merged through PR #25 at `68accf37f1cc744644e6639f9ff8c102952a7426`; Tool 16 / Convolution Room Profiler findings were verified already resolved on `main` and removed from the outstanding queue rather than reimplemented.
   - Completion gate: every accepted audit finding is either fixed with fresh focused evidence, explicitly rejected with evidence, or deliberately deferred with rationale; no accepted finding is untracked; required validation is green on the exact integrated `origin/main` revision; applicable Pages deployment is green; and the audit entry is moved to `DONE.md`/`WORK_LOG.md` only after those conditions are simultaneously true.
-
-- **Photo Studio** — local-first non-destructive photo editor with 30+ functional editing capabilities, professional export/metadata workflow, responsive accessibility, focused validation, and Pages verification.
-  - Design: `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
-  - Plan: `docs/superpowers/plans/2026-09-11-photo-studio.md`
-  - Current milestone: A — foundation and global editor
 
 - **Crystal Lattice Studio** — local-first crystallography and crystal-lattice workstation governed by the 163-capability master design.
   - Design: `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`.
