@@ -259,3 +259,56 @@ test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and 
   await page.getByRole('tab', { name: 'Edit', exact: true }).click();
   await expect(page.getByLabel('Clip edits')).toHaveText('8');
 });
+
+test('runs every restoration tool on a clip or a selection', async ({ page }) => {
+  await page.goto('./#/tools/midi-harmony-lab');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'interview.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 180) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded interview\.wav/);
+  const status = page.locator('.status-line');
+  const clipEdits = page.getByLabel('Clip edits');
+  const setSelection = async (start: string, end: string) => {
+    await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+    await page.getByLabel('Selection start (seconds)').fill(start);
+    await page.getByLabel('Selection end (seconds)').fill(end);
+    await page.getByRole('tab', { name: 'Repair' }).click();
+  };
+
+  await setSelection('0.2', '0.9');
+  await page.getByRole('button', { name: 'Capture noise fingerprint' }).click();
+  await expect(page.getByText('0:00.200–0:00.900', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reduce noise' }).click();
+  await expect(status).toContainText(/Reduced noise by up to 12 dB on all of interview\.wav/);
+
+  const open = async (tool: string) => page.locator('summary').filter({ hasText: tool }).click();
+  await open('Hum removal');
+  await page.getByRole('button', { name: 'Remove hum' }).click();
+  await expect(status).toContainText(/Removed 60 Hz hum and 7 harmonics/);
+  await open('Click removal');
+  await page.getByRole('button', { name: 'Remove clicks' }).click();
+  await open('Crackle reduction');
+  await page.getByRole('button', { name: 'Reduce crackle' }).click();
+  await open('Plosive control');
+  await page.getByRole('button', { name: 'Soften plosives' }).click();
+  await open('De-esser');
+  await page.getByRole('button', { name: 'De-ess' }).click();
+  await open('Hiss gate');
+  await page.getByRole('button', { name: 'Gate hiss' }).click();
+  await page.getByLabel('Selection only', { exact: false }).check();
+  await open('De-clip');
+  await page.getByRole('button', { name: 'De-clip' }).click();
+  await expect(status).toContainText(/Rebuilt clipped peaks on 0:00\.200–0:00\.900/);
+
+  await setSelection('1.5', '1.55');
+  await open('Burst repair');
+  await page.getByRole('button', { name: 'Rebuild selection' }).click();
+  await expect(status).toContainText(/Rebuilt 0:01\.500–0:01\.550 from its surroundings/);
+  await open('Frequency band repair');
+  await page.getByRole('button', { name: 'Attenuate band' }).click();
+  await page.getByRole('button', { name: 'Heal band' }).click();
+  await expect(status).toContainText(/Healed 2000–4000 Hz/);
+  await expect(page.locator('.mastering-busy')).toHaveCount(0, { timeout: 30_000 });
+  await expect(status).not.toContainText(/Could not/);
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await expect(clipEdits).toHaveText('11');
+});

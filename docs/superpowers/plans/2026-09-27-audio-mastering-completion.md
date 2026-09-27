@@ -78,7 +78,18 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 30 | Duration/BPM target | done | S4: duration and tempo modes resolve to the same stretch ratio |
 | 31 | Exact silence insertion | done | Phase 2 |
 | 32 | Room-tone fill | done | S4: capture + sine-window grain fill, 10 ms equal-power edges |
-| 33–44 | Restoration and spectral repair | open | S5 |
+| 33 | Noise fingerprint capture | done | S5: capture from a noise-only selection; profile computed at replay (`noiseProfile`) |
+| 34 | STFT spectral denoise | done | S5: decision-directed Wiener gain, reduction floor, smoothing |
+| 35 | 50/60 Hz de-hum | done | S5: notch cascade, 1–20 harmonics |
+| 36 | De-click | done | S5: second-difference detection vs local median, bidirectional Burg AR repair |
+| 37 | Plosive attenuation | done | S5: LR4 low band ducked on fast-vs-slow envelope rise |
+| 38 | Micro-crackle | done | S5: low-threshold impulse detection, median blend |
+| 39 | De-esser | done | S5: band-pass side chain, linked stereo, LR4 high band reduction |
+| 40 | Multi-band hiss gate | done | S5: phase-compensated 3-band LR4 split, per-band threshold/release |
+| 41 | De-clip | done | S5: AR reconstruction constrained to exceed the clip level |
+| 42 | Burst repair | done | S5: AR interpolation of a selected span up to 200 ms |
+| 43 | Spectral brush attenuate | partial | S5: region attenuation engine + numeric band-in-selection control; painting on the spectrogram arrives with S8 |
+| 44 | Spectral heal | done | S5: magnitude interpolation from neighbouring frames, phases kept; band-in-selection control |
 | 45–59 | EQ, dynamics, colour, stereo | open | S6 |
 | 60–64 | Monitoring and meters | open | S7 |
 | 65–67 | Loudness, true peak, peak/RMS/crest | partial | S3 kernels done and conformance-tested (EBU Tech 3341 cases 1–6, 9, 10, 12, 13, 15–23; Tech 3342 cases 1–4); UI in S7 |
@@ -87,7 +98,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 73–80 | Export formats, metadata, artwork, batch | open | S9 |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 29/81 done** (2026-09-27, after S4: mastering units 75/75; mastering + music browser specs 16/16 desktop/mobile).
+**Count: 40/81 done** (2026-09-27, after S5: 94 mastering unit tests in 10 files; mastering browser spec 8/8 and music spec 10/10 across desktop/mobile Chromium).
 
 ## Rules for whoever continues
 

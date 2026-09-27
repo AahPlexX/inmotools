@@ -1,5 +1,7 @@
 import { fillRoomTone, normalizeLevel, patchSamples, quantizePcm, type DitherMode, type LevelMeasure } from './dsp/processors';
 import { pitchShift, stretchedLength, timeStretch } from './dsp/stretch';
+import { declick, declip, decrackle, deess, dehum, deplosive, hissGate, repairBurst, type HissBand } from './dsp/restoration';
+import { denoise, spectralAttenuate, spectralHeal, type SpectralRegion } from './dsp/spectral';
 
 export interface PcmAudio {
   sampleRate: number;
@@ -271,7 +273,46 @@ export type AudioEdit =
   | { type: 'samplePatch'; startFrame: number; values: number[][] }
   | { type: 'roomTone'; captureStartSeconds: number; captureEndSeconds: number; startSeconds: number; endSeconds: number; seed: number }
   | { type: 'timeStretch'; ratio: number }
-  | { type: 'pitchShift'; semitones: number; cents: number; preserveFormants: boolean };
+  | { type: 'pitchShift'; semitones: number; cents: number; preserveFormants: boolean }
+  | { type: 'denoise'; noiseStartSeconds: number; noiseEndSeconds: number; reductionDb: number; smoothing: number; range?: TimeSelection }
+  | { type: 'dehum'; fundamental: 50 | 60; harmonics: number; range?: TimeSelection }
+  | { type: 'declick'; sensitivity: number; maxClickMs: number; range?: TimeSelection }
+  | { type: 'decrackle'; amount: number; range?: TimeSelection }
+  | { type: 'deplosive'; cutoffHz: number; sensitivityDb: number; reductionDb: number; range?: TimeSelection }
+  | { type: 'deess'; frequencyHz: number; thresholdDb: number; rangeDb: number; range?: TimeSelection }
+  | { type: 'hissGate'; lowCrossover: number; highCrossover: number; bands: HissBand[]; rangeDb: number; range?: TimeSelection }
+  | { type: 'declip'; levelPercent: number; range?: TimeSelection }
+  | { type: 'repairBurst'; startSeconds: number; endSeconds: number }
+  | { type: 'spectralAttenuate'; regions: SpectralRegion[]; reductionDb: number }
+  | { type: 'spectralHeal'; region: SpectralRegion };
+
+/**
+ * Runs a whole-clip processor but keeps its result only inside `range`,
+ * blending in and out over 5 ms with equal-power curves. Without a range the
+ * processed audio is returned as is. Processing the whole clip keeps filter
+ * and envelope state realistic at the range edges.
+ */
+export function processInRange(audio: PcmAudio, range: TimeSelection | undefined, process: (input: PcmAudio) => PcmAudio): PcmAudio {
+  const processed = process(audio);
+  if (!range) return processed;
+  const length = audio.channels[0]?.length ?? 0;
+  const start = Math.max(0, Math.min(length, Math.round(Math.min(range.startSeconds, range.endSeconds) * audio.sampleRate)));
+  const end = Math.max(start, Math.min(length, Math.round(Math.max(range.startSeconds, range.endSeconds) * audio.sampleRate)));
+  const fade = Math.min(Math.round(0.005 * audio.sampleRate), Math.floor((end - start) / 2));
+  return {
+    sampleRate: audio.sampleRate,
+    channels: audio.channels.map((channel, index) => {
+      const output = channel.slice();
+      const wetChannel = processed.channels[index] ?? channel;
+      for (let n = start; n < end; n += 1) {
+        const edge = Math.min(n - start, end - 1 - n);
+        const wet = fade > 0 && edge < fade ? Math.sin(Math.PI / 2 * (edge + 0.5) / fade) : 1;
+        output[n] = channel[n] * Math.sqrt(1 - wet * wet) + wetChannel[n] * wet;
+      }
+      return output;
+    }),
+  };
+}
 
 export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAudio {
   let current: PcmAudio = { sampleRate: source.sampleRate, channels: source.channels.map((channel) => channel.slice()) };
@@ -295,6 +336,17 @@ export function applyEdits(source: PcmAudio, edits: readonly AudioEdit[]): PcmAu
       case 'roomTone': current = fillRoomTone(current, edit.captureStartSeconds, edit.captureEndSeconds, edit.startSeconds, edit.endSeconds, edit.seed); break;
       case 'timeStretch': current = timeStretch(current, edit.ratio); break;
       case 'pitchShift': current = pitchShift(current, edit.semitones, edit.cents, edit.preserveFormants); break;
+      case 'denoise': { const e = edit; current = processInRange(current, e.range, (input) => denoise(input, e.noiseStartSeconds, e.noiseEndSeconds, e.reductionDb, e.smoothing)); break; }
+      case 'dehum': { const e = edit; current = processInRange(current, e.range, (input) => dehum(input, e.fundamental, e.harmonics)); break; }
+      case 'declick': { const e = edit; current = processInRange(current, e.range, (input) => declick(input, e.sensitivity, e.maxClickMs).audio); break; }
+      case 'decrackle': { const e = edit; current = processInRange(current, e.range, (input) => decrackle(input, e.amount)); break; }
+      case 'deplosive': { const e = edit; current = processInRange(current, e.range, (input) => deplosive(input, e.cutoffHz, e.sensitivityDb, e.reductionDb)); break; }
+      case 'deess': { const e = edit; current = processInRange(current, e.range, (input) => deess(input, e.frequencyHz, e.thresholdDb, e.rangeDb)); break; }
+      case 'hissGate': { const e = edit; current = processInRange(current, e.range, (input) => hissGate(input, e.lowCrossover, e.highCrossover, e.bands, e.rangeDb)); break; }
+      case 'declip': { const e = edit; current = processInRange(current, e.range, (input) => declip(input, e.levelPercent).audio); break; }
+      case 'repairBurst': current = repairBurst(current, edit.startSeconds, edit.endSeconds); break;
+      case 'spectralAttenuate': current = spectralAttenuate(current, edit.regions, edit.reductionDb); break;
+      case 'spectralHeal': current = spectralHeal(current, edit.region); break;
     }
   }
   return current;

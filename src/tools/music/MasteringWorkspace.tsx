@@ -133,7 +133,7 @@ export default function MasteringWorkspace() {
     }).catch((error: unknown) => {
       if (cancelled || !mountedRef.current) return;
       setRendering(false);
-      setStatus(`Could not render the timeline: ${messageOf(error)}`);
+      setStatus(`Could not render the timeline: ${messageOf(error)} Undo the last change to return to the previous version.`);
     });
     return () => { cancelled = true; };
   }, [renderKey, hasAudio]);

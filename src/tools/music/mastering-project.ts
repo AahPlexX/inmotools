@@ -594,7 +594,7 @@ export function insertSilenceRevision(document: MasteringDocument, atSeconds: nu
 }
 
 /** Edits whose `startSeconds`/`endSeconds` are timeline ranges that must be mapped into clip time. */
-const RANGE_EDIT_TYPES = new Set<AudioEdit['type']>(['reverse', 'roomTone']);
+const RANGE_EDIT_TYPES = new Set<AudioEdit['type']>(['reverse', 'roomTone', 'repairBurst']);
 
 /**
  * Appends a length-preserving edit to the active clip. Range edits are given in
@@ -611,6 +611,33 @@ export function appendAudioEditRevision(document: MasteringDocument, edit: Audio
     const range = localRange(context, edit);
     if (range.endSeconds <= range.startSeconds) return cloneDocument(document);
     normalized = { ...normalized, startSeconds: range.startSeconds, endSeconds: range.endSeconds } as AudioEdit;
+  }
+  // Optional processing ranges, noise fingerprints, and spectral regions are
+  // timeline ranges too; each must land inside the clip to be meaningful.
+  if ('range' in normalized && normalized.range) {
+    const range = localRange(context, normalized.range);
+    if (range.endSeconds <= range.startSeconds) return cloneDocument(document);
+    normalized = { ...normalized, range };
+  }
+  if (normalized.type === 'denoise') {
+    const noise = localRange(context, { startSeconds: normalized.noiseStartSeconds, endSeconds: normalized.noiseEndSeconds });
+    if (noise.endSeconds <= noise.startSeconds) return cloneDocument(document);
+    normalized = { ...normalized, noiseStartSeconds: noise.startSeconds, noiseEndSeconds: noise.endSeconds };
+  }
+  if (normalized.type === 'spectralAttenuate' || normalized.type === 'spectralHeal') {
+    const mapRegion = (region: { startSeconds: number; endSeconds: number; lowHz: number; highHz: number }) => {
+      const time = localRange(context, region);
+      return time.endSeconds > time.startSeconds ? { ...region, ...time } : null;
+    };
+    if (normalized.type === 'spectralAttenuate') {
+      const regions = normalized.regions.map(mapRegion).filter((region) => region !== null);
+      if (!regions.length) return cloneDocument(document);
+      normalized = { ...normalized, regions };
+    } else {
+      const region = mapRegion(normalized.region);
+      if (!region) return cloneDocument(document);
+      normalized = { ...normalized, region };
+    }
   }
   if (normalized.type === 'roomTone') {
     const capture = localRange(context, { startSeconds: normalized.captureStartSeconds, endSeconds: normalized.captureEndSeconds });

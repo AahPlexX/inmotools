@@ -76,6 +76,18 @@
 .mastering-steps { margin:0 0 12px; padding-left:20px; color:var(--muted); font-size:13px; line-height:1.5; }
 .mastering-pen-canvas { display:block; width:100%; margin-top:12px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); touch-action:none; cursor:crosshair; }
 
+/* Restoration tools */
+.mastering-tool { border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); }
+.mastering-tool + .mastering-tool { margin-top:8px; }
+.mastering-tool summary { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; min-height:44px; padding:10px 12px; cursor:pointer; list-style-position:inside; }
+.mastering-tool-title { font-weight:760; }
+.mastering-tool-summary { color:var(--muted); font-size:12px; }
+.mastering-tool-body { display:grid; gap:10px; padding:0 12px 12px; }
+.mastering-tool-body .button-row { margin-top:4px; }
+.mastering-tool-body .help-text { margin:0; }
+.mastering-scope { margin:0; }
+.mastering-band { display:grid; gap:10px; }
+
 /* Panels */
 .mastering-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 .mastering-panel { min-width:0; padding:16px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }
