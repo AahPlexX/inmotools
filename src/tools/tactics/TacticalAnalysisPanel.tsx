@@ -39,6 +39,8 @@ export interface AnalysisDisplaySettings {
   heatColumns: number;
   heatRows: number;
   trajectoryStepMs: number;
+  tetherTargetId: string;
+  distanceUnit: 'metric' | 'imperial';
 }
 
 export const DEFAULT_ANALYSIS_DISPLAY_SETTINGS: AnalysisDisplaySettings = {
@@ -60,6 +62,8 @@ export const DEFAULT_ANALYSIS_DISPLAY_SETTINGS: AnalysisDisplaySettings = {
   heatColumns: 10,
   heatRows: 6,
   trajectoryStepMs: 250,
+  tetherTargetId: 'ball',
+  distanceUnit: 'metric',
 };
 
 export interface TeamGeometrySummary {
@@ -147,8 +151,11 @@ export function deriveTacticalAnalysis(
   const ring = settings.distanceRing && selectedToken
     ? createDistanceRing(selectedToken.position, settings.ringRadiusMeters, project.pitch.dimensions)
     : undefined;
+  const tetherTarget = settings.tetherTargetId === 'ball'
+    ? project.ball.position
+    : visibleSceneTokens.find((token) => token.id === settings.tetherTargetId)?.position ?? project.ball.position;
   const tether = settings.tether && selectedToken
-    ? measureTether(selectedToken.position, project.ball.position, project.pitch.dimensions)
+    ? measureTether(selectedToken.position, tetherTarget, project.pitch.dimensions)
     : undefined;
 
   const selectedTrack = selectedToken
@@ -333,6 +340,7 @@ export interface TacticalAnalysisPanelProps {
   selectedTokenId?: string;
   settings: AnalysisDisplaySettings;
   onSettingsChange: (settings: AnalysisDisplaySettings) => void;
+  onSetOrientation?: (degrees: number) => void;
 }
 
 function numberInput(
@@ -361,11 +369,18 @@ export default function TacticalAnalysisPanel({
   selectedTokenId,
   settings,
   onSettingsChange,
+  onSetOrientation,
 }: TacticalAnalysisPanelProps) {
   const view = deriveTacticalAnalysis(project, sceneId, selectedTokenId, settings);
   const update = <K extends keyof AnalysisDisplaySettings>(key: K, value: AnalysisDisplaySettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
+  const visibleTargets = project.playerTokens.filter(
+    (token) => token.sceneId === sceneId && token.visible && token.id !== view.selectedToken?.id,
+  );
+  const formatDistance = (meters: number) => settings.distanceUnit === 'metric'
+    ? `${meters.toFixed(2)} m`
+    : `${(meters * 3.28084).toFixed(2)} ft`;
   const nearestClearance = view.passingLane?.minimumClearanceMeters;
   const clearanceText = nearestClearance === undefined
     ? 'Enable the passing-lane aid to inspect geometric clearance.'
@@ -399,7 +414,49 @@ export default function TacticalAnalysisPanel({
           <label>Grid columns<input {...numberInput(settings.gridColumns, (value) => update('gridColumns', Math.round(value)), { min: 1, max: 12, step: 1 })} /></label>
           <label>Grid rows<input {...numberInput(settings.gridRows, (value) => update('gridRows', Math.round(value)), { min: 1, max: 12, step: 1 })} /></label>
           <label>Trajectory sample step (ms)<input {...numberInput(settings.trajectoryStepMs, (value) => update('trajectoryStepMs', Math.round(value)), { min: 1, step: 1 })} /></label>
+          <label>
+            Distance units
+            <select value={settings.distanceUnit} onChange={(event) => update('distanceUnit', event.target.value as 'metric' | 'imperial')}>
+              <option value="metric">Metric (m)</option>
+              <option value="imperial">Imperial (ft)</option>
+            </select>
+          </label>
+          <label>
+            Tether target
+            <select value={settings.tetherTargetId} onChange={(event) => update('tetherTargetId', event.target.value)}>
+              <option value="ball">Ball</option>
+              {visibleTargets.map((token) => <option key={token.id} value={token.id}>{token.id}</option>)}
+            </select>
+          </label>
         </section>
+
+        <form
+          aria-label="Player orientation"
+          key={`orientation-${view.selectedToken?.id ?? 'none'}-${view.selectedToken?.rotationDeg ?? 0}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!onSetOrientation || !view.selectedToken) return;
+            const degrees = Number(new FormData(event.currentTarget).get('bodyOrientationDeg'));
+            if (!Number.isFinite(degrees) || degrees < 0 || degrees > 360) return;
+            onSetOrientation(degrees === 360 ? 0 : degrees);
+          }}
+        >
+          <h3>Player orientation</h3>
+          <p>Orientation is authored by the user; it is not inferred from match footage or player attention.</p>
+          <label>
+            Body orientation (deg)
+            <input
+              name="bodyOrientationDeg"
+              type="number"
+              min="0"
+              max="360"
+              step="1"
+              defaultValue={view.selectedToken?.rotationDeg ?? 0}
+              disabled={!view.selectedToken}
+            />
+          </label>
+          <button type="submit" disabled={!view.selectedToken || !onSetOrientation}>Set orientation</button>
+        </form>
 
         <section aria-labelledby="team-geometry-heading">
           <h3 id="team-geometry-heading">Team geometry</h3>
@@ -411,7 +468,11 @@ export default function TacticalAnalysisPanel({
             )) : <p>Enable team hulls to inspect width, depth, area, and centroid geometry.</p>}
           </div>
           <p data-testid="passing-lane-summary">{clearanceText}</p>
-          {view.tether ? <p>Selected-player tether to ball: {view.tether.distanceMeters.toFixed(2)} m.</p> : null}
+          {view.tether ? (
+            <p>
+              {settings.tetherTargetId === 'ball' ? 'Selected-player tether to ball' : 'Player/unit spacing'}: {formatDistance(view.tether.distanceMeters)}.
+            </p>
+          ) : null}
         </section>
 
         <section aria-labelledby="trajectory-metrics-heading">
