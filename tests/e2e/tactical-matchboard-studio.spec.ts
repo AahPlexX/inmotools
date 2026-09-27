@@ -328,6 +328,7 @@ test('authors typed triggers, named action patterns, and linked-unit tactical ad
 test('has no serious or critical accessibility violations in the tactical workspace', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One focused Axe pass covers the shared workspace DOM.');
   await page.getByText('Rules, formations & restarts', { exact: true }).click();
+  await page.getByText('Spatial analysis', { exact: true }).click();
   const results = await new AxeBuilder({ page })
     .include('[data-testid="suite-workspace"]')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -351,6 +352,7 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
     await page.goto('./#/tools/tactical-matchboard-studio');
     await expect(page.locator('.tactical-board')).toBeVisible();
     await page.getByText('Rules, formations & restarts', { exact: true }).click();
+    await page.getByText('Spatial analysis', { exact: true }).click();
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${viewport.name} document overflow`).toBeLessThanOrEqual(1);
@@ -643,4 +645,5 @@ test('derives occupancy and speed metrics only from authored trajectory samples'
   await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/authored trajectory/i);
   await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/distance.*m/i);
   await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/average speed.*m\/s/i);
+  await expect(page.getByTestId('trajectory-metrics-summary')).toContainText(/duration 1000 ms/i);
 });
