@@ -177,9 +177,9 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
 
   return <div className="mastering-spectrogram">
     <div className="mastering-spectrogram-bar">
-      <div className="mastering-listen" role="radiogroup" aria-label="Spectrogram drag action">
-        <button type="button" role="radio" aria-checked={mode === 'select'} onClick={() => setMode('select')}>Select time</button>
-        <button type="button" role="radio" aria-checked={mode === 'paint'} onClick={() => setMode('paint')}>Paint regions</button>
+      <div className="mastering-listen" role="group" aria-label="Spectrogram drag action">
+        <button type="button" aria-pressed={mode === 'select'} onClick={() => setMode('select')}>Select time</button>
+        <button type="button" aria-pressed={mode === 'paint'} onClick={() => setMode('paint')}>Paint regions</button>
       </div>
       {loading && <span className="mastering-busy" role="status">Analysing…</span>}
     </div>
