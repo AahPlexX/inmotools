@@ -43,18 +43,36 @@ afterEach(async () => {
 });
 
 describe('Tactical project interchange', () => {
-  it('migrates every pre-persistence schema-v1 project to the current portable schema before validation', () => {
+  it('migrates the actual historical schema-v1 ownership and marker model before validation', () => {
     const current = projectFixture();
+    current.timeline.markers = [{
+      id: 'legacy-trigger',
+      timeMs: 250,
+      kind: 'coaching-cue',
+      label: 'Press now',
+    }];
     const legacy = structuredClone(current) as unknown as Record<string, unknown>;
     legacy.schemaVersion = 1;
+
+    for (const token of legacy.playerTokens as Array<Record<string, unknown>>) {
+      delete token.sceneId;
+      delete token.layerId;
+    }
     const timeline = legacy.timeline as Record<string, unknown>;
     delete timeline.possessionEvents;
+    (timeline.markers as Array<Record<string, unknown>>)[0]!.kind = 'coaching-trigger';
 
     const imported = importTacticalProjectJson(JSON.stringify(legacy), 'legacy-board.json');
 
     expect(TACTICS_SCHEMA_VERSION).toBe(2);
     expect(imported.schemaVersion).toBe(2);
+    expect(imported.playerTokens.every((token) => token.sceneId === 'scene-1' && token.layerId === 'layer-1')).toBe(true);
     expect(imported.timeline.possessionEvents).toEqual([]);
+    expect(imported.timeline.markers[0]).toMatchObject({
+      id: 'legacy-trigger',
+      kind: 'coaching-cue',
+      label: 'Press now',
+    });
     expect(imported.importProvenance.at(-1)).toMatchObject({
       sourceType: 'project-json',
       sourceName: 'legacy-board.json',
