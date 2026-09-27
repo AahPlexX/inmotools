@@ -107,7 +107,7 @@ Research date: 2026-09-26 local / 2026-09-27 UTC. `GOVERNANCE.md` was read and n
 
 ## Real-world remediation pass — 2026-09-27
 
-Status at implementation commit: **ACTIVE — validation pending**.
+Status: **COMPLETE — 7/7 accepted remediation functions verified on `14099c3c476d74bce943abc8a4623ced9435a9c7`.**
 
 The prior completion record remains historical evidence, not a waiver for newly reproduced real-world defects. This pass started from `origin/main` at `48257af167d4296552ccb4e4b09570e0aee0a45d`; the pre-write focused-tool and Pages workflows on that revision were green. Scope is restricted to Markdown Workbench source, its browser regression suite, this handoff record, and the additive task-state entry.
 
@@ -139,6 +139,11 @@ The prior completion record remains historical evidence, not a waiver for newly 
 - CodeMirror 6 guide/reference — keymaps and command precedence: https://codemirror.net/docs/guide/ and https://codemirror.net/docs/ref/
 - W3C — WCAG 2.2: https://www.w3.org/TR/WCAG22/
 
-### Validation contract
+### Validation evidence
 
-The implementation is not complete until the production TypeScript/Vite build, Markdown desktop/mobile browser regression set, and integrated `origin/main` workflows are green on the exact product revision. The new browser regressions cover F01/F02 together plus F03, F05, F06, F07, and an actual click of a generated TOC link for F04. If validation exposes a defect, update this section and the live task-state entry before any completion claim.
+- Exact-product focused run `36329231897` / job `108647853700`: production TypeScript/Vite build passed; focused selection resolved to all three Markdown browser specs; **118/118** desktop/mobile Chromium checks passed.
+- Exact-product Pages run `36329231892`: **195 unit files / 1956 tests** passed, production build passed, Pages artifact build/upload passed, and deployment job `108647967903` succeeded.
+- The repository-wide Playwright sweep in that Pages run finished with **953 passed, 22 skipped, 1 flaky**. The sole flaky case was outside Markdown (`tests/e2e/typing.spec.ts:439` on mobile Chromium) and passed on retry; Playwright's documented retry classification treats a first-attempt failure that passes on retry as `flaky`. No Markdown test failed.
+- The focused run directly exercises F01/F02 together plus F03, F05, F06, F07, the name-only transition race guard, and an actual click of a generated TOC link for F04 on both configured Chromium projects.
+
+This seven-function remediation is therefore closed. Any future Markdown work must be based on a newly verified defect or explicitly approved new scope rather than reopening this completed ledger.

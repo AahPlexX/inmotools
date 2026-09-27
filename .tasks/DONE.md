@@ -1,5 +1,27 @@
 # Done
 
+## Markdown Workbench real-world remediation — 7/7 complete
+
+The 2026-09-27 real-world remediation is complete on `origin/main` at product revision
+`14099c3c476d74bce943abc8a4623ced9435a9c7`. The seven accepted functions are closed: dirty-safe file replacement,
+isolated draft identity for imported files, durable draft names/name-only autosave, hash-safe
+preview anchors, a first-class full-width Preview mode, runtime Markdown/plain-text file
+validation, and conventional Ctrl/Cmd formatting shortcuts.
+
+Fresh exact-product evidence:
+- focused run `36329231897` / job `108647853700` passed the production TypeScript/Vite build
+  and **118/118 Markdown desktop/mobile Chromium checks** across
+  `markdown-workbench.spec.ts`, `markdown-workbench-ux.spec.ts`, and `markdown-mermaid.spec.ts`;
+- Pages run `36329231892` passed **195 unit files / 1956 tests**, production build, Pages artifact
+  generation/upload, and deployment job `108647967903`;
+- the same Pages run's repository-wide browser sweep reported **953 passed, 22 skipped, 1 flaky**.
+  The flaky case was the unrelated mobile Typing test at `tests/e2e/typing.spec.ts:439`; Playwright
+  retried it successfully, so the run and validate job concluded success. No Markdown case failed.
+
+No runtime dependency was added. The live Markdown handoff remains
+`docs/markdown-audit-2026-09-16.md`; future Markdown changes should start from current `origin/main`
+and reopen task state only for newly verified scope.
+
 ## Markdown Workbench Gauntlet hardening — 4/4 complete
 
 The post-completion Markdown adversarial pass is integrated on `origin/main` at
