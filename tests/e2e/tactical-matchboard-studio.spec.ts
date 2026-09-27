@@ -752,6 +752,13 @@ test('lists, loads, and removes browser-local saved projects', async ({ page }) 
   await page.getByText('Project vault & interchange', { exact: true }).click();
   await page.getByRole('button', { name: 'Remove saved project Training board' }).click();
   await expect(page.locator('.status-line').last()).toContainText('Saved project and its snapshots removed');
+  await expect(page.getByTestId('vault-autosave-state')).toContainText('Autosave is paused because this open project has no saved local copy');
+  await page.waitForTimeout(750);
+  await expect(page.getByLabel('Saved projects')).toContainText('No saved projects yet');
+
+  await page.getByRole('button', { name: 'Save to device' }).click();
+  await expect(page.getByTestId('vault-autosave-state')).toContainText('Crash-safe autosave is active');
+  await expect(page.getByLabel('Saved projects')).toContainText('Training board');
 });
 
 
