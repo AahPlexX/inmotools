@@ -93,12 +93,11 @@ export function deriveTacticalAnalysis(
   selectedTokenId: string | undefined,
   settings: AnalysisDisplaySettings,
 ): TacticalAnalysisView {
-  const sceneTokens = project.playerTokens.filter((token) => (
-    token.sceneId === sceneId
-      && token.visible
-      && (settings.includeGoalkeepers || !isGoalkeeper(project, token))
-  ));
-  const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId) ?? sceneTokens[0];
+  const visibleSceneTokens = project.playerTokens.filter((token) => token.sceneId === sceneId && token.visible);
+  const selectedToken = visibleSceneTokens.find((token) => token.id === selectedTokenId) ?? visibleSceneTokens[0];
+  const sceneTokens = visibleSceneTokens.filter(
+    (token) => settings.includeGoalkeepers || !isGoalkeeper(project, token),
+  );
 
   const voronoi = settings.voronoi
     ? computeEuclideanVoronoi(
@@ -155,11 +154,14 @@ export function deriveTacticalAnalysis(
   const selectedTrack = selectedToken
     ? project.timeline.tracks.find((track) => track.targetId === selectedToken.id)
     : undefined;
-  const trajectorySamples = selectedTrack
+  const authoredTimes = selectedTrack?.keyframes
+    .filter((keyframe) => keyframe.position)
+    .map((keyframe) => keyframe.timeMs) ?? [];
+  const trajectorySamples = selectedTrack && authoredTimes.length
     ? sampleAuthoredTrajectory(
         selectedTrack,
-        0,
-        project.timeline.durationMs,
+        Math.min(...authoredTimes),
+        Math.max(...authoredTimes),
         settings.trajectoryStepMs,
       )
     : [];
