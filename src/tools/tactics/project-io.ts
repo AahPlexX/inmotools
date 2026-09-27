@@ -83,16 +83,16 @@ function appendProvenance(
 
 function assertRequiredProjectShape(value: Record<string, unknown>): void {
   if (typeof value.id !== 'string' || !value.id.trim()) throw new Error('Invalid tactical project: project id is missing.');
-  for (const key of [
+  for (const key of ([
     'metadata', 'ruleset', 'pitch', 'ball', 'timeline', 'analysisSettings',
     'sessionPlan', 'exportPreferences',
-  ]) as const {
+  ] as const)) {
     asRecord(value[key], `Tactical project ${key}`);
   }
-  for (const key of [
+  for (const key of ([
     'teams', 'playerTokens', 'officials', 'equipment', 'scenes', 'formationStates',
     'annotations', 'cameraStates', 'media', 'importProvenance',
-  ]) as const {
+  ] as const)) {
     if (!Array.isArray(value[key])) throw new Error(`Invalid tactical project: ${key} must be an array.`);
   }
 }
