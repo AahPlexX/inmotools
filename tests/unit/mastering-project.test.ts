@@ -249,6 +249,22 @@ describe('clip range edits', () => {
     const reset = resetClipEditsRevision(deleted);
     expect(reset.tracks[0].clips[0].edits).toEqual([]);
     expect(reset.tracks[0].clips[1].startSeconds).toBe(6);
+    // Annotations after the clip ripple back with the audio they mark.
+    expect(reset.markers[0].seconds).toBe(7);
+  });
+
+  it('keeps annotations after a reset clip aligned and leaves ones inside the clip in place', () => {
+    let document = addSourceTracksRevision(createMasteringDocument(), [{ source: source('a', 4), trackId: 't1', clipId: 'a' }]);
+    document = duplicateClipRevision(document, 'a', 'a2');
+    document = moveClipRevision(document, 'a2', 4);
+    document = { ...document, activeClipId: 'a', markers: [{ id: 'in', label: 'Inside', seconds: 0.5 }, { id: 'out', label: 'After', seconds: 5 }], regions: [{ id: 'r', label: 'Chorus', startSeconds: 4.5, endSeconds: 6 }] };
+    const deleted = deleteRangeRevision(document, 1, 2);
+    const shifted = { ...deleted, selection: { startSeconds: 4, endSeconds: 5 }, playhead: 4.5 };
+    const reset = resetClipEditsRevision(shifted);
+    expect(reset.markers.map((marker) => marker.seconds)).toEqual([0.5, 5]);
+    expect(reset.regions[0]).toMatchObject({ startSeconds: 4.5, endSeconds: 6 });
+    expect(reset.selection).toEqual({ startSeconds: 5, endSeconds: 6 });
+    expect(reset.playhead).toBe(5.5);
   });
 });
 

@@ -52,6 +52,8 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
         break;
       case 'releaseAll':
         engine.releaseAll();
+        // A queued render would run against released sources; answer it so its caller settles.
+        if (pendingRender) post({ type: 'superseded', requestId: pendingRender.requestId });
         pendingRender = null;
         post({ type: 'released', requestId: request.requestId });
         break;

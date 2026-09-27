@@ -20,6 +20,8 @@ export class MasteringDspClient {
   private readonly pending = new Map<number, Pending>();
   private nextId = 1;
   private disposed = false;
+  /** Set once the worker reports an uncaught error; later requests fail fast instead of hanging. */
+  private failure: Error | null = null;
 
   constructor() {
     this.worker = new Worker(new URL('./mastering-dsp.worker.ts', import.meta.url), { type: 'module' });
@@ -31,6 +33,7 @@ export class MasteringDspClient {
     };
     this.worker.onerror = (event) => {
       const error = new Error(event.message || 'The audio processing worker stopped unexpectedly.');
+      this.failure = error;
       for (const waiter of this.pending.values()) waiter.reject(error);
       this.pending.clear();
     };
@@ -38,6 +41,7 @@ export class MasteringDspClient {
 
   private request(message: WithoutId<DspRequest>, transfer: Transferable[] = []): Promise<DspResponse> {
     if (this.disposed) return Promise.reject(new Error('The audio processing worker has been released.'));
+    if (this.failure) return Promise.reject(this.failure);
     const requestId = this.nextId++;
     return new Promise<DspResponse>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });

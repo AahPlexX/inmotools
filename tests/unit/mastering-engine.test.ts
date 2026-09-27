@@ -45,6 +45,13 @@ describe('waveform and edit math', () => {
     ]);
   });
 
+  it('reports true extremes when gain pushes a whole bucket beyond full scale', () => {
+    expect(buildPeakEnvelope(pcm([1.5, 1.25, -1.5, -1.75]), 2)).toEqual([
+      { min: 1.25, max: 1.5 },
+      { min: -1.75, max: -1.5 },
+    ]);
+  });
+
   it('snaps to the nearest sign change around an edit point', () => {
     const samples = Float32Array.from([0.4, 0.2, 0.05, -0.03, -0.2, 0.4]);
     expect(findZeroCrossing(samples, 2, 3)).toBe(3);

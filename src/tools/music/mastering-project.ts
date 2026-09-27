@@ -678,7 +678,13 @@ export function stretchClipRevision(document: MasteringDocument, ratio: number):
   return next;
 }
 
-/** Clears the active clip's edits, restoring it to its source while keeping placement. */
+/**
+ * Clears the active clip's edits, restoring it to its source while keeping placement.
+ * Later clips ripple by the length change, and so do markers, regions, selection, and
+ * playhead at or after the old clip end, so annotations stay with the audio they mark.
+ * Annotations inside the clip keep their times: undoing arbitrary edits has no
+ * one-to-one time map back into the source.
+ */
 export function resetClipEditsRevision(document: MasteringDocument): MasteringDocument {
   const context = activeContext(document);
   if (!context || !context.clip.edits.length) return cloneDocument(document);
@@ -687,9 +693,14 @@ export function resetClipEditsRevision(document: MasteringDocument): MasteringDo
   clip.edits = [];
   const delta = clipDurationSeconds(next, clip) - duration;
   rippleTrack(context, oldEnd, delta);
+  const mapTime = (seconds: number) => seconds >= oldEnd - 1e-12 ? frameTime(next, Math.max(0, seconds + delta)) : seconds;
+  remapAnnotations(next, mapTime, () => true);
   const total = estimateDocumentDuration(next);
-  next.selection = clampSelection(next.selection, total);
-  next.playhead = Math.min(total, next.playhead);
+  next.selection = clampSelection({
+    startSeconds: mapTime(frameTime(next, document.selection.startSeconds)),
+    endSeconds: mapTime(frameTime(next, document.selection.endSeconds)),
+  }, total);
+  next.playhead = Math.min(total, mapTime(frameTime(next, document.playhead)));
   return next;
 }
 

@@ -46,8 +46,8 @@ export function buildPeakEnvelope(audio: PcmAudio, bucketCount: number): PeakBuc
   for (let bucket = 0; bucket < buckets; bucket += 1) {
     const start = Math.floor(bucket * sampleCount / buckets);
     const end = Math.max(start + 1, Math.floor((bucket + 1) * sampleCount / buckets));
-    let min = 1;
-    let max = -1;
+    let min = Infinity;
+    let max = -Infinity;
     for (const channel of audio.channels) {
       for (let index = start; index < end; index += 1) {
         const sample = channel[index] ?? 0;

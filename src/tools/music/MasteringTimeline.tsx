@@ -59,7 +59,9 @@ export default function MasteringTimeline({ document, render, duration, playhead
   const [width, setWidth] = useState(0);
   const dragStart = useRef<number | null>(null);
   const pointers = useRef(new Map<number, number>());
-  const pinch = useRef<{ distance: number; viewport: TimelineViewport } | null>(null);
+  // The anchor is fixed at pinch start in the starting viewport's time base, so every move zooms
+  // from the same view around the same instant instead of drifting as the view updates.
+  const pinch = useRef<{ distance: number; viewport: TimelineViewport; anchor: number } | null>(null);
   const rate = document.sampleRate;
   const view = clampViewport(viewport, duration, rate);
   const viewEnd = view.startSeconds + view.spanSeconds;
@@ -168,7 +170,7 @@ export default function MasteringTimeline({ document, render, duration, playhead
     pointers.current.set(event.pointerId, event.clientX);
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
-      pinch.current = { distance: Math.max(8, Math.abs(a - b)), viewport: view };
+      pinch.current = { distance: Math.max(8, Math.abs(a - b)), viewport: view, anchor: secondsAtClientX((a + b) / 2) };
       dragStart.current = null;
       return;
     }
@@ -182,8 +184,7 @@ export default function MasteringTimeline({ document, render, duration, playhead
     if (pinch.current && pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       const factor = pinch.current.distance / Math.max(8, Math.abs(a - b));
-      const anchor = secondsAtClientX((a + b) / 2);
-      onViewportChange(zoomViewport(pinch.current.viewport, factor, anchor, duration, rate));
+      onViewportChange(zoomViewport(pinch.current.viewport, factor, pinch.current.anchor, duration, rate));
       return;
     }
     if (dragStart.current === null) return;

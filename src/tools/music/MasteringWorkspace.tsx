@@ -260,7 +260,8 @@ export default function MasteringWorkspace() {
 
   const play = async () => {
     const mix = render?.mix;
-    if (!mix || !mix.channels[0]?.length) {
+    // While a render is pending the stored mix predates the latest edit.
+    if (rendering || !mix || !mix.channels[0]?.length) {
       setStatus(hasAudio ? 'The timeline is still rendering. Try again in a moment.' : 'Add audio before starting playback.');
       return;
     }
@@ -414,19 +415,24 @@ export default function MasteringWorkspace() {
     const placements: SourcePlacement[] = [];
     const infos: Record<string, AudioFileInfo> = {};
     let projectRate = historyRef.current.present.sampleRate;
+    // A newer import or a cleared project supersedes this batch; sources it already
+    // handed to the worker would otherwise stay decoded there with no clip using them.
+    const abandon = (extra?: string) => {
+      for (const id of [...placements.map((placement) => placement.source.id), ...(extra ? [extra] : [])]) void client.releaseSource(id).catch(() => undefined);
+    };
     try {
       for (const [index, file] of accepted.entries()) {
         setStatus(`Reading ${file.name} (${index + 1} of ${accepted.length})…`);
         try {
           const decoded = await decodeAudioFile(file);
-          if (revision !== importRevisionRef.current || !mountedRef.current) return;
+          if (revision !== importRevisionRef.current || !mountedRef.current) { abandon(); return; }
           if (decoded.info.channelCount > 2) { skipped.push(`${file.name} (${decoded.info.channelCount} channels; tracks hold mono or stereo)`); continue; }
           const pcm = bufferToPcm(decoded.buffer);
           projectRate ??= pcm.sampleRate;
           if (pcm.sampleRate !== projectRate) setStatus(`Converting ${file.name} from ${pcm.sampleRate.toLocaleString()} Hz to the project rate of ${projectRate.toLocaleString()} Hz…`);
           const sourceId = newId('source');
           const loaded = await client.loadSource(sourceId, pcm, projectRate);
-          if (revision !== importRevisionRef.current || !mountedRef.current) return;
+          if (revision !== importRevisionRef.current || !mountedRef.current) { abandon(sourceId); return; }
           infos[sourceId] = decoded.info;
           placements.push({
             source: {
@@ -619,7 +625,7 @@ export default function MasteringWorkspace() {
       </div>
 
       <div className="mastering-transport" aria-label="Audio transport">
-        <button type="button" onClick={() => void play()} disabled={!canEdit || !mixReady || playbackState === 'playing' || playbackState === 'starting'}>{playbackState === 'paused' ? 'Resume' : 'Play'}</button>
+        <button type="button" onClick={() => void play()} disabled={!canEdit || !mixReady || rendering || playbackState === 'playing' || playbackState === 'starting'}>{playbackState === 'paused' ? 'Resume' : 'Play'}</button>
         <button type="button" onClick={pause} disabled={playbackState !== 'playing'}>Pause</button>
         <button type="button" onClick={() => stopPlayback(true, true)} disabled={playbackState === 'idle' && playhead === 0}>Stop</button>
         <button type="button" onClick={() => seek(playhead - 1)} disabled={!canEdit}>−1 s</button>

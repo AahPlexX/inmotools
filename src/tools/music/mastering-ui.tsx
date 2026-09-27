@@ -21,8 +21,10 @@ export const formatBytes = (bytes: number) => bytes < 1024
 /** `m:ss.mmm`, the precision edit fields and readouts share. */
 export const formatTime = (seconds: number) => {
   const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0);
-  const minutes = Math.floor(safe / 60);
-  return `${minutes}:${(safe % 60).toFixed(3).padStart(6, '0')}`;
+  // Round to whole milliseconds first so 59.9996 s carries into the next minute instead of showing 0:60.000.
+  const milliseconds = Math.round(safe * 1000);
+  const minutes = Math.floor(milliseconds / 60_000);
+  return `${minutes}:${((milliseconds % 60_000) / 1000).toFixed(3).padStart(6, '0')}`;
 };
 
 export const formatDb = (value: number, digits = 1) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(digits)} dB`;
@@ -55,6 +57,8 @@ export function CommitNumberField({ label, value, onCommit, min, max, step = 0.1
   useEffect(() => { setDraft(shown); }, [shown]);
 
   const commit = () => {
+    // An untouched field shows a rounded value; committing it would silently move the stored one.
+    if (draft === shown) return;
     const parsed = Number(draft);
     if (draft.trim() === '' || !Number.isFinite(parsed)) { setDraft(shown); return; }
     const bounded = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, parsed));
