@@ -3,7 +3,7 @@
 - **PlanCraft Studio real-world hardening** — the floor-plan tool (`#/floorplan-studio`) was previously recorded complete (TASK-001), but owner field testing found real-world defects. A 2026-09-27 audit verified 19 defects and 16 capability gaps (35 ledger rows, F01–F35).
   - Tool SSOT: `src/tools/floorplan/TRACKING.md` (per-row status, evidence, known limits, verification commands).
   - Branch: `claude/plancraft-hardening`, integrated to `main` by squash PR.
-  - Current milestone: engine fixes (DXF validity/orientation, clearance model, T-junction wall split, export labels/arcs), then workspace interaction fixes, then browser coverage.
+  - Current milestone (2026-09-27): all 38 ledger rows (F01–F38) implemented on the branch with fresh local evidence — `tsc` clean, floorplan + spec-selection units 55/55, `pnpm build` passes, floorplan browser specs 39 passed / 1 skipped (desktop-only wheel test) on desktop and mobile Chromium, ezdxf strict read of both DXF versions with 0 audit errors. Remaining: open the PR (the session's GitHub integration returned 403 on PR creation), get CI green on it, squash-merge to `main`, confirm the Pages deploy, then move this entry to DONE/WORK_LOG.
   - Completion gate: every ledger row `merged` or moved to `BACKLOG.md` with rationale; focused floorplan units, `tsc`, build, and floorplan browser specs pass on the PR; DXF exports strict-read cleanly with ezdxf; PR squash-merged into `main`.
   - Scope: `src/tools/floorplan/`, `tests/unit/floorplan-*.test.ts`, `tests/e2e/floorplan*.spec.ts`, the floorplan catalog entry, and this entry. Other workstreams untouched.
 
