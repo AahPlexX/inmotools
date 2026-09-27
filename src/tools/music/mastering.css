@@ -104,6 +104,14 @@
 .mastering-band-row summary { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; min-height:44px; padding:10px 12px; cursor:pointer; }
 .mastering-stage + .mastering-stage, .mastering-panel + .mastering-stage, .mastering-stage + .mastering-panel { margin-top:0; }
 .mastering-table-scroll { overflow-x:auto; }
+.mastering-recovery { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid var(--signal); border-radius:var(--radius-sm); background:var(--signal-soft); }
+.mastering-recovery h3 { margin:0 0 4px; font-size:16px; }
+.mastering-recovery p { margin:0; }
+.mastering-presets { display:grid; gap:10px; }
+.mastering-preset-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; }
+.mastering-preset-row .field { flex:1 1 220px; margin:0; }
+.mastering-report td[data-state="ok"] { color:var(--signal-strong); }
+.mastering-report td[data-state="missing"] { color:var(--danger); }
 .mastering-tag-grid { align-items:start; }
 .mastering-tag-wide { grid-column:1 / -1; }
 .mastering-fit { justify-self:start; }

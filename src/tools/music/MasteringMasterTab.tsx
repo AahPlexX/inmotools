@@ -26,6 +26,8 @@ interface Props {
   master: MasterSettings;
   onPreview: (settings: MasterSettings) => void;
   onCommit: (settings: MasterSettings, status: string) => void;
+  /** Preset controls, supplied by the workspace because it owns the browser store. */
+  presets?: ReactNode;
 }
 
 const clone = (settings: MasterSettings): MasterSettings => JSON.parse(JSON.stringify(settings)) as MasterSettings;
@@ -44,7 +46,7 @@ function Stage({ title, enabled, onToggle, disabled, children, summary }: { titl
   </details>;
 }
 
-export default function MasteringMasterTab({ ctx, master, onPreview, onCommit }: Props) {
+export default function MasteringMasterTab({ ctx, master, onPreview, onCommit, presets }: Props) {
   const disabled = !ctx.canEdit;
   const rate = ctx.document.sampleRate ?? 48_000;
   const [analysis, setAnalysis] = useState<{ spectrumDb: Float64Array; binHz: number; resonances: Resonance[]; label: string } | null>(null);
@@ -100,6 +102,10 @@ export default function MasteringMasterTab({ ctx, master, onPreview, onCommit }:
         <h3 id="master-heading">Master chain</h3>
         <p>Processes the whole mix in this order: input, EQ, expander, compressor, three-band compressor, saturation, stereo, clipper, limiter, output. Press Play to hear changes as you make them. Use Original on the transport to compare.</p>
       </div></div>
+      {presets && <details className="mastering-tool">
+        <summary><span className="mastering-tool-title">Presets</span> <span className="mastering-tool-summary">Save this chain or start from one you saved</span></summary>
+        <div className="mastering-tool-body">{presets}</div>
+      </details>}
       <div className="workspace-grid">
         <ParameterControl label="Input gain" unit="dB" value={master.inputGainDb} min={-24} max={24} step={0.1} disabled={disabled} {...control((s, v) => { s.inputGainDb = v; }, (v) => `Input gain ${fmtDb(v)} dB.`)} />
         <ParameterControl label="Output gain" unit="dB" value={master.outputGainDb} min={-24} max={24} step={0.1} disabled={disabled} {...control((s, v) => { s.outputGainDb = v; }, (v) => `Output gain ${fmtDb(v)} dB.`)} />

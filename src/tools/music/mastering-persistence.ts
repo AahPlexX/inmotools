@@ -218,27 +218,34 @@ export class MasteringStore {
 
   close() { this.db.close(); }
 
+  /** Source ids known to be stored per session, so a save issues every write at once. */
+  private readonly storedSources = new Map<string, Set<string>>();
+
   /**
    * Saves a tab's session: document plus any source bytes not stored yet, and removes
-   * this session's stored sources the document no longer uses. One transaction.
+   * this session's stored sources the document no longer uses. Every write is issued
+   * synchronously in one transaction, with no read first, so a save started while the
+   * page unloads still commits as a whole.
    */
   async saveSession(sessionId: string, document: MasteringDocument, sources: ReadonlyMap<string, Blob>): Promise<void> {
     const transaction = this.db.transaction([SESSIONS, SOURCES], 'readwrite');
     const finished = done(transaction);
-    const sessionStore = transaction.objectStore(SESSIONS);
     const sourceStore = transaction.objectStore(SOURCES);
+    const known = this.storedSources.get(sessionId) ?? new Set<string>();
     const needed = new Set(document.sources.map((source) => source.id));
-    const range = IDBKeyRange.bound(`${sessionId}/`, `${sessionId}/￿`);
-    const storedKeys = (await request(sourceStore.getAllKeys(range))).map(String);
-    const stored = new Set(storedKeys.map((key) => key.slice(sessionId.length + 1)));
-    for (const key of storedKeys) if (!needed.has(key.slice(sessionId.length + 1))) sourceStore.delete(key);
+    const nextKnown = new Set<string>();
+    for (const id of known) if (!needed.has(id)) sourceStore.delete(sourceKey(sessionId, id));
     for (const id of needed) {
+      if (known.has(id)) { nextKnown.add(id); continue; }
       const blob = sources.get(id);
-      if (blob && !stored.has(id)) sourceStore.put(blob, sourceKey(sessionId, id));
+      if (blob) { sourceStore.put(blob, sourceKey(sessionId, id)); nextKnown.add(id); }
     }
     const record: StoredSession = { id: sessionId, savedAt: Date.now(), document, sourceNames: document.sources.map((source) => source.name) };
-    sessionStore.put(record);
+    transaction.objectStore(SESSIONS).put(record);
+    // Commit now rather than when the event loop idles: during pagehide there may be no later turn.
+    transaction.commit?.();
     await finished;
+    this.storedSources.set(sessionId, nextKnown);
   }
 
   /** Every stored session, newest first. Records that fail validation are skipped, not thrown. */
@@ -260,15 +267,19 @@ export class MasteringStore {
     const transaction = this.db.transaction(SOURCES, 'readonly');
     const store = transaction.objectStore(SOURCES);
     const entries = await Promise.all(sourceIds.map(async (id) => [id, await request(store.get(sourceKey(sessionId, id)))] as const));
-    return new Map(entries.filter((entry): entry is readonly [string, Blob] => entry[1] instanceof Blob));
+    const found = new Map(entries.filter((entry): entry is readonly [string, Blob] => entry[1] instanceof Blob));
+    // A restored session keeps saving under its id; its stored audio need not be written again.
+    this.storedSources.set(sessionId, new Set(found.keys()));
+    return found;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
     const transaction = this.db.transaction([SESSIONS, SOURCES], 'readwrite');
     const finished = done(transaction);
     transaction.objectStore(SESSIONS).delete(sessionId);
-    transaction.objectStore(SOURCES).delete(IDBKeyRange.bound(`${sessionId}/`, `${sessionId}/￿`));
+    transaction.objectStore(SOURCES).delete(IDBKeyRange.bound(`${sessionId}/`, `${sessionId}/\uffff`));
     await finished;
+    this.storedSources.delete(sessionId);
   }
 
   /** Keeps the newest {@link MAX_SESSIONS} sessions (always keeping `keep`) and deletes the rest. */

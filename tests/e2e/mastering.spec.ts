@@ -28,7 +28,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
 
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeDisabled();
-  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
     name: 'mastering-fixture.wav',
     mimeType: 'audio/wav',
     buffer: makeMonoPcm16Wav(),
@@ -135,7 +135,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
 test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').setInputFiles([
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles([
     { name: 'drums.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 110) },
     { name: 'keys.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 44_100, 440) },
   ]);
@@ -193,7 +193,7 @@ test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', a
 test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and the sample pen', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 200) });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 48_000, 200) });
   await expect(page.locator('.status-line')).toContainText(/Loaded voice\.wav/);
   const editTab = page.getByRole('tab', { name: 'Edit', exact: true });
   await expect(editTab).toHaveAttribute('aria-selected', 'true');
@@ -260,7 +260,7 @@ test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and 
 test('runs every restoration tool on a clip or a selection', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'interview.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 180) });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'interview.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 180) });
   await expect(page.locator('.status-line')).toContainText(/Loaded interview\.wav/);
   const status = page.locator('.status-line');
   const clipEdits = page.getByLabel('Clip edits');
@@ -313,7 +313,7 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
 test('masters the mix with the realtime chain, meters, monitoring, and an offline render', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(6, 48_000, 440) });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(6, 48_000, 440) });
   await expect(page.locator('.status-line')).toContainText(/Loaded song\.wav/);
   const status = page.locator('.status-line');
 
@@ -365,7 +365,7 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
 test('shows a synced spectrogram and repairs a painted region', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'birdsong.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 2000) });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'birdsong.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 2000) });
   await expect(page.locator('.status-line')).toContainText(/Loaded birdsong\.wav/);
   await page.getByLabel('Show spectrogram').check();
   const overlay = page.locator('.mastering-spectrogram-overlay');
@@ -422,7 +422,7 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
   const tone = makeMonoPcm16Wav(1, 48_000, 440);
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
-  await page.locator('.mastering-file-button input[type="file"]').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: tone });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: tone });
   await expect(page.locator('.status-line')).toContainText(/Loaded tone\.wav/);
 
   await page.getByRole('tab', { name: 'Export' }).click();
@@ -496,7 +496,7 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
   await panel.getByLabel('MP3').check();
 
   // Stems: a second track, then one file per track plus reports in one ZIP.
-  await page.locator('.mastering-file-button input[type="file"]').first().setInputFiles({ name: 'bass.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 110) });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'bass.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 110) });
   await expect(page.locator('.status-line')).toContainText(/Loaded bass\.wav/);
   await panel.getByLabel(/Each track as a stem \(2\)/).check();
   await expect(panel.getByLabel('Apply the master chain')).toHaveCount(0);
@@ -516,4 +516,83 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
   const report = JSON.parse(await archive.file('tone stems/reports/loudness.json')!.async('string')) as { files: Array<{ file: string }> };
   expect(report.files.map((file) => file.file)).toEqual(['tone - Track 1.mp3', 'tone - Track 2.mp3']);
   await expect(page.locator('.status-line')).toContainText(/Exported 2 files with loudness and spectrum reports in tone stems\.zip/);
+});
+
+// --- SECTION: project persistence ---
+
+test('autosaves, recovers after a reload, backs up and reopens, saves presets, and reports capabilities', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'session.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 330) });
+  await expect(page.locator('.status-line')).toContainText(/Loaded session\.wav/);
+  await page.getByLabel('Marker name').fill('Chorus');
+  await page.getByRole('button', { name: 'Add marker at playhead' }).click();
+  await expect(page.locator('.status-line')).toContainText('Added Chorus at 0:00.000.');
+
+  const project = page.getByRole('tabpanel', { name: 'Project' });
+  await page.getByRole('tab', { name: 'Project' }).click();
+  await expect(project.getByTestId('autosave-status')).toContainText('Saved on this device', { timeout: 10_000 });
+  await expect(project.getByRole('row', { name: /Realtime processing \(AudioWorklet\)/ })).toContainText('Available', { timeout: 30_000 });
+
+  // Wait until the marker is in storage, so the reload does not race the debounced save.
+  await expect.poll(() => page.evaluate(() => new Promise<number>((resolve) => {
+    const opening = indexedDB.open('inmotools.audio-mastering');
+    opening.onsuccess = () => {
+      const read = opening.result.transaction('sessions').objectStore('sessions').getAll();
+      read.onsuccess = () => { resolve((read.result as Array<{ document: { markers: unknown[] } }>).reduce((count, session) => count + session.document.markers.length, 0)); opening.result.close(); };
+    };
+  })), { timeout: 10_000 }).toBe(1);
+
+  // A reload (as after a crash) offers the saved session and brings back audio and markers.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Pick up where you left off?' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/is saved on this device: session\.wav/)).toBeVisible();
+  await page.getByRole('button', { name: 'Restore session' }).click();
+  await expect(page.locator('.status-line')).toContainText('Restored your session: 1 track and 1 audio file.');
+  await expect(page.getByText('1 of 8 tracks in use')).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Edit' }).getByLabel('Marker 1 name')).toHaveValue('Chorus');
+
+  // Presets: save the chain, change it, and apply the preset back as one undoable step.
+  await page.getByRole('tab', { name: 'Master' }).click();
+  const master = page.getByRole('tabpanel', { name: 'Master' });
+  await master.getByText('Presets', { exact: true }).click();
+  await master.getByLabel('Save the current chain as').fill('Gentle');
+  await master.getByRole('button', { name: 'Save preset' }).click();
+  await expect(page.locator('.status-line')).toContainText('Saved the current chain as the preset "Gentle".');
+  await expect(master.getByLabel('Saved presets')).toHaveValue(/preset-/);
+  await master.getByRole('button', { name: 'Apply preset' }).click();
+  await expect(page.locator('.status-line')).toContainText('Applied the preset "Gentle".');
+
+  // Backup round trip: save, start over, and open the backup from the empty workspace.
+  await page.getByRole('tab', { name: 'Project' }).click();
+  const [backup] = await Promise.all([page.waitForEvent('download'), project.getByRole('button', { name: 'Save project backup' }).click()]);
+  expect(backup.suggestedFilename()).toBe('session project.zip');
+  const { readFile } = await import('node:fs/promises');
+  const zipBytes = await readFile(await backup.path());
+  const { default: JSZip } = await import('jszip');
+  const archive = await JSZip.loadAsync(zipBytes);
+  const manifest = JSON.parse(await archive.file('project.json')!.async('string')) as { format: string; version: number; document: { markers: Array<{ label: string }> } };
+  expect(manifest).toMatchObject({ format: 'inmotools-audio-mastering', version: 1 });
+  expect(manifest.document.markers.map((marker) => marker.label)).toEqual(['Chorus']);
+
+  await page.getByRole('button', { name: 'New project' }).click();
+  await page.getByRole('button', { name: 'Confirm new project' }).click();
+  await expect(page.getByText('Add audio', { exact: true })).toBeVisible();
+  await page.locator('.mastering-import input[type="file"][accept=".zip,application/zip"]').setInputFiles({ name: 'session project.zip', mimeType: 'application/zip', buffer: zipBytes });
+  await expect(page.locator('.status-line')).toContainText('Opened session project.zip: 1 track and 1 audio file.');
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Edit' }).getByLabel('Marker 1 name')).toHaveValue('Chorus');
+
+  // A file that is not a backup is refused without touching the open project.
+  await page.getByRole('tab', { name: 'Project' }).click();
+  await project.locator('input[type="file"]').setInputFiles({ name: 'notes.zip', mimeType: 'application/zip', buffer: Buffer.from('not a zip') });
+  await expect(page.locator('.status-line')).toContainText('Could not open notes.zip: This file is not a project backup (it is not a ZIP).');
+  await expect(page.getByText('1 of 8 tracks in use')).toBeVisible();
+
+  // The shortcut list opens from anywhere with "?".
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('?');
+  await expect(page.locator('.mastering-shortcuts')).toHaveAttribute('open', '');
 });

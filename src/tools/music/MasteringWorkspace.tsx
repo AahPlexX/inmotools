@@ -7,6 +7,7 @@
  * worker turns each revision into the mix that playback and the timeline show.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { downloadBytes } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { clampSelection, type AudioEdit, type MasteringMarker, type TimeSelection } from './mastering-engine';
 import { bufferToPcm, decodeAudioFile, type AudioFileInfo } from './mastering-media';
@@ -35,6 +36,10 @@ import {
 import { formatTime, messageOf, newId, type MasteringPanelContext } from './mastering-ui';
 import MasteringTabs from './MasteringTabs';
 import MasteringExportTab from './MasteringExportTab';
+import MasteringProjectTab, { type AutosaveState } from './MasteringProjectTab';
+import MasteringPresets from './MasteringPresets';
+import { safeFileName } from './mastering-export';
+import { MasteringStore, buildProjectBackup, isQuotaError, readProjectBackup, type StoredSession } from './mastering-persistence';
 import MasteringEditTab from './MasteringEditTab';
 import MasteringTimePitchTab from './MasteringTimePitchTab';
 import MasteringRepairTab from './MasteringRepairTab';
@@ -78,6 +83,9 @@ function timelinePosition(graph: PlaybackGraph, contextTime: number, duration: n
 function createPlaybackContext(sampleRate: number): AudioContext {
   try { return new AudioContext({ sampleRate, latencyHint: 'playback' }); } catch { return new AudioContext({ latencyHint: 'playback' }); }
 }
+
+/** Quiet period after the last edit before the session is written to browser storage. */
+const AUTOSAVE_DELAY_MS = 1000;
 
 const ACCEPTED_AUDIO = 'audio/*,.wav,.wave,.mp3,.flac,.ogg,.oga,.opus,.m4a,.aac,.aiff,.aif,.caf,.webm';
 
@@ -132,6 +140,16 @@ export default function MasteringWorkspace() {
   const sessionRef = useRef(0);
   const mountedRef = useRef(true);
   const importRevisionRef = useRef(0);
+  const [store, setStore] = useState<MasteringStore | null>(null);
+  /** Identifies this tab's autosave session; restoring a session adopts its id. */
+  const sessionIdRef = useRef(newId('session'));
+  /** Original bytes of every loaded source, kept for autosave and backups. */
+  const sourceFilesRef = useRef(new Map<string, Blob>());
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const [recovery, setRecovery] = useState<StoredSession | null>(null);
+  const [autosave, setAutosave] = useState<AutosaveState>({ state: 'starting' });
+  const [projectBusy, setProjectBusy] = useState(false);
+  const shortcutsRef = useRef<HTMLDetailsElement | null>(null);
 
   const commitDocument = useCallback((next: MasteringDocument) => setHistory((current) => commitProjectRevision(current, next)), []);
   const updateView = useCallback((patch: Partial<Pick<MasteringDocument, 'selection' | 'playhead' | 'activeClipId'>>) => setHistory((current) => replaceProjectView(current, patch)), []);
@@ -165,6 +183,78 @@ export default function MasteringWorkspace() {
       client.dispose();
     };
   }, []);
+
+  // --- SECTION: autosave and recovery (ledger 18) ---
+
+  useEffect(() => {
+    let cancelled = false;
+    let opened: MasteringStore | null = null;
+    MasteringStore.open().then(async (value) => {
+      opened = value;
+      if (cancelled) { value.close(); return; }
+      setStore(value);
+      setAutosave({ state: 'idle' });
+      try {
+        const sessions = await value.listSessions();
+        // Offer the newest session from another tab or an earlier visit, never this tab's own.
+        const candidate = sessions.find((session) => session.id !== sessionIdRef.current && session.document.tracks.some((track) => track.clips.length));
+        if (!cancelled && candidate) setRecovery(candidate);
+      } catch { /* an unreadable session list only means nothing is offered */ }
+    }).catch((error: unknown) => {
+      if (!cancelled) setAutosave({ state: 'unavailable', message: messageOf(error) });
+    });
+    return () => { cancelled = true; opened?.close(); };
+  }, []);
+
+  /** Writes the current document now; queued behind any save already running. */
+  const saveNow = useCallback(() => {
+    if (!store) return;
+    const snapshot = historyRef.current.present;
+    const sessionId = sessionIdRef.current;
+    const files = new Map(sourceFilesRef.current);
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      if (snapshot.tracks.some((track) => track.clips.length)) {
+        await store.saveSession(sessionId, snapshot, files);
+        await store.pruneSessions(sessionId);
+        if (mountedRef.current) setAutosave({ state: 'saved', at: Date.now() });
+      } else {
+        await store.deleteSession(sessionId);
+        if (mountedRef.current) setAutosave({ state: 'idle' });
+      }
+    }).catch((error: unknown) => {
+      if (mountedRef.current) setAutosave(isQuotaError(error) ? { state: 'full' } : { state: 'unavailable', message: messageOf(error) });
+    });
+  }, [store]);
+
+  // Saves after a quiet second. View-only changes (playhead, active clip) keep the same
+  // references for everything listed here, so playback never triggers writes.
+  const pendingSaveRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!store) return;
+    pendingSaveRef.current = window.setTimeout(() => { pendingSaveRef.current = null; saveNow(); }, AUTOSAVE_DELAY_MS);
+    return () => {
+      if (pendingSaveRef.current !== null) window.clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = null;
+    };
+  }, [store, saveNow, document.sampleRate, document.sources, document.tracks, document.markers, document.regions, document.master, document.metadataEdits, document.selection]);
+
+  // Closing, reloading, or backgrounding the tab (where mobile browsers may kill it) writes a
+  // pending save at once; browsers let an IndexedDB transaction started here finish.
+  useEffect(() => {
+    const flush = () => {
+      if (pendingSaveRef.current === null) return;
+      window.clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = null;
+      saveNow();
+    };
+    const onVisibility = () => { if (window.document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    window.document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [saveNow]);
 
   // Only placement/edit changes affect the mix; selection, playhead, and markers do not.
   const renderKey = useMemo(() => JSON.stringify({ rate: document.sampleRate, tracks: document.tracks }), [document.sampleRate, document.tracks]);
@@ -415,6 +505,7 @@ export default function MasteringWorkspace() {
     setLoading(true);
     const placements: SourcePlacement[] = [];
     const infos: Record<string, AudioFileInfo> = {};
+    const blobs = new Map<string, Blob>();
     let projectRate = historyRef.current.present.sampleRate;
     // A newer import or a cleared project supersedes this batch; sources it already
     // handed to the worker would otherwise stay decoded there with no clip using them.
@@ -435,6 +526,7 @@ export default function MasteringWorkspace() {
           const loaded = await client.loadSource(sourceId, pcm, projectRate);
           if (revision !== importRevisionRef.current || !mountedRef.current) { abandon(sourceId); return; }
           infos[sourceId] = decoded.info;
+          blobs.set(sourceId, file);
           placements.push({
             source: {
               id: sourceId, name: file.name, sampleRate: decoded.info.sampleRate, channelCount: loaded.channelCount,
@@ -450,6 +542,7 @@ export default function MasteringWorkspace() {
       if (!placements.length) { setStatus(`Could not open audio: ${skipped.join('; ')}.`); return; }
       const next = addSourceTracksRevision(historyRef.current.present, placements);
       setSourceInfos((current) => ({ ...current, ...infos }));
+      for (const [id, blob] of blobs) sourceFilesRef.current.set(id, blob);
       if (!historyRef.current.present.tracks.length) setHistory(createProjectHistory(next));
       else commitDocument(next);
       const added = placements.map((placement) => placement.source.name).join(', ');
@@ -483,9 +576,106 @@ export default function MasteringWorkspace() {
     void clientRef.current?.releaseAll().catch(() => undefined);
     setHistory(createProjectHistory());
     setSourceInfos({});
+    sourceFilesRef.current = new Map();
     setRender(null);
     setConfirmClear(false);
     setStatus('Started a new empty project. Add audio to begin.');
+  };
+
+  // --- SECTION: reopening saved projects (ledgers 18, 81) ---
+
+  /**
+   * Replaces the project with a saved one: decodes each stored file under its original
+   * source id, then swaps the document in. The current project stays intact until every
+   * file has loaded, so a failed restore changes nothing.
+   */
+  const openProject = useCallback(async (saved: MasteringDocument, files: ReadonlyMap<string, Blob>, label: string, adoptSessionId?: string) => {
+    const client = clientRef.current;
+    if (!client) return;
+    const revision = ++importRevisionRef.current;
+    stopPlayback(false);
+    setLoading(true);
+    const previousIds = new Set(historyRef.current.present.sources.map((source) => source.id));
+    const loadedIds: string[] = [];
+    const infos: Record<string, AudioFileInfo> = {};
+    let next = saved;
+    const lengthChanges: string[] = [];
+    try {
+      for (const [index, source] of saved.sources.entries()) {
+        const blob = files.get(source.id);
+        if (!blob) throw new Error(`the audio for ${source.name} is missing.`);
+        setStatus(`Reopening ${source.name} (${index + 1} of ${saved.sources.length})…`);
+        const decoded = await decodeAudioFile(new File([blob], source.name, { lastModified: source.lastModified }));
+        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        const loaded = await client.loadSource(source.id, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
+        loadedIds.push(source.id);
+        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        infos[source.id] = decoded.info;
+        // Another browser's decoder can pad a compressed file differently; edits are timed in seconds, so record the new length and say so.
+        if (loaded.frameCount !== source.frameCount) {
+          lengthChanges.push(source.name);
+          next = { ...next, sources: next.sources.map((item) => (item.id === source.id ? { ...item, frameCount: loaded.frameCount } : item)) };
+        }
+      }
+      for (const id of previousIds) if (!next.sources.some((source) => source.id === id)) void client.releaseSource(id).catch(() => undefined);
+      sourceFilesRef.current = new Map(next.sources.map((source) => [source.id, files.get(source.id)!]));
+      if (adoptSessionId) sessionIdRef.current = adoptSessionId;
+      setRecovery(null);
+      setSourceInfos(infos);
+      setHistory(createProjectHistory(next));
+      const count = next.tracks.length;
+      setStatus(`${label} ${count} track${count === 1 ? '' : 's'} and ${next.sources.length} audio file${next.sources.length === 1 ? '' : 's'}.${lengthChanges.length ? ` ${lengthChanges.join(', ')} decoded to a slightly different length in this browser; listen to edits near their ends.` : ''}`);
+    } catch (error) {
+      for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
+      if (mountedRef.current) setStatus(`Could not reopen the project: ${messageOf(error)} Your current project is unchanged.`);
+    } finally {
+      if (revision === importRevisionRef.current && mountedRef.current) setLoading(false);
+    }
+  }, [stopPlayback]);
+
+  const restoreSession = async () => {
+    if (!store || !recovery) return;
+    try {
+      const files = await store.loadSources(recovery.id, recovery.document.sources.map((source) => source.id));
+      await openProject(recovery.document, files, 'Restored your session:', recovery.id);
+    } catch (error) { setStatus(`Could not restore the session: ${messageOf(error)}`); }
+  };
+
+  const discardSession = async () => {
+    if (!recovery) return;
+    const id = recovery.id;
+    setRecovery(null);
+    try {
+      await store?.deleteSession(id);
+      setStatus('Discarded the saved session.');
+    } catch (error) { setStatus(`Could not discard the saved session: ${messageOf(error)}`); }
+  };
+
+  const saveBackup = async () => {
+    setProjectBusy(true);
+    try {
+      const snapshot = historyRef.current.present;
+      const bytes = await buildProjectBackup(snapshot, sourceFilesRef.current);
+      const name = `${safeFileName((snapshot.sources[0]?.name ?? 'project').replace(/\.[^.]+$/, ''), 'project')} project.zip`;
+      downloadBytes(bytes, name, 'application/zip');
+      setStatus(`Saved ${name} with ${snapshot.sources.length} audio file${snapshot.sources.length === 1 ? '' : 's'}. Open it here to carry on later.`);
+    } catch (error) { setStatus(`Could not save the backup: ${messageOf(error)}`); }
+    finally { if (mountedRef.current) setProjectBusy(false); }
+  };
+
+  const restoreBackup = async (file: File) => {
+    setProjectBusy(true);
+    try {
+      const backup = await readProjectBackup(file);
+      await openProject(backup.document, backup.sources, `Opened ${file.name}:`);
+    } catch (error) { setStatus(`Could not open ${file.name}: ${messageOf(error)}`); }
+    finally { if (mountedRef.current) setProjectBusy(false); }
+  };
+
+  const onBackupFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    consumeFileInput(input, () => (file ? restoreBackup(file) : undefined));
   };
 
   useEffect(() => {
@@ -556,6 +746,12 @@ export default function MasteringWorkspace() {
       const mod = event.ctrlKey || event.metaKey;
       if (mod && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
       if (mod && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; }
+      if (!mod && !event.altKey && event.key === '?') {
+        event.preventDefault();
+        const details = shortcutsRef.current;
+        if (details) { details.open = true; details.scrollIntoView({ block: 'nearest' }); details.querySelector('summary')?.focus(); }
+        return;
+      }
       if (mod || event.altKey || !hasAudio || loading) return;
       if (event.code === 'Space') {
         event.preventDefault();
@@ -605,6 +801,16 @@ export default function MasteringWorkspace() {
       <span className="mastering-local-badge">Local processing</span>
     </div>
     <div className="workspace-body mastering-workspace">
+      {recovery && !hasAudio && <section className="mastering-recovery" aria-labelledby="mastering-recovery-heading">
+        <div>
+          <h3 id="mastering-recovery-heading">Pick up where you left off?</h3>
+          <p>Your session from {new Date(recovery.savedAt).toLocaleString()} is saved on this device: {recovery.sourceNames.slice(0, 3).join(', ')}{recovery.sourceNames.length > 3 ? ` and ${recovery.sourceNames.length - 3} more` : ''}.</p>
+        </div>
+        <div className="button-row">
+          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading}>Restore session</button>
+          <button type="button" onClick={() => void discardSession()} disabled={loading}>Discard it</button>
+        </div>
+      </section>}
       <div
         className={`mastering-import${dragging ? ' is-dragging' : ''}`}
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
@@ -620,6 +826,10 @@ export default function MasteringWorkspace() {
             {loading ? 'Reading…' : hasAudio ? 'Add audio files' : 'Choose audio files'}
             <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
           </label>
+          {!hasAudio && <label className={`mastering-file-button mastering-file-secondary${loading || projectBusy ? ' is-disabled' : ''}`}>
+            Open project backup
+            <input type="file" accept=".zip,application/zip" disabled={loading || projectBusy} onChange={onBackupFile} />
+          </label>}
           {hasAudio && (confirmClear
             ? <button type="button" className="mastering-danger" onClick={clearProject}>Confirm new project</button>
             : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading}>New project</button>)}
@@ -644,7 +854,7 @@ export default function MasteringWorkspace() {
         {rendering && <span className="mastering-busy" role="status">Rendering…</span>}
         <output className="mastering-time" aria-label="Playhead time">{formatTime(playhead)}</output>
       </div>
-      <details className="mastering-shortcuts">
+      <details className="mastering-shortcuts" ref={shortcutsRef}>
         <summary>Keyboard shortcuts</summary>
         <dl>
           <div><dt>Space</dt><dd>Play or pause</dd></div>
@@ -658,6 +868,7 @@ export default function MasteringWorkspace() {
           <div><dt>+ / −</dt><dd>Zoom the timeline around the playhead</dd></div>
           <div><dt>Ctrl/⌘ + Z</dt><dd>Undo</dd></div>
           <div><dt>Ctrl/⌘ + Shift + Z or Ctrl + Y</dt><dd>Redo</dd></div>
+          <div><dt>?</dt><dd>Show this list</dd></div>
           <div><dt>Ctrl/⌘ + wheel</dt><dd>Zoom at the pointer; Shift + wheel scrolls sideways</dd></div>
         </dl>
         <p>Shortcuts pause while you type in a field.</p>
@@ -687,6 +898,8 @@ export default function MasteringWorkspace() {
         { id: 'time', label: 'Time & pitch', render: () => <MasteringTimePitchTab ctx={ctx} /> },
         { id: 'repair', label: 'Repair', render: () => <MasteringRepairTab ctx={ctx} /> },
         { id: 'master', label: 'Master', render: () => <MasteringMasterTab ctx={ctx} master={document.master} onPreview={setMasterPreview}
+          presets={<MasteringPresets store={store} master={document.master} disabled={!canEdit} onStatus={setStatus}
+            onApply={(settings, name) => { setMasterPreview(null); commitWithStatus(updateMasterRevision(historyRef.current.present, settings), `Applied the preset "${name}".`); }} />}
           onCommit={(settings, message) => { setMasterPreview(null); commitWithStatus(updateMasterRevision(historyRef.current.present, settings), message); }} /> },
         { id: 'meters', label: 'Meters', render: () => <MasteringMeters meters={meters} playing={playbackState === 'playing'} pre={analysers?.pre ?? null} post={analysers?.post ?? null}
           monitor={monitor} onMonitorChange={(patch) => setMonitor((current) => ({ ...current, ...patch }))}
@@ -697,6 +910,8 @@ export default function MasteringWorkspace() {
           timelineAt={(time) => lastGraphRef.current ? timelinePosition(lastGraphRef.current, time, duration) : null}
           onJump={seek} /> },
         { id: 'export', label: 'Export', render: (active) => <MasteringExportTab ctx={ctx} active={active} /> },
+        { id: 'project', label: 'Project', render: (active) => <MasteringProjectTab ctx={ctx} active={active} autosave={autosave} busy={projectBusy || loading}
+          onSaveBackup={saveBackup} onRestoreBackup={restoreBackup} /> },
       ]} />}
 
       <p className={`status-line ${/^Could not|failed|could not start/i.test(status) ? 'error' : ''}`} role="status" aria-live="polite">{status}</p>
