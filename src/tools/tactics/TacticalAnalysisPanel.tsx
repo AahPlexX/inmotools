@@ -185,6 +185,146 @@ export function deriveTacticalAnalysis(
   };
 }
 
+export interface TacticalAnalysisOverlayProps {
+  project: TacticalProject;
+  sceneId: string;
+  selectedTokenId?: string;
+  settings: AnalysisDisplaySettings;
+}
+
+function polygonPoints(points: Array<{ x: number; y: number }>): string {
+  return points.map((point) => `${point.x * 1000},${point.y * 1000}`).join(' ');
+}
+
+export function TacticalAnalysisOverlay({
+  project,
+  sceneId,
+  selectedTokenId,
+  settings,
+}: TacticalAnalysisOverlayProps) {
+  const view = deriveTacticalAnalysis(project, sceneId, selectedTokenId, settings);
+  const selected = view.selectedToken;
+
+  return (
+    <svg
+      className="tactical-analysis-overlay"
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {settings.positionalGrid && settings.gridColumns === 5 ? (
+        <>
+          <rect data-analysis-kind="half-space-zone" x="200" y="0" width="200" height="1000" className="tactical-analysis-zone half-space" />
+          <rect data-analysis-kind="central-corridor" x="400" y="0" width="200" height="1000" className="tactical-analysis-zone central" />
+          <rect data-analysis-kind="half-space-zone" x="600" y="0" width="200" height="1000" className="tactical-analysis-zone half-space" />
+        </>
+      ) : null}
+
+      {settings.heatMap && view.heatMap ? view.heatMap.cells
+        .filter((cell) => cell.count > 0)
+        .map((cell) => (
+          <rect
+            key={`heat-${cell.column}-${cell.row}`}
+            data-analysis-kind="heat-cell"
+            x={(cell.column / view.heatMap!.columns) * 1000}
+            y={(cell.row / view.heatMap!.rows) * 1000}
+            width={1000 / view.heatMap!.columns}
+            height={1000 / view.heatMap!.rows}
+            className="tactical-analysis-heat"
+            style={{ opacity: 0.12 + cell.intensity * 0.38 }}
+          />
+        )) : null}
+
+      {settings.voronoi ? view.voronoi.map((cell) => (
+        <polygon
+          key={cell.targetId}
+          data-analysis-kind="voronoi-cell"
+          points={polygonPoints(cell.polygon)}
+          className="tactical-analysis-voronoi"
+        />
+      )) : null}
+
+      {settings.hulls ? view.hulls.map(({ teamId, geometry }) => (
+        <polygon
+          key={teamId}
+          data-analysis-kind="team-hull"
+          points={polygonPoints(geometry.hull)}
+          className="tactical-analysis-hull"
+        />
+      )) : null}
+
+      {settings.positionalGrid ? (
+        <>
+          {view.grid.vertical.map((x) => (
+            <line
+              key={`grid-v-${x}`}
+              data-analysis-kind="grid-line"
+              x1={x * 1000}
+              x2={x * 1000}
+              y1="0"
+              y2="1000"
+              className="tactical-analysis-grid-line"
+            />
+          ))}
+          {view.grid.horizontal.map((y) => (
+            <line
+              key={`grid-h-${y}`}
+              data-analysis-kind="grid-line"
+              x1="0"
+              x2="1000"
+              y1={y * 1000}
+              y2={y * 1000}
+              className="tactical-analysis-grid-line"
+            />
+          ))}
+        </>
+      ) : null}
+
+      {settings.passingLane && selected ? (
+        <line
+          data-analysis-kind="passing-lane"
+          x1={selected.position.x * 1000}
+          y1={selected.position.y * 1000}
+          x2={project.ball.position.x * 1000}
+          y2={project.ball.position.y * 1000}
+          className={view.passingLane?.blocked ? 'tactical-analysis-lane blocked' : 'tactical-analysis-lane'}
+        />
+      ) : null}
+
+      {settings.vision && view.vision ? (
+        <polygon
+          data-analysis-kind="vision-sector"
+          points={polygonPoints(view.vision.points)}
+          className="tactical-analysis-vision"
+        />
+      ) : null}
+
+      {settings.distanceRing && view.ring ? (
+        <ellipse
+          data-analysis-kind="distance-ring"
+          cx={view.ring.center.x * 1000}
+          cy={view.ring.center.y * 1000}
+          rx={view.ring.radiusXNormalized * 1000}
+          ry={view.ring.radiusYNormalized * 1000}
+          className="tactical-analysis-ring"
+        />
+      ) : null}
+
+      {settings.tether && view.tether ? (
+        <line
+          data-analysis-kind="tether"
+          x1={view.tether.from.x * 1000}
+          y1={view.tether.from.y * 1000}
+          x2={view.tether.to.x * 1000}
+          y2={view.tether.to.y * 1000}
+          className="tactical-analysis-tether"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
 export interface TacticalAnalysisPanelProps {
   project: TacticalProject;
   sceneId: string;
