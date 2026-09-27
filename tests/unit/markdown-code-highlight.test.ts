@@ -42,7 +42,7 @@ describe('preview fenced-code language coloring', () => {
   });
 
   it('leaves an oversized recognized fence plain instead of parsing it for cosmetic highlighting', async () => {
-    const source = 'const x = 1;\n'.repeat(Math.ceil((MAX_HIGHLIGHT_SOURCE_CHARS + 1) / 13));
+    const source = 'x'.repeat(MAX_HIGHLIGHT_SOURCE_CHARS + 1);
     const result = await highlightSnippet(source, 'javascript');
     expect(source.length).toBeGreaterThan(MAX_HIGHLIGHT_SOURCE_CHARS);
     expect(result.recognized).toBe(false);
