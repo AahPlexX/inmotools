@@ -1,5 +1,10 @@
 # In Progress
 
+- **Universal Site Intelligence Analyzer** — final-completion pass on the existing draft PR #44 (`feature/site-analysis-workstation`); local-first URL/domain forensics, DNS/network, registration/history, TLS/security, email-auth, performance telemetry, scoring, export, and browser-local vault.
+  - Tool SSOT: `src/tools/site-intel/TRACKING.md` on PR #44. Current ledger: 38 accepted features; most are implemented, with Feature 13 missing its GeoIP minimap UI, Feature 6 still requiring an explicit client-safe redirect-resolution decision, and Features 11/17/19/28 carrying documented external/platform substitutions or blockers.
+  - Verified branch baseline: unit and production-build stages passed in PR run `35345670947`; Site Intelligence unit files and both desktop/mobile browser cases ran successfully, and the shared accessibility route produced no Site Intelligence failure. That run was red only in unrelated repository suites.
+  - Current milestone: close the two remaining implementable product gaps, add export/social regression coverage and real-network endpoint proof, reconcile external-service assumptions against current primary documentation, then reconcile PR #44 non-destructively with current `origin/main`.
+  - Completion gate: every one of the 38 ledger rows is Done or has an explicitly documented unavoidable static-browser substitution/blocker; outstanding-work items are implemented or deliberately deferred with rationale; focused units/build/browser/accessibility/reflow/export checks pass; at least one live-network verification confirms the public endpoints; PR #44 is integrated into current `main`; exact-main Pages deployment is green; then task state moves to DONE/WORK_LOG.
 - **Digital Logic Workstation** — local-first digital logic circuit simulator, schematic capture, and electronic-prototyping workstation governed by a 34-capability ledger.
   - Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
   - Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
