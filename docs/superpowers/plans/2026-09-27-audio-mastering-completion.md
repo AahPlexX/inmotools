@@ -38,7 +38,7 @@ Research for this plan (fetched 2026-09-27): ITU-R BS.1770-5 PDF (K-weighting Ta
 | S10 Durable workflow | 18, 81 | IndexedDB autosave, backup, presets, diagnostics, commands |
 | S11 Acceptance | all | Responsive, keyboard, axe, copy, browser workflow, integration |
 
-UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master and Meters tabs landed with S6/S7; Export and Project tabs are added by S9/S10. The realtime path is source → AnalyserNode (pre) → `mastering-master.worklet.ts` (chain + monitoring + meters) → AnalyserNode (post) → output, in an AudioContext at the project rate. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
+UI layout: the workspace has a fixed header, import strip, sticky transport, and timeline, then a tab workbench (`MasteringTabs`): Edit, Arrange, Time & pitch, Repair. Master and Meters tabs landed with S6/S7, Export with S9; a Project tab is added by S10. The realtime path is source → AnalyserNode (pre) → `mastering-master.worklet.ts` (chain + monitoring + meters) → AnalyserNode (post) → output, in an AudioContext at the project rate. Tabs share one `MasteringPanelContext` (`mastering-ui.tsx`); panels stay mounted when hidden so work in progress survives tab switches.
 
 ## Function status
 
@@ -71,7 +71,7 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 23 | Peak normalize | done | Phase 2 (target field added in S4) |
 | 24 | RMS/loudness normalize | done | S4: `normalizeLevel` edit (BS.1770-5 integrated or RMS) |
 | 25 | Reverse | done | Phase 2 |
-| 26 | Sample-rate conversion | partial | Resampler done (S1, import); explicit export target rate lands in S9 |
+| 26 | Sample-rate conversion | done | Resampler on import (S1); export converts to any common rate after the master chain and measures the converted samples (S9, `renderExport` `targetRate`) |
 | 27 | Bit depth + TPDF dither | done | S4: `quantize` edit with seeded TPDF; export depth reuses it in S9 |
 | 28 | Pitch shift + formant | done | S4: phase vocoder + resample, cepstral formant preservation |
 | 29 | Time stretch 25–400% | done | S4: identity-phase-locked vocoder, mid/side for stereo; ripple + annotation scaling |
@@ -118,10 +118,10 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 70 | Delta audition | done | S7 |
 | 71 | Reference track | done | S7: synced start offset, loudness-matched |
 | 72 | Offline master render | done | S6: worker `renderMaster`, latency-compensated, with loudness report |
-| 73–80 | Export formats, metadata, artwork, batch | open | S9 in progress: `mastering-export.ts` encoders and reports are written and unit-tested (`tests/unit/mastering-export.test.ts`); worker target-rate/stem requests, the Export tab, batch ZIP, and browser round trips remain |
+| 73–80 | Export formats, metadata, artwork, batch | done | S9: Export tab (`MasteringExportTab.tsx`) over `mastering-export.ts` and worker `renderExport`. WAV 16/24-bit PCM with optional TPDF dither or 32-bit float, bext v2 loudness + RIFF INFO; FLAC, MP3, AAC in M4A, Ogg (Opus or Vorbis, labelled) via MediaBunny with WASM fallbacks, capability-probed on first view; per-format tag fields with "Not stored" notes; front cover in FLAC/MP3/M4A/Ogg; project, selection, regions, or stems, batches as one ZIP with loudness CSV/JSON and spectrum PNGs. Browser spec proves a bit-exact 16-bit WAV round trip, container signatures, tags, cover art, and the stems ZIP layout |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 70/81 done** (2026-09-27: 132 mastering unit tests in 14 files; mastering browser spec 12/12, music spec 10/10, and the MIDI Harmony Lab cases in `audit-hardening.spec.ts` green across desktop/mobile Chromium).
+**Count: 79/81 done** (2026-09-27, after S9: 139 mastering unit tests in 14 files; mastering browser spec 14/14, music spec 10/10, and the MIDI Harmony Lab cases in `audit-hardening.spec.ts` green across desktop/mobile Chromium).
 
 ## Rules for whoever continues
 

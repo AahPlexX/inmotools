@@ -484,12 +484,15 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
   expect(m4a.name).toBe('tone.m4a');
   expect(m4a.bytes.subarray(4, 8).toString('ascii')).toBe('ftyp');
   expect(m4a.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+  expect(m4a.bytes.includes(cover)).toBe(true);
 
   await panel.getByLabel('Ogg').check();
   await expect(panel.getByTestId('export-format-note')).toContainText(/Writes (Opus|Vorbis) in Ogg/);
   const ogg = await exportDownload(page, panel, 'Export Ogg');
   expect(ogg.bytes.subarray(0, 4).toString('ascii')).toBe('OggS');
   expect(ogg.bytes.includes(Buffer.from('Test Tone'))).toBe(true);
+  // Vorbis comments carry cover art as a base64 FLAC picture block.
+  expect(ogg.bytes.includes(Buffer.from('METADATA_BLOCK_PICTURE', 'ascii')) || ogg.bytes.includes(Buffer.from('metadata_block_picture', 'ascii'))).toBe(true);
   await panel.getByLabel('MP3').check();
 
   // Stems: a second track, then one file per track plus reports in one ZIP.
