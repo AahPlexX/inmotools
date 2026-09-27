@@ -25,11 +25,13 @@ function runPendingRender() {
   if (!request) return;
   try {
     const result = engine.render(request.document);
+    // The engine keeps its mix for analysis and master renders; the UI gets a copy.
+    const mix = { sampleRate: result.mix.sampleRate, channels: result.mix.channels.map((channel) => channel.slice()) };
     const transfer: Transferable[] = [
-      ...result.mix.channels.map((channel) => channel.buffer),
+      ...mix.channels.map((channel) => channel.buffer),
       ...result.pyramid.levels.flatMap((level) => [level.min.buffer, level.max.buffer]),
     ];
-    post({ type: 'rendered', requestId: request.requestId, result }, transfer);
+    post({ type: 'rendered', requestId: request.requestId, result: { ...result, mix } }, transfer);
   } catch (error) {
     post({ type: 'error', requestId: request.requestId, message: errorText(error) });
   }
@@ -63,6 +65,19 @@ scope.onmessage = (event: MessageEvent<DspRequest>) => {
         break;
       case 'snap':
         post({ type: 'snapped', requestId: request.requestId, seconds: engine.snapToZeroCrossings(request.document, request.clipId, request.seconds, request.radius) });
+        break;
+      case 'spectrum': {
+        const analysis = engine.analyzeSpectrum(request.startSeconds, request.endSeconds);
+        post({ type: 'spectrumResult', requestId: request.requestId, ...analysis }, [analysis.spectrum.db.buffer]);
+        break;
+      }
+      case 'master': {
+        const result = engine.renderMaster(request.settings, request.startSeconds, request.endSeconds);
+        post({ type: 'masterResult', requestId: request.requestId, result }, result.channels.map((channel) => channel.buffer));
+        break;
+      }
+      case 'measureMix':
+        post({ type: 'mixMeasured', requestId: request.requestId, loudness: engine.measureMix() });
         break;
       case 'slice': {
         const slice = engine.clipSlice(request.document, request.clipId, request.startFrame, request.frameCount);

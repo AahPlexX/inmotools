@@ -42,3 +42,25 @@ describe('DSP engine', () => {
     expect(() => engine.clipSlice(document, 'missing', 0, 1)).toThrow(/not loaded/);
   });
 });
+
+describe('DSP engine analysis', () => {
+  it('renders the master from the last mix with a loudness report and analyses its spectrum', async () => {
+    const { defaultMasterSettings } = await import('../../src/tools/music/dsp/master-chain');
+    const engine = new MasteringDspEngine();
+    expect(() => engine.measureMix()).toThrow(/Render the timeline/);
+    const rate = 48_000;
+    const tone = Float32Array.from({ length: rate * 4 }, (_, n) => 0.1 * Math.sin(2 * Math.PI * 1000 * n / rate));
+    engine.loadSource('a', { sampleRate: rate, channels: [tone] }, rate);
+    const document = addSourceTracksRevision(createMasteringDocument(), [{ source: { ...reference('a', rate * 4), sampleRate: rate }, trackId: 't', clipId: 'c' }]);
+    engine.render(document);
+    const settings = defaultMasterSettings();
+    settings.outputGainDb = 6;
+    const master = engine.renderMaster(settings, 0.5, 4);
+    expect(master.channels).toHaveLength(1);
+    expect(master.channels[0]).toHaveLength(rate * 3.5);
+    expect(master.loudness.integrated - engine.measureMix().integrated).toBeCloseTo(6, 1);
+    expect(master.shortTermSeries.length).toBeGreaterThan(0);
+    const { resonances } = engine.analyzeSpectrum(0, 4);
+    expect(Math.abs(resonances[0].frequency - 1000)).toBeLessThan(10);
+  });
+});

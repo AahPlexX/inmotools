@@ -17,6 +17,7 @@ import {
   type MasteringRegion,
   type TimeSelection,
 } from './mastering-engine';
+import { defaultMasterSettings, normalizeMasterSettings, type MasterSettings } from './dsp/master-chain';
 
 // --- SECTION: types ---
 
@@ -87,6 +88,8 @@ export interface MasteringDocument {
   markers: MasteringMarker[];
   regions: MasteringRegion[];
   metadataEdits: Record<string, string>;
+  /** Master chain settings; part of the document so processing changes are undoable. */
+  master: MasterSettings;
 }
 
 export interface MasteringProjectHistory {
@@ -135,6 +138,7 @@ export function cloneDocument(document: MasteringDocument): MasteringDocument {
     markers: document.markers.map((marker) => ({ ...marker })),
     regions: document.regions.map((region) => ({ ...region })),
     metadataEdits: { ...document.metadataEdits },
+    master: JSON.parse(JSON.stringify(document.master)) as MasterSettings,
   };
 }
 
@@ -152,6 +156,7 @@ export function createMasteringDocument(): MasteringDocument {
     markers: [],
     regions: [],
     metadataEdits: {},
+    master: defaultMasterSettings(),
   };
 }
 
@@ -686,6 +691,13 @@ export function resetClipEditsRevision(document: MasteringDocument): MasteringDo
   next.selection = clampSelection(next.selection, total);
   next.playhead = Math.min(total, next.playhead);
   return next;
+}
+
+// --- SECTION: master chain (ledgers 45–59) ---
+
+/** Replaces the master settings with a sanitized copy; one undo step. */
+export function updateMasterRevision(document: MasteringDocument, master: MasterSettings): MasteringDocument {
+  return { ...cloneDocument(document), master: normalizeMasterSettings(master) };
 }
 
 // --- SECTION: history ---

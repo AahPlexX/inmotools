@@ -308,6 +308,12 @@ export class LoudnessMeter {
     };
   }
 
+  /** Current short-term loudness; cheap enough to call every render quantum. */
+  shortTermLufs(): number { return toLufs(this.windowPower(SHORT_TERM_SUB_BLOCKS)); }
+
+  /** Largest channel true peak so far in dBTP; cheap enough to call every render quantum. */
+  maxTruePeakDb(): number { return toDb(Math.max(...this.truePeaks.map((detector) => detector.peak))); }
+
   /** Short-term values recorded every 100 ms once 3 s are available (for LRA and loudness CSV export). */
   shortTermSeries(): readonly number[] { return this.shortTermHistory; }
 }

@@ -6,7 +6,8 @@
  * `dispose` terminates the worker and rejects anything still waiting, which
  * releases the worker's source PCM when the workspace unmounts.
  */
-import type { RenderResult } from './mastering-dsp-engine';
+import type { MasterRenderResult, RenderResult } from './mastering-dsp-engine';
+import type { MasterSettings } from './dsp/master-chain';
 import type { DspRequest, DspResponse } from './mastering-dsp-protocol';
 import type { MasteringDocument } from './mastering-project';
 import type { PcmAudio } from './mastering-engine';
@@ -82,6 +83,19 @@ export class MasteringDspClient {
   async slice(document: MasteringDocument, clipId: string, startFrame: number, frameCount: number) {
     const response = MasteringDspClient.unwrap(await this.request({ type: 'slice', document, clipId, startFrame, frameCount }), 'sliced');
     return { startFrame: response.startFrame, channels: response.channels };
+  }
+
+  async spectrum(startSeconds?: number, endSeconds?: number) {
+    const response = MasteringDspClient.unwrap(await this.request({ type: 'spectrum', startSeconds, endSeconds }), 'spectrumResult');
+    return { spectrum: response.spectrum, resonances: response.resonances };
+  }
+
+  async renderMaster(settings: MasterSettings, startSeconds?: number, endSeconds?: number): Promise<MasterRenderResult> {
+    return MasteringDspClient.unwrap(await this.request({ type: 'master', settings, startSeconds, endSeconds }), 'masterResult').result;
+  }
+
+  async measureMix() {
+    return MasteringDspClient.unwrap(await this.request({ type: 'measureMix' }), 'mixMeasured').loudness;
   }
 
   dispose() {

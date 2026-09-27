@@ -11,6 +11,9 @@ import { MaterialCache, mixArrangement } from './mastering-arrangement';
 import { buildPeakEnvelope, findZeroCrossing, measureDcOffset, type PcmAudio, type PeakBucket } from './mastering-engine';
 import type { MasteringDocument } from './mastering-project';
 import { buildPeakPyramid, type PeakPyramid } from './dsp/peaks';
+import { averageSpectrum, findResonances, type Resonance, type Spectrum } from './dsp/analysis';
+import { measureLoudness, LoudnessMeter, type LoudnessReading } from './dsp/loudness';
+import { renderMaster, type MasterSettings } from './dsp/master-chain';
 import { resamplePcm } from './dsp/resample';
 
 export interface ClipRenderInfo {
@@ -29,9 +32,19 @@ export interface RenderResult {
 
 const CLIP_OVERVIEW_BUCKETS = 600;
 
+export interface MasterRenderResult {
+  channels: Float32Array[];
+  sampleRate: number;
+  loudness: LoudnessReading;
+  /** Short-term loudness every 100 ms (for the loudness CSV/JSON report). */
+  shortTermSeries: number[];
+}
+
 export class MasteringDspEngine {
   private readonly sources = new Map<string, PcmAudio>();
   private readonly cache = new MaterialCache();
+  /** The most recent mix, kept so analysis and master renders need no re-mix. */
+  private lastMix: PcmAudio | null = null;
 
   /**
    * Registers decoded PCM for a source, converting it to the project rate.
@@ -53,6 +66,7 @@ export class MasteringDspEngine {
   releaseAll() {
     this.sources.clear();
     this.cache.clear();
+    this.lastMix = null;
   }
 
   hasSource(sourceId: string) { return this.sources.has(sourceId); }
@@ -92,7 +106,46 @@ export class MasteringDspEngine {
     const mix = document.sampleRate && materials.size
       ? mixArrangement(document, materials)
       : { sampleRate: document.sampleRate ?? 48_000, channels: [new Float32Array(0)] };
+    this.lastMix = mix;
     return { mix, pyramid: buildPeakPyramid(mix), clips };
+  }
+
+  private mixRange(startSeconds?: number, endSeconds?: number): { mix: PcmAudio; start: number; end: number } {
+    const mix = this.lastMix;
+    if (!mix || !mix.channels[0]?.length) throw new Error('Render the timeline before analysing it.');
+    const length = mix.channels[0].length;
+    const start = startSeconds === undefined ? 0 : Math.max(0, Math.min(length, Math.round(startSeconds * mix.sampleRate)));
+    const end = endSeconds === undefined ? length : Math.max(start, Math.min(length, Math.round(endSeconds * mix.sampleRate)));
+    return { mix, start, end };
+  }
+
+  /** Average spectrum of the mix over a range, plus the strongest resonances (ledger 50). */
+  analyzeSpectrum(startSeconds?: number, endSeconds?: number): { spectrum: Spectrum; resonances: Resonance[] } {
+    const { mix, start, end } = this.mixRange(startSeconds, endSeconds);
+    const spectrum = averageSpectrum(mix.channels, mix.sampleRate, start, end);
+    return { spectrum, resonances: findResonances(spectrum) };
+  }
+
+  /**
+   * Offline master render (ledger 72) of the mix or a range of it, with a full
+   * BS.1770-5 / EBU R 128 loudness reading of the result.
+   */
+  renderMaster(settings: MasterSettings, startSeconds?: number, endSeconds?: number): MasterRenderResult {
+    const { mix, start, end } = this.mixRange(startSeconds, endSeconds);
+    const channels = renderMaster(mix.channels.map((channel) => channel.subarray(start, end)), mix.sampleRate, settings);
+    const meter = new LoudnessMeter(mix.sampleRate, channels.length);
+    const block = 8192;
+    for (let offset = 0; offset < channels[0].length; offset += block) {
+      const size = Math.min(block, channels[0].length - offset);
+      meter.process(channels.map((channel) => channel.subarray(offset, offset + size)), size);
+    }
+    return { channels, sampleRate: mix.sampleRate, loudness: meter.reading(), shortTermSeries: [...meter.shortTermSeries()] };
+  }
+
+  /** Loudness reading of the unprocessed mix, for before/after comparison. */
+  measureMix(): LoudnessReading {
+    const { mix } = this.mixRange();
+    return measureLoudness(mix.channels, mix.sampleRate);
   }
 
   /**
