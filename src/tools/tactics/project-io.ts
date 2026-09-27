@@ -292,7 +292,7 @@ export async function importTacticalProjectZip(
     totalAssetBytes += bytes.byteLength;
     if (totalAssetBytes > MAX_PROJECT_ZIP_BYTES) throw new Error('Tactical ZIP expanded assets exceed the local import size limit.');
     assetsById.set(asset.mediaId, {
-      blob: new Blob([bytes], { type: asset.mimeType }),
+      blob: new Blob([Uint8Array.from(bytes).buffer], { type: asset.mimeType }),
       sizeBytes: bytes.byteLength,
     });
   }
