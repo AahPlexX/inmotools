@@ -5,7 +5,7 @@ import type {
 import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
 import { validateTacticalTimeline } from './timeline-engine';
 
-export const TACTICS_SCHEMA_VERSION = 1 as const;
+export const TACTICS_SCHEMA_VERSION = 2 as const;
 
 function isoNow(): string {
   return new Date().toISOString();
@@ -83,6 +83,7 @@ export function createStarterTacticalProject(): TacticalProject {
       playbackRate: 1,
       tracks: [],
       markers: [],
+      possessionEvents: [],
     },
     cameraStates: [],
     analysisSettings: {
