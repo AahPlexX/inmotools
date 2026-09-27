@@ -1,28 +1,38 @@
 # Done
 
-## Markdown Workbench real-world remediation — 7/7 pass complete
+## Markdown Workbench real-world remediation + historical reconciliation — 10/10 complete
 
-> Historical pass record: F01–F07 are complete. A later same-day stale-branch reconciliation opened F08–F10; see `.tasks/IN_PROGRESS.md` until that scoped follow-up is verified and closed.
+The 2026-09-27 Markdown real-world pass is complete on `origin/main`. F01–F07 close dirty-safe
+file replacement, imported-file draft isolation, durable names/name-only autosave, hash-safe preview
+anchors, full-width Preview mode, runtime document-file validation, and conventional formatting
+shortcuts. Reconciliation of the stale `claude/markdown-tool-audit-docs-lwrb3w` branch then closed
+F08–F10 without merging its old tree: detached Copy/HTML/EPUB rendering now uses stable export-safe
+`tok-*` syntax-highlighting classes, cosmetic highlighting is bounded at 20,000 characters per fence,
+and the dead contradictory `markdown-types.ts` `ExportAsset` declaration is removed.
 
-The 2026-09-27 real-world remediation is complete on `origin/main` at product revision
-`14099c3c476d74bce943abc8a4623ced9435a9c7`. The seven accepted functions are closed: dirty-safe file replacement,
-isolated draft identity for imported files, durable draft names/name-only autosave, hash-safe
-preview anchors, a first-class full-width Preview mode, runtime Markdown/plain-text file
-validation, and conventional Ctrl/Cmd formatting shortcuts.
+Product implementation revision: `63b99476f3731266c1c57f268ca4259b446fe19f`.
+Final acceptance revision: `4607159234bc84653585c4a0906a212ea8574396`. Git comparison proves the
+only changes between those revisions are the Markdown regression files (one exact size-fixture
+correction and one Copy HTML browser assertion), so shipped product source is byte-identical.
 
-Fresh exact-product evidence:
-- focused run `36329231897` / job `108647853700` passed the production TypeScript/Vite build
-  and **118/118 Markdown desktop/mobile Chromium checks** across
-  `markdown-workbench.spec.ts`, `markdown-workbench-ux.spec.ts`, and `markdown-mermaid.spec.ts`;
-- Pages run `36329231892` passed **195 unit files / 1956 tests**, production build, Pages artifact
-  generation/upload, and deployment job `108647967903`;
-- the same Pages run's repository-wide browser sweep reported **953 passed, 22 skipped, 1 flaky**.
-  The flaky case was the unrelated mobile Typing test at `tests/e2e/typing.spec.ts:439`; Playwright
-  retried it successfully, so the run and validate job concluded success. No Markdown case failed.
+Fresh evidence:
+- same-product focused run `36332490614` / job `108656984010` passed the production build and
+  **124/124** desktop/mobile Chromium checks across all three Markdown specs;
+- exact-final focused run `36332688014` / job `108657533447` passed the production build and
+  **54/54** desktop/mobile UX checks, including Copy HTML token markup, self-contained standalone
+  HTML coloring, packaged EPUB coloring, oversized-fence fallback, and the complete F01–F07 UX set;
+- exact-final Pages run `36332688074` completed its repository unit step successfully, completed its
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
 
-No runtime dependency was added. The live Markdown handoff remains
-`docs/markdown-audit-2026-09-16.md`; future Markdown changes should start from current `origin/main`
-and reopen task state only for newly verified scope.
+No dependency changed. Direct current-tree reads confirm the contradictory `ExportAsset` type is gone
+and the export-safe stylesheet is present. The historical branch has no open PR and no intended behavior
+left stranded from `main`; it is superseded evidence and must not be merged wholesale. The available
+GitHub connector exposes no branch-delete/ref-delete action, so physical deletion of that already-
+superseded ref was not performed by this workstream.
+
+The durable handoff is `docs/markdown-audit-2026-09-16.md`. Future Markdown work should reopen task
+state only for a newly verified defect or explicitly accepted scope.
 
 ## Markdown Workbench Gauntlet hardening — 4/4 complete
 

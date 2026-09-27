@@ -107,7 +107,7 @@ Research date: 2026-09-26 local / 2026-09-27 UTC. `GOVERNANCE.md` was read and n
 
 ## Real-world remediation pass — 2026-09-27
 
-Status: **COMPLETE — 7/7 accepted remediation functions verified on `14099c3c476d74bce943abc8a4623ced9435a9c7`.**
+Status: **STAGE COMPLETE — F01–F07 verified; final workstream ledger is F01–F10 in the reconciliation section below.**
 
 The prior completion record remains historical evidence, not a waiver for newly reproduced real-world defects. This pass started from `origin/main` at `48257af167d4296552ccb4e4b09570e0aee0a45d`; the pre-write focused-tool and Pages workflows on that revision were green. Scope is restricted to Markdown Workbench source, its browser regression suite, this handoff record, and the additive task-state entry.
 
@@ -151,7 +151,7 @@ This seven-function remediation is therefore closed. Any future Markdown work mu
 
 ## Historical branch reconciliation — 2026-09-27
 
-Status: **ACTIVE — F08–F10 implemented; exact-main validation pending.**
+Status: **COMPLETE — F01–F10 verified and integrated on `origin/main`; product source `63b99476f3731266c1c57f268ca4259b446fe19f`, final acceptance revision `4607159234bc84653585c4a0906a212ea8574396`.**
 
 After F01–F07 closed, the old branch `claude/markdown-tool-audit-docs-lwrb3w` was compared against current `origin/main` before branch cleanup. It has no open pull request and is far behind current main, so its tree is not safe to merge. Three behaviors in its unique commits were nevertheless still valid when re-verified against the newer production implementation:
 
@@ -159,14 +159,29 @@ After F01–F07 closed, the old branch `claude/markdown-tool-audit-docs-lwrb3w` 
 - **F09 — bounded cosmetic highlighting.** A recognized fence had no size bound even though highlighting is cosmetic and reruns during editing. `MAX_HIGHLIGHT_SOURCE_CHARS = 20_000` now returns the existing safe plain-code fallback before loading/parsing a grammar.
 - **F10 — one authoritative export-asset contract.** `markdown-types.ts` still declared an unused `ExportAsset { filename, mimeType }` while the actual export pipeline uses `export-assets.ts`'s `ExportAsset { path, mediaType, data }`. The dead contradictory type is removed.
 
-### Reconciliation evidence to run
+### Reconciliation evidence
 
-- focused unit regression for the oversized-fence fallback;
-- live browser regression proving recognized fences still receive visible token colors;
-- real downloaded standalone HTML proving highlighted markup and its token CSS travel together;
-- real downloaded EPUB proving the chapter and packaged stylesheet travel together;
-- oversized-fence browser regression proving the source remains visible without token spans;
-- exact-main production build and complete Markdown desktop/mobile browser matrix;
-- exact-main Pages unit/build/artifact/deploy gate.
+- Product-source focused run `36332490614` / job `108656984010` selected
+  `markdown-workbench.spec.ts`, `markdown-workbench-ux.spec.ts`, and `markdown-mermaid.spec.ts`,
+  passed the production build, and passed **124/124** desktop/mobile Chromium cases.
+- Final acceptance revision `4607159234bc84653585c4a0906a212ea8574396` differs from the product
+  source revision only in Markdown test files. Its exact-final focused run `36332688014` /
+  job `108657533447` passed the production build and **54/54** desktop/mobile UX cases, including:
+  Copy HTML token classes; downloaded standalone HTML with token CSS; downloaded EPUB chapter +
+  packaged token stylesheet; oversized-fence plain-code fallback; and the earlier F01–F07 regressions.
+- Exact-final Pages run `36332688074` completed the repository unit step successfully, completed the
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
+- Direct reads at the final acceptance revision confirm `markdown-types.ts` no longer contains the
+  duplicate `ExportAsset` interface and `code-highlight.css` is present. No dependency changed.
 
-No dependency is added. Current official Lezer documentation describes `classHighlighter` as the highlighter that emits stable predictable token classes for external CSS; CodeMirror's own styling guidance uses static highlighting for non-editor HTML. The stale branch is treated as evidence only, not as an integration source of truth.
+Current official Lezer documentation describes `classHighlighter` as the highlighter that emits stable
+predictable token classes for external CSS; CodeMirror's styling guidance uses static highlighting for
+non-editor HTML. The current implementation preserves main's newer lazy/cached language loader and
+integrates only the still-valid behavior from the historical branch.
+
+The historical branch `claude/markdown-tool-audit-docs-lwrb3w` has no open pull request and no
+remaining intended behavior absent from `main`; its unique commits are superseded implementation
+history and must not be merged wholesale. The connected GitHub capability does not expose branch/ref
+deletion, so the physical ref remains as non-authoritative history rather than as active or stranded
+work.
