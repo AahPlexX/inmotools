@@ -1,5 +1,24 @@
 # Done
 
+## Markdown Workbench Gauntlet hardening — 4/4 complete
+
+The post-completion Markdown adversarial pass is integrated on `origin/main` at
+`9c005972e60c445700a45739865d4f0391cfd1ed` through merged PR #79. It closes four hardening
+contracts without changing the established Markdown feature count: stale citation-result rejection,
+table-formula Worker lifecycle/cancellation safety, detached export sanitization, and Graphviz SVG
+navigation/resource sanitization.
+
+Final PR run `36283957420` passed **195 unit files / 1956 tests**, production build, and **106/106**
+selected Markdown desktop/mobile Chromium cases. Exact-main focused run `36284149989` passed build and
+**106/106** Markdown browser cases again. Exact-main Pages run `36284150052` passed install, units and
+build, built/uploaded the production artifact, and deployed successfully through job `108521673120`.
+A forced uncached production-route fetch returned HTTP 200 with the current Markdown Workbench surface.
+
+The temporary validation workflow was removed before merge and the PR branch was removed after merge.
+Static closure found no Markdown FIXME/HACK, XHR/WebSocket, or internal prompt/confidence/chain-of-thought
+leakage. Remaining TODO text belongs to bundled upstream CSL XML; export `fetch` usage is limited to
+document-referenced asset inlining/EPUB packaging rather than hidden telemetry or file upload.
+
 ## Photo Studio — 164/164 complete
 
 Photo Studio is complete against its authoritative 164-capability ledger and integrated on

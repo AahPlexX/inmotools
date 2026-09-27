@@ -43,23 +43,32 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
   } | null = null;
   let disposed = false;
 
-  const terminateWorker = () => {
-    worker?.terminate();
-    worker = null;
+  const terminateWorker = (target: TableFormulaWorkerPort | null = worker) => {
+    if (!target) return;
+    // Detach callbacks before termination. Besides avoiding retained closures,
+    // this guarantees a queued callback from a superseded worker cannot act on
+    // a later request that happens to be active when the callback is delivered.
+    target.onmessage = null;
+    target.onerror = null;
+    target.onmessageerror = null;
+    target.terminate();
+    if (worker === target) worker = null;
   };
 
   const cancelActive = () => {
     if (!active) return;
     const pending = active;
     active = null;
+    terminateWorker(worker);
     pending.reject(new TableFormulaRunCancelled());
-    terminateWorker();
   };
 
   const attachWorker = (): TableFormulaWorkerPort => {
     const next = (workerFactory ?? browserWorkerFactory)();
+    worker = next;
+
     next.onmessage = (event) => {
-      if (!active || event.data.id !== active.id) return;
+      if (worker !== next || !active || event.data.id !== active.id) return;
       const pending = active;
       active = null;
       if (event.data.error) pending.reject(new Error(event.data.error));
@@ -67,20 +76,20 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
       else pending.reject(new Error('The table-formula worker returned no result.'));
     };
     next.onerror = () => {
-      if (!active) return;
+      if (worker !== next || !active) return;
       const pending = active;
       active = null;
-      terminateWorker();
+      terminateWorker(next);
       pending.reject(new Error('The table-formula worker failed to start.'));
     };
     next.onmessageerror = () => {
-      if (!active) return;
+      if (worker !== next || !active) return;
       const pending = active;
       active = null;
-      terminateWorker();
+      terminateWorker(next);
       pending.reject(new Error('The table-formula worker response could not be read.'));
     };
-    worker = next;
+
     return next;
   };
 
@@ -90,9 +99,10 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
 
       if (active) cancelActive();
 
-      // Keep the previous synchronous behavior only for runtimes that do not
-      // expose Web Workers (for example non-browser tests or unusual embedded
-      // browsers). Normal app execution takes the worker path below.
+      // Keep the previous synchronous behavior for runtimes that do not expose
+      // Workers, and for browsers where Worker exists but construction is
+      // blocked (for example by policy). A custom injected factory still
+      // rejects on construction failure so tests/callers can observe its error.
       if (!workerFactory && typeof Worker === 'undefined') {
         try {
           return Promise.resolve(substituteFormulaValues(source));
@@ -101,7 +111,20 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
         }
       }
 
-      const currentWorker = worker ?? attachWorker();
+      let currentWorker = worker;
+      if (!currentWorker) {
+        try {
+          currentWorker = attachWorker();
+        } catch (error) {
+          if (workerFactory) return Promise.reject(error);
+          try {
+            return Promise.resolve(substituteFormulaValues(source));
+          } catch (fallbackError) {
+            return Promise.reject(fallbackError);
+          }
+        }
+      }
+
       const id = ++requestCounter;
 
       return new Promise<string>((resolve, reject) => {
@@ -109,8 +132,8 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
         try {
           currentWorker.postMessage({ id, source });
         } catch (error) {
-          active = null;
-          terminateWorker();
+          if (active?.id === id) active = null;
+          terminateWorker(currentWorker);
           reject(error);
         }
       });
@@ -120,7 +143,7 @@ export const createTableFormulaRunner = (workerFactory?: WorkerFactory): TableFo
       if (disposed) return;
       disposed = true;
       cancelActive();
-      terminateWorker();
+      terminateWorker(worker);
     },
   };
 };

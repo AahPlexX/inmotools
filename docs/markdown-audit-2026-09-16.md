@@ -66,3 +66,40 @@ Research date: 2026-09-16 UTC. GOVERNANCE.md was read and not modified.
 ## Integration evidence
 
 Implemented on main at 1e9bef197327337d638b5a0bfd50b203165fcc48. All 191 Markdown units pass after changes; Pages deployment succeeded. Live source highlight spans, syntax dialog opening/closing and visible find/replace were verified. Focused run 35144034742 passed 78/80 checks; both failures were an obsolete single-draft assumption in the same desktop/mobile test. The corrected test now verifies both preserved drafts and deletes only the requested one. Rerun 35144496126 at main 007be946664ebee98e05f9dd56ddf7d9183c23b1 passed all 50 checks in the affected workflow spec on desktop/mobile; build and Pages deployment also passed. The application source tree is identical to the first run, where all UX and Mermaid checks passed. Full validation fails outside Markdown in Vector tests.
+
+## Gauntlet hardening — 2026-09-26
+
+A post-completion adversarial pass closed four hardening contracts without expanding the Markdown feature ledger:
+
+1. **Citation async snapshot safety.** A citation-format result is accepted only when bibliography, style, source/citekeys, and request generation still match the request that produced it, so a delayed formatter cannot overwrite newer document state.
+2. **Table-formula Worker lifecycle safety.** The reusable Worker runner now rejects stale callbacks, recovers cleanly from termination/failure, and preserves the synchronous fallback when Worker construction is unavailable.
+3. **Detached export sanitization.** Standalone/rendered export paths retain the same sanitized document boundary rather than allowing detached export assembly to reintroduce active unsafe markup.
+4. **Graphviz SVG safety.** Generated SVG is parsed and rebuilt from the SVG root; executable/container elements and event-handler attributes are removed, unsafe navigation schemes are stripped, non-anchor external resource references are rejected while same-document fragments are preserved, and safe HTTP(S)/mailto/tel navigation links remain usable.
+
+### Adversarial regression evidence
+
+- The first safe-link browser assertion intentionally failed on branch head `e5910d2` because Playwright string `hasText: 'Safe'` also matched `Unsafe`; this was a test-locator defect, not a sanitizer failure.
+- A role-based replacement then failed because imported Graphviz SVG anchors were not exposed as `role=link` in this browser surface. The final regression therefore asserts the real SVG DOM boundary directly: exact `Safe` and `Unsafe` anchor text, retained HTTPS `href` on `Safe`, null `href` on `Unsafe`, and no `javascript:` URL anywhere in rendered diagram markup.
+- Focused branch run `36283681892` at `43721c0151dd0b0d2869d49bdb0d664c651c1140` passed **20 Markdown unit files / 215 tests**, production browser fixture build, and **106/106** desktop/mobile Chromium cases.
+- Final PR run `36283957420` at durable head `3df572c5b08ff041fc07e34d13186b178707d9da` passed the repository unit suite (**195 files / 1956 tests**), production build, Chromium install, and **106/106** selected Markdown desktop/mobile browser cases.
+- PR #79 was squash-merged to `origin/main` as product revision `9c005972e60c445700a45739865d4f0391cfd1ed`; the temporary Markdown-only workflow was deleted before integration and the PR branch was automatically removed after merge.
+- Exact-main focused run `36284149989` passed the production build and **106/106** selected Markdown desktop/mobile Chromium checks on `9c005972`.
+- Exact-main Pages run `36284150052` passed frozen dependency installation, repository unit tests and production build, built/uploaded the Pages artifact, and deployment job `108521673120` succeeded. Its repository-wide browser matrix was still running at the moment this record was written; Markdown completion does not depend on that duplicate broad check because the exact-main focused matrix is already green.
+- A forced uncached fetch of `https://aahplexx.github.io/inmotools/#/tools/markdown-workbench` after deployment returned HTTP 200 and rendered the current Markdown Workbench production surface.
+
+### Final audit notes
+
+- No Markdown `FIXME` or `HACK` implementation markers, XHR/WebSocket path, or internal prompt/confidence/chain-of-thought text is present under `src/tools/markdown/`.
+- Remaining `TODO` matches are comments in bundled upstream CSL style XML, not open Markdown implementation work.
+- `fetch` usage is confined to export asset inlining/EPUB packaging for document-referenced images/styles; citation style and locale data remain bundled local static assets. No hidden telemetry or selected-file upload path was introduced by this hardening.
+- Current Graphviz documentation confirms SVG supports graph-level stylesheet URLs and image/resource references. Graphviz's current SVG renderer emits the stylesheet as an XML processing instruction before the SVG root; root-only import therefore excludes it, while the sanitizer's non-anchor `href` policy rejects external SVG resource references.
+
+### Sources checked for this pass
+
+- Playwright locators: https://playwright.dev/docs/locators
+- Graphviz `stylesheet`: https://graphviz.org/docs/attrs/stylesheet/
+- Graphviz SVG renderer source (`gvrender_core_svg.c`): https://gitlab.com/graphviz/graphviz/-/blob/main/plugin/core/gvrender_core_svg.c
+- Graphviz SVG output: https://graphviz.org/docs/outputs/svg/
+- SVG 2 linking/external resources: https://www.w3.org/TR/SVG/linking.html
+
+Research date: 2026-09-26 local / 2026-09-27 UTC. `GOVERNANCE.md` was read and not modified.
