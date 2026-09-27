@@ -1,5 +1,9 @@
 import { useMemo, type PointerEvent as ReactPointerEvent } from 'react';
 import { serializeTacticalBoardSvg } from './board-engine';
+import {
+  TacticalAnalysisOverlay,
+  type AnalysisDisplaySettings,
+} from './TacticalAnalysisPanel';
 import type { NormalizedPoint, TacticalProject } from './tactics-types';
 import { clientPointToNormalized } from './workspace-engine';
 
@@ -9,6 +13,7 @@ export interface TacticalBoardProps {
   selectedTokenId?: string;
   interactionMode: 'move' | 'arrow';
   arrowStart?: NormalizedPoint | null;
+  analysisSettings?: AnalysisDisplaySettings;
   onSelectToken: (tokenId: string) => void;
   onPitchPoint: (point: NormalizedPoint) => void;
 }
@@ -25,6 +30,7 @@ export default function TacticalBoard({
   selectedTokenId,
   interactionMode,
   arrowStart,
+  analysisSettings,
   onSelectToken,
   onPitchPoint,
 }: TacticalBoardProps) {
@@ -73,6 +79,14 @@ export default function TacticalBoard({
         aria-label={instruction}
       >
         <div className="tactical-board-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+        {analysisSettings ? (
+          <TacticalAnalysisOverlay
+            project={project}
+            sceneId={sceneId}
+            selectedTokenId={selectedTokenId}
+            settings={analysisSettings}
+          />
+        ) : null}
         {arrowStart ? (
           <div
             className="tactical-arrow-start"
