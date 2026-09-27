@@ -104,6 +104,9 @@
 .mastering-band-row summary { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; min-height:44px; padding:10px 12px; cursor:pointer; }
 .mastering-stage + .mastering-stage, .mastering-panel + .mastering-stage, .mastering-stage + .mastering-panel { margin-top:0; }
 .mastering-table-scroll { overflow-x:auto; }
+.mastering-diagnostics th, .mastering-diagnostics td { white-space:normal; }
+.mastering-diagnostics th { width:45%; }
+.mastering-diagnostics td { overflow-wrap:anywhere; }
 .mastering-recovery { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid var(--signal); border-radius:var(--radius-sm); background:var(--signal-soft); }
 .mastering-recovery h3 { margin:0 0 4px; font-size:16px; }
 .mastering-recovery p { margin:0; }
@@ -130,7 +133,8 @@
 .mastering-image-row { display:grid; grid-template-columns:180px minmax(0,1fr); gap:12px; margin-top:12px; align-items:start; }
 .mastering-goniometer { width:180px; height:180px; border-radius:var(--radius-sm); }
 .mastering-meter-canvas { display:block; width:100%; border-radius:var(--radius-sm); }
-.mastering-file-secondary { background:var(--surface); color:var(--ink); border-color:var(--line-strong); }
+.mastering-file-secondary { background:var(--surface); color:var(--ink); border-color:var(--line-strong); font-size:13px; font-weight:680; }
+.mastering-file-secondary:hover:not(.is-disabled) { border-color:var(--signal); background:var(--signal-soft); }
 
 /* Spectrogram */
 .mastering-spectrogram { display:grid; gap:8px; }
