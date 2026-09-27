@@ -238,8 +238,9 @@ export default function MasteringWorkspace() {
     };
   }, [store, saveNow, document.sampleRate, document.sources, document.tracks, document.markers, document.regions, document.master, document.metadataEdits, document.selection]);
 
-  // Closing, reloading, or backgrounding the tab (where mobile browsers may kill it) writes a
-  // pending save at once; browsers let an IndexedDB transaction started here finish.
+  // Backgrounding is the last reliably observable lifecycle transition on mobile, so flush a
+  // pending save there and on pagehide as a best effort. IndexedDB cannot guarantee a transaction
+  // will finish if the browser process is terminated, which is why portable backups remain available.
   useEffect(() => {
     const flush = () => {
       if (pendingSaveRef.current === null) return;
@@ -314,7 +315,10 @@ export default function MasteringWorkspace() {
       if (!node) continue;
       try { node.onended = null; node.stop(); } catch { /* source may already have ended */ }
     }
-    if (graph.master) graph.master.port.onmessage = null;
+    if (graph.master) {
+      graph.master.onprocessorerror = null;
+      graph.master.port.onmessage = null;
+    }
     for (const node of [graph.source, graph.reference, graph.master, graph.pre, graph.post]) {
       try { node?.disconnect(); } catch { /* already disconnected */ }
     }
@@ -397,6 +401,18 @@ export default function MasteringWorkspace() {
           if (graphRef.current !== graph || !mountedRef.current) return;
           graph.latencySeconds = event.data.latencyFrames / context.sampleRate;
           setMeters(event.data);
+        };
+        node.onprocessorerror = () => {
+          if (graphRef.current !== graph || sessionRef.current !== session) return;
+          const failedAt = timelinePosition(graph, context.currentTime, mixDuration);
+          sessionRef.current += 1;
+          graphRef.current = null;
+          releaseGraph(graph);
+          if (mountedRef.current) {
+            updateView({ playhead: Math.min(mixDuration, failedAt) });
+            setPlaybackState('paused');
+            setStatus(`Realtime audio processor stopped unexpectedly at ${formatTime(failedAt)}. Playback was stopped; your edits are unchanged. Press Resume to try again.`);
+          }
         };
         node.port.postMessage({ type: 'settings', settings: liveMasterRef.current } satisfies WorkletInbound);
         node.port.postMessage({ type: 'monitor', ...monitorRef.current } satisfies WorkletInbound);
@@ -550,6 +566,7 @@ export default function MasteringWorkspace() {
       const detail = placements.length === 1 && first ? `: ${first.codec}, ${first.channelCount} channel${first.channelCount === 1 ? '' : 's'}, ${first.sampleRate.toLocaleString()} Hz` : '';
       setStatus(`Loaded ${added}${detail}.${skipped.length ? ` Skipped ${skipped.join('; ')}.` : ''}`);
     } catch (error) {
+      abandon();
       setStatus(`Could not open audio: ${messageOf(error)}`);
     } finally {
       if (revision === importRevisionRef.current && mountedRef.current) setLoading(false);
@@ -565,6 +582,10 @@ export default function MasteringWorkspace() {
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
+    if (loading || projectBusy) {
+      setStatus('Finish the current file operation before dropping more audio.');
+      return;
+    }
     const files = Array.from(event.dataTransfer.files ?? []).filter((file) => file.type.startsWith('audio/') || /\.(wav|wave|mp3|flac|ogg|oga|opus|m4a|aac|aiff?|caf|webm)$/i.test(file.name));
     if (files.length) void importFiles(files);
     else setStatus('Drop audio files (WAV, MP3, FLAC, Ogg, M4A, AIFF and similar).');
@@ -597,6 +618,9 @@ export default function MasteringWorkspace() {
     setLoading(true);
     const previousIds = new Set(historyRef.current.present.sources.map((source) => source.id));
     const loadedIds: string[] = [];
+    const abandonLoaded = () => {
+      for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
+    };
     const infos: Record<string, AudioFileInfo> = {};
     let next = saved;
     const lengthChanges: string[] = [];
@@ -606,10 +630,10 @@ export default function MasteringWorkspace() {
         if (!blob) throw new Error(`the audio for ${source.name} is missing.`);
         setStatus(`Reopening ${source.name} (${index + 1} of ${saved.sources.length})…`);
         const decoded = await decodeAudioFile(new File([blob], source.name, { lastModified: source.lastModified }));
-        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return; }
         const loaded = await client.loadSource(source.id, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
         loadedIds.push(source.id);
-        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return; }
         infos[source.id] = decoded.info;
         // Another browser's decoder can pad a compressed file differently; edits are timed in seconds, so record the new length and say so.
         if (loaded.frameCount !== source.frameCount) {
@@ -626,7 +650,7 @@ export default function MasteringWorkspace() {
       const count = next.tracks.length;
       setStatus(`${label} ${count} track${count === 1 ? '' : 's'} and ${next.sources.length} audio file${next.sources.length === 1 ? '' : 's'}.${lengthChanges.length ? ` ${lengthChanges.join(', ')} decoded to a slightly different length in this browser; listen to edits near their ends.` : ''}`);
     } catch (error) {
-      for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
+      abandonLoaded();
       if (mountedRef.current) setStatus(`Could not reopen the project: ${messageOf(error)} Your current project is unchanged.`);
     } finally {
       if (revision === importRevisionRef.current && mountedRef.current) setLoading(false);
