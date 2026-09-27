@@ -118,10 +118,10 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 | 70 | Delta audition | done | S7 |
 | 71 | Reference track | done | S7: synced start offset, loudness-matched |
 | 72 | Offline master render | done | S6: worker `renderMaster`, latency-compensated, with loudness report |
-| 73–80 | Export formats, metadata, artwork, batch | open | S9 |
+| 73–80 | Export formats, metadata, artwork, batch | open | S9 in progress: `mastering-export.ts` encoders and reports are written and unit-tested (`tests/unit/mastering-export.test.ts`); worker target-rate/stem requests, the Export tab, batch ZIP, and browser round trips remain |
 | 81 | Backup, presets, diagnostics, commands | open | S10 |
 
-**Count: 70/81 done** (2026-09-27, after S8: 111 mastering unit tests in 12 files; mastering browser spec 12/12 and music spec 10/10 across desktop/mobile Chromium).
+**Count: 70/81 done** (2026-09-27: 132 mastering unit tests in 14 files; mastering browser spec 12/12, music spec 10/10, and the MIDI Harmony Lab cases in `audit-hardening.spec.ts` green across desktop/mobile Chromium).
 
 ## Rules for whoever continues
 
