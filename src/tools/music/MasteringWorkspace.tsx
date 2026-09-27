@@ -872,9 +872,9 @@ export default function MasteringWorkspace() {
         <label className="mastering-check"><input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} disabled={!canEdit} /> Loop</label>
         <button type="button" onClick={undo} disabled={!history.past.length}>Undo</button>
         <button type="button" onClick={redo} disabled={!history.future.length}>Redo</button>
-        <div className="mastering-listen" role="radiogroup" aria-label="Listen to">
-          {([['processed', 'Processed'], ['original', 'Original'], ['delta', 'Difference'], ['reference', 'Reference']] as const).map(([value, label]) => <button key={value} type="button" role="radio"
-            aria-checked={monitor.listen === value} disabled={value === 'reference' && !reference}
+        <div className="mastering-listen" role="group" aria-label="Listen to">
+          {([['processed', 'Processed'], ['original', 'Original'], ['delta', 'Difference'], ['reference', 'Reference']] as const).map(([value, label]) => <button key={value} type="button"
+            aria-pressed={monitor.listen === value} disabled={value === 'reference' && !reference}
             title={value === 'reference' && !reference ? 'Load a reference track on the Meters tab first' : undefined}
             onClick={() => setListen(value)}>{label}</button>)}
         </div>
