@@ -1,1 +1,3 @@
 # Backlog
+
+- **Crawlable per-tool URLs (site-wide).** Tools are served on hash routes such as `#/floorplan-studio`. Google Search Central's JavaScript SEO guidance says URL fragments are generally not indexed as separate pages, so no tool page can rank on its own, and social previews only see the shared `index.html` metadata. Fixing this needs History-API routes with GitHub Pages-compatible fallbacks and per-route static metadata. It is cross-cutting (router, every tool, deployment), so it is deferred here rather than done inside one tool. Raised during the PlanCraft hardening pass (2026-09-27); PlanCraft sets a tool-scoped `document.title` and meta description while open, which helps tabs, bookmarks, and history but not indexing.

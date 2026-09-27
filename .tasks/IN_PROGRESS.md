@@ -1,5 +1,12 @@
 # In Progress
 
+- **PlanCraft Studio real-world hardening** — the floor-plan tool (`#/floorplan-studio`) was previously recorded complete (TASK-001), but owner field testing found real-world defects. A 2026-09-27 audit verified 19 defects and 16 capability gaps (35 ledger rows, F01–F35).
+  - Tool SSOT: `src/tools/floorplan/TRACKING.md` (per-row status, evidence, known limits, verification commands).
+  - Branch: `claude/plancraft-hardening`, integrated to `main` by squash PR.
+  - Current milestone: engine fixes (DXF validity/orientation, clearance model, T-junction wall split, export labels/arcs), then workspace interaction fixes, then browser coverage.
+  - Completion gate: every ledger row `merged` or moved to `BACKLOG.md` with rationale; focused floorplan units, `tsc`, build, and floorplan browser specs pass on the PR; DXF exports strict-read cleanly with ezdxf; PR squash-merged into `main`.
+  - Scope: `src/tools/floorplan/`, `tests/unit/floorplan-*.test.ts`, `tests/e2e/floorplan*.spec.ts`, the floorplan catalog entry, and this entry. Other workstreams untouched.
+
 - **Universal Site Intelligence Analyzer** — final-completion pass on the existing draft PR #44 (`feature/site-analysis-workstation`); local-first URL/domain forensics, DNS/network, registration/history, TLS/security, email-auth, performance telemetry, scoring, export, and browser-local vault.
   - Tool SSOT: `src/tools/site-intel/TRACKING.md` on PR #44. Current ledger: 38 accepted features; most are implemented, with Feature 13 missing its GeoIP minimap UI, Feature 6 still requiring an explicit client-safe redirect-resolution decision, and Features 11/17/19/28 carrying documented external/platform substitutions or blockers.
   - Verified branch baseline: unit and production-build stages passed in PR run `35345670947`; Site Intelligence unit files and both desktop/mobile browser cases ran successfully, and the shared accessibility route produced no Site Intelligence failure. That run was red only in unrelated repository suites.
