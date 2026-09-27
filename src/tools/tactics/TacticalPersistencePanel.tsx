@@ -100,6 +100,15 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
     onStatus('Current board kept. Local autosave resumed.');
   }
 
+  async function saveProjectNow() {
+    try {
+      await vault.saveProject(project);
+      setAutosaveEnabled(true);
+      await refresh();
+      onStatus('Project saved to this browser.');
+    } catch (error) { onStatus(message(error)); }
+  }
+
   async function loadSavedProject(projectId: string) {
     try {
       const stored = await vault.getProject(projectId);
@@ -110,9 +119,14 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
 
   async function removeSavedProject(projectId: string) {
     try {
+      if (projectId === project.id) setAutosaveEnabled(false);
       await vault.deleteProject(projectId);
       await refresh();
-      onStatus('Saved project and its snapshots removed from this browser.');
+      onStatus(
+        projectId === project.id
+          ? 'Saved project and its snapshots removed. Autosave is paused until you save this open board again.'
+          : 'Saved project and its snapshots removed from this browser.',
+      );
     } catch (error) { onStatus(message(error)); }
   }
 
@@ -187,11 +201,20 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
             </div>
           ) : null}
           <div className="tactical-inline-actions">
-            <button type="button" onClick={() => void vault.saveProject(project).then(refresh).then(() => onStatus('Project saved to this browser.')).catch((error) => onStatus(message(error)))}>Save to device</button>
+            <button type="button" onClick={() => void saveProjectNow()}>Save to device</button>
             {recoveryChecked && recovery && !autosaveEnabled ? null : (
               <button type="button" disabled={!recovery} onClick={() => recovery && void restore(recovery)}>Restore latest autosave</button>
             )}
           </div>
+          <small data-testid="vault-autosave-state">
+            {!recoveryChecked
+              ? 'Checking local recovery before autosave starts.'
+              : autosaveEnabled
+                ? 'Crash-safe autosave is active for this open project.'
+                : recovery
+                  ? 'Autosave is paused until you restore the available recovery or keep the current board.'
+                  : 'Autosave is paused because this open project has no saved local copy. Use Save to device to resume it.'}
+          </small>
           <form onSubmit={(event) => void createSnapshot(event)}>
             <label>Snapshot label<input name="snapshotLabel" required maxLength={80} /></label>
             <button type="submit">Create snapshot</button>
