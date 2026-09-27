@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 function makeMonoPcm16Wav(seconds = 2, sampleRate = 48_000, frequency = 220) {
@@ -595,4 +596,29 @@ test('autosaves, recovers after a reload, backs up and reopens, saves presets, a
   await page.locator('body').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('?');
   await expect(page.locator('.mastering-shortcuts')).toHaveAttribute('open', '');
+});
+
+// --- SECTION: accessibility ---
+
+test('every workbench tab passes an axe scan with its disclosures open', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  const scan = async (label: string) => {
+    const results = await new AxeBuilder({ page }).include('[data-testid="suite-workspace"]').analyze();
+    expect(results.violations.map((violation) => `${label}: ${violation.id} (${violation.nodes.length})`)).toEqual([]);
+  };
+  await scan('empty workspace');
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles([
+    { name: 'lead.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(3, 48_000, 220) },
+    { name: 'pad.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 44_100, 110) },
+  ]);
+  await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+  for (const tab of ['Edit', 'Arrange', 'Time & pitch', 'Repair', 'Master', 'Meters', 'Export', 'Project']) {
+    await page.getByRole('tab', { name: tab, exact: true }).click();
+    const panel = page.getByRole('tabpanel', { name: tab, exact: true });
+    await expect(panel).toBeVisible();
+    await panel.locator('details').evaluateAll((elements) => elements.forEach((element) => { (element as HTMLDetailsElement).open = true; }));
+    await scan(tab);
+  }
 });
