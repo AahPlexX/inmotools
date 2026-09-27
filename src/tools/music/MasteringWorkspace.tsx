@@ -836,6 +836,9 @@ export default function MasteringWorkspace() {
         </div>
       </div>
 
+      {/* Transport, shortcuts, and timeline appear once there is audio to act on; an empty
+          project shows only the ways to add some. */}
+      {hasAudio && <>
       <div className="mastering-transport" aria-label="Audio transport">
         <button type="button" onClick={() => void play()} disabled={!canEdit || !mixReady || rendering || playbackState === 'playing' || playbackState === 'starting'}>{playbackState === 'paused' ? 'Resume' : 'Play'}</button>
         <button type="button" onClick={pause} disabled={playbackState !== 'playing'}>Pause</button>
@@ -887,6 +890,7 @@ export default function MasteringWorkspace() {
         onSelect={updateSelection}
         onActivateClip={(clipId) => { updateView({ activeClipId: clipId }); }}
       />
+      </>}
 
       {hasAudio && <label className="mastering-check mastering-spectrogram-toggle"><input type="checkbox" checked={showSpectrogram} onChange={(event) => setShowSpectrogram(event.target.checked)} /> Show spectrogram</label>}
       {hasAudio && showSpectrogram && <MasteringSpectrogram ctx={ctx} spectrogram={spectrogram} loading={spectrogramLoading}

@@ -28,7 +28,8 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
 
-  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeDisabled();
+  // An empty project offers only ways to add audio; the transport appears with the first file.
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toHaveCount(0);
   await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
     name: 'mastering-fixture.wav',
     mimeType: 'audio/wav',

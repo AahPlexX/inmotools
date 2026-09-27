@@ -220,7 +220,7 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
         <div className="metric"><span>Sample rate</span><strong>{sourceInfo.sampleRate.toLocaleString()} Hz</strong></div>
         <div className="metric"><span>Channels</span><strong>{sourceInfo.channelCount}</strong></div>
         <div className="metric"><span>Source size</span><strong>{formatBytes(sourceInfo.fileSize)}</strong></div>
-        <div className="metric"><span>Artwork</span><strong>{metadata?.artworkCount ?? 0}</strong></div>
+        <div className="metric"><span>Artwork</span><strong>{metadata?.artworkCount ? `${metadata.artworkCount} image${metadata.artworkCount === 1 ? '' : 's'}` : 'None'}</strong></div>
       </div>
       {document.sampleRate && sourceInfo.sampleRate !== document.sampleRate && <p className="help-text">Converted to the project rate of {document.sampleRate.toLocaleString()} Hz on import with a band-limited resampler.</p>}
       {(metadata?.title || metadata?.artist || metadata?.album || metadata?.genre) && <dl className="mastering-metadata">
