@@ -20,8 +20,8 @@ Scope came from a full read of every file in `src/tools/floorplan/`, a strict DX
 
 | ID | Defect | Evidence | Fix | Status |
 |----|--------|----------|-----|--------|
-| F01 | DXF R2000 export is not a valid R2000 file (no CLASSES/TABLES/BLOCKS/OBJECTS, no handles, no AcDb subclass markers) | `ezdxf.readfile` strict read fails: "missing 'AcDbPolyline' subclass in LWPOLYLINE" | Write the minimal R2000 structure listed by the ezdxf DXF-internals docs, with handles and subclass markers; `$INSUNITS` = 4 (mm) | open |
-| F02 | DXF exports are mirrored top-to-bottom | Canvas world Y points down; DXF WCS Y points up. A wall drawn downward on screen is upward in CAD | Negate Y for every DXF coordinate | open |
+| F01 | DXF R2000 export is not a valid R2000 file (no CLASSES/TABLES/BLOCKS/OBJECTS, no handles, no AcDb subclass markers) | `ezdxf.readfile` strict read fails: "missing 'AcDbPolyline' subclass in LWPOLYLINE" | Write the minimal R2000 structure listed by the ezdxf DXF-internals docs, with handles and subclass markers; `$INSUNITS` = 4 (mm) | done |
+| F02 | DXF exports are mirrored top-to-bottom | Canvas world Y points down; DXF WCS Y points up. A wall drawn downward on screen is upward in CAD | Negate Y for every DXF coordinate | done |
 | F03 | Mouse-wheel zoom also scrolls the page | React registers `onWheel` as a passive listener, so `preventDefault()` is ignored (react/react#19651) | Native `wheel` listener with `{ passive: false }` | open |
 | F04 | PDF export failure is silent | `exportPdf` throws when a scaled plan does not fit the sheet; the button calls it with `void`, producing an unhandled rejection and no message | Catch and report in the status bar; add sheet and scale pickers | open |
 | F05 | Inspector numbers write 0/NaN while typing and add one undo step per keystroke | `Number('')` is 0; every `onChange` calls `commit` | Draft-then-commit number fields (Enter/blur), clamped to min/max, ignore invalid | open |
@@ -29,8 +29,8 @@ Scope came from a full read of every file in `src/tools/floorplan/`, a strict DX
 | F07 | A door or window cannot be selected again after clicking away | Select-mode hit test only checks components and walls; the wall wins | Hit-test openings before walls | open |
 | F08 | Dimensions cannot be selected or deleted | No dimension hit test; delete handler has no dimension branch | Hit-test dimensions; delete them | open |
 | F09 | An interior wall ending on another wall does not create rooms | Endpoint on a wall's interior is a free vertex; the host wall is not split, so the room graph has no junction | Snap to wall centerlines and split the host wall at the junction (openings re-hosted by position) | open |
-| F10 | Clearance warnings fire for normal layouts (sofa against a wall, nightstand beside a bed) | The whole buffered envelope is tested against walls and every other envelope | Report footprint collisions (item vs item, item vs wall) and front access-zone conflicts separately | open |
-| F11 | Toilet ADA clearance uses the generic 30"×48" clear floor space | 2010 ADA Standards 604.3.1: 60" (1525 mm) from side wall × 56" (1420 mm) from rear wall | Model a 1525 × 1420 mm zone with the toilet centerline 455 mm from its side edge (604.2 range 405–455 mm) | open |
+| F10 | Clearance warnings fire for normal layouts (sofa against a wall, nightstand beside a bed) | The whole buffered envelope is tested against walls and every other envelope | Report footprint collisions (item vs item, item vs wall) and front access-zone conflicts separately | done |
+| F11 | Toilet ADA clearance uses the generic 30"×48" clear floor space | 2010 ADA Standards 604.3.1: 60" (1525 mm) from side wall × 56" (1420 mm) from rear wall | Model a 1525 × 1420 mm zone with the toilet centerline 455 mm from its side edge (604.2 range 405–455 mm) | done |
 | F12 | Space bar is captured page-wide | Window keydown `preventDefault` on Space blocks button activation and page scrolling | Pan with Space only while the pointer is over the canvas or the canvas has focus | open |
 | F13 | Single-letter shortcuts fire with Ctrl/Cmd/Alt | No modifier guard (Ctrl+R rotates then reloads) | Ignore letter shortcuts when a modifier is held | open |
 | F14 | Undo/redo while drawing leaves a stale rubber-band line | Draft state is not reset | Clear draft on undo/redo | open |
@@ -48,23 +48,31 @@ Scope came from a full read of every file in `src/tools/floorplan/`, a strict DX
 | F21 | Wall corners cannot be moved | Drag vertices; dropping on another vertex merges them | open |
 | F22 | No keyboard way to position a selected item | Arrow keys nudge by the grid step (Shift = ×10) | open |
 | F23 | No duplicate | Duplicate button and Ctrl/Cmd+D | open |
-| F24 | Rooms cannot be named | Room names stored by boundary and shown on canvas and exports | open |
-| F25 | Metric only, although the tool targets US users (ADA, 1/4" = 1'-0") | Display units: millimeters or feet-inches for readouts, inputs, dimension labels, exports | open |
-| F26 | Components are unlabeled boxes | Labels on canvas and exports | open |
-| F27 | Exports draw doors without swing arcs | Arcs in SVG, PDF, and DXF (ARC entity) | open |
-| F28 | Room names/areas missing from SVG and DXF | Labels at room centroid | open |
+| F24 | Rooms cannot be named | Room names stored by boundary and shown on canvas and exports | wip |
+| F25 | Metric only, although the tool targets US users (ADA, 1/4" = 1'-0") | Display units: millimeters or feet-inches for readouts, inputs, dimension labels, exports | wip |
+| F26 | Components are unlabeled boxes | Labels on canvas and exports | wip |
+| F27 | Exports draw doors without swing arcs | Arcs in SVG, PDF, and DXF (ARC entity) | done |
+| F28 | Room names/areas missing from SVG and DXF | Labels at room centroid | done |
 | F29 | Closing a room keeps the wall tool drawing from the closing point | Chain ends when the new wall joins existing geometry | open |
 | F30 | Copy shows raw ids ("wall-lz3k2-5") and machine-like status text; export toast pushes donations | Plain-language copy pass | open |
 | F31 | On phones, the tool list sits below the canvas | Tools above the canvas on narrow screens; touch-specific hints | open |
 | F32 | Browser tab title stays "InMo Tools" in the tool | Tool-scoped `document.title` and meta description while mounted | open |
 | F33 | No way to start a new plan | "New plan" (undoable) | open |
 | F34 | No way to bring the drawing back into view | "Fit to drawing" button and `0` shortcut | open |
-| F35 | SVG export has no background, so white "erase" strokes show on dark viewers | White background rectangle | open |
+| F35 | SVG export has no background, so white "erase" strokes show on dark viewers | White background rectangle | done |
+
+## Evidence log
+
+- 2026-09-27 — Baseline before changes: floorplan units 23/23 pass on `a771885`.
+- 2026-09-27 — Engine batch (F01, F02, F10, F11, F27, F28, F35; export and analysis halves of F24–F26): floorplan units 42/42, `tsc --noEmit` clean. ezdxf 1.4.4 strict `readfile` + `audit()` on a door/wall/sofa/dimension fixture: R12 `AC1009` 0 errors 0 fixes; R2000 `AC1015` 0 errors 0 fixes, `$INSUNITS` 4. Door ARC reads back center (1542, 0), r 915, 270°→0° (open leaf to closed jamb). `\U+00FC` decodes to "ü".
+- Clearance rules now: `collision` (footprints overlap; seating may tuck under tables/desks), `wall_collision`, `access_blocked` (zone in front of an item, `bufferOffset` deep, blocked by non-seating footprints or walls), `ada_turning_circle`, `ada_fixture_clearance`. MEP devices and the turning-space guide never collide. The library clearance overrides the copy stored in older saves.
 
 ## Known limits (deliberate, not defects)
 
 - Walls that cross each other mid-span (X junctions) are not split automatically; only T junctions (a wall ending on another) are. Draw the crossing as two walls meeting at the junction.
 - Toilet clearance is modeled for a left-side wall; rotate the fixture for other orientations. Mirroring is not modeled.
+- Access zones are a single strip in front of an item (local +Y). A dining table's zone is its front edge only; seating is exempt so chairs around the table never warn.
+- DXF R12 predates Unicode text, so non-ASCII characters in labels become "?" there; R2000 keeps them as `\U+XXXX` escapes.
 - Tool pages use hash routes (`#/floorplan-studio`). Google does not index URL fragments as separate pages, so per-tool search indexing needs a site-wide routing change outside this tool. Tracked in `.tasks/BACKLOG.md`.
 
 ## Verification commands
