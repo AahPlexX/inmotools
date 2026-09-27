@@ -45,7 +45,7 @@ user-supplied credential).
 | 3 | Lexical Shannon entropy & DGA analyzer | Done | `url-forensics.ts:shannonEntropy` |
 | 4 | Typosquatting & Levenshtein brand-distance calculator | Done | `url-forensics.ts:findTyposquatMatches` against curated `BRAND_REFERENCE_DOMAINS` (not a live Tranco fetch — see substitutions) |
 | 5 | Query parameter & privacy tracking profiler | Done | `url-forensics.ts:classifyQueryParams` / `buildSanitizedUrl` |
-| 6 | Deep URL shortener & vanity link detector | Partial | `url-forensics.ts:detectShortener` plus an explicit user-triggered, CORS-dependent redirect resolver in `redirect-engine.ts`; final focused browser validation is pending before promotion to Done |
+| 6 | Deep URL shortener & vanity link detector | Done | `url-forensics.ts:detectShortener` plus explicit user-triggered, CORS-dependent resolution in `redirect-engine.ts`; desktop/mobile browser proof in run `36323940637` verifies no shortener contact occurs before the user chooses Resolve destination |
 
 ### Group 2 — DNS Architecture, Infrastructure & Network Routing
 | # | Feature | Status | Implementation |
@@ -56,7 +56,7 @@ user-supplied credential).
 | 10 | CAA record validator | Done | `dns-engine.ts:validateCaaRecords` |
 | 11 | DNSSEC cryptographic chain verification | Partial | `dns-engine.ts:checkDnssecSignals` reports DNSKEY/DS/RRSIG presence plus the resolver's authenticated-data (AD) bit rather than re-deriving the full root-to-zone signature chain client-side (see substitutions) |
 | 12 | BGP ASN & hosting profiler | Done | `network-engine.ts:profileHosting` via ipapi.co |
-| 13 | GeoIP server location & Anycast detector | Partial | `network-engine.ts:detectAnycast` plus the dependency-free, keyboard-accessible coordinate minimap in `components/GeoIpMap.tsx`; final focused browser validation is pending before promotion to Done |
+| 13 | GeoIP server location & Anycast detector | Done | `network-engine.ts:detectAnycast` plus dependency-free, keyboard-accessible coordinate minimap in `components/GeoIpMap.tsx`; desktop/mobile browser proof in run `36323940637` covers the DNS→IP-intel→map path |
 
 ### Group 3 — Domain Registration, Lifecycles & Historical Records
 | # | Feature | Status | Implementation |
@@ -135,8 +135,8 @@ user-supplied credential).
 
 ## Outstanding work (not yet started / not yet complete)
 
-- [ ] Promote Feature 13's implemented GeoIP minimap from Partial to Done after the focused browser gate passes.
-- [ ] Promote Feature 6's explicit CORS-aware resolver from Partial to Done after the focused browser gate passes.
+- [x] Feature 13 GeoIP minimap implemented and promoted to Done after desktop/mobile browser validation (`36323940637`).
+- [x] Feature 6 explicit CORS-aware resolver implemented and promoted to Done after desktop/mobile browser validation (`36323940637`).
 - [ ] Broaden `BRAND_REFERENCE_DOMAINS` beyond the current curated ~100-domain
       list if a larger, still-offline-friendly reference set is wanted.
 - [ ] Add focused unit coverage for `export-engine.ts` (JSON/Markdown/CSV/PDF
@@ -154,6 +154,8 @@ user-supplied credential).
       the rest of InMo Tools) once functional scope is accepted.
 
 ## Verified/implemented so far (what a resuming agent can trust as tested)
+
+- 2026-09-27 completion slice: run `36323940637` passed Site Intelligence units, production build, Chromium install, and all 8 Site Intelligence browser executions on desktop/mobile after red-first proof (`36323072877`) established the missing resolver/minimap contracts. Feature 6 and Feature 13 are now Done.
 
 - All Group 1 functions: 14 unit tests passing (`tests/unit/site-intel-url-forensics.test.ts`).
 - Scoring, mixed-content, CDN/CMS fingerprint heuristics: unit tested
