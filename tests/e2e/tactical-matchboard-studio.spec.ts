@@ -743,11 +743,9 @@ test('lists, loads, and removes browser-local saved projects', async ({ page }) 
   await expect(page.locator('.status-line').last()).toContainText('Project saved to this browser');
   await expect(page.getByLabel('Saved projects')).toContainText('Training board');
 
-  await setupPanel(page).getByLabel('Project title').fill('Temporary board');
-  await page.getByRole('button', { name: 'Build board' }).click();
-  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Temporary board');
+  await setupPanel(page).getByLabel('Project title').fill('Temporary unsaved title');
+  await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Temporary unsaved title');
 
-  await page.getByText('Project vault & interchange', { exact: true }).click();
   await page.getByRole('button', { name: 'Load saved project Training board' }).click();
   await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Training board');
 
