@@ -74,30 +74,25 @@ test('short-link resolution is explicit and only contacts the destination after 
 });
 
 test('hosting coordinates render an accessible GeoIP distribution minimap', async ({ page }) => {
-  await page.route('https://**', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.hostname === 'cloudflare-dns.com') {
-      const type = url.searchParams.get('type');
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/dns-json',
-        headers: { 'access-control-allow-origin': '*' },
-        body: JSON.stringify({
+  await page.addInitScript(() => {
+    window.fetch = (async (input: RequestInfo | URL) => {
+      const value = input instanceof Request ? input.url : input.toString();
+      const url = new URL(value, window.location.href);
+      if (url.hostname === 'cloudflare-dns.com') {
+        const type = url.searchParams.get('type');
+        return new Response(JSON.stringify({
           Status: 0,
           AD: true,
           Answer: type === 'A'
             ? [{ name: 'example.com.', type: 1, TTL: 300, data: '203.0.113.10' }]
             : [],
-        }),
-      });
-      return;
-    }
-    if (url.hostname === 'ipapi.co') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        headers: { 'access-control-allow-origin': '*' },
-        body: JSON.stringify({
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/dns-json' },
+        });
+      }
+      if (url.hostname === 'ipapi.co') {
+        return new Response(JSON.stringify({
           ip: '203.0.113.10',
           asn: 'AS64500',
           org: 'Example Network',
@@ -105,11 +100,13 @@ test('hosting coordinates render an accessible GeoIP distribution minimap', asyn
           country_name: 'Exampleland',
           latitude: 29.95,
           longitude: -90.07,
-        }),
-      });
-      return;
-    }
-    await route.abort();
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new TypeError(`Blocked test network request: ${url.hostname}`);
+    }) as typeof window.fetch;
   });
 
   await page.goto('./#/tools/site-intelligence-analyzer');
