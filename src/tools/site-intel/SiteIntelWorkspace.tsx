@@ -10,6 +10,7 @@ import './site-intel-workspace.css';
 import { InfoBadge } from './components/InfoBadge';
 import { ScoreRadar } from './components/ScoreRadar';
 import { NodeGraph, type NodeGraphData } from './components/NodeGraph';
+import { GeoIpMap } from './components/GeoIpMap';
 import {
   buildSanitizedUrl, classifyQueryParams, detectHomoglyphs, detectShortener,
   findTyposquatMatches, parseUrl, shannonEntropy,
@@ -29,6 +30,7 @@ import { buildWellKnownPaths, previewWellKnownPath, type WellKnownPath } from '.
 import { computeScorecard, type ScoreVector } from './scoring-engine';
 import { exportCsv, exportJson, exportMarkdown, exportPdf, type ReportMetadata } from './export-engine';
 import { renderSocialCard } from './social-card-engine';
+import { resolveShortUrl, type ShortUrlResolution } from './redirect-engine';
 import { deleteAudit, getSetting, listAudits, purgeAllAudits, saveAudit, setSetting } from './vault-db';
 import { downloadBlob, downloadText } from '../../lib/download';
 import type { AsyncTaskState, Finding, ParsedUrl } from './site-intel-types';
@@ -107,6 +109,7 @@ export default function SiteIntelWorkspace() {
   const [metadata, setMetadata] = useState<ReportMetadata>({ auditorName: '', organization: '', notes: '', auditTimestamp: Date.now() });
   const [vault, setVault] = useState<AuditRecord[]>([]);
   const [busy, setBusy] = useState(false);
+  const [shortResolution, setShortResolution] = useState<ShortUrlResolution | { status: 'idle' | 'loading' }>({ status: 'idle' });
 
   const sanitizedUrl = useMemo(() => (parsed ? buildSanitizedUrl(parsed) : ''), [parsed]);
   const homoglyphs = useMemo(() => (parsed ? detectHomoglyphs(parsed.hostnameUnicode) : null), [parsed]);
@@ -119,6 +122,7 @@ export default function SiteIntelWorkspace() {
   async function runAnalysis() {
     const result = parseUrl(rawInput);
     setParsed(result);
+    setShortResolution({ status: 'idle' });
     if (!result.normalized) return;
     setBusy(true);
     const hostname = result.host.split(':')[0];
@@ -191,6 +195,13 @@ export default function SiteIntelWorkspace() {
 
     setBusy(false);
     void v6; // reserved for future dual-stack detail panel
+  }
+
+  async function resolveShortenerDestination() {
+    if (!shortener?.isShortener) return;
+    setShortResolution({ status: 'loading' });
+    const result = await resolveShortUrl(shortener.originalUrl);
+    setShortResolution(result);
   }
 
   async function persistCruxKey(key: string) {
@@ -339,7 +350,30 @@ export default function SiteIntelWorkspace() {
               <ul>{trackingParams.map((p) => <li key={p.key}>{p.key} — {p.category}{p.service ? ` (${p.service})` : ''}</li>)}</ul>
               {sanitizedUrl ? <p>Sanitized: <code>{sanitizedUrl}</code> <button type="button" onClick={() => navigator.clipboard.writeText(sanitizedUrl)}>Copy</button></p> : null}
             </div>
-            {shortener?.isShortener ? <p className="finding-row finding-warn"><Severity level="warn" /> {shortener.note}</p> : null}
+            {shortener?.isShortener ? (
+              <div className="finding-row finding-warn shortener-finding">
+                <Severity level="warn" />
+                <div>
+                  <p className="finding-label">{shortener.note}</p>
+                  <button
+                    type="button"
+                    className="secondary-action"
+                    onClick={() => void resolveShortenerDestination()}
+                    disabled={shortResolution.status === 'loading'}
+                  >
+                    {shortResolution.status === 'loading' ? 'Resolving…' : 'Resolve destination'}
+                  </button>
+                  {shortResolution.status === 'resolved' ? (
+                    <p className="shortener-result" role="status">
+                      Resolved destination: <code>{shortResolution.finalUrl}</code>
+                    </p>
+                  ) : null}
+                  {shortResolution.status === 'blocked' ? (
+                    <p className="task-blocked shortener-result" role="status">{shortResolution.reason}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <ul className="finding-list">{schemeFindings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>
           </section>
 
@@ -366,7 +400,13 @@ export default function SiteIntelWorkspace() {
             <h3>Nameserver redundancy <InfoBadge term="asn" /></h3>
             <TaskPanel state={nsRedundancy} render={(d) => <FindingRow finding={d.finding} />} />
             <h3>Hosting / ASN profile</h3>
-            <TaskPanel state={hosting} render={(d) => <ul className="finding-list">{d.findings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>} />
+            <TaskPanel state={hosting} render={(d) => (
+              <>
+                <ul className="finding-list">{d.findings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>
+                <h4>GeoIP distribution</h4>
+                <GeoIpMap intel={d.intel} />
+              </>
+            )} />
             {anycast ? <FindingRow finding={anycast} /> : null}
             <h3>DNSBL reputation <InfoBadge term="dnsbl" /></h3>
             <TaskPanel state={dnsbl} render={(d) => <FindingRow finding={d.finding} />} />

@@ -45,7 +45,7 @@ user-supplied credential).
 | 3 | Lexical Shannon entropy & DGA analyzer | Done | `url-forensics.ts:shannonEntropy` |
 | 4 | Typosquatting & Levenshtein brand-distance calculator | Done | `url-forensics.ts:findTyposquatMatches` against curated `BRAND_REFERENCE_DOMAINS` (not a live Tranco fetch — see substitutions) |
 | 5 | Query parameter & privacy tracking profiler | Done | `url-forensics.ts:classifyQueryParams` / `buildSanitizedUrl` |
-| 6 | Deep URL shortener & vanity link detector | Done | `url-forensics.ts:detectShortener`; redirect-unwrapping is a documented UI affordance, not implemented (see substitutions) |
+| 6 | Deep URL shortener & vanity link detector | Partial | `url-forensics.ts:detectShortener` plus an explicit user-triggered, CORS-dependent redirect resolver in `redirect-engine.ts`; final focused browser validation is pending before promotion to Done |
 
 ### Group 2 — DNS Architecture, Infrastructure & Network Routing
 | # | Feature | Status | Implementation |
@@ -56,7 +56,7 @@ user-supplied credential).
 | 10 | CAA record validator | Done | `dns-engine.ts:validateCaaRecords` |
 | 11 | DNSSEC cryptographic chain verification | Partial | `dns-engine.ts:checkDnssecSignals` reports DNSKEY/DS/RRSIG presence plus the resolver's authenticated-data (AD) bit rather than re-deriving the full root-to-zone signature chain client-side (see substitutions) |
 | 12 | BGP ASN & hosting profiler | Done | `network-engine.ts:profileHosting` via ipapi.co |
-| 13 | GeoIP server location & Anycast detector | Done | `network-engine.ts:detectAnycast`; minimap visualization not yet built (coordinates are fetched and available, only the map UI is outstanding) |
+| 13 | GeoIP server location & Anycast detector | Partial | `network-engine.ts:detectAnycast` plus the dependency-free, keyboard-accessible coordinate minimap in `components/GeoIpMap.tsx`; final focused browser validation is pending before promotion to Done |
 
 ### Group 3 — Domain Registration, Lifecycles & Historical Records
 | # | Feature | Status | Implementation |
@@ -126,17 +126,8 @@ user-supplied credential).
    diffing (which would need dozens of extra, CORS-uncertain fetches of
    archived HTML) with the CDX API's own `digest` content-hash field to
    detect meaningful content changes over time.
-5. **Feature 6 (shortener redirect-unwrapping)** — detection is fully
-   implemented; a client-side "follow the redirect chain" resolver is not
-   implemented yet because most shorteners do not send CORS headers on their
-   redirect response, so a generic client-side unwrapper would silently fail
-   for most targets. Flagged here as "other" for a judgment call: either (a)
-   leave as detection-only (current state), or (b) add a best-effort
-   `fetch(..., { redirect: 'follow' })` attempt that only succeeds for
-   shorteners that do happen to allow it, clearly labeled as unreliable.
-6. **Feature 13 (GeoIP minimap)** — coordinate data is fetched and available
-   on every hosting/ASN finding; the interactive minimap visualization
-   component itself has not been built yet (listed as outstanding work below).
+5. **Feature 6 (shortener redirect-unwrapping)** — implemented as an explicit user action rather than an automatic request. The browser performs a bounded `HEAD` request with `redirect: 'follow'`, no credentials, no referrer, and no cache; `Response.url` is shown only when CORS permits the redirect inspection. When the shortener blocks CORS, the UI reports that limitation and does not guess or route through a proxy. Intermediate redirect hops are deliberately not claimed because the Fetch API exposes only the final response URL.
+6. **Feature 13 (GeoIP minimap)** — implemented without a map/tile dependency. The minimap plots the latitude/longitude coordinates already returned by the hosting lookup, exposes each point as a keyboard-focusable control, and keeps the selected IP/location/ASN text visible below the plot. No additional network request is introduced.
 7. **ipapi.co dependency (Features 9, 12, 13)** — free-tier rate limits and
    CORS terms should be re-verified from https://ipapi.co/api/ in a
    network-enabled environment before this ships to real production traffic
@@ -144,9 +135,8 @@ user-supplied credential).
 
 ## Outstanding work (not yet started / not yet complete)
 
-- [ ] GeoIP interactive minimap UI for Feature 13 (data plumbing is done; map
-      rendering is not).
-- [ ] Decide and implement the Feature 6 substitution judgment call above.
+- [ ] Promote Feature 13's implemented GeoIP minimap from Partial to Done after the focused browser gate passes.
+- [ ] Promote Feature 6's explicit CORS-aware resolver from Partial to Done after the focused browser gate passes.
 - [ ] Broaden `BRAND_REFERENCE_DOMAINS` beyond the current curated ~100-domain
       list if a larger, still-offline-friendly reference set is wanted.
 - [ ] Add focused unit coverage for `export-engine.ts` (JSON/Markdown/CSV/PDF

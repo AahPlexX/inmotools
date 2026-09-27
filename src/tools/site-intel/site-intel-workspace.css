@@ -270,3 +270,112 @@
   .site-intel-tabs { font-size: 0.85rem; }
   .info-tooltip { width: 80vw; }
 }
+
+
+.secondary-action {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary-action:hover:not(:disabled) { background: var(--surface-strong); }
+.secondary-action:disabled { opacity: 0.65; cursor: wait; }
+.secondary-action:focus-visible,
+.geoip-map-point:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 3px;
+}
+
+.shortener-finding > div { min-width: 0; }
+.shortener-result { margin: 8px 0 0; overflow-wrap: anywhere; }
+.shortener-result code { word-break: break-all; }
+
+.geoip-map-card { margin: 10px 0 16px; }
+.geoip-map {
+  position: relative;
+  width: 100%;
+  min-height: 180px;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 24% 36%, color-mix(in srgb, var(--signal) 10%, transparent) 0 11%, transparent 12%),
+    radial-gradient(circle at 51% 38%, color-mix(in srgb, var(--signal) 8%, transparent) 0 15%, transparent 16%),
+    radial-gradient(circle at 75% 48%, color-mix(in srgb, var(--signal) 10%, transparent) 0 13%, transparent 14%),
+    var(--surface-strong);
+}
+
+.geoip-map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--line-strong) 50%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--line-strong) 50%, transparent) 1px, transparent 1px);
+  background-size: 12.5% 100%, 100% 25%;
+  pointer-events: none;
+}
+
+.geoip-map-point {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--signal) 35%, transparent);
+  cursor: pointer;
+}
+
+.geoip-map-point > span {
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin: auto;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.geoip-map-point.selected {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--signal) 28%, transparent);
+}
+
+.geoip-map-axis {
+  position: absolute;
+  z-index: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--muted);
+  font-size: 0.68rem;
+  pointer-events: none;
+}
+.geoip-map-axis-north { top: 4px; left: 4px; }
+.geoip-map-axis-south { bottom: 4px; left: 4px; }
+.geoip-map-axis-west { bottom: 4px; left: 50%; transform: translateX(-110%); }
+.geoip-map-axis-east { bottom: 4px; left: 50%; transform: translateX(10%); }
+
+.geoip-map-detail {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .geoip-map { min-height: 160px; }
+  .geoip-map-point { width: 36px; height: 36px; min-height: 36px; }
+}
