@@ -24,6 +24,32 @@ function makeMonoPcm16Wav(seconds = 2, sampleRate = 48_000, frequency = 220) {
   }
   return bytes;
 }
+test('stops safely when the realtime master processor crashes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
+      original.call(this, type, listener, options);
+      if (type === 'processorerror' && listener && typeof AudioWorkletNode !== 'undefined' && this instanceof AudioWorkletNode) {
+        window.setTimeout(() => this.dispatchEvent(new Event('processorerror')), 75);
+      }
+    };
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
+    name: 'processor-failure.wav',
+    mimeType: 'audio/wav',
+    buffer: makeMonoPcm16Wav(3),
+  });
+  await expect(page.locator('.status-line')).toContainText(/Loaded processor-failure\.wav/i);
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.locator('.status-line')).toContainText(/Realtime audio processor stopped unexpectedly/i);
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
+  await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000');
+});
+
 test('imports, auditions, edits, marks, and undoes a local master', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
