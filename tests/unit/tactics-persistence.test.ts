@@ -125,34 +125,104 @@ describe('Tactical project interchange', () => {
 });
 
 describe('Open tactical trajectory interchange', () => {
-  it('round-trips authored trajectories through deterministic CSV and JSON', () => {
+  it('round-trips authored trajectories through the documented rich CSV and JSON format', () => {
     const project = projectFixture();
+    const teamId = project.playerTokens[0]!.teamId;
     project.timeline.tracks = [{
       id: 'track-token-1',
       targetId: 'token-1',
       keyframes: [
-        { id: 'start', timeMs: 0, position: { x: 0.2, y: 0.3 }, interpolation: 'linear' },
+        { id: 'start', timeMs: 0, position: { x: 0.2, y: 0.3 }, rotationDeg: 45, event: 'regain', interpolation: 'linear' },
         { id: 'finish', timeMs: 1000, position: { x: 0.7, y: 0.6 }, interpolation: 'hold' },
       ],
     }];
 
     const csv = exportTrajectoryCsv(project);
-    expect(csv.split('\n')[0]).toBe('targetId,timeMs,x,y');
-    expect(parseTrajectoryCsv(csv, 'motion.csv')).toEqual([
-      { targetId: 'token-1', timeMs: 0, position: { x: 0.2, y: 0.3 } },
-      { targetId: 'token-1', timeMs: 1000, position: { x: 0.7, y: 0.6 } },
-    ]);
+    expect(csv.split('\n')[0]).toBe('timestamp_ms,entity_id,team_id,x,y,z,orientation_deg,event,coordinate_system');
+    const parsedCsv = parseTrajectoryCsv(csv, 'motion.csv', project.pitch.dimensions);
+    expect(parsedCsv).toHaveLength(2);
+    expect(parsedCsv[0]).toMatchObject({
+      targetId: 'token-1',
+      teamId,
+      timeMs: 0,
+      position: { x: 0.2, y: 0.3 },
+      orientationDeg: 45,
+      event: 'regain',
+      coordinateSystem: 'normalized',
+    });
+    expect(parsedCsv[1]).toMatchObject({
+      targetId: 'token-1',
+      teamId,
+      timeMs: 1000,
+      position: { x: 0.7, y: 0.6 },
+      coordinateSystem: 'normalized',
+    });
 
     const json = exportTrajectoryJson(project);
-    expect(parseTrajectoryJson(json, 'motion.json')).toEqual(parseTrajectoryCsv(csv, 'motion.csv'));
+    expect(parseTrajectoryJson(json, 'motion.json', project.pitch.dimensions)).toEqual(parsedCsv);
+  });
+
+  it('imports physical coordinates and optional Z/orientation/event fields without guessing the pitch mapping', () => {
+    const project = projectFixture();
+    const teamId = project.playerTokens[0]!.teamId;
+    const csv = [
+      'timestamp_ms,entity_id,team_id,x,y,z,orientation_deg,event,coordinate_system',
+      `500,token-1,${teamId},20,15,1.2,90,press,meters`,
+    ].join('\n');
+
+    const samples = parseTrajectoryCsv(csv, 'physical.csv', project.pitch.dimensions);
+    expect(samples[0]).toMatchObject({
+      targetId: 'token-1',
+      teamId,
+      timeMs: 500,
+      position: { x: 0.5, y: 0.5 },
+      zMeters: 1.2,
+      orientationDeg: 90,
+      event: 'press',
+      coordinateSystem: 'meters',
+    });
+
+    const imported = applyTrajectoryImport(project, samples, 'trajectory-csv', 'physical.csv');
+    const keyframe = imported.timeline.tracks.find((track) => track.targetId === 'token-1')?.keyframes[0];
+    expect(keyframe).toMatchObject({
+      timeMs: 500,
+      position: { x: 0.5, y: 0.5 },
+      elevationMeters: 1.2,
+      rotationDeg: 90,
+      event: 'press',
+    });
+
+    expect(() => parseTrajectoryCsv(
+      [
+        'timestamp_ms,entity_id,team_id,x,y,z,orientation_deg,event,coordinate_system',
+        `500,token-1,${teamId},41,15,,,press,meters`,
+      ].join('\n'),
+      'outside.csv',
+      project.pitch.dimensions,
+    )).toThrow(/pitch|coordinate/i);
+  });
+
+  it('keeps the historical four-column normalized CSV import-compatible', () => {
+    const project = projectFixture();
+    const parsed = parseTrajectoryCsv(
+      'targetId,timeMs,x,y\ntoken-1,250,0.25,0.75',
+      'legacy.csv',
+      project.pitch.dimensions,
+    );
+    expect(parsed[0]).toMatchObject({
+      targetId: 'token-1',
+      timeMs: 250,
+      position: { x: 0.25, y: 0.75 },
+      coordinateSystem: 'normalized',
+    });
   });
 
   it('validates all imported samples before replacing target tracks or adding provenance', () => {
     const project = projectFixture();
     const before = JSON.stringify(project);
     const samples = [
-      { targetId: 'token-1', timeMs: 0, position: { x: 0.2, y: 0.3 } },
-      { targetId: 'token-1', timeMs: 1000, position: { x: 0.8, y: 0.6 } },
+      { targetId: 'token-1', timeMs: 0, position: { x: 0.2, y: 0.3 }, coordinateSystem: 'normalized' as const },
+      { targetId: 'token-1', timeMs: 1000, position: { x: 0.8, y: 0.6 }, coordinateSystem: 'normalized' as const },
     ];
 
     const imported = applyTrajectoryImport(project, samples, 'trajectory-csv', 'motion.csv');
@@ -165,7 +235,7 @@ describe('Open tactical trajectory interchange', () => {
 
     expect(() => applyTrajectoryImport(project, [
       ...samples,
-      { targetId: 'missing-token', timeMs: 2000, position: { x: 2, y: 0.4 } },
+      { targetId: 'missing-token', timeMs: 2000, position: { x: 2, y: 0.4 }, coordinateSystem: 'normalized' as const },
     ], 'trajectory-json', 'bad.json')).toThrow(/target|position|normalized|within/i);
     expect(JSON.stringify(project)).toBe(before);
   });
