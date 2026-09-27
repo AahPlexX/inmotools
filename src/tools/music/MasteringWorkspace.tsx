@@ -834,7 +834,7 @@ export default function MasteringWorkspace() {
           <p>Your session from {new Date(recovery.savedAt).toLocaleString()} is saved on this device: {recovery.sourceNames.slice(0, 3).join(', ')}{recovery.sourceNames.length > 3 ? ` and ${recovery.sourceNames.length - 3} more` : ''}.</p>
         </div>
         <div className="button-row">
-          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading}>Restore session</button>
+          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading || projectBusy}>Restore session</button>
           <button type="button" onClick={() => void discardSession()} disabled={loading}>Discard it</button>
         </div>
       </section>}
@@ -849,17 +849,17 @@ export default function MasteringWorkspace() {
           <p>{hasAudio ? 'Add more files as new tracks, or drop them here. Files at other sample rates are converted to the project rate.' : 'Choose or drop one or more audio files. Each file becomes its own track. Nothing is uploaded.'}</p>
         </div>
         <div className="mastering-import-actions">
-          <label className={`mastering-file-button${loading || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
+          <label className={`mastering-file-button${loading || projectBusy || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
             {loading ? 'Reading…' : hasAudio ? 'Add audio files' : 'Choose audio files'}
-            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
+            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || projectBusy || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
           </label>
           {!hasAudio && <label className={`mastering-file-button mastering-file-secondary${loading || projectBusy ? ' is-disabled' : ''}`}>
             Open project backup
             <input type="file" accept=".zip,application/zip" disabled={loading || projectBusy} onChange={onBackupFile} />
           </label>}
           {hasAudio && (confirmClear
-            ? <button type="button" className="mastering-danger" onClick={clearProject}>Confirm new project</button>
-            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading}>New project</button>)}
+            ? <button type="button" className="mastering-danger" onClick={clearProject} disabled={loading || projectBusy}>Confirm new project</button>
+            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading || projectBusy}>New project</button>)}
         </div>
       </div>
 
