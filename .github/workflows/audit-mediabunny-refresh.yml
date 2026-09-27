@@ -1,0 +1,45 @@
+name: Audit MediaBunny lockfile refresh
+
+on:
+  push:
+    branches:
+      - audit/audio-mastering-20260927
+    paths:
+      - .github/workflows/audit-mediabunny-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v7
+        with:
+          ref: audit/audio-mastering-20260927
+          fetch-depth: 0
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install current lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Refresh MediaBunny family
+        run: pnpm add --save-exact mediabunny@1.60.0 @mediabunny/aac-encoder@1.60.0 @mediabunny/flac-encoder@1.60.0 @mediabunny/mp3-encoder@1.60.0
+      - name: Update release-age exception
+        run: sed -i 's/mediabunny@1\.58\.0/mediabunny@1.60.0/' pnpm-workspace.yaml
+      - name: Prove frozen install
+        run: pnpm install --frozen-lockfile
+      - name: Remove temporary workflow and commit generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/audit-mediabunny-refresh.yml
+          git add package.json pnpm-lock.yaml pnpm-workspace.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(mastering): refresh Mediabunny to 1.60.0"
+          git push origin HEAD:audit/audio-mastering-20260927
