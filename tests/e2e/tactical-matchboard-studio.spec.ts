@@ -604,7 +604,9 @@ test('renders source-honest spatial analysis overlays with readable metric summa
   await page.getByLabel('Distance ring').check();
   await page.getByLabel('Tether to ball').check();
 
-  await expect(page.locator('[data-analysis-kind="voronoi-cell"]')).toHaveCount(4);
+  const visiblePlayers = await page.locator('.tactical-board-svg g[data-tactical-kind="player"]').count();
+  expect(visiblePlayers).toBeGreaterThan(0);
+  await expect(page.locator('[data-analysis-kind="voronoi-cell"]')).toHaveCount(visiblePlayers);
   await expect(page.locator('[data-analysis-kind="team-hull"]')).toHaveCount(1);
   await expect(page.locator('[data-analysis-kind="passing-lane"]')).toHaveCount(1);
   await expect(page.locator('[data-analysis-kind="vision-sector"]')).toHaveCount(1);
@@ -615,6 +617,14 @@ test('renders source-honest spatial analysis overlays with readable metric summa
   await expect(page.getByTestId('team-geometry-summary')).toContainText(/width.*m/i);
   await expect(page.getByTestId('passing-lane-summary')).toContainText(/clearance.*m/i);
   await expect(page.getByText(/Geometric analysis only/i)).toBeVisible();
+
+  await page.getByLabel('Body orientation (deg)').fill('135');
+  await page.getByRole('button', { name: 'Set orientation' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('135°');
+
+  await page.getByLabel('Tether target').selectOption('token-2');
+  await page.getByLabel('Distance units').selectOption('imperial');
+  await expect(page.getByText(/Player\/unit spacing: .* ft/i)).toBeVisible();
 });
 
 test('derives occupancy and speed metrics only from authored trajectory samples', async ({ page }) => {
