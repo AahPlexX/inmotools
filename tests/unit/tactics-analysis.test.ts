@@ -142,8 +142,8 @@ describe('Tactical spatial analysis', () => {
       teamName: 'Team',
       primaryColor: '#154c79',
       secondaryColor: '#ffffff',
-      formationId: 'ussf-4v4-1-2-1',
-      pitchDimensions: { lengthMeters: 40, widthMeters: 30 },
+      formationId: 'ussf-7v7-1-3-2-1',
+      pitchDimensions: { lengthMeters: 60, widthMeters: 40 },
       direction: 'left-to-right',
     });
     const settings = {
@@ -156,7 +156,7 @@ describe('Tactical spatial analysis', () => {
     const view = deriveTacticalAnalysis(project, 'scene-1', 'token-1', settings);
 
     expect(view.selectedToken?.id).toBe('token-1');
-    expect(view.voronoi).toHaveLength(3);
+    expect(view.voronoi).toHaveLength(6);
     expect(view.ring?.center).toEqual(project.playerTokens.find((token) => token.id === 'token-1')?.position);
   });
 
