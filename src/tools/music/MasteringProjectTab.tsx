@@ -152,7 +152,7 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
         <p>Useful when something is unavailable or slow. Share the report when asking for help; it contains no audio or file names.</p>
       </div></div>
       {checking && !diagnostics && <p className="mastering-busy" role="status">Checking…</p>}
-      {diagnostics && <div className="mastering-table-scroll"><table className="mastering-report mastering-diagnostics">
+      {diagnostics && <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Browser capability report"><table className="mastering-report mastering-diagnostics">
         <caption className="visually-hidden">Browser capabilities</caption>
         <tbody>{diagnostics.map((row) => <tr key={row.label}>
           <th scope="row">{row.label}</th>
