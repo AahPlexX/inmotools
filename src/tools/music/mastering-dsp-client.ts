@@ -34,11 +34,14 @@ export class MasteringDspClient {
     const fail = (error: Error) => {
       if (this.failure) return;
       this.failure = error;
-      onFailure?.(error);
       for (const waiter of this.pending.values()) waiter.reject(error);
       this.pending.clear();
+      try { onFailure?.(error); } catch { /* failure observers must not break worker cleanup */ }
     };
-    this.worker.onerror = (event) => fail(new Error(event.message || 'The audio processing worker stopped unexpectedly.'));
+    this.worker.onerror = (event) => {
+      event.preventDefault();
+      fail(new Error(event.message || 'The audio processing worker stopped unexpectedly.'));
+    };
     this.worker.onmessageerror = () => fail(new Error('The audio processing worker returned data this browser could not read.'));
   }
 
