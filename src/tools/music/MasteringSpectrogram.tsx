@@ -185,7 +185,7 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
     </div>
     <div ref={wrapRef} className="mastering-spectrogram-view">
       <canvas ref={baseRef} className="mastering-spectrogram-base" style={{ height: HEIGHT }} aria-hidden="true" />
-      <canvas ref={overlayRef} className="mastering-spectrogram-overlay" style={{ height: HEIGHT, cursor: mode === 'paint' ? 'cell' : 'crosshair' }} role="img"
+      <canvas ref={overlayRef} className="mastering-spectrogram-overlay" style={{ height: HEIGHT, cursor: mode === 'paint' ? 'cell' : 'crosshair', touchAction: mode === 'paint' ? 'none' : 'pan-y' }} role="img"
         aria-label={`Spectrogram from ${formatTime(startSeconds)} to ${formatTime(startSeconds + spanSeconds)}, ${formatFrequency(minHz)} to ${formatFrequency(maxHz)} on a logarithmic scale. ${regions.length} painted region${regions.length === 1 ? '' : 's'}.`}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
         onPointerCancel={() => { drag.current = null; setDraft(null); }} />
