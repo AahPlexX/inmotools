@@ -20,8 +20,8 @@ export interface MonitorState {
 }
 
 export const LOUDNESS_TARGETS = [
-  { value: -14, label: 'Streaming (−14 LUFS)' },
-  { value: -16, label: 'Podcast / spoken word (−16 LUFS)' },
+  { value: -14, label: 'General streaming reference (−14 LUFS)' },
+  { value: -16, label: 'Spoken-word reference (−16 LUFS)' },
   { value: -23, label: 'Broadcast, EBU R 128 (−23 LUFS)' },
   { value: -24, label: 'Broadcast, ATSC A/85 (−24 LKFS)' },
 ] as const;
@@ -157,8 +157,9 @@ export default function MasteringMeters({ meters, playing, pre, post, monitor, o
     </section>
 
     <section className="mastering-panel" aria-labelledby="loudness-heading">
-      <div className="mastering-panel-heading"><div><h3 id="loudness-heading">Loudness (ITU-R BS.1770-5, EBU R 128)</h3><p>{playing ? 'Live readings of the processed master.' : 'Play to measure. For exact whole-file numbers, use Render and measure on the Master tab.'}</p></div>
+      <div className="mastering-panel-heading"><div><h3 id="loudness-heading">Loudness (ITU-R BS.1770-5, EBU R 128)</h3><p>{playing ? 'Live readings of the processed master.' : 'Play to measure. For full-project rendered PCM measurements, use Render and measure on the Master tab.'}</p></div>
         <button type="button" onClick={onResetMeters}>Reset meters</button></div>
+      <p className="help-text">Targets are comparison references, not universal delivery rules. Check the destination's current specification before final delivery.</p>
       <div className="workspace-grid">
         <label className="field"><span className="field-label">Target</span>
           <select value={target} onChange={(event) => onTargetChange(Number(event.target.value))}>
