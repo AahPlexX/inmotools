@@ -37,12 +37,14 @@ test('stops safely when the realtime master processor crashes', async ({ page })
 
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Reference: load one on the Meters tab.')).toHaveCount(0);
   await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
     name: 'processor-failure.wav',
     mimeType: 'audio/wav',
     buffer: makeMonoPcm16Wav(3),
   });
   await expect(page.locator('.status-line')).toContainText(/Loaded processor-failure\.wav/i);
+  await expect(page.getByText('Reference: load one on the Meters tab.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.locator('.status-line')).toContainText(/Realtime audio processor stopped unexpectedly/i);
