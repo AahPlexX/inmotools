@@ -3,7 +3,7 @@
 **Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 3 counted-thread in progress; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **26/65 complete**
+**Function progress:** **27/65 complete**
 
 ## Goal
 
@@ -71,6 +71,7 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-38** selectable color-plus-symbol or symbols-only counted chart presentation; print and forced-color rendering retain distinct per-floss symbols so thread identity never depends on hue alone.
 - **FC-39** persisted Aida/linen/evenweave fabric-count controls with stitch-over handling, finished-size calculation in inches/centimeters, and deterministic isolated same-color stitch warnings surfaced by shape/text as well as color.
 - **FC-42** automatically regenerated printable symbol key mapping every used project color to a unique symbol plus editable floss brand/palette and code identity.
+- **FC-40** floss skein and yardage calculator, per color, from fabric count, weighted stitch/backstitch/knot totals, and an editable 1–6 strand-count control; uses DMC's manufacturer-published 8 m / 8.7 yd skein length and a clearly-documented planning-estimate per-stitch length (see `engines/counted-thread-engine.ts`) with a 20% safety margin, rounded up to whole skeins.
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
 - **FC-52** bidirectional physical-dimension and gauge scaling for grid and round crochet charts.
@@ -92,6 +93,20 @@ reporting, accessible isolated-stitch warnings, portable-project restore, existi
 crochet editing/export/recovery, and offline PWA reload. Earlier unrelated branch commits remain
 preserved rather than rewritten.
 
+FC-40 acceptance: a red run confirmed `estimateCountedThreadFlossUsage`, `DMC_SKEIN_YARDS`, and the
+`strandCount` settings field did not yet exist (`TypeError: estimateCountedThreadFlossUsage is not
+a function`), then a green run at this branch's next commit passed the focused unit set
+(**66/66** across the five CI-scoped Fiber files), the production TypeScript/Vite build (151-entry
+PWA precache unchanged), and the full 6-case Fiber Playwright spec on desktop and mobile Chromium —
+all run locally in-session with fresh command output (this container's pre-installed Chromium
+build predates the exact build `@playwright/test@1.63.0` expects, so the browser run used an
+external, non-repo Playwright config that only overrides `launchOptions.executablePath` to the
+container's pre-installed binary; the committed `playwright.config.ts` and the test source itself
+are unchanged, and real CI resolves its own matching browser via
+`playwright install --with-deps chromium` and needs no such override). No GitHub Actions run ID
+exists yet for this commit; the next agent should let CI run on push and treat that as the
+authoritative record once available, the same as every other function accepted before it.
+
 ## Delivery slices
 
 - [x] **Slice 0 — Foundation.** This plan, the design spec, and the canonical
@@ -111,14 +126,15 @@ preserved rather than rewritten.
       focused unit/build/desktop-mobile browser gate.
 - [ ] **Slice 3 — Cross-stitch & counted-thread engine.** **In progress:** FC-35 precision counted
 grid, FC-36 worker-backed raster quantization, FC-38 print-safe symbol-over-color mode, FC-39
-fabric-count/confetti controls, and FC-42 auto-generated floss symbol key are accepted. FC-37 has a
+fabric-count/confetti controls, FC-40 floss skein/yardage calculator, and FC-42 auto-generated floss
+symbol key are accepted. FC-37 has a
 tested generic CIEDE2000 matcher but remains
 open and provenance-blocked: current first-party research does not support redistributing scraped/
 transcribed manufacturer color cards, and Madeira explicitly warns its digital colors are not
 authoritative enough for precise matching. See `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md`.
 Preserve the original DMC/Anchor/Madeira/Sullivans requirement; do not substitute a hand-picked/community
-table. FC-40 floss length/skein math is the next independent executable counted-thread slice; FC-41
-expanded blackwork/hardanger specialty layer remains open.
+table. FC-41 expanded blackwork/hardanger specialty layer is now the next independent executable
+counted-thread slice.
 Basic backstitch required by FC-35 does not by itself close the broader FC-41 specialty scope.
 - [ ] **Slice 4 — Knitting colorwork/cable engine.** Gauge-corrected non-square grid, knit/cable
       symbol matrix, stranded-float analyzer.
@@ -139,7 +155,7 @@ Basic backstitch required by FC-35 does not by itself close the broader FC-41 sp
 ## Testing strategy
 
 - **TDD scope:** add tests for new contracts, demonstrated regressions, and high-value invariants; do not create one test per helper or duplicate coverage already enforced by a dependency-backed integration path.
-- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **65 checks across 5 files**; FC-39 adds one persisted-settings/finished-size/confetti invariant while retaining the existing quantization, legend, matcher, validation, and state coverage without adding a test-only dependency.
+- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **66 checks across 5 files**; FC-40 adds one floss-yardage/skein invariant (strand-count and fabric-count sensitivity, cross-craft-type guard) while retaining the existing quantization, legend, matcher, validation, and state coverage without adding a test-only dependency.
 - **Browser cadence:** `.github/workflows/fiber-craft.yml` runs one sequential Playwright worker across **6 cases**: crochet/edit/export/recovery, counted-thread edit/key/save/restore, and offline PWA reload on desktop and mobile Chromium. Keep this coherent matrix instead of multiplying browser loops.
 - **Build gate:** production TypeScript/Vite build is required for user-facing or engine/state changes that can affect bundling. Documentation-only changes do not invalidate accepted code evidence.
 - **Workflow hygiene:** counted-thread coverage is consolidated into existing focused suites; do not recreate a standalone `fiber-craft-cross-stitch.test.ts`. The current workflow contains no stale reference to that deleted file.
@@ -151,7 +167,7 @@ Basic backstitch required by FC-35 does not by itself close the broader FC-41 sp
 - `src/tools/fiber-craft/CountedThreadPanel.tsx`, `engines/counted-thread-engine.ts`, `engines/counted-image-engine.ts`, `counted-image-worker-client.ts`, and `counted-image.worker.ts` are authoritative for current counted-thread/image-import behavior. The superseded `CountedThreadWorkspace.tsx` and `counted-thread-workspace.css` were deliberately removed; do not resurrect them.
 - FC-35, FC-36, FC-38, FC-39, and FC-42 are accepted. FC-37 is **not** accepted: only its generic CIEDE2000 nearest-match engine exists. Read `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md` before touching FC-37. Current first-party evidence shows DMC expressly restricts color-card/conversion-card reproduction, Anchor restricts reproduction of site content, Madeira warns digital colors are not authoritative, and no explicit Sullivans redistribution license was found in the official materials reviewed.
 - Preserve the original four-manufacturer FC-37 requirement. Do not replace it with a convenience subset, scraped/transcribed protected material, or third-party/community conversion table. Reuse existing `culori@4.0.2`; no new color-distance dependency is needed. FC-37 may close only after a defensible manufacturer-permission/licensed-data route (or another user-approved provenance route) is evidenced.
-- FC-38 and FC-39 are accepted. FC-38 reuses FC-42 symbol assignment so print/forced-color output does not rely on hue alone; FC-39 persists fabric/count/stitch-over settings and marks isolated same-color stitches with an accessible non-color warning. FC-40 is the next independent executable counted-thread slice while FC-37's provenance path remains blocked.
+- FC-38, FC-39, and FC-40 are accepted. FC-38 reuses FC-42 symbol assignment so print/forced-color output does not rely on hue alone; FC-39 persists fabric/count/stitch-over settings and marks isolated same-color stitches with an accessible non-color warning; FC-40 (`estimateCountedThreadFlossUsage` in `engines/counted-thread-engine.ts`) adds a `strandCount` (1–6) field to `CountedThreadProjectSettings` and reports per-color estimated yardage and whole-skein counts, surfaced in `CountedThreadPanel.tsx` as a "Strands per stitch" control, an overall chart total, and a per-color line in the generated symbol key. FC-41 is the next independent executable counted-thread slice while FC-37's provenance path remains blocked.
 - Current branch history includes unrelated Vector-only commit `a4ddb40` after FC-36. Preserve it; do not rewrite history to make Fiber commits contiguous.
 
 ## Verification gate (every slice)
