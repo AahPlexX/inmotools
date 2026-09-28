@@ -431,6 +431,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(page.locator('.mastering-spectrogram .mastering-busy')).toHaveCount(0, { timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Paint regions' }).click();
+  await expect(overlay).toHaveCSS('touch-action', 'none');
   await overlay.scrollIntoViewIfNeeded();
   const box = await overlay.boundingBox();
   if (!box) throw new Error('spectrogram missing');
@@ -446,6 +447,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(page.getByLabel('Clip edits')).toHaveText('0');
 
   await page.getByRole('button', { name: 'Select time' }).click();
+  await expect(overlay).toHaveCSS('touch-action', 'pan-y');
   await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5, { steps: 3 });
