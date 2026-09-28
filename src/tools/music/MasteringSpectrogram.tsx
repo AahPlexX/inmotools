@@ -15,7 +15,7 @@ import { spectrogramPalette, type Spectrogram } from './dsp/spectrogram';
 import type { SpectralRegion } from './dsp/spectral';
 import type { TimelineViewport } from './MasteringTimeline';
 import { formatFrequency } from './MasteringControls';
-import { formatTime, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatTime, type MasteringPanelContext } from './mastering-ui';
 
 const HEIGHT = 180;
 
@@ -199,8 +199,8 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
         </li>)}
       </ul>}
       <div className="mastering-nudge">
-        <label className="field"><span className="field-label">Attenuation (dB)</span>
-          <input type="number" min={1} max={60} step={1} value={reduction} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value)) setReduction(Math.min(60, Math.max(1, value))); }} /></label>
+        <CommitNumberField label="Attenuation (dB)" value={reduction} min={1} max={60} step={1}
+          onCommit={setReduction} onPreview={setReduction} />
         <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('attenuate')}>Attenuate painted regions</button>
         <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('heal')}>Heal painted regions</button>
         <button type="button" disabled={!regions.length} onClick={() => setRegions([])}>Clear regions</button>
