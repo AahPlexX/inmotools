@@ -669,3 +669,193 @@
     height: clamp(260px, 48vh, 420px);
   }
 }
+
+.tactical-video-panel {
+  min-width: 0;
+}
+
+.tactical-video-body {
+  display: grid;
+  gap: clamp(12px, 2vw, 18px);
+  padding: clamp(12px, 2vw, 18px);
+  min-width: 0;
+}
+
+.tactical-video-note,
+.tactical-video-error,
+.tactical-video-stage figcaption,
+.tactical-video-tools p {
+  margin: 0;
+  max-width: 78ch;
+  overflow-wrap: anywhere;
+}
+
+.tactical-video-error {
+  color: #7f1d1d;
+  background: #f8e8e6;
+  border: 1px solid #e2aaa6;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.tactical-video-open,
+.tactical-video-transport,
+.tactical-video-tools,
+.tactical-video-tools form,
+.tactical-video-tools fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tactical-video-open,
+.tactical-video-transport {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  align-items: end;
+}
+
+.tactical-video-open label,
+.tactical-video-transport label,
+.tactical-video-tools label {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+  min-width: 0;
+}
+
+.tactical-video-open input,
+.tactical-video-open button,
+.tactical-video-transport input,
+.tactical-video-transport select,
+.tactical-video-transport button,
+.tactical-video-tools input,
+.tactical-video-tools select,
+.tactical-video-tools button {
+  min-height: 44px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tactical-video-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: clamp(10px, 2vw, 16px);
+  min-width: 0;
+}
+
+.tactical-video-stage,
+.tactical-video-frame {
+  min-width: 0;
+  margin: 0;
+}
+
+.tactical-video-frame {
+  position: relative;
+  height: clamp(220px, 48vh, 520px);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+  overflow: hidden;
+  background: #10233f;
+}
+
+.tactical-video-frame video,
+.tactical-video-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tactical-video-frame video {
+  object-fit: contain;
+  background: #10233f;
+}
+
+.tactical-video-overlay {
+  touch-action: none;
+}
+
+.tactical-video-stage figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding-top: 8px;
+}
+
+.tactical-video-tools fieldset {
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 12px;
+  padding: clamp(10px, 1.5vw, 14px);
+}
+
+.tactical-video-tools legend {
+  padding-inline: 6px;
+  font-weight: 750;
+}
+
+.tactical-video-tools ul,
+.tactical-video-tools ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 1.2rem;
+  min-width: 0;
+}
+
+.tactical-video-tools li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.tactical-video-checks {
+  display: grid;
+  gap: 8px;
+}
+
+.tactical-video-checks label {
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  min-height: 44px;
+}
+
+.tactical-video-checks input {
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 720px) {
+  .tactical-video-open,
+  .tactical-video-transport,
+  .tactical-video-tools li {
+    grid-template-columns: 1fr;
+  }
+
+  .tactical-video-open button,
+  .tactical-video-transport button,
+  .tactical-video-tools li > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .tactical-video-frame {
+    height: clamp(200px, 42vh, 360px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactical-video-frame video {
+    scroll-behavior: auto;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .tactical-video-error {
+    color: #ffd7d3;
+    background: #4a1d1d;
+    border-color: #e2aaa6;
+  }
+}

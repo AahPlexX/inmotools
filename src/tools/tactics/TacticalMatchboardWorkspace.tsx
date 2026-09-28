@@ -4,6 +4,7 @@ import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './Tact
 import TacticalBoard from './TacticalBoard';
 import TacticalPersistencePanel from './TacticalPersistencePanel';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
+import TacticalVideoPanel from './TacticalVideoPanel';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
   commitTacticalProject,
@@ -779,6 +780,8 @@ export default function TacticalMatchboardWorkspace() {
           onReplaceProject={replaceProject}
           onStatus={setStatus}
         />
+
+        <TacticalVideoPanel project={project} onEdit={applyEdit} onStatus={setStatus} />
 
         <div className="tactical-command-bar" aria-label="Board commands">
           <label className="tactical-arrow-label tactical-scene-picker">

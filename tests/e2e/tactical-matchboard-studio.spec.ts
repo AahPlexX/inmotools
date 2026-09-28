@@ -1,5 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
+import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+
+const localReviewVideo = path.join(process.cwd(), 'tests/fixtures/tactical-review-sample.webm');
 
 const board = (page: Page) => page.locator('.tactical-board');
 const setupPanel = (page: Page) => page.locator('.tactical-setup').first();
@@ -813,6 +816,104 @@ test('synchronizes the lazy 3D pitch, canonical player editing, and authored cam
   expect(panelOverflow).toBeLessThanOrEqual(1);
 
   const results = await new AxeBuilder({ page }).include('#tactical-3d-panel').analyze();
+  const severe = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''));
+  expect(severe, severe.map((item) => item.id + ': ' + item.help).join('\n')).toEqual([]);
+});
+
+test('reports local video files that cannot be reviewed', async ({ page }) => {
+  await page.getByText('Local video review', { exact: true }).click();
+  await page.getByLabel('Open local match video').setInputFiles({
+    name: 'notes.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('not a video'),
+  });
+  await expect(page.getByRole('alert')).toContainText(/supported local video/i);
+  await expect(page.getByTestId('tactical-video-duration')).toHaveText('Duration unavailable');
+
+  await page.getByLabel('Open local match video').setInputFiles({
+    name: 'broken.mp4',
+    mimeType: 'video/mp4',
+    buffer: Buffer.from('this is not a playable mp4'),
+  });
+  await expect(page.getByRole('alert')).toContainText(/decoded|cannot play|could not be reviewed|could not be read/i);
+  await expect(page.getByTestId('tactical-review-video')).toBeVisible();
+});
+
+test('reviews local video with telestration, tracking, events, clips, and manual angle sync', async ({ page }) => {
+  await page.getByText('Local video review', { exact: true }).click();
+  await page.getByLabel('Open local match video').setInputFiles(localReviewVideo);
+  await expect(page.getByTestId('tactical-video-duration')).not.toHaveText('Duration unavailable');
+  const duration = Number((await page.getByTestId('tactical-video-duration').innerText()).replace(/[^\d]/g, ''));
+  expect(duration).toBeGreaterThan(200);
+
+  await page.getByRole('button', { name: 'Step forward one frame' }).click();
+  await expect(page.getByTestId('tactical-video-time')).not.toHaveText('Review time 0 ms');
+  await page.getByLabel('Review time (ms)').fill('0');
+  await page.getByRole('button', { name: 'Set review time' }).click();
+  await expect(page.getByTestId('tactical-video-time')).toHaveText('Review time 0 ms');
+
+  await page.getByLabel('Telestration end (ms)').fill('200');
+  await page.getByRole('button', { name: 'Add telestration' }).click();
+  await expect(page.getByTestId('tactical-telestration-list')).toContainText(/arrow/i);
+  await expect(page.locator('.status-line').last()).toContainText(/telestration/i);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('tactical-telestration-list')).not.toContainText(/arrow/i);
+  await expect(page.getByTestId('tactical-video-duration')).not.toHaveText('Duration unavailable');
+  await page.getByRole('button', { name: 'Add telestration' }).click();
+  await expect(page.getByTestId('tactical-video-overlay').locator('line')).toBeVisible();
+
+  await page.getByLabel('Track end (ms)').fill(String(duration));
+  await page.getByRole('button', { name: 'Add overlay track' }).click();
+  await page.getByRole('button', { name: 'Add track anchor' }).click();
+  await expect(page.getByTestId('tactical-track-sample')).toContainText('Tracked position 40% , 50%');
+  await expect(page.getByTestId('tactical-track-marker')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add match event' }).click();
+  await expect(page.getByTestId('tactical-event-list')).toContainText('Near-post goal at 0 ms');
+
+  await page.getByLabel('Clip label').fill('Press');
+  await page.getByLabel('Clip start (ms)').fill('0');
+  await page.getByLabel('Clip end (ms)').fill('200');
+  await page.getByRole('button', { name: 'Add clip' }).click();
+  await page.getByLabel('Clip label').fill('Shot');
+  await page.getByLabel('Clip start (ms)').fill('200');
+  await page.getByLabel('Clip end (ms)').fill(String(duration));
+  await page.getByRole('button', { name: 'Add clip' }).click();
+  await page.getByRole('button', { name: 'Create playlist' }).click();
+  await page.getByRole('button', { name: 'Move Shot earlier' }).click();
+  await expect(page.getByTestId('tactical-playlist-order').locator('li').first()).toContainText('Shot');
+  await page.getByRole('button', { name: 'Play playlist' }).click();
+  await expect.poll(async () => page.getByTestId('tactical-review-video').evaluate((element) => (
+    element instanceof HTMLVideoElement ? element.currentTime : 0
+  ))).toBeGreaterThan(0.15);
+  await expect(page.getByRole('button', { name: 'Pause review' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause review' }).click();
+
+  await page.getByLabel('Open comparison angle').setInputFiles(localReviewVideo);
+  await expect(page.getByTestId('tactical-comparison-video')).toBeVisible();
+  await expect(page.getByTestId('tactical-comparison-duration')).not.toHaveText('Duration unavailable');
+  await expect(page.getByTestId('tactical-angle-offset')).toHaveText('Angle offset Not set');
+  await page.getByLabel('Review time (ms)').fill('0');
+  await page.getByRole('button', { name: 'Set review time' }).click();
+  await page.getByLabel('Sync shared time (ms)').fill('0');
+  await page.getByLabel('Sync angle time (ms)').fill('200');
+  await page.getByRole('button', { name: 'Set sync anchor' }).click();
+  await expect(page.getByTestId('tactical-angle-offset')).toHaveText('Angle offset 200 ms');
+  await expect.poll(async () => page.getByTestId('tactical-comparison-video').evaluate((element) => (
+    element instanceof HTMLVideoElement ? element.currentTime : 0
+  ))).toBeGreaterThan(0.15);
+
+  const controls = page.locator('#tactical-video-panel').locator('button, select');
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const box = await controls.nth(index).boundingBox();
+    expect(box?.height ?? 0, `video control ${index}`).toBeGreaterThanOrEqual(44);
+  }
+  const panelOverflow = await page.locator('#tactical-video-panel').evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(panelOverflow).toBeLessThanOrEqual(1);
+  const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(documentOverflow).toBeLessThanOrEqual(1);
+
+  const results = await new AxeBuilder({ page }).include('#tactical-video-panel').analyze();
   const severe = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''));
   expect(severe, severe.map((item) => item.id + ': ' + item.help).join('\n')).toEqual([]);
 });

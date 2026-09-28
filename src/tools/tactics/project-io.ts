@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import Papa from 'papaparse';
 import { createNormalizedPoint, metersToNormalized } from './pitch-engine';
 import { TACTICS_SCHEMA_VERSION, validateTacticalProject } from './tactics-engine';
+import { createEmptyVideoReview } from './video-review-engine';
 import {
   TIMELINE_MARKER_KINDS,
   type ImportProvenance,
@@ -16,7 +17,7 @@ const TRAJECTORY_TOOL_ID = 'inmotools-tactical-trajectory';
 const TRAJECTORY_SCHEMA_VERSION = 1 as const;
 const MAX_PROJECT_JSON_BYTES = 20 * 1024 * 1024;
 const MAX_PROJECT_ZIP_BYTES = 256 * 1024 * 1024;
-const MAX_ASSET_BYTES = 128 * 1024 * 1024;
+export const MAX_ASSET_BYTES = 128 * 1024 * 1024;
 const MAX_TRAJECTORY_SAMPLES = 100_000;
 const ZIP_DATE = new Date('1980-01-01T00:00:00.000Z');
 
@@ -105,6 +106,7 @@ function assertRequiredProjectShape(value: Record<string, unknown>): void {
   ] as const)) {
     if (!Array.isArray(value[key])) throw new Error(`Invalid tactical project: ${key} must be an array.`);
   }
+  asRecord(value.videoReview, 'Tactical project videoReview');
 }
 
 export function migrateTacticalProject(raw: unknown): TacticalProject {
@@ -166,6 +168,8 @@ export function migrateTacticalProject(raw: unknown): TacticalProject {
     };
     source.schemaVersion = 2;
   }
+
+  if (source.videoReview == null) source.videoReview = createEmptyVideoReview();
 
   if (source.schemaVersion !== TACTICS_SCHEMA_VERSION) {
     throw new Error(`Unsupported tactical project schema version: ${String(source.schemaVersion)}.`);

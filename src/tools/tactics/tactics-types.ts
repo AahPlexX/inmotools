@@ -302,6 +302,87 @@ export interface LocalMediaReference {
   blob?: Blob;
 }
 
+export type TelestrationKind = 'freehand' | 'line' | 'arrow' | 'circle' | 'text';
+
+export type OverlayInterpolation = 'hold' | 'linear';
+
+export type MatchEventKind =
+  | 'goal'
+  | 'shot'
+  | 'chance'
+  | 'turnover'
+  | 'foul'
+  | 'set-piece'
+  | 'press'
+  | 'transition'
+  | 'coaching-note';
+
+export interface TelestrationStroke {
+  id: string;
+  mediaId: string;
+  kind: TelestrationKind;
+  startMs: number;
+  endMs: number;
+  points: NormalizedPoint[];
+  color: string;
+  label?: string;
+}
+
+export interface OverlayTrackAnchor {
+  id: string;
+  timeMs: number;
+  position: NormalizedPoint;
+}
+
+export interface OverlayTrack {
+  id: string;
+  mediaId: string;
+  label: string;
+  startMs: number;
+  endMs: number;
+  interpolation: OverlayInterpolation;
+  anchors: OverlayTrackAnchor[];
+}
+
+export interface MatchEventTag {
+  id: string;
+  mediaId: string;
+  timeMs: number;
+  kind: MatchEventKind;
+  label: string;
+}
+
+export interface VideoClip {
+  id: string;
+  mediaId: string;
+  label: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface VideoPlaylist {
+  id: string;
+  name: string;
+  clipIds: string[];
+}
+
+export interface AngleSyncAnchor {
+  mediaId: string;
+  mediaTimeMs: number;
+  sharedTimeMs: number;
+}
+
+export interface VideoReviewDocument {
+  activeMediaId: string | null;
+  comparisonMediaId: string | null;
+  telestrations: TelestrationStroke[];
+  overlayTracks: OverlayTrack[];
+  events: MatchEventTag[];
+  clips: VideoClip[];
+  playlists: VideoPlaylist[];
+  syncAnchors: AngleSyncAnchor[];
+}
+
 export interface ImportProvenance {
   sourceType: 'project-json' | 'project-zip' | 'trajectory-csv' | 'trajectory-json' | 'local-media';
   sourceName: string;
@@ -336,6 +417,7 @@ export interface TacticalProject {
   analysisSettings: AnalysisSettings;
   sessionPlan: CoachingSessionPlan;
   media: LocalMediaReference[];
+  videoReview: VideoReviewDocument;
   importProvenance: ImportProvenance[];
   exportPreferences: ExportPreferences;
 }

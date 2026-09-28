@@ -4,6 +4,7 @@ import type {
 } from './tactics-types';
 import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
 import { validateTacticalTimeline } from './timeline-engine';
+import { createEmptyVideoReview, validateVideoReview } from './video-review-engine';
 export {
   createCameraPresetState,
   normalizedPointToPitch3D,
@@ -113,6 +114,7 @@ export function createStarterTacticalProject(): TacticalProject {
       notes: '',
     },
     media: [],
+    videoReview: createEmptyVideoReview(),
     importProvenance: [],
     exportPreferences: {
       aspect: 'landscape',
@@ -248,6 +250,8 @@ export function validateTacticalProject(project: TacticalProject): string[] {
       }
     }
   }
+
+  errors.push(...validateVideoReview(project));
 
   return errors;
 }
