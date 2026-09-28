@@ -681,7 +681,7 @@ test('edits a coaching session and restores a named local snapshot', async ({ pa
   await expect(page.getByLabel('Session objective')).toHaveValue('Create width and scan before receiving');
 
   await expect(page.getByRole('button', { name: 'Restore latest autosave' })).toBeEnabled();
-  await expect(page.getByText(/stored only in this browser/i)).toBeVisible();
+  await expect(page.getByText(/Projects, autosaves, and snapshots are stored only in this browser/i)).toBeVisible();
 });
 
 test('round-trips a project ZIP and preserves the open project after corrupt JSON import', async ({ page }) => {
@@ -730,8 +730,6 @@ test('round-trips authored trajectory CSV through the browser interchange contro
   await page.getByRole('button', { name: 'Build board' }).click();
   await page.getByLabel('Import trajectory file').setInputFiles(csvPath!);
   await expect(page.locator('.status-line').last()).toContainText('Trajectory CSV imported');
-
-  await page.getByText('Timeline & motion', { exact: true }).click();
   await expect(page.getByText(/token-1: 2 keyframes.*0-1000 ms/i)).toBeVisible();
 });
 
@@ -749,7 +747,6 @@ test('lists, loads, and removes browser-local saved projects', async ({ page }) 
   await page.getByRole('button', { name: 'Load saved project Training board' }).click();
   await expect(setupPanel(page).getByLabel('Project title')).toHaveValue('Training board');
 
-  await page.getByText('Project vault & interchange', { exact: true }).click();
   await page.getByRole('button', { name: 'Remove saved project Training board' }).click();
   await expect(page.locator('.status-line').last()).toContainText('Saved project and its snapshots removed');
   await expect(page.getByTestId('vault-autosave-state')).toContainText('Autosave is paused because this open project has no saved local copy');

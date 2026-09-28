@@ -25,6 +25,32 @@ const message = (error: unknown) => error instanceof Error ? error.message : 'Un
 const stem = (title: string) => title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'tactical-project';
 const list = (value: FormDataEntryValue | null) => String(value ?? '').split('\n').map((item) => item.trim()).filter(Boolean);
 
+function hasZipSignature(bytes: Uint8Array): boolean {
+  return bytes.length >= 4
+    && bytes[0] === 0x50
+    && bytes[1] === 0x4b
+    && ((bytes[2] === 0x03 && bytes[3] === 0x04)
+      || (bytes[2] === 0x05 && bytes[3] === 0x06)
+      || (bytes[2] === 0x07 && bytes[3] === 0x08));
+}
+
+function projectImportKind(file: File, bytes: Uint8Array): 'json' | 'zip' {
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+  if (name.endsWith('.zip') || type === 'application/zip' || type === 'application/x-zip-compressed') return 'zip';
+  if (name.endsWith('.json') || type === 'application/json') return 'json';
+  return hasZipSignature(bytes) ? 'zip' : 'json';
+}
+
+function trajectoryImportKind(file: File, text: string): 'csv' | 'json' {
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+  if (name.endsWith('.csv') || type === 'text/csv') return 'csv';
+  if (name.endsWith('.json') || type === 'application/json') return 'json';
+  const first = text.trimStart()[0];
+  return first === '{' || first === '[' ? 'json' : 'csv';
+}
+
 export default function TacticalPersistencePanel({ project, onEdit, onReplaceProject, onStatus }: TacticalPersistencePanelProps) {
   const vault = useMemo(() => new TacticalProjectVault(), []);
   const [snapshots, setSnapshots] = useState<TacticalSnapshotRecord[]>([]);
@@ -88,9 +114,10 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
 
   async function createSnapshot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      await vault.createSnapshot(project, String(new FormData(event.currentTarget).get('snapshotLabel') ?? ''));
-      event.currentTarget.reset();
+      await vault.createSnapshot(project, String(new FormData(form).get('snapshotLabel') ?? ''));
+      form.reset();
       await refresh();
       onStatus('Named snapshot created in this browser.');
     } catch (error) { onStatus(message(error)); }
@@ -148,12 +175,13 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
     event.currentTarget.value = '';
     if (!file) return;
     try {
-      const zip = file.name.toLowerCase().endsWith('.zip');
-      const imported = zip
-        ? (await importTacticalProjectZip(new Uint8Array(await file.arrayBuffer()), file.name)).project
-        : await vault.importJson(await file.text(), file.name);
-      await vault.saveProject(imported);
-      onReplaceProject(imported, zip ? 'Project ZIP imported.' : 'Project JSON imported.');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const kind = projectImportKind(file, bytes);
+      const imported = kind === 'zip'
+        ? (await importTacticalProjectZip(bytes, file.name)).project
+        : await vault.importJson(new TextDecoder().decode(bytes), file.name);
+      if (kind === 'zip') await vault.saveProject(imported);
+      onReplaceProject(imported, kind === 'zip' ? 'Project ZIP imported.' : 'Project JSON imported.');
       await refresh();
     } catch (error) { onStatus(message(error)); }
   }
@@ -163,14 +191,15 @@ export default function TacticalPersistencePanel({ project, onEdit, onReplacePro
     event.currentTarget.value = '';
     if (!file) return;
     try {
-      const csv = file.name.toLowerCase().endsWith('.csv');
-      const samples = csv
-        ? parseTrajectoryCsv(await file.text(), file.name, project.pitch.dimensions)
-        : parseTrajectoryJson(await file.text(), file.name, project.pitch.dimensions);
+      const text = await file.text();
+      const kind = trajectoryImportKind(file, text);
+      const samples = kind === 'csv'
+        ? parseTrajectoryCsv(text, file.name, project.pitch.dimensions)
+        : parseTrajectoryJson(text, file.name, project.pitch.dimensions);
       onEdit(
-        csv ? 'Import trajectory CSV' : 'Import trajectory JSON',
-        (current) => applyTrajectoryImport(current, samples, csv ? 'trajectory-csv' : 'trajectory-json', file.name),
-        csv ? 'Trajectory CSV imported.' : 'Trajectory JSON imported.',
+        kind === 'csv' ? 'Import trajectory CSV' : 'Import trajectory JSON',
+        (current) => applyTrajectoryImport(current, samples, kind === 'csv' ? 'trajectory-csv' : 'trajectory-json', file.name),
+        kind === 'csv' ? 'Trajectory CSV imported.' : 'Trajectory JSON imported.',
       );
     } catch (error) { onStatus(message(error)); }
   }

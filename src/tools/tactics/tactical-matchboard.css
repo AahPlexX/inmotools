@@ -550,6 +550,10 @@
   align-items: center;
 }
 
+.tactical-inline-actions > button {
+  min-inline-size: 44px;
+}
+
 .tactical-vault-list {
   display: grid;
   gap: 8px;
