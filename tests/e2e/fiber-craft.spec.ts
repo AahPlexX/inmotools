@@ -168,6 +168,11 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('counted-thread-legend')).toContainText('Primary');
     await expect(page.getByTestId('counted-thread-legend')).toContainText('Project floss · P-01');
     await expect(page.getByTestId('counted-thread-legend')).toContainText('1 mark');
+    const appearance = page.getByLabel('Chart appearance');
+    await expect(appearance).toHaveValue('color-symbols');
+    await appearance.selectOption('symbols-only');
+    await expect(page.getByTestId('counted-thread-grid')).toHaveAttribute('data-chart-appearance', 'symbols-only');
+    await expect(page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ }).locator('.fiber-counted-color-symbol')).toHaveText('A');
 
     await page.locator('#fiber-counted-color').selectOption('accent');
     await page.locator('#fiber-counted-tool').selectOption('quarter-ne');
