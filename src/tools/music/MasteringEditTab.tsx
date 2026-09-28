@@ -126,8 +126,12 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
       <section className="mastering-panel" aria-labelledby="selection-heading">
         <div className="mastering-panel-heading"><div><h3 id="selection-heading">Selection & precision edits</h3><p>Drag across the waveform or type exact times. Range edits change the selected clip{clip ? ` (${clip.name})` : ''}.</p></div></div>
         <div className="workspace-grid three">
-          <div className="field"><label htmlFor="mastering-selection-start">Selection start (seconds)</label><input id="mastering-selection-start" type="number" min="0" max={duration} step="0.001" value={selection.startSeconds} onChange={(event) => { const start = Number(event.target.value); updateSelection({ startSeconds: start, endSeconds: Math.max(start, selection.endSeconds) }); }} disabled={!canEdit} /></div>
-          <div className="field"><label htmlFor="mastering-selection-end">Selection end (seconds)</label><input id="mastering-selection-end" type="number" min="0" max={duration} step="0.001" value={selection.endSeconds} onChange={(event) => { const end = Number(event.target.value); updateSelection({ startSeconds: Math.min(end, selection.startSeconds), endSeconds: end }); }} disabled={!canEdit} /></div>
+          <CommitNumberField id="mastering-selection-start" label="Selection start (seconds)" value={selection.startSeconds} min={0} max={duration} step={0.001}
+            onCommit={(start) => updateSelection({ startSeconds: start, endSeconds: Math.max(start, selection.endSeconds) })}
+            onPreview={(start) => updateSelection({ startSeconds: start, endSeconds: Math.max(start, selection.endSeconds) })} disabled={!canEdit} />
+          <CommitNumberField id="mastering-selection-end" label="Selection end (seconds)" value={selection.endSeconds} min={0} max={duration} step={0.001}
+            onCommit={(end) => updateSelection({ startSeconds: Math.min(end, selection.startSeconds), endSeconds: end })}
+            onPreview={(end) => updateSelection({ startSeconds: Math.min(end, selection.startSeconds), endSeconds: end })} disabled={!canEdit} />
           <div className="field"><span className="field-label">Duration</span><output className="mastering-readout">{(selection.endSeconds - selection.startSeconds).toFixed(3)} s</output></div>
         </div>
         <div className="workspace-grid">
