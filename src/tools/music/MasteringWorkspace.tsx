@@ -150,6 +150,8 @@ export default function MasteringWorkspace() {
   const [recovery, setRecovery] = useState<StoredSession | null>(null);
   const [autosave, setAutosave] = useState<AutosaveState>({ state: 'starting' });
   const [projectBusy, setProjectBusy] = useState(false);
+  const [dspFailure, setDspFailure] = useState<string | null>(null);
+  const dspFailureRef = useRef<string | null>(null);
   const shortcutsRef = useRef<HTMLDetailsElement | null>(null);
 
   const commitDocument = useCallback((next: MasteringDocument) => setHistory((current) => commitProjectRevision(current, next)), []);
@@ -169,14 +171,22 @@ export default function MasteringWorkspace() {
   const clipEnd = clip ? clipStart + clipDurationSeconds(document, clip) : 0;
   const boundedSelection = useMemo(() => clampSelection(selection, duration), [selection, duration]);
   const hasAudio = document.tracks.some((track) => track.clips.length > 0);
-  const canEdit = hasAudio && !loading;
+  const canEdit = hasAudio && !loading && !dspFailure;
   const mixReady = Boolean(render && render.mix.channels[0]?.length);
 
   // --- SECTION: worker lifecycle and rendering ---
 
   useEffect(() => {
     mountedRef.current = true;
-    const client = new MasteringDspClient();
+    const client = new MasteringDspClient((error) => {
+      const message = messageOf(error);
+      dspFailureRef.current = message;
+      if (!mountedRef.current) return;
+      setDspFailure(message);
+      setRendering(false);
+      setSpectrogramLoading(false);
+      setStatus(`The audio processing worker stopped unexpectedly: ${message} Save a project backup, then reload this page to restart local audio processing.`);
+    });
     clientRef.current = client;
     return () => {
       mountedRef.current = false;
@@ -274,7 +284,8 @@ export default function MasteringWorkspace() {
     }).catch((error: unknown) => {
       if (cancelled || !mountedRef.current) return;
       setRendering(false);
-      setStatus(`Could not render the timeline: ${messageOf(error)} Undo the last change to return to the previous version.`);
+      if (dspFailureRef.current) return;
+      setStatus(`Could not render the timeline: ${messageOf(error)} The last completed render is unchanged; fix the edit or undo it before continuing.`);
     });
     return () => { cancelled = true; };
   }, [renderKey, hasAudio]);
@@ -585,8 +596,10 @@ export default function MasteringWorkspace() {
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
-    if (loading || projectBusy) {
-      setStatus('Finish the current file operation before dropping more audio.');
+    if (loading || projectBusy || dspFailure) {
+      setStatus(dspFailure
+        ? 'Local audio processing has stopped. Save a project backup, then reload this page before adding more audio.'
+        : 'Finish the current file operation before dropping more audio.');
       return;
     }
     const files = Array.from(event.dataTransfer.files ?? []).filter((file) => file.type.startsWith('audio/') || /\.(wav|wave|mp3|flac|ogg|oga|opus|m4a|aac|aiff?|caf|webm)$/i.test(file.name));
@@ -834,8 +847,17 @@ export default function MasteringWorkspace() {
           <p>Your session from {new Date(recovery.savedAt).toLocaleString()} is saved on this device: {recovery.sourceNames.slice(0, 3).join(', ')}{recovery.sourceNames.length > 3 ? ` and ${recovery.sourceNames.length - 3} more` : ''}.</p>
         </div>
         <div className="button-row">
-          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading || projectBusy}>Restore session</button>
+          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading || projectBusy || Boolean(dspFailure)}>Restore session</button>
           <button type="button" onClick={() => void discardSession()} disabled={loading}>Discard it</button>
+        </div>
+      </section>}
+      {dspFailure && hasAudio && <section className="mastering-recovery" role="alert">
+        <div>
+          <h3>Local audio processing stopped</h3>
+          <p>{dspFailure} Your project data is still in this tab. Save a project backup, then reload this page before making more audio changes.</p>
+        </div>
+        <div className="button-row">
+          <button type="button" className="mastering-primary" onClick={() => void saveBackup()} disabled={loading || projectBusy}>Save project backup</button>
         </div>
       </section>}
       <div
@@ -849,17 +871,17 @@ export default function MasteringWorkspace() {
           <p>{hasAudio ? 'Add more files as new tracks, or drop them here. Files at other sample rates are converted to the project rate.' : 'Choose or drop one or more audio files. Each file becomes its own track. Nothing is uploaded.'}</p>
         </div>
         <div className="mastering-import-actions">
-          <label className={`mastering-file-button${loading || projectBusy || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
+          <label className={`mastering-file-button${loading || projectBusy || dspFailure || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
             {loading ? 'Reading…' : hasAudio ? 'Add audio files' : 'Choose audio files'}
-            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || projectBusy || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
+            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || projectBusy || Boolean(dspFailure) || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
           </label>
           {!hasAudio && <label className={`mastering-file-button mastering-file-secondary${loading || projectBusy ? ' is-disabled' : ''}`}>
             Open project backup
             <input type="file" accept=".zip,application/zip" disabled={loading || projectBusy} onChange={onBackupFile} />
           </label>}
           {hasAudio && (confirmClear
-            ? <button type="button" className="mastering-danger" onClick={clearProject} disabled={loading || projectBusy}>Confirm new project</button>
-            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading || projectBusy}>New project</button>)}
+            ? <button type="button" className="mastering-danger" onClick={clearProject} disabled={loading || projectBusy || Boolean(dspFailure)}>Confirm new project</button>
+            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading || projectBusy || Boolean(dspFailure)}>New project</button>)}
         </div>
       </div>
 
