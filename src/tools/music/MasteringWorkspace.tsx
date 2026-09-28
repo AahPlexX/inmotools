@@ -622,9 +622,10 @@ export default function MasteringWorkspace() {
   // --- SECTION: reopening saved projects (ledgers 18, 81) ---
 
   /**
-   * Replaces the project with a saved one: decodes each stored file under its original
-   * source id, then swaps the document in. The current project stays intact until every
-   * file has loaded, so a failed restore changes nothing.
+   * Replaces the project with a saved one transactionally. Restored sources are decoded
+   * under fresh worker ids and the saved document is remapped to those ids before any
+   * worker state is touched. The old project sources are released only after every new
+   * source has loaded, so a failed restore cannot overwrite live PCM behind the current UI.
    */
   const openProject = useCallback(async (saved: MasteringDocument, files: ReadonlyMap<string, Blob>, label: string, adoptSessionId?: string) => {
     const client = clientRef.current;
@@ -633,32 +634,43 @@ export default function MasteringWorkspace() {
     stopPlayback(false);
     setLoading(true);
     const previousIds = new Set(historyRef.current.present.sources.map((source) => source.id));
+    const stagedIds = new Map(saved.sources.map((source) => [source.id, newId('source')]));
     const loadedIds: string[] = [];
     const abandonLoaded = () => {
-      for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
+      for (const id of loadedIds) void client.releaseSource(id).catch(() => undefined);
     };
     const infos: Record<string, AudioFileInfo> = {};
-    let next = saved;
+    const stagedFiles = new Map<string, Blob>();
+    let next: MasteringDocument = {
+      ...saved,
+      sources: saved.sources.map((source) => ({ ...source, id: stagedIds.get(source.id)! })),
+      tracks: saved.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((item) => ({ ...item, sourceId: stagedIds.get(item.sourceId)! })),
+      })),
+    };
     const lengthChanges: string[] = [];
     try {
       for (const [index, source] of saved.sources.entries()) {
+        const stagedId = stagedIds.get(source.id)!;
         const blob = files.get(source.id);
         if (!blob) throw new Error(`the audio for ${source.name} is missing.`);
         setStatus(`Reopening ${source.name} (${index + 1} of ${saved.sources.length})…`);
         const decoded = await decodeAudioFile(new File([blob], source.name, { lastModified: source.lastModified }));
         if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return; }
-        const loaded = await client.loadSource(source.id, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
-        loadedIds.push(source.id);
+        const loaded = await client.loadSource(stagedId, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
+        loadedIds.push(stagedId);
+        stagedFiles.set(stagedId, blob);
         if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return; }
-        infos[source.id] = decoded.info;
+        infos[stagedId] = decoded.info;
         // Another browser's decoder can pad a compressed file differently; edits are timed in seconds, so record the new length and say so.
         if (loaded.frameCount !== source.frameCount) {
           lengthChanges.push(source.name);
-          next = { ...next, sources: next.sources.map((item) => (item.id === source.id ? { ...item, frameCount: loaded.frameCount } : item)) };
+          next = { ...next, sources: next.sources.map((item) => (item.id === stagedId ? { ...item, frameCount: loaded.frameCount } : item)) };
         }
       }
-      for (const id of previousIds) if (!next.sources.some((source) => source.id === id)) void client.releaseSource(id).catch(() => undefined);
-      sourceFilesRef.current = new Map(next.sources.map((source) => [source.id, files.get(source.id)!]));
+      for (const id of previousIds) void client.releaseSource(id).catch(() => undefined);
+      sourceFilesRef.current = stagedFiles;
       if (adoptSessionId) sessionIdRef.current = adoptSessionId;
       setRecovery(null);
       setSourceInfos(infos);
