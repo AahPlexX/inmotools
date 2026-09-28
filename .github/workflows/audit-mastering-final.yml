@@ -1,0 +1,43 @@
+name: Final Audio Mastering Audit Validation
+
+on:
+  push:
+    branches:
+      - audit/audio-mastering-20260927
+
+permissions:
+  contents: read
+
+jobs:
+  validate-mastering:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit head
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - name: Install exact dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Repository unit tests
+        run: pnpm test:unit
+      - name: Production build
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Mastering and Harmony browser tests
+        run: pnpm exec playwright test tests/e2e/mastering.spec.ts tests/e2e/music.spec.ts
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mastering-audit-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
