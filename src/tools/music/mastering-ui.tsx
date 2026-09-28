@@ -41,6 +41,8 @@ interface CommitNumberFieldProps {
   label: string;
   value: number;
   onCommit: (value: number) => void;
+  /** Updates transient/local parameter state while the draft is already a complete in-range number. */
+  onPreview?: (value: number) => void;
   min?: number;
   max?: number;
   step?: number;
@@ -51,7 +53,7 @@ interface CommitNumberFieldProps {
   digits?: number;
 }
 
-export function CommitNumberField({ id: providedId, label, value, onCommit, min, max, step = 0.1, disabled, suffix, hint, digits = 3 }: CommitNumberFieldProps) {
+export function CommitNumberField({ id: providedId, label, value, onCommit, onPreview, min, max, step = 0.1, disabled, suffix, hint, digits = 3 }: CommitNumberFieldProps) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
   const shown = Number.isFinite(value) ? String(Number(value.toFixed(digits))) : '0';
@@ -74,7 +76,12 @@ export function CommitNumberField({ id: providedId, label, value, onCommit, min,
   return <div className="field">
     <label htmlFor={id}>{label}{suffix ? <span className="mastering-unit"> ({suffix})</span> : null}</label>
     <input id={id} type="number" inputMode="decimal" min={min} max={max} step={step} value={draft} disabled={disabled}
-      onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={onKeyDown}
+      onChange={(event) => {
+        const next = event.target.value;
+        setDraft(next);
+        const parsed = Number(next);
+        if (next.trim() !== '' && Number.isFinite(parsed) && parsed >= (min ?? -Infinity) && parsed <= (max ?? Infinity)) onPreview?.(parsed);
+      }} onBlur={commit} onKeyDown={onKeyDown}
       aria-describedby={hint ? `${id}-hint` : undefined} />
     {hint && <small id={`${id}-hint`}>{hint}</small>}
   </div>;
