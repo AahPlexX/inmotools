@@ -130,14 +130,30 @@ const isCountedThreadChart = (value: unknown, paletteIds: ReadonlySet<string>): 
   });
 };
 
-const hasValidCrochetSettings = (value: Record<string, unknown>): boolean => {
+const hasValidFiberSettings = (value: Record<string, unknown>): boolean => {
   if (value.settings === undefined) return true;
-  if (!isRecord(value.settings) || value.settings.crochet === undefined) return isRecord(value.settings);
-  if (!isRecord(value.settings.crochet)) return false;
-  const crochet = value.settings.crochet;
-  if (!Array.isArray(crochet.targetRoundCounts) || !crochet.targetRoundCounts.every((count) => Number.isInteger(count) && Number(count) > 0 && Number(count) <= 10_000)) return false;
-  const yarnWeight = crochet.yarnWeight;
-  return yarnWeight === null || (Number.isInteger(yarnWeight) && Number(yarnWeight) >= 0 && Number(yarnWeight) <= 7);
+  if (!isRecord(value.settings)) return false;
+
+  if (value.settings.crochet !== undefined) {
+    if (!isRecord(value.settings.crochet)) return false;
+    const crochet = value.settings.crochet;
+    if (!Array.isArray(crochet.targetRoundCounts)
+      || !crochet.targetRoundCounts.every((count) => Number.isInteger(count) && Number(count) > 0 && Number(count) <= 10_000)) return false;
+    const yarnWeight = crochet.yarnWeight;
+    if (yarnWeight !== null && !(Number.isInteger(yarnWeight) && Number(yarnWeight) >= 0 && Number(yarnWeight) <= 7)) return false;
+  }
+
+  if (value.settings.countedThread !== undefined) {
+    if (!isRecord(value.settings.countedThread)) return false;
+    const counted = value.settings.countedThread;
+    if (counted.fabricType !== 'aida' && counted.fabricType !== 'linen' && counted.fabricType !== 'evenweave') return false;
+    if (!Number.isInteger(counted.fabricCount) || Number(counted.fabricCount) < 1 || Number(counted.fabricCount) > 100) return false;
+    if (counted.stitchOver !== 1 && counted.stitchOver !== 2) return false;
+    if (counted.fabricType === 'aida' && counted.stitchOver !== 1) return false;
+    if (typeof counted.confettiWarningsEnabled !== 'boolean') return false;
+  }
+
+  return true;
 };
 
 const hasValidSwatchImages = (value: unknown): boolean => isRecord(value) && Object.values(value).every((image) => typeof image === 'string' && image.startsWith('data:'));
@@ -148,7 +164,7 @@ export const isRestorableFiberCraftDocument = (value: unknown): value is FiberCr
   const chartValid = value.metadata.discipline === 'crochet'
     ? isPolarChart(value.chart, paletteIds) || isGridChart(value.chart, paletteIds)
     : isCountedThreadChart(value.chart, paletteIds);
-  return chartValid && (value.metadata.discipline !== 'crochet' || hasValidCrochetSettings(value))
+  return chartValid && hasValidFiberSettings(value)
     && isGauge(value.gauge) && hasValidSwatchImages(value.swatchImages)
     && Array.isArray(value.completedSteps) && value.completedSteps.every((step) => typeof step === 'string' && step.trim() !== '');
 };
