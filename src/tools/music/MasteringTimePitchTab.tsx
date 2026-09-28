@@ -45,11 +45,11 @@ export default function MasteringTimePitchTab({ ctx }: { ctx: MasteringPanelCont
           <input type="radio" name="mastering-stretch-mode" value={value} checked={mode === value} onChange={() => setMode(value)} disabled={!canEdit} /> {label}
         </label>)}
       </fieldset>
-      {mode === 'percent' && <CommitNumberField label="New length" suffix="% of current" value={percent} min={25} max={400} step={0.1} digits={1} onCommit={setPercent} disabled={!canEdit} />}
-      {mode === 'duration' && <CommitNumberField label="Target duration" suffix="seconds" value={targetSeconds || Number(current.toFixed(3))} min={0.001} step={0.001} onCommit={setTargetSeconds} disabled={!canEdit} />}
+      {mode === 'percent' && <CommitNumberField label="New length (% of current, 25–400)" value={percent} min={25} max={400} step={0.1} digits={1} onCommit={setPercent} onPreview={setPercent} disabled={!canEdit} />}
+      {mode === 'duration' && <CommitNumberField label="Target duration (seconds)" value={targetSeconds || Number(current.toFixed(3))} min={0.001} step={0.001} onCommit={setTargetSeconds} onPreview={setTargetSeconds} disabled={!canEdit} />}
       {mode === 'tempo' && <div className="workspace-grid">
-        <CommitNumberField label="Current tempo" suffix="BPM" value={fromBpm} min={20} max={400} step={0.01} digits={2} onCommit={setFromBpm} disabled={!canEdit} />
-        <CommitNumberField label="Target tempo" suffix="BPM" value={toBpm} min={20} max={400} step={0.01} digits={2} onCommit={setToBpm} disabled={!canEdit} />
+        <CommitNumberField label="Current tempo (BPM)" value={fromBpm} min={20} max={400} step={0.01} digits={2} onCommit={setFromBpm} onPreview={setFromBpm} disabled={!canEdit} />
+        <CommitNumberField label="Target tempo (BPM)" value={toBpm} min={20} max={400} step={0.01} digits={2} onCommit={setToBpm} onPreview={setToBpm} disabled={!canEdit} />
       </div>}
       <p className="help-text" aria-live="polite">
         {!clip ? 'Add audio to stretch a clip.' : ratio === null ? 'Enter a value to preview the new length.' : inRange
@@ -65,8 +65,8 @@ export default function MasteringTimePitchTab({ ctx }: { ctx: MasteringPanelCont
     <section className="mastering-panel" aria-labelledby="pitch-heading">
       <div className="mastering-panel-heading"><div><h3 id="pitch-heading">Pitch shift</h3><p>Transpose the selected clip without changing its length.</p></div></div>
       <div className="workspace-grid">
-        <CommitNumberField label="Semitones" value={semitones} min={-24} max={24} step={1} digits={0} onCommit={(value) => setSemitones(Math.trunc(value))} disabled={!canEdit} />
-        <CommitNumberField label="Cents" value={cents} min={-100} max={100} step={1} digits={0} onCommit={setCents} disabled={!canEdit} />
+        <CommitNumberField label="Semitones (−24 to 24)" value={semitones} min={-24} max={24} step={1} digits={0} onCommit={(value) => setSemitones(Math.trunc(value))} onPreview={(value) => setSemitones(Math.trunc(value))} disabled={!canEdit} />
+        <CommitNumberField label="Cents (−100 to 100)" value={cents} min={-100} max={100} step={1} digits={0} onCommit={setCents} onPreview={setCents} disabled={!canEdit} />
       </div>
       <label className="mastering-check"><input type="checkbox" checked={formants} onChange={(event) => setFormants(event.target.checked)} disabled={!canEdit} /> Preserve formants (keeps voices from sounding chipmunk-like or boomy)</label>
       <div className="button-row">
