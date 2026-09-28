@@ -138,9 +138,9 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
       </div></div>
       <div className="button-row">
         <button type="button" className="mastering-primary" disabled={busy || !ctx.document.tracks.some((track) => track.clips.length)} onClick={() => void onSaveBackup()}>Save project backup</button>
-        <label className={`mastering-file-button mastering-file-secondary${busy ? ' is-disabled' : ''}`}>
+        <label className={`mastering-file-button mastering-file-secondary${busy || !ctx.canEdit ? ' is-disabled' : ''}`}>
           Open project backup
-          <input type="file" accept=".zip,application/zip" disabled={busy} onChange={onFile} />
+          <input type="file" accept=".zip,application/zip" disabled={busy || !ctx.canEdit} onChange={onFile} />
         </label>
       </div>
       <p className="help-text">Opening a backup replaces the current project. Save a backup of this one first if you want to keep it.</p>
