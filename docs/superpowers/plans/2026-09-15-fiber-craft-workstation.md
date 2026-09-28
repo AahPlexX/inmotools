@@ -3,7 +3,7 @@
 **Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 3 counted-thread in progress; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **25/65 complete**
+**Function progress:** **26/65 complete**
 
 ## Goal
 
@@ -69,6 +69,7 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-35** precision counted-thread grid with full, half, quarter, and three-quarter stitches plus visible French-knot and backstitch overlays on the same addressable grid.
 - **FC-36** worker-backed raster-to-counted-thread quantization with adjustable chart rows/columns, bounded color count, optional Floyd–Steinberg dithering, PNG/JPEG-compatible browser image decode, and lossless shared-project metadata preservation when the generated chart is applied.
 - **FC-38** selectable color-plus-symbol or symbols-only counted chart presentation; print and forced-color rendering retain distinct per-floss symbols so thread identity never depends on hue alone.
+- **FC-39** persisted Aida/linen/evenweave fabric-count controls with stitch-over handling, finished-size calculation in inches/centimeters, and deterministic isolated same-color stitch warnings surfaced by shape/text as well as color.
 - **FC-42** automatically regenerated printable symbol key mapping every used project color to a unique symbol plus editable floss brand/palette and code identity.
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
@@ -80,14 +81,16 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-63** generated 1200×630 social preview PNG with project title/details, crochet badge, and canonical chart thumbnail.
 - **FC-64** offline PWA project use verified through the generated service worker plus the same portable `.craftproj` workflow; Fiber reloads and remains usable offline without an account.
 
-Latest acceptance milestone: dedicated Fiber run `36364539605` at code head
-`7bd7afe1d9527e8b70be413153b82ad95e2afd8e` passed **64/64** focused unit/selector checks,
+Latest acceptance milestone: dedicated Fiber run `36365240251` at code head
+`4c662232dc2afa15e776882eca5dc60fbf5829b6` passed **65/65** focused unit/selector checks,
 the production TypeScript/Vite build, a 151-entry production PWA precache, and **6/6** Playwright
-cases using one worker across desktop and mobile Chromium. FC-38 was developed through a recorded
-red-green cycle: run `36364295940` failed only at the newly specified `Chart appearance` contract,
-then the accepted run verified the implemented color-plus-symbol / symbols-only control and retained
-crochet editing/export/recovery, counted-thread editing/key/save/restore/image import, and offline PWA
-reload. Earlier unrelated branch commits remain preserved rather than rewritten.
+cases using one worker across desktop and mobile Chromium. FC-39 used two explicit TDD gates: model
+run `36364793454` failed only because the fabric-settings API did not yet exist, and browser run
+`36364977126` passed unit/build before failing only at the missing `Fabric type` UI contract. The
+accepted run verifies persisted Aida/linen/evenweave count and stitch-over controls, physical-size
+reporting, accessible isolated-stitch warnings, portable-project restore, existing image import,
+crochet editing/export/recovery, and offline PWA reload. Earlier unrelated branch commits remain
+preserved rather than rewritten.
 
 ## Delivery slices
 
@@ -107,14 +110,15 @@ reload. Earlier unrelated branch commits remain preserved rather than rewritten.
       amigurumi shaping, and yarn/hook reference guidance are implemented and accepted through the
       focused unit/build/desktop-mobile browser gate.
 - [ ] **Slice 3 — Cross-stitch & counted-thread engine.** **In progress:** FC-35 precision counted
-grid, FC-36 worker-backed raster quantization, FC-38 print-safe symbol-over-color mode, and FC-42
-auto-generated floss symbol key are accepted. FC-37 has a tested generic CIEDE2000 matcher but remains
+grid, FC-36 worker-backed raster quantization, FC-38 print-safe symbol-over-color mode, FC-39
+fabric-count/confetti controls, and FC-42 auto-generated floss symbol key are accepted. FC-37 has a
+tested generic CIEDE2000 matcher but remains
 open and provenance-blocked: current first-party research does not support redistributing scraped/
 transcribed manufacturer color cards, and Madeira explicitly warns its digital colors are not
 authoritative enough for precise matching. See `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md`.
 Preserve the original DMC/Anchor/Madeira/Sullivans requirement; do not substitute a hand-picked/community
-table. FC-39 fabric-count/confetti controls are the next independent executable counted-thread slice;
-FC-40 floss length/skein math and FC-41 expanded blackwork/hardanger specialty layer remain open.
+table. FC-40 floss length/skein math is the next independent executable counted-thread slice; FC-41
+expanded blackwork/hardanger specialty layer remains open.
 Basic backstitch required by FC-35 does not by itself close the broader FC-41 specialty scope.
 - [ ] **Slice 4 — Knitting colorwork/cable engine.** Gauge-corrected non-square grid, knit/cable
       symbol matrix, stranded-float analyzer.
@@ -135,7 +139,7 @@ Basic backstitch required by FC-35 does not by itself close the broader FC-41 sp
 ## Testing strategy
 
 - **TDD scope:** add tests for new contracts, demonstrated regressions, and high-value invariants; do not create one test per helper or duplicate coverage already enforced by a dependency-backed integration path.
-- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **64 checks across 5 files**; FC-36 added quantization, dithering, generated-legend scale, metadata-preservation, matcher, and validation contracts without adding a test-only dependency.
+- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **65 checks across 5 files**; FC-39 adds one persisted-settings/finished-size/confetti invariant while retaining the existing quantization, legend, matcher, validation, and state coverage without adding a test-only dependency.
 - **Browser cadence:** `.github/workflows/fiber-craft.yml` runs one sequential Playwright worker across **6 cases**: crochet/edit/export/recovery, counted-thread edit/key/save/restore, and offline PWA reload on desktop and mobile Chromium. Keep this coherent matrix instead of multiplying browser loops.
 - **Build gate:** production TypeScript/Vite build is required for user-facing or engine/state changes that can affect bundling. Documentation-only changes do not invalidate accepted code evidence.
 - **Workflow hygiene:** counted-thread coverage is consolidated into existing focused suites; do not recreate a standalone `fiber-craft-cross-stitch.test.ts`. The current workflow contains no stale reference to that deleted file.
@@ -145,9 +149,9 @@ Basic backstitch required by FC-35 does not by itself close the broader FC-41 sp
 
 - Fetch `origin/feature/fiber-craft-workstation` before every implementation round; concurrent Fiber and unrelated branch commits have landed on this branch. Reconcile non-destructively and never force-push over newer work.
 - `src/tools/fiber-craft/CountedThreadPanel.tsx`, `engines/counted-thread-engine.ts`, `engines/counted-image-engine.ts`, `counted-image-worker-client.ts`, and `counted-image.worker.ts` are authoritative for current counted-thread/image-import behavior. The superseded `CountedThreadWorkspace.tsx` and `counted-thread-workspace.css` were deliberately removed; do not resurrect them.
-- FC-35, FC-36, FC-38, and FC-42 are accepted. FC-37 is **not** accepted: only its generic CIEDE2000 nearest-match engine exists. Read `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md` before touching FC-37. Current first-party evidence shows DMC expressly restricts color-card/conversion-card reproduction, Anchor restricts reproduction of site content, Madeira warns digital colors are not authoritative, and no explicit Sullivans redistribution license was found in the official materials reviewed.
+- FC-35, FC-36, FC-38, FC-39, and FC-42 are accepted. FC-37 is **not** accepted: only its generic CIEDE2000 nearest-match engine exists. Read `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md` before touching FC-37. Current first-party evidence shows DMC expressly restricts color-card/conversion-card reproduction, Anchor restricts reproduction of site content, Madeira warns digital colors are not authoritative, and no explicit Sullivans redistribution license was found in the official materials reviewed.
 - Preserve the original four-manufacturer FC-37 requirement. Do not replace it with a convenience subset, scraped/transcribed protected material, or third-party/community conversion table. Reuse existing `culori@4.0.2`; no new color-distance dependency is needed. FC-37 may close only after a defensible manufacturer-permission/licensed-data route (or another user-approved provenance route) is evidenced.
-- FC-38 is accepted. Its screen control reuses FC-42 symbol assignment, and print/forced-color output no longer relies on floss hue alone. FC-39 is the next independent executable counted-thread slice while FC-37's provenance path remains blocked.
+- FC-38 and FC-39 are accepted. FC-38 reuses FC-42 symbol assignment so print/forced-color output does not rely on hue alone; FC-39 persists fabric/count/stitch-over settings and marks isolated same-color stitches with an accessible non-color warning. FC-40 is the next independent executable counted-thread slice while FC-37's provenance path remains blocked.
 - Current branch history includes unrelated Vector-only commit `a4ddb40` after FC-36. Preserve it; do not rewrite history to make Fiber commits contiguous.
 
 ## Verification gate (every slice)
