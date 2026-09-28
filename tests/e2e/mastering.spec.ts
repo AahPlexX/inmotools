@@ -421,13 +421,17 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await page.getByLabel('Equalizer on').check();
   await page.locator('summary').filter({ hasText: 'Band 6' }).click();
   await page.getByLabel('Band 6 on').check();
-  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).fill('4');
-  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).press('Enter');
-  await expect(status).toContainText(/Band 6 gain \+4\.0 dB/);
+  const bandGain = page.getByRole('spinbutton', { name: 'Band 6 gain' });
+  await bandGain.click();
+  await bandGain.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await bandGain.press('Backspace');
+  await bandGain.pressSequentially('-2.5');
+  await bandGain.press('Enter');
+  await expect(status).toContainText(/Band 6 gain -2\.5 dB/);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('0');
+  await expect(bandGain).toHaveValue('0');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('4');
+  await expect(bandGain).toHaveValue('-2.5');
 
   await page.locator('summary').filter({ hasText: 'True-peak limiter' }).click();
   await page.getByLabel('True-peak limiter on').check();
