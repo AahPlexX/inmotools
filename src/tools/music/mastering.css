@@ -47,7 +47,7 @@
 .mastering-zoom-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .mastering-zoom-bar button { min-height:44px; }
 .mastering-scroll { display:flex; align-items:center; gap:8px; flex:1 1 220px; min-width:0; font-size:12px; font-weight:700; }
-.mastering-scroll input { flex:1; min-width:0; min-height:32px; }
+.mastering-scroll input { flex:1; min-width:0; min-height:44px; }
 .mastering-view-readout { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted); }
 .mastering-waveform-wrap { overflow:hidden; border:1px solid var(--line-strong); border-radius:var(--radius); background:#111820; }
 .mastering-waveform { display:block; width:100%; touch-action:pan-y; cursor:crosshair; }
@@ -179,7 +179,7 @@
 .mastering-nudge .field { min-width:140px; }
 .mastering-nudge button { min-height:44px; }
 .mastering-fade-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.mastering-workspace input[type="range"] { width:100%; min-height:32px; accent-color:var(--signal); }
+.mastering-workspace input[type="range"] { width:100%; min-height:44px; accent-color:var(--signal); }
 
 @media (max-width:860px) {
   .mastering-columns { grid-template-columns:1fr; }
