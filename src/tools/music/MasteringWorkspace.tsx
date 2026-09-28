@@ -900,9 +900,9 @@ export default function MasteringWorkspace() {
         <div className="mastering-listen" role="group" aria-label="Listen to">
           {([['processed', 'Processed'], ['original', 'Original'], ['delta', 'Difference'], ['reference', 'Reference']] as const).map(([value, label]) => <button key={value} type="button"
             aria-pressed={monitor.listen === value} disabled={value === 'reference' && !reference}
-            title={value === 'reference' && !reference ? 'Load a reference track on the Meters tab first' : undefined}
             onClick={() => setListen(value)}>{label}</button>)}
         </div>
+        {!reference && <span className="mastering-transport-note">Reference: load one on the Meters tab.</span>}
         {rendering && <span className="mastering-busy" role="status">Rendering…</span>}
         <output className="mastering-time" aria-label="Playhead time">{formatTime(playhead)}</output>
       </div>
