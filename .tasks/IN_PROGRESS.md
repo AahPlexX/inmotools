@@ -1,5 +1,7 @@
 # In Progress
 
+- **GeoJSON Simplifier completion audit (2026-09-28)** — ACTIVE on `feat/geo-tool-completion` from `origin/main` `e4e0503`. Scope is the geo tool, its focused tests and documentation, and geo-specific task state. The eight user functions (load, validate, inspect, configure, simplify, compare, export, cancel) are implemented. Current milestone: integrate and verify exact-main CI/Pages, then reconcile this task into DONE/WORK_LOG. Focused geo units: 16/16; production build: passed; focused desktop/mobile Chromium workflow, worker, reflow, and Axe checks: 14/14. The repository-wide local unit command had only unrelated Markdown/audio timeouts (2105/2108 then 2107/2108); exact-main CI at `e4e0503` was green before this work. Geo-specific handoff and limits: `src/tools/geo/README.md`.
+
 - **Markdown Workbench production audit remediation (2026-09-27)** — ACTIVE on `main`; current audit extends the completed F01–F10 ledger with nine evidence-backed functions while preserving the static/local-first architecture.
   - F11 source-scroll sync: manual CodeMirror viewport scrolling must move the split preview, not only cursor/edit changes.
   - F12 bibliography diagnostics: malformed or entry-less BibTeX/CSL-JSON must explain why citations are not resolving instead of failing silently.
