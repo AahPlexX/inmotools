@@ -3,7 +3,7 @@
 **Updated:** 2026-09-28
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Validated Task 7 runtime tip:** `f22b134e3accd7c4bc0152a2a0d70b769851ce33`
+**Validated Task 9 runtime tip:** `c3ad7fb603f78456740f954b833c8db496d19d9e`
 
 ## Purpose and source-of-truth roles
 
@@ -113,15 +113,15 @@
 - **Reverse-safe:** complete.
 
 ### T09-01 — Local video review and telestration
-- **Status:** READY
+- **Status:** DONE
 - **Depends on:** T08-01
 - **Primary files:** tactical local-media modules + UI/tests
-- **Action:** local video open/review, time-ranged telestration, manual/interpolated tracking, events, clip playlists, manual multi-angle sync, object-URL cleanup.
-- **Exit evidence:** browser media behavior and failure-path evidence.
-- **Reverse-safe:** no.
+- **Implementation:** runtime source `c3ad7fb603f78456740f954b833c8db496d19d9e` adds schema-v2 video review state, local video open/review, time-ranged telestration, manual hold/linear tracking, match-event tags, ordered clip playlists, manual multi-angle sync, and deterministic object-URL/listener cleanup. Scrubbing stays outside undo history.
+- **Exit evidence:** focused Tactical/selector units **117/117**, TypeScript/production/PWA build, and the full Tactical Playwright spec **56 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Desktop/mobile coverage includes unsupported-file and undecodable-video failures, precision transport, overlay/tracking/event/playlist/sync workflows, 44px controls, overflow, and Axe. Rows 43–48 are verified; numerator is **42/60**.
+- **Reverse-safe:** complete.
 
 ### T10-01 — Professional export and metadata
-- **Status:** BLOCKED
+- **Status:** READY
 - **Depends on:** T09-01
 - **Primary files:** tactical export modules + UI/tests
 - **Action:** metadata editor, raster/social/standalone HTML, PDF/contact sheets, analytics CSV/JSON, project JSON/ZIP, capability-negotiated video export/fallback.

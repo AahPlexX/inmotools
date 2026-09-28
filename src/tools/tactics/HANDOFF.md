@@ -4,17 +4,21 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `5d76a91b74d78b913796875853af31977c22833f`
+- Last fully browser-validated source tip: `c3ad7fb603f78456740f954b833c8db496d19d9e`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 9 — local video review and telestration**
-- Verified functional features: **36/60**
+- Milestone: **Task 10 — professional export and metadata**
+- Verified functional features: **42/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-Execute **T09-01 — local video review and telestration**. Reuse browser-native local media and existing tactical timeline/project state: local video open/review, precise seeking/stepping/playback controls, time-ranged telestration, manual/interpolated overlay tracking, event tags, clip playlists and manual multi-angle sync. Object URLs and media listeners must be released deterministically. Keep all media local, use non-destructive tactical overlays, and add failure-path plus desktop/mobile browser evidence before advancing.
+Execute **T10-01 — professional export and metadata**. Keep export local and capability-negotiated. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Analytics report export remains row 50; do not reopen rows 43–48.
+
+## Task 9 closure evidence
+
+Task 9 is **DONE** at runtime source `c3ad7fb603f78456740f954b833c8db496d19d9e`. Fresh focused Tactical/selector units pass **117/117**; TypeScript and the production/PWA build pass; and the full Tactical Playwright spec passes **56 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Desktop and mobile coverage includes unsupported local files, undecodable video, integer-millisecond seek and frame step, non-destructive telestration with scrubbing kept out of undo, manual hold/linear tracking, event tags, ordered clip playback, manual multi-angle sync, object-URL cleanup units, 44px controls, overflow, and Axe. Rows **43–48** are verified. The feature-matrix header that still said 32/60 after Task 8 is reconciled to the verified-row count **42/60**.
 
 ## Task 8 closure evidence
 
@@ -34,7 +38,7 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 49, 56, 60**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 56, 60**.
 
 In progress: **3, 4, 5, 7, 8, 51, 52, 55, 59**.
 
