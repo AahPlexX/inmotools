@@ -80,6 +80,24 @@ test('locks destructive processing safely when the DSP worker crashes', async ({
   await expect(page.getByRole('button', { name: 'Save project backup' })).toBeEnabled();
 });
 
+test('fails gracefully when the DSP worker cannot start', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'Worker', {
+      configurable: true,
+      value: class {
+        constructor() { throw new Error('Workers are blocked in this browser context.'); }
+      },
+    });
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('alert')).toContainText(/Local audio processing stopped/i);
+  await expect(page.getByRole('alert')).toContainText(/reload this page before adding audio/i);
+  await expect(page.locator('.mastering-import input[type="file"][multiple]')).toBeDisabled();
+  await expect(page.locator('.status-line')).toContainText(/Workers are blocked in this browser context/i);
+});
+
 test('imports, auditions, edits, marks, and undoes a local master', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
