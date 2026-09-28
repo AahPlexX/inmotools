@@ -602,9 +602,9 @@ export default function MasteringWorkspace() {
    * source id, then swaps the document in. The current project stays intact until every
    * file has loaded, so a failed restore changes nothing.
    */
-  const openProject = useCallback(async (saved: MasteringDocument, files: ReadonlyMap<string, Blob>, label: string, adoptSessionId?: string) => {
+  const openProject = useCallback(async (saved: MasteringDocument, files: ReadonlyMap<string, Blob>, label: string, adoptSessionId?: string): Promise<boolean> => {
     const client = clientRef.current;
-    if (!client) return;
+    if (!client) return false;
     const revision = ++importRevisionRef.current;
     stopPlayback(false);
     setLoading(true);
@@ -619,10 +619,10 @@ export default function MasteringWorkspace() {
         if (!blob) throw new Error(`the audio for ${source.name} is missing.`);
         setStatus(`Reopening ${source.name} (${index + 1} of ${saved.sources.length})…`);
         const decoded = await decodeAudioFile(new File([blob], source.name, { lastModified: source.lastModified }));
-        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        if (revision !== importRevisionRef.current || !mountedRef.current) return false;
         const loaded = await client.loadSource(source.id, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
         loadedIds.push(source.id);
-        if (revision !== importRevisionRef.current || !mountedRef.current) return;
+        if (revision !== importRevisionRef.current || !mountedRef.current) return false;
         infos[source.id] = decoded.info;
         // Another browser's decoder can pad a compressed file differently; edits are timed in seconds, so record the new length and say so.
         if (loaded.frameCount !== source.frameCount) {
@@ -638,9 +638,11 @@ export default function MasteringWorkspace() {
       setHistory(createProjectHistory(next));
       const count = next.tracks.length;
       setStatus(`${label} ${count} track${count === 1 ? '' : 's'} and ${next.sources.length} audio file${next.sources.length === 1 ? '' : 's'}.${lengthChanges.length ? ` ${lengthChanges.join(', ')} decoded to a slightly different length in this browser; listen to edits near their ends.` : ''}`);
+      return true;
     } catch (error) {
       for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
       if (mountedRef.current) setStatus(`Could not reopen the project: ${messageOf(error)} Your current project is unchanged.`);
+      return false;
     } finally {
       if (revision === importRevisionRef.current && mountedRef.current) setLoading(false);
     }
@@ -652,8 +654,12 @@ export default function MasteringWorkspace() {
     if (recovery?.id === session.id) setRecovery(null);
     try {
       const files = await store.loadSources(session.id, session.document.sources.map((source) => source.id));
-      await openProject(session.document, files, 'Restored your session:', session.id);
-      setSessions((current) => current.filter((item) => item.id !== session.id));
+      // Only drop the entry from the browsable list once it actually opened; a failed
+      // restore (e.g. audio evicted by the browser) leaves the still-unusable record in
+      // place instead of hiding it until the next refresh brings it back unexplained.
+      if (await openProject(session.document, files, 'Restored your session:', session.id)) {
+        setSessions((current) => current.filter((item) => item.id !== session.id));
+      }
     } catch (error) { setStatus(`Could not restore the session: ${messageOf(error)}`); }
   };
 

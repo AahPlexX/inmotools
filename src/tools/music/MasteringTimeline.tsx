@@ -230,7 +230,7 @@ export default function MasteringTimeline({ document, render, duration, playhead
 
   return <div className="mastering-timeline">
     <div className="mastering-zoom-bar" aria-label="Timeline zoom">
-      <button type="button" title="Zoom in around the playhead (+)" onClick={() => onViewportChange(zoomViewport(view, 0.5, zoomed ? view.startSeconds + view.spanSeconds / 2 : playhead, duration, rate))} disabled={duration <= 0}>Zoom in</button>
+      <button type="button" title={zoomed ? 'Zoom in around the centre of the view (+)' : 'Zoom in around the playhead (+)'} onClick={() => onViewportChange(zoomViewport(view, 0.5, zoomed ? view.startSeconds + view.spanSeconds / 2 : playhead, duration, rate))} disabled={duration <= 0}>Zoom in</button>
       <button type="button" title="Zoom out around the centre of the view (−)" onClick={() => onViewportChange(zoomViewport(view, 2, view.startSeconds + view.spanSeconds / 2, duration, rate))} disabled={!zoomed}>Zoom out</button>
       <button type="button" title="Show the whole timeline" onClick={() => onViewportChange({ startSeconds: 0, spanSeconds: duration })} disabled={!zoomed}>Show all</button>
       <button type="button" title="Zoom to fit the current selection" onClick={() => {
