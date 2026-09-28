@@ -26,6 +26,7 @@ import type {
 } from './fiber-craft-types';
 
 type CountedTool = CountedStitchKind | 'french-knot' | 'backstitch' | 'erase';
+type CountedChartAppearance = 'color-symbols' | 'symbols-only';
 
 const TOOL_LABELS: Readonly<Record<CountedTool, string>> = {
   'full-cross': 'Full cross',
@@ -76,6 +77,7 @@ export function CountedThreadPanel({
   onStatus: (message: string) => void;
 }) {
   const [tool, setTool] = useState<CountedTool>('full-cross');
+  const [chartAppearance, setChartAppearance] = useState<CountedChartAppearance>('color-symbols');
   const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
   const [backstitchStart, setBackstitchStart] = useState<{ row: number; col: number } | null>(null);
   const [flossBrand, setFlossBrand] = useState(() => document.palette.find((color) => color.id === selectedColor)?.paletteName ?? '');
@@ -234,6 +236,17 @@ export function CountedThreadPanel({
             <option value="erase">{TOOL_LABELS.erase}</option>
           </select>
         </label>
+        <label className="fiber-craft-field" htmlFor="fiber-counted-appearance">
+          <span>Chart appearance</span>
+          <select
+            id="fiber-counted-appearance"
+            value={chartAppearance}
+            onChange={(event) => setChartAppearance(event.target.value as CountedChartAppearance)}
+          >
+            <option value="color-symbols">Color + symbols</option>
+            <option value="symbols-only">Symbols only · print-safe</option>
+          </select>
+        </label>
         <label className="fiber-craft-field" htmlFor="fiber-counted-color">
           <span>Floss / palette color</span>
           <select
@@ -328,6 +341,7 @@ export function CountedThreadPanel({
             aria-label={`Counted-thread grid, ${chart.rows} rows by ${chart.cols} columns`}
             aria-rowcount={chart.rows}
             aria-colcount={chart.cols}
+            data-chart-appearance={chartAppearance}
             data-testid="counted-thread-grid"
           >
             {Array.from({ length: chart.rows }, (_, row) => (
@@ -360,7 +374,7 @@ export function CountedThreadPanel({
                           {cell.stitchKind ? (
                             <span className="fiber-counted-mark" aria-hidden="true">
                               <span>{MARK_TEXT[cell.stitchKind]}</span>
-                              {colorSymbol ? <small>{colorSymbol}</small> : null}
+                              {colorSymbol ? <small className="fiber-counted-color-symbol">{colorSymbol}</small> : null}
                             </span>
                           ) : null}
                         </button>
