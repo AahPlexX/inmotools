@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { MAX_STRETCH, MIN_STRETCH } from './dsp/stretch';
-import { formatTime, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatTime, type MasteringPanelContext } from './mastering-ui';
 
 type StretchMode = 'percent' | 'duration' | 'tempo';
 
@@ -45,13 +45,11 @@ export default function MasteringTimePitchTab({ ctx }: { ctx: MasteringPanelCont
           <input type="radio" name="mastering-stretch-mode" value={value} checked={mode === value} onChange={() => setMode(value)} disabled={!canEdit} /> {label}
         </label>)}
       </fieldset>
-      {mode === 'percent' && <div className="field"><label htmlFor="mastering-stretch-percent">New length (% of current, 25–400)</label>
-        <input id="mastering-stretch-percent" type="number" min={25} max={400} step={0.1} value={percent} onChange={(event) => setPercent(Number(event.target.value))} disabled={!canEdit} /></div>}
-      {mode === 'duration' && <div className="field"><label htmlFor="mastering-stretch-duration">Target duration (seconds)</label>
-        <input id="mastering-stretch-duration" type="number" min={0.001} step={0.001} value={targetSeconds || Number(current.toFixed(3))} onChange={(event) => setTargetSeconds(Number(event.target.value))} disabled={!canEdit} /></div>}
+      {mode === 'percent' && <CommitNumberField label="New length" suffix="% of current" value={percent} min={25} max={400} step={0.1} digits={1} onCommit={setPercent} disabled={!canEdit} />}
+      {mode === 'duration' && <CommitNumberField label="Target duration" suffix="seconds" value={targetSeconds || Number(current.toFixed(3))} min={0.001} step={0.001} onCommit={setTargetSeconds} disabled={!canEdit} />}
       {mode === 'tempo' && <div className="workspace-grid">
-        <div className="field"><label htmlFor="mastering-from-bpm">Current tempo (BPM)</label><input id="mastering-from-bpm" type="number" min={20} max={400} step={0.01} value={fromBpm} onChange={(event) => setFromBpm(Number(event.target.value))} disabled={!canEdit} /></div>
-        <div className="field"><label htmlFor="mastering-to-bpm">Target tempo (BPM)</label><input id="mastering-to-bpm" type="number" min={20} max={400} step={0.01} value={toBpm} onChange={(event) => setToBpm(Number(event.target.value))} disabled={!canEdit} /></div>
+        <CommitNumberField label="Current tempo" suffix="BPM" value={fromBpm} min={20} max={400} step={0.01} digits={2} onCommit={setFromBpm} disabled={!canEdit} />
+        <CommitNumberField label="Target tempo" suffix="BPM" value={toBpm} min={20} max={400} step={0.01} digits={2} onCommit={setToBpm} disabled={!canEdit} />
       </div>}
       <p className="help-text" aria-live="polite">
         {!clip ? 'Add audio to stretch a clip.' : ratio === null ? 'Enter a value to preview the new length.' : inRange
@@ -67,8 +65,8 @@ export default function MasteringTimePitchTab({ ctx }: { ctx: MasteringPanelCont
     <section className="mastering-panel" aria-labelledby="pitch-heading">
       <div className="mastering-panel-heading"><div><h3 id="pitch-heading">Pitch shift</h3><p>Transpose the selected clip without changing its length.</p></div></div>
       <div className="workspace-grid">
-        <div className="field"><label htmlFor="mastering-semitones">Semitones (−24 to 24)</label><input id="mastering-semitones" type="number" min={-24} max={24} step={1} value={semitones} onChange={(event) => setSemitones(Math.trunc(Number(event.target.value)))} disabled={!canEdit} /></div>
-        <div className="field"><label htmlFor="mastering-cents">Cents (−100 to 100)</label><input id="mastering-cents" type="number" min={-100} max={100} step={1} value={cents} onChange={(event) => setCents(Number(event.target.value))} disabled={!canEdit} /></div>
+        <CommitNumberField label="Semitones" value={semitones} min={-24} max={24} step={1} digits={0} onCommit={(value) => setSemitones(Math.trunc(value))} disabled={!canEdit} />
+        <CommitNumberField label="Cents" value={cents} min={-100} max={100} step={1} digits={0} onCommit={setCents} disabled={!canEdit} />
       </div>
       <label className="mastering-check"><input type="checkbox" checked={formants} onChange={(event) => setFormants(event.target.checked)} disabled={!canEdit} /> Preserve formants (keeps voices from sounding chipmunk-like or boomy)</label>
       <div className="button-row">
