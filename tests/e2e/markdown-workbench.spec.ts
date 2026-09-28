@@ -463,6 +463,8 @@ const viewports = [
   { name: '390 portrait phone', width: 390, height: 844 },
   { name: '844 landscape phone', width: 844, height: 390 },
   { name: '768 tablet portrait', width: 768, height: 1024 },
+  { name: '1024 tablet landscape', width: 1024, height: 768 },
+  { name: '1280 compact desktop', width: 1280, height: 720 },
   { name: '1440 desktop', width: 1440, height: 900 },
 ];
 
