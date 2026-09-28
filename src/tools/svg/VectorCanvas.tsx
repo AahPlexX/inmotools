@@ -378,6 +378,9 @@ export default function VectorCanvas({ document, selection, tool, zoom, drawSett
     <div
       ref={scrollRef}
       className="vector-canvas-scroll"
+      role="region"
+      aria-label="Scrollable vector artboard viewport"
+      tabIndex={0}
       style={tool === 'pan' ? { cursor: isPanning ? 'grabbing' : 'grab', touchAction: 'none' } : undefined}
       onPointerDown={beginPan}
       onPointerMove={movePan}

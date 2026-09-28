@@ -1,7 +1,14 @@
 /// <reference lib="webworker" />
 
-import { applyPixelAdjustments } from './photo-engine';
+import { processPhotoColorPipeline } from './color/photo-color-pipeline';
 import type { PhotoRecipe } from './photo-types';
+
+interface LayerBufferPayload {
+  layerId: string;
+  buffer: ArrayBuffer;
+  width: number;
+  height: number;
+}
 
 interface ProcessMessage {
   type: 'process';
@@ -9,7 +16,10 @@ interface ProcessMessage {
   width: number;
   height: number;
   buffer: ArrayBuffer;
+  layers: LayerBufferPayload[];
   recipe: PhotoRecipe;
+  mode: 'preview' | 'export';
+  jpegBackground?: readonly [number, number, number];
 }
 
 interface ProcessedMessage {
@@ -18,6 +28,8 @@ interface ProcessedMessage {
   width: number;
   height: number;
   buffer: ArrayBuffer;
+  proofBaseBuffer?: ArrayBuffer;
+  gamutWarningPixels: number;
 }
 
 interface ErrorMessage {
@@ -30,21 +42,39 @@ interface ErrorMessage {
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
-scope.addEventListener('message', (event: MessageEvent<ProcessMessage>) => {
+scope.addEventListener('message', async (event: MessageEvent<ProcessMessage>) => {
   const request = event.data;
   if (!request || request.type !== 'process') return;
 
   try {
     const pixels = new Uint8ClampedArray(request.buffer);
-    applyPixelAdjustments(pixels, request.width, request.height, request.recipe);
+    const layerPixels = (request.layers ?? []).map((entry) => ({
+      layerId: entry.layerId,
+      data: new Uint8ClampedArray(entry.buffer),
+      width: entry.width,
+      height: entry.height,
+    }));
+    const processed = await processPhotoColorPipeline(
+      pixels,
+      request.width,
+      request.height,
+      request.recipe,
+      request.mode,
+      request.jpegBackground,
+      layerPixels,
+    );
     const response: ProcessedMessage = {
       type: 'processed',
       revision: request.revision,
       width: request.width,
       height: request.height,
-      buffer: pixels.buffer as ArrayBuffer,
+      buffer: processed.pixels.buffer as ArrayBuffer,
+      proofBaseBuffer: processed.proofBasePixels?.buffer as ArrayBuffer | undefined,
+      gamutWarningPixels: processed.gamutWarningPixels,
     };
-    scope.postMessage(response, [response.buffer]);
+    const transfers: Transferable[] = [response.buffer];
+    if (response.proofBaseBuffer) transfers.push(response.proofBaseBuffer);
+    scope.postMessage(response, transfers);
   } catch (error) {
     const response: ErrorMessage = {
       type: 'error',

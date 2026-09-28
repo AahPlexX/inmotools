@@ -1,5 +1,232 @@
 # Done
 
+## Markdown Workbench real-world remediation + historical reconciliation — 10/10 complete
+
+The 2026-09-27 Markdown real-world pass is complete on `origin/main`. F01–F07 close dirty-safe
+file replacement, imported-file draft isolation, durable names/name-only autosave, hash-safe preview
+anchors, full-width Preview mode, runtime document-file validation, and conventional formatting
+shortcuts. Reconciliation of the stale `claude/markdown-tool-audit-docs-lwrb3w` branch then closed
+F08–F10 without merging its old tree: detached Copy/HTML/EPUB rendering now uses stable export-safe
+`tok-*` syntax-highlighting classes, cosmetic highlighting is bounded at 20,000 characters per fence,
+and the dead contradictory `markdown-types.ts` `ExportAsset` declaration is removed.
+
+Product implementation revision: `63b99476f3731266c1c57f268ca4259b446fe19f`.
+Final acceptance revision: `4607159234bc84653585c4a0906a212ea8574396`. Git comparison proves the
+only changes between those revisions are the Markdown regression files (one exact size-fixture
+correction and one Copy HTML browser assertion), so shipped product source is byte-identical.
+
+Fresh evidence:
+- same-product focused run `36332490614` / job `108656984010` passed the production build and
+  **124/124** desktop/mobile Chromium checks across all three Markdown specs;
+- exact-final focused run `36332688014` / job `108657533447` passed the production build and
+  **54/54** desktop/mobile UX checks, including Copy HTML token markup, self-contained standalone
+  HTML coloring, packaged EPUB coloring, oversized-fence fallback, and the complete F01–F07 UX set;
+- exact-final Pages run `36332688074` completed its repository unit step successfully, completed its
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
+
+No dependency changed. Direct current-tree reads confirm the contradictory `ExportAsset` type is gone
+and the export-safe stylesheet is present. The historical branch has no open PR and no intended behavior
+left stranded from `main`; it is superseded evidence and must not be merged wholesale. The available
+GitHub connector exposes no branch-delete/ref-delete action, so physical deletion of that already-
+superseded ref was not performed by this workstream.
+
+The durable handoff is `docs/markdown-audit-2026-09-16.md`. Future Markdown work should reopen task
+state only for a newly verified defect or explicitly accepted scope.
+
+## Markdown Workbench Gauntlet hardening — 4/4 complete
+
+The post-completion Markdown adversarial pass is integrated on `origin/main` at
+`9c005972e60c445700a45739865d4f0391cfd1ed` through merged PR #79. It closes four hardening
+contracts without changing the established Markdown feature count: stale citation-result rejection,
+table-formula Worker lifecycle/cancellation safety, detached export sanitization, and Graphviz SVG
+navigation/resource sanitization.
+
+Final PR run `36283957420` passed **195 unit files / 1956 tests**, production build, and **106/106**
+selected Markdown desktop/mobile Chromium cases. Exact-main focused run `36284149989` passed build and
+**106/106** Markdown browser cases again. Exact-main Pages run `36284150052` passed install, units and
+build, built/uploaded the production artifact, and deployed successfully through job `108521673120`.
+A forced uncached production-route fetch returned HTTP 200 with the current Markdown Workbench surface.
+
+The temporary validation workflow was removed before merge and the PR branch was removed after merge.
+Static closure found no Markdown FIXME/HACK, XHR/WebSocket, or internal prompt/confidence/chain-of-thought
+leakage. Remaining TODO text belongs to bundled upstream CSL XML; export `fetch` usage is limited to
+document-referenced asset inlining/EPUB packaging rather than hidden telemetry or file upload.
+
+## Photo Studio — 164/164 complete
+
+Photo Studio is complete against its authoritative 164-capability ledger and integrated on
+`origin/main` through merged PR #78 at product revision
+`4740cca77eb946801e09a78dec8022d448aac67a`. The final PR head
+`7d6a67e950e41bd4187f58ccf3f1b340b355ed85` and the integrated main commit share the
+identical Git tree `a1b3fedc3e6e5e023491bfe116a3c450fe46db37`; old draft PR #29 was closed
+as superseded.
+
+The completed product includes local JPEG/PNG/WebP/TIFF/camera-RAW acquisition, reversible global and
+local editing, crop/transform/perspective/detail/color workflows, selections and masks, retouching, layers
+and compositing, warp/liquify and deterministic filters, HDR/exposure-fusion/panorama/focus/average/median
+multi-image merges, project/preset/snapshot/version workflows, TIFF/AVIF and metadata-aware export,
+resampling, print/contact sheets, and progressive File System Access—all within the static/local-first
+architecture.
+
+Final evidence:
+- full merged-tree Pages validation run `36195289978` / job `108269628093` passed frozen install,
+  repository units, production build, Chromium installation, and the complete desktop/mobile browser suite;
+- exact-main Pages run `36204814286` passed frozen install, repository units and production build,
+  built/uploaded the production Pages artifact, and deployment job `108299095824` succeeded;
+- a forced uncached live fetch of `/#/tools/photo-studio` returned HTTP 200 and rendered the completed
+  production workspace after deployment;
+- the focused Photo matrix previously reached 210/210 desktop/mobile browser checks and 41 unit/selector
+  files / 445 tests;
+- all five Photo-specific runtime dependencies are current exact pins and the dependency audit found zero
+  known vulnerabilities across 136 scanned packages/dependencies;
+- static closure found no Photo TODO/FIXME/HACK implementation debt, remote network path, or internal
+  prompt/confidence/chain-of-thought leakage.
+
+No accepted capability is deferred. Future Photo scope must start from current `origin/main` and re-enter
+the task-state system.
+
+## Typing Workstation — 47/47 complete
+
+The approved 2026-09-25 traditional-controls/local-typist expansion is complete on top of the original 38-capability workstation. F39–F47 add explicit Start/Pause/Resume/Stop/Reset lifecycle controls, paused-time-excluded scoring, persistent browser-local typist profiles, profile-scoped history/averages/PBs/imports/exports, profile-specific score reset, and active-session mutation guardrails while preserving implicit first-character start and the existing native input/IME path.
+
+The Gauntlet adversarial pass found and fixed one remaining state-integrity/affordance gap: score-history import, saved-result deletion, and selected-profile score reset could still change history/PB context while Running/Paused, and the guarded focusable New text action lacked a visible unavailable state. Accepted product tip `7222854833f507ebfbcf00ab0c156b58ee90f335` passed dedicated run `36188765930` / job `108248550068`: **76/76 focused Typing units across eight files**, production build, and **18/18 desktop/mobile browser checks**. Pages run `36188765977` built and deployed the same product revision successfully.
+
+## Vector Studio — 66/66 complete
+
+Vector Studio is complete against the 66-capability design ledger in
+`docs/superpowers/specs/2026-09-11-vector-studio-design.md`. The authoritative product revision
+is `e5a31cf0a01da6ede1437f15a457a54afcdf3e29` on `origin/main`.
+
+The final closure pass did not add feature-count inflation. It reconciled the historical
+`feat/vector-spec-completion` and `fix/vector-path-motion-20260916` branches against current
+`main`, proving the accepted UI/export/tests are already integrated and that the current engine
+is the completed engine plus the later SVG path-geometry translation fix. It then fixed two real
+closure defects: focused validation omitted `vector-nested-composition.spec.ts`, and the
+artboard/inspector scroll regions failed Axe's serious `scrollable-region-focusable` rule.
+Focused SVG validation now selects both Vector browser specs; scrollable Vector regions are
+keyboard reachable with visible focus and native scrolling keys preserved.
+
+Exact-main focused run `36052165692` / job `107810129727` passed the production build,
+selector step, Chromium install, and **22/22 desktop/mobile browser checks**, including the new
+serious/critical Axe regression and nested composition parity. Pages run `36052165503` passed
+repository units and production build, built the production Pages artifact, and deployed the same
+revision successfully through job `107810383399`. Static closure found no Vector
+TODO/FIXME/HACK implementation debt and no remote `fetch`, `XMLHttpRequest`, or `WebSocket`
+path under `src/tools/svg/`.
+
+Historical Vector branches are evidence only and must not be merged wholesale. New Vector scope
+must re-enter the task-state system from current `origin/main`.
+
+## TASK-013: Reconcile the two undo histories in Markdown Workbench
+**Priority:** P3 | **Tags:** editor, ux | **Completed:** 2026-09-24
+
+Closed without collapsing the two history systems into one. CodeMirror keeps its native fine-grained Ctrl/Cmd+Z history and caret behavior. The workspace toolbar now exposes explicitly named document-step Undo/Redo controls and groups adjacent editor changes into one coarse snapshot by edit proximity; opening a file, loading a draft, starting a new document, or using toolbar undo/redo resets that grouping boundary. External document swaps remain excluded from CodeMirror history, so the two stacks do not fight.
+
+The same completion pass resolved TASK-014's Markdown-specific performance item: live table-formula substitution moved from the React render path to a reusable cancellable local Web Worker, with latest-request protection and a synchronous no-Worker fallback. Export actions still compute their requested exact snapshot synchronously because they are explicit operations rather than per-keystroke work.
+
+Red-first evidence was captured before implementation. Final pre-integration PR validation run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks across desktop and mobile Chromium.
+
+---
+
+## Typing Workstation completion audit — 38/38 complete
+
+The 2026-09-24 Typing follow-up is closed without expanding the original 38-capability denominator.
+Fresh source and standards review found two real interaction defects in the already-shipped tool:
+the typing surface depended on raw `keydown` text capture, which excluded reliable software-keyboard
+and IME text entry, and it intercepted `Tab` to generate a new sample instead of allowing standard
+focus traversal. The implementation now uses a native textarea input surface with
+`input`/composition handling, preserves physical `KeyboardEvent.code` metadata for raw hardware
+logs when available, supports mobile Backspace input, moves fresh-sample generation to `F2`, keeps
+`Tab` as normal focus navigation, exposes the shortcuts in visible copy, gives tag-removal targets
+a 24 CSS-pixel minimum, and reflows the virtual keyboard/panels across compact widths.
+
+Product changes landed directly on `origin/main` as
+`dea365cf61d1633db66fdcc49b8321a4f3e8ff76` and follow-up compatibility fix
+`1538148b21d7502bc181ffe7ffcf1f683beb750d`. Dedicated Typing run
+`36009754067` / job `107667101416` passed **67/67 focused unit tests**, the production
+build, Chromium installation, and **14/14 desktop/mobile browser checks**. Pages run
+`36009753871` built and deployed the same product revision successfully. Its repository-wide
+browser lane was red on 15 failures in other workspaces/infrastructure, while all 14 Typing cases
+executed and none failed. `main` subsequently advanced only through unrelated Crystal/task
+documentation before closure, and no Typing-named branch remains.
+
+The Typing plan is the maintenance handoff:
+`docs/superpowers/plans/2026-09-15-typing-workstation.md`. New Typing scope must re-enter the
+task-state system rather than reopening this completed audit implicitly.
+
+## Transcode Workstation — F01–F36 complete
+
+The local-first Transcode Workstation is complete against its 36-capability design ledger and
+integrated on `origin/main` through PR #33 (merge commit
+`c923512a753b15c2086e3e22f7c189c42fd4ca59`). The retired branch
+`arena/01a0a5c8-inmotools` no longer exists, so no completed Transcode work is stranded off
+`main`.
+
+Closure evidence was refreshed against current product revision
+`4f800253b29493d69fac21cbd1b665080ee3ca64`: Pages run `35914410493` passed the full
+unit-test step and production build, executed all 22 Transcode Playwright cases (11 desktop and
+11 mobile) with zero Transcode failures, and successfully built and deployed the Pages artifact.
+The run's 13 browser failures were confined to unrelated workspaces and do not change the
+Transcode workstream result. The prior focused Transcode gate also passed 124 focused unit tests,
+the production build, and 22/22 desktop/mobile browser cases after integration.
+
+A final static closure audit found no Transcode `FIXME` debt and no remote `fetch`,
+`XMLHttpRequest`, or `WebSocket` path. Search hits for `TODO` were the
+`markdownToDocx` identifier, while “placeholder” hits were normal form hints and the temporary
+TAR checksum field used while constructing a header. The design's legacy `.xlsb`/`.xls`
+ingest and additional legacy text encoders are explicitly non-ledger future scope; capability-
+dependent animated WebP remains governed by F14's documented “where supported” contract. Any
+new Transcode scope must re-enter `.tasks` before implementation.
+
+## TASK-021: Close the Sightline Velocity Studio audit findings
+
+Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); this closes the remaining audit findings found against it. The dedicated validation workflow only triggered on pushes to `feat/sightline-velocity`, so it never validated `main` or any `fix/sightline-*` branch — widened to `[main, feat/sightline-velocity, 'fix/sightline-*']`. Clearing local reading history, document history, and the word bank was a single click with no confirmation and no way back; it now asks first and names exactly what it removes. Loading multiple files reported the *last selected* file as "active" even when that file failed to load and an earlier one succeeded instead; failures and successes are now tracked separately and the status names the file that is genuinely active. The workspace never released its IndexedDB handle, audio context, or an in-flight speech-synthesis utterance on unmount, and the metronome allocated a `AudioContext` even when set to a visual-only channel; both are fixed. `clearWarehouse`'s result was previously discarded, so a failed clear silently reported success — it's now surfaced to the user instead.
+
+Accepted revision `f0b6c0481c9e600ca6ec00284527216e00d433f9` on `fix/sightline-audit` (a clean descendant of `main`): `tsc --noEmit` clean, 408/408 focused unit tests across 16 `tests/unit/sightline-*.test.ts` files, production build passed, and Playwright `tests/e2e/sightline.spec.ts` 46/46 passed (one earlier run showed a single 5s-timeout flake on the catalog-navigation test, not reproducible across 6 repeated runs afterward).
+
+
+
+**UX/real-world follow-up closure — 2026-09-24.** The later reading-first remediation merged
+through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403` without changing the F1–F35
+denominator. It added accurate multi-file results and in-session document switching, loaded-state
+source collapse, a persistent reading cockpit with direct WPM control, progressive disclosure of
+specialist controls/diagnostics/metadata/contents, live status semantics, nested drag-leave
+correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel wiring,
+and narrow/coarse-pointer ergonomics.
+
+Dedicated workflow `35613856993` passed 409/409 Sightline unit assertions across 16 files, the
+production build, and 48/48 desktop/mobile Chromium browser checks, including accessibility,
+keyboard-only operation, export round trips, and desktop/tablet/phone overflow coverage. Pages
+run `35613857161` built and deployed successfully; its broad browser failures were unrelated
+to Sightline and all Sightline cases ran without a Sightline failure. A final static closure scan
+found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or WebSocket path. The
+historical `feat/sightline-velocity` branch is 0 commits ahead of `main`, so no intended
+completed Sightline work is stranded there.
+
+## TASK-020: Add the Typing Workstation
+
+Implemented the Typing Workstation as a local speed-typing calculator and ergonomic touch-typing tester against its 38-item feature ledger (`docs/superpowers/plans/2026-09-15-typing-workstation.md`): the engine, exact ranked corpora, target generation, IndexedDB storage, audio, CSV/JSON/PDF/Markdown exports with a bundle re-import path, styles, workspace UI, and catalog/loader registration.
+
+Closing this out required resolving every audit discrepancy found against the branch rather than the self-patching CI workflow a prior pass had committed to fix them (`.github/workflows/typing-audit-unit-fix.yml`, deleted — it failed on every run without ever reaching its patch script). Backspace was never logged to the event stream, so `wpmSeries` and `ghostSeries` couldn't see erasures; both now replay events in order against an index-keyed `Set` of currently-correct positions, removing an index when it's backspaced rather than blindly decrementing a counter, which stays correct even when the same position is re-typed and erased more than once. A committed Enter/newline was excluded from those same metrics because they gated on `key.length === 1`, undercounting throughput on multiline targets, fixed with a shared `isCommittedTextEvent()` predicate that doesn't change the raw `key` recorded on each keystroke. The keystroke audio cue played "correct" for every wrong keystroke, fixed with a single `classifyKeystrokeSound()` used at the call site. `findPersonalBest` required an exact `durationValue` match even in quote mode, where `quoteLength` — not a numeric duration — is the real grouping key. Stored and imported test records had no structural validation; `normalizeStoredTest()` now checks every field (mode/duration-mode/language/layout/finish-reason membership, numeric ranges, keystroke-array shape) and is the single gate both `saveTest` and `parseImportedTests` go through, so a malformed record is rejected outright rather than corrupting history lookups later. CSV export had no formula-injection guard, closed via PapaParse's own `escapeFormulae`. A proficiency certificate could be issued for a test that never completed, now rejected explicitly. A pasted tab in custom text produced an untypeable target, now normalized to four spaces before trimming. `homeRowAnchors()` derives the two index-finger home-row keys from each layout's own finger assignment (`l2`/`r2`) rather than a fixed row position, so it stays correct across layouts whose home-row key count or stagger differs from QWERTY.
+
+Prior acceptance baseline `72296c61127ed305852c417e0ca4ed239e6fe83e` on `feature/typing-workstation`, verified independently: `tsc --noEmit -p tsconfig.app.json` clean, 65/65 focused unit tests across seven `tests/unit/typing-*.test.ts` files, production build passed, and a full local Playwright run against a freshly started preview server passed 14/14 (desktop + mobile Chromium, all seven acceptance scenarios) in 2.1 minutes. Two later same-day e2e re-runs on the same accepted revision showed unrelated random subsets of failures (`keyboard.type` timeouts, and once an internal AxeBuilder "No elements found for include in page Context" error on a test that isn't an accessibility check's normal failure mode) under heavy concurrent load from other sessions on the shared machine — traced to genuine resource contention (100+ concurrent chrome/node processes, a stale leftover `vite preview` process once confirmed holding port 4173), not a code defect: the failing test subset changed between runs with no consistent pattern, and non-typing scenarios (reflow) kept passing throughout.
+
+
+**Follow-up Typing audit hardening — 2026-09-17.** A second source/UI audit found that several helpers proven by the 65-test unit suite were not yet wired through the React surface: wrong-key audio still used a hard-coded “correct” cue, JSON import bypassed the sanitizer, history tag filtering affected export but not the visible history/analytics, and the home-row reminder stayed hard-coded to F/J. The result modal also still offered a PDF certificate action for failed attempts even though the export layer correctly rejected it. QoL/performance review additionally found the live Chart.js object being destroyed and recreated every 100 ms, no reduced-motion override for caret/confetti motion, and unused future-only `diff`/`howler` dependencies. All were resolved on `03849ed6d18957f7dd3186db1f3dbb3e76a5e142`: one shared filtered-history view now drives table/stats/chart/export, import uses `parseImportedTests`, audio uses `classifyKeystrokeSound`, layout guidance uses `homeRowAnchors`, certificate UI is completion-only, the live chart updates in place, reduced-motion suppresses nonessential motion, and the unused dependencies/types are removed.
+
+Prior follow-up acceptance authority was dedicated Typing workflow run `35238817822` / job `105261636522`: frozen install and supply-chain policy, **65/65 focused unit tests**, production build, and **14/14 desktop/mobile Chromium checks** all passed. A preceding local 14/14 failure was diagnosed as Playwright reusing an unrelated stale Vite preview on port 4173 from `inmotools-audio-mastering`; after terminating only that stale server and rerunning with `CI=1`, the checkout passed 14/14 as well.
+
+**Lifecycle/boundary audit — 2026-09-18.** A fresh audit found and resolved stale personal-best state after row deletion/history clearing, unvalidated persisted configuration plus a default-state hydration-write race, stale async PB query results, case-sensitive/whitespace-sensitive human tag filtering, Zen PB families split by irrelevant legacy numeric duration values, eager/late AudioContext creation from volume and delayed cue timers, unnamed tag-removal buttons, whitespace-only custom targets, and unclamped pacer/metronome number-entry values. The same pass removed dead workspace state and corrected the internal timestamp description from “microsecond precision” to high-resolution millisecond timing. Source revision: `86b1982ccec67ee34d11cddf187d5a39edfa56a6`.
+
+Original Typing baseline integration is confirmed: PR #40 merged branch head `08c3916456c8a47498efe143afac84dfbde743e1` to `main` on 2026-09-18 as merge commit `d5a2359084c39899ccf78324b2b55d5d0155b579`. The later lifecycle and post-integration audit hardening described below is a separate branch delta and is not yet claimed as integrated or deployed.
+
+**Post-integration Typing audit hardening — 2026-09-19.** The audit found and resolved: result export silently saving to IndexedDB/closing the result dialog instead of remaining independent from **Save**; incoherent quote/Zen mode-duration state at persistence/hydration boundaries; whitespace-only restored custom mode; legacy malformed IndexedDB rows bypassing read-side validation; imported better results not refreshing the current personal-best/pacer; saved history silently truncating after 24 visible rows; narrow-screen result-modal actions not wrapping; per-key analytics silently hiding keys after the weakest 12; and n-gram analytics rendering an unbounded table in long sessions. The shared `PagedTable` now bounds history, per-key, and n-gram rendering without truncating underlying analytics or exports. A final static sweep found no real Typing-scoped TODO/FIXME/HACK markers, type-suppression debris, truncated/placeholder implementation, production console logging, or internal/AI prompting leakage; the apparent hits were normal input placeholders, Spanish/French corpus words, and `console.log` inside a JavaScript practice snippet.
+
+Current integrated Typing authority is PR #69 merge `463ef3c0b3e002e833b8b86dff9889ee9671f3a8` on `main`. Dedicated exact-main Typing workflow run `35464501127` / job `105954236504` passed supply-chain policy, **67/67 focused unit tests across seven files**, production build, Chromium setup, and **14/14 desktop/mobile Chromium checks** in 53.6s; failure-artifact upload was skipped because the lane was green. Pages run `35464501124` successfully built the production artifact (job `105954236296`) and deployed it (job `105954313887`) from the same integrated SHA. The broad Pages validate job `105954236443` is red only because `tests/unit/e2e-spec-selection.test.mjs` has a stale Crystal expectation (one Crystal browser spec expected, two now selected); all seven Typing unit files passed in that broad run. TASK-020's post-integration hardening is therefore integrated and deployed for Typing, with the unrelated Crystal repository-wide gate failure explicitly not attributed to this tool. GitHub automatically deleted `feature/typing-workstation` after PR #69 merged, verified by branch search, so no stale Typing feature branch remains. A subsequent docs-only Pages run `35464727475` again built and deployed successfully; its broad validation repeated only the same unrelated Crystal selector failure.
+
+**Current-main continuity — 2026-09-20.** `main` advanced to `d41481fbfdc442b161d7fa7df98bdbfe0befad36` through unrelated repo work without modifying Typing source/tests. Dedicated Typing run `35480931482` / job `105998484306` passed supply-chain policy for 1,224 lockfile entries, **67/67 Typing units**, production build, and **14/14 desktop/mobile browser checks in 46.7s**. Pages run `35480931478` passed **1258/1258 unit tests**, production artifact build, and deployment; its browser lane has 12 failures in other tools/infrastructure, while every desktop/mobile Typing scenario ran and no Typing test is in the failure list. No new Typing remediation is open.
+
 ## TASK-019: Fix the findings that make a tool produce wrong or unsafe output
 **Priority:** P0 | **Tags:** audit, correctness, security
 

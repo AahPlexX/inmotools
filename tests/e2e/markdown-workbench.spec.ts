@@ -67,31 +67,31 @@ test('editing the source updates the live preview, and toggling Source view hide
   await expect(preview).toBeVisible();
 });
 
-test('undo and redo roll source edits back and forward', async ({ page }) => {
-  // History is committed per CodeMirror docChanged event (effectively per
-  // keystroke for typed input - see state-engine.ts's commitHistory), so one
-  // Undo click reverts the single most recent change, not an entire typed
-  // sequence. This test exercises that actual granularity.
+test('toolbar undo groups adjacent typing into one document step and redo restores it', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
   const preview = page.locator('.markdown-workbench-preview');
   await setSource(page, '# Version one');
   await expect(preview.locator('h1')).toContainText('Version one');
 
-  const undo = page.getByRole('button', { name: 'Undo' });
-  const redo = page.getByRole('button', { name: 'Redo' });
+  const undo = page.getByRole('button', { name: 'Undo document step' });
+  const redo = page.getByRole('button', { name: 'Redo document step' });
   await expect(redo).toBeDisabled();
   await expect(undo).toBeEnabled();
 
-  await page.keyboard.press('!');
-  await expect(preview.locator('h1')).toContainText('Version one!');
+  // Let the setup edit form its own document step, then type several adjacent
+  // characters. The toolbar history should treat that burst as one meaningful
+  // document step while CodeMirror's native Ctrl/Cmd+Z remains fine-grained.
+  await page.waitForTimeout(750);
+  await editorLocator(page).pressSequentially(' next', { delay: 20 });
+  await expect(preview.locator('h1')).toContainText('Version one next');
 
   await undo.click();
   await expect(preview.locator('h1')).toContainText('Version one');
-  await expect(preview.locator('h1')).not.toContainText('Version one!');
+  await expect(preview.locator('h1')).not.toContainText('Version one next');
   await expect(redo).toBeEnabled();
 
   await redo.click();
-  await expect(preview.locator('h1')).toContainText('Version one!');
+  await expect(preview.locator('h1')).toContainText('Version one next');
 });
 
 test('evaluates a table formula and keeps a static cell untouched', async ({ page }) => {
@@ -106,6 +106,33 @@ test('evaluates a table formula and keeps a static cell untouched', async ({ pag
   const row = preview.locator('table tbody tr').first();
   await expect(row.locator('td').nth(0)).toHaveText('Widgets');
   await expect(row.locator('td').nth(3)).toHaveText('10');
+});
+
+test('table formula preparation runs in a background worker', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount = 0;
+    window.Worker = new Proxy(NativeWorker, {
+      construct(Target, args: ConstructorParameters<typeof Worker>) {
+        if (String(args[0]).includes('table-formula.worker')) {
+          (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount += 1;
+        }
+        return Reflect.construct(Target, args);
+      },
+    }) as typeof Worker;
+  });
+
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '| A | B |',
+    '| - | - |',
+    '| 6 | =A2*7 |',
+  ].join('\n'));
+
+  await expect(page.locator('.markdown-workbench-preview table tbody td').nth(1)).toHaveText('42');
+  await expect.poll(() => page.evaluate(() =>
+    (window as unknown as { __markdownFormulaWorkerCount: number }).__markdownFormulaWorkerCount,
+  )).toBeGreaterThan(0);
 });
 
 test('resolves a pasted .bib citekey and substitutes the formatted citation into the document', async ({ page }) => {
@@ -129,6 +156,39 @@ test('resolves a pasted .bib citekey and substitutes the formatted citation into
 
   // IEEE renders a numeric marker instead, proving the substitution follows the style.
   await page.getByLabel('Citation style').selectOption('ieee');
+  await expect(preview).toContainText(/\[\d+\]/, { timeout: 15_000 });
+});
+
+test('changing citation style never shows a stale previous style while the new style loads', async ({ page }) => {
+  let releaseIeee!: () => void;
+  const ieeeGate = new Promise<void>((resolve) => { releaseIeee = resolve; });
+  let ieeeChunkIntercepted = false;
+
+  await page.route(/\/assets\/ieee-[^/]+\.js(?:\?.*)?$/, async (route) => {
+    ieeeChunkIntercepted = true;
+    await ieeeGate;
+    await route.continue();
+  });
+
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'See [@smith2024] for details.');
+  await openPanel(page, /^Citations/);
+  await page.getByLabel('Bibliography source').fill(SAMPLE_BIB);
+
+  const preview = page.locator('.markdown-workbench-preview');
+  await expect(preview).toContainText('Smith', { timeout: 15_000 });
+  await expect(preview).toContainText('2024');
+
+  await page.getByLabel('Citation style').selectOption('ieee');
+  await expect.poll(() => ieeeChunkIntercepted).toBe(true);
+
+  // The old APA result is no longer valid for the selected IEEE style. While
+  // the new formatter is intentionally held, show the original marker rather
+  // than misrepresenting the document with a stale citation.
+  await expect(preview).toContainText('[@smith2024]');
+  await expect(preview).not.toContainText('Smith');
+
+  releaseIeee();
   await expect(preview).toContainText(/\[\d+\]/, { timeout: 15_000 });
 });
 
@@ -214,6 +274,31 @@ test('the rendered Markdown export carries evaluated formulas while the plain ex
   const renderedText = await readDownload(await rendered);
   expect(renderedText).toContain('| 4 | 12 |');
   expect(renderedText).not.toContain('=A2*3');
+});
+
+test('Standalone HTML export keeps sanitized Markdown inert through the detached render path', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, [
+    '# Safe export',
+    '',
+    '<script>window.__markdownXss = true</script>',
+    '',
+    '[unsafe](javascript:window.__markdownXss = true)',
+    '',
+    '<img src=x onerror="window.__markdownXss = true">',
+  ].join('\n'));
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Standalone HTML', exact: true }).click();
+  const html = await readDownload(await download);
+
+  expect(html).not.toContain('<script');
+  expect(html).not.toMatch(/(?:href|xlink:href)\s*=\s*["']\s*javascript:/i);
+  expect(html).not.toContain('onerror');
+  // Sanitization may preserve the author's rejected Markdown as inert text;
+  // the security invariant is that it never becomes an executable URI.
+  expect(html).toContain('[unsafe](javascript:window.__markdownXss = true)');
 });
 
 test('HTML export still contains the document when exporting from Source view', async ({ page }) => {
@@ -346,9 +431,13 @@ test('saves, lists, reloads and deletes a local draft', async ({ page }) => {
   await draftList.locator('li > button').first().click();
   await expect(page.locator('.markdown-workbench-preview h1')).toContainText('Draft under test');
 
-  await page.getByRole('button', { name: /^Delete draft saved/ }).click();
+  // Switching also preserves the document we leave, so target the requested draft.
+  await expect(draftList.locator('li')).toHaveCount(2);
+  await draftList.locator('li').filter({ hasText: 'Draft under test' })
+    .getByRole('button', { name: /^Delete draft saved/ }).click();
   await expect(page.getByTestId('markdown-status')).toContainText(/Deleted/, { timeout: 15_000 });
-  await expect(draftList).toHaveCount(0);
+  await expect(draftList.locator('li')).toHaveCount(1);
+  await expect(draftList).toContainText('Untitled document');
 });
 
 test('changing the font size keeps the caret and document intact', async ({ page }) => {

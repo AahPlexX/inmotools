@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { renderMarkdown } from './render-engine';
-import { renderMermaidDiagram, renderGraphvizDiagram, scheduleIdle } from './diagram-engine';
+import { scheduleIdle } from './diagram-engine';
+import { renderDiagramBlocks } from './diagram-renderer';
+import { highlightCodeBlocks } from './code-highlight-engine';
 import type { ScrollAnchor } from './markdown-types';
-
-mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+import './code-highlight.css';
 
 export interface MarkdownPreviewProps {
   readonly preparedSource: string;
@@ -13,76 +13,67 @@ export interface MarkdownPreviewProps {
 }
 
 const DIAGRAM_DEBOUNCE_MS = 250;
-let mermaidDiagramCounter = 0;
 
-const renderDiagramBlocks = async (
-  container: HTMLElement,
-  isCurrent: () => boolean,
-  trackCancel: (cancel: () => void) => void,
-): Promise<void> => {
-  const blocks = Array.from(
-    container.querySelectorAll('pre > code.language-mermaid, pre > code.language-dot'),
-  );
-
-  for (const block of blocks) {
-    if (!isCurrent()) return;
-    const pre = block.parentElement;
-    if (!pre) continue;
-    const source = block.textContent ?? '';
-    const isMermaid = block.classList.contains('language-mermaid');
-
-    if (isMermaid) {
-      mermaidDiagramCounter += 1;
-      const id = `markdown-workbench-mermaid-${mermaidDiagramCounter}`;
-      const result = await renderMermaidDiagram(
-        (diagramId, text) => mermaid.render(diagramId, text),
-        id,
-        source,
-      );
-      if (!isCurrent()) return;
-      if (result.svg) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'markdown-workbench-diagram';
-        wrapper.innerHTML = result.svg;
-        pre.replaceWith(wrapper);
-      } else if (result.error) {
-        pre.classList.add('markdown-workbench-diagram-error');
-        pre.setAttribute('title', result.error);
-      }
-    } else {
-      const handle = renderGraphvizDiagram(source);
-      trackCancel(handle.cancel);
-      try {
-        const response = await handle.promise;
-        if (!isCurrent()) return;
-        if (response.svg) {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'markdown-workbench-diagram';
-          wrapper.innerHTML = response.svg;
-          pre.replaceWith(wrapper);
-        } else if (response.error) {
-          pre.classList.add('markdown-workbench-diagram-error');
-          pre.setAttribute('title', response.error);
-        }
-      } catch {
-        if (!isCurrent()) return;
-        pre.classList.add('markdown-workbench-diagram-error');
-        pre.setAttribute('title', 'Graphviz rendering failed.');
-      }
-    }
-  }
+const measureAnchors = (
+  host: HTMLElement,
+  anchors: readonly ScrollAnchor[],
+  onAnchorsMeasured: MarkdownPreviewProps['onAnchorsMeasured'],
+): void => {
+  const offsets = anchors.map((anchor) => {
+    const element = host.querySelector<HTMLElement>(`[data-source-line="${anchor.sourceLine}"]`);
+    return { sourceLine: anchor.sourceLine, offsetTop: element?.offsetTop ?? 0 };
+  });
+  onAnchorsMeasured(offsets);
 };
 
 export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const [anchors, setAnchors] = useState<ScrollAnchor[]>([]);
   const generationRef = useRef(0);
 
+  const handlePreviewClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const origin = event.target;
+    if (!(origin instanceof Element)) return;
+    const anchor = origin.closest<HTMLAnchorElement>('a[href^="#"]');
+    if (!anchor || !event.currentTarget.contains(anchor)) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.length <= 1) return;
+    let targetId = href.slice(1);
+    try {
+      targetId = decodeURIComponent(targetId);
+    } catch {
+      return;
+    }
+
+    const destination = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('[id]'),
+    ).find((node) => node.id === targetId);
+    if (!destination) return;
+
+    event.preventDefault();
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    destination.scrollIntoView({
+      block: 'start',
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  };
+
   useEffect(() => {
-    const { html, anchors: nextAnchors } = renderMarkdown(preparedSource);
+    const { html, anchors } = renderMarkdown(preparedSource);
     const host = hostRef.current;
-    if (host) host.innerHTML = html;
-    setAnchors(nextAnchors);
+    if (host) {
+      host.innerHTML = html;
+      measureAnchors(host, anchors, onAnchorsMeasured);
+    }
 
     generationRef.current += 1;
     const generation = generationRef.current;
@@ -91,17 +82,28 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
     onRenderStateChange?.(true);
 
     const timer = setTimeout(() => {
-      scheduleIdle(() => {
+      const cancelIdle = scheduleIdle(() => {
         if (!isCurrent()) return;
         if (!host) {
           onRenderStateChange?.(false);
           return;
         }
-        void renderDiagramBlocks(host, isCurrent, (cancel) => cancels.push(cancel))
+        void highlightCodeBlocks(host, { isCurrent })
+          .then((changed) => {
+            if (isCurrent() && changed) measureAnchors(host, anchors, onAnchorsMeasured);
+          })
+          .then(() => renderDiagramBlocks(host, {
+            isCurrent,
+            trackCancel: (cancel) => cancels.push(cancel),
+            onLayoutChanged: () => {
+              if (isCurrent()) measureAnchors(host, anchors, onAnchorsMeasured);
+            },
+          }))
           .finally(() => {
             if (isCurrent()) onRenderStateChange?.(false);
           });
       });
+      cancels.push(cancelIdle);
     }, DIAGRAM_DEBOUNCE_MS);
 
     return () => {
@@ -112,17 +114,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       // the current render. A replacement effect immediately marks itself pending.
       onRenderStateChange?.(false);
     };
-  }, [preparedSource, onRenderStateChange]);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const offsets = anchors.map((anchor) => {
-      const element = host.querySelector<HTMLElement>(`[data-source-line="${anchor.sourceLine}"]`);
-      return { sourceLine: anchor.sourceLine, offsetTop: element?.offsetTop ?? 0 };
-    });
-    onAnchorsMeasured(offsets);
-  }, [anchors, onAnchorsMeasured]);
+  }, [preparedSource, onAnchorsMeasured, onRenderStateChange]);
 
   return (
     <div
@@ -131,6 +123,7 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       role="region"
       aria-label="Rendered markdown preview"
       tabIndex={0}
+      onClick={handlePreviewClick}
     />
   );
 }

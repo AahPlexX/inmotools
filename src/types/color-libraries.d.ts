@@ -21,9 +21,16 @@ declare module 'culori' {
 
   export type CuloriColorInput = CuloriColor | string;
   export function parse(value: string): CuloriColor | undefined;
-  export function formatHex(color: CuloriColor): string;
+  export function formatHex(color: CuloriColorInput): string;
   export function converter(mode: 'rgb'): (color: CuloriColorInput) => RgbColor | undefined;
   export function differenceCiede2000(
     Kl?: number, Kc?: number, Kh?: number,
   ): (color1: CuloriColorInput, color2: CuloriColorInput) => number;
+  /** Perceptual interpolation between two or more colours. */
+  export function interpolate(
+    colors: readonly CuloriColorInput[],
+    mode?: string,
+  ): (position: number) => CuloriColor;
+  /** WCAG 2 contrast ratio between two colours, from 1 to 21. */
+  export function wcagContrast(first: CuloriColorInput, second: CuloriColorInput): number;
 }

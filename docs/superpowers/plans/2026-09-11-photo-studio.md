@@ -1,6 +1,6 @@
 # Photo Studio Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Completion note (2026-09-25):** This is the historical baseline execution plan. Photo Studio is complete at 164/164 capabilities on `origin/main`; do not restart these tasks. The authoritative completion/maintenance record is `.tasks/PHOTO_STUDIO.md`, and later expansion scope is documented in `docs/superpowers/plans/2026-09-12-photo-studio-capability-expansion.md`.
 
 **Goal:** Ship a local-first Photo Studio on INMOTOOLS Pages with 30+ functional non-destructive editing capabilities, safe browser rendering/export, professional metadata controls, local retouching, responsive accessibility, and focused validation.
 
@@ -9,6 +9,17 @@
 **Tech Stack:** React 19, TypeScript 7, Vite 8, Canvas 2D/OffscreenCanvas, Web Workers, `createImageBitmap`, existing `exifreader`, existing `culori`, Vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-09-11-photo-studio-design.md`
+
+## Completion status — 2026-09-25
+
+Complete and integrated on `origin/main` through PR #78 at product revision
+`4740cca77eb946801e09a78dec8022d448aac67a`. The baseline plan below was expanded by the
+164-capability Photo Studio specification/plan and is retained as implementation history. All of its
+deliverables are shipped. Final merged-tree validation passed the full unit/build/browser gate; exact-main
+Pages artifact/deployment and an uncached live Photo Studio route check also passed. The initial
+"no new dependency" constraint applied to this baseline implementation; the later expansion introduced
+five exact-pinned, audited browser-local codec/color dependencies recorded in `.tasks/PHOTO_STUDIO.md`.
+
 
 ## Global Constraints
 
@@ -44,7 +55,7 @@
 - Produces: `serializePhotoXmp(metadata: PhotoExportMetadata): string`
 - Produces: `safePhotoFilename(sourceName: string, mime: PhotoOutputMime): string`
 
-- [ ] **Step 1: Write unit tests first**
+- [x] **Step 1: Write unit tests first**
 
 Create `tests/unit/photo.test.ts` with tests that prove:
 
@@ -116,7 +127,7 @@ describe('Photo Studio engine', () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused unit test and verify RED**
+- [x] **Step 2: Run the focused unit test and verify RED**
 
 Run:
 
@@ -126,15 +137,15 @@ pnpm exec vitest run tests/unit/photo.test.ts
 
 Expected: fail because the photo modules do not exist yet.
 
-- [ ] **Step 3: Implement the typed recipe and engine**
+- [x] **Step 3: Implement the typed recipe and engine**
 
 `photo-types.ts` defines geometry, global adjustments, HSL arrays, grading, masks/brush strokes/retouch operations, export metadata, histogram, and history types. `photo-engine.ts` implements clamping, sRGB/linear conversion, global adjustments, histogram sampling, local-operation helpers, and bounded recipe history. Neutral defaults must be mathematically identity-preserving aside from integer round-trip noise, which the neutral path avoids entirely by returning early.
 
-- [ ] **Step 4: Implement metadata serialization**
+- [x] **Step 4: Implement metadata serialization**
 
 `photo-metadata.ts` generates XML-escaped XMP using standard Dublin Core, Photoshop, XMP Rights, IPTC Core/Extension, and EXIF GPS namespace fields used by the UI. It must not invent source metadata. It also owns output extension/filename mapping.
 
-- [ ] **Step 5: Run unit test GREEN**
+- [x] **Step 5: Run unit test GREEN**
 
 Run:
 
@@ -144,7 +155,7 @@ pnpm exec vitest run tests/unit/photo.test.ts
 
 Expected: all Photo Studio unit tests pass.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 Commit message:
 
@@ -167,7 +178,7 @@ feat(photo): add non-destructive recipe engine
 - Produces: `renderPhoto(request: PhotoRenderRequest): Promise<PhotoRenderResult>`
 - Worker messages carry `{ revision, type, ...payload }` and every response echoes the same revision.
 
-- [ ] **Step 1: Add failing capability/geometry tests**
+- [x] **Step 1: Add failing capability/geometry tests**
 
 Append tests for:
 
@@ -186,11 +197,11 @@ test('revision comparator rejects stale render results', () => {
 });
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run the single Photo Studio unit file and confirm the new assertions fail for missing behavior.
 
-- [ ] **Step 3: Implement renderer**
+- [x] **Step 3: Implement renderer**
 
 The renderer must:
 
@@ -207,7 +218,7 @@ The renderer must:
 
 The worker uses the same pure engine and returns transferable `ImageBitmap` previews where supported. If worker setup fails, `photo-renderer.ts` performs equivalent processing on the main thread without changing the public API.
 
-- [ ] **Step 4: Verify unit/build**
+- [x] **Step 4: Verify unit/build**
 
 Run:
 
@@ -218,7 +229,7 @@ pnpm build
 
 Expected: Photo unit suite passes and TypeScript/Vite build succeeds.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 Commit message:
 
@@ -243,7 +254,7 @@ feat(photo): add revisioned local renderer
 - Consumes: Task 1/2 engine, renderer, metadata and types.
 - Produces: catalog slug `photo-studio` and lazy workspace loader.
 
-- [ ] **Step 1: Write browser tests before route wiring**
+- [x] **Step 1: Write browser tests before route wiring**
 
 Create `tests/e2e/photo.spec.ts` that generates a small PNG fixture in-page and verifies:
 
@@ -278,7 +289,7 @@ test('Photo Studio reflows at 320 CSS pixels without page overflow', async ({ pa
 
 Add tests for keyboard undo/redo, crop numeric fields, metadata sidecar download, local brush creation, and export capability warnings.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -288,11 +299,11 @@ pnpm exec playwright test tests/e2e/photo.spec.ts --project=chromium
 
 Expected: route/tool missing.
 
-- [ ] **Step 3: Wire catalog/router/focused selector**
+- [x] **Step 3: Wire catalog/router/focused selector**
 
 Add `photo-studio` to `ToolSlug`, add a catalog definition that accurately describes local photo editing, add the lazy workspace loader, and map `src/tools/photo/**` to `tests/e2e/photo.spec.ts` in the focused selector.
 
-- [ ] **Step 4: Implement workspace and canvas**
+- [x] **Step 4: Implement workspace and canvas**
 
 `PhotoWorkspace.tsx` owns source selection, recipe/history state, grouped control UI, export dialog, metadata editor, snapshots/presets, recipe import/export, batch queue, and live status. Controls are generated from strongly typed control descriptors where possible to avoid repetitive state plumbing.
 
@@ -300,11 +311,11 @@ Add `photo-studio` to `ToolSlug`, add a catalog definition that accurately descr
 
 `photo.css` provides the desktop three-region workbench and responsive stacked/bottom-sheet behavior. It must avoid viewport-locked heights on narrow devices and respect `prefers-reduced-motion`.
 
-- [ ] **Step 5: Ensure feature count is real**
+- [x] **Step 5: Ensure feature count is real**
 
 Before claiming the milestone, verify every control listed in the design maps to a state field and renderer behavior. A DOM control without render/state effect is a failing requirement.
 
-- [ ] **Step 6: Run targeted validation**
+- [x] **Step 6: Run targeted validation**
 
 Run:
 
@@ -316,7 +327,7 @@ pnpm exec playwright test tests/e2e/photo.spec.ts
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 Commit message:
 
@@ -341,23 +352,23 @@ feat(photo): ship local Photo Studio workspace
 - Consumes all prior Photo Studio interfaces.
 - Produces final verified Pages-ready tool and task records.
 
-- [ ] **Step 1: Add metadata and batch regression tests first**
+- [x] **Step 1: Add metadata and batch regression tests first**
 
 Tests must prove XML escaping, keywords, GPS omission under strip policy, explicit location retention under custom policy, batch failure isolation, recipe round-trip stability, and stale-result rejection.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run only the newly added Photo Studio unit/browser cases and confirm each new assertion fails for the intended missing behavior.
 
-- [ ] **Step 3: Complete metadata/export workflow**
+- [x] **Step 3: Complete metadata/export workflow**
 
 The export dialog must expose filename, format, quality, resize mode/value, background, output sharpening, metadata policy, editable metadata, XMP sidecar, and per-format capability status. Metadata errors must not destroy the pixel render.
 
-- [ ] **Step 4: Complete batch and project workflow**
+- [x] **Step 4: Complete batch and project workflow**
 
 Batch processing runs sequentially, reports each file's status, applies the current recipe, and never holds all rendered full-resolution outputs simultaneously. JSON recipe import validates shape/version and clamps values through `normalizeRecipe`.
 
-- [ ] **Step 5: Run focused validation**
+- [x] **Step 5: Run focused validation**
 
 Run:
 
@@ -367,7 +378,7 @@ pnpm build
 pnpm exec playwright test tests/e2e/photo.spec.ts
 ```
 
-- [ ] **Step 6: Run repository validation required by changed global paths**
+- [x] **Step 6: Run repository validation required by changed global paths**
 
 Run:
 
@@ -379,19 +390,19 @@ pnpm exec playwright test
 
 If the pre-existing baseline is red, compare the fresh failure signature to the baseline and do not attribute unrelated failures to Photo Studio.
 
-- [ ] **Step 7: Verify GitHub Actions and Pages**
+- [x] **Step 7: Verify GitHub Actions and Pages**
 
 After pushing to `origin/main`, verify the focused validation run and Pages workflow against the exact final SHA. Confirm the live route `https://aahplexx.github.io/inmotools/#/tools/photo-studio` loads the new workspace and that an uncached browser can open the editor.
 
-- [ ] **Step 8: Close repository task tracking**
+- [x] **Step 8: Close repository task tracking**
 
 Move Photo Studio from `.tasks/IN_PROGRESS.md` to `.tasks/DONE.md`, append a concise factual entry to `.tasks/WORK_LOG.md`, and leave any genuinely deferred decoder extension in `.tasks/NEXT.md` only if it is still intended.
 
-- [ ] **Step 9: Final verification**
+- [x] **Step 9: Final verification**
 
 Re-check `origin/main`, branch inventory, exact changed-file set, CI status, live route, and that no source file contains private prompting/internal discussion.
 
-- [ ] **Step 10: Commit closure**
+- [x] **Step 10: Commit closure**
 
 Commit message:
 

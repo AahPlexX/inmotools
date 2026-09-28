@@ -175,7 +175,9 @@ test('Python re executes locally with Python-only named groups', async ({ page }
   await page.getByLabel('Flags').fill('g');
   await page.getByLabel('Test subject').fill('alpha beta');
   await page.getByRole('button', { name: 'Run pattern' }).click();
-  await expect(page.getByTestId('match-count')).toHaveText('2');
+  // The first Python run includes the Pyodide cold start (measured 4.5-6.2 s
+  // under parallel load), which the runtime itself bounds at 30 s.
+  await expect(page.getByTestId('match-count')).toHaveText('2', { timeout: 30_000 });
   await expect(page.getByTestId('match-inspector')).toContainText('word');
   await expect(page.getByTestId('match-inspector')).toContainText('alpha');
 });
