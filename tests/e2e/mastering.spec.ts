@@ -672,7 +672,7 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
   ]);
   await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
   const assertTouchTargets = async (label: string) => {
-    const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number').evaluateAll((elements) =>
+    const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number, .mastering-workspace input[type="range"]').evaluateAll((elements) =>
       elements
         .filter((element) => (element as HTMLElement).offsetParent !== null)
         .map((element) => ({ label: (element.textContent || (element as HTMLInputElement).ariaLabel || element.tagName).trim().slice(0, 80), height: element.getBoundingClientRect().height }))
