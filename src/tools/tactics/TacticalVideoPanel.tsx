@@ -584,9 +584,17 @@ export default function TacticalVideoPanel({ project, onEdit, onStatus }: Tactic
     <details className="tactical-setup tactical-video-panel" id="tactical-video-panel">
       <summary>Local video review</summary>
       <div className="tactical-video-body">
-        <p className="tactical-video-note">
-          Local files stay in this browser. Drawings, tags, clips, and sync anchors are project notes on top of the video. Tracking follows only the anchors you enter.
-        </p>
+        <div className="tactical-video-note" role="note">
+          <p>
+            Start with <strong>Open local match video</strong> and choose an mp4, WebM, Ogg, or QuickTime file from this device. The file stays in this browser; it is not uploaded.
+          </p>
+          <p>
+            Use the review transport to set a millisecond time, step one frame, or play. Then add drawings (telestration), match-event tags, clips, playlists, or a comparison angle. Those items are project notes drawn on top of the video; removing them leaves the video file unchanged.
+          </p>
+          <p>
+            Overlay tracking follows only the anchors you enter. Choose hold or linear blending between those anchors. When you open a comparison angle, set one shared-time sync anchor so the second angle follows the review clock.
+          </p>
+        </div>
         {error ? <p className="tactical-video-error" role="alert">{error}</p> : null}
         <div className="tactical-video-open">
           <label>
