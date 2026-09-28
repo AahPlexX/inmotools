@@ -23,7 +23,7 @@ export class MasteringDspClient {
   /** Set once the worker reports an uncaught error; later requests fail fast instead of hanging. */
   private failure: Error | null = null;
 
-  constructor() {
+  constructor(onFailure?: (error: Error) => void) {
     this.worker = new Worker(new URL('./mastering-dsp.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event: MessageEvent<DspResponse>) => {
       const waiter = this.pending.get(event.data.requestId);
@@ -31,12 +31,15 @@ export class MasteringDspClient {
       this.pending.delete(event.data.requestId);
       waiter.resolve(event.data);
     };
-    this.worker.onerror = (event) => {
-      const error = new Error(event.message || 'The audio processing worker stopped unexpectedly.');
+    const fail = (error: Error) => {
+      if (this.failure) return;
       this.failure = error;
+      onFailure?.(error);
       for (const waiter of this.pending.values()) waiter.reject(error);
       this.pending.clear();
     };
+    this.worker.onerror = (event) => fail(new Error(event.message || 'The audio processing worker stopped unexpectedly.'));
+    this.worker.onmessageerror = () => fail(new Error('The audio processing worker returned data this browser could not read.'));
   }
 
   private request(message: WithoutId<DspRequest>, transfer: Transferable[] = []): Promise<DspResponse> {
@@ -45,7 +48,12 @@ export class MasteringDspClient {
     const requestId = this.nextId++;
     return new Promise<DspResponse>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
-      this.worker.postMessage({ ...message, requestId } as DspRequest, transfer);
+      try {
+        this.worker.postMessage({ ...message, requestId } as DspRequest, transfer);
+      } catch (error) {
+        this.pending.delete(requestId);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 
