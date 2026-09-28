@@ -15,6 +15,7 @@ import { getPossessionHolderAtTime } from './possession-engine';
 export interface SampledTimelineState {
   position?: NormalizedPoint;
   rotationDeg?: number;
+  elevationMeters?: number;
   visible?: boolean;
   attachmentTargetId?: string | null;
 }
@@ -148,6 +149,7 @@ function inheritedState(keyframes: TacticalKeyframe[], index: number): SampledTi
     const keyframe = keyframes[cursor]!;
     if (keyframe.position) state.position = { ...keyframe.position };
     if (keyframe.rotationDeg !== undefined) state.rotationDeg = keyframe.rotationDeg;
+    if (keyframe.elevationMeters !== undefined) state.elevationMeters = keyframe.elevationMeters;
     if (keyframe.visible !== undefined) state.visible = keyframe.visible;
   }
   return state;
@@ -243,7 +245,8 @@ export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): Sampl
         };
   }
   const rotationDeg = interpolateNumber(leftState.rotationDeg, rightState.rotationDeg, progress);
-  return { position, rotationDeg, visible: leftState.visible };
+  const elevationMeters = interpolateNumber(leftState.elevationMeters, rightState.elevationMeters, progress);
+  return { position, rotationDeg, elevationMeters, visible: leftState.visible };
 }
 
 export function offsetTimelineTrack(track: TimelineTrack, deltaMs: number): TimelineTrack {
@@ -435,6 +438,7 @@ export function sampleTacticalProjectAtTime(
     ball: {
       ...project.ball,
       position: ballState?.position ? { ...ballState.position } : { ...project.ball.position },
+      elevationMeters: ballState?.elevationMeters ?? project.ball.elevationMeters,
       attachedToPlayerId: ballState?.attachmentTargetId ?? project.ball.attachedToPlayerId,
     },
   };

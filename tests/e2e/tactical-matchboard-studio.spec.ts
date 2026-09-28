@@ -777,3 +777,42 @@ test('preserves crash recovery across reload before starter autosave can overwri
   await page.getByRole('button', { name: 'Restore latest autosave' }).first().click();
   await expect.poll(async () => Number(await coordinateInput(page, 'X').inputValue())).toBeCloseTo(moved, 1);
 });
+
+
+test('synchronizes the lazy 3D pitch, canonical player editing, and authored camera keyframes', async ({ page }) => {
+  await page.getByRole('button', { name: 'Show 3D view' }).click();
+  await expect(page.getByRole('heading', { name: '3D pitch view' })).toBeVisible();
+  await expect(page.getByTestId('tactical-3d-canvas')).toBeVisible();
+
+  await page.locator('.tactical-player-list button').first().click();
+  const beforeX = Number(await coordinateInput(page, 'X').inputValue());
+  await expect(page.getByTestId('tactical-3d-summary')).toContainText(/Selected token-1/i);
+
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  const afterX = Number(await coordinateInput(page, 'X').inputValue());
+  expect(afterX).toBeGreaterThan(beforeX);
+  await expect(page.getByTestId('tactical-3d-summary')).toContainText(afterX.toFixed(1) + '% X');
+
+  await page.getByLabel('Camera preset').selectOption('broadcast');
+  await page.getByRole('button', { name: 'Capture camera at playhead' }).click();
+  await expect(page.getByText('1 camera keyframe', { exact: true })).toBeVisible();
+  await expect(page.locator('.status-line').last()).toContainText(/camera keyframe captured/i);
+
+  await page.getByLabel('Camera preset').selectOption('goal-line');
+  await page.getByRole('button', { name: 'Capture camera at playhead' }).click();
+  await expect(page.getByText('1 camera keyframe', { exact: true })).toBeVisible();
+
+  const controls = page.locator('.tactical-3d-controls').locator('button, select');
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const box = await controls.nth(index).boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  const panelOverflow = await page.locator('#tactical-3d-panel').evaluate(
+    (element) => element.scrollWidth - element.clientWidth,
+  );
+  expect(panelOverflow).toBeLessThanOrEqual(1);
+
+  const results = await new AxeBuilder({ page }).include('#tactical-3d-panel').analyze();
+  const severe = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''));
+  expect(severe, severe.map((item) => item.id + ': ' + item.help).join('\n')).toEqual([]);
+});

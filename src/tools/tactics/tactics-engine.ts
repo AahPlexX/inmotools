@@ -4,6 +4,13 @@ import type {
 } from './tactics-types';
 import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
 import { validateTacticalTimeline } from './timeline-engine';
+export {
+  createCameraPresetState,
+  normalizedPointToPitch3D,
+  pitch3DToNormalizedPoint,
+  sampleCameraState,
+  upsertCameraState,
+} from './presentation3d-engine';
 
 export const TACTICS_SCHEMA_VERSION = 2 as const;
 
@@ -200,6 +207,32 @@ export function validateTacticalProject(project: TacticalProject): string[] {
     }
     for (const [playerId, point] of Object.entries(state.playerPositions)) {
       validatePosition(errors, playerId, point);
+    }
+  }
+
+  const cameraIds = new Set<string>();
+  const cameraTimes = new Set<number>();
+  for (const camera of project.cameraStates) {
+    if (!camera.id.trim()) errors.push('Camera state id is required.');
+    if (cameraIds.has(camera.id)) errors.push(`Camera id ${camera.id} is duplicated.`);
+    cameraIds.add(camera.id);
+    if (!Number.isInteger(camera.timeMs) || camera.timeMs < 0) {
+      errors.push(`Camera ${camera.id || 'state'} time must be a non-negative integer millisecond value.`);
+    } else {
+      if (cameraTimes.has(camera.timeMs)) errors.push(`Camera time ${camera.timeMs} is duplicated.`);
+      cameraTimes.add(camera.timeMs);
+      if (camera.timeMs > project.timeline.durationMs) {
+        errors.push(`Camera ${camera.id} time ${camera.timeMs} exceeds timeline duration.`);
+      }
+    }
+    if (![camera.position.x, camera.position.y, camera.position.z].every(Number.isFinite)) {
+      errors.push(`Camera ${camera.id} position must use finite 3D coordinates.`);
+    }
+    if (![camera.target.x, camera.target.y, camera.target.z].every(Number.isFinite)) {
+      errors.push(`Camera ${camera.id} target must use finite 3D coordinates.`);
+    }
+    if (!Number.isFinite(camera.fieldOfViewDeg) || camera.fieldOfViewDeg < 10 || camera.fieldOfViewDeg > 120) {
+      errors.push(`Camera ${camera.id} field of view must be between 10 and 120 degrees.`);
     }
   }
 

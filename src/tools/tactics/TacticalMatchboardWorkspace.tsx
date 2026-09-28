@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
@@ -35,13 +35,22 @@ import {
   reviewRestartLegality,
   type RestartTemplate,
 } from './restart-engine';
-import type { FormationTemplate, NormalizedPoint, PitchRuleProfile, TacticalProject } from './tactics-types';
+import type { CameraState, FormationTemplate, NormalizedPoint, PitchRuleProfile, TacticalProject } from './tactics-types';
+import {
+  CAMERA_PRESET_IDS,
+  createCameraPresetState,
+  sampleCameraState,
+  upsertCameraState,
+  type CameraPresetId,
+} from './presentation3d-engine';
 import {
   addTacticalArrow,
   buildBeginnerTacticalProject,
   nudgeNormalizedPoint,
 } from './workspace-engine';
 import './tactical-matchboard.css';
+
+const Tactical3DView = lazy(() => import('./Tactical3DView'));
 
 type InteractionMode = 'move' | 'arrow';
 
@@ -131,6 +140,9 @@ export default function TacticalMatchboardWorkspace() {
   const [activeSceneId, setActiveSceneId] = useState('scene-1');
   const [previewTimeMs, setPreviewTimeMs] = useState(0);
   const [analysisSettings, setAnalysisSettings] = useState(DEFAULT_ANALYSIS_DISPLAY_SETTINGS);
+  const [show3D, setShow3D] = useState(false);
+  const [cameraPresetId, setCameraPresetId] = useState<CameraPresetId>('tactical');
+  const [cameraDraft, setCameraDraft] = useState<CameraState | null>(null);
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
 
   const project = history.present;
@@ -138,6 +150,11 @@ export default function TacticalMatchboardWorkspace() {
     () => sampleTacticalProjectAtTime(project, Math.min(previewTimeMs, project.timeline.durationMs)),
     [previewTimeMs, project],
   );
+  const sampledCamera = useMemo(
+    () => sampleCameraState(project.cameraStates, Math.min(previewTimeMs, project.timeline.durationMs), project.pitch.dimensions),
+    [previewTimeMs, project.cameraStates, project.pitch.dimensions, project.timeline.durationMs],
+  );
+  const activeCamera = cameraDraft ?? sampledCamera;
   const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
   const sceneId = activeScene?.id ?? '';
   const layerId = activeScene?.layers[0]?.id ?? '';
@@ -175,6 +192,34 @@ export default function TacticalMatchboardWorkspace() {
     }
   }
 
+  function applyCameraPreset(preset: CameraPresetId) {
+    const next = createCameraPresetState(
+      preset,
+      project.pitch.dimensions,
+      Math.min(previewTimeMs, project.timeline.durationMs),
+    );
+    setCameraPresetId(preset);
+    setCameraDraft(next);
+    setStatus(`3D camera changed to ${preset.replace('-', ' ')} view. Capture it to animate this camera.`);
+  }
+
+  function captureCameraKeyframe() {
+    const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
+    const next = {
+      ...activeCamera,
+      id: `camera-${timeMs}`,
+      timeMs,
+      position: { ...activeCamera.position },
+      target: { ...activeCamera.target },
+    };
+    applyEdit(
+      'Capture 3D camera',
+      (current) => ({ ...current, cameraStates: upsertCameraState(current.cameraStates, next) }),
+      `3D camera keyframe captured at ${timeMs} ms.`,
+    );
+    setCameraDraft(null);
+  }
+
   function replaceProject(nextProject: TacticalProject, message: string) {
     const firstSceneId = nextProject.scenes[0]?.id ?? '';
     const firstTokenId = nextProject.playerTokens.find((token) => token.sceneId === firstSceneId)?.id
@@ -187,6 +232,7 @@ export default function TacticalMatchboardWorkspace() {
     setHistory(createTacticalHistory(nextProject));
     setActiveSceneId(firstSceneId);
     setPreviewTimeMs(0);
+    setCameraDraft(null);
     setSelectedTokenId(firstTokenId);
     setMode('move');
     setArrowStart(null);
@@ -701,7 +747,7 @@ export default function TacticalMatchboardWorkspace() {
           project={project}
           activeSceneId={sceneId}
           previewTimeMs={Math.min(previewTimeMs, project.timeline.durationMs)}
-          onPreviewTimeChange={setPreviewTimeMs}
+          onPreviewTimeChange={(timeMs) => { setPreviewTimeMs(timeMs); setCameraDraft(null); }}
           onTransportStatus={setStatus}
           onEdit={applyEdit}
         />
@@ -774,7 +820,50 @@ export default function TacticalMatchboardWorkspace() {
           <button className="action-button secondary" type="button" disabled={!history.past.length} onClick={undo}>Undo</button>
           <button className="action-button secondary" type="button" disabled={!history.future.length} onClick={redo}>Redo</button>
           <button className="action-button secondary" type="button" onClick={exportSvg}>Export SVG</button>
+          <button
+            className="action-button secondary"
+            type="button"
+            aria-expanded={show3D}
+            aria-controls="tactical-3d-panel"
+            onClick={() => setShow3D((value) => !value)}
+          >
+            {show3D ? 'Hide 3D view' : 'Show 3D view'}
+          </button>
         </div>
+
+        {show3D ? (
+          <section id="tactical-3d-panel" className="tactical-3d-panel" aria-label="3D presentation controls">
+            <div className="tactical-3d-controls">
+              <label>
+                Camera preset
+                <select
+                  value={cameraPresetId}
+                  onChange={(event) => applyCameraPreset(event.target.value as CameraPresetId)}
+                >
+                  {CAMERA_PRESET_IDS.map((preset) => (
+                    <option key={preset} value={preset}>{preset.replace('-', ' ')}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={captureCameraKeyframe}>Capture camera at playhead</button>
+              <span aria-live="polite">{project.cameraStates.length} camera keyframe{project.cameraStates.length === 1 ? '' : 's'}</span>
+            </div>
+            <Suspense fallback={<div className="tactical-3d-loading" role="status">Loading the local 3D view…</div>}>
+              <Tactical3DView
+                project={presentationProject}
+                sceneId={sceneId}
+                selectedTokenId={selectedTokenId}
+                cameraState={activeCamera}
+                onSelectToken={(tokenId) => {
+                  setSelectedTokenId(tokenId);
+                  setStatus(`Selected ${tokenId} in the 3D view.`);
+                }}
+                onCameraChange={setCameraDraft}
+                onStatus={setStatus}
+              />
+            </Suspense>
+          </section>
+        ) : null}
 
         <div className="tactical-editor-layout">
           <TacticalBoard

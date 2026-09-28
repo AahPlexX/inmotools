@@ -22,8 +22,8 @@ const baseTrack = (): TimelineTrack => ({
   id: 'track-player-1',
   targetId: 'token-1',
   keyframes: [
-    { id: 'kf-0', timeMs: 0, position: { x: 0.1, y: 0.2 }, rotationDeg: 0, visible: true, interpolation: 'linear' },
-    { id: 'kf-1000', timeMs: 1000, position: { x: 0.5, y: 0.6 }, rotationDeg: 90, interpolation: 'linear' },
+    { id: 'kf-0', timeMs: 0, position: { x: 0.1, y: 0.2 }, rotationDeg: 0, elevationMeters: 0, visible: true, interpolation: 'linear' },
+    { id: 'kf-1000', timeMs: 1000, position: { x: 0.5, y: 0.6 }, rotationDeg: 90, elevationMeters: 2, interpolation: 'linear' },
   ],
 });
 
@@ -45,6 +45,7 @@ describe('Tactical timeline engine', () => {
     expect(linear.position?.x).toBeCloseTo(0.3, 12);
     expect(linear.position?.y).toBeCloseTo(0.4, 12);
     expect(linear.rotationDeg).toBe(45);
+    expect((linear as typeof linear & { elevationMeters?: number }).elevationMeters).toBe(1);
     expect(linear.visible).toBe(true);
 
     const smoothTrack = baseTrack();

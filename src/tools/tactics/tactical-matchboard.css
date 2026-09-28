@@ -585,3 +585,87 @@
     flex: 1 1 100%;
   }
 }
+
+.tactical-3d-panel {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: clamp(12px, 2vw, 18px);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface, #fff);
+}
+
+.tactical-3d-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.tactical-3d-controls label {
+  min-width: min(100%, 190px);
+  display: grid;
+  gap: 6px;
+}
+
+.tactical-3d-controls select,
+.tactical-3d-controls button {
+  min-height: 44px;
+}
+
+.tactical-3d-runtime {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.tactical-3d-runtime__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tactical-3d-runtime__heading h3,
+.tactical-3d-runtime__heading p,
+.tactical-3d-help {
+  margin: 0;
+}
+
+.tactical-3d-canvas {
+  width: 100%;
+  height: clamp(300px, 52vh, 560px);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+  background: #0b1220;
+  touch-action: none;
+}
+
+.tactical-3d-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tactical-3d-loading {
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border-color, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+}
+
+@media (max-width: 560px) {
+  .tactical-3d-controls,
+  .tactical-3d-controls label,
+  .tactical-3d-controls button {
+    width: 100%;
+  }
+
+  .tactical-3d-canvas {
+    height: clamp(260px, 48vh, 420px);
+  }
+}
