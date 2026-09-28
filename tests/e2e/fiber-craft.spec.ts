@@ -158,6 +158,12 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Counted-Thread Pattern Workbench');
     await page.getByLabel('Chart mode').selectOption('counted');
     await expect(page.getByTestId('counted-thread-grid')).toBeVisible();
+    await expect(page.getByLabel('Fabric type')).toHaveValue('aida');
+    await expect(page.getByLabel('Fabric count')).toHaveValue('14');
+    await page.getByLabel('Fabric type').selectOption('linen');
+    await page.getByLabel('Fabric count').fill('28');
+    await page.getByLabel('Stitch over').selectOption('2');
+    await expect(page.getByTestId('counted-thread-fabric-summary')).toContainText('0.86 × 0.86 in');
     await page.locator('#fiber-counted-brand').fill('Project floss');
     await page.locator('#fiber-counted-code').fill('P-01');
     await page.getByRole('button', { name: 'Save floss identity' }).click();
@@ -168,6 +174,8 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('counted-thread-legend')).toContainText('Primary');
     await expect(page.getByTestId('counted-thread-legend')).toContainText('Project floss · P-01');
     await expect(page.getByTestId('counted-thread-legend')).toContainText('1 mark');
+    await expect(page.getByTestId('counted-thread-confetti-summary')).toContainText('1 isolated stitch');
+    await expect(page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ })).toHaveAttribute('data-confetti', 'true');
     const appearance = page.getByLabel('Chart appearance');
     await expect(appearance).toHaveValue('color-symbols');
     await appearance.selectOption('symbols-only');
@@ -204,6 +212,9 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('crochet-round-canvas')).toBeVisible();
     await page.getByLabel('Open project file').setInputFiles(path!);
     await expect(page.getByLabel('Chart mode')).toHaveValue('counted');
+    await expect(page.getByLabel('Fabric type')).toHaveValue('linen');
+    await expect(page.getByLabel('Fabric count')).toHaveValue('28');
+    await expect(page.getByLabel('Stitch over')).toHaveValue('2');
     await expect(page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ })).toBeVisible();
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 French knot');
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 backstitch line');
