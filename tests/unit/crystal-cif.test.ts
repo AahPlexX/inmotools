@@ -95,4 +95,52 @@ C1 C 0 0 0
     expect(serialized).toContain("{'first':1 'second':[2 3]}");
     expect(parseCif(serialized).blocks).toEqual(parsed.blocks);
   });
+
+  it('expands the asymmetric unit via the source symmetry operations (NaCl, Fm-3m F-centering)', () => {
+    const nacl = `data_NaCl
+_cell_length_a 5.64
+_cell_length_b 5.64
+_cell_length_c 5.64
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_space_group_symop_operation_xyz
+x,y,z
+x,y+1/2,z+1/2
+x+1/2,y,z+1/2
+x+1/2,y+1/2,z
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Na1 Na 0 0 0
+Cl1 Cl 0.5 0.5 0.5
+`;
+    const structure = structureFromCif(parseCif(nacl));
+    expect(structure.sites).toHaveLength(8);
+    expect(structure.sites.filter((site) => site.element === 'Na')).toHaveLength(4);
+    expect(structure.sites.filter((site) => site.element === 'Cl')).toHaveLength(4);
+    // The raw parsed block (used for lossless CIF re-export) still holds only the asymmetric unit.
+    expect(structure.cif?.blocks[0]!.entries.some((entry) => entry.kind === 'loop' && entry.rows.length === 2)).toBe(true);
+  });
+
+  it('also expands via the legacy _symmetry_equiv_pos_as_xyz loop tag', () => {
+    const cif = parseCif(CIF11.replace(
+      'loop_\n_atom_site_label',
+      'loop_\n_symmetry_equiv_pos_as_xyz\nx,y,z\nx+1/2,y+1/2,z\nloop_\n_atom_site_label',
+    ));
+    const structure = structureFromCif(cif);
+    expect(structure.sites).toHaveLength(4);
+  });
+
+  it('fails visibly on a malformed symmetry-operation string instead of silently dropping it', () => {
+    const cif = parseCif(CIF11.replace(
+      'loop_\n_atom_site_label',
+      'loop_\n_space_group_symop_operation_xyz\nx,y\nloop_\n_atom_site_label',
+    ));
+    expect(() => structureFromCif(cif)).toThrow(/3 comma-separated components/);
+  });
 });
