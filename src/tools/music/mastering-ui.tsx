@@ -75,7 +75,7 @@ export function CommitNumberField({ id: providedId, label, value, onCommit, onPr
   };
   return <div className="field">
     <label htmlFor={id}>{label}{suffix ? <span className="mastering-unit"> ({suffix})</span> : null}</label>
-    <input id={id} type="number" inputMode="decimal" min={min} max={max} step={step} value={draft} disabled={disabled}
+    <input id={id} type="number" inputMode={min !== undefined && min < 0 ? 'text' : 'decimal'} min={min} max={max} step={step} value={draft} disabled={disabled}
       onChange={(event) => {
         const next = event.target.value;
         setDraft(next);
