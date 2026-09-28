@@ -99,8 +99,8 @@ export default function MasteringArrangePanel({ document, playhead, disabled, on
               onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
           </label>
           <div className="mastering-toggle-row">
-            <button type="button" aria-pressed={track.muted} disabled={disabled} onClick={() => commit(updateTrackRevision(document, track.id, { muted: !track.muted }), `${track.name} ${track.muted ? 'unmuted' : 'muted'}.`)}>Mute</button>
-            <button type="button" aria-pressed={track.solo} disabled={disabled} onClick={() => commit(updateTrackRevision(document, track.id, { solo: !track.solo }), `${track.name} solo ${track.solo ? 'off' : 'on'}.`)}>Solo</button>
+            <button type="button" aria-pressed={track.muted} aria-label={`Mute ${track.name}`} title={`Mute ${track.name}`} disabled={disabled} onClick={() => commit(updateTrackRevision(document, track.id, { muted: !track.muted }), `${track.name} ${track.muted ? 'unmuted' : 'muted'}.`)}>Mute</button>
+            <button type="button" aria-pressed={track.solo} aria-label={`Solo ${track.name}`} title={`Solo ${track.name} (mutes every other track unless it is also soloed)`} disabled={disabled} onClick={() => commit(updateTrackRevision(document, track.id, { solo: !track.solo }), `${track.name} solo ${track.solo ? 'off' : 'on'}.`)}>Solo</button>
             <button type="button" disabled={disabled || index === 0} aria-label={`Move ${track.name} up`} onClick={() => commit(moveTrackRevision(document, track.id, -1), `Moved ${track.name} up.`)}>↑</button>
             <button type="button" disabled={disabled || index === document.tracks.length - 1} aria-label={`Move ${track.name} down`} onClick={() => commit(moveTrackRevision(document, track.id, 1), `Moved ${track.name} down.`)}>↓</button>
             {pendingRemoval === track.id

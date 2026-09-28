@@ -147,6 +147,8 @@ export default function MasteringWorkspace() {
   const sourceFilesRef = useRef(new Map<string, Blob>());
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [recovery, setRecovery] = useState<StoredSession | null>(null);
+  /** Other saved sessions (any tab, any earlier visit), for the Project tab's browser. Never includes this tab's own session. */
+  const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [autosave, setAutosave] = useState<AutosaveState>({ state: 'starting' });
   const [projectBusy, setProjectBusy] = useState(false);
   const shortcutsRef = useRef<HTMLDetailsElement | null>(null);
@@ -195,16 +197,27 @@ export default function MasteringWorkspace() {
       setStore(value);
       setAutosave({ state: 'idle' });
       try {
-        const sessions = await value.listSessions();
-        // Offer the newest session from another tab or an earlier visit, never this tab's own.
-        const candidate = sessions.find((session) => session.id !== sessionIdRef.current && session.document.tracks.some((track) => track.clips.length));
-        if (!cancelled && candidate) setRecovery(candidate);
+        const found = await value.listSessions();
+        const others = found.filter((session) => session.id !== sessionIdRef.current && session.document.tracks.some((track) => track.clips.length));
+        if (cancelled) return;
+        setSessions(others);
+        // Offer the newest of them as a one-time "pick up where you left off" prompt.
+        if (others.length) setRecovery(others[0]);
       } catch { /* an unreadable session list only means nothing is offered */ }
     }).catch((error: unknown) => {
       if (!cancelled) setAutosave({ state: 'unavailable', message: messageOf(error) });
     });
     return () => { cancelled = true; opened?.close(); };
   }, []);
+
+  /** Re-reads the saved-session list, for the Project tab's browser and after this tab adopts or removes one. */
+  const refreshSessions = useCallback(async () => {
+    if (!store) return;
+    try {
+      const found = await store.listSessions();
+      if (mountedRef.current) setSessions(found.filter((session) => session.id !== sessionIdRef.current));
+    } catch (error) { if (mountedRef.current) setStatus(`Could not read saved sessions: ${messageOf(error)}`); }
+  }, [store]);
 
   /** Writes the current document now; queued behind any save already running. */
   const saveNow = useCallback(() => {
@@ -633,23 +646,30 @@ export default function MasteringWorkspace() {
     }
   }, [stopPlayback]);
 
-  const restoreSession = async () => {
-    if (!store || !recovery) return;
+  /** Opens any saved session (from the recovery banner or the Project tab's list) in place of the current project. */
+  const openSavedSession = async (session: StoredSession) => {
+    if (!store) return;
+    if (recovery?.id === session.id) setRecovery(null);
     try {
-      const files = await store.loadSources(recovery.id, recovery.document.sources.map((source) => source.id));
-      await openProject(recovery.document, files, 'Restored your session:', recovery.id);
+      const files = await store.loadSources(session.id, session.document.sources.map((source) => source.id));
+      await openProject(session.document, files, 'Restored your session:', session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
     } catch (error) { setStatus(`Could not restore the session: ${messageOf(error)}`); }
   };
 
-  const discardSession = async () => {
-    if (!recovery) return;
-    const id = recovery.id;
-    setRecovery(null);
+  const restoreSession = () => { if (recovery) void openSavedSession(recovery); };
+
+  /** Deletes a saved session without opening it. */
+  const deleteStoredSession = async (id: string) => {
+    if (recovery?.id === id) setRecovery(null);
     try {
       await store?.deleteSession(id);
-      setStatus('Discarded the saved session.');
-    } catch (error) { setStatus(`Could not discard the saved session: ${messageOf(error)}`); }
+      setSessions((current) => current.filter((session) => session.id !== id));
+      setStatus('Deleted the saved session.');
+    } catch (error) { setStatus(`Could not delete the saved session: ${messageOf(error)}`); }
   };
+
+  const discardSession = () => { if (recovery) void deleteStoredSession(recovery.id); };
 
   const saveBackup = async () => {
     setProjectBusy(true);
@@ -840,18 +860,23 @@ export default function MasteringWorkspace() {
           project shows only the ways to add some. */}
       {hasAudio && <>
       <div className="mastering-transport" aria-label="Audio transport">
-        <button type="button" onClick={() => void play()} disabled={!canEdit || !mixReady || rendering || playbackState === 'playing' || playbackState === 'starting'}>{playbackState === 'paused' ? 'Resume' : 'Play'}</button>
-        <button type="button" onClick={pause} disabled={playbackState !== 'playing'}>Pause</button>
-        <button type="button" onClick={() => stopPlayback(true, true)} disabled={playbackState === 'idle' && playhead === 0}>Stop</button>
-        <button type="button" onClick={() => seek(playhead - 1)} disabled={!canEdit}>−1 s</button>
-        <button type="button" onClick={() => seek(playhead + 1)} disabled={!canEdit}>+1 s</button>
-        <label className="mastering-check"><input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} disabled={!canEdit} /> Loop</label>
-        <button type="button" onClick={undo} disabled={!history.past.length}>Undo</button>
-        <button type="button" onClick={redo} disabled={!history.future.length}>Redo</button>
+        <button type="button" title="Play (Space)" onClick={() => void play()} disabled={!canEdit || !mixReady || rendering || playbackState === 'playing' || playbackState === 'starting'}>{playbackState === 'paused' ? 'Resume' : 'Play'}</button>
+        <button type="button" title="Pause (Space)" onClick={pause} disabled={playbackState !== 'playing'}>Pause</button>
+        <button type="button" title="Stop and return to the start (Esc)" onClick={() => stopPlayback(true, true)} disabled={playbackState === 'idle' && playhead === 0}>Stop</button>
+        <button type="button" title="Seek back 1 second (←)" onClick={() => seek(playhead - 1)} disabled={!canEdit}>−1 s</button>
+        <button type="button" title="Seek forward 1 second (→)" onClick={() => seek(playhead + 1)} disabled={!canEdit}>+1 s</button>
+        <label className="mastering-check" title="Loop the selection, or the whole mix with no selection (L)"><input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} disabled={!canEdit} /> Loop</label>
+        <button type="button" title="Undo (Ctrl/⌘+Z)" onClick={undo} disabled={!history.past.length}>Undo</button>
+        <button type="button" title="Redo (Ctrl/⌘+Shift+Z)" onClick={redo} disabled={!history.future.length}>Redo</button>
         <div className="mastering-listen" role="radiogroup" aria-label="Listen to">
-          {([['processed', 'Processed'], ['original', 'Original'], ['delta', 'Difference'], ['reference', 'Reference']] as const).map(([value, label]) => <button key={value} type="button" role="radio"
+          {([
+            ['processed', 'Processed', 'The mastered mix with the master chain applied (A)'],
+            ['original', 'Original', 'The unmastered mix, for comparison'],
+            ['delta', 'Difference', 'Only what the master chain is adding or removing'],
+            ['reference', 'Reference', reference ? 'The loaded reference track' : 'Load a reference track on the Meters tab first'],
+          ] as const).map(([value, label, hint]) => <button key={value} type="button" role="radio"
             aria-checked={monitor.listen === value} disabled={value === 'reference' && !reference}
-            title={value === 'reference' && !reference ? 'Load a reference track on the Meters tab first' : undefined}
+            title={hint}
             onClick={() => setListen(value)}>{label}</button>)}
         </div>
         {rendering && <span className="mastering-busy" role="status">Rendering…</span>}
@@ -915,7 +940,8 @@ export default function MasteringWorkspace() {
           onJump={seek} /> },
         { id: 'export', label: 'Export', render: (active) => <MasteringExportTab ctx={ctx} active={active} /> },
         { id: 'project', label: 'Project', render: (active) => <MasteringProjectTab ctx={ctx} active={active} autosave={autosave} busy={projectBusy || loading}
-          onSaveBackup={saveBackup} onRestoreBackup={restoreBackup} /> },
+          onSaveBackup={saveBackup} onRestoreBackup={restoreBackup}
+          sessions={sessions} onOpenSession={openSavedSession} onDeleteSession={deleteStoredSession} onRefreshSessions={refreshSessions} /> },
       ]} />}
 
       <p className={`status-line ${/^Could not|failed|could not start/i.test(status) ? 'error' : ''}`} role="status" aria-live="polite">{status}</p>
