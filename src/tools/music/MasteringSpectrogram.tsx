@@ -15,7 +15,7 @@ import { spectrogramPalette, type Spectrogram } from './dsp/spectrogram';
 import type { SpectralRegion } from './dsp/spectral';
 import type { TimelineViewport } from './MasteringTimeline';
 import { formatFrequency } from './MasteringControls';
-import { formatTime, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatTime, type MasteringPanelContext } from './mastering-ui';
 
 const HEIGHT = 180;
 
@@ -177,15 +177,15 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
 
   return <div className="mastering-spectrogram">
     <div className="mastering-spectrogram-bar">
-      <div className="mastering-listen" role="radiogroup" aria-label="Spectrogram drag action">
-        <button type="button" role="radio" aria-checked={mode === 'select'} onClick={() => setMode('select')}>Select time</button>
-        <button type="button" role="radio" aria-checked={mode === 'paint'} onClick={() => setMode('paint')}>Paint regions</button>
+      <div className="mastering-listen" role="group" aria-label="Spectrogram drag action">
+        <button type="button" aria-pressed={mode === 'select'} onClick={() => setMode('select')}>Select time</button>
+        <button type="button" aria-pressed={mode === 'paint'} onClick={() => setMode('paint')}>Paint regions</button>
       </div>
       {loading && <span className="mastering-busy" role="status">Analysing…</span>}
     </div>
     <div ref={wrapRef} className="mastering-spectrogram-view">
       <canvas ref={baseRef} className="mastering-spectrogram-base" style={{ height: HEIGHT }} aria-hidden="true" />
-      <canvas ref={overlayRef} className="mastering-spectrogram-overlay" style={{ height: HEIGHT, cursor: mode === 'paint' ? 'cell' : 'crosshair' }} role="img"
+      <canvas ref={overlayRef} className="mastering-spectrogram-overlay" style={{ height: HEIGHT, cursor: mode === 'paint' ? 'cell' : 'crosshair', touchAction: mode === 'paint' ? 'none' : 'pan-y' }} role="img"
         aria-label={`Spectrogram from ${formatTime(startSeconds)} to ${formatTime(startSeconds + spanSeconds)}, ${formatFrequency(minHz)} to ${formatFrequency(maxHz)} on a logarithmic scale. ${regions.length} painted region${regions.length === 1 ? '' : 's'}.`}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
         onPointerCancel={() => { drag.current = null; setDraft(null); }} />
@@ -199,8 +199,8 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
         </li>)}
       </ul>}
       <div className="mastering-nudge">
-        <label className="field"><span className="field-label">Attenuation (dB)</span>
-          <input type="number" min={1} max={60} step={1} value={reduction} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value)) setReduction(Math.min(60, Math.max(1, value))); }} /></label>
+        <CommitNumberField label="Attenuation (dB)" value={reduction} min={1} max={60} step={1}
+          onCommit={setReduction} onPreview={setReduction} />
         <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('attenuate')}>Attenuate painted regions</button>
         <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('heal')}>Heal painted regions</button>
         <button type="button" disabled={!regions.length} onClick={() => setRegions([])}>Clear regions</button>
