@@ -284,3 +284,66 @@
   display: none;
   border-right: 0;
 }
+
+
+/* Production-audit interaction/accessibility additions. */
+.markdown-workbench-theme-dark {
+  color-scheme: dark;
+  --surface: #111827;
+  --surface-strong: #1f2937;
+  --ink: #f3f6fa;
+  --muted: #b4bec9;
+  --line: #344050;
+  --line-strong: #667487;
+  --signal: #7fa7ff;
+  --signal-strong: #adc4ff;
+  --signal-soft: #1e335f;
+  --good: #5ee0aa;
+  --warning: #f4b860;
+  --danger: #ff8a80;
+  --focus: #9fc0ff;
+  background: var(--surface);
+  color: var(--ink);
+}
+.markdown-workbench-theme-dark .markdown-workbench-diagram { padding: 10px; border-radius: var(--radius-sm); background: #fff; }
+.markdown-workbench-theme-dark pre code .tok-comment { color: #b4bec9; }
+.markdown-workbench-theme-dark pre code .tok-keyword { color: #9fb8ff; }
+.markdown-workbench-theme-dark pre code :is(.tok-string, .tok-string2, .tok-literal) { color: #7ad9a5; }
+.markdown-workbench-theme-dark pre code :is(.tok-number, .tok-atom, .tok-bool) { color: #f2b36c; }
+.markdown-workbench-theme-dark pre code :is(.tok-typeName, .tok-className, .tok-namespace) { color: #d2adff; }
+.markdown-workbench-theme-dark pre code :is(.tok-propertyName, .tok-labelName, .tok-heading, .tok-link, .tok-url) { color: #8cc8ff; }
+.markdown-workbench-theme-dark pre code :is(.tok-meta, .tok-punctuation, .tok-operator) { color: #c7d0d9; }
+.markdown-workbench-theme-dark pre code .tok-invalid { color: #ff8a80; }
+
+.markdown-workbench-check, .markdown-workbench-font-size { min-height: 32px; padding: 2px 4px; }
+.markdown-workbench-check input { width: 18px; height: 18px; min-height: 18px; }
+.markdown-workbench-font-size input[type="range"] { min-width: 96px; }
+.markdown-workbench-font-size output { min-width: 3.5em; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.markdown-workbench-format-action { position: relative; display: inline-flex; }
+.markdown-workbench-format-tooltip {
+  position: absolute; z-index: 20; top: calc(100% + 7px); left: 50%;
+  width: max-content; max-width: min(260px, calc(100vw - 32px)); padding: 7px 9px;
+  transform: translateX(-50%); border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--ink); color: var(--surface); box-shadow: 0 8px 24px rgb(15 23 42 / .18);
+  font-size: 12px; font-weight: 500; line-height: 1.4; text-align: left; white-space: normal;
+}
+.markdown-workbench-format-tooltip[hidden] { display: none; }
+
+.markdown-workbench-outline-filter { display: grid; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.markdown-workbench-outline-filter input { width: min(360px, 100%); min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.markdown-workbench-outline button[aria-current="location"] { border-color: var(--signal); background: var(--signal-soft); color: var(--ink); }
+
+.markdown-workbench-focus .markdown-workbench-toolbar-section:not(:first-child),
+.markdown-workbench-focus .markdown-workbench-namebar,
+.markdown-workbench-focus .markdown-workbench-status,
+.markdown-workbench-focus .markdown-workbench-panel,
+.markdown-workbench-focus .markdown-workbench-toolbar-label,
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child .markdown-workbench-toolbar-group > button:not(.markdown-workbench-focus-toggle) { display: none; }
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child { flex: 1 1 100%; padding: 6px; border: 0; background: transparent; }
+.markdown-workbench-focus .markdown-workbench-toolbar { justify-content: flex-end; padding: 6px 8px; }
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child .markdown-workbench-toolbar-group { justify-content: flex-end; }
+
+@media (max-width: 520px) {
+  .markdown-workbench-format-tooltip { position: fixed; inset: auto 12px 12px; width: auto; max-width: none; transform: none; }
+}

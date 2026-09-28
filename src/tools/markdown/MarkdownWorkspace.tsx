@@ -13,6 +13,7 @@ import { parseMarkdown } from './parse-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
 import { highlightCodeBlocks } from './code-highlight-engine';
+import { htmlToMarkdownDocument } from './html-import-engine';
 import { computeScrollOffset } from './scroll-sync';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
@@ -55,10 +56,18 @@ type ViewMode = 'source' | 'split' | 'preview';
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 const DOCUMENT_HISTORY_COALESCE_MS = 600;
 const MARKDOWN_FILE_EXTENSION = /\.(md|markdown|txt)$/i;
+const HTML_FILE_EXTENSION = /\.html?$/i;
+const DOCUMENT_FILE_EXTENSION = /\.(md|markdown|txt|html?)$/i;
 const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/plain']);
+const HTML_MIME_TYPES = new Set(['text/html', 'application/xhtml+xml']);
 
-const isSupportedMarkdownFile = (file: File): boolean =>
-  MARKDOWN_FILE_EXTENSION.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type);
+type LocalDocumentKind = 'markdown' | 'html';
+
+const localDocumentKind = (file: File): LocalDocumentKind | null => {
+  if (MARKDOWN_FILE_EXTENSION.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type)) return 'markdown';
+  if (HTML_FILE_EXTENSION.test(file.name) || HTML_MIME_TYPES.has(file.type)) return 'html';
+  return null;
+};
 const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
   { id: 'apa', label: 'APA 7th' },
   { id: 'ieee', label: 'IEEE' },
@@ -101,6 +110,10 @@ export default function MarkdownWorkspace() {
   const [vimMode, setVimMode] = useState(false);
   const [spellcheck, setSpellcheck] = useState(true);
   const [syntaxSuggestions, setSyntaxSuggestions] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [outlineFilter, setOutlineFilter] = useState('');
+  const [activeSourceLine, setActiveSourceLine] = useState(1);
   const [revealRequest, setRevealRequest] = useState<{ line: number; nonce: number }>();
 
   const [bibliographyText, setBibliographyText] = useState('');
@@ -219,6 +232,18 @@ export default function MarkdownWorkspace() {
   const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
   const slides = useMemo(() => splitIntoSlides(source), [source]);
   const outline = useMemo(() => buildOutline(source), [source]);
+  const filteredOutline = useMemo(() => {
+    const query = outlineFilter.trim().toLocaleLowerCase();
+    return query ? outline.filter((entry) => entry.text.toLocaleLowerCase().includes(query)) : outline;
+  }, [outline, outlineFilter]);
+  const activeOutlineId = useMemo(() => {
+    let active: string | null = null;
+    for (const entry of outline) {
+      if (entry.line > activeSourceLine) break;
+      active = entry.id;
+    }
+    return active;
+  }, [outline, activeSourceLine]);
   const mathDiagnostics = useMemo(() => collectMathDiagnostics(source), [source]);
 
   const frontmatterEntries = useMemo(
@@ -241,6 +266,7 @@ export default function MarkdownWorkspace() {
 
   useEffect(() => {
     if (!draftStoreRef.current) return;
+    if (source === persistedTextRef.current && documentName === persistedDocumentNameRef.current) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
       void persistDraft(source, effectiveTitle);
@@ -250,14 +276,30 @@ export default function MarkdownWorkspace() {
     };
   }, [source, documentName, effectiveTitle, persistDraft]);
 
-  const citationLibrary = useMemo(() => {
-    if (!bibliographyText.trim()) return null;
+  const citationParse = useMemo(() => {
+    if (!bibliographyText.trim()) return { library: null, problem: null };
     try {
-      return bibliographyFormat === 'bib' ? parseBibtex(bibliographyText) : parseCslJson(bibliographyText);
+      const library = bibliographyFormat === 'bib' ? parseBibtex(bibliographyText) : parseCslJson(bibliographyText);
+      if (library.entries.size === 0) {
+        return {
+          library: null,
+          problem: bibliographyFormat === 'bib'
+            ? 'No BibTeX entries were found. Each entry should start like @article{key, ...}.'
+            : 'No CSL-JSON entries were found. Add an object or array of objects with an id field.',
+        };
+      }
+      return { library, problem: null };
     } catch {
-      return null;
+      return {
+        library: null,
+        problem: bibliographyFormat === 'json'
+          ? 'Couldn’t read that CSL-JSON. Check the JSON syntax and try again.'
+          : 'Couldn’t read that BibTeX. Check the entry syntax and try again.',
+      };
     }
   }, [bibliographyText, bibliographyFormat]);
+  const citationLibrary = citationParse.library;
+  const citationProblem = citationParse.problem;
 
   const citekeys = useMemo(() => extractCitekeys(source), [source]);
   const citekeySignature = citekeys.join('\u0000');
@@ -352,14 +394,20 @@ export default function MarkdownWorkspace() {
     scroller?.scrollTo({ top: targetOffset, behavior: 'smooth' });
   }, []);
 
+  const handleSourceLineChange = useCallback((line: number) => {
+    setActiveSourceLine(line);
+    if (view === 'split') scrollPreviewToLine(line);
+  }, [view, scrollPreviewToLine]);
+
   const revealLine = useCallback((line: number) => {
     setRevealRequest({ line, nonce: Date.now() });
     scrollPreviewToLine(line);
   }, [scrollPreviewToLine]);
 
   const loadMarkdownFile = useCallback(async (file: File) => {
-    if (!isSupportedMarkdownFile(file)) {
-      setStatus(`"${file.name}" is not a Markdown or plain-text document. Choose a .md, .markdown, or .txt file.`);
+    const kind = localDocumentKind(file);
+    if (!kind) {
+      setStatus(`"${file.name}" is not a supported document. Choose Markdown, plain text, or HTML (.md, .markdown, .txt, .html, .htm).`);
       return;
     }
 
@@ -367,7 +415,8 @@ export default function MarkdownWorkspace() {
     const original = sourceRef.current;
     const originalDocumentName = documentNameRef.current;
     try {
-      const text = await file.text();
+      const rawText = await file.text();
+      const text = kind === 'html' ? await htmlToMarkdownDocument(rawText) : rawText;
       if (request !== fileReadRef.current) return;
       if (
         sourceRef.current !== original
@@ -396,7 +445,7 @@ export default function MarkdownWorkspace() {
         }
       }
 
-      const nextDocumentName = file.name.replace(MARKDOWN_FILE_EXTENSION, '');
+      const nextDocumentName = file.name.replace(DOCUMENT_FILE_EXTENSION, '');
       draftIdRef.current = null;
       persistedTextRef.current = text;
       persistedDocumentNameRef.current = nextDocumentName;
@@ -404,7 +453,9 @@ export default function MarkdownWorkspace() {
       setDocumentName(nextDocumentName);
       setLastSavedAt(null);
       setIsDirty(false);
-      setStatus(`Opened ${file.name} locally. Nothing was uploaded.`);
+      setStatus(kind === 'html'
+        ? `Imported ${file.name} locally as Markdown. Complex HTML layout and styling may be simplified.`
+        : `Opened ${file.name} locally. Nothing was uploaded.`);
     } catch {
       setStatus('Could not read that file in this browser.');
     }
@@ -559,6 +610,11 @@ export default function MarkdownWorkspace() {
     }
   };
 
+  const persistCurrentIfDirty = useCallback((text: string, name: string, currentDocumentName: string) => {
+    if (text === persistedTextRef.current && currentDocumentName === persistedDocumentNameRef.current) return Promise.resolve(true);
+    return persistDraft(text, name);
+  }, [persistDraft]);
+
   const saveDraftNow = useCallback(() => {
     if (!draftStoreRef.current) {
       setStatus('Local draft storage is unavailable in this browser.');
@@ -572,7 +628,7 @@ export default function MarkdownWorkspace() {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
     const previousDocumentName = documentNameRef.current;
-    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+    if (!await persistCurrentIfDirty(previous, effectiveTitleRef.current, previousDocumentName)) {
       setStatus('Could not save the current document. Download Markdown before starting a new document.');
       return;
     }
@@ -600,7 +656,7 @@ export default function MarkdownWorkspace() {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     const previous = sourceRef.current;
     const previousDocumentName = documentNameRef.current;
-    if (!await persistDraft(previous, effectiveTitleRef.current)) {
+    if (!await persistCurrentIfDirty(previous, effectiveTitleRef.current, previousDocumentName)) {
       setStatus('Could not save the current document. Download Markdown before switching drafts.');
       return;
     }
@@ -653,7 +709,7 @@ export default function MarkdownWorkspace() {
     : 'Storage usage is unavailable in this browser.';
 
   return (
-    <div className="markdown-workbench" data-testid="markdown-workbench">
+    <div className={`markdown-workbench${darkMode ? ' markdown-workbench-theme-dark' : ''}${focusMode ? ' markdown-workbench-focus' : ''}`} data-testid="markdown-workbench">
       <div className="markdown-workbench-toolbar" role="toolbar" aria-label="Markdown Workbench controls">
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="View and history">
           <span className="markdown-workbench-toolbar-label">View &amp; history</span>
@@ -663,6 +719,7 @@ export default function MarkdownWorkspace() {
             <button type="button" onClick={() => setView('preview')} aria-pressed={view === 'preview'}>Preview</button>
             <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo document step" title="Undo one grouped document step. Ctrl/Cmd+Z inside the editor keeps CodeMirror's fine-grained text history.">Undo step</button>
             <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo document step" title="Redo one grouped document step.">Redo step</button>
+            <button type="button" className="markdown-workbench-focus-toggle" onClick={() => setFocusMode((current) => !current)}>{focusMode ? 'Exit focus' : 'Focus writing'}</button>
           </div>
         </div>
 
@@ -672,7 +729,7 @@ export default function MarkdownWorkspace() {
             <button type="button" onClick={() => fileInputRef.current?.click()}>Open document</button>
             <button type="button" onClick={startNewDraft}>New</button>
             <button type="button" onClick={saveDraftNow}>Save draft</button>
-            <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileInputChange} aria-label="Open a local Markdown file" />
+            <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,.html,.htm,text/markdown,text/plain,text/html,application/xhtml+xml" onChange={onFileInputChange} aria-label="Open a local Markdown, text, or HTML file" />
           </div>
         </div>
 
@@ -683,7 +740,8 @@ export default function MarkdownWorkspace() {
             <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={syntaxSuggestions} onChange={(event) => setSyntaxSuggestions(event.target.checked)} />Syntax suggestions</label>
-            <label className="markdown-workbench-font-size">Font<input type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /></label>
+            <label className="markdown-workbench-check"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} />Dark workspace</label>
+            <label className="markdown-workbench-font-size">Font size<input aria-label="Font size" type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /><output data-testid="markdown-font-size-value">{fontSize} px</output></label>
             <MarkdownSyntaxHelp />
           </div>
         </div>
@@ -719,13 +777,15 @@ export default function MarkdownWorkspace() {
           <MarkdownEditor
             value={source}
             onChange={handleEditorSourceChange}
-            onCursorLineChange={view === 'split' ? scrollPreviewToLine : undefined}
+            onCursorLineChange={handleSourceLineChange}
+            onViewportLineChange={handleSourceLineChange}
             onStatus={setStatus}
             lineWrapping={lineWrapping}
             fontSize={fontSize}
             vimMode={vimMode}
             spellcheck={spellcheck}
             syntaxSuggestions={syntaxSuggestions}
+            darkMode={darkMode}
             revealRequest={revealRequest}
           />
         </div>
@@ -750,13 +810,21 @@ export default function MarkdownWorkspace() {
       <details className="markdown-workbench-panel">
         <summary>Outline ({outline.length})</summary>
         {outline.length > 0 ? (
-          <ul className="markdown-workbench-outline" data-testid="markdown-outline">
-            {outline.map((entry) => (
-              <li key={`${entry.id}-${entry.line}`} data-depth={entry.depth}>
-                <button type="button" onClick={() => revealLine(entry.line)}>{entry.text || '(untitled heading)'}</button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <label className="markdown-workbench-outline-filter">
+              Filter headings
+              <input type="search" aria-label="Filter outline headings" value={outlineFilter} onChange={(event) => setOutlineFilter(event.target.value)} placeholder="Find a section" />
+            </label>
+            {filteredOutline.length > 0 ? (
+              <ul className="markdown-workbench-outline" data-testid="markdown-outline">
+                {filteredOutline.map((entry) => (
+                  <li key={`${entry.id}-${entry.line}`} data-depth={entry.depth}>
+                    <button type="button" onClick={() => revealLine(entry.line)} aria-current={entry.id === activeOutlineId ? 'location' : undefined}>{entry.text || '(untitled heading)'}</button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="markdown-workbench-hint">No headings match that filter.</p>}
+          </>
         ) : <p className="markdown-workbench-hint">No headings yet. Add a line starting with # to build an outline.</p>}
       </details>
 
@@ -764,6 +832,8 @@ export default function MarkdownWorkspace() {
         <summary>Document metrics</summary>
         <dl className="markdown-workbench-metrics">
           <div><dt>Words</dt><dd>{proseMetrics.words}</dd></div>
+          <div><dt>Characters</dt><dd>{proseMetrics.characters}</dd></div>
+          <div><dt>Lines</dt><dd>{source ? source.split(/\r\n|\r|\n/).length : 0}</dd></div>
           <div><dt>Sentences</dt><dd>{proseMetrics.sentences}</dd></div>
           <div><dt>Reading time (estimate)</dt><dd>{proseMetrics.readingMinutes.toFixed(1)} min</dd></div>
           <div><dt>Speaking time (estimate)</dt><dd>{proseMetrics.speakingMinutes.toFixed(1)} min</dd></div>
@@ -826,6 +896,7 @@ export default function MarkdownWorkspace() {
           onChange={(event) => setBibliographyText(event.target.value)}
         />
         <p className="markdown-workbench-hint">Reference a source with <code>[@citekey]</code>. Resolved markers are replaced with formatted citations in the preview and in every export; an unresolved marker is left exactly as written so it stays visible.</p>
+        {citationProblem ? <p className="markdown-workbench-citation-warning" role="alert">{citationProblem}</p> : null}
         {citationResult ? (
           <div className="markdown-workbench-citation-preview">
             {citationResult.unresolved.length > 0 ? (

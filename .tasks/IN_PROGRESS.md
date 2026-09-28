@@ -10,9 +10,11 @@
   - F17 editor-setting accessibility: settings need >=24 CSS-pixel effective targets and the font-size slider needs visible numeric feedback.
   - F18 dark workspace: provide a tool-local dark appearance with readable source/preview syntax and diagrams; exports remain self-contained/light unless their format says otherwise.
   - F19 focus writing: provide a reversible low-chrome writing state without hiding the control needed to exit it.
+  - F20 conventional block shortcuts: Ctrl/Cmd+Shift+7, +8, and +. must match numbered-list, bullet-list, and blockquote toolbar actions.
+  - F21 practical document counts: surface the already-computed character count plus source line count alongside words/sentences/timing.
   - Cross-cutting gate: expand responsive regression evidence beyond the existing 320/390/768/844/1440 matrix, retain keyboard/Axe coverage, and keep source/preview/export behavior green on desktop and mobile Chromium.
   - Baseline: `origin/main` `4685013b261f83408145bed98851d09b0bca752e`; Pages run `36343223865` and focused-tool run `36343223816` are green before this audit. Browser screenshot connector is unavailable in this session, so visual-only claims require repository Playwright/DOM evidence rather than fabricated screenshots.
-  - Scope: `src/tools/markdown/`, Markdown-focused tests, the existing global Markdown CSS block only where required, and additive Markdown task/handoff records. Preserve all unrelated workstreams.
+  - Scope: `src/tools/markdown/`, Markdown-focused tests, the Markdown catalog metadata, the existing global Markdown CSS block only where required, and additive Markdown task/handoff records. Preserve all unrelated workstreams.
 
 - **Audio Mastering Workstation** — local-first audio editing, restoration, mastering, metering, metadata, and export workstream governed by an 81-function ledger.
   - Branch: `claude/music-editing-tool-b9w0pq` (contains all of `feature/audio-mastering-workstation` merged onto current `main` at `95d9028`). Do not continue on `feature/audio-mastering-workstation`; its draft PR #45 is superseded.

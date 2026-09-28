@@ -252,7 +252,7 @@ test('document metrics show characters and lines alongside words and sentences',
   const metrics = await openPanel(page, /^Document metrics/);
   await expect(metrics).toContainText('Characters');
   await expect(metrics).toContainText('Lines');
-  await expect(metrics).toContainText('18');
+  await expect(metrics).toContainText('19');
   await expect(metrics).toContainText('2');
 });
 
