@@ -11,6 +11,8 @@ import {
   addCountedFrenchKnot,
   countedStitchLabel,
   countedThreadFinishedSizeInches,
+  COUNTED_BACKSTITCH_TECHNIQUES,
+  COUNTED_BACKSTITCH_TECHNIQUE_LABELS,
   COUNTED_STITCH_KINDS,
   DEFAULT_COUNTED_THREAD_SETTINGS,
   estimateCountedThreadFlossUsage,
@@ -21,6 +23,7 @@ import {
   setCountedThreadFabricSettings,
   setCountedThreadPaletteIdentity,
   setCountedThreadStitch,
+  type CountedBackstitchTechnique,
   type CountedStitchKind,
 } from './engines/counted-thread-engine';
 import { applyCountedImageResult } from './engines/counted-image-engine';
@@ -65,6 +68,19 @@ const MARK_TEXT: Readonly<Record<CountedStitchKind, string>> = {
   'three-quarter-se': '¾↘',
 };
 
+// FC-41: line style is a chart-legibility aid for telling technique layers apart at a glance,
+// not a claim about how the finished stitch looks on fabric.
+const BACKSTITCH_TECHNIQUE_STROKE_WIDTH: Readonly<Record<CountedBackstitchTechnique, number>> = {
+  backstitch: 0.06,
+  blackwork: 0.09,
+  hardanger: 0.06,
+};
+const BACKSTITCH_TECHNIQUE_DASHARRAY: Readonly<Record<CountedBackstitchTechnique, string | undefined>> = {
+  backstitch: undefined,
+  blackwork: undefined,
+  hardanger: '0.12 0.08',
+};
+
 const pointKey = (row: number, col: number) => `${row}:${col}`;
 
 export function CountedThreadPanel({
@@ -86,6 +102,7 @@ export function CountedThreadPanel({
   const [chartAppearance, setChartAppearance] = useState<CountedChartAppearance>('color-symbols');
   const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
   const [backstitchStart, setBackstitchStart] = useState<{ row: number; col: number } | null>(null);
+  const [backstitchTechnique, setBackstitchTechnique] = useState<CountedBackstitchTechnique>('backstitch');
   const [flossBrand, setFlossBrand] = useState(() => document.palette.find((color) => color.id === selectedColor)?.paletteName ?? '');
   const [flossCode, setFlossCode] = useState(() => document.palette.find((color) => color.id === selectedColor)?.paletteCode ?? '');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -216,8 +233,8 @@ export function CountedThreadPanel({
           return;
         }
         onCommit(
-          addCountedBackstitch(document, backstitchStart, cellPoint, selectedColor),
-          'Added a backstitch line.',
+          addCountedBackstitch(document, backstitchStart, cellPoint, selectedColor, backstitchTechnique),
+          `Added a ${COUNTED_BACKSTITCH_TECHNIQUE_LABELS[backstitchTechnique].toLowerCase()} line.`,
         );
         setBackstitchStart(null);
         return;
@@ -300,6 +317,20 @@ export function CountedThreadPanel({
           <input id="fiber-counted-code" type="text" value={flossCode} onChange={(event) => setFlossCode(event.target.value)} placeholder="e.g. 310" />
         </label>
         <button className="action-button secondary" type="button" onClick={saveFlossIdentity}>Save floss identity</button>
+        {tool === 'backstitch' ? (
+          <label className="fiber-craft-field" htmlFor="fiber-counted-backstitch-technique">
+            <span>Line technique</span>
+            <select
+              id="fiber-counted-backstitch-technique"
+              value={backstitchTechnique}
+              onChange={(event) => setBackstitchTechnique(event.target.value as CountedBackstitchTechnique)}
+            >
+              {COUNTED_BACKSTITCH_TECHNIQUES.map((technique) => (
+                <option key={technique} value={technique}>{COUNTED_BACKSTITCH_TECHNIQUE_LABELS[technique]}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {backstitchStart ? (
           <button
             className="action-button secondary"
@@ -448,11 +479,15 @@ export function CountedThreadPanel({
             {chart.backstitches.map((line) => (
               <line
                 key={line.id}
+                data-testid={`counted-thread-backstitch-${line.id}`}
+                data-technique={line.technique}
                 x1={line.start.col}
                 y1={line.start.row}
                 x2={line.end.col}
                 y2={line.end.row}
                 stroke={paletteById.get(line.colorId)?.hex ?? '#111827'}
+                strokeWidth={BACKSTITCH_TECHNIQUE_STROKE_WIDTH[line.technique]}
+                strokeDasharray={BACKSTITCH_TECHNIQUE_DASHARRAY[line.technique]}
                 vectorEffect="non-scaling-stroke"
               />
             ))}
@@ -527,7 +562,17 @@ export function CountedThreadPanel({
 
       <div className="fiber-counted-summary" data-testid="counted-thread-specialty-summary">
         <span>{chart.knots.length} French {chart.knots.length === 1 ? 'knot' : 'knots'}</span>
-        <span>{chart.backstitches.length} backstitch {chart.backstitches.length === 1 ? 'line' : 'lines'}</span>
+        <span>
+          {chart.backstitches.length} backstitch {chart.backstitches.length === 1 ? 'line' : 'lines'}
+          {chart.backstitches.length > 0 ? (
+            <> ({COUNTED_BACKSTITCH_TECHNIQUES
+              .map((technique) => [technique, chart.backstitches.filter((line) => line.technique === technique).length] as const)
+              .filter(([, count]) => count > 0)
+              .map(([technique, count]) => `${count} ${COUNTED_BACKSTITCH_TECHNIQUE_LABELS[technique].toLowerCase()}`)
+              .join(', ')})
+            </>
+          ) : null}
+        </span>
       </div>
 
       {(chart.knots.length > 0 || chart.backstitches.length > 0) ? (
@@ -549,9 +594,9 @@ export function CountedThreadPanel({
                 key={line.id}
                 className="action-button secondary"
                 type="button"
-                onClick={() => onCommit(removeCountedBackstitch(document, line.id), `Removed backstitch line ${index + 1}.`)}
+                onClick={() => onCommit(removeCountedBackstitch(document, line.id), `Removed ${COUNTED_BACKSTITCH_TECHNIQUE_LABELS[line.technique].toLowerCase()} line ${index + 1}.`)}
               >
-                Remove line {index + 1}
+                Remove {COUNTED_BACKSTITCH_TECHNIQUE_LABELS[line.technique].toLowerCase()} {index + 1}
               </button>
             ))}
           </div>

@@ -196,12 +196,16 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 French knot');
 
     await page.locator('#fiber-counted-tool').selectOption('backstitch');
+    await expect(page.getByLabel('Line technique')).toHaveValue('backstitch');
+    await page.getByLabel('Line technique').selectOption('blackwork');
     await page.getByRole('button', { name: 'Row 2, column 3, empty' }).click();
     await page.getByRole('button', { name: 'Row 3, column 4, empty' }).click();
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 backstitch line');
+    await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 blackwork fill outline');
     const overlay = page.getByTestId('counted-thread-overlay');
     await expect(overlay.locator('circle')).toHaveCount(1);
     await expect(overlay.locator('line')).toHaveCount(1);
+    await expect(overlay.locator('line')).toHaveAttribute('data-technique', 'blackwork');
     await expect(page.getByTestId('chart-description')).toContainText('Counted-thread chart with 12 rows and 12 columns');
 
     const workedFirst = page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ });
@@ -223,6 +227,7 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByRole('button', { name: /Row 1, column 1, Full cross, Primary/ })).toBeVisible();
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 French knot');
     await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 backstitch line');
+    await expect(page.getByTestId('counted-thread-specialty-summary')).toContainText('1 blackwork fill outline');
     await page.getByText('Import image to counted chart', { exact: true }).click();
     const pngBytes = await page.evaluate(async () => {
       const canvas = document.createElement('canvas'); canvas.width = 2; canvas.height = 2;

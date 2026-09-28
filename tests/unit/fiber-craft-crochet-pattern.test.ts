@@ -172,7 +172,7 @@ describe('counted-thread precision grid and generated legend', () => {
     document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', FIXED_TIME);
     document = setCountedThreadStitch(document, 0, 1, 'quarter-ne', 'accent', FIXED_TIME);
     document = addCountedFrenchKnot(document, { row: 1.5, col: 1.5 }, 'contrast', FIXED_TIME);
-    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', FIXED_TIME);
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', 'backstitch', FIXED_TIME);
 
     if (document.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
     expect(document.chart.knots).toHaveLength(1);
@@ -192,7 +192,7 @@ describe('counted-thread precision grid and generated legend', () => {
     expect(() => setCountedThreadStitch(document, -1, 0, 'full-cross', 'primary', FIXED_TIME)).toThrow(/outside/i);
     expect(() => setCountedThreadStitch(document, 0, 0, 'full-cross', 'missing', FIXED_TIME)).toThrow(/palette/i);
     expect(() => addCountedFrenchKnot(document, { row: 0.25, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/half-grid/i);
-    expect(() => addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 0.5, col: 0.5 }, 'primary', FIXED_TIME)).toThrow(/different/i);
+    expect(() => addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 0.5, col: 0.5 }, 'primary', 'backstitch', FIXED_TIME)).toThrow(/different/i);
   });
 });
 

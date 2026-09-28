@@ -12,7 +12,8 @@ export type CountedStitchKind = 'full-cross' | 'half-forward' | 'half-back' | 'q
 export interface CountedThreadCell { readonly row: number; readonly col: number; readonly stitchKind: CountedStitchKind | null; readonly colorId: string | null; }
 export interface CountedThreadPoint { readonly row: number; readonly col: number; }
 export interface CountedFrenchKnot { readonly id: string; readonly point: CountedThreadPoint; readonly colorId: string; }
-export interface CountedBackstitch { readonly id: string; readonly start: CountedThreadPoint; readonly end: CountedThreadPoint; readonly colorId: string; }
+export type CountedBackstitchTechnique = 'backstitch' | 'blackwork' | 'hardanger';
+export interface CountedBackstitch { readonly id: string; readonly start: CountedThreadPoint; readonly end: CountedThreadPoint; readonly colorId: string; readonly technique: CountedBackstitchTechnique; }
 export interface CountedThreadChart { readonly kind: 'counted-thread'; readonly rows: number; readonly cols: number; readonly cells: readonly CountedThreadCell[]; readonly knots: readonly CountedFrenchKnot[]; readonly backstitches: readonly CountedBackstitch[]; }
 export type CountedThreadFabricType = 'aida' | 'linen' | 'evenweave';
 export type CountedThreadStrandCount = 1 | 2 | 3 | 4 | 5 | 6;

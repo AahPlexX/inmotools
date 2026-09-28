@@ -1,4 +1,4 @@
-import { isCountedStitchKind } from './engines/counted-thread-engine';
+import { isCountedBackstitchTechnique, isCountedStitchKind } from './engines/counted-thread-engine';
 import { CROCHET_SYMBOLS } from './engines/symbol-library';
 import type {
   CountedThreadChart,
@@ -123,7 +123,7 @@ const isCountedThreadChart = (value: unknown, paletteIds: ReadonlySet<string>): 
   })) return false;
   const lineIds = new Set<string>();
   return value.backstitches.every((line) => {
-    if (!isRecord(line) || typeof line.id !== 'string' || line.id.trim() === '' || lineIds.has(line.id) || typeof line.colorId !== 'string' || !paletteIds.has(line.colorId) || !isHalfGridPoint(line.start, bounds) || !isHalfGridPoint(line.end, bounds)) return false;
+    if (!isRecord(line) || typeof line.id !== 'string' || line.id.trim() === '' || lineIds.has(line.id) || typeof line.colorId !== 'string' || !paletteIds.has(line.colorId) || !isHalfGridPoint(line.start, bounds) || !isHalfGridPoint(line.end, bounds) || !isCountedBackstitchTechnique(line.technique)) return false;
     const start = line.start as CountedThreadPoint; const end = line.end as CountedThreadPoint;
     if (start.row === end.row && start.col === end.col) return false;
     lineIds.add(line.id); return true;

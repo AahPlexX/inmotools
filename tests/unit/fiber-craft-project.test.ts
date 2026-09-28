@@ -69,7 +69,7 @@ describe('portable Fiber Craft project bundle', () => {
     document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-16T18:01:00.000Z');
     document = setCountedThreadStitch(document, 0, 1, 'quarter-ne', 'accent', '2026-09-16T18:02:00.000Z');
     document = addCountedFrenchKnot(document, { row: 1.5, col: 1.5 }, 'contrast', '2026-09-16T18:03:00.000Z');
-    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', '2026-09-16T18:04:00.000Z');
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 2.5, col: 3.5 }, 'primary', 'backstitch', '2026-09-16T18:04:00.000Z');
     const restored = parseFiberCraftProject(serializeFiberCraftProject(document));
     expect(restored).toEqual(document);
     expect(restored.metadata.discipline).toBe('cross-stitch');
@@ -116,7 +116,7 @@ describe('portable Fiber Craft project bundle', () => {
     document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-28T13:02:00.000Z');
     document = setCountedThreadStitch(document, 0, 1, 'half-forward', 'primary', '2026-09-28T13:03:00.000Z');
     document = addCountedFrenchKnot(document, { row: 2.5, col: 2.5 }, 'accent', '2026-09-28T13:04:00.000Z');
-    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 3.5, col: 4.5 }, 'accent', '2026-09-28T13:05:00.000Z');
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 3.5, col: 4.5 }, 'accent', 'backstitch', '2026-09-28T13:05:00.000Z');
 
     const usage = estimateCountedThreadFlossUsage(document);
     expect(usage.map((entry) => entry.colorId)).toEqual(['primary', 'accent']);
@@ -154,6 +154,34 @@ describe('portable Fiber Craft project bundle', () => {
     expect(DMC_SKEIN_YARDS).toBeCloseTo(8.7, 5);
     expect(() => estimateCountedThreadFlossUsage(createStarterCrochetDocument('2026-09-28T13:08:00.000Z')))
       .toThrow(/counted-thread/);
+  });
+
+  it('tags backstitch lines with a technique layer and rejects an unsupported one (FC-41)', () => {
+    let document = createStarterCountedThreadDocument('2026-09-28T14:00:00.000Z');
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 1.5, col: 1.5 }, 'primary', 'backstitch', '2026-09-28T14:01:00.000Z');
+    document = addCountedBackstitch(document, { row: 2.5, col: 2.5 }, { row: 3.5, col: 2.5 }, 'primary', 'blackwork', '2026-09-28T14:02:00.000Z');
+    document = addCountedBackstitch(document, { row: 4.5, col: 4.5 }, { row: 5.5, col: 5.5 }, 'accent', 'hardanger', '2026-09-28T14:03:00.000Z');
+
+    if (document.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
+    expect(document.chart.backstitches.map((line) => line.technique)).toEqual(['backstitch', 'blackwork', 'hardanger']);
+
+    // Defaults to plain backstitch when no technique is given, so existing callers keep working.
+    const defaulted = addCountedBackstitch(document, { row: 6.5, col: 0.5 }, { row: 7.5, col: 1.5 }, 'primary');
+    if (defaulted.chart.kind !== 'counted-thread') throw new Error('Expected counted-thread chart');
+    expect(defaulted.chart.backstitches.at(-1)?.technique).toBe('backstitch');
+
+    expect(() => addCountedBackstitch(document, { row: 0.5, col: 2.5 }, { row: 1.5, col: 2.5 }, 'primary', 'cutwork' as never))
+      .toThrow(/backstitch, blackwork, or hardanger/i);
+
+    // Round-trips through the portable project bundle without losing the technique tag.
+    const restored = parseFiberCraftProject(serializeFiberCraftProject(document));
+    expect(restored).toEqual(document);
+
+    // FC-40's floss estimate keeps working across every technique, since all three are still a
+    // straight line laid between two half-grid points.
+    const usage = estimateCountedThreadFlossUsage(document);
+    expect(usage.find((entry) => entry.colorId === 'primary')?.estimatedYards).toBeGreaterThan(0);
+    expect(usage.find((entry) => entry.colorId === 'accent')?.estimatedYards).toBeGreaterThan(0);
   });
 
   it('rejects unrelated envelopes and invalid project data', () => {

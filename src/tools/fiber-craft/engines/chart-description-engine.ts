@@ -1,4 +1,4 @@
-import { countedStitchLabel, generateCountedThreadLegend } from './counted-thread-engine';
+import { COUNTED_BACKSTITCH_TECHNIQUE_LABELS, countedStitchLabel, generateCountedThreadLegend } from './counted-thread-engine';
 import { crochetSymbolLabel, type CrochetDialect } from './symbol-library';
 import type { ColorSlot, FiberCraftDocument } from '../fiber-craft-types';
 
@@ -48,7 +48,11 @@ export function describeCountedThreadChart(document: FiberCraftDocument): FiberC
     return `Row ${row + 1}: ${rowWorked.length} worked, ${rowCells.length - rowWorked.length} empty.${stitches}${colors}`;
   });
   const legend = generateCountedThreadLegend(document);
-  return { summary: `Counted-thread chart with ${chart.rows} rows and ${chart.cols} columns. ${plural(worked.length, 'counted stitch')} placed, ${plural(chart.knots.length, 'French knot')}, and ${plural(chart.backstitches.length, 'backstitch line')}.`, details, legend: legend.map((entry) => { const code = [entry.paletteName, entry.code].filter(Boolean).join(' '); return `${entry.symbol}: ${entry.label}${code ? `, ${code}` : ''}, ${plural(entry.usageCount, 'mark')}.`; }) };
+  const techniqueCounts = countValues(chart.backstitches.map((line) => line.technique));
+  const lineText = chart.backstitches.length > 0
+    ? `${plural(chart.backstitches.length, 'backstitch line')} (${formattedCounts(techniqueCounts, (id) => COUNTED_BACKSTITCH_TECHNIQUE_LABELS[id as keyof typeof COUNTED_BACKSTITCH_TECHNIQUE_LABELS].toLowerCase())})`
+    : plural(chart.backstitches.length, 'backstitch line');
+  return { summary: `Counted-thread chart with ${chart.rows} rows and ${chart.cols} columns. ${plural(worked.length, 'counted stitch')} placed, ${plural(chart.knots.length, 'French knot')}, and ${lineText}.`, details, legend: legend.map((entry) => { const code = [entry.paletteName, entry.code].filter(Boolean).join(' '); return `${entry.symbol}: ${entry.label}${code ? `, ${code}` : ''}, ${plural(entry.usageCount, 'mark')}.`; }) };
 }
 
 export function describeFiberCraftChart(document: FiberCraftDocument, dialect: CrochetDialect): FiberChartTextDescription {

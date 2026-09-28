@@ -2,6 +2,7 @@ import {
   createEmptyMetadata,
   type ColorSlot,
   type CountedBackstitch,
+  type CountedBackstitchTechnique,
   type CountedFrenchKnot,
   type CountedStitchKind,
   type CountedThreadCell,
@@ -12,7 +13,29 @@ import {
   type FiberCraftDocument,
 } from '../fiber-craft-types';
 
-export type { CountedStitchKind, CountedThreadPoint } from '../fiber-craft-types';
+export type { CountedBackstitchTechnique, CountedStitchKind, CountedThreadPoint } from '../fiber-craft-types';
+
+// --- FC-41: backstitch & specialty-technique layer ---
+// The counted grid already carries a single flat `backstitches` layer (used since FC-35). FC-41
+// tags each line with which technique it belongs to so backstitch, blackwork (geometric backstitch
+// fill patterns), and hardanger (pulled/openwork outlines) can be told apart on the chart, in the
+// legend, and in the specialty-mark cleanup list, without changing how a line's length or floss
+// usage (FC-40) is computed — all three are still worked as a straight line between two half-grid
+// points, so no additional geometry is assumed.
+export const COUNTED_BACKSTITCH_TECHNIQUES = [
+  'backstitch',
+  'blackwork',
+  'hardanger',
+] as const satisfies readonly CountedBackstitchTechnique[];
+
+export const COUNTED_BACKSTITCH_TECHNIQUE_LABELS: Readonly<Record<CountedBackstitchTechnique, string>> = {
+  backstitch: 'Backstitch outline',
+  blackwork: 'Blackwork fill outline',
+  hardanger: 'Hardanger pulled-thread outline',
+};
+
+export const isCountedBackstitchTechnique = (value: unknown): value is CountedBackstitchTechnique =>
+  typeof value === 'string' && (COUNTED_BACKSTITCH_TECHNIQUES as readonly string[]).includes(value);
 
 export const COUNTED_STITCH_KINDS = [
   'full-cross',
@@ -341,6 +364,7 @@ export const addCountedBackstitch = (
   start: CountedThreadPoint,
   end: CountedThreadPoint,
   colorId: string,
+  technique: CountedBackstitchTechnique = 'backstitch',
   now = new Date().toISOString(),
 ): FiberCraftDocument => {
   const chart = requireChart(document);
@@ -350,11 +374,15 @@ export const addCountedBackstitch = (
   if (start.row === end.row && start.col === end.col) {
     throw new Error('Backstitch endpoints must be different.');
   }
+  if (!isCountedBackstitchTechnique(technique)) {
+    throw new Error('Choose backstitch, blackwork, or hardanger for this line.');
+  }
   const line: CountedBackstitch = {
     id: `backstitch:${chart.backstitches.length + 1}`,
     start: { ...start },
     end: { ...end },
     colorId,
+    technique,
   };
   return withChart(document, { ...chart, backstitches: [...chart.backstitches, line] }, now);
 };
