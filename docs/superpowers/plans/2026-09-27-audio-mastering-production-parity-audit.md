@@ -47,6 +47,7 @@ Primary/first-party sources reviewed on 2026-09-27:
   - https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/processorerror_event
   - https://developer.mozilla.org/en-US/docs/Web/CSS/overflow
   - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/number
+  - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/inputmode
   - https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum
   - https://www.w3.org/WAI/standards-guidelines/act/rules/0ssw9k/
 
@@ -132,7 +133,8 @@ Primary/first-party sources reviewed on 2026-09-27:
     - Edit gain/normalization/silence, exact selection times, Time & Pitch parameters, all Repair parameters, Meters peak threshold, Sample Pen index/value, and spectrogram attenuation now use one draft-safe field behavior.
     - Complete in-range numbers update local previews immediately; empty/intermediate or out-of-range drafts do not become processing state; Enter/blur commits a bounded value and Escape restores the committed value.
     - Direct range/select controls remain native because they already emit constrained values.
-    - Browser coverage physically types negative decimal values and checks an out-of-range clamp instead of relying only on programmatic `fill()`.
+    - Signed ranges request a standard text keyboard instead of a decimal keypad because current platform guidance explicitly notes that decimal/numeric virtual keyboards may omit the minus key; nonnegative ranges keep the decimal keypad hint.
+    - Browser coverage physically types negative decimal values, checks signed/nonnegative `inputmode` hints, and verifies an out-of-range clamp instead of relying only on programmatic `fill()`.
 
 17. **The smallest authored informational text was unnecessarily dense for compact devices.**
     - Timeline lane labels, clip labels, and report headers were the only 11px mastering text found in the branch-wide CSS scan; they are now 12px with slightly more line height.
