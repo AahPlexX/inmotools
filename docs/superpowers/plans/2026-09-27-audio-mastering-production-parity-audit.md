@@ -45,6 +45,7 @@ Primary/first-party sources reviewed on 2026-09-27:
 - Platform/accessibility references used by the audit:
   - https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/processorerror_event
   - https://developer.mozilla.org/en-US/docs/Web/CSS/overflow
+  - https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/number
   - https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum
   - https://www.w3.org/WAI/standards-guidelines/act/rules/0ssw9k/
 
@@ -58,11 +59,16 @@ Primary/first-party sources reviewed on 2026-09-27:
 
 2. **Fatal DSP Web Worker failure was not a first-class workspace state.**
    - The client now surfaces worker `error` and `messageerror` once, rejects pending work, and cleans a synchronous `postMessage` failure.
+   - Worker construction/startup failures are caught by the workspace instead of escaping the React effect; an empty tool now explains the failure and disables audio import until reload.
    - The workspace fails closed for DSP-dependent edits/import/restore, explains that local processing stopped, and keeps project-backup export available so work can be rescued.
    - Opening a backup is disabled after fatal DSP failure because that operation also needs the failed worker.
+   - Browser regressions cover both a worker that crashes after audio loads and a browser context where Worker construction is blocked.
 
-3. **Superseded project/import operations could leave newly decoded PCM registered in the worker.**
+3. **Project/import replacement was not fully transactional.**
    - Superseded restore/import paths now release worker sources they introduced.
+   - Reopening a backup whose source ids matched the live project could overwrite live worker PCM before all backup sources had decoded, then report that the current project was unchanged if a later source failed.
+   - Restored sources are now staged under fresh worker ids, the restored document is remapped to those ids, and old live sources are released only after every staged source succeeds. A failed restore releases only staged sources.
+   - Browser coverage creates a two-source backup, corrupts the second source, and proves the first restore source uses a fresh id and is released on failure.
    - Drag/drop and project-level file operations are serialized so incompatible operations do not race.
 
 4. **Reference replacement had a last-operation-wins race.**
@@ -117,7 +123,24 @@ Primary/first-party sources reviewed on 2026-09-27:
 
 15. **Task documentation still described the already-merged workstation as awaiting PR #81 integration.**
     - `.tasks/IN_PROGRESS.md` now tracks this post-merge audit against the exact merged baseline.
-    - The historical completion plan will receive an additive post-merge closure note after the final audit merge; its original feature history must remain intact.
+    - The historical completion plan has an additive status notice marking PR #81 as integrated history and points to this audit; its original evidence remains intact.
+    - Final branch/main validation evidence will be appended at closure rather than rewriting prior records.
+
+16. **Free-form numeric controls mixed browser constraint validation with application state and produced brittle typing.**
+    - HTML `min`/`max` marks manually entered out-of-range numbers invalid, but does not prevent such text from being entered; processing state now enforces bounds at the shared field seam instead of assuming attributes are business logic.
+    - Edit gain/normalization/silence, exact selection times, Time & Pitch parameters, all Repair parameters, Meters peak threshold, Sample Pen index/value, and spectrogram attenuation now use one draft-safe field behavior.
+    - Complete in-range numbers update local previews immediately; empty/intermediate or out-of-range drafts do not become processing state; Enter/blur commits a bounded value and Escape restores the committed value.
+    - Direct range/select controls remain native because they already emit constrained values.
+    - Browser coverage physically types negative decimal values and checks an out-of-range clamp instead of relying only on programmatic `fill()`.
+
+17. **The smallest authored informational text was unnecessarily dense for compact devices.**
+    - Timeline lane labels, clip labels, and report headers were the only 11px mastering text found in the branch-wide CSS scan; they are now 12px with slightly more line height.
+    - Browser coverage guards a 12px authored informational-text floor for those surfaces. This is a product legibility rule, not a claim that WCAG defines a 12px minimum.
+
+18. **Mastering/loudness guidance still contained technically overconfident delivery language.**
+    - Limiter help now explains that the true-peak ceiling applies before later sample-rate conversion/lossy encoding and that decoded peaks can move slightly.
+    - “Render and measure” now states that it measures project-rate rendered PCM, not the final resampled/lossy file.
+    - Loudness presets are explicitly comparison references rather than universal streaming/delivery requirements.
 
 ### Verified clean / no repair warranted
 
