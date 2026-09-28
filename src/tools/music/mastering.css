@@ -141,7 +141,7 @@
 .mastering-spectrogram-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
 .mastering-spectrogram-view { position:relative; border:1px solid var(--line-strong); border-radius:var(--radius); overflow:hidden; background:#04040f; }
 .mastering-spectrogram-base, .mastering-spectrogram-overlay { display:block; width:100%; }
-.mastering-spectrogram-overlay { position:absolute; inset:0; touch-action:pan-y; }
+.mastering-spectrogram-overlay { position:absolute; inset:0; }
 .mastering-spectrogram-toggle { justify-self:start; margin-top:-8px; }
 .mastering-paint-tools { display:grid; gap:8px; }
 
