@@ -185,7 +185,7 @@ export default function MasteringWorkspace() {
       setDspFailure(message);
       setRendering(false);
       setSpectrogramLoading(false);
-      setStatus(`The audio processing worker stopped unexpectedly: ${message} Save a project backup, then reload this page to restart local audio processing.`);
+      setStatus(`The audio processing worker stopped unexpectedly: ${message} Reload this page to restart local audio processing. If a project is open, save a project backup first.`);
     };
     let client: MasteringDspClient;
     try {
