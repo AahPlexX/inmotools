@@ -364,7 +364,7 @@ export default function MasteringExportTab({ ctx, active }: { ctx: MasteringPane
         <h3 id="export-report-heading">Last export</h3>
         <p>Measured on the rendered PCM submitted to the encoder. Lossy codecs can change decoded peaks and loudness slightly, so this is pre-codec mastering telemetry rather than a post-codec compliance measurement.</p>
       </div></div>
-      <div className="mastering-table-scroll">
+      <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Last export loudness report">
         <table className="mastering-report">
           <caption className="visually-hidden">Loudness of each exported file</caption>
           <thead><tr><th scope="col">File</th><th scope="col">Integrated</th><th scope="col">Range</th><th scope="col">True peak</th><th scope="col">Spectrum</th></tr></thead>
