@@ -689,6 +689,13 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     await expect(panel).toBeVisible();
     await panel.locator('details').evaluateAll((elements) => elements.forEach((element) => { (element as HTMLDetailsElement).open = true; }));
     await assertTouchTargets(tab);
+    const scrollRegions = panel.locator('.mastering-table-scroll:visible');
+    for (let index = 0; index < await scrollRegions.count(); index += 1) {
+      const region = scrollRegions.nth(index);
+      await expect(region).toHaveAttribute('tabindex', '0');
+      await expect(region).toHaveAttribute('role', 'region');
+      await expect(region).toHaveAttribute('aria-label', /\S+/);
+    }
     await scan(tab);
   }
 });
