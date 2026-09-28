@@ -675,6 +675,15 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     { name: 'pad.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 44_100, 110) },
   ]);
   await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+  const assertMinimumAuthoredText = async (label: string) => {
+    const undersizedText = await page.locator('.mastering-lane-name, .mastering-clip span, .mastering-report thead th').evaluateAll((elements) =>
+      elements
+        .filter((element) => (element as HTMLElement).offsetParent !== null)
+        .map((element) => ({ text: (element.textContent ?? '').trim().slice(0, 80), size: Number.parseFloat(getComputedStyle(element).fontSize) }))
+        .filter((entry) => entry.size < 12),
+    );
+    expect(undersizedText, `${label} has authored informational text below the workstation's 12px floor`).toEqual([]);
+  };
   const assertTouchTargets = async (label: string) => {
     const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number, .mastering-workspace input[type="range"]').evaluateAll((elements) =>
       elements
@@ -691,6 +700,7 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     await expect(panel).toBeVisible();
     await panel.locator('details').evaluateAll((elements) => elements.forEach((element) => { (element as HTMLDetailsElement).open = true; }));
     await assertTouchTargets(tab);
+    await assertMinimumAuthoredText(tab);
     const scrollRegions = panel.locator('.mastering-table-scroll:visible');
     for (let index = 0; index < await scrollRegions.count(); index += 1) {
       const region = scrollRegions.nth(index);
