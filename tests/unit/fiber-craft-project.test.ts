@@ -6,6 +6,8 @@ import {
   addCountedFrenchKnot,
   countedThreadFinishedSizeInches,
   createStarterCountedThreadDocument,
+  DMC_SKEIN_YARDS,
+  estimateCountedThreadFlossUsage,
   findCountedThreadConfettiCells,
   setCountedThreadFabricSettings,
   setCountedThreadStitch,
@@ -81,6 +83,7 @@ describe('portable Fiber Craft project bundle', () => {
       fabricCount: 28,
       stitchOver: 2,
       confettiWarningsEnabled: true,
+      strandCount: 2,
     }, '2026-09-27T20:11:00.000Z');
     document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-27T20:12:00.000Z');
     document = setCountedThreadStitch(document, 0, 1, 'full-cross', 'primary', '2026-09-27T20:13:00.000Z');
@@ -91,6 +94,7 @@ describe('portable Fiber Craft project bundle', () => {
       fabricCount: 28,
       stitchOver: 2,
       confettiWarningsEnabled: true,
+      strandCount: 2,
     });
     expect(countedThreadFinishedSizeInches(document)).toEqual({
       width: 12 / 14,
@@ -98,6 +102,58 @@ describe('portable Fiber Craft project bundle', () => {
     });
     expect(findCountedThreadConfettiCells(document).map(({ row, col }) => [row, col])).toEqual([[5, 5]]);
     expect(parseFiberCraftProject(serializeFiberCraftProject(document))).toEqual(document);
+  });
+
+  it('estimates floss yardage and whole-skein counts per color from fabric count, stitches, and strand count (FC-40)', () => {
+    let document = createStarterCountedThreadDocument('2026-09-28T13:00:00.000Z');
+    document = setCountedThreadFabricSettings(document, {
+      fabricType: 'aida',
+      fabricCount: 14,
+      stitchOver: 1,
+      confettiWarningsEnabled: true,
+      strandCount: 2,
+    }, '2026-09-28T13:01:00.000Z');
+    document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-28T13:02:00.000Z');
+    document = setCountedThreadStitch(document, 0, 1, 'half-forward', 'primary', '2026-09-28T13:03:00.000Z');
+    document = addCountedFrenchKnot(document, { row: 2.5, col: 2.5 }, 'accent', '2026-09-28T13:04:00.000Z');
+    document = addCountedBackstitch(document, { row: 0.5, col: 0.5 }, { row: 3.5, col: 4.5 }, 'accent', '2026-09-28T13:05:00.000Z');
+
+    const usage = estimateCountedThreadFlossUsage(document);
+    expect(usage.map((entry) => entry.colorId)).toEqual(['primary', 'accent']);
+
+    const primary = usage.find((entry) => entry.colorId === 'primary')!;
+    expect(primary.stitchUnits).toBeCloseTo(1.5, 10);
+    expect(primary.knotCount).toBe(0);
+    expect(primary.estimatedYards).toBeGreaterThan(0);
+    expect(primary.skeinsNeeded).toBe(1);
+
+    const accent = usage.find((entry) => entry.colorId === 'accent')!;
+    expect(accent.stitchUnits).toBe(0);
+    expect(accent.knotCount).toBe(1);
+    expect(accent.estimatedYards).toBeGreaterThan(0);
+    expect(accent.skeinsNeeded).toBeGreaterThanOrEqual(1);
+
+    // Doubling the strand count roughly doubles skein-material consumed for the same stitched path.
+    const doubledStrands = setCountedThreadFabricSettings(document, {
+      ...document.settings!.countedThread!,
+      strandCount: 4,
+    }, '2026-09-28T13:06:00.000Z');
+    const doubledUsage = estimateCountedThreadFlossUsage(doubledStrands);
+    const doubledPrimary = doubledUsage.find((entry) => entry.colorId === 'primary')!;
+    expect(doubledPrimary.estimatedYards).toBeCloseTo(primary.estimatedYards * 2, 5);
+
+    // A finer fabric count uses less physical thread per stitch than a coarser one.
+    const finerFabric = setCountedThreadFabricSettings(document, {
+      ...document.settings!.countedThread!,
+      fabricCount: 28,
+    }, '2026-09-28T13:07:00.000Z');
+    const finerUsage = estimateCountedThreadFlossUsage(finerFabric);
+    const finerPrimary = finerUsage.find((entry) => entry.colorId === 'primary')!;
+    expect(finerPrimary.estimatedYards).toBeLessThan(primary.estimatedYards);
+
+    expect(DMC_SKEIN_YARDS).toBeCloseTo(8.7, 5);
+    expect(() => estimateCountedThreadFlossUsage(createStarterCrochetDocument('2026-09-28T13:08:00.000Z')))
+      .toThrow(/counted-thread/);
   });
 
   it('rejects unrelated envelopes and invalid project data', () => {
