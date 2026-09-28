@@ -8,6 +8,7 @@ import {
   type CountedThreadChart,
   type CountedThreadPoint,
   type CountedThreadProjectSettings,
+  type CountedThreadStrandCount,
   type FiberCraftDocument,
 } from '../fiber-craft-types';
 
@@ -71,7 +72,47 @@ export const DEFAULT_COUNTED_THREAD_SETTINGS: CountedThreadProjectSettings = {
   fabricCount: 14,
   stitchOver: 1,
   confettiWarningsEnabled: true,
+  strandCount: 2,
 };
+
+// --- FC-40: floss skein & length estimate constants ---
+// DMC's own official product specification (dmc.com, Mouliné Spécial embroidery floss,
+// verified 2026-09-28) states each skein holds 8 m / 8.7 yd of 6-strand cotton. This figure is
+// a manufacturer-published fact, not an estimate, and is reused as-is.
+export const DMC_SKEIN_YARDS = 8.7;
+const SKEIN_STRAND_COUNT = 6;
+
+// The physical thread length a single full cross stitch consumes on N-count fabric has no
+// single manufacturer-published value: independent cross-stitch planning calculators were
+// checked as of 2026-09-28 and disagreed with each other by roughly 2x (some ~13.8/N in.,
+// others ~7/N in., per full cross at 2 strands). No official standards body publishes this
+// figure, so it cannot be pinned to a single authoritative source the way the skein length
+// above can be. This constant is therefore a clearly-labeled planning estimate derived from
+// the geometrically self-consistent side of that research (a constant length-per-stitch times
+// 1/fabricCount held across every count in that source's table), not an asserted manufacturer
+// fact. Real consumption varies with individual stitching technique (parking vs. away-waste
+// knots, tail length, travel between stitches); the 20% safety margin below is a common
+// convention across the calculators reviewed and exists specifically to absorb that variance.
+const ESTIMATED_INCHES_PER_FULL_STITCH_AT_COUNT_1 = 13.78;
+const ESTIMATED_INCHES_PER_FRENCH_KNOT = 0.4;
+const FLOSS_SAFETY_MARGIN = 1.2;
+
+const STITCH_LENGTH_WEIGHT: Readonly<Record<CountedStitchKind, number>> = {
+  'full-cross': 1,
+  'half-forward': 0.5,
+  'half-back': 0.5,
+  'quarter-nw': 0.25,
+  'quarter-ne': 0.25,
+  'quarter-sw': 0.25,
+  'quarter-se': 0.25,
+  'three-quarter-nw': 0.75,
+  'three-quarter-ne': 0.75,
+  'three-quarter-sw': 0.75,
+  'three-quarter-se': 0.75,
+};
+
+export const isCountedThreadStrandCount = (value: unknown): value is CountedThreadStrandCount =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 6;
 
 export const isCountedStitchKind = (value: unknown): value is CountedStitchKind =>
   typeof value === 'string' && (COUNTED_STITCH_KINDS as readonly string[]).includes(value);
@@ -186,6 +227,9 @@ export const setCountedThreadFabricSettings = (
   }
   if (settings.stitchOver !== 1 && settings.stitchOver !== 2) {
     throw new Error('Stitch-over must be one or two fabric threads.');
+  }
+  if (!isCountedThreadStrandCount(settings.strandCount)) {
+    throw new Error('Strand count must be a whole number from 1 to 6.');
   }
   const normalized: CountedThreadProjectSettings = {
     ...settings,
@@ -377,4 +421,72 @@ export const generateCountedThreadLegend = (
       usageCount: usage.get(color.id)!,
     }]
     : []);
+};
+
+// FC-40: floss skein & length calculator. See the constants above for the exact provenance of
+// each figure used here (DMC's published skein length is a manufacturer fact; the per-stitch
+// length is a documented planning estimate, not a manufacturer spec).
+export interface CountedThreadFlossUsageEntry {
+  readonly colorId: string;
+  readonly label: string;
+  readonly code?: string;
+  readonly paletteName?: string;
+  readonly symbol: string;
+  readonly stitchUnits: number;
+  readonly knotCount: number;
+  readonly estimatedInches: number;
+  readonly estimatedYards: number;
+  readonly skeinsNeeded: number;
+}
+
+export const estimateCountedThreadFlossUsage = (
+  document: FiberCraftDocument,
+): readonly CountedThreadFlossUsageEntry[] => {
+  const chart = requireChart(document);
+  const settings = countedSettings(document);
+  const perStitchInches = (ESTIMATED_INCHES_PER_FULL_STITCH_AT_COUNT_1 / settings.fabricCount) * settings.stitchOver;
+  const gridSpacingInches = settings.stitchOver / settings.fabricCount;
+  const skeinFractionPerInchLaid = settings.strandCount / SKEIN_STRAND_COUNT;
+
+  const stitchUnitsByColor = new Map<string, number>();
+  for (const cell of chart.cells) {
+    if (!cell.stitchKind || !cell.colorId) continue;
+    stitchUnitsByColor.set(
+      cell.colorId,
+      (stitchUnitsByColor.get(cell.colorId) ?? 0) + STITCH_LENGTH_WEIGHT[cell.stitchKind],
+    );
+  }
+  const knotCountByColor = new Map<string, number>();
+  for (const knot of chart.knots) {
+    knotCountByColor.set(knot.colorId, (knotCountByColor.get(knot.colorId) ?? 0) + 1);
+  }
+  const backstitchInchesByColor = new Map<string, number>();
+  for (const line of chart.backstitches) {
+    const dRow = line.end.row - line.start.row;
+    const dCol = line.end.col - line.start.col;
+    const lengthInches = Math.sqrt(dRow * dRow + dCol * dCol) * gridSpacingInches;
+    backstitchInchesByColor.set(line.colorId, (backstitchInchesByColor.get(line.colorId) ?? 0) + lengthInches);
+  }
+
+  return generateCountedThreadLegend(document).map((entry) => {
+    const stitchUnits = stitchUnitsByColor.get(entry.colorId) ?? 0;
+    const knotCount = knotCountByColor.get(entry.colorId) ?? 0;
+    const laidInches = stitchUnits * perStitchInches
+      + knotCount * ESTIMATED_INCHES_PER_FRENCH_KNOT
+      + (backstitchInchesByColor.get(entry.colorId) ?? 0);
+    const estimatedInches = laidInches * skeinFractionPerInchLaid * FLOSS_SAFETY_MARGIN;
+    const estimatedYards = estimatedInches / 36;
+    return {
+      colorId: entry.colorId,
+      label: entry.label,
+      code: entry.code,
+      paletteName: entry.paletteName,
+      symbol: entry.symbol,
+      stitchUnits,
+      knotCount,
+      estimatedInches,
+      estimatedYards,
+      skeinsNeeded: estimatedYards > 0 ? Math.ceil(estimatedYards / DMC_SKEIN_YARDS) : 0,
+    };
+  });
 };

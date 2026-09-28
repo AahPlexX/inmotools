@@ -15,7 +15,8 @@ export interface CountedFrenchKnot { readonly id: string; readonly point: Counte
 export interface CountedBackstitch { readonly id: string; readonly start: CountedThreadPoint; readonly end: CountedThreadPoint; readonly colorId: string; }
 export interface CountedThreadChart { readonly kind: 'counted-thread'; readonly rows: number; readonly cols: number; readonly cells: readonly CountedThreadCell[]; readonly knots: readonly CountedFrenchKnot[]; readonly backstitches: readonly CountedBackstitch[]; }
 export type CountedThreadFabricType = 'aida' | 'linen' | 'evenweave';
-export interface CountedThreadProjectSettings { readonly fabricType: CountedThreadFabricType; readonly fabricCount: number; readonly stitchOver: 1 | 2; readonly confettiWarningsEnabled: boolean; }
+export type CountedThreadStrandCount = 1 | 2 | 3 | 4 | 5 | 6;
+export interface CountedThreadProjectSettings { readonly fabricType: CountedThreadFabricType; readonly fabricCount: number; readonly stitchOver: 1 | 2; readonly confettiWarningsEnabled: boolean; readonly strandCount: CountedThreadStrandCount; }
 export type VectorStitchKind = 'running' | 'triple' | 'satin' | 'tatami' | 'placement' | 'tackdown';
 export interface VectorPathPoint { readonly x: number; readonly y: number; }
 export interface VectorStitchPath { readonly id: string; readonly kind: VectorStitchKind; readonly points: readonly VectorPathPoint[]; readonly colorId: string; readonly density?: number; readonly pullCompensation?: number; readonly underlay?: 'edge-walk' | 'center-walk' | 'zigzag' | 'none'; }
