@@ -95,6 +95,20 @@ test('point collections preview as separate points and linked view works without
  expect(accessibility.violations.filter((item)=>item.impact==='serious'||item.impact==='critical')).toEqual([]);
 });
 
+test('a large first geometry does not hide later features in the preview',async({page})=>{
+ await page.goto('./#/tools/geojson-simplifier');
+ const line=Array.from({length:10000},(_,index)=>[index/100,Math.sin(index/1000)]);
+ const source={type:'FeatureCollection',features:[
+   {type:'Feature',properties:{name:'Long route'},geometry:{type:'LineString',coordinates:line}},
+   {type:'Feature',properties:{name:'Isolated site'},geometry:{type:'Point',coordinates:[120,2]}},
+ ]};
+ await page.locator('#geo-file').setInputFiles({name:'mixed.geojson',mimeType:'application/geo+json',buffer:Buffer.from(JSON.stringify(source))});
+ const preview=page.getByRole('img',{name:'Original GeoJSON geometry preview'});
+ await expect(preview.locator('path')).toHaveCount(1);
+ await expect(preview.locator('circle')).toHaveCount(1);
+ await expect(page.getByText(/Preview sampled at most 5,000 positions/)).toBeVisible();
+});
+
 test('Stop terminates an in-flight worker and leaves no downloadable partial result',async({page})=>{
  await page.addInitScript(()=>{
    (window as typeof window & {geoWorkerTerminated:boolean}).geoWorkerTerminated=false;
