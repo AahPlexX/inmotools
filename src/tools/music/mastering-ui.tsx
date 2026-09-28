@@ -37,6 +37,7 @@ export const newId = (prefix: string) => typeof crypto !== 'undefined' && 'rando
   : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 interface CommitNumberFieldProps {
+  id?: string;
   label: string;
   value: number;
   onCommit: (value: number) => void;
@@ -50,8 +51,9 @@ interface CommitNumberFieldProps {
   digits?: number;
 }
 
-export function CommitNumberField({ label, value, onCommit, min, max, step = 0.1, disabled, suffix, hint, digits = 3 }: CommitNumberFieldProps) {
-  const id = useId();
+export function CommitNumberField({ id: providedId, label, value, onCommit, min, max, step = 0.1, disabled, suffix, hint, digits = 3 }: CommitNumberFieldProps) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
   const shown = Number.isFinite(value) ? String(Number(value.toFixed(digits))) : '0';
   const [draft, setDraft] = useState(shown);
   useEffect(() => { setDraft(shown); }, [shown]);
