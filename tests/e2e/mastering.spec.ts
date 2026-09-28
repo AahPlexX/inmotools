@@ -149,8 +149,15 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await expect(page.getByRole('heading', { name: 'Regions' })).toBeVisible();
   await expect(page.getByLabel('Region 1 name')).toHaveValue('Verse A');
 
-  await page.getByLabel('Gain to apply (dB)').fill('6');
+  const gainInput = page.getByLabel('Gain to apply (dB)');
+  await gainInput.click();
+  await gainInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await gainInput.press('Backspace');
+  await gainInput.pressSequentially('-3.5');
+  await gainInput.press('Enter');
+  await expect(gainInput).toHaveValue('-3.5');
   await page.getByRole('button', { name: 'Apply gain' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Applied -3\.5 dB gain/);
   const levelPanel = page.locator('.mastering-panel').filter({ hasText: 'Level operations' });
   await expect(levelPanel.getByLabel('Clip edits')).toHaveText('1');
 
@@ -291,9 +298,15 @@ test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and 
   await expect(page.getByText(/voice\.wav: 0:02\.000 → 0:03\.000/)).toBeVisible();
   await page.getByRole('button', { name: 'Apply time stretch' }).click();
   await expect(page.getByLabel('Visible range')).toHaveText(/0:03\.000$/, { timeout: 20_000 });
-  await page.getByLabel('Semitones (−24 to 24)').fill('3');
+  const semitonesInput = page.getByLabel('Semitones (−24 to 24)');
+  await semitonesInput.click();
+  await semitonesInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await semitonesInput.press('Backspace');
+  await semitonesInput.pressSequentially('-7');
+  await semitonesInput.press('Enter');
+  await expect(semitonesInput).toHaveValue('-7');
   await page.getByRole('button', { name: 'Apply pitch shift' }).click();
-  await expect(page.locator('.status-line')).toContainText(/Shifted pitch by 3 semitones with formants preserved/);
+  await expect(page.locator('.status-line')).toContainText(/Shifted pitch by -7 semitones with formants preserved/);
   await expect(page.locator('.mastering-busy')).toHaveCount(0, { timeout: 30_000 });
 
   await page.getByRole('tab', { name: 'Edit', exact: true }).click();
@@ -364,6 +377,16 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
   await open('Plosive control');
   await page.getByRole('button', { name: 'Soften plosives' }).click();
   await open('De-esser');
+  const essThreshold = page.getByLabel('Threshold (dB, −60–0)');
+  await essThreshold.click();
+  await essThreshold.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await essThreshold.press('Backspace');
+  await essThreshold.pressSequentially('-31.5');
+  await essThreshold.press('Enter');
+  await expect(essThreshold).toHaveValue('-31.5');
+  await essThreshold.fill('-999');
+  await essThreshold.press('Enter');
+  await expect(essThreshold).toHaveValue('-60');
   await page.getByRole('button', { name: 'De-ess' }).click();
   await open('Hiss gate');
   await page.getByRole('button', { name: 'Gate hiss' }).click();
