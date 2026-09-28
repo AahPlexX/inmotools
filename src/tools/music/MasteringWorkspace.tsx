@@ -178,7 +178,7 @@ export default function MasteringWorkspace() {
 
   useEffect(() => {
     mountedRef.current = true;
-    const client = new MasteringDspClient((error) => {
+    const reportFailure = (error: unknown) => {
       const message = messageOf(error);
       dspFailureRef.current = message;
       if (!mountedRef.current) return;
@@ -186,8 +186,15 @@ export default function MasteringWorkspace() {
       setRendering(false);
       setSpectrogramLoading(false);
       setStatus(`The audio processing worker stopped unexpectedly: ${message} Save a project backup, then reload this page to restart local audio processing.`);
-    });
-    clientRef.current = client;
+    };
+    let client: MasteringDspClient;
+    try {
+      client = new MasteringDspClient(reportFailure);
+      clientRef.current = client;
+    } catch (error) {
+      reportFailure(error);
+      return () => { mountedRef.current = false; clientRef.current = null; };
+    }
     return () => {
       mountedRef.current = false;
       clientRef.current = null;
