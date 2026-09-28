@@ -35,6 +35,7 @@
 .mastering-check { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding-inline:6px; font-size:13px; font-weight:700; }
 .mastering-check input { inline-size:18px; block-size:18px; }
 .mastering-time { margin-left:auto; min-width:94px; font:700 13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-align:right; }
+.mastering-transport-note { color:var(--muted); font-size:12px; line-height:1.35; }
 .mastering-shortcuts { margin:-8px 2px 0; color:var(--muted); font-size:12px; line-height:1.45; }
 .mastering-shortcuts summary { cursor:pointer; font-weight:700; color:var(--ink); min-height:44px; display:flex; align-items:center; }
 .mastering-shortcuts dl { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:6px 16px; margin:8px 0; }
