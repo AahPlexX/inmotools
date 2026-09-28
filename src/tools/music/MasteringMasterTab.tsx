@@ -242,17 +242,19 @@ export default function MasteringMasterTab({ ctx, master, onPreview, onCommit, p
     <section className="mastering-panel" aria-labelledby="render-heading">
       <div className="mastering-panel-heading"><div><h3 id="render-heading">Render and measure</h3><p>Runs the whole chain offline at full quality, exactly as export will, and measures the result.</p></div></div>
       <div className="button-row"><button type="button" disabled={disabled || Boolean(busy)} onClick={() => void measure()}>Render and measure master</button>{busy && <span className="mastering-busy" role="status">{busy}</span>}</div>
-      {report && <table className="mastering-report">
-        <caption>Mix before and after the master chain (rendered in {report.seconds.toFixed(1)} s)</caption>
-        <thead><tr><th scope="col">Measure</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Integrated loudness</th><td>{fmtDb(report.before.integrated)} LUFS</td><td>{fmtDb(report.after.integrated)} LUFS</td></tr>
-          <tr><th scope="row">Loudness range</th><td>{report.before.loudnessRange.toFixed(1)} LU</td><td>{report.after.loudnessRange.toFixed(1)} LU</td></tr>
-          <tr><th scope="row">Max true peak</th><td>{fmtDb(report.before.maxTruePeakDb)} dBTP</td><td>{fmtDb(report.after.maxTruePeakDb)} dBTP</td></tr>
-          <tr><th scope="row">Max momentary</th><td>{fmtDb(report.before.maxMomentary)} LUFS</td><td>{fmtDb(report.after.maxMomentary)} LUFS</td></tr>
-          <tr><th scope="row">Max short-term</th><td>{fmtDb(report.before.maxShortTerm)} LUFS</td><td>{fmtDb(report.after.maxShortTerm)} LUFS</td></tr>
-        </tbody>
-      </table>}
+      {report && <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Before and after master measurements">
+        <table className="mastering-report">
+          <caption>Mix before and after the master chain (rendered in {report.seconds.toFixed(1)} s)</caption>
+          <thead><tr><th scope="col">Measure</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Integrated loudness</th><td>{fmtDb(report.before.integrated)} LUFS</td><td>{fmtDb(report.after.integrated)} LUFS</td></tr>
+            <tr><th scope="row">Loudness range</th><td>{report.before.loudnessRange.toFixed(1)} LU</td><td>{report.after.loudnessRange.toFixed(1)} LU</td></tr>
+            <tr><th scope="row">Max true peak</th><td>{fmtDb(report.before.maxTruePeakDb)} dBTP</td><td>{fmtDb(report.after.maxTruePeakDb)} dBTP</td></tr>
+            <tr><th scope="row">Max momentary</th><td>{fmtDb(report.before.maxMomentary)} LUFS</td><td>{fmtDb(report.after.maxMomentary)} LUFS</td></tr>
+            <tr><th scope="row">Max short-term</th><td>{fmtDb(report.before.maxShortTerm)} LUFS</td><td>{fmtDb(report.after.maxShortTerm)} LUFS</td></tr>
+          </tbody>
+        </table>
+      </div>}
     </section>
   </>;
 }
