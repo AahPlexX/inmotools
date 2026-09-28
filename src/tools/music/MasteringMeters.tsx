@@ -178,19 +178,21 @@ export default function MasteringMeters({ meters, playing, pre, post, monitor, o
 
     <section className="mastering-panel" aria-labelledby="peak-heading">
       <div className="mastering-panel-heading"><div><h3 id="peak-heading">Peaks, RMS, and crest factor</h3><p>True peak uses 4× oversampling (BS.1770-5 Annex 2). RMS and peak cover the last 400 ms; programme values cover everything since the last reset.</p></div></div>
-      <table className="mastering-report">
-        <thead><tr><th scope="col">Channel</th><th scope="col">True peak</th><th scope="col">Peak</th><th scope="col">RMS</th><th scope="col">Crest</th><th scope="col">Programme crest</th></tr></thead>
-        <tbody>
-          {['Left', 'Right'].map((name, index) => <tr key={name}>
-            <th scope="row">{name}</th>
-            <td>{signed(loudness?.truePeakDb[index])} dBTP</td>
-            <td>{signed(levels?.peakDb[index])} dBFS</td>
-            <td>{signed(levels?.rmsDb[index])} dBFS</td>
-            <td>{levels ? levels.crestDb[index].toFixed(1) : '—'} dB</td>
-            <td>{levels ? levels.programCrestDb[index].toFixed(1) : '—'} dB</td>
-          </tr>)}
-        </tbody>
-      </table>
+      <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Peak and crest measurements">
+        <table className="mastering-report">
+          <thead><tr><th scope="col">Channel</th><th scope="col">True peak</th><th scope="col">Peak</th><th scope="col">RMS</th><th scope="col">Crest</th><th scope="col">Programme crest</th></tr></thead>
+          <tbody>
+            {['Left', 'Right'].map((name, index) => <tr key={name}>
+              <th scope="row">{name}</th>
+              <td>{signed(loudness?.truePeakDb[index])} dBTP</td>
+              <td>{signed(levels?.peakDb[index])} dBFS</td>
+              <td>{signed(levels?.rmsDb[index])} dBFS</td>
+              <td>{levels ? levels.crestDb[index].toFixed(1) : '—'} dB</td>
+              <td>{levels ? levels.programCrestDb[index].toFixed(1) : '—'} dB</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
       <div className="workspace-grid">
         <label className="field"><span className="field-label">Log true peaks above (dBTP)</span>
           <input type="number" min={-12} max={3} step={0.1} value={monitor.excursionThresholdDb} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value)) onMonitorChange({ excursionThresholdDb: Math.min(3, Math.max(-12, value)) }); }} /></label>
