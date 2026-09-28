@@ -137,7 +137,7 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
         <p>A backup is one ZIP with your edits, arrangement, master chain, markers, and the original audio. Open it here later in a compatible browser to carry on where you left off.</p>
       </div></div>
       <div className="button-row">
-        <button type="button" className="mastering-primary" disabled={busy || !ctx.canEdit} onClick={() => void onSaveBackup()}>Save project backup</button>
+        <button type="button" className="mastering-primary" disabled={busy || !ctx.document.tracks.some((track) => track.clips.length)} onClick={() => void onSaveBackup()}>Save project backup</button>
         <label className={`mastering-file-button mastering-file-secondary${busy ? ' is-disabled' : ''}`}>
           Open project backup
           <input type="file" accept=".zip,application/zip" disabled={busy} onChange={onFile} />
