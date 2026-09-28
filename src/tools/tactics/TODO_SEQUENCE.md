@@ -105,15 +105,15 @@
 - **Reverse-safe:** complete.
 
 ### T08-01 — Synchronized 3D presentation
-- **Status:** READY
-- **Depends on:** T07-01
+- **Status:** DONE
+- **Depends on:** T07-01 DONE
 - **Primary files:** tactical Three.js projection modules + UI/tests
-- **Action:** synchronized pitch/players/ball, camera presets/keyframes, 2D/3D shared-state editing, on-demand rendering, disposal.
-- **Exit evidence:** lifecycle/resource tests and browser proof.
-- **Reverse-safe:** no.
+- **Implementation:** exact runtime source `5d76a91b74d78b913796875853af31977c22833f` adds immutable normalized↔metre projection, sampled ball elevation, four pitch-aware camera presets, deterministic camera keyframing/interpolation, lazy shared-state Three.js presentation, click-vs-orbit selection guarding, on-demand hidden-tab-aware scheduling, WebGL recovery and explicit GPU/resource disposal.
+- **Exit evidence:** fresh focused Tactical/selector units **106/106**, TypeScript + production/PWA build, explicit scheduler/disposal units, and the complete Tactical desktop/mobile Playwright spec **52 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Rows 35–38 are verified; numerator is **36/60**.
+- **Reverse-safe:** complete.
 
 ### T09-01 — Local video review and telestration
-- **Status:** BLOCKED
+- **Status:** READY
 - **Depends on:** T08-01
 - **Primary files:** tactical local-media modules + UI/tests
 - **Action:** local video open/review, time-ranged telestration, manual/interpolated tracking, events, clip playlists, manual multi-angle sync, object-URL cleanup.

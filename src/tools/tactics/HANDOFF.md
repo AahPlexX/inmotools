@@ -4,17 +4,21 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `f22b134e3accd7c4bc0152a2a0d70b769851ce33`
+- Last fully browser-validated source tip: `5d76a91b74d78b913796875853af31977c22833f`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 8 — synchronized 3D presentation**
-- Verified functional features: **32/60**
+- Milestone: **Task 9 — local video review and telestration**
+- Verified functional features: **36/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-Execute **T08-01 — synchronized 3D presentation**. First inspect the current tactical project/scene/time sampler and existing pinned Three.js stack, then build the 3D pitch/players/ball projection from that sampled state. Add camera presets and keyframes, a shared 2D/3D editing path, on-demand rendering and resource disposal, with focused unit and desktop/mobile browser evidence. Keep canonical coordinates and timeline state shared; do not create a second mutable project model.
+Execute **T09-01 — local video review and telestration**. Reuse browser-native local media and existing tactical timeline/project state: local video open/review, precise seeking/stepping/playback controls, time-ranged telestration, manual/interpolated overlay tracking, event tags, clip playlists and manual multi-angle sync. Object URLs and media listeners must be released deterministically. Keep all media local, use non-destructive tactical overlays, and add failure-path plus desktop/mobile browser evidence before advancing.
+
+## Task 8 closure evidence
+
+Task 8 is **DONE** at runtime source `5d76a91b74d78b913796875853af31977c22833f`. Fresh exact-source focused Tactical/selector units pass **106/106**; TypeScript and the production/PWA build pass; explicit lifecycle tests verify frame deduplication, hidden-tab pause/resume and geometry/material disposal; and the full Tactical Playwright contract passes **52 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. The 3D runtime is lazy-loaded, derives pitch/players/ball from the same sampled project as 2D, preserves authored ball elevation, provides tactical/broadcast/touchline/goal-line camera presets plus deterministic keyframes, rejects invalid/duplicate camera states, shares selection/editing, prevents orbit drags from becoming player clicks, and cleans renderer resources. Rows **35–38** are verified.
 
 ## Task 7 closure evidence
 
@@ -30,7 +34,7 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 42, 49, 56, 60**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 49, 56, 60**.
 
 In progress: **3, 4, 5, 7, 8, 51, 52, 55, 59**.
 

@@ -5,10 +5,10 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
-  - Current milestone: **Task 8 — synchronized 3D presentation.** Task 7 is closed; T08-01 is READY.
-  - Current verified feature count: **32/60**. Verified rows: 1, 2, 9–34, 42, 49, 56, 60. Analytics report export row 50 remains Task 10.
-  - Current evidence: exact Task-7 runtime source `f22b134e3accd7c4bc0152a2a0d70b769851ce33` passes 10/10 focused persistence units, TypeScript/production/PWA build, and the full Tactical Playwright spec with 50 passes, 2 intentional duplicate mobile Axe/reflow skips and 0 failures, including vault, recovery, ZIP/CSV, session, Axe and responsive workflows.
-  - Tasks 5–7 are complete: deterministic timeline/coordinated motion, physical-metre spatial analysis, browser-local persistence/interchange and session planning are verified.
+  - Current milestone: **Task 9 — local video review and telestration.** Task 8 is closed; T09-01 is READY.
+  - Current verified feature count: **36/60**. Verified rows: 1, 2, 9–38, 42, 49, 56, 60. Analytics report export row 50 remains Task 10.
+  - Current evidence: exact Task-8 runtime source `5d76a91b74d78b913796875853af31977c22833f` passes 106/106 focused Tactical/selector units, TypeScript/production/PWA build, explicit 3D lifecycle/disposal units, and the full Tactical Playwright spec with 52 passes, 2 intentional duplicate mobile Axe/reflow skips and 0 failures, including lazy synchronized 3D, camera authoring, persistence, Axe and responsive workflows.
+  - Tasks 5–8 are complete: deterministic timeline/coordinated motion, physical-metre spatial analysis, browser-local persistence/interchange/session planning, and synchronized resource-safe 3D presentation are verified.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the Tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 
