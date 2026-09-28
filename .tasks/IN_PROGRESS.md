@@ -1,5 +1,19 @@
 # In Progress
 
+- **Markdown Workbench production audit remediation (2026-09-27)** — ACTIVE on `main`; current audit extends the completed F01–F10 ledger with nine evidence-backed functions while preserving the static/local-first architecture.
+  - F11 source-scroll sync: manual CodeMirror viewport scrolling must move the split preview, not only cursor/edit changes.
+  - F12 bibliography diagnostics: malformed or entry-less BibTeX/CSL-JSON must explain why citations are not resolving instead of failing silently.
+  - F13 clean-draft persistence: untouched/clean documents must not create or retimestamp local drafts merely because autosave, New, or draft switching runs.
+  - F14 long-document outline: filter headings and expose the current source section so large documents remain navigable.
+  - F15 local HTML import: open/drop `.html`/`.htm` as Markdown using the already-pinned local Turndown dependency; no upload/network path.
+  - F16 formatting guidance: every insert/format control needs a concise discoverable tooltip, especially stateful/structural actions.
+  - F17 editor-setting accessibility: settings need >=24 CSS-pixel effective targets and the font-size slider needs visible numeric feedback.
+  - F18 dark workspace: provide a tool-local dark appearance with readable source/preview syntax and diagrams; exports remain self-contained/light unless their format says otherwise.
+  - F19 focus writing: provide a reversible low-chrome writing state without hiding the control needed to exit it.
+  - Cross-cutting gate: expand responsive regression evidence beyond the existing 320/390/768/844/1440 matrix, retain keyboard/Axe coverage, and keep source/preview/export behavior green on desktop and mobile Chromium.
+  - Baseline: `origin/main` `4685013b261f83408145bed98851d09b0bca752e`; Pages run `36343223865` and focused-tool run `36343223816` are green before this audit. Browser screenshot connector is unavailable in this session, so visual-only claims require repository Playwright/DOM evidence rather than fabricated screenshots.
+  - Scope: `src/tools/markdown/`, Markdown-focused tests, the existing global Markdown CSS block only where required, and additive Markdown task/handoff records. Preserve all unrelated workstreams.
+
 - **Audio Mastering Workstation** — local-first audio editing, restoration, mastering, metering, metadata, and export workstream governed by an 81-function ledger.
   - Branch: `claude/music-editing-tool-b9w0pq` (contains all of `feature/audio-mastering-workstation` merged onto current `main` at `95d9028`). Do not continue on `feature/audio-mastering-workstation`; its draft PR #45 is superseded.
   - Resume here: `docs/superpowers/plans/2026-09-27-audio-mastering-completion.md` — architecture decision, slice order, and the per-function status table (the single source for progress). Spec: `docs/superpowers/specs/2026-09-16-audio-mastering-workstation-design.md`. Earlier phase plans and `docs/research/audio-mastering-*.md` are history and decisions.
