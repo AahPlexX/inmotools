@@ -70,13 +70,14 @@ function parseSource(value: unknown, index: number): MasteringSourceReference {
 
 function parseClip(value: unknown, sources: ReadonlySet<string>, seen: Set<string>): MasteringClip {
   if (!isObject(value) || typeof value.id !== 'string' || !value.id) return fail('A clip in the project has no id.');
-  if (seen.has(value.id)) return fail('Two clips in the project share one id.');
-  seen.add(value.id);
+  const id = value.id.slice(0, 120);
+  if (seen.has(id)) return fail('Two clips in the project share one id.');
+  seen.add(id);
   const name = text(value.name, 'Clip', 120);
   if (typeof value.sourceId !== 'string' || !sources.has(value.sourceId)) return fail(`${name} points to audio that is not in the project.`);
   const edits = Array.isArray(value.edits) ? value.edits.map((edit) => parseEdit(edit, name)) : [];
   return {
-    id: value.id.slice(0, 120),
+    id,
     name,
     sourceId: value.sourceId,
     startSeconds: nonNegative(value.startSeconds),
@@ -130,23 +131,30 @@ export function parseMasteringDocument(value: unknown): MasteringDocument {
   if (rawTracks.length > MAX_TRACKS) return fail(`The project has ${rawTracks.length} tracks; this tool holds up to ${MAX_TRACKS}.`);
   const clipIds = new Set<string>();
   const tracks = rawTracks.map((track, index) => parseTrack(track, index, sourceIds, clipIds));
+  const trackIds = new Set(tracks.map((track) => track.id));
+  if (trackIds.size !== tracks.length) return fail('Two tracks in the project share one id.');
   const sampleRate = value.sampleRate === null ? null : clamp(value.sampleRate, 1, 768_000, 48_000);
   if (sampleRate === null && tracks.some((track) => track.clips.length)) return fail('The project has audio but no sample rate.');
   const selection = isObject(value.selection) ? value.selection : {};
   const start = nonNegative(selection.startSeconds);
   const end = nonNegative(selection.endSeconds);
+  const markers = (Array.isArray(value.markers) ? value.markers : []).map(parseMarker).filter((marker): marker is MasteringMarker => marker !== null);
+  if (new Set(markers.map((marker) => marker.id)).size !== markers.length) return fail('Two markers in the project share one id.');
+  const regions = (Array.isArray(value.regions) ? value.regions : []).map(parseRegion).filter((region): region is MasteringRegion => region !== null);
+  if (new Set(regions.map((region) => region.id)).size !== regions.length) return fail('Two regions in the project share one id.');
   const metadataEdits: Record<string, string> = {};
   if (isObject(value.metadataEdits)) for (const [key, entry] of Object.entries(value.metadataEdits)) if (typeof entry === 'string') metadataEdits[key.slice(0, 60)] = entry.slice(0, 2000);
+  const activeClipId = typeof value.activeClipId === 'string' ? value.activeClipId.slice(0, 120) : null;
   return {
     version: 2,
     sampleRate,
     sources,
     tracks,
-    activeClipId: typeof value.activeClipId === 'string' && clipIds.has(value.activeClipId) ? value.activeClipId : null,
+    activeClipId: activeClipId && clipIds.has(activeClipId) ? activeClipId : null,
     selection: { startSeconds: Math.min(start, end), endSeconds: Math.max(start, end) },
     playhead: nonNegative(value.playhead),
-    markers: (Array.isArray(value.markers) ? value.markers : []).map(parseMarker).filter((marker): marker is MasteringMarker => marker !== null),
-    regions: (Array.isArray(value.regions) ? value.regions : []).map(parseRegion).filter((region): region is MasteringRegion => region !== null),
+    markers,
+    regions,
     metadataEdits,
     master: normalizeMasterSettings(isObject(value.master) ? value.master as Partial<MasterSettings> : undefined),
   };
