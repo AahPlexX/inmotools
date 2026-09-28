@@ -21,7 +21,7 @@ function Tool({ title, summary, children, open = false }: { title: string; summa
 }
 
 function NumberInput({ id, label, value, onChange, min, max, step, disabled }: { id: string; label: string; value: number; onChange: (value: number) => void; min: number; max: number; step: number; disabled: boolean }) {
-  return <CommitNumberField id={id} label={label} value={value} onCommit={onChange} min={min} max={max} step={step} disabled={disabled} />;
+  return <CommitNumberField id={id} label={label} value={value} onCommit={onChange} onPreview={onChange} min={min} max={max} step={step} disabled={disabled} />;
 }
 
 export default function MasteringRepairTab({ ctx }: { ctx: MasteringPanelContext }) {
