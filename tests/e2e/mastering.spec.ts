@@ -50,6 +50,34 @@ test('stops safely when the realtime master processor crashes', async ({ page })
   await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000');
 });
 
+test('locks destructive processing safely when the DSP worker crashes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalPostMessage = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+      originalPostMessage.call(this, message, transfer ?? []);
+      if (typeof message === 'object' && message !== null && 'type' in message && (message as { type?: unknown }).type === 'render') {
+        window.setTimeout(() => this.dispatchEvent(new ErrorEvent('error', { message: 'Injected DSP worker failure' })), 0);
+      }
+    } as typeof Worker.prototype.postMessage;
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
+    name: 'worker-failure.wav',
+    mimeType: 'audio/wav',
+    buffer: makeMonoPcm16Wav(3),
+  });
+
+  await expect(page.locator('.status-line')).toContainText(/audio processing worker stopped unexpectedly/i);
+  await expect(page.getByRole('alert')).toContainText(/Save a project backup, then reload this page/i);
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByRole('button', { name: 'Normalize peak' })).toBeDisabled();
+
+  await page.getByRole('tab', { name: 'Project' }).click();
+  await expect(page.getByRole('button', { name: 'Save project backup' })).toBeEnabled();
+});
+
 test('imports, auditions, edits, marks, and undoes a local master', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
