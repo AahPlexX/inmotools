@@ -55,12 +55,12 @@
 .mastering-lanes { display:grid; border-top:1px solid #2b3642; }
 .mastering-lane { position:relative; min-height:52px; border-bottom:1px solid #2b3642; }
 .mastering-lane:last-child { border-bottom:0; }
-.mastering-lane-name { position:absolute; left:6px; top:3px; z-index:2; max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#c4ced8; font:700 11px/1.3 system-ui,sans-serif; pointer-events:none; text-shadow:0 1px 2px #000; }
+.mastering-lane-name { position:absolute; left:6px; top:3px; z-index:2; max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#c4ced8; font:700 12px/1.35 system-ui,sans-serif; pointer-events:none; text-shadow:0 1px 2px #000; }
 .mastering-lane-body { position:absolute; inset:0; overflow:hidden; }
 .mastering-clip { position:absolute; top:16px; bottom:4px; display:block; min-height:0; padding:0; overflow:hidden; border:1px solid #4d7fe6; border-radius:4px; background:rgba(32,91,214,.32); color:#e8efff; text-align:left; cursor:pointer; }
 .mastering-clip svg { position:absolute; inset:0; width:100%; height:100%; }
 .mastering-clip path { fill:none; stroke:#bcd2ff; stroke-width:1; vector-effect:non-scaling-stroke; }
-.mastering-clip span { position:relative; display:block; padding:1px 5px; overflow:hidden; font:600 11px/1.3 system-ui,sans-serif; white-space:nowrap; text-overflow:ellipsis; text-shadow:0 1px 2px #000; }
+.mastering-clip span { position:relative; display:block; padding:1px 5px; overflow:hidden; font:600 12px/1.35 system-ui,sans-serif; white-space:nowrap; text-overflow:ellipsis; text-shadow:0 1px 2px #000; }
 .mastering-clip.is-active { border-color:#f2b84b; box-shadow:inset 0 0 0 1px #f2b84b; background:rgba(242,184,75,.22); }
 .mastering-clip.is-muted { opacity:.45; }
 .mastering-clip:focus-visible { outline:3px solid #f2b84b; outline-offset:-3px; }
@@ -125,7 +125,7 @@
 .mastering-report { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
 .mastering-report caption { text-align:left; color:var(--muted); font-size:12px; padding-bottom:6px; }
 .mastering-report th, .mastering-report td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; font-variant-numeric:tabular-nums; }
-.mastering-report thead th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+.mastering-report thead th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
 .mastering-meter-row .metric strong { font-variant-numeric:tabular-nums; }
 .mastering-excursions { display:grid; gap:6px; margin:10px 0 0; padding-left:20px; font-size:13px; }
 .mastering-excursions li { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
