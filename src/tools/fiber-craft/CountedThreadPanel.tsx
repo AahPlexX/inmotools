@@ -13,6 +13,7 @@ import {
   countedThreadFinishedSizeInches,
   COUNTED_STITCH_KINDS,
   DEFAULT_COUNTED_THREAD_SETTINGS,
+  estimateCountedThreadFlossUsage,
   findCountedThreadConfettiCells,
   generateCountedThreadLegend,
   removeCountedBackstitch,
@@ -98,6 +99,11 @@ export function CountedThreadPanel({
   const legendByColor = useMemo(
     () => new Map(legend.map((entry) => [entry.colorId, entry])),
     [legend],
+  );
+  const flossUsage = useMemo(() => estimateCountedThreadFlossUsage(document), [document]);
+  const flossUsageByColor = useMemo(
+    () => new Map(flossUsage.map((entry) => [entry.colorId, entry])),
+    [flossUsage],
   );
   const fabricSettings = document.settings?.countedThread ?? DEFAULT_COUNTED_THREAD_SETTINGS;
   const finishedSize = useMemo(() => countedThreadFinishedSizeInches(document), [document]);
@@ -363,6 +369,21 @@ export function CountedThreadPanel({
               <option value="2">2 fabric threads</option>
             </select>
           </label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-strand-count">
+            <span>Strands per stitch</span>
+            <select
+              id="fiber-counted-strand-count"
+              value={fabricSettings.strandCount}
+              onChange={(event) => updateFabricSettings({
+                ...fabricSettings,
+                strandCount: Number(event.target.value) as CountedThreadProjectSettings['strandCount'],
+              })}
+            >
+              {[1, 2, 3, 4, 5, 6].map((count) => (
+                <option key={count} value={count}>{count} strand{count === 1 ? '' : 's'}</option>
+              ))}
+            </select>
+          </label>
           <label className="fiber-counted-checkbox" htmlFor="fiber-counted-confetti-warnings">
             <input
               id="fiber-counted-confetti-warnings"
@@ -383,6 +404,11 @@ export function CountedThreadPanel({
             {' · '}{(finishedSize.width * 2.54).toFixed(1)} × {(finishedSize.height * 2.54).toFixed(1)} cm
           </span>
         </div>
+        <p className="fiber-craft-muted" data-testid="counted-thread-floss-total">
+          {flossUsage.length === 0
+            ? 'Add stitches to estimate how much floss this chart will use.'
+            : `Estimated floss for this chart: ${flossUsage.reduce((sum, entry) => sum + entry.skeinsNeeded, 0)} skein${flossUsage.reduce((sum, entry) => sum + entry.skeinsNeeded, 0) === 1 ? '' : 's'} total across ${flossUsage.length} color${flossUsage.length === 1 ? '' : 's'}, using ${fabricSettings.strandCount}-strand floss on an 8.7 yd DMC-size skein. This is a planning estimate — actual usage varies with your stitching technique, so buy one extra skein per color when in doubt.`}
+        </p>
         <p
           className="fiber-counted-confetti-summary"
           data-testid="counted-thread-confetti-summary"
@@ -550,6 +576,10 @@ export function CountedThreadPanel({
                   <small>
                     {[entry.paletteName, entry.code].filter(Boolean).join(' · ') || 'Project color'}
                     {' · '}{entry.usageCount} {entry.usageCount === 1 ? 'mark' : 'marks'}
+                  </small>
+                  <small data-testid={`counted-thread-floss-${entry.colorId}`}>
+                    ≈ {(flossUsageByColor.get(entry.colorId)?.estimatedYards ?? 0).toFixed(1)} yd
+                    {' · '}{flossUsageByColor.get(entry.colorId)?.skeinsNeeded ?? 0} skein{(flossUsageByColor.get(entry.colorId)?.skeinsNeeded ?? 0) === 1 ? '' : 's'}
                   </small>
                 </span>
               </li>
