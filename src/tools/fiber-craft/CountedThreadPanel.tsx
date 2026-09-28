@@ -10,10 +10,14 @@ import {
   addCountedBackstitch,
   addCountedFrenchKnot,
   countedStitchLabel,
+  countedThreadFinishedSizeInches,
   COUNTED_STITCH_KINDS,
+  DEFAULT_COUNTED_THREAD_SETTINGS,
+  findCountedThreadConfettiCells,
   generateCountedThreadLegend,
   removeCountedBackstitch,
   removeCountedFrenchKnot,
+  setCountedThreadFabricSettings,
   setCountedThreadPaletteIdentity,
   setCountedThreadStitch,
   type CountedStitchKind,
@@ -22,6 +26,7 @@ import { applyCountedImageResult } from './engines/counted-image-engine';
 import { quantizeCountedImageFile } from './counted-image-worker-client';
 import type {
   CountedThreadChart,
+  CountedThreadProjectSettings,
   FiberCraftDocument,
 } from './fiber-craft-types';
 
@@ -94,6 +99,13 @@ export function CountedThreadPanel({
     () => new Map(legend.map((entry) => [entry.colorId, entry])),
     [legend],
   );
+  const fabricSettings = document.settings?.countedThread ?? DEFAULT_COUNTED_THREAD_SETTINGS;
+  const finishedSize = useMemo(() => countedThreadFinishedSizeInches(document), [document]);
+  const confettiCells = useMemo(() => findCountedThreadConfettiCells(document), [document]);
+  const confettiKeys = useMemo(
+    () => new Set(confettiCells.map((cell) => pointKey(cell.row, cell.col))),
+    [confettiCells],
+  );
 
   const paletteById = useMemo(
     () => new Map(document.palette.map((color) => [color.id, color])),
@@ -105,6 +117,17 @@ export function CountedThreadPanel({
     setFlossBrand(color?.paletteName ?? '');
     setFlossCode(color?.paletteCode ?? '');
   }, [document.palette, selectedColor]);
+
+  const updateFabricSettings = (next: CountedThreadProjectSettings) => {
+    try {
+      onCommit(
+        setCountedThreadFabricSettings(document, next),
+        `Updated fabric to ${next.fabricCount}-count ${next.fabricType}.`,
+      );
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : 'Could not update the counted-thread fabric settings.');
+    }
+  };
 
   const saveFlossIdentity = () => {
     try {
@@ -289,6 +312,91 @@ export function CountedThreadPanel({
         </p>
       </div>
 
+      <div className="fiber-counted-fabric" aria-label="Fabric and stitchability settings">
+        <div className="fiber-counted-tools fiber-counted-fabric-controls">
+          <label className="fiber-craft-field" htmlFor="fiber-counted-fabric-type">
+            <span>Fabric type</span>
+            <select
+              id="fiber-counted-fabric-type"
+              value={fabricSettings.fabricType}
+              onChange={(event) => updateFabricSettings({
+                ...fabricSettings,
+                fabricType: event.target.value as CountedThreadProjectSettings['fabricType'],
+                stitchOver: event.target.value === 'aida' ? 1 : fabricSettings.stitchOver,
+              })}
+            >
+              <option value="aida">Aida</option>
+              <option value="linen">Linen</option>
+              <option value="evenweave">Evenweave</option>
+            </select>
+          </label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-fabric-count">
+            <span>Fabric count</span>
+            <input
+              id="fiber-counted-fabric-count"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              inputMode="numeric"
+              value={fabricSettings.fabricCount}
+              onChange={(event) => {
+                const nextCount = Number(event.target.value);
+                if (Number.isInteger(nextCount) && nextCount >= 1 && nextCount <= 100) {
+                  updateFabricSettings({ ...fabricSettings, fabricCount: nextCount });
+                }
+              }}
+            />
+          </label>
+          <label className="fiber-craft-field" htmlFor="fiber-counted-stitch-over">
+            <span>Stitch over</span>
+            <select
+              id="fiber-counted-stitch-over"
+              value={fabricSettings.stitchOver}
+              disabled={fabricSettings.fabricType === 'aida'}
+              onChange={(event) => updateFabricSettings({
+                ...fabricSettings,
+                stitchOver: Number(event.target.value) as 1 | 2,
+              })}
+            >
+              <option value="1">1 fabric thread</option>
+              <option value="2">2 fabric threads</option>
+            </select>
+          </label>
+          <label className="fiber-counted-checkbox" htmlFor="fiber-counted-confetti-warnings">
+            <input
+              id="fiber-counted-confetti-warnings"
+              type="checkbox"
+              checked={fabricSettings.confettiWarningsEnabled}
+              onChange={(event) => updateFabricSettings({
+                ...fabricSettings,
+                confettiWarningsEnabled: event.target.checked,
+              })}
+            />
+            <span>Warn about isolated stitches</span>
+          </label>
+        </div>
+        <div className="fiber-counted-fabric-summary" data-testid="counted-thread-fabric-summary">
+          <strong>{fabricSettings.fabricCount}-count {fabricSettings.fabricType} · stitch over {fabricSettings.stitchOver}</strong>
+          <span>
+            Finished chart: {finishedSize.width.toFixed(2)} × {finishedSize.height.toFixed(2)} in
+            {' · '}{(finishedSize.width * 2.54).toFixed(1)} × {(finishedSize.height * 2.54).toFixed(1)} cm
+          </span>
+        </div>
+        <p
+          className="fiber-counted-confetti-summary"
+          data-testid="counted-thread-confetti-summary"
+          role="status"
+          aria-live="polite"
+        >
+          {!fabricSettings.confettiWarningsEnabled
+            ? 'Isolated-stitch warnings are off.'
+            : confettiCells.length === 0
+              ? 'No isolated color stitches detected.'
+              : `${confettiCells.length} isolated ${confettiCells.length === 1 ? 'stitch' : 'stitches'} to review. An isolated stitch has no adjacent stitch of the same color.`}
+        </p>
+      </div>
+
       <details className="fiber-counted-import">
         <summary>Import image to counted chart</summary>
         <div className="fiber-counted-tools fiber-counted-import-controls">
@@ -351,6 +459,8 @@ export function CountedThreadPanel({
                   .map((cell) => {
                     const color = cell.colorId ? paletteById.get(cell.colorId) : undefined;
                     const colorSymbol = cell.colorId ? legendByColor.get(cell.colorId)?.symbol : undefined;
+                    const isConfetti = fabricSettings.confettiWarningsEnabled
+                      && confettiKeys.has(pointKey(cell.row, cell.col));
                     const label = cell.stitchKind
                       ? `${countedStitchLabel(cell.stitchKind)}, ${color?.label ?? cell.colorId ?? 'unknown color'}`
                       : 'empty';
@@ -365,7 +475,8 @@ export function CountedThreadPanel({
                           className="fiber-counted-cell"
                           type="button"
                           tabIndex={activeCell.row === cell.row && activeCell.col === cell.col ? 0 : -1}
-                          aria-label={`Row ${cell.row + 1}, column ${cell.col + 1}, ${label}`}
+                          aria-label={`Row ${cell.row + 1}, column ${cell.col + 1}, ${label}${isConfetti ? ', isolated color stitch warning' : ''}`}
+                          data-confetti={isConfetti ? 'true' : undefined}
                           onFocus={() => setActiveCell({ row: cell.row, col: cell.col })}
                           onKeyDown={(event) => handleKeyDown(event, cell.row, cell.col)}
                           onClick={() => applyTool(cell.row, cell.col)}
@@ -377,6 +488,7 @@ export function CountedThreadPanel({
                               {colorSymbol ? <small className="fiber-counted-color-symbol">{colorSymbol}</small> : null}
                             </span>
                           ) : null}
+                          {isConfetti ? <span className="fiber-counted-confetti-badge" aria-hidden="true">!</span> : null}
                         </button>
                       </div>
                     );
