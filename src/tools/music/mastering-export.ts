@@ -270,10 +270,16 @@ export interface CodecCapability {
 
 const EXTENSION_CODECS = new Set(['mp3', 'flac', 'aac']);
 
-/** Registers a first-party WASM encoder only when the browser has no native one. */
-async function ensureEncoder(codec: 'mp3' | 'flac' | 'aac') {
+type EncoderProbeOptions = {
+  numberOfChannels?: number;
+  sampleRate?: number;
+  quality?: import('mediabunny').Quality;
+};
+
+/** Registers a first-party WASM encoder when the browser cannot encode the exact requested configuration. */
+async function ensureEncoder(codec: 'mp3' | 'flac' | 'aac', options: EncoderProbeOptions = {}) {
   const { canEncodeAudio } = await import('mediabunny');
-  if (await canEncodeAudio(codec)) return;
+  if (await canEncodeAudio(codec, options)) return;
   if (codec === 'mp3') (await import('@mediabunny/mp3-encoder')).registerMp3Encoder();
   else if (codec === 'flac') (await import('@mediabunny/flac-encoder')).registerFlacEncoder();
   else (await import('@mediabunny/aac-encoder')).registerAacEncoder();
@@ -288,8 +294,9 @@ export async function probeExportCapabilities(numberOfChannels: number, sampleRa
   const { canEncodeAudio } = await import('mediabunny');
   const check = async (codec: 'mp3' | 'flac' | 'aac' | 'opus' | 'vorbis') => {
     try {
-      if (EXTENSION_CODECS.has(codec)) await ensureEncoder(codec as 'mp3' | 'flac' | 'aac');
-      return await canEncodeAudio(codec, { numberOfChannels, sampleRate });
+      const config = { numberOfChannels, sampleRate };
+      if (EXTENSION_CODECS.has(codec)) await ensureEncoder(codec as 'mp3' | 'flac' | 'aac', config);
+      return await canEncodeAudio(codec, config);
     } catch { return false; }
   };
   const [mp3, flac, aac, opus, vorbis] = await Promise.all([check('mp3'), check('flac'), check('aac'), check('opus'), check('vorbis')]);
@@ -329,12 +336,23 @@ export interface EncodeOptions {
 export async function encodeCompressed(channels: readonly Float32Array[], sampleRate: number, options: EncodeOptions): Promise<{ bytes: Uint8Array; mimeType: string; codec: string }> {
   const mediabunny = await import('mediabunny');
   const codec = options.format === 'mp3' ? 'mp3' : options.format === 'flac' ? 'flac' : options.format === 'm4a' ? 'aac' : null;
+  const quality = options.format === 'flac'
+    ? undefined
+    : new mediabunny.Quality({ bitrate: options.bitrateKbps * 1000, bitrateMode: 'constant' });
+  const encodingConfig = { numberOfChannels: channels.length, sampleRate, ...(quality ? { quality } : {}) };
   let audioCodec: import('mediabunny').AudioCodec;
   if (codec) {
-    await ensureEncoder(codec);
+    await ensureEncoder(codec, encodingConfig);
+    if (!await mediabunny.canEncodeAudio(codec, encodingConfig)) {
+      throw new Error(`The ${codec.toUpperCase()} encoder cannot encode ${channels.length} channel${channels.length === 1 ? '' : 's'} at ${sampleRate.toLocaleString()} Hz with the selected quality.`);
+    }
     audioCodec = codec;
+  } else if (await mediabunny.canEncodeAudio('opus', encodingConfig)) {
+    audioCodec = 'opus';
+  } else if (await mediabunny.canEncodeAudio('vorbis', encodingConfig)) {
+    audioCodec = 'vorbis';
   } else {
-    audioCodec = await mediabunny.canEncodeAudio('opus', { numberOfChannels: channels.length, sampleRate }) ? 'opus' : 'vorbis';
+    throw new Error(`No Ogg encoder can encode ${channels.length} channel${channels.length === 1 ? '' : 's'} at ${sampleRate.toLocaleString()} Hz with the selected quality.`);
   }
   const format = options.format === 'mp3' ? new mediabunny.Mp3OutputFormat()
     : options.format === 'flac' ? new mediabunny.FlacOutputFormat()
@@ -344,7 +362,7 @@ export async function encodeCompressed(channels: readonly Float32Array[], sample
   const output = new mediabunny.Output({ format, target });
   const source = new mediabunny.AudioSampleSource({
     codec: audioCodec,
-    ...(options.format === 'flac' ? {} : { quality: new mediabunny.Quality({ bitrate: options.bitrateKbps * 1000, bitrateMode: 'constant' }) }),
+    ...(quality ? { quality } : {}),
   });
   output.addAudioTrack(source);
   output.setMetadataTags(buildMetadataTags(options.metadata, options.artwork, options.format));
