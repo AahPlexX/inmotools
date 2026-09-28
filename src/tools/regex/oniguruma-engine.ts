@@ -6,6 +6,8 @@ const DISPLAY_MATCH_LIMIT = 5_000;
 const COUNT_LIMIT = 100_000;
 let runtimePromise: Promise<typeof import('vscode-oniguruma')> | undefined;
 
+export const prepareOnigurumaRuntime = async (): Promise<void> => { await getRuntime(); };
+
 const getRuntime = () => {
   runtimePromise ??= import('vscode-oniguruma').then(async (module) => {
     const response = await fetch(onigWasmUrl);

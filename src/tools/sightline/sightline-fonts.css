@@ -1,0 +1,91 @@
+
+/* ------------------------------------------------------------------ fonts --
+   The six reading typefaces ship with the app as latin-subset woff2 files so
+   the tool renders its own type offline. Each file is licensed under the SIL
+   Open Font License 1.1; the licence text travels with the package in
+   node_modules/@fontsource/<family>/LICENSE and the family is named in the
+   third-party notices. */
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/opendyslexic-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/opendyslexic-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lexend Deca';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/lexend-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lexend Deca';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/lexend-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('./fonts/merriweather-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('./fonts/merriweather-latin-700-normal.woff2') format('woff2');
+}

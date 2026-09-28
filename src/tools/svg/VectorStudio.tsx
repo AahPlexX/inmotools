@@ -446,6 +446,8 @@ export default function VectorStudio() {
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
     const target = event.target as HTMLElement;
     const editable = target.matches('input,textarea,select,[contenteditable="true"]');
+    const scrollingRegion = target.matches('.vector-canvas-scroll,.vector-inspector,.vector-layers,.vector-export-panel');
+    if (scrollingRegion && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
     if (!editable && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       event.shiftKey ? redo() : undo();
@@ -515,7 +517,7 @@ export default function VectorStudio() {
         <VectorCanvas document={document} selection={selection} tool={tool} zoom={zoom} drawSettings={drawSettings} onDocumentChange={(next, nextSelection) => commit(next, nextSelection ?? selection)} onSelectionChange={setSelection} onStatus={setStatus}/>
       </main>
 
-      <aside className={`vector-inspector ${panel !== 'design' ? 'vector-mobile-hidden' : ''}`} aria-label="Vector inspector">
+      <aside className={`vector-inspector ${panel !== 'design' ? 'vector-mobile-hidden' : ''}`} aria-label="Vector inspector" tabIndex={0}>
         {(tool === 'polygon' || tool === 'star' || tool === 'pencil') ? <section className="vector-panel vector-tool-options" aria-label="Tool settings">
           <div className="vector-panel-heading"><h3>Tool settings</h3><span>{TOOLS.find((item) => item.id === tool)?.label}</span></div>
           {tool === 'polygon' ? <label>Polygon sides<input aria-label="Polygon sides" type="number" min="3" max="64" step="1" value={drawSettings.polygonSides} onChange={(event) => setDrawSettings((current) => ({ ...current, polygonSides: clamp(Math.round(Number(event.target.value) || 3), 3, 64) }))}/></label> : null}
@@ -604,7 +606,7 @@ export default function VectorStudio() {
         </section>
       </aside>
 
-      <aside className={`vector-layers ${panel !== 'layers' ? 'vector-mobile-hidden' : ''}`} aria-label="Layers and artboard">
+      <aside className={`vector-layers ${panel !== 'layers' ? 'vector-mobile-hidden' : ''}`} aria-label="Layers and artboard" tabIndex={0}>
         <section className="vector-panel">
           <div className="vector-panel-heading"><h3>Layers</h3><span>{document.elements.length}</span></div>
           <div className="vector-layer-list">{[...document.elements].reverse().map((element) => <div key={element.id} data-testid="vector-layer" className={`vector-layer ${selection.includes(element.id) ? 'selected' : ''}`}>
@@ -626,7 +628,7 @@ export default function VectorStudio() {
         </section>
       </aside>
 
-      <aside className={`vector-export-panel ${panel !== 'export' ? 'vector-mobile-hidden' : ''}`} aria-label="Export options">
+      <aside className={`vector-export-panel ${panel !== 'export' ? 'vector-mobile-hidden' : ''}`} aria-label="Export options" tabIndex={0}>
         <section className="vector-panel">
           <div className="vector-panel-heading"><h3>Export</h3><span>Local</span></div>
           <label>Filename<input value={exportSettings.filename} onChange={(event) => setExportSettings((current) => ({ ...current, filename: event.target.value }))}/></label>

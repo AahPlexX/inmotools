@@ -1,0 +1,61 @@
+name: Sightline Velocity validation
+
+on:
+  push:
+    branches: [main, feat/sightline-velocity, 'fix/sightline-*']
+    paths:
+      - 'src/tools/sightline/**'
+      - 'src/catalog.ts'
+      - 'src/tools/workspaces.tsx'
+      - 'tests/unit/sightline-*.test.ts'
+      - 'tests/unit/sightline-*.test.tsx'
+      - 'tests/e2e/sightline.spec.ts'
+      - 'scripts/select-e2e-specs.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/sightline.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/tools/sightline/**'
+      - 'src/catalog.ts'
+      - 'src/tools/workspaces.tsx'
+      - 'tests/unit/sightline-*.test.ts'
+      - 'tests/unit/sightline-*.test.tsx'
+      - 'tests/e2e/sightline.spec.ts'
+      - 'scripts/select-e2e-specs.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/sightline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Sightline unit tests
+        run: pnpm exec vitest run tests/unit/sightline-*.test.ts tests/unit/sightline-*.test.tsx
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Sightline browser tests
+        run: pnpm exec playwright test tests/e2e/sightline.spec.ts
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: sightline-failure-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7

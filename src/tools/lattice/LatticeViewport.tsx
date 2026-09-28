@@ -4,6 +4,10 @@ import type { LatticeGraphModel, LatticeGraphNode } from './graph-engine';
 import type { LatticeLayoutModel } from './layout-engine';
 import { fitViewport, visibleLayoutNodes, type LatticeScreenSize, type LatticeViewport as ViewportState } from './viewport-engine';
 
+const MIN_SCALE = 0.12;
+const MAX_SCALE = 3;
+const BUTTON_ZOOM_STEP = 1.25;
+
 const labelFor = (node: LatticeGraphNode): string => {
   if (node.value === undefined) return node.type === 'object' ? `Object (${node.childCount})` : node.type === 'array' ? `Array (${node.childCount})` : node.type;
   if (node.value === null) return 'null';
@@ -75,7 +79,9 @@ export default function LatticeViewport({
   const visibleIds = useMemo(() => new Set(visible.map((node) => node.id)), [visible]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('.lattice-node')) return;
+    // Presses on nodes or on the viewport's own controls must not start a pan: capturing the
+    // pointer here would retarget the click away from the button that was pressed.
+    if (event.button !== 0 || (event.target as HTMLElement).closest('.lattice-node, .lattice-viewport-actions, button, input')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: viewport.x, originY: viewport.y };
   };
@@ -87,19 +93,22 @@ export default function LatticeViewport({
   const stopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
   };
-  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
-    const factor = Math.exp(-event.deltaY * 0.0012);
+  // Zooms by `factor` while keeping the graph point under (px, py) fixed on screen.
+  const zoomAt = (px: number, py: number, factor: number) => {
     setViewport((current) => {
-      const nextScale = Math.min(3, Math.max(0.12, current.scale * factor));
+      const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor));
       const worldX = (px - current.x) / current.scale;
       const worldY = (py - current.y) / current.scale;
       return { scale: nextScale, x: px - worldX * nextScale, y: py - worldY * nextScale };
     });
   };
+  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    zoomAt(event.clientX - rect.left, event.clientY - rect.top, Math.exp(-event.deltaY * 0.0012));
+  };
+  // Buttons zoom around the centre of the view, so touch and keyboard users can zoom too.
+  const zoomCentre = (factor: number) => zoomAt(screen.width / 2, screen.height / 2, factor);
 
   const beginEdit = (node: LatticeGraphNode) => {
     if (!['string', 'number', 'boolean', 'null'].includes(node.type)) return;
@@ -118,7 +127,12 @@ export default function LatticeViewport({
   if (!layout) return <div className="lattice-viewport lattice-viewport-loading" role="status">Laying out graph locally…</div>;
 
   return <div className="lattice-viewport" ref={hostRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag} onWheel={onWheel}>
-    <div className="lattice-viewport-actions"><button type="button" onClick={fit}>Fit graph</button><span>{Math.round(viewport.scale * 100)}%</span></div>
+    <div className="lattice-viewport-actions" role="group" aria-label="Graph zoom">
+      <button type="button" onClick={fit}>Fit graph</button>
+      <button type="button" aria-label="Zoom out" disabled={viewport.scale <= MIN_SCALE + 1e-6} onClick={() => zoomCentre(1 / BUTTON_ZOOM_STEP)}>−</button>
+      <span>{Math.round(viewport.scale * 100)}%</span>
+      <button type="button" aria-label="Zoom in" disabled={viewport.scale >= MAX_SCALE - 1e-6} onClick={() => zoomCentre(BUTTON_ZOOM_STEP)}>+</button>
+    </div>
     <div className="lattice-world" style={{ width: layout.bounds.width, height: layout.bounds.height, transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}>
       <svg className="lattice-edges" width={layout.bounds.width} height={layout.bounds.height} aria-hidden="true">
         <g>{layout.edges.map((edge) => <path key={edge.id} d={edge.points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ')} />)}</g>

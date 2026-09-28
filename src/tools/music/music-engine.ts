@@ -48,7 +48,8 @@ export function validateProgression(progression: ChordSpec[], bpm: number): stri
   if (!Number.isFinite(bpm) || bpm < 30 || bpm > 300) errors.push('Tempo must be between 30 and 300 BPM.');
   if (!progression.length) errors.push('Add at least one chord.');
   progression.forEach((chord, index) => {
-    if (!tryBuildChord(chord)) errors.push(`Chord ${index + 1} has an invalid or out-of-range voicing.`);
+    if (!isValidNote(chord.root)) errors.push(`Fix the root note on chord ${index + 1}.`);
+    else if (!tryBuildChord(chord)) errors.push(`Chord ${index + 1} has an invalid or out-of-range voicing.`);
     const beats = chord.beats ?? 4;
     if (!Number.isFinite(beats) || beats <= 0 || beats > 64) errors.push(`Chord ${index + 1} duration must be greater than 0 and no more than 64 beats.`);
   });

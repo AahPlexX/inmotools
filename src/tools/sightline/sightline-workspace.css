@@ -1,0 +1,1106 @@
+/* Sightline Velocity Studio presentation.
+   Kept beside the lazy workspace so the rules load only when the tool opens.
+   The reading surface itself is themed at runtime: `themeVariables()` writes
+   the palette onto `.sightline-surface` as custom properties, so a theme change
+   never needs a new stylesheet. */
+
+.sightline-stage-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .sightline-stage-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sightline-column {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sightline-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.sightline-card > h2,
+.sightline-card > h3 {
+  margin: 0;
+  font-size: .95rem;
+  letter-spacing: .01em;
+}
+
+.sightline-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.sightline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.sightline-row--between {
+  justify-content: space-between;
+}
+
+.sightline-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sightline-field > span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.sightline-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.sightline-field input[type='text'],
+.sightline-field input[type='url'],
+.sightline-field textarea,
+.sightline-field select,
+.sightline-field input[type='number'] {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.sightline-field textarea { min-height: 74px; resize: vertical; }
+
+.sightline-field input[type='range'] { width: 100%; }
+
+.sightline-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sightline-tab {
+  padding: 6px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .8rem;
+  font-weight: 650;
+}
+
+.sightline-tab[aria-pressed='true'],
+.sightline-tab[aria-selected='true'] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal-strong);
+}
+
+.sightline-button {
+  padding: 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.sightline-button--primary {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: #fff;
+}
+
+.sightline-button--ghost { border-style: dashed; }
+
+.sightline-badge {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.sightline-badge--warn { border-color: #e0b979; background: #fdf6e6; color: var(--warning); }
+.sightline-badge--good { border-color: #9ac9b4; background: #eaf7f1; color: var(--good); }
+.sightline-badge--danger { border-color: #e3a9a4; background: #fdeeec; color: var(--danger); }
+
+/* Drop zone */
+.sightline-drop {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 18px 14px;
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  text-align: center;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.sightline-drop[data-active='true'] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+
+.sightline-drop strong { font-size: .95rem; }
+.sightline-drop span { color: var(--muted); font-size: .78rem; }
+
+/* Reading surface */
+.sightline-surface {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-height: 320px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sightline-background, var(--surface));
+  color: var(--sightline-text, var(--ink));
+}
+
+.sightline-surface-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sightline-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 210px;
+  overflow: hidden;
+}
+
+.sightline-rsvp-anchor {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  font-family: var(--sightline-font, inherit);
+  font-weight: 620;
+  line-height: 1.1;
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+}
+
+.sightline-rsvp-left {
+  flex: 0 0 var(--anchor-fraction, 36%);
+  white-space: pre;
+  text-align: right;
+}
+
+.sightline-rsvp-right {
+  flex: 0 0 calc(100% - var(--anchor-fraction, 36%));
+  white-space: pre;
+  text-align: left;
+}
+
+.sightline-rsvp-word {
+  font-size: var(--sightline-word-size, 3.4rem);
+}
+
+.sightline-rsvp-word--paused { opacity: .45; }
+
+.sightline-anchor-letter {
+  color: var(--sightline-accent, #c2410c);
+}
+
+.sightline-chunk-word {
+  font-size: calc(var(--sightline-word-size, 3.4rem) * .58);
+}
+
+.sightline-marker {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sightline-marker-crosshair::before,
+.sightline-marker-crosshair::after,
+.sightline-marker-reticle::before,
+.sightline-marker-reticle::after {
+  content: '';
+  position: absolute;
+  background: color-mix(in srgb, var(--sightline-muted, #64748b) 55%, transparent);
+}
+
+.sightline-marker-crosshair::before,
+.sightline-marker-reticle::before {
+  left: var(--anchor-fraction, 36%);
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+}
+
+.sightline-marker-crosshair::after,
+.sightline-marker-reticle::after {
+  left: 4%;
+  right: 4%;
+  top: 50%;
+  height: 1px;
+}
+
+.sightline-marker-reticle::before { top: 30%; bottom: 30%; }
+.sightline-marker-reticle::after { left: 30%; right: 30%; }
+
+.sightline-marker-brackets .sightline-bracket {
+  position: absolute;
+  top: 32%;
+  bottom: 32%;
+  width: 12px;
+  border: 2px solid var(--sightline-accent, #c2410c);
+}
+
+.sightline-marker-brackets .sightline-bracket--left {
+  left: calc(var(--anchor-fraction, 36%) - 66px);
+  border-right: 0;
+}
+
+.sightline-marker-brackets .sightline-bracket--right {
+  left: calc(var(--anchor-fraction, 36%) + 54px);
+  border-left: 0;
+}
+
+.sightline-marker-dot .sightline-dot {
+  position: absolute;
+  left: calc(var(--anchor-fraction, 36%) - 4px);
+  top: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sightline-accent, #c2410c);
+}
+
+.sightline-marker-box .sightline-box {
+  position: absolute;
+  left: calc(var(--anchor-fraction, 36%) - 40px);
+  top: 18%;
+  bottom: 18%;
+  width: 148px;
+  border: 2px solid var(--sightline-accent, #c2410c);
+  border-radius: 6px;
+}
+
+.sightline-progress {
+  display: grid;
+  gap: 6px;
+}
+
+.sightline-progress input[type='range'] { width: 100%; }
+
+.sightline-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--sightline-muted, var(--muted));
+  font-size: .72rem;
+}
+
+.sightline-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.sightline-metric {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.sightline-metric dt {
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.sightline-metric dd {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Page mode */
+.sightline-page {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 4px 2px;
+  font-family: var(--sightline-font, inherit);
+  font-size: var(--sightline-page-size, 1.05rem);
+  line-height: var(--sightline-line-height, 1.7);
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+  scroll-behavior: smooth;
+}
+
+.sightline-page-paragraph { margin: 0; }
+
+.sightline-page-paragraph[data-kind='heading'] {
+  font-weight: 760;
+  font-size: 1.35em;
+}
+
+.sightline-page-paragraph[data-kind='quote'] {
+  padding-left: 12px;
+  border-left: 3px solid var(--sightline-muted, var(--line-strong));
+  font-style: italic;
+}
+
+.sightline-page-token { border-radius: 3px; }
+
+.sightline-page-token[data-current='true'] {
+  background: color-mix(in srgb, var(--sightline-accent, #c2410c) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sightline-accent, #c2410c) 32%, transparent);
+}
+
+.sightline-page-token[data-emphasis='strong'] { font-weight: 720; }
+.sightline-page-token[data-emphasis='rest'] { opacity: .84; }
+
+.sightline-page-token[data-highlight] { background: #ffe9a8; }
+.sightline-page-token[data-highlight='mint'] { background: #c9f2df; }
+.sightline-page-token[data-highlight='sky'] { background: #cfe6ff; }
+.sightline-page-token[data-highlight='rose'] { background: #ffd8e2; }
+.sightline-page-token[data-highlight='violet'] { background: #e3d6ff; }
+
+.sightline-pacer {
+  position: absolute;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--sightline-accent, #c2410c);
+  transition-property: left, top, width, opacity;
+  transition-timing-function: ease-out;
+}
+
+/* Peripheral mode */
+.sightline-peripheral {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 340px;
+  overflow: hidden;
+  font-family: var(--sightline-font, inherit);
+}
+
+.sightline-peripheral-column {
+  position: absolute;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  font-size: var(--sightline-page-size, .95rem);
+  line-height: var(--sightline-line-height, 1.6);
+}
+
+.sightline-peripheral-column[data-faded='true'] {
+  opacity: .5;
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
+}
+
+.sightline-peripheral-note {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  color: var(--sightline-muted, var(--muted));
+  font-size: .72rem;
+}
+
+/* Drill mode */
+.sightline-drill-stage {
+  display: grid;
+  place-items: center;
+  min-height: 190px;
+  font-family: var(--sightline-font, inherit);
+}
+
+.sightline-drill-card {
+  font-size: var(--sightline-word-size, 3.4rem);
+  font-weight: 680;
+  letter-spacing: .02em;
+}
+
+.sightline-drill-card[data-gap='true'] { opacity: 0; }
+
+.sightline-drill-recognised { outline: 3px solid var(--good); border-radius: 8px; }
+
+.sightline-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .78rem;
+}
+
+.sightline-table th,
+.sightline-table td {
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sightline-table th {
+  color: var(--muted);
+  font-size: .68rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sightline-scroll-x { max-height: 260px; overflow: auto; }
+
+.sightline-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.sightline-list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  font-size: .8rem;
+}
+
+.sightline-chapter-list { max-height: 220px; overflow: auto; }
+
+.sightline-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.sightline-swatch {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: .74rem;
+}
+
+.sightline-swatch[aria-pressed='true'] { border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal-soft); }
+
+.sightline-diag {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: .76rem;
+}
+
+.sightline-diag li { display: flex; gap: 6px; align-items: baseline; }
+
+.sightline-stage-empty {
+  display: grid;
+  gap: 8px;
+  place-items: center;
+  padding: 26px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.sightline-export-row {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.sightline-export-row strong { font-size: .86rem; }
+.sightline-export-row small { color: var(--muted); font-size: .74rem; }
+
+.sightline-beat {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.sightline-beat[data-accent='true'] { background: var(--signal); }
+.sightline-beat[data-on='true'] { transform: scale(1.4); }
+
+.sightline-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sightline-pacer { transition-duration: 0s !important; }
+  .sightline-page { scroll-behavior: auto; }
+}
+
+/* ------------------------------------------------------------------ layout
+   The workspace is a vertical stack: source, contents, then a two-column
+   region holding the reading surface and the control panels. */
+.sightline {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sightline-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .sightline-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sightline-panels {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-panel-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-source {
+  border-style: dashed;
+}
+
+.sightline-source--dragging {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+
+/* Grid children must be allowed to shrink, or a wide table pushes the card. */
+.sightline-card > *,
+.sightline-surface > *,
+.sightline-reader-body > * {
+  min-width: 0;
+}
+
+.sightline-row--wrap {
+  flex-wrap: wrap;
+}
+
+.sightline-row--inline {
+  gap: 6px;
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.sightline-field--inline {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.sightline-field--inline > span {
+  white-space: nowrap;
+}
+
+.sightline-field--scrub {
+  width: 100%;
+}
+
+.sightline-field--scrub > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ----------------------------------------------------------------- buttons */
+.sightline-button--file {
+  position: relative;
+  overflow: hidden;
+}
+
+.sightline-button--file > input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+
+.sightline-button--small {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: .74rem;
+}
+
+.sightline-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sightline-accent, var(--signal));
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sightline-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .78rem;
+  font-weight: 650;
+}
+
+.sightline-chip:hover:not(:disabled) {
+  border-color: var(--signal);
+  color: var(--signal-strong);
+}
+
+.sightline-chip:disabled {
+  opacity: .55;
+}
+
+.sightline-chip--on,
+.sightline-chip[aria-pressed='true'] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal-strong);
+}
+
+.sightline-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+}
+
+/* --------------------------------------------------------------- contents */
+.sightline-chapter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sightline-chapter:last-child {
+  border-bottom: 0;
+}
+
+.sightline-chapter--level-2 { padding-left: 12px; }
+.sightline-chapter--level-3 { padding-left: 24px; }
+.sightline-chapter--level-4 { padding-left: 36px; }
+.sightline-chapter--level-5,
+.sightline-chapter--level-6 { padding-left: 48px; }
+
+.sightline-pages {
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+.sightline-pages > summary {
+  cursor: pointer;
+}
+
+.sightline-page-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+
+/* ---------------------------------------------------------------- surface */
+.sightline-reader-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sightline-page-scroll {
+  position: relative;
+  max-height: min(62vh, 620px);
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sightline-surface, var(--surface));
+  font-family: var(--sightline-font, inherit);
+  font-size: var(--sightline-page-size, .95rem);
+  line-height: var(--sightline-line-height, 1.7);
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+}
+
+.sightline-paragraph {
+  margin: 0 0 .75em;
+  text-align: left;
+}
+
+.sightline-paragraph--heading {
+  margin-bottom: .3em;
+  font-size: 1.2em;
+  font-weight: 720;
+  letter-spacing: -.01em;
+}
+
+.sightline-paragraph--quote {
+  padding-left: 10px;
+  border-left: 3px solid var(--line-strong);
+  font-style: italic;
+}
+
+.sightline-paragraph--list-item {
+  padding-left: 14px;
+  text-indent: -14px;
+}
+
+.sightline-paragraph--note,
+.sightline-paragraph--caption {
+  font-size: .84em;
+  color: var(--sightline-muted, var(--muted));
+}
+
+.sightline-page-word[data-current='true'] {
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sightline-accent, #c2410c) 40%, transparent);
+}
+
+.sightline-columns {
+  position: absolute;
+  inset: 0;
+  letter-spacing: var(--sightline-letter-spacing, 0);
+  word-spacing: var(--sightline-word-spacing, 0);
+}
+
+.sightline-column-word {
+  display: inline-block;
+  margin-right: .28em;
+}
+
+.sightline-column-word[data-current='true'] {
+  color: var(--sightline-accent, #c2410c);
+  font-weight: 700;
+}
+
+.sightline-pacer--idle {
+  opacity: 0;
+}
+
+.sightline-pacer--underline {
+  border-radius: 2px;
+}
+
+.sightline-pacer--window {
+  border-radius: 4px;
+  opacity: .22;
+}
+
+.sightline-pacer--bar {
+  opacity: .3;
+}
+
+.sightline-current {
+  margin: 0;
+  width: 100%;
+}
+
+.sightline-rsvp-line {
+  display: block;
+  white-space: pre;
+  font-size: var(--sightline-word-size, 3.4rem);
+  letter-spacing: var(--sightline-letter-spacing, 0);
+}
+
+.sightline-empty {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--sightline-muted, var(--muted));
+  font-size: .84rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------- measures */
+.sightline-scrub {
+  display: grid;
+  gap: 6px;
+}
+
+.sightline-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sightline-note-field {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.sightline-note--warning {
+  color: var(--danger, #a11);
+}
+
+/* ------------------------------------------------------------------ lists */
+.sightline-list,
+.sightline-note-list,
+.sightline-bookmark-list,
+.sightline-progress-list,
+.sightline-cloze-list,
+.sightline-export-list,
+.sightline-velocity-list,
+.sightline-diagnostics,
+.sightline-limits {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  font-size: .78rem;
+}
+
+.sightline-bookmark-list > li,
+.sightline-progress-list > li,
+.sightline-export-list > li,
+.sightline-velocity-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sightline-bookmark-list > li:last-child,
+.sightline-progress-list > li:last-child,
+.sightline-export-list > li:last-child,
+.sightline-velocity-list > li:last-child {
+  border-bottom: 0;
+}
+
+.sightline-export-list > li {
+  justify-content: space-between;
+}
+
+.sightline-export-list strong {
+  font-size: .82rem;
+}
+
+.sightline-velocity-list > li > span:first-child {
+  min-width: 82px;
+  color: var(--muted);
+}
+
+.sightline-velocity-bar {
+  height: 8px;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--signal);
+}
+
+.sightline-cloze-list > li {
+  padding: 6px 8px;
+  border-left: 3px solid var(--signal);
+  background: var(--surface-strong);
+}
+
+.sightline-diagnostic {
+  padding: 6px 8px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+
+.sightline-diagnostic--error { border-left-color: var(--danger, #b4231f); }
+.sightline-diagnostic--warning { border-left-color: #b45309; }
+.sightline-diagnostic--info { border-left-color: var(--signal); }
+
+.sightline-brief {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: var(--ink);
+  font: 500 .72rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------- keyboard */
+.sightline :focus-visible {
+  outline: 3px solid #b45309;
+  outline-offset: 2px;
+}
+
+.sightline .sightline-btn:focus,
+.sightline button:focus,
+.sightline a:focus,
+.sightline input:focus,
+.sightline select:focus,
+.sightline textarea:focus,
+.sightline summary:focus,
+.sightline [tabindex]:focus {
+  outline: 3px solid #b45309;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sightline-pacer {
+    transition: none;
+  }
+}
+
+/* The anchored line scales with the viewport so a long word or a five-word
+   frame cannot push the stage wider than its container. */
+.sightline-rsvp-line {
+  font-size: min(var(--sightline-word-size, 3.4rem), 7vw);
+}
+
+.sightline-marker {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sightline-rsvp-left,
+.sightline-rsvp-right {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sightline-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sightline-facts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sightline-facts dt {
+  color: var(--sightline-muted, var(--muted));
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sightline-facts dd {
+  margin: 0;
+  font-size: .9rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+/* Sightline UX audit remediation: component-driven reflow and touch ergonomics. */
+.sightline { container: sightline / inline-size; container-type: inline-size; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.sightline-card > h2, .sightline-card > h3, .sightline-card summary { font-size: clamp(.95rem, .9rem + .2vw, 1.1rem); }
+.sightline-note, .sightline-row--inline, .sightline-list, .sightline-diagnostics, .sightline-limits { font-size: .875rem; }
+.sightline-field > span { font-size: .75rem; }
+.sightline-button, .sightline-tab, .sightline-chip, .sightline-source-details > summary, .sightline-settings-details > summary, .sightline-contents-details > summary { min-height: 40px; }
+.sightline-source-details > summary, .sightline-settings-details > summary, .sightline-contents-details > summary, .sightline-evidence-details > summary { display: flex; align-items: center; cursor: pointer; font-weight: 750; }
+.sightline-source-details, .sightline-settings-details, .sightline-technical-details, .sightline-diagnostic-details { min-width: 0; }
+.sightline-source-details[open], .sightline-settings-details[open], .sightline-technical-details[open], .sightline-diagnostic-details[open] { display: grid; gap: 10px; }
+.sightline-start-here, .sightline-inline-details { min-width: 0; }
+.sightline-inline-details > summary { cursor: pointer; font-weight: 700; }
+.sightline-document-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.sightline-document-bar > div { display: grid; gap: 2px; min-width: 0; }
+.sightline-document-bar strong { overflow-wrap: anywhere; }
+.sightline-document-bar span { color: var(--muted); font-size: .875rem; }
+.sightline-batch-results { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sightline-batch-results li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.sightline-cockpit { position: sticky; top: 8px; z-index: 8; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); }
+.sightline-field--cockpit { grid-template-columns: auto minmax(72px, 96px); align-items: center; }
+.sightline-field--cockpit input { min-height: 40px; }
+.sightline-basic-controls { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); }
+.sightline-page-scroll { height: clamp(280px, 58dvh, 720px); max-height: none; }
+.sightline-surface { min-height: clamp(320px, 52dvh, 760px); }
+@container sightline (max-width: 760px) {
+  .sightline-main { grid-template-columns: minmax(0, 1fr); }
+  .sightline-surface { padding: 10px; min-height: min(70dvh, 620px); }
+  .sightline-rsvp-line { font-size: clamp(1.65rem, 9vw, var(--sightline-word-size, 3.4rem)); }
+  .sightline-document-bar, .sightline-batch-results li { align-items: stretch; }
+  .sightline-document-bar .sightline-field { width: 100%; }
+}
+@media (pointer: coarse) {
+  .sightline-button, .sightline-tab, .sightline-chip, .sightline-field input, .sightline-field select, .sightline-field textarea, .sightline summary { min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .sightline { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .sightline-cockpit { position: fixed; inset-inline: 8px; bottom: 0; top: auto; z-index: 50; padding-bottom: max(8px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgb(0 0 0 / .12); }
+  .sightline-cockpit .sightline-button { flex: 1 1 auto; }
+  .sightline-field--cockpit { flex: 1 1 100%; grid-template-columns: auto minmax(72px, 1fr); }
+}
+
+.sightline-cockpit-more { flex: 0 1 auto; }
+.sightline-cockpit-more > summary { display: flex; align-items: center; min-height: 40px; padding: 0 10px; cursor: pointer; font-weight: 700; }
+.sightline-cockpit-more[open] { flex-basis: 100%; }
+.sightline-cockpit-more[open] > .sightline-row { margin-top: 6px; }

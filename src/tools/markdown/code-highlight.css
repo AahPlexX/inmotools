@@ -1,0 +1,31 @@
+/* Stable Lezer token classes for Markdown fenced-code highlighting.
+   This stylesheet is also inlined into standalone HTML and EPUB exports, so
+   it intentionally uses literal contrast-safe colors instead of app-only CSS
+   custom properties. Unlisted token classes inherit the surrounding code
+   color without losing content or semantics. */
+pre code .tok-comment { color: #59636e; font-style: italic; }
+pre code .tok-keyword { color: #1546ad; font-weight: 700; }
+pre code .tok-string,
+pre code .tok-string2,
+pre code .tok-literal { color: #1c7a4a; }
+pre code .tok-number,
+pre code .tok-atom,
+pre code .tok-bool { color: #a0521d; }
+pre code .tok-typeName,
+pre code .tok-className,
+pre code .tok-namespace { color: #6a3fb5; }
+pre code .tok-propertyName,
+pre code .tok-labelName { color: #1546ad; }
+pre code .tok-variableName2,
+pre code .tok-macroName { color: #a0521d; }
+pre code .tok-meta,
+pre code .tok-punctuation,
+pre code .tok-operator { color: #59636e; }
+pre code .tok-invalid { color: #b3261e; text-decoration: underline wavy; }
+pre code .tok-strong { font-weight: 700; }
+pre code .tok-emphasis { font-style: italic; }
+pre code .tok-heading { color: #1546ad; font-weight: 700; }
+pre code .tok-link,
+pre code .tok-url { color: #205bd6; text-decoration: underline; }
+pre code .tok-inserted { color: #1c7a4a; }
+pre code .tok-deleted { color: #b3261e; }

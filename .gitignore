@@ -6,3 +6,6 @@ test-results/
 *.log
 .DS_Store
 public/pyodide/
+public/libarchive.js/
+public/libarchive.js
+review-receipts/

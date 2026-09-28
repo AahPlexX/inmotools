@@ -155,7 +155,3 @@ export interface DiagramRenderResponse {
   readonly error?: string;
 }
 
-export interface ExportAsset {
-  readonly filename: string;
-  readonly mimeType: string;
-}
