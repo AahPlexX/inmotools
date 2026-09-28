@@ -103,7 +103,8 @@
 .mastering-band-row { border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
 .mastering-band-row summary { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; min-height:44px; padding:10px 12px; cursor:pointer; }
 .mastering-stage + .mastering-stage, .mastering-panel + .mastering-stage, .mastering-stage + .mastering-panel { margin-top:0; }
-.mastering-table-scroll { overflow-x:auto; }
+.mastering-table-scroll { overflow-x:auto; max-width:100%; }
+.mastering-table-scroll:focus-visible { outline:3px solid var(--signal); outline-offset:2px; border-radius:var(--radius-sm); }
 .mastering-diagnostics th, .mastering-diagnostics td { white-space:normal; }
 .mastering-diagnostics th { width:45%; }
 .mastering-diagnostics td { overflow-wrap:anywhere; }
