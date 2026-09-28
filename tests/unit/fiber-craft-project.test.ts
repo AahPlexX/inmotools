@@ -1,7 +1,15 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { createStarterCrochetDocument, workNextCrochetStitch } from '../../src/tools/fiber-craft/crochet-document-engine';
-import { addCountedBackstitch, addCountedFrenchKnot, createStarterCountedThreadDocument, setCountedThreadStitch } from '../../src/tools/fiber-craft/engines/counted-thread-engine';
+import {
+  addCountedBackstitch,
+  addCountedFrenchKnot,
+  countedThreadFinishedSizeInches,
+  createStarterCountedThreadDocument,
+  findCountedThreadConfettiCells,
+  setCountedThreadFabricSettings,
+  setCountedThreadStitch,
+} from '../../src/tools/fiber-craft/engines/counted-thread-engine';
 import { crochetPngDimensions } from '../../src/tools/fiber-craft/engines/crochet-chart-renderer';
 import { crochetGlyphPrimitives } from '../../src/tools/fiber-craft/engines/crochet-glyph-engine';
 import { CROCHET_SYMBOLS } from '../../src/tools/fiber-craft/engines/symbol-library';
@@ -64,6 +72,32 @@ describe('portable Fiber Craft project bundle', () => {
     expect(restored).toEqual(document);
     expect(restored.metadata.discipline).toBe('cross-stitch');
     expect(restored.chart.kind).toBe('counted-thread');
+  });
+
+  it('persists fabric-count settings and finds isolated same-color confetti stitches', () => {
+    let document = createStarterCountedThreadDocument('2026-09-27T20:10:00.000Z');
+    document = setCountedThreadFabricSettings(document, {
+      fabricType: 'linen',
+      fabricCount: 28,
+      stitchOver: 2,
+      confettiWarningsEnabled: true,
+    }, '2026-09-27T20:11:00.000Z');
+    document = setCountedThreadStitch(document, 0, 0, 'full-cross', 'primary', '2026-09-27T20:12:00.000Z');
+    document = setCountedThreadStitch(document, 0, 1, 'full-cross', 'primary', '2026-09-27T20:13:00.000Z');
+    document = setCountedThreadStitch(document, 5, 5, 'full-cross', 'accent', '2026-09-27T20:14:00.000Z');
+
+    expect(document.settings?.countedThread).toEqual({
+      fabricType: 'linen',
+      fabricCount: 28,
+      stitchOver: 2,
+      confettiWarningsEnabled: true,
+    });
+    expect(countedThreadFinishedSizeInches(document)).toEqual({
+      width: 12 / 14,
+      height: 12 / 14,
+    });
+    expect(findCountedThreadConfettiCells(document).map(({ row, col }) => [row, col])).toEqual([[5, 5]]);
+    expect(parseFiberCraftProject(serializeFiberCraftProject(document))).toEqual(document);
   });
 
   it('rejects unrelated envelopes and invalid project data', () => {
