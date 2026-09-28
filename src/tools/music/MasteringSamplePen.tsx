@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { MAX_PATCH_FRAMES } from './dsp/processors';
-import { formatTime, messageOf, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatTime, messageOf, type MasteringPanelContext } from './mastering-ui';
 
 const VIEW_FRAMES = 256;
 const HEIGHT = 180;
@@ -184,8 +184,10 @@ export default function MasteringSamplePen({ ctx }: { ctx: MasteringPanelContext
     <fieldset className="mastering-fieldset">
       <legend>Set one sample by number</legend>
       <div className="workspace-grid three">
-        <div className="field"><label htmlFor="mastering-pen-index">Sample number in clip</label><input id="mastering-pen-index" type="number" min={0} max={Math.max(0, clipFrames - 1)} step={1} value={editIndex} onChange={(event) => setEditIndex(Math.trunc(Number(event.target.value)))} disabled={disabled} /></div>
-        <div className="field"><label htmlFor="mastering-pen-value">New value (−1 to 1)</label><input id="mastering-pen-value" type="number" min={-1} max={1} step={0.0001} value={editValue} onChange={(event) => setEditValue(Number(event.target.value))} disabled={disabled} /></div>
+        <CommitNumberField id="mastering-pen-index" label="Sample number in clip" value={editIndex} min={0} max={Math.max(0, clipFrames - 1)} step={1} digits={0}
+          onCommit={(value) => setEditIndex(Math.trunc(value))} onPreview={(value) => setEditIndex(Math.trunc(value))} disabled={disabled} />
+        <CommitNumberField id="mastering-pen-value" label="New value (−1 to 1)" value={editValue} min={-1} max={1} step={0.0001} digits={4}
+          onCommit={setEditValue} onPreview={setEditValue} disabled={disabled} />
         <div className="field"><span className="field-label">At time</span><output className="mastering-readout">{formatTime(clipStart + editIndex / rate)}</output></div>
       </div>
       <div className="button-row">
