@@ -3,8 +3,8 @@
 **Deterministic denominator:** 60 accepted functional features
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
-**Current verified count:** 28/60
-**Current executable evidence:** Task 6 is closed at runtime source `c41fe4704f3710a919912264f9a37f663b761f4e`. Exact-source local verification on the connected Windows checkout passes 10/10 focused spatial-analysis units, TypeScript/production/PWA build, and the complete Tactical Playwright spec with 40 passed / 2 intentional mobile duplicate Axe/reflow skips / 0 failures using tracing disabled only to avoid a local Playwright trace-file ENOENT. GitHub workflow run `36284500497` on the same source tip independently passes repository unit tests and production build and is executing the full repository browser matrix. Rows 27–34 are verified, bringing the deterministic numerator to 28/60. Task 7 persistence, interchange and session planning is active.
+**Current verified count:** 32/60
+**Current executable evidence:** Task 7 is closed at runtime source `f22b134e3accd7c4bc0152a2a0d70b769851ce33`. Exact-source local verification passes 10/10 persistence units, TypeScript/production/PWA build, and the complete Tactical Playwright spec with 50 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures. Browser evidence includes desktop/mobile session and snapshot editing, ZIP and trajectory CSV round trips, corrupt-import preservation, project vault load/remove, crash recovery, Axe, and five-width reflow with 44px targets. Rows 42, 49, 56 and 60 are verified. Row 50 remains planned for Task 10 analytics report export. Task 8 synchronized 3D presentation is next.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
 | ---: | --- | --- | --- | --- |
@@ -49,25 +49,25 @@
 | 39 | Presentation / Spotlight Telestration | planned | — | — |
 | 40 | Onion-Skin / Ghost Positions | planned | — | — |
 | 41 | Scenario Comparison View | planned | — | — |
-| 42 | Coaching Session / Drill Plan | planned | — | — |
+| 42 | Coaching Session / Drill Plan | verified | `session-engine.ts`, `TacticalPersistencePanel.tsx`, session/persistence tests | Structured local session fields, validated immutable editing and project/snapshot round trip pass focused units, build and desktop/mobile browser workflows at `f22b134`. |
 | 43 | Local Match-Video Import & Precision Review | planned | — | — |
 | 44 | Video-Synchronized Telestration | planned | — | — |
 | 45 | Manual / Interpolated Overlay Tracking | planned | — | — |
 | 46 | Match Event Tagging | planned | — | — |
 | 47 | Local Clip / Playlist Builder | planned | — | — |
 | 48 | Multi-Angle Local Video Sync | planned | — | — |
-| 49 | Open Tactical Trajectory Import | planned | — | — |
-| 50 | Tactical Analytics CSV/JSON Export | planned | — | — |
+| 49 | Open Tactical Trajectory Import | verified | `project-io.ts`, `TacticalPersistencePanel.tsx`, persistence/e2e tests | Open CSV/JSON trajectory interchange validates normalized/metre coordinates, ownership and optional authored fields, preserves provenance, and feeds canonical motion/analysis. Unit and desktop/mobile CSV round-trip evidence are green at `f22b134`. |
+| 50 | Tactical Analytics CSV/JSON Export | planned | — | Task 7 exports trajectory samples; the distinct analysis/metrics report export remains Task 10 work. |
 | 51 | Device-Agnostic Responsive Workspace | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `tactical-matchboard.css`, `tests/e2e/tactical-matchboard-studio.spec.ts` | The beginner slice passes phone portrait/landscape, tablet, laptop and desktop reflow plus 44px target checks; later timeline, analysis, media, 3D and export surfaces must join the same responsive contract before the whole feature is verified. |
 | 52 | Context Menu + Explicit Touch Equivalent | in-progress | `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx`, `workspace-engine.ts`, `tests/e2e/tactical-matchboard-studio.spec.ts` | Pointer/touch click-to-place plus keyboard-reachable player buttons, D-pad movement, and numeric coordinates have desktop/mobile evidence for the current workflow; future context-menu actions and their touch equivalents remain. |
 | 53 | Collision-Protected Tooltips & Help Reference | planned | — | — |
 | 54 | Keyboard Shortcut & Transport Engine | planned | — | — |
 | 55 | Layers, Selection, Grouping, Locking & Visibility | in-progress | `tactics-types.ts`, `editor-engine.ts`, `TacticalBoard.tsx`, `TacticalMatchboardWorkspace.tsx` | Scene/layer ownership plus lock/visibility primitives exist and the beginner workspace has explicit player selection; grouping, layer reorder, solo/focus and full layer UI remain. |
-| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | in-progress | `editor-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Immutable undo/redo history is bounded at 100 snapshots and exposed in the registered workspace; autosave, named/recovery snapshots, persistence and crash recovery remain. |
+| 56 | Undo/Redo, Snapshots & Crash-Safe Autosave | verified | `editor-engine.ts`, `persistence-engine.ts`, `TacticalPersistencePanel.tsx`, persistence/e2e tests | Bounded immutable undo/redo, named snapshots, bounded browser-local autosaves, recovery gating and reload restoration pass units and desktop/mobile browser workflows at `f22b134`. |
 | 57 | Capability-Negotiated Local Video Export | planned | — | — |
 | 58 | Vector-First Coaching PDF / Contact-Sheet Publisher | planned | — | — |
 | 59 | Still, Social-Card & Standalone Playback Export | in-progress | `board-engine.ts`, `TacticalMatchboardWorkspace.tsx` | Deterministic accessible SVG serialization plus a real local SVG download action exist with escaped text, physical pitch aspect ratio, scene/layer filtering, players, equipment and annotations; raster/social/standalone HTML paths remain. |
-| 60 | Deterministic Project Vault / ZIP / Schema Migration | planned | — | — |
+| 60 | Deterministic Project Vault / ZIP / Schema Migration | verified | `persistence-engine.ts`, `project-io.ts`, `TacticalPersistencePanel.tsx`, persistence/e2e tests | Dexie vault save/load/remove, validated JSON and deterministic ZIP with bounded local assets/path checks, schema v1→v2 migration, and corrupt-import preservation pass units, build and desktop/mobile browser workflows at `f22b134`. |
 
 ## Evidence policy
 

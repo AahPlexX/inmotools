@@ -1,9 +1,9 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-25
+**Updated:** 2026-09-28
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Validated Task 5 runtime tip:** `c6550af2a0b32f970983e2aed2c70fed68817346`
+**Validated Task 7 runtime tip:** `f22b134e3accd7c4bc0152a2a0d70b769851ce33`
 
 ## Purpose and source-of-truth roles
 
@@ -97,15 +97,15 @@
 - **Reverse-safe:** complete.
 
 ### T07-01 — Persistence, interchange and session planning
-- **Status:** ACTIVE
+- **Status:** DONE
 - **Depends on:** T06-01 DONE
 - **Primary files:** tactical persistence/import/session modules + tests
 - **Action:** Dexie vault, autosave/snapshots/recovery, migration, safe JSON/ZIP round-trip, assets, trajectory import/export, session plans.
-- **Exit evidence:** corrupt-import preservation and deterministic round-trip tests plus responsive browser-local persistence/import/session workflows.
-- **Reverse-safe:** no while ACTIVE; its persistence/import/session files are reserved.
+- **Exit evidence:** exact runtime source `f22b134` passes 10/10 persistence units, TypeScript/production/PWA build and the full Tactical Playwright spec: 50 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures. Desktop/mobile workflows cover ZIP/CSV round trips, corrupt-import preservation, session/snapshot editing, vault lifecycle and reload recovery. Rows 42, 49, 56 and 60 are verified; analytics report row 50 remains Task 10.
+- **Reverse-safe:** complete.
 
 ### T08-01 — Synchronized 3D presentation
-- **Status:** BLOCKED
+- **Status:** READY
 - **Depends on:** T07-01
 - **Primary files:** tactical Three.js projection modules + UI/tests
 - **Action:** synchronized pitch/players/ball, camera presets/keyframes, 2D/3D shared-state editing, on-demand rendering, disposal.

@@ -4,25 +4,21 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `c41fe4704f3710a919912264f9a37f663b761f4e`
+- Last fully browser-validated source tip: `f22b134e3accd7c4bc0152a2a0d70b769851ce33`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 7 — persistence, interchange and session planning**
-- Verified functional features: **28/60**
+- Milestone: **Task 8 — synchronized 3D presentation**
+- Verified functional features: **32/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-Execute **T07-01 — persistence, interchange and session planning** in dependency order:
+Execute **T08-01 — synchronized 3D presentation**. First inspect the current tactical project/scene/time sampler and existing pinned Three.js stack, then build the 3D pitch/players/ball projection from that sampled state. Add camera presets and keyframes, a shared 2D/3D editing path, on-demand rendering and resource disposal, with focused unit and desktop/mobile browser evidence. Keep canonical coordinates and timeline state shared; do not create a second mutable project model.
 
-1. Audit existing pinned Dexie/ZIP/import dependencies before adding anything.
-2. RED tests for local project vault lifecycle, autosave/recovery, snapshot/version retention and schema migration.
-3. Safe deterministic project JSON/ZIP import/export with corrupt-import preservation and asset references.
-4. Trajectory CSV/JSON import/export with explicit provenance feeding the already-verified analysis engine.
-5. Editable coaching/session plans and local project/session round-trip.
-6. Responsive accessible persistence/import/session UI with browser-local storage honesty and failure states.
-7. Run focused units, TypeScript/build, desktop/mobile browser, accessibility/reflow and round-trip evidence before reconciling the corresponding feature rows.
+## Task 7 closure evidence
+
+Task 7 is **DONE** at runtime source `f22b134e3accd7c4bc0152a2a0d70b769851ce33`. Fresh exact-source local verification passes **10/10** persistence units, TypeScript/production/PWA build, and the full Tactical Playwright spec with **50 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. ZIP/CSV interchange, corrupt-import preservation, session/snapshot editing, vault lifecycle, reload recovery, accessibility and responsive controls are covered. Rows **42, 49, 56, 60** are verified; row 50 remains Task 10 analytics report export.
 
 ## Task 6 closure evidence
 
@@ -34,9 +30,9 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 42, 49, 56, 60**.
 
-In progress: **3, 4, 5, 7, 8, 35, 51, 52, 55, 56, 59**.
+In progress: **3, 4, 5, 7, 8, 51, 52, 55, 59**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 

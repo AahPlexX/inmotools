@@ -5,10 +5,10 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
-  - Current milestone: **Task 7 — persistence, interchange and session planning.** Task 6 is closed with exact source-honest geometry/browser evidence; T07-01 is active.
-  - Current verified feature count: **28/60**. Verified rows: 1, 2, 9–34. Persistence/interchange/session planning is the active dependency-ordered milestone.
-  - Current evidence: exact Task-6 source `c41fe4704f3710a919912264f9a37f663b761f4e` passes 10/10 focused spatial units, production/PWA build, and the full Tactical Playwright spec with 40 passes, 2 intentional mobile duplicate Axe/reflow skips and 0 failures; GitHub run `36284500497` independently passes repository units/build on the same source while its full repository browser matrix continues.
-  - Tasks 5–6 are complete: deterministic timeline/coordinated motion plus physical-metre spatial analysis, source-honest SVG overlays/text equivalents, authored orientation, occupancy and trajectory metrics are verified.
+  - Current milestone: **Task 8 — synchronized 3D presentation.** Task 7 is closed; T08-01 is READY.
+  - Current verified feature count: **32/60**. Verified rows: 1, 2, 9–34, 42, 49, 56, 60. Analytics report export row 50 remains Task 10.
+  - Current evidence: exact Task-7 runtime source `f22b134e3accd7c4bc0152a2a0d70b769851ce33` passes 10/10 focused persistence units, TypeScript/production/PWA build, and the full Tactical Playwright spec with 50 passes, 2 intentional duplicate mobile Axe/reflow skips and 0 failures, including vault, recovery, ZIP/CSV, session, Axe and responsive workflows.
+  - Tasks 5–7 are complete: deterministic timeline/coordinated motion, physical-metre spatial analysis, browser-local persistence/interchange and session planning are verified.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the Tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 
