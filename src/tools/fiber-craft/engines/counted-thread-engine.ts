@@ -4,8 +4,10 @@ import {
   type CountedBackstitch,
   type CountedFrenchKnot,
   type CountedStitchKind,
+  type CountedThreadCell,
   type CountedThreadChart,
   type CountedThreadPoint,
+  type CountedThreadProjectSettings,
   type FiberCraftDocument,
 } from '../fiber-craft-types';
 
@@ -63,6 +65,13 @@ const STARTER_PALETTE: readonly ColorSlot[] = [
   { id: 'accent', label: 'Accent', hex: '#087a55' },
   { id: 'contrast', label: 'Contrast', hex: '#9b5d00' },
 ];
+
+export const DEFAULT_COUNTED_THREAD_SETTINGS: CountedThreadProjectSettings = {
+  fabricType: 'aida',
+  fabricCount: 14,
+  stitchOver: 1,
+  confettiWarningsEnabled: true,
+};
 
 export const isCountedStitchKind = (value: unknown): value is CountedStitchKind =>
   typeof value === 'string' && (COUNTED_STITCH_KINDS as readonly string[]).includes(value);
@@ -131,6 +140,7 @@ export const createStarterCountedThreadDocument = (
       knots: [],
       backstitches: [],
     },
+    settings: { countedThread: DEFAULT_COUNTED_THREAD_SETTINGS },
     swatchImages: {},
     completedSteps: [],
   };
@@ -160,6 +170,66 @@ export const switchToCountedThreadDocument = (
     palette: document.palette,
     swatchImages: document.swatchImages,
   };
+};
+
+export const setCountedThreadFabricSettings = (
+  document: FiberCraftDocument,
+  settings: CountedThreadProjectSettings,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  requireChart(document);
+  if (!['aida', 'linen', 'evenweave'].includes(settings.fabricType)) {
+    throw new Error('Choose Aida, linen, or evenweave fabric.');
+  }
+  if (!Number.isInteger(settings.fabricCount) || settings.fabricCount < 1 || settings.fabricCount > 100) {
+    throw new Error('Fabric count must be a whole number from 1 to 100.');
+  }
+  if (settings.stitchOver !== 1 && settings.stitchOver !== 2) {
+    throw new Error('Stitch-over must be one or two fabric threads.');
+  }
+  const normalized: CountedThreadProjectSettings = {
+    ...settings,
+    stitchOver: settings.fabricType === 'aida' ? 1 : settings.stitchOver,
+  };
+  return {
+    ...document,
+    settings: { ...document.settings, countedThread: normalized },
+    metadata: {
+      ...document.metadata,
+      materialClass: `${normalized.fabricCount}-count ${normalized.fabricType === 'aida' ? 'Aida' : normalized.fabricType}`,
+      updatedAt: now,
+    },
+  };
+};
+
+const countedSettings = (document: FiberCraftDocument): CountedThreadProjectSettings =>
+  document.settings?.countedThread ?? DEFAULT_COUNTED_THREAD_SETTINGS;
+
+export const countedThreadFinishedSizeInches = (
+  document: FiberCraftDocument,
+): { readonly width: number; readonly height: number } => {
+  const chart = requireChart(document);
+  const settings = countedSettings(document);
+  const stitchesPerInch = settings.fabricCount / settings.stitchOver;
+  return {
+    width: chart.cols / stitchesPerInch,
+    height: chart.rows / stitchesPerInch,
+  };
+};
+
+export const findCountedThreadConfettiCells = (
+  document: FiberCraftDocument,
+): readonly CountedThreadCell[] => {
+  const chart = requireChart(document);
+  const stitched = chart.cells.filter(
+    (cell): cell is CountedThreadCell & { readonly colorId: string } =>
+      cell.stitchKind !== null && cell.colorId !== null,
+  );
+  return stitched.filter((cell) => !stitched.some((neighbor) =>
+    neighbor !== cell
+      && neighbor.colorId === cell.colorId
+      && Math.abs(neighbor.row - cell.row) <= 1
+      && Math.abs(neighbor.col - cell.col) <= 1));
 };
 
 export const setCountedThreadStitch = (
