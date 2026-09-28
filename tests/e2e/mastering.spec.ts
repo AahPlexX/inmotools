@@ -150,6 +150,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await expect(page.getByLabel('Region 1 name')).toHaveValue('Verse A');
 
   const gainInput = page.getByLabel('Gain to apply (dB)');
+  await expect(gainInput).toHaveAttribute('inputmode', 'text');
   await gainInput.click();
   await gainInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
   await gainInput.press('Backspace');
@@ -195,6 +196,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await page.getByRole('button', { name: 'Remove DC offset' }).click();
   await page.getByRole('button', { name: 'Invert polarity' }).click();
   await page.getByRole('button', { name: 'Reverse selection' }).click();
+  await expect(page.getByLabel('Silence duration (seconds)')).toHaveAttribute('inputmode', 'decimal');
   await page.getByLabel('Silence duration (seconds)').fill('0.1');
   await page.getByRole('button', { name: 'Insert silence at playhead' }).click();
   await expect(levelPanel.getByLabel('Clip edits')).toHaveText('4');
@@ -422,6 +424,7 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await page.locator('summary').filter({ hasText: 'Band 6' }).click();
   await page.getByLabel('Band 6 on').check();
   const bandGain = page.getByRole('spinbutton', { name: 'Band 6 gain' });
+  await expect(bandGain).toHaveAttribute('inputmode', 'text');
   await bandGain.click();
   await bandGain.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
   await bandGain.press('Backspace');
