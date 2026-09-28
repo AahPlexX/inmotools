@@ -17,7 +17,7 @@ import {
   resetClipEditsRevision,
 } from './mastering-project';
 import { SUPPORTED_BIT_DEPTHS, type LevelMeasure } from './dsp/processors';
-import { formatBytes, formatTime, messageOf, newId, newSeed, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatBytes, formatTime, messageOf, newId, newSeed, type MasteringPanelContext } from './mastering-ui';
 
 interface Props {
   ctx: MasteringPanelContext;
@@ -150,8 +150,8 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
       <section className="mastering-panel" aria-labelledby="level-heading">
         <div className="mastering-panel-heading"><div><h3 id="level-heading">Level operations</h3><p>Applies to the selected clip. Every operation stays reversible.</p></div></div>
         <div className="workspace-grid three">
-          <div className="field"><label htmlFor="mastering-gain">Gain to apply (dB)</label><input id="mastering-gain" type="number" min="-60" max="24" step="0.1" value={gainDb} onChange={(event) => setGainDb(Number(event.target.value))} disabled={!canEdit} /></div>
-          <div className="field"><label htmlFor="mastering-peak-target">Peak target (dBFS)</label><input id="mastering-peak-target" type="number" min="-60" max="0" step="0.1" value={peakTarget} onChange={(event) => setPeakTarget(Math.min(0, Number(event.target.value)))} disabled={!canEdit} /></div>
+          <CommitNumberField label="Gain to apply" suffix="dB" value={gainDb} min={-60} max={24} step={0.1} digits={1} onCommit={setGainDb} disabled={!canEdit} />
+          <CommitNumberField label="Peak target" suffix="dBFS" value={peakTarget} min={-60} max={0} step={0.1} digits={1} onCommit={setPeakTarget} disabled={!canEdit} />
           <div className="field"><span className="field-label">Clip edits</span><output className="mastering-readout" aria-label="Clip edits">{clip?.edits.length ?? 0}</output></div>
         </div>
         <div className="button-row">
@@ -167,7 +167,7 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
                 <option value="lufs">Integrated loudness (LUFS, BS.1770-5)</option>
                 <option value="rms">RMS level (dBFS)</option>
               </select></div>
-            <div className="field"><label htmlFor="mastering-level-target">Target ({levelMeasure === 'lufs' ? 'LUFS' : 'dBFS'})</label><input id="mastering-level-target" type="number" min="-60" max="0" step="0.1" value={levelTarget} onChange={(event) => setLevelTarget(Number(event.target.value))} disabled={!canEdit} /></div>
+            <CommitNumberField label="Target" suffix={levelMeasure === 'lufs' ? 'LUFS' : 'dBFS'} value={levelTarget} min={-60} max={0} step={0.1} digits={1} onCommit={setLevelTarget} disabled={!canEdit} />
           </div>
           <p className="help-text">Common targets: −14 LUFS for most streaming services, −16 LUFS for podcasts, −23 LUFS for EBU R 128 broadcast. Normalizing only changes gain, so check the true-peak meter before export.</p>
           <div className="button-row"><button type="button" onClick={() => ctx.applyEdit({ type: 'normalizeLevel', measure: levelMeasure, target: levelTarget }, `Normalized to ${levelTarget.toFixed(1)} ${levelMeasure === 'lufs' ? 'LUFS integrated loudness' : 'dBFS RMS'}. Undo is available.`)} disabled={!canEdit || !Number.isFinite(levelTarget)}>Normalize level</button></div>
@@ -195,7 +195,7 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
         <div className="field"><label htmlFor="mastering-channel">Channel target</label><select id="mastering-channel" value={activeChannelIndex} onChange={(event) => setChannelIndex(Number(event.target.value))} disabled={!canEdit}>{Array.from({ length: clipInfo?.channelCount ?? 1 }, (_, index) => <option key={index} value={index}>Channel {index + 1}</option>)}</select></div>
       </div>
       <div className="workspace-grid">
-        <div className="field"><label htmlFor="mastering-silence-duration">Silence duration (seconds)</label><input id="mastering-silence-duration" type="number" min="0.001" max="3600" step="0.001" value={silenceDuration} onChange={(event) => setSilenceDuration(Number(event.target.value))} disabled={!canEdit} /></div>
+        <CommitNumberField label="Silence duration" suffix="seconds" value={silenceDuration} min={0.001} max={3600} step={0.001} onCommit={setSilenceDuration} disabled={!canEdit} />
         <div className="field"><span className="field-label">Insertion point</span><output className="mastering-readout">{formatTime(playhead)}</output></div>
       </div>
       <div className="button-row">
