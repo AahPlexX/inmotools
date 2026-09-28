@@ -851,14 +851,14 @@ export default function MasteringWorkspace() {
           <button type="button" onClick={() => void discardSession()} disabled={loading}>Discard it</button>
         </div>
       </section>}
-      {dspFailure && hasAudio && <section className="mastering-recovery" role="alert">
+      {dspFailure && <section className="mastering-recovery" role="alert">
         <div>
           <h3>Local audio processing stopped</h3>
-          <p>{dspFailure} Your project data is still in this tab. Save a project backup, then reload this page before making more audio changes.</p>
+          <p>{dspFailure} {hasAudio ? 'Your project data is still in this tab. Save a project backup, then reload this page before making more audio changes.' : 'Reload this page before adding audio.'}</p>
         </div>
-        <div className="button-row">
+        {hasAudio && <div className="button-row">
           <button type="button" className="mastering-primary" onClick={() => void saveBackup()} disabled={loading || projectBusy}>Save project backup</button>
-        </div>
+        </div>}
       </section>}
       <div
         className={`mastering-import${dragging ? ' is-dragging' : ''}`}
