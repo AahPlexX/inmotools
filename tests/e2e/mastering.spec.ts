@@ -582,6 +582,78 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
 
 // --- SECTION: project persistence ---
 
+test('stages backup audio transactionally before replacing the live project', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    target.__masteringWorkerMessages = [];
+    const originalPostMessage = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+      if (typeof message === 'object' && message !== null && 'type' in message) {
+        const item = message as { type?: unknown; sourceId?: unknown };
+        if (item.type === 'loadSource' || item.type === 'releaseSource') {
+          target.__masteringWorkerMessages!.push({
+            type: String(item.type),
+            sourceId: typeof item.sourceId === 'string' ? item.sourceId : undefined,
+          });
+        }
+      }
+      originalPostMessage.call(this, message, transfer ?? []);
+    } as typeof Worker.prototype.postMessage;
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles([
+    { name: 'first.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 220) },
+    { name: 'second.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 330) },
+  ]);
+  await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+
+  const initialIds = await page.evaluate(() => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    return (target.__masteringWorkerMessages ?? []).filter((item) => item.type === 'loadSource').map((item) => item.sourceId);
+  });
+  expect(initialIds).toHaveLength(2);
+
+  await page.getByRole('tab', { name: 'Project' }).click();
+  const project = page.getByRole('tabpanel', { name: 'Project' });
+  const [backup] = await Promise.all([page.waitForEvent('download'), project.getByRole('button', { name: 'Save project backup' }).click()]);
+  const { readFile } = await import('node:fs/promises');
+  const { default: JSZip } = await import('jszip');
+  const archive = await JSZip.loadAsync(await readFile(await backup.path()));
+  const manifest = JSON.parse(await archive.file('project.json')!.async('string')) as {
+    document: { sources: Array<{ id: string }> };
+    files: Record<string, string>;
+  };
+  const [firstSource, secondSource] = manifest.document.sources;
+  archive.file(manifest.files[firstSource.id], makeMonoPcm16Wav(1, 48_000, 880));
+  archive.file(manifest.files[secondSource.id], Buffer.from('not-decodable-audio'));
+  const brokenBackup = await archive.generateAsync({ type: 'nodebuffer' });
+
+  await project.locator('input[type="file"]').setInputFiles({
+    name: 'broken project.zip',
+    mimeType: 'application/zip',
+    buffer: brokenBackup,
+  });
+  await expect(page.locator('.status-line')).toContainText(/Could not reopen the project:/);
+  await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+
+  const restoreMessages = await page.evaluate((initialCount) => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    const messages = target.__masteringWorkerMessages ?? [];
+    const loads = messages.filter((item) => item.type === 'loadSource').slice(initialCount);
+    const releases = messages.filter((item) => item.type === 'releaseSource');
+    return { loads, releases };
+  }, initialIds.length);
+
+  expect(restoreMessages.loads).toHaveLength(1);
+  const stagedId = restoreMessages.loads[0].sourceId;
+  expect(stagedId).toBeTruthy();
+  expect(initialIds).not.toContain(stagedId);
+  expect(restoreMessages.releases.map((item) => item.sourceId)).toContain(stagedId);
+});
+
 test('autosaves, recovers after a reload, backs up and reopens, saves presets, and reports capabilities', async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto('./#/tools/audio-mastering');
