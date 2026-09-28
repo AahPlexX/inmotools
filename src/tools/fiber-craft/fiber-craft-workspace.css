@@ -102,7 +102,9 @@
 .fiber-counted-cell:hover { background: var(--surface-soft); }
 .fiber-counted-cell:focus-visible { z-index: 6; outline: 3px solid var(--focus); outline-offset: -3px; }
 .fiber-counted-mark { position: absolute; inset: 2px; display: grid; place-items: center; font-size: 1.35rem; font-weight: 800; line-height: 1; }
-.fiber-counted-mark > small { position: absolute; top: 1px; right: 2px; padding: 1px 2px; border-radius: 2px; background: var(--surface); color: var(--ink); font-size: .58rem; font-weight: 900; line-height: 1; }
+.fiber-counted-color-symbol { position: absolute; top: 1px; right: 2px; padding: 1px 2px; border: 1px solid transparent; border-radius: 2px; background: var(--surface); color: var(--ink); font-size: .58rem; font-weight: 900; line-height: 1; }
+.fiber-counted-grid[data-chart-appearance='symbols-only'] .fiber-counted-cell { color: var(--ink); background: var(--surface); }
+.fiber-counted-grid[data-chart-appearance='symbols-only'] .fiber-counted-color-symbol { border-color: var(--ink); }
 .fiber-counted-overlay { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .fiber-counted-overlay line { stroke-width: 3px; stroke-linecap: round; }
 .fiber-counted-summary { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: .9rem; font-weight: 700; }
@@ -129,7 +131,22 @@
 @media print {
   .fiber-counted-tools, .fiber-counted-removals { display: none !important; }
   .fiber-counted-scroll { overflow: visible; max-width: none; }
+  .fiber-counted-cell { border-color: #000; background: #fff; color: #000; }
+  .fiber-counted-color-symbol { border-color: #000; background: #fff; color: #000; }
+  .fiber-counted-overlay line { stroke: #000; }
+  .fiber-counted-overlay circle { fill: #000; stroke: #fff; }
   .fiber-counted-legend { break-inside: avoid; }
+}
+
+@media (forced-colors: active) {
+  .fiber-counted-cell,
+  .fiber-counted-color-symbol,
+  .fiber-counted-legend li > b,
+  .fiber-counted-legend li > i { border-color: ButtonText; }
+  .fiber-counted-cell,
+  .fiber-counted-color-symbol { background: Canvas; color: CanvasText; }
+  .fiber-counted-overlay line { stroke: CanvasText; }
+  .fiber-counted-overlay circle { fill: CanvasText; stroke: Canvas; }
 }
 
 .fiber-counted-import { padding: 0 16px 14px; border-top: 1px solid var(--line); }
