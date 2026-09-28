@@ -233,14 +233,14 @@ export default function MasteringMasterTab({ ctx, master, onPreview, onCommit, p
     </Stage>
 
     <Stage title="True-peak limiter" enabled={master.limiter.enabled} onToggle={toggle((s, on) => { s.limiter.enabled = on; }, 'Limiter')} disabled={disabled} summary={`Ceiling ${master.limiter.ceilingDb} dBTP`}>
-      <p className="help-text">Watches the peaks between samples (4× oversampled, as BS.1770-5 describes) so the master stays under the ceiling after conversion. −1 dBTP suits most streaming services.</p>
+      <p className="help-text">Watches peaks between samples using 4× oversampling as BS.1770-5 describes. It controls the pre-export true peak; sample-rate conversion and lossy encoding can still move decoded peaks slightly. −1 dBTP is a common delivery ceiling, but requirements vary.</p>
       <ParameterControl label="Limiter ceiling" unit="dBTP" value={master.limiter.ceilingDb} min={-24} max={0} step={0.1} disabled={disabled} {...control((s, v) => { s.limiter.ceilingDb = v; }, (v) => `Limiter ceiling ${v} dBTP.`)} />
       <ParameterControl label="Lookahead" unit="ms" value={master.limiter.lookaheadMs} min={0.5} max={10} step={0.1} disabled={disabled} {...control((s, v) => { s.limiter.lookaheadMs = v; }, (v) => `Lookahead ${v} ms.`)} />
       <ParameterControl label="Limiter release" unit="ms" value={master.limiter.releaseMs} min={1} max={2000} step={1} disabled={disabled} {...control((s, v) => { s.limiter.releaseMs = v; }, (v) => `Limiter release ${v} ms.`)} />
     </Stage>
 
     <section className="mastering-panel" aria-labelledby="render-heading">
-      <div className="mastering-panel-heading"><div><h3 id="render-heading">Render and measure</h3><p>Runs the whole chain offline at full quality, exactly as export will, and measures the result.</p></div></div>
+      <div className="mastering-panel-heading"><div><h3 id="render-heading">Render and measure</h3><p>Runs the same master chain used by export at the project sample rate and measures that rendered PCM. Export-rate conversion or lossy encoding happens later.</p></div></div>
       <div className="button-row"><button type="button" disabled={disabled || Boolean(busy)} onClick={() => void measure()}>Render and measure master</button>{busy && <span className="mastering-busy" role="status">{busy}</span>}</div>
       {report && <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Before and after master measurements">
         <table className="mastering-report">
