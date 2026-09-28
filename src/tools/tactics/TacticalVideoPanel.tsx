@@ -678,13 +678,13 @@ export default function TacticalVideoPanel({ project, onEdit, onStatus }: Tactic
           <button type="button" className="action-button" onClick={() => { void togglePlayback(); }} disabled={primary?.durationMs == null}>{playing ? 'Pause review' : 'Play review'}</button>
           <button type="button" className="action-button secondary" onClick={() => step(1)} disabled={primary?.durationMs == null}>Step forward one frame</button>
           <label>
-            Review frame rate
+            Review stepping
             <select value={frameRate} onChange={(event) => setFrameRate(Number(event.target.value))}>
               {[24, 25, 30, 50, 60].map((rate) => <option key={rate} value={rate}>{rate} fps</option>)}
             </select>
           </label>
           <label>
-            Playback speed
+            Review rate
             <select value={playbackRate} onChange={(event) => {
               const next = assertPlaybackRate(Number(event.target.value));
               setPlaybackRate(next);
@@ -770,7 +770,7 @@ export default function TacticalVideoPanel({ project, onEdit, onStatus }: Tactic
               <label>Track start (ms)<input name="start" inputMode="numeric" defaultValue={0} /></label>
               <label>Track end (ms)<input name="end" inputMode="numeric" defaultValue={200} /></label>
               <label>
-                Track interpolation
+                Anchor blending
                 <select name="interpolation" defaultValue="linear">
                   <option value="linear">Linear</option>
                   <option value="hold">Hold</option>
