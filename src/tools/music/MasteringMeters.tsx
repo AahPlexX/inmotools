@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, type ChangeEvent } from 'react';
 import type { ListenSource, MonitorMode, WorkletMeterMessage } from './mastering-worklet-protocol';
-import { formatTime } from './mastering-ui';
+import { CommitNumberField, formatTime } from './mastering-ui';
 
 export interface MonitorState {
   listen: ListenSource;
@@ -195,8 +195,9 @@ export default function MasteringMeters({ meters, playing, pre, post, monitor, o
         </table>
       </div>
       <div className="workspace-grid">
-        <label className="field"><span className="field-label">Log true peaks above (dBTP)</span>
-          <input type="number" min={-12} max={3} step={0.1} value={monitor.excursionThresholdDb} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value)) onMonitorChange({ excursionThresholdDb: Math.min(3, Math.max(-12, value)) }); }} /></label>
+        <CommitNumberField label="Log true peaks above (dBTP)" value={monitor.excursionThresholdDb} min={-12} max={3} step={0.1} digits={1}
+          onCommit={(value) => onMonitorChange({ excursionThresholdDb: value })}
+          onPreview={(value) => onMonitorChange({ excursionThresholdDb: value })} />
         <div className="field"><span className="field-label">Processing latency</span><output className="mastering-readout">{meters ? `${meters.latencyFrames} samples` : '—'}</output></div>
       </div>
       {meters && meters.excursions.length > 0 ? <ol className="mastering-excursions" aria-label="True-peak excursions">
