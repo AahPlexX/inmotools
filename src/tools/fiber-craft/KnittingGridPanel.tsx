@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   STARTER_KNITTING_GAUGE,
+  knittingRowDirection,
+  setKnittingConstruction,
   setKnittingGauge,
 } from './knitting-document-engine';
 import { getKnittingSymbol } from './engines/symbol-library';
@@ -8,6 +10,7 @@ import type {
   FiberCraftDocument,
   GridChart,
   LengthUnit,
+  KnittingConstruction,
 } from './fiber-craft-types';
 
 const formatNumber = (value: number): string =>
@@ -29,6 +32,7 @@ export function KnittingGridPanel({
   const [rows, setRows] = useState(String(savedGauge.rowCount));
   const [span, setSpan] = useState(String(savedGauge.span));
   const [unit, setUnit] = useState<LengthUnit>(savedGauge.unit);
+  const construction = document.settings?.knitting?.construction ?? 'flat';
 
   useEffect(() => {
     const gauge = document.gauge ?? STARTER_KNITTING_GAUGE;
@@ -124,6 +128,27 @@ export function KnittingGridPanel({
             <option value="cm">centimeters</option>
           </select>
         </label>
+        <label className="fiber-craft-field" htmlFor="fiber-knitting-construction">
+          <span>Construction</span>
+          <select
+            id="fiber-knitting-construction"
+            value={construction}
+            onChange={(event) => {
+              const next = event.target.value as KnittingConstruction;
+              try {
+                onCommit(
+                  setKnittingConstruction(document, next),
+                  next === 'round' ? 'Set knitting chart to in-the-round reading.' : 'Set knitting chart to flat row reading.',
+                );
+              } catch (error) {
+                onStatus(error instanceof Error ? error.message : 'Could not change knitting construction.');
+              }
+            }}
+          >
+            <option value="flat">Flat / turned rows</option>
+            <option value="round">In the round</option>
+          </select>
+        </label>
         <button className="action-button secondary" type="button" onClick={saveGauge}>
           Save knitting gauge
         </button>
@@ -141,8 +166,28 @@ export function KnittingGridPanel({
           aria-colcount={chart.cols}
           style={gridStyle}
         >
-          {Array.from({ length: chart.rows }, (_, row) => (
-            <div className="fiber-knitting-row" role="row" key={row}>
+          {Array.from({ length: chart.rows }, (_, offset) => chart.rows - 1 - offset).map((row) => {
+            const reading = knittingRowDirection(row, construction);
+            const sideLabel = reading.side === 'right' ? 'RS' : 'WS';
+            const directionLabel = reading.direction === 'right-to-left' ? 'right to left' : 'left to right';
+            return (
+            <div
+              className="fiber-knitting-row"
+              role="row"
+              key={row}
+              data-testid={`knitting-row-${row}`}
+              data-side={reading.side}
+              data-direction={reading.direction}
+            >
+              <div
+                className="fiber-knitting-row-label"
+                role="rowheader"
+                aria-label={`Row ${row + 1}, ${reading.side} side, read ${directionLabel}`}
+              >
+                <span aria-hidden="true">{reading.direction === 'right-to-left' ? '←' : '→'}</span>
+                <b>{row + 1}</b>
+                <small>{sideLabel}</small>
+              </div>
               {chart.cells
                 .filter((cell) => cell.row === row)
                 .toSorted((a, b) => a.col - b.col)
@@ -163,11 +208,18 @@ export function KnittingGridPanel({
                   );
                 })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       <div className="fiber-craft-compiler-summary">
+        <p data-testid="knitting-construction-summary">
+          <strong>{construction === 'round' ? 'In the round' : 'Flat'}:</strong>{' '}
+          {construction === 'round'
+            ? 'every round reads right to left on the right side.'
+            : 'right-side rows read right to left; wrong-side rows read left to right.'}
+        </p>
         <p>
           <strong>Gauge preview:</strong> each stitch cell is {chart.aspectRatio.toFixed(2)}× as wide as it is tall.
         </p>
