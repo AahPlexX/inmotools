@@ -30,10 +30,10 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
 - [x] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
 - [x] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
-- [ ] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
+- [x] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
 - [x] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
-- [ ] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
-- [ ] **G11 Full validation** — `pnpm test:unit`, `pnpm build`, relevant e2e green; baseline comparison recorded.
+- [x] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
+- [x] **G11 Full validation** — `pnpm test:unit`, `pnpm build`, relevant e2e green; baseline comparison recorded.
 - [ ] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11.
 
 Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` 211 files / 2,119 tests passed.
@@ -263,3 +263,28 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `pnpm build` and a browser pass against `vite preview` at 375, 768, 1280, 1440 and 2560 px; fix defects found (G8 → G10).
 - `tests/e2e/geo-intel.spec.ts` — Playwright with every network source mocked by `page.route` from the recorded fixtures.
+
+## Delivery 11 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/ui/Icon.tsx` — inline SVG icons; replaced text glyphs (ⓘ ⧉ ⌂ ★ ×) that rendered as missing-glyph boxes in the test browser's fonts.
+- `src/tools/geo-intel/ui/Tooltip.tsx` — a scroll during the hover delay no longer cancels a pending tooltip; `:hover` is re-checked before showing.
+- `src/tools/geo-intel/ui/ExportDialog.tsx` — the anchor download is the default path; the File System Access save dialog is an opt-in checkbox shown only where supported.
+- `src/tools/geo-intel/engine/synthesize.ts`, `export/binary.ts` — country name stored without a flag emoji; the social card draws an ISO-code badge (Windows fonts do not render flag emoji).
+- `src/tools/geo-intel/geo-intel.css` — icon alignment, ISO badge, ≤400 px tab bar.
+- `tests/e2e/geo-intel.spec.ts` — 15 tests × 2 projects, with every external request fulfilled from recorded fixtures: place profile + provenance dialog, postal caveat, tooltip + context menu, JSON/iCal/SVG/PNG/ZIP downloads with edited metadata, map click + measure, mobile bottom bar + sheets, fully offline lookup, axe on profile/export/provenance states, a 320–2560 px viewport matrix.
+### Gate evidence
+- G8 checked: screenshots reviewed at 320, 375, 768, 1024, 1440, 1920 and 2560 px; no horizontal overflow; controls inside the viewport.
+- G10 checked: `playwright test tests/e2e/geo-intel.spec.ts` 21 passed / 9 skipped (project-specific), and 36/36 over `--repeat-each=3 --retries=0`; the catalog-driven `accessibility.spec.ts` + `app.spec.ts` passed 94/94.
+- G11 checked: `pnpm test:unit` 218 files / 2,237 tests; `pnpm build` exit 0; full `CI=1 playwright test` 1,011 passed / 31 skipped / 0 failed / 0 flaky (17.6 min).
+### Next batch (planned)
+- G12: open a PR into `main` and let `.github/workflows/pages.yml` validate it. The PR runs the full browser suite because `src/catalog.ts` is a global path.
+- At merge time only: reconcile `.tasks/` (DONE.md, WORK_LOG.md) in the merge commit or a follow-up on `main`, so parallel branches do not conflict on those files.
+
+## Feature status (all 44 implemented)
+F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F14, F16–F19, F21, F22, F24, F25, F28–F37; e2e tests cover F01, F03, F05, F14, F18, F22, F29, F32–F36, F38–F41; the remaining UI-only features are exercised through the browser tests of the panels that host them.
+
+## Known limitations (documented, not defects)
+- Timezone polygons are simplified (99.93% agreement on land); points within a few hundred metres of a zone border can resolve to the neighbour.
+- Country polygons are 1:50m; coastal points ≤40 km offshore snap to the nearest country and say so in the note.
+- PDF uses the standard Helvetica font (WinAnsi), so non-Latin names are transliterated or dropped in the PDF only; JSON/CSV/SVG keep full Unicode.
+- Nominatim cannot be remotely switched off without a new deploy (static hosting); it is therefore off by default and opt-in.
