@@ -34,6 +34,7 @@ import {
   getKnittingSymbol,
 } from '../../src/tools/fiber-craft/engines/symbol-library';
 import type { GaugeSwatch } from '../../src/tools/fiber-craft/fiber-craft-types';
+import { createStarterKnittingDocument, setKnittingGauge } from '../../src/tools/fiber-craft/knitting-document-engine';
 
 describe('grid geometry engine', () => {
   it('creates an empty grid with every cell unset', () => {
@@ -151,6 +152,27 @@ describe('gauge and physical-dimension math', () => {
   it('rejects invalid gauge components', () => {
     expect(() => gaugeAspectRatio({ stitchCount: 0, rowCount: 10, span: 4, unit: 'in' })).toThrow();
     expect(() => rowDensity({ stitchCount: 10, rowCount: 0, span: 4, unit: 'in' }, 'in')).toThrow();
+  });
+});
+
+describe('knitting gauge-corrected grid', () => {
+  it('locks grid cell proportions to the measured stitch/row gauge and updates when gauge changes', () => {
+    const starter = createStarterKnittingDocument('2026-09-28T00:00:00.000Z');
+    expect(starter.metadata.discipline).toBe('knitting');
+    expect(starter.chart.kind).toBe('grid');
+    if (starter.chart.kind !== 'grid') throw new Error('Expected knitting grid');
+    expect(starter.gauge).toEqual({ stitchCount: 20, rowCount: 25, span: 4, unit: 'in' });
+    expect(starter.chart.aspectRatio).toBeCloseTo(25 / 20, 5);
+
+    const updated = setKnittingGauge(
+      starter,
+      { stitchCount: 18, rowCount: 24, span: 4, unit: 'in' },
+      '2026-09-28T00:01:00.000Z',
+    );
+    expect(updated.chart.kind).toBe('grid');
+    if (updated.chart.kind !== 'grid') throw new Error('Expected knitting grid');
+    expect(updated.chart.aspectRatio).toBeCloseTo(24 / 18, 5);
+    expect(updated.metadata.updatedAt).toBe('2026-09-28T00:01:00.000Z');
   });
 });
 
