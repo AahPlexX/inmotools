@@ -76,17 +76,22 @@ Delivers ledger items 3, 4, 9, 13, 16, 21, 23, 24, and the remaining part of 27 
 
 Delivers ledger items 29, 30, 31 (PDF/title-block), 32, 33 (OpenGraph card generation).
 
-- Verilog and VHDL structural exporters driven by the same component/net graph used for simulation.
-- SPICE `.cir`, EDIF, and KiCad schematic-netlist exporters.
-- PDF schematic export with title block, border grid, and reference designators (reuse an existing repository PDF dependency already pinned for another tool if it fits without new scope; otherwise propose and verify a new dependency here, not earlier).
-- BOM CSV/JSON exporter mapping gate types to classic 74-series IC equivalents.
-- OpenGraph social-card generation for the metadata studio.
+- ~~Verilog and VHDL structural exporters driven by the same component/net graph used for simulation.~~ Delivered in 4a.
+- ~~SPICE `.cir`, EDIF, and KiCad schematic-netlist exporters.~~ Delivered in 4b.
+- ~~BOM CSV/JSON exporter mapping gate types to classic 74-series IC equivalents.~~ Delivered in 4c.
+- ~~PDF schematic export with title block, border grid, and reference designators.~~ Delivered in 4d with the already-pinned pdf-lib 1.17.1 (no new dependency).
+- ~~OpenGraph social-card generation for the metadata studio.~~ Delivered in 4e.
+- **Delivered (Phase 4a):** `netlist-engine.ts` (`buildNetlist`) is the one netlist every exporter reads: the flattened circuit as parts with reference designators, pins, nets named from labels, ports and bus bits. `hdl-verilog.ts` writes gate primitives (optionally with per-gate delays) plus behavioral cells; `hdl-vhdl.ts` writes an entity and architecture. Both are proven by co-simulating exported circuits in Icarus Verilog and GHDL against the workstation simulator (`logic-hdl-toolchain.test.ts`, skipped where the tools are absent). The co-simulation exposed and fixed a simulator bug (a sink behind combinational logic following a clocked part showed the pre-edge level for a tick).
+- **Delivered (Phase 4b):** `spice-export.ts` (behavioral B-source subcircuits; run through ngspice in `logic-spice-toolchain.test.ts`), `kicad-export.ts` (s-expression netlist), `edif-export.ts` (EDIF 2 0 0).
+- **Delivered (Phase 4c):** `bom-engine.ts` and `ic-catalog.ts`: 74-series packages with pin tables read from datasheets on 2026-09-29 (7400, 7402, 7404, 7408, 7410, 7411, 7420, 7421, 7427, 7430, 7432, 7474, 7486, 74125), decomposition of gates that have no single package, spare-gate tie-off list, block parts matched to a part number without a pin table (pinouts not verified), CSV/JSON/pin-allocation CSV.
+- **Delivered (Phase 4d):** `svg-subset.ts` reads the schematic SVG back into draw items and `pdf-export.ts` draws them as a one-page vector PDF (sheet border with lettered columns and numbered rows, title block, designators, net labels, A4/A3/Letter, document properties from the metadata). `renderSchematicSvg` gained the options `designators`, `netLabels`, `sheet` and `titleBlock`; the default output is unchanged.
+- **Delivered (Phase 4e):** `og-card.ts` (1200 x 630 card and the `og:`/`twitter:` meta tags, fields editable at export time, addresses restricted to http(s) or relative), `svg-raster.ts` (browser PNG), `export-formats.ts` (every export in one list) and `LogicExportDock.tsx` (toolbar "Export...").
 
 **Gate:** same shape as prior phases; export-format unit tests assert on generated text/structure (module headers, port lists, subckt syntax) rather than only "did not throw."
 
 ## Dependency ledger
 
-No new dependency is introduced in Phase 1. Later phases that plausibly need one (PDF export in Phase 4) must re-verify the exact current stable version against its official source and npmjs.com at the time that phase starts, and record the finding here before pinning it in `package.json`. As of this writing no dependency has been added for this workstream.
+No new dependency is introduced in Phase 1. Phase 4's PDF export uses `pdf-lib` 1.17.1, which the repository already pins for other tools; npmjs.com listed 1.17.1 as the current release on 2026-09-29 (Phase 4d start), so no dependency was added or changed for this workstream.
 
 ## Task-state synchronization
 

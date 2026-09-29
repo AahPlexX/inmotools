@@ -116,11 +116,11 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 28. Accessible high-contrast / OLED-dark / paper-light / deuteranopia-and-protanopia-safe palettes where logic High/Low/Z/contention are distinguished by shape and pattern as well as hue. *(Phase 1)*
 
 ### Export, netlists, HDL & metadata
-29. HDL exporter: synthesis-formatted structural Verilog (`.v`) and VHDL (`.vhd`) with standard module headers and port declarations. *(Phase 4)*
-30. Industry-standard netlist exporter: SPICE `.cir` subcircuits, KiCad schematic netlist text, and EDIF. *(Phase 4)*
-31. Vector SVG and print-ready PDF schematic exporter with title block, border grid, reference designators, and net labels. *(Phase 1: SVG; Phase 4: PDF/title-block)*
-32. Bill-of-materials exporter: CSV/JSON itemizing components, gate counts, and classic IC package equivalents (e.g., 7400 quad NAND, 7404 hex inverter) with pin allocations. *(Phase 4)*
-33. Granular project metadata / OpenGraph tag studio: title, author, description, version, license (MIT / CERN-OHL / Creative Commons), and generated OpenGraph social-card preview fields, editable at export time. *(Phase 1: metadata fields + JSON export; Phase 4: OpenGraph card generation)*
+29. HDL exporter: synthesis-formatted structural Verilog (`.v`) and VHDL (`.vhd`) with standard module headers and port declarations. *(Phase 4; delivered in 4a)*
+30. Industry-standard netlist exporter: SPICE `.cir` subcircuits, KiCad schematic netlist text, and EDIF. *(Phase 4; delivered in 4b)*
+31. Vector SVG and print-ready PDF schematic exporter with title block, border grid, reference designators, and net labels. *(Phase 1: SVG; Phase 4: PDF/title-block, designators and net labels; delivered in 4d)*
+32. Bill-of-materials exporter: CSV/JSON itemizing components, gate counts, and classic IC package equivalents (e.g., 7400 quad NAND, 7404 hex inverter) with pin allocations. *(Phase 4; delivered in 4c)*
+33. Granular project metadata / OpenGraph tag studio: title, author, description, version, license (MIT / CERN-OHL / Creative Commons), and generated OpenGraph social-card preview fields, editable at export time. *(Phase 1: metadata fields + JSON export; Phase 4: OpenGraph card generation; delivered in 4e)*
 34. Offline single-file portable `.circuit.json` project bundle (layouts, embedded subcircuits, memory contents), reloadable with zero network connectivity. *(Phase 1)*
 
 Truth-table CSV export, referenced by capability 19, ships in Phase 1 alongside the generator itself.
