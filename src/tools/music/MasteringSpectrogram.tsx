@@ -178,8 +178,8 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
   return <div className="mastering-spectrogram">
     <div className="mastering-spectrogram-bar">
       <div className="mastering-listen" role="radiogroup" aria-label="Spectrogram drag action">
-        <button type="button" role="radio" aria-checked={mode === 'select'} onClick={() => setMode('select')}>Select time</button>
-        <button type="button" role="radio" aria-checked={mode === 'paint'} onClick={() => setMode('paint')}>Paint regions</button>
+        <button type="button" role="radio" aria-checked={mode === 'select'} title="Drag to select a time range, like on the waveform" onClick={() => setMode('select')}>Select time</button>
+        <button type="button" role="radio" aria-checked={mode === 'paint'} title="Drag a box around a sound to fix, such as a squeak or bird call" onClick={() => setMode('paint')}>Paint regions</button>
       </div>
       {loading && <span className="mastering-busy" role="status">Analysing…</span>}
     </div>
@@ -201,9 +201,9 @@ export default function MasteringSpectrogram({ ctx, spectrogram, loading, viewpo
       <div className="mastering-nudge">
         <label className="field"><span className="field-label">Attenuation (dB)</span>
           <input type="number" min={1} max={60} step={1} value={reduction} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value)) setReduction(Math.min(60, Math.max(1, value))); }} /></label>
-        <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('attenuate')}>Attenuate painted regions</button>
-        <button type="button" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('heal')}>Heal painted regions</button>
-        <button type="button" disabled={!regions.length} onClick={() => setRegions([])}>Clear regions</button>
+        <button type="button" title="Lower the volume of the painted regions by the attenuation amount" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('attenuate')}>Attenuate painted regions</button>
+        <button type="button" title="Rebuild the painted regions from the frequencies around them, removing the sound entirely" disabled={!ctx.canEdit || !regions.length} onClick={() => applyRegions('heal')}>Heal painted regions</button>
+        <button type="button" title="Discard the painted regions without changing the audio" disabled={!regions.length} onClick={() => setRegions([])}>Clear regions</button>
       </div>
     </div>}
   </div>;

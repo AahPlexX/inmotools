@@ -203,7 +203,7 @@ export default function MasteringEditTab({ ctx, sourceInfo, onAddMarker }: Props
         <button type="button" onClick={() => ctx.applyEdit({ type: 'invertPolarity' }, 'Inverted polarity on every channel. Undo is available.')} disabled={!canEdit}>Invert polarity</button>
         <button type="button" onClick={() => ctx.applyEdit({ type: 'reverse', startSeconds: selection.startSeconds, endSeconds: selection.endSeconds }, 'Reversed the selected range. Undo is available.')} disabled={!canEdit || !selectionInsideClip}>Reverse selection</button>
         <button type="button" onClick={() => ctx.applyEdit({ type: 'reverse', startSeconds: clipStart, endSeconds: clipEnd }, 'Reversed the whole clip. Undo is available.')} disabled={!canEdit || !clip}>Reverse whole clip</button>
-        <button type="button" onClick={insertSilenceAtPlayhead} disabled={!canEdit || silenceDuration <= 0}>Insert silence at playhead</button>
+        <button type="button" onClick={insertSilenceAtPlayhead} disabled={!canEdit || !clip || silenceDuration <= 0}>Insert silence at playhead</button>
         <button type="button" onClick={() => ctx.applyEdit({ type: 'swapStereo' }, 'Swapped left and right. Undo is available.')} disabled={!canEdit || clipInfo?.channelCount !== 2}>Swap L/R</button>
         <button type="button" onClick={() => ctx.applyEdit({ type: 'foldDownMono' }, 'Folded the clip down to mono. Undo is available.')} disabled={!canEdit || (clipInfo?.channelCount ?? 0) <= 1}>Fold down to mono</button>
         <button type="button" onClick={() => ctx.applyEdit({ type: 'extractChannel', channelIndex: activeChannelIndex }, `Kept only channel ${activeChannelIndex + 1}. Undo is available.`)} disabled={!canEdit || (clipInfo?.channelCount ?? 0) <= 1}>Extract channel</button>
