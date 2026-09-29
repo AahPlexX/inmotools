@@ -1,5 +1,6 @@
 import { type ChangeEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { consumeFileInput } from '../../lib/file-input';
+import CrystalAdvancedAnalysisPanel from './CrystalAdvancedAnalysisPanel';
 import CrystalDiffractionPanel from './CrystalDiffractionPanel';
 import CrystalEnvironmentPanel from './CrystalEnvironmentPanel';
 import CrystalExportDialog from './CrystalExportDialog';
@@ -277,6 +278,8 @@ export default function CrystalWorkspace() {
       <CrystalDiffractionPanel document={document} />
 
       <CrystalReciprocalPanel document={document} />
+
+      <CrystalAdvancedAnalysisPanel document={document} />
     </div>
   );
 }
