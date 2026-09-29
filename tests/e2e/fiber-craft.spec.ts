@@ -266,11 +266,23 @@ test.describe('Fiber Craft Workstation', () => {
     });
     expect(updatedRatio).toBeCloseTo(1.5, 1);
 
+    const construction = page.getByLabel('Construction');
+    await expect(construction).toHaveValue('flat');
+    await expect(page.getByTestId('knitting-row-0')).toHaveAttribute('data-side', 'right');
+    await expect(page.getByTestId('knitting-row-0')).toHaveAttribute('data-direction', 'right-to-left');
+    await expect(page.getByTestId('knitting-row-1')).toHaveAttribute('data-side', 'wrong');
+    await expect(page.getByTestId('knitting-row-1')).toHaveAttribute('data-direction', 'left-to-right');
+    await construction.selectOption('round');
+    await expect(page.getByTestId('knitting-construction-summary')).toContainText('In the round');
+    await expect(page.getByTestId('knitting-row-1')).toHaveAttribute('data-side', 'right');
+    await expect(page.getByTestId('knitting-row-1')).toHaveAttribute('data-direction', 'right-to-left');
+
     await expect(page.locator('p.fiber-craft-status')).toContainText('Saved locally', { timeout: 3_000 });
     await page.reload();
     await page.getByRole('button', { name: 'Restore last session' }).click();
     await expect(page.getByLabel('Chart mode')).toHaveValue('knitting');
     await expect(page.getByLabel('Rows in gauge')).toHaveValue('30');
+    await expect(page.getByLabel('Construction')).toHaveValue('round');
   });
 
   test('reopens the Fiber workspace while offline after the PWA is installed', async ({ page, context }) => {
