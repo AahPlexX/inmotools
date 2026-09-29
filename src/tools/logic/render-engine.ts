@@ -1,5 +1,7 @@
 import { getComponentPorts } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
+import { isDisplayType, restoreSegmentLit, segmentIdsOf, type DisplayType } from './display-engine';
+import { digitGeometries } from './segment-shapes';
+import { BUBBLE_RADIUS, type BodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
 import { readLevel } from './sim-engine';
 import type {
@@ -224,12 +226,13 @@ const drawPinLabels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   ctx.textBaseline = 'middle';
   ctx.font = '9px ui-monospace, monospace';
   for (const port of ports) {
-    const isOutput = port.direction === 'output';
+    // The side a pin sits on, not its direction: a display's digit selects are inputs on the right edge.
+    const rightSide = port.x > 0;
     ctx.save();
-    ctx.translate(port.x * GRID_SIZE + (isOutput ? -4 : 4), port.y * GRID_SIZE);
+    ctx.translate(port.x * GRID_SIZE + (rightSide ? -4 : 4), port.y * GRID_SIZE);
     ctx.rotate(textTurn);
     ctx.scale(unmirror, 1);
-    ctx.textAlign = isOutput !== reversed ? 'right' : 'left';
+    ctx.textAlign = rightSide !== reversed ? 'right' : 'left';
     ctx.fillText(port.label, 0, 0);
     ctx.restore();
   }
@@ -241,8 +244,8 @@ const drawPinLabels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
  * the top edge (inside, it would collide with the pin names), and the pin
  * names just inside the edges.
  */
-const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[]): void => {
-  const body = blockBodyRect(ports);
+const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[], frame: SimulationFrame): void => {
+  const body = componentBodyRect(component, ports);
   ctx.fillStyle = palette.componentFill;
   ctx.strokeStyle = palette.componentStroke;
   ctx.lineWidth = 1.6;
@@ -251,8 +254,36 @@ const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   ctx.fill();
   ctx.stroke();
   drawPinLabels(ctx, palette, component, ports);
+  if (isDisplayType(component.type)) drawDisplayGlyphs(ctx, palette, component.type, body, restoreSegmentLit(frame.componentState[component.id]?.segmentLit, component.type));
 
   drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, 'bold 10px ui-monospace, monospace');
+};
+
+/**
+ * The digit glyphs inside a display body: lit segments in the theme's
+ * high-level color, unlit ones as a faint ghost so the digit's shape stays
+ * readable when everything is off (also for color-blind users, who can still
+ * tell lit from unlit by fill strength instead of hue alone).
+ */
+const drawDisplayGlyphs = (ctx: CanvasRenderingContext2D, palette: ThemePalette, type: DisplayType, body: BodyRect, lit: readonly (0 | 1)[]): void => {
+  const segmentCount = segmentIdsOf(type).length;
+  for (const digit of digitGeometries(type, body)) {
+    const isLit = (id: string): boolean => lit[digit.index * segmentCount + segmentIdsOf(type).indexOf(id)] === 1;
+    for (const segment of digit.segments) {
+      ctx.beginPath();
+      segment.points.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+      ctx.closePath();
+      ctx.globalAlpha = isLit(segment.id) ? 1 : 0.16;
+      ctx.fillStyle = isLit(segment.id) ? palette.levelHigh : palette.levelFloating;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(digit.dot.cx, digit.dot.cy, digit.dot.r, 0, Math.PI * 2);
+    ctx.globalAlpha = isLit(digit.dot.id) ? 1 : 0.16;
+    ctx.fillStyle = isLit(digit.dot.id) ? palette.levelHigh : palette.levelFloating;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 };
 
 const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[], frame: SimulationFrame, hoverPort: PortRef | undefined): void => {
@@ -349,7 +380,7 @@ export const renderScene = (
     if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE') {
       drawIoComponent(ctx, palette, component, input.frame);
     } else if (usesBlockBody(component.type)) {
-      drawBlockBody(ctx, palette, component, ports);
+      drawBlockBody(ctx, palette, component, ports, input.frame);
     } else if (component.type === 'D_FLIP_FLOP' || component.type === 'JK_FLIP_FLOP' || component.type === 'T_FLIP_FLOP' || component.type === 'SR_LATCH') {
       drawSequentialBody(ctx, palette, GRID_SIZE * 2, height);
       drawPinLabels(ctx, palette, component, ports);

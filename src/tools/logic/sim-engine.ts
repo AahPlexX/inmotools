@@ -1,5 +1,6 @@
 import { evaluateBlock, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
+import { isDisplayType, restoreSegmentLit, updateSegmentLit } from './display-engine';
 import { bitWidthOf, isRegisterType, registerOutputs, restoreRegisterRuntime, stepRegister } from './register-engine';
 import {
   portKey,
@@ -409,6 +410,20 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
   const postSequentialNets = resolveAllNets();
   for (const [key, value] of postSequentialNets) levels.set(key, value);
   settleIdealIfNeeded();
+
+  // --- Segment displays: sinks that record which segments are lit, holding a multiplexed digit between selects. ---
+  const displayNets = resolveAllNets();
+  for (const component of document.components) {
+    if (!isDisplayType(component.type)) continue;
+    const state = nextState[component.id] ?? {};
+    const segmentLit = updateSegmentLit({
+      type: component.type,
+      params: component.params,
+      previous: restoreSegmentLit(state.segmentLit, component.type),
+      read: (portId) => displayNets.get(net.find(portKey(component.id, portId))) ?? 'Z',
+    });
+    nextState[component.id] = { ...state, segmentLit };
+  }
 
   const hazards: Hazard[] = [];
   for (const root of oscillatingNets) {

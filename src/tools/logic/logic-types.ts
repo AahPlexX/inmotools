@@ -25,7 +25,10 @@ export type ComponentType =
   | 'PRIORITY_ENCODER'
   | 'BCD_7SEG'
   | 'COUNTER'
-  | 'REGISTER';
+  | 'REGISTER'
+  | 'SEVEN_SEGMENT'
+  | 'SEVEN_SEGMENT_4'
+  | 'SIXTEEN_SEGMENT';
 
 export type PortDirection = 'input' | 'output';
 
@@ -63,6 +66,8 @@ export interface ComponentParams {
   readonly asyncRipple?: boolean;
   /** A counter exposes a LOAD pin and parallel data inputs for synchronous load. */
   readonly hasLoad?: boolean;
+  /** A multiplexed display's digit-select pins are asserted high (true, the default) or low. */
+  readonly digitActiveHigh?: boolean;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -154,6 +159,8 @@ export interface ComponentRuntimeState {
   readonly registerPreviousBits?: readonly LogicLevel[];
   /** How many low-order counter bits have taken their new value. */
   readonly rippleStage?: number;
+  /** Which segments of a display are lit, digit-major (1 = lit). */
+  readonly segmentLit?: readonly LogicLevel[];
 }
 
 export interface PendingUpdate {

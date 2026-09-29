@@ -201,6 +201,63 @@ test('places a counter, configures it from the inspector, and its pins follow th
   await expect(ercDock).toContainText('LOAD');
 });
 
+test('places a multiplexed 4-digit display and exposes its polarity controls', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Segment displays' })).toBeVisible();
+
+  await placeAt(page, '4-DIGIT 7-SEG', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 6 * GRID, y: 4 * GRID } });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  await expect(inspector.getByRole('heading', { name: '4-DIGIT 7-SEG' })).toBeVisible();
+  await inspector.getByLabel('Segment polarity').selectOption({ label: 'Active low (common anode)' });
+  await inspector.getByLabel('Digit-select polarity').selectOption({ label: 'Active low' });
+  await expect(inspector.getByLabel('Segment polarity')).toHaveValue('low');
+  if (isSheet) await page.getByLabel('Close inspector').click();
+
+  // 8 segment pins and 4 digit selects, all unwired.
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toContainText('DIG4');
+  await expect(ercDock).toContainText('DP');
+});
+
+test('a click on the lower of two closely spaced switches selects that switch, not its neighbor', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 1, 1);
+  await placeAt(page, 'SWITCH', 1, 3);
+  const canvas = page.getByTestId('logic-canvas');
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  const labelField = inspector.getByLabel('Label');
+
+  const selectAndRename = async (gridY: number, label: string) => {
+    // Left of the output pin, so the click lands on the switch body rather than starting a wire.
+    await canvas.click({ position: { x: 1.25 * GRID, y: gridY * GRID } });
+    if (isSheet) await inspectToggle.click();
+    await labelField.fill(label);
+    if (isSheet) await page.getByLabel('Close inspector').click();
+  };
+  const selectedLabel = async (gridY: number) => {
+    await canvas.click({ position: { x: 1.25 * GRID, y: gridY * GRID } });
+    if (isSheet) await inspectToggle.click();
+    const value = await labelField.inputValue();
+    if (isSheet) await page.getByLabel('Close inspector').click();
+    return value;
+  };
+
+  await selectAndRename(1, 'UPPER');
+  await selectAndRename(3, 'LOWER');
+  // Before the fix, both clicks landed on the upper switch (overlapping 72px hit boxes), so it ended up named LOWER.
+  expect(await selectedLabel(1)).toBe('UPPER');
+  expect(await selectedLabel(3)).toBe('LOWER');
+});
+
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/tools/digital-logic-workstation');

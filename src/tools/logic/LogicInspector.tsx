@@ -1,5 +1,6 @@
 import { blockSizeLabel, hasSelectableSize, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
-import { clampInputCount, isVariadicGate } from './component-library';
+import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
+import { isDisplayType } from './display-engine';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
 
@@ -38,7 +39,7 @@ export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpd
 function ComponentInspector({ component, onRelabel, onUpdateParams }: { component: ComponentInstance; onRelabel: LogicInspectorProps['onRelabel']; onUpdateParams: LogicInspectorProps['onUpdateParams'] }) {
   return (
     <div>
-      <h3>{component.type.replace(/_/g, ' ')}</h3>
+      <h3>{paletteLabel(component.type)}</h3>
       <label className="logic-field">
         <span>Label</span>
         <input type="text" value={component.label} onChange={(event) => onRelabel(component.id, event.target.value)} maxLength={40} />
@@ -142,7 +143,28 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </>
       ) : null}
 
-      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && !isRegisterType(component.type) ? (
+      {isDisplayType(component.type) ? (
+        <>
+          <label className="logic-field">
+            <span>Segment polarity</span>
+            <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+              <option value="high">Active high (common cathode)</option>
+              <option value="low">Active low (common anode)</option>
+            </select>
+          </label>
+          {component.type === 'SEVEN_SEGMENT_4' ? (
+            <label className="logic-field">
+              <span>Digit-select polarity</span>
+              <select value={component.params.digitActiveHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { digitActiveHigh: event.target.value !== 'low' })}>
+                <option value="high">Active high</option>
+                <option value="low">Active low</option>
+              </select>
+            </label>
+          ) : null}
+        </>
+      ) : null}
+
+      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && !isRegisterType(component.type) && !isDisplayType(component.type) ? (
         <label className="logic-field">
           <span>Propagation delay (ns)</span>
           <input

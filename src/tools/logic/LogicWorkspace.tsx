@@ -12,7 +12,7 @@ import {
   type ErcFinding,
   type TruthTable,
 } from './analysis-engine';
-import { clampInputCount, COMPONENT_CATEGORIES } from './component-library';
+import { clampInputCount, COMPONENT_CATEGORIES, paletteLabel } from './component-library';
 import { bitWidthOf, isRegisterType, isRippling, restoreRegisterRuntime } from './register-engine';
 import {
   addComponent,
@@ -316,7 +316,7 @@ export default function LogicWorkspace() {
             <button type="button" className="logic-sheet-close" aria-label="Close component palette" onClick={() => setMobilePanel('none')}>Close</button>
           </div>
           {placingType ? (
-            <p className="logic-palette-hint">Placing {placingType.replace(/_/g, ' ')} — click the canvas, or press Escape to stop.</p>
+            <p className="logic-palette-hint">Placing {paletteLabel(placingType)} — click the canvas, or press Escape to stop.</p>
           ) : null}
           {COMPONENT_CATEGORIES.map((category) => (
             <div key={category.category} className="logic-palette-group">
@@ -328,9 +328,9 @@ export default function LogicWorkspace() {
                     type="button"
                     className={placingType === type ? 'logic-palette-button active' : 'logic-palette-button'}
                     onClick={() => { setPlacingType((current) => (current === type ? null : type)); setMobilePanel('none'); }}
-                    title={`Place a ${type.replace(/_/g, ' ')}`}
+                    title={`Place a ${paletteLabel(type)}`}
                   >
-                    {type.replace(/_/g, ' ')}
+                    {paletteLabel(type)}
                   </button>
                 ))}
               </div>

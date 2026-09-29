@@ -1,5 +1,7 @@
 import { getComponentPorts, isSequential } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
+import { isDisplayType } from './display-engine';
+import { digitGeometries } from './segment-shapes';
+import { BUBBLE_RADIUS, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, documentBoundingBox, portAbsolutePosition, GRID_SIZE } from './geometry';
 import type { ComponentInstance, ComponentType, LogicDocument, PortRef, ThemeName, Wire, WirePoint } from './logic-types';
 
@@ -68,8 +70,17 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
   if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE') {
     parts.push(renderIoBodySvg(component));
   } else if (usesBlockBody(component.type)) {
-    const body = blockBodyRect(ports);
+    const body = componentBodyRect(component, ports);
     parts.push(`<rect x="${body.x}" y="${body.y}" width="${body.width}" height="${body.height}" fill="${GATE_FILL}" stroke="${GATE_STROKE}" stroke-width="1.5" />`);
+    // A schematic has no live signal, so the digits are drawn with every segment unlit.
+    if (isDisplayType(component.type)) {
+      for (const digit of digitGeometries(component.type, body)) {
+        for (const segment of digit.segments) {
+          parts.push(`<polygon points="${segment.points.map((point) => `${svgNum(point.x)},${svgNum(point.y)}`).join(' ')}" fill="#cbd5e1" />`);
+        }
+        parts.push(`<circle cx="${svgNum(digit.dot.cx)}" cy="${svgNum(digit.dot.cy)}" r="${svgNum(digit.dot.r)}" fill="#cbd5e1" />`);
+      }
+    }
     // Undo the group's mirror and 180-degree turn for the text alone, as the canvas does, so the caption never reads backwards or upside down.
     const captionTurn = component.rotation === 180 ? 180 : 0;
     parts.push(`<text transform="translate(${svgNum(body.width / 2)},${svgNum(body.y - 6)}) rotate(${captionTurn}) scale(${scaleX},1)" font-size="11" font-weight="700" text-anchor="middle" fill="${GATE_STROKE}">${escapeXml(blockCaption(component))}</text>`);
@@ -85,7 +96,7 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
     const px = svgNum(position.x + offsetX);
     const py = svgNum(position.y + offsetY);
     parts.push(`<circle cx="${px}" cy="${py}" r="2.5" fill="${port.direction === 'output' ? '#0f766e' : '#1f2933'}" />`);
-    parts.push(`<text x="${px + (port.direction === 'output' ? 6 : -6)}" y="${py - 6}" font-size="9" text-anchor="${port.direction === 'output' ? 'start' : 'end'}" fill="#52606d">${escapeXml(port.label)}</text>`);
+    parts.push(`<text x="${px + (port.x > 0 ? 6 : -6)}" y="${py - 6}" font-size="9" text-anchor="${port.x > 0 ? 'start' : 'end'}" fill="#52606d">${escapeXml(port.label)}</text>`);
   }
   const labelAnchor = componentLabelAnchor(component, ports);
   parts.push(`<text x="${svgNum(labelAnchor.x + offsetX)}" y="${svgNum(labelAnchor.y + offsetY)}" font-size="10" text-anchor="middle" fill="#334155">${escapeXml(component.label)}</text>`);
@@ -146,7 +157,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG',
-  'COUNTER', 'REGISTER',
+  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);

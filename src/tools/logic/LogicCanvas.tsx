@@ -9,7 +9,8 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { getComponentPorts } from './component-library';
-import { componentBoundingBox, findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
+import { findComponentAt } from './gate-shapes';
+import { findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
 import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
@@ -117,11 +118,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
   }, []);
 
-  const componentAt = useCallback((worldPoint: ScreenPoint) =>
-    doc.components.find((component) => {
-      const box = componentBoundingBox(component);
-      return worldPoint.x >= box.minX && worldPoint.x <= box.maxX && worldPoint.y >= box.minY && worldPoint.y <= box.maxY;
-    }), [doc.components]);
+  const componentAt = useCallback((worldPoint: ScreenPoint) => findComponentAt(doc.components, worldPoint), [doc.components]);
 
   const portAt = useCallback((worldPoint: ScreenPoint) => {
     for (const component of doc.components) {

@@ -1,5 +1,6 @@
 import { BLOCK_WIDTH_COLS, blockTitle, isBlockType } from './block-engine';
-import { isSequential } from './component-library';
+import { getComponentPorts, isSequential } from './component-library';
+import { displayTitle, displayWidthCols, isDisplayType } from './display-engine';
 import { isRegisterType, registerTitle } from './register-engine';
 import { GRID_SIZE, componentOriginPixels, rotatePoint, type Point } from './geometry';
 import type { ComponentInstance, ComponentType, PortDefinition } from './logic-types';
@@ -28,6 +29,7 @@ export const GATE_ABBREVIATION: Readonly<Record<ComponentType, string>> = {
   BUFFER: '1', TRI_BUFFER: '1', SWITCH: 'SW', PUSH_BUTTON: 'PB', CLOCK: 'CLK', LED: 'LED',
   PROBE: 'PRB', D_FLIP_FLOP: 'D', JK_FLIP_FLOP: 'JK', T_FLIP_FLOP: 'T', SR_LATCH: 'SR',
   MUX: 'MUX', DEMUX: 'DEMUX', DECODER: 'DEC', PRIORITY_ENCODER: 'ENC', BCD_7SEG: 'BCD', COUNTER: 'CTR', REGISTER: 'REG',
+  SEVEN_SEGMENT: '7SEG', SEVEN_SEGMENT_4: '4x7', SIXTEEN_SEGMENT: '16SEG',
 };
 
 /** A rectangle in a component's local (pre-rotation, pre-mirror) pixel space. */
@@ -43,20 +45,21 @@ export interface BodyRect {
  * (the lowest pin row plus one) rather than a separate constant, so the box
  * always encloses every pin in both the Canvas2D and SVG renderers.
  */
-export const blockBodyRect = (ports: readonly PortDefinition[]): BodyRect => {
+export const blockBodyRect = (ports: readonly PortDefinition[], widthCols: number = BLOCK_WIDTH_COLS): BodyRect => {
   const rows = ports.reduce((max, port) => Math.max(max, port.y + 1), 1);
-  return { x: 0, y: -GRID_SIZE * 0.5, width: BLOCK_WIDTH_COLS * GRID_SIZE, height: rows * GRID_SIZE };
+  return { x: 0, y: -GRID_SIZE * 0.5, width: widthCols * GRID_SIZE, height: rows * GRID_SIZE };
 };
 
 /** The centered caption drawn inside a block body, such as `MUX 4:1`. */
 export const blockCaption = (component: ComponentInstance): string => {
   if (isBlockType(component.type)) return blockTitle(component.type, component.params);
   if (isRegisterType(component.type)) return registerTitle(component.type, component.params);
+  if (isDisplayType(component.type)) return displayTitle(component.type);
   return GATE_ABBREVIATION[component.type];
 };
 
-/** Multi-pin parts (blocks, counters, registers) share one body: a box sized by its pin layout with a caption above it. */
-export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type);
+/** Multi-pin parts (blocks, counters, registers, displays) share one body: a box sized by its pin layout with a caption above it. */
+export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type) || isDisplayType(type);
 
 /**
  * Where a component's body is drawn, in local pixels. Used to size the
@@ -64,6 +67,7 @@ export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type)
  * (gate bodies hang below their origin row, I/O parts are centered on it).
  */
 export const componentBodyRect = (component: ComponentInstance, ports: readonly PortDefinition[]): BodyRect => {
+  if (isDisplayType(component.type)) return blockBodyRect(ports, displayWidthCols(component.type));
   if (usesBlockBody(component.type)) return blockBodyRect(ports);
   const inputCount = ports.filter((port) => port.direction === 'input').length;
   const height = gateBodyHeight(inputCount);
@@ -74,22 +78,58 @@ export const componentBodyRect = (component: ComponentInstance, ports: readonly 
 };
 
 /**
- * Where a component's instance label is centered, in world pixels: just below
- * the lowest edge of the body as it actually appears on screen. The local body
- * corners go through the same mirror-then-rotate transform the renderers apply,
- * so a rotated or mirrored part keeps its label beside the drawn body instead
- * of under the pre-rotation rectangle.
+ * The four corners of a component's drawn body in world pixels, after the same
+ * mirror-then-rotate transform the renderers apply.
  */
-export const componentLabelAnchor = (component: ComponentInstance, ports: readonly PortDefinition[]): Point => {
+const worldBodyCorners = (component: ComponentInstance, ports: readonly PortDefinition[]): Point[] => {
   const body = componentBodyRect(component, ports);
   const origin = componentOriginPixels(component);
-  const corners: Point[] = [
+  return [
     { x: body.x, y: body.y },
     { x: body.x + body.width, y: body.y },
     { x: body.x, y: body.y + body.height },
     { x: body.x + body.width, y: body.y + body.height },
-  ].map((corner) => rotatePoint(component.mirrored ? { x: -corner.x, y: corner.y } : corner, component.rotation));
+  ].map((corner) => {
+    const rotated = rotatePoint(component.mirrored ? { x: -corner.x, y: corner.y } : corner, component.rotation);
+    return { x: origin.x + rotated.x, y: origin.y + rotated.y };
+  });
+};
+
+/**
+ * Where a component's instance label is centered, in world pixels: just below
+ * the lowest edge of the body as it actually appears on screen, so a rotated
+ * or mirrored part keeps its label beside the drawn body instead of under the
+ * pre-rotation rectangle.
+ */
+export const componentLabelAnchor = (component: ComponentInstance, ports: readonly PortDefinition[]): Point => {
+  const corners = worldBodyCorners(component, ports);
   const xs = corners.map((corner) => corner.x);
-  const maxY = Math.max(...corners.map((corner) => corner.y));
-  return { x: origin.x + (Math.min(...xs) + Math.max(...xs)) / 2, y: origin.y + maxY + 14 };
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.max(...corners.map((corner) => corner.y)) + 14 };
+};
+
+/** Slack around a body, in pixels, so a click just off the outline still grabs the part. */
+const HIT_PADDING = 6;
+
+/**
+ * The component under a world-pixel point, judged against the drawn body
+ * rather than a fixed box around the origin. Parts on adjacent grid rows have
+ * overlapping fixed boxes, so hit-testing the body is what lets a click on
+ * the lower part reach it. Later components are drawn on top, so they win.
+ */
+export const findComponentAt = (components: readonly ComponentInstance[], point: Point): ComponentInstance | undefined => {
+  for (let index = components.length - 1; index >= 0; index -= 1) {
+    const component = components[index]!;
+    const corners = worldBodyCorners(component, getComponentPorts(component.type, component.params));
+    const xs = corners.map((corner) => corner.x);
+    const ys = corners.map((corner) => corner.y);
+    if (
+      point.x >= Math.min(...xs) - HIT_PADDING &&
+      point.x <= Math.max(...xs) + HIT_PADDING &&
+      point.y >= Math.min(...ys) - HIT_PADDING &&
+      point.y <= Math.max(...ys) + HIT_PADDING
+    ) {
+      return component;
+    }
+  }
+  return undefined;
 };

@@ -1,8 +1,9 @@
 import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './block-engine';
+import { displayPorts, type DisplayType } from './display-engine';
 import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -88,6 +89,14 @@ const registerDefinition = (type: RegisterType, label: string, extra: ComponentP
   ports: (params) => registerPorts(type, params),
 });
 
+const displayDefinition = (type: DisplayType, label: string): ComponentDefinition => ({
+  type,
+  label,
+  category: 'display',
+  defaultParams: { activeHigh: true, ...(type === 'SEVEN_SEGMENT_4' ? { digitActiveHigh: true } : {}) },
+  ports: () => displayPorts(type),
+});
+
 export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefinition>> = {
   AND: { type: 'AND', label: 'AND', category: 'gate', defaultParams: { inputCount: 2, delayNs: 5 }, minInputs: 2, maxInputs: 8, ports: variadicGatePorts },
   OR: { type: 'OR', label: 'OR', category: 'gate', defaultParams: { inputCount: 2, delayNs: 5 }, minInputs: 2, maxInputs: 8, ports: variadicGatePorts },
@@ -125,6 +134,9 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   BCD_7SEG: blockDefinition('BCD_7SEG', 'BCD to 7-segment decoder', { activeHigh: true }),
   COUNTER: registerDefinition('COUNTER', 'Binary counter'),
   REGISTER: registerDefinition('REGISTER', 'Register'),
+  SEVEN_SEGMENT: displayDefinition('SEVEN_SEGMENT', '7-segment display'),
+  SEVEN_SEGMENT_4: displayDefinition('SEVEN_SEGMENT_4', 'Multiplexed 4-digit display'),
+  SIXTEEN_SEGMENT: displayDefinition('SIXTEEN_SEGMENT', '16-segment display'),
 };
 
 export const getComponentPorts = (type: ComponentType, params: ComponentParams): readonly PortDefinition[] =>
@@ -148,5 +160,16 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG'] },
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
   { category: 'register', label: 'Counters & registers', types: ['COUNTER', 'REGISTER'] },
+  { category: 'display', label: 'Segment displays', types: ['SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];
+
+const PALETTE_LABELS: Readonly<Partial<Record<ComponentType, string>>> = {
+  BCD_7SEG: 'BCD TO 7-SEG',
+  SEVEN_SEGMENT: '7-SEGMENT',
+  SEVEN_SEGMENT_4: '4-DIGIT 7-SEG',
+  SIXTEEN_SEGMENT: '16-SEGMENT',
+};
+
+/** The name shown on a palette button, in the inspector heading, and in placement hints. */
+export const paletteLabel = (type: ComponentType): string => PALETTE_LABELS[type] ?? type.replace(/_/g, ' ');
