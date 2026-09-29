@@ -16,7 +16,7 @@ import { abbreviation, formatOffset, isDst, localDate, nextTransition, observesD
 import type { AdminLevel, ConfidenceClass, GeographyType, LatLon, LocationProfile, ProfileField, QueryKind, SourceId } from '../core/types';
 import type { HttpClient } from '../net/http';
 import type { GeoIntelSettings } from '../net/store';
-import { admin1Match, countryAt, currencySymbol, flagEmoji, languageNames, placesNear, timezoneAt, type CountryRecord } from '../offline/static-data';
+import { admin1Match, countryAt, currencySymbol, languageNames, placesNear, timezoneAt, type CountryRecord } from '../offline/static-data';
 
 /** Countries whose points GISCO can place in a NUTS 2024 region (EU, EFTA, candidates). */
 export const NUTS_COUNTRIES = new Set(['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'IS', 'LI', 'NO', 'CH', 'AL', 'ME', 'MK', 'RS', 'TR']);
@@ -166,7 +166,7 @@ function countryFields(country: CountryRecord, retrievedAt: string, match: 'insi
   const note = match === 'nearest' ? `Point is ${distance.toFixed(1)} km outside the simplified 1:50m coastline; nearest country used.` : undefined;
   const symbol = currencySymbol(country.currencyCode);
   return [
-    field('country.name', 'Country', 'country', `${flagEmoji(country.a2)} ${country.name}`.trim(), { ...ne, note: note ?? 'Point-in-polygon on bundled Natural Earth 1:50m boundaries.' }),
+    field('country.name', 'Country', 'country', country.name, { ...ne, note: note ?? 'Point-in-polygon on bundled Natural Earth 1:50m boundaries.' }),
     field('country.official', 'Official name', 'country', country.official, ne),
     field('country.a2', 'ISO 3166-1 alpha-2', 'country', country.a2, meta),
     field('country.a3', 'ISO 3166-1 alpha-3', 'country', country.a3, meta),

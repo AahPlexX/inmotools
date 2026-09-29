@@ -254,3 +254,12 @@
 
 .gi [data-tip][tabindex='0']:focus-visible, .gi button:focus-visible, .gi a:focus-visible, .gi input:focus-visible, .gi select:focus-visible, .gi textarea:focus-visible, .gi summary:focus-visible, .gi [tabindex='0']:focus-visible { outline: 3px solid var(--focus, #0b66ff); outline-offset: 2px; }
 @media (min-width: 2200px) { .gi { --gi-map-h: clamp(600px, 62vh, 1300px); } .gi-layout { grid-template-columns: minmax(0, 1.5fr) minmax(28rem, 1fr); } }
+.gi-svg-icon { display: block; flex: none; }
+.gi-btn .gi-svg-icon { display: inline-block; }
+.gi-icon, .gi-prov, .gi-star, .gi-map-controls button { display: inline-grid; place-items: center; }
+.gi-cc { display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 4px; background: #ffd166; color: #0b1220; font-weight: 700; font-size: 0.72rem; }
+@media (max-width: 400px) {
+  .gi-tabs { gap: 1px; padding-inline: 2px; }
+  .gi-tabs button { font-size: 0.68rem; padding: 0 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gi-count { display: none; }
+}

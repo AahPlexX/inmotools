@@ -114,7 +114,7 @@ export interface CardModel { title: string; subtitle: string; flag: string; stat
 const fieldValue = (profile: LocationProfile, key: string) => profile.fields.find((item) => item.key === key)?.value ?? null;
 
 export function cardModel(profile: LocationProfile, meta: ResolvedMetadata, timeText: string): CardModel {
-  const countryName = String(fieldValue(profile, 'country.name') ?? '').replace(/^\p{Regional_Indicator}{2}\s*/u, '');
+  const countryName = String(fieldValue(profile, 'country.name') ?? '');
   const population = fieldValue(profile, 'wb.SP.POP.TOTL');
   const elevation = fieldValue(profile, 'elevation.metres');
   const stats: Array<[string, string]> = [
@@ -125,7 +125,8 @@ export function cardModel(profile: LocationProfile, meta: ResolvedMetadata, time
     ['Country population', typeof population === 'number' ? new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(population) : '—'],
     ['Daylight', formatDuration(profile.solar?.dayLengthSeconds ?? null)],
   ];
-  const flag = profile.countryCode ? String.fromCodePoint(...[...profile.countryCode].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : '';
+  // ISO code rather than a flag emoji: Windows fonts do not draw flag emoji.
+  const flag = profile.countryCode ?? '';
   return { title: meta.title, subtitle: [profile.label !== meta.title ? profile.label : '', countryName].filter(Boolean).join(' · '), flag, stats, tags: meta.tags.slice(0, 6), footer: `${meta.author ? `${meta.author} · ` : ''}${meta.date} · Data: ${profile.sourcesUsed.filter((id) => !['computed', 'user', 'device'].includes(id)).length} open sources` };
 }
 
@@ -146,7 +147,16 @@ export function drawCard(canvas: HTMLCanvasElement, model: CardModel): void {
   c.fillStyle = '#ffd166'; c.fillRect(64, 64, 8, 120);
   c.fillStyle = '#ffffff'; c.textBaseline = 'top';
   c.font = '700 60px system-ui, -apple-system, "Segoe UI", sans-serif';
-  c.fillText(fitText(c, `${model.flag ? `${model.flag} ` : ''}${model.title}`, 1060), 96, 64);
+  let titleX = 96;
+  if (model.flag) {
+    c.font = '700 28px system-ui, sans-serif';
+    const w = c.measureText(model.flag).width + 24;
+    c.fillStyle = '#ffd166'; c.fillRect(96, 76, w, 44);
+    c.fillStyle = '#0b1220'; c.fillText(model.flag, 108, 84);
+    titleX += w + 18;
+    c.fillStyle = '#ffffff'; c.font = '700 60px system-ui, -apple-system, "Segoe UI", sans-serif';
+  }
+  c.fillText(fitText(c, model.title, 1156 - titleX), titleX, 64);
   c.fillStyle = '#c9d6ea'; c.font = '400 30px system-ui, -apple-system, "Segoe UI", sans-serif';
   c.fillText(fitText(c, model.subtitle, 1060), 96, 144);
   model.stats.forEach(([label, value], i) => {

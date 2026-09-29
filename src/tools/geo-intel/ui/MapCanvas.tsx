@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { Icon } from './Icon';
 import { normalizeBBox } from '../core/geodesy';
 import { invert, linePath, project, WORLD_EXTENT } from '../core/projection';
 import type { BBox, LatLon } from '../core/types';
@@ -248,9 +249,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
       </svg>
       {hover && hoverStyle ? <div className="gi-map-hover" style={hoverStyle} aria-hidden="true">{hover.name}</div> : null}
       <div className="gi-map-controls">
-        <button type="button" aria-label="Zoom in" data-tip="Zoom in (+ key or scroll)" onClick={() => zoomAt(1.6)}>+</button>
-        <button type="button" aria-label="Zoom out" data-tip="Zoom out (− key or scroll)" onClick={() => zoomAt(1 / 1.6)}>−</button>
-        <button type="button" aria-label="Reset view" data-tip="Show the whole world (0 key)" onClick={() => setView(HOME)}>⌂</button>
+        <button type="button" aria-label="Zoom in" data-tip="Zoom in (+ key or scroll)" onClick={() => zoomAt(1.6)}><Icon name="plus" size={20} /></button>
+        <button type="button" aria-label="Zoom out" data-tip="Zoom out (− key or scroll)" onClick={() => zoomAt(1 / 1.6)}><Icon name="minus" size={20} /></button>
+        <button type="button" aria-label="Reset view" data-tip="Show the whole world (0 key)" onClick={() => setView(HOME)}><Icon name="home" size={20} /></button>
       </div>
       <p className="gi-map-credit">Made with Natural Earth · Equal Earth projection</p>
     </div>

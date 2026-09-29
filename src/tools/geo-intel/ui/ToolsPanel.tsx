@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Icon } from './Icon';
 import { formatDD, formatDDM, formatDMS, formatUtm, toMgrs } from '../core/coords';
 import { bboxAreaKm2, compassPoint, distanceKm, finalBearing, initialBearing, midpoint } from '../core/geodesy';
 import { decode, describeArea, encode, isFull, isShort, recoverNearest, shorten } from '../core/olc';
@@ -15,7 +16,7 @@ function CopyRow({ label, value, tip, onCopy }: { label: string; value: string; 
   return (
     <div className="gi-row">
       <dt data-tip={tip} tabIndex={0}>{label}</dt>
-      <dd><code className="gi-value">{value}</code><button type="button" className="gi-prov" aria-label={`Copy ${label}`} data-tip={`Copy ${label}`} onClick={() => onCopy(value, label)}>⧉</button></dd>
+      <dd><code className="gi-value">{value}</code><button type="button" className="gi-prov" aria-label={`Copy ${label}`} data-tip={`Copy ${label}`} onClick={() => onCopy(value, label)}><Icon name="copy" /></button></dd>
     </div>
   );
 }

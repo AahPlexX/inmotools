@@ -36,9 +36,11 @@ export function TooltipLayer({ root }: { root: RefObject<HTMLElement | null> }) 
     const clearTimer = () => { if (timer.current !== null) window.clearTimeout(timer.current); timer.current = null; };
     const hide = () => { clearTimer(); setTip(null); };
     const targetOf = (event: Event) => (event.target instanceof Element ? event.target.closest<HTMLElement>('[data-tip]') : null);
-    const show = (target: HTMLElement) => {
+    const show = (target: HTMLElement, requireHover = false) => {
       const text = target.dataset.tip;
       if (!text || !document.contains(target)) return;
+      // A scroll during the hover delay may have moved the element away from the pointer.
+      if (requireHover && !target.matches(':hover')) return;
       setTip({ text, rect: target.getBoundingClientRect(), target });
     };
     const onOver = (event: PointerEvent) => {
@@ -46,7 +48,7 @@ export function TooltipLayer({ root }: { root: RefObject<HTMLElement | null> }) 
       const target = targetOf(event);
       clearTimer();
       if (!target) { setTip(null); return; }
-      timer.current = window.setTimeout(() => show(target), HOVER_DELAY);
+      timer.current = window.setTimeout(() => show(target, true), HOVER_DELAY);
     };
     const onOut = (event: PointerEvent) => {
       if (event.pointerType !== 'mouse') return;
@@ -77,6 +79,8 @@ export function TooltipLayer({ root }: { root: RefObject<HTMLElement | null> }) 
       if (target && target.matches(':focus-visible')) show(target);
     };
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') hide(); };
+    // Scrolling hides a visible tooltip but keeps a pending hover timer (it re-checks :hover).
+    const onScroll = () => setTip(null);
     host.addEventListener('pointerover', onOver);
     host.addEventListener('pointerout', onOut);
     host.addEventListener('pointerdown', onDown, true);
@@ -85,7 +89,7 @@ export function TooltipLayer({ root }: { root: RefObject<HTMLElement | null> }) 
     window.addEventListener('pointermove', onMove, { passive: true });
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', hide);
-    window.addEventListener('scroll', hide, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('keydown', onKey);
     return () => {
       clearTimer();
@@ -97,7 +101,7 @@ export function TooltipLayer({ root }: { root: RefObject<HTMLElement | null> }) 
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', hide);
-      window.removeEventListener('scroll', hide, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('keydown', onKey);
     };
   }, [root]);

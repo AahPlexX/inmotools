@@ -1,4 +1,5 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { Icon } from './Icon';
 import { SOURCES } from '../core/sources';
 import { abbreviation, formatOffset, offsetMinutes } from '../core/timezone';
 import { FIELD_GROUP_LABELS, type FieldGroup, type LocationProfile, type ProfileField } from '../core/types';
@@ -21,7 +22,7 @@ export function FieldRow({ item, zone, units, onInspect }: { item: ProfileField;
       <dd>
         <span className="gi-value">{displayValue(item, zone, units)}</span>
         {item.reference_year ? <span className="gi-year">{item.reference_year}</span> : null}
-        <button type="button" className="gi-prov" aria-label={`Provenance for ${item.label}`} data-tip="Source, record ID, year, license and confidence for this value" onClick={() => onInspect(item.key)}>ⓘ</button>
+        <button type="button" className="gi-prov" aria-label={`Provenance for ${item.label}`} data-tip="Source, record ID, year, license and confidence for this value" onClick={() => onInspect(item.key)}><Icon name="info" /></button>
       </dd>
     </div>
   );
@@ -175,7 +176,7 @@ export function ProfilePanel(props: ProfilePanelProps) {
       <section className="gi-summary" aria-label="Resolved location" onContextMenu={onContextMenu} {...longPress}>
         <div className="gi-summary-head">
           <div>
-            <p className="gi-kicker">{country ? String(country.value) : 'No country'}</p>
+            <p className="gi-kicker">{profile.countryCode ? <span className="gi-cc">{profile.countryCode}</span> : null}{country ? String(country.value) : 'No country'}</p>
             <h2 className="gi-title" data-testid="gi-profile-title">{profile.label}</h2>
             <p className="gi-coords">
               <button type="button" className="gi-link" onClick={() => props.onCopy(coordText, 'Coordinates')} data-tip="Copy latitude, longitude">{coordText}</button>
@@ -187,7 +188,7 @@ export function ProfilePanel(props: ProfilePanelProps) {
         <div className="gi-actions">
           <button type="button" className="gi-btn primary" onClick={props.onExport} data-tip="Export JSON, CSV, PDF, iCal, PNG, SVG, social card or a ZIP bundle, with editable metadata">Export…</button>
           <button type="button" className="gi-btn" aria-pressed={props.pinned} onClick={props.onPin} data-tip="Add to the side-by-side comparison (up to 6)">{props.pinned ? 'In comparison' : 'Compare'}</button>
-          <button type="button" className="gi-btn" aria-pressed={props.starred} onClick={props.onStar} data-tip="Starred locations are never removed from history">{props.starred ? '★ Starred' : '☆ Star'}</button>
+          <button type="button" className="gi-btn" aria-pressed={props.starred} onClick={props.onStar} data-tip="Starred locations are never removed from history"><Icon name={props.starred ? 'star' : 'starOutline'} />{props.starred ? 'Starred' : 'Star'}</button>
           <button type="button" className="gi-btn" onClick={() => props.onInspect(null)} data-tip="Open the provenance inspector for every value">Provenance</button>
           <button type="button" className="gi-btn" onClick={props.onRefresh} data-tip="Look this location up again (cached answers are reused until they expire)">Refresh</button>
         </div>
@@ -286,7 +287,7 @@ export function ProvenanceDialog({ profile, focusKey, onClose, units }: { profil
       <div className="gi-dialog wide" role="dialog" aria-modal="true" aria-labelledby="gi-prov-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
         <header className="gi-dialog-head">
           <h2 id="gi-prov-title">{focusKey ? 'Value provenance' : 'Provenance inspector'}</h2>
-          <button type="button" className="gi-icon" aria-label="Close" onClick={onClose} autoFocus>×</button>
+          <button type="button" className="gi-icon" aria-label="Close" onClick={onClose} autoFocus><Icon name="close" size={20} /></button>
         </header>
         {!focusKey ? <label className="gi-field"><span>Filter</span><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Field, source or group" /></label> : null}
         <div className="gi-table-wrap" tabIndex={0} role="region" aria-label="Provenance table">

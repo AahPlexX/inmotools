@@ -17,7 +17,7 @@ const profile: LocationProfile = {
   lat: 52.5173885, lon: 13.3951309, countryCode: 'DE', timezone: 'Europe/Berlin',
   fields: [
     field('location.lat', 'Latitude', 'location', 52.517389, { ...meta, source: 'photon', geography: 'locality', confidence: 'locality_centroid' }),
-    field('country.name', 'Country', 'country', '🇩🇪 Germany', { ...meta, source: 'natural-earth' }),
+    field('country.name', 'Country', 'country', 'Germany', { ...meta, source: 'natural-earth' }),
     field('wb.SP.POP.TOTL', 'Population (country)', 'population', 83491249, { ...meta, year: 2025, unit: 'people' }),
     field('address.name', 'Place', 'address', '=HYPERLINK("x")', { ...meta, source: 'photon' }),
     field('tz.offset', 'Current UTC offset', 'timezone', 'UTC+02:00', { ...meta, source: 'computed' }),
@@ -136,7 +136,7 @@ describe('binary exports', () => {
 
   it('builds the social card model', () => {
     const model = cardModel(profile, metadata, '14:00');
-    expect(model).toMatchObject({ title: 'Berlin brief', flag: '🇩🇪', tags: ['trip', 'eu'] });
+    expect(model).toMatchObject({ title: 'Berlin brief', flag: 'DE', tags: ['trip', 'eu'] });
     expect(model.subtitle).toBe('Berlin, Germany · Germany');
     expect(model.stats.find(([label]) => label === 'Country population')?.[1]).toBe('83.5M');
   });

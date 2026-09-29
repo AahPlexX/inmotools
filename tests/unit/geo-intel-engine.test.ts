@@ -48,7 +48,7 @@ describe('resolveLocation', () => {
     const profile = await resolveLocation({ kind: 'text', text: 'Berlin' }, { client: http, settings: DEFAULT_SETTINGS, now: NOW });
     expect(profile).toMatchObject({ countryCode: 'DE', timezone: 'Europe/Berlin', queryKind: 'place', id: '52.51739,13.39513' });
     const get = (key: string) => profile.fields.find((item) => item.key === key);
-    expect(get('country.name')?.value).toBe('🇩🇪 Germany');
+    expect(get('country.name')?.value).toBe('Germany');
     expect(get('wb.SP.POP.TOTL')).toMatchObject({ value: 83491249, reference_year: 2025, source: 'world-bank' });
     expect(get('eu.population.nuts3')).toMatchObject({ value: 3685265, geography_type: 'nuts3' });
     expect(get('tz.offset')?.value).toBe('UTC+02:00');

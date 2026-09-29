@@ -1,4 +1,5 @@
 import { useMemo, useState, type MouseEvent } from 'react';
+import { Icon } from './Icon';
 import { distanceKm } from '../core/geodesy';
 import { formatOffset, offsetMinutes } from '../core/timezone';
 import type { LocationProfile } from '../core/types';
@@ -31,7 +32,7 @@ function CompareCard({ profile, index, base, units, now, onRemove, onOpen, onMen
       <header>
         <span className="gi-index" aria-hidden="true">{index + 1}</span>
         <button type="button" className="gi-link" onClick={onOpen} data-tip="Show this location's full profile">{profile.label}</button>
-        <button type="button" className="gi-icon" aria-label={`Remove ${profile.label} from comparison`} data-tip="Remove from comparison" onClick={onRemove}>×</button>
+        <button type="button" className="gi-icon" aria-label={`Remove ${profile.label} from comparison`} data-tip="Remove from comparison" onClick={onRemove}><Icon name="close" /></button>
       </header>
       <dl className="gi-rows">{rows.map(([label, text, tip]) => <div className="gi-row" key={label}><dt data-tip={tip} tabIndex={0}>{label}</dt><dd>{text}</dd></div>)}</dl>
     </article>
@@ -64,7 +65,7 @@ function HistoryItem({ item, onOpen, onStar, onRename, onTags, onDelete, onCompa
   const longPress = useLongPress((x, y) => onMenu(x, y));
   return (
     <li className="gi-history-item" onContextMenu={(event) => { event.preventDefault(); onMenu(event.clientX, event.clientY); }} {...longPress}>
-      <button type="button" className="gi-star" aria-pressed={item.starred} aria-label={item.starred ? `Unstar ${item.name}` : `Star ${item.name}`} data-tip={item.starred ? 'Unstar (may then be trimmed from history)' : 'Star to keep permanently'} onClick={onStar}>{item.starred ? '★' : '☆'}</button>
+      <button type="button" className="gi-star" aria-pressed={item.starred} aria-label={item.starred ? `Unstar ${item.name}` : `Star ${item.name}`} data-tip={item.starred ? 'Unstar (may then be trimmed from history)' : 'Star to keep permanently'} onClick={onStar}><Icon name={item.starred ? 'star' : 'starOutline'} size={22} /></button>
       <div className="gi-history-main">
         {editing ? (
           <form className="gi-edit" onSubmit={(event) => { event.preventDefault(); onRename(name); onTags(parseTagInput(tags)); setEditing(false); }}>

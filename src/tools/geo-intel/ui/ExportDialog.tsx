@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { downloadBlob } from '../../../lib/download';
 import { FIELD_GROUPS, FIELD_GROUP_LABELS, type ExportMetadata, type FieldGroup, type LocationProfile } from '../core/types';
 import { buildCsv, buildIcs, buildJson, fileSlug, resolveMetadata, type ResolvedMetadata } from '../export/formats';
@@ -37,6 +38,7 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
   const [scale, setScale] = useState(2);
   const [bundle, setBundle] = useState<Format[]>(['json', 'csv', 'pdf', 'ics', 'png', 'svg', 'card']);
   const [busy, setBusy] = useState<string | null>(null);
+  const [askWhere, setAskWhere] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const primary = profiles[0];
   const multiple = profiles.length > 1;
@@ -90,6 +92,8 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
     }
   };
 
+  // The anchor download is the default path; the File System Access picker is opt-in.
+  const save = (blob: Blob, name: string) => (askWhere ? saveWithPicker(blob, name, downloadBlob) : Promise.resolve(downloadBlob(blob, name)));
   const run = async (label: string, task: () => Promise<void>) => {
     setBusy(label);
     try { await task(); onStatus(`${label} ready.`); }
@@ -98,14 +102,14 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
   };
   const download = (format: Format) => run(FORMATS.find((f) => f.id === format)?.label ?? format, async () => {
     const file = await make(format);
-    await saveWithPicker(file.blob, file.name, downloadBlob);
+    await save(file.blob, file.name);
   });
   const downloadZip = () => run('ZIP bundle', async () => {
     const chosen = bundle.filter(available);
     const files = [];
     for (const format of chosen) files.push(await make(format));
     const blob = await buildZip(files.map((file) => ({ name: file.name, data: file.blob })), bundleReadme(profiles, resolved, files.map((file) => file.name)));
-    await saveWithPicker(blob, `${base}.zip`, downloadBlob);
+    await save(blob, `${base}.zip`);
   });
 
   const set = (patch: Partial<ExportMetadata>) => setMeta((current) => ({ ...current, ...patch }));
@@ -115,7 +119,7 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
       <div ref={dialog} className="gi-dialog wide" role="dialog" aria-modal="true" aria-labelledby="gi-export-title" data-testid="gi-export">
         <header className="gi-dialog-head">
           <h2 id="gi-export-title">Export {multiple ? `${profiles.length} locations` : primary.label}</h2>
-          <button type="button" className="gi-icon" aria-label="Close export" onClick={onClose}>×</button>
+          <button type="button" className="gi-icon" aria-label="Close export" onClick={onClose}><Icon name="close" size={20} /></button>
         </header>
         <div className="gi-export-grid">
           <fieldset className="gi-meta">
@@ -160,7 +164,7 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
             })}
             <div className="gi-actions">
               <button type="button" className="gi-btn primary" disabled={!!busy || !bundle.some(available)} onClick={downloadZip} data-testid="gi-export-zip" data-tip="All ticked formats in one ZIP with a README that lists attribution">{busy === 'ZIP bundle' ? 'Building ZIP…' : 'Download ZIP bundle'}</button>
-              {supportsSavePicker() ? <span className="gi-muted">Your browser will ask where to save.</span> : null}
+              {supportsSavePicker() ? <label className="gi-check" data-tip="Use the browser's save dialog (File System Access API) instead of a normal download"><input type="checkbox" checked={askWhere} onChange={(event) => setAskWhere(event.target.checked)} /> Ask where to save</label> : null}
             </div>
           </div>
         </div>

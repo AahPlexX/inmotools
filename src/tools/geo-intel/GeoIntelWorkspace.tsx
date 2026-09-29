@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Icon } from './ui/Icon';
 import { downloadText } from '../../lib/download';
 import { boundaryLayer, featureAt, boundaryAttribution, type AdmLevel } from './adapters/boundaries';
 import { worldBankAllCountries, WB_INDICATORS } from './adapters/statistics';
@@ -389,7 +390,7 @@ export default function GeoIntelWorkspace() {
             <header className="gi-sheet-head">
               <span className="gi-grip" aria-hidden="true" />
               <h2 id="gi-sheet-title">{TABS.find((t) => t.id === tab)?.label}</h2>
-              <button type="button" className="gi-icon" aria-label="Close panel" onClick={() => { setSheetOpen(false); setTab('profile'); }} autoFocus>×</button>
+              <button type="button" className="gi-icon" aria-label="Close panel" onClick={() => { setSheetOpen(false); setTab('profile'); }} autoFocus><Icon name="close" size={20} /></button>
             </header>
             <div className="gi-sheet-body" tabIndex={0} role="region" aria-label={`${TABS.find((t) => t.id === tab)?.label} panel`}>{panel}</div>
           </div>
