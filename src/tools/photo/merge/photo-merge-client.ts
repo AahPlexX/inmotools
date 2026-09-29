@@ -1,7 +1,9 @@
 import {
   PHOTO_MERGE_LIMITS,
   type PhotoFrameRegistration,
+  type PhotoMergeCrop,
   type PhotoMergeDiagnostic,
+  type PhotoTonemapSettings,
   type PhotoMergeRaster,
   type PhotoMergeRequest,
   type PhotoMergeResponse,
@@ -30,6 +32,9 @@ export interface PhotoMergeClientOptions {
 }
 
 type AlignResult = { registrations: PhotoFrameRegistration[]; aligned: PhotoMergeRaster[] };
+type MergeResult = { registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop };
+// Distributes over the union so each request variant keeps its own fields.
+type RequestWithoutId = PhotoMergeRequest extends infer R ? R extends unknown ? Omit<R, 'id'> : never : never;
 
 function defaultWorker(): PhotoMergeWorkerLike {
   return new Worker(new URL('./photo-merge.worker.ts', import.meta.url), { type: 'module' }) as unknown as PhotoMergeWorkerLike;
@@ -52,7 +57,7 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
     worker = null;
   }
 
-  function run(request: Omit<PhotoMergeRequest, 'id'>): Promise<PhotoMergeResponse & { ok: true }> {
+  function run(request: RequestWithoutId): Promise<PhotoMergeResponse & { ok: true }> {
     const task = queue.then(() => new Promise<PhotoMergeResponse & { ok: true }>((resolve, reject) => {
       if (disposed) {
         reject(new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge workspace was closed.' }));
@@ -105,6 +110,16 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
       const response = await run({ type: 'align', model, referenceIndex, sources });
       if (response.type !== 'align') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
       return { registrations: response.registrations, aligned: response.aligned };
+    },
+    async fuse(model: PhotoRegistrationModel, align: boolean, sources: PhotoMergeRaster[]): Promise<MergeResult> {
+      const response = await run({ type: 'fuse', model, align, referenceIndex: 0, sources });
+      if (response.type !== 'fuse') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
+      return { registrations: response.registrations, result: response.result, crop: response.crop };
+    },
+    async hdr(model: PhotoRegistrationModel, align: boolean, sources: PhotoMergeRaster[], exposureSeconds: number[], tonemap: PhotoTonemapSettings): Promise<MergeResult> {
+      const response = await run({ type: 'hdr', model, align, referenceIndex: 0, sources, exposureSeconds, tonemap });
+      if (response.type !== 'hdr') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
+      return { registrations: response.registrations, result: response.result, crop: response.crop };
     },
     dispose() {
       disposed = true;

@@ -526,6 +526,78 @@ test('dust visualization renders a preview-only overlay distinct from clipping/f
   await expect(page.getByTestId('photo-dust-overlay')).toHaveCount(0);
 });
 
+/** A 3-frame exposure bracket of one textured scene, rendered in the page as PNG bytes. The
+ * middle frame is shifted 4 px, as a handheld camera would be. */
+async function bracketPngs(page: Page): Promise<Buffer[]> {
+  const frames = await page.evaluate(() => {
+    const width = 240;
+    const height = 180;
+    const margin = 16;
+    const scene = document.createElement('canvas');
+    scene.width = width + margin * 2;
+    scene.height = height + margin * 2;
+    const sceneContext = scene.getContext('2d')!;
+    sceneContext.fillStyle = 'rgb(90, 100, 110)';
+    sceneContext.fillRect(0, 0, scene.width, scene.height);
+    let seed = 91;
+    const next = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 180; i += 1) {
+      sceneContext.fillStyle = `rgb(${Math.floor(next() * 255)}, ${Math.floor(next() * 255)}, ${Math.floor(next() * 255)})`;
+      sceneContext.fillRect(Math.floor(next() * scene.width), Math.floor(next() * scene.height), 6 + Math.floor(next() * 40), 6 + Math.floor(next() * 30));
+    }
+    return ([[0.4, 0], [1, 4], [2.6, 0]] as const).map(([gain, dx]) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(scene, margin - dx, margin, width, height, 0, 0, width, height);
+      const image = context.getImageData(0, 0, width, height);
+      for (let i = 0; i < image.data.length; i += 4) for (let c = 0; c < 3; c += 1) image.data[i + c] = Math.min(255, image.data[i + c] * gain);
+      context.putImageData(image, 0, 0);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+  });
+  return frames.map((base64) => Buffer.from(base64, 'base64'));
+}
+
+test('exposure fusion and HDR merge a bracket into a new photo and refuse mismatched sizes', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openFixture(page);
+  const bracket = await bracketPngs(page);
+  await page.getByRole('button', { name: 'Merge photos' }).click();
+  const input = page.getByTestId('photo-merge-file-input');
+  const mergeButton = page.getByRole('button', { name: 'Merge selected photos' });
+
+  await input.setInputFiles([
+    { name: 'wide.png', mimeType: 'image/png', buffer: FIXTURE_PNG },
+    { name: 'dark.png', mimeType: 'image/png', buffer: bracket[0] },
+  ]);
+  await expect(page.getByTestId('photo-merge-plan')).toContainText('needs identical dimensions');
+  await expect(mergeButton).toBeDisabled();
+
+  await input.setInputFiles(['dark', 'mid', 'bright'].map((name, index) => ({ name: `${name}.png`, mimeType: 'image/png', buffer: bracket[index] })));
+  await expect(page.getByTestId('photo-merge-frame')).toHaveCount(3);
+  await expect(page.getByTestId('photo-merge-plan')).toContainText('3 photos · 240 × 180');
+  await mergeButton.click();
+  const report = page.getByTestId('photo-merge-report');
+  await expect(report).toContainText('Exposure fusion of 3 photos', { timeout: 90_000 });
+  const [, width, height] = (await report.textContent())!.match(/(\d+) × (\d+) after cropping/)!;
+  expect(Number(width)).toBeLessThan(240);
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText(`${width} × ${height}`);
+
+  await page.getByRole('button', { name: 'Merge photos' }).click();
+  await page.getByLabel('Merge method').selectOption('hdr');
+  await input.setInputFiles(['dark', 'mid', 'bright'].map((name, index) => ({ name: `${name}.png`, mimeType: 'image/png', buffer: bracket[index] })));
+  await expect(page.getByText('Enter an exposure time for every photo to merge as HDR.')).toBeVisible();
+  await expect(mergeButton).toBeDisabled();
+  for (const [name, seconds] of [['dark', '0.0067'], ['mid', '0.0167'], ['bright', '0.0433']]) {
+    await page.getByLabel(`Exposure time for ${name}.png`).fill(seconds);
+  }
+  await expect(mergeButton).toBeEnabled();
+  await mergeButton.click();
+  await expect(report).toContainText('HDR merge of 3 photos', { timeout: 90_000 });
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();

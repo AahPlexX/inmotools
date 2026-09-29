@@ -25,6 +25,7 @@ export type PhotoMergeDiagnosticCode =
   | 'dimension-mismatch'
   | 'memory-budget'
   | 'registration-failed'
+  | 'no-common-coverage'
   | 'engine-unavailable'
   | 'invalid-request'
   | 'timeout'
@@ -58,11 +59,33 @@ export interface PhotoFrameRegistration {
   lowConfidence: boolean;
 }
 
+/** OpenCV TonemapReinhard parameters (Reinhard et al. 2005), passed through unchanged. */
+export interface PhotoTonemapSettings {
+  gamma: number;
+  intensity: number;
+  lightAdaptation: number;
+  colorAdaptation: number;
+}
+
+export const DEFAULT_TONEMAP: PhotoTonemapSettings = { gamma: 1, intensity: 0, lightAdaptation: 1, colorAdaptation: 0 };
+
+export interface PhotoMergeCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+type RequestBase = { id: number; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] };
+
 export type PhotoMergeRequest =
-  | { id: number; type: 'register'; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] }
-  | { id: number; type: 'align'; model: PhotoRegistrationModel; referenceIndex: number; sources: PhotoMergeRaster[] };
+  | RequestBase & { type: 'register' }
+  | RequestBase & { type: 'align' }
+  | RequestBase & { type: 'fuse'; align: boolean }
+  | RequestBase & { type: 'hdr'; align: boolean; exposureSeconds: number[]; tonemap: PhotoTonemapSettings };
 
 export type PhotoMergeResponse =
   | { id: number; ok: true; type: 'register'; registrations: PhotoFrameRegistration[] }
   | { id: number; ok: true; type: 'align'; registrations: PhotoFrameRegistration[]; aligned: PhotoMergeRaster[] }
+  | { id: number; ok: true; type: 'fuse' | 'hdr'; registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop }
   | { id: number; ok: false; diagnostic: PhotoMergeDiagnostic };

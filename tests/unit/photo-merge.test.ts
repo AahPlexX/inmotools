@@ -4,7 +4,9 @@ import { resolvePhotoCvRuntime } from '../../src/tools/photo/merge/photo-cv-runt
 import { createPhotoMergeClient, PhotoMergeFailure, type PhotoMergeWorkerLike } from '../../src/tools/photo/merge/photo-merge-client';
 import { handlePhotoMergeRequest, validatePhotoMergeRequest } from '../../src/tools/photo/merge/photo-merge-handler';
 import { checkMergeSources, planPhotoMerge } from '../../src/tools/photo/merge/photo-merge-plan';
-import type { PhotoMergeRaster, PhotoMergeResponse } from '../../src/tools/photo/merge/photo-merge-types';
+import { DEFAULT_TONEMAP, type PhotoMergeRaster, type PhotoMergeResponse } from '../../src/tools/photo/merge/photo-merge-types';
+import { commonCoverageRect } from '../../src/tools/photo/merge/photo-exposure-merge';
+import { exposureSecondsFromTags } from '../../src/tools/photo/merge/photo-merge-sources';
 import { createCvScope, registerFramePair, warpFrameToReference, type PhotoCv } from '../../src/tools/photo/merge/photo-registration';
 
 /** Deterministic textured fixture: overlapping soft-edged rectangles of varied size and color,
@@ -196,6 +198,120 @@ describe('registration adapter against the real OpenCV engine', () => {
       expect(response.registrations[1].matrix[2]).toBeCloseTo(4, 1);
     }
   }, 30_000);
+});
+
+/** Same scene through a linear sensor at a different exposure: RGB scaled by `gain`, clipped. */
+function exposed(raster: PhotoMergeRaster, gain: number): PhotoMergeRaster {
+  const bytes = new Uint8ClampedArray(raster.buffer.slice(0));
+  for (let i = 0; i < bytes.length; i += 4) for (let c = 0; c < 3; c += 1) bytes[i + c] = bytes[i + c] * gain;
+  return { width: raster.width, height: raster.height, buffer: bytes.buffer };
+}
+
+function clippedFraction(raster: PhotoMergeRaster): number {
+  const bytes = new Uint8Array(raster.buffer);
+  let clipped = 0;
+  for (let i = 0; i < bytes.length; i += 4) if (bytes[i] >= 254 || bytes[i + 1] >= 254 || bytes[i + 2] >= 254) clipped += 1;
+  return clipped / (bytes.length / 4);
+}
+
+function meanLevel(raster: PhotoMergeRaster): number {
+  const bytes = new Uint8Array(raster.buffer);
+  let sum = 0;
+  for (let i = 0; i < bytes.length; i += 4) sum += (bytes[i] + bytes[i + 1] + bytes[i + 2]) / 3;
+  return sum / (bytes.length / 4);
+}
+
+describe('EXIF exposure time', () => {
+  test('reads a rational or plain ExposureTime and rejects missing or non-positive values', () => {
+    expect(exposureSecondsFromTags({ ExposureTime: { value: [1, 60] } })).toBeCloseTo(1 / 60, 9);
+    expect(exposureSecondsFromTags({ ExposureTime: { value: 0.5 } })).toBe(0.5);
+    expect(exposureSecondsFromTags({})).toBeNull();
+    expect(exposureSecondsFromTags({ ExposureTime: { value: [0, 1] } })).toBeNull();
+    expect(exposureSecondsFromTags({ ExposureTime: { value: 'fast' } })).toBeNull();
+  });
+});
+
+describe('common coverage crop', () => {
+  const frame = (width: number, height: number, transparent: (x: number, y: number) => boolean) => {
+    const bytes = new Uint8Array(width * height * 4).fill(128);
+    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) bytes[(y * width + x) * 4 + 3] = transparent(x, y) ? 0 : 255;
+    return { width, height, buffer: bytes.buffer };
+  };
+
+  test('fully covered frames keep the whole frame', () => {
+    expect(commonCoverageRect([frame(20, 10, () => false), frame(20, 10, () => false)])).toEqual({ x: 0, y: 0, width: 20, height: 10 });
+  });
+
+  test('padding from alignment in any frame is cropped away', () => {
+    const shifted = frame(20, 10, (x, y) => x < 3 || y >= 8);
+    expect(commonCoverageRect([frame(20, 10, () => false), shifted])).toEqual({ x: 3, y: 0, width: 17, height: 8 });
+  });
+
+  test('frames with no shared coverage return null', () => {
+    expect(commonCoverageRect([frame(8, 8, (x) => x < 4), frame(8, 8, (x) => x >= 4)])).toBeNull();
+  });
+});
+
+describe('exposure fusion and HDR against the real OpenCV engine', () => {
+  const bracket = () => {
+    const near = cameraPair(240, 180, 0, 0, 44);
+    const shifted = cameraPair(240, 180, 4, -3, 44);
+    return [exposed(near.reference, 0.4), exposed(shifted.target, 1), exposed(near.reference, 2.6)];
+  };
+
+  test('fusion aligns the bracket, crops to shared coverage, and holds highlights the bright frame clipped', async () => {
+    const frames = bracket();
+    const bright = copyRaster(frames[2]);
+    const dark = copyRaster(frames[0]);
+    const response = await handlePhotoMergeRequest({ id: 1, type: 'fuse', model: 'translation', align: true, referenceIndex: 0, sources: frames }, loadPhotoMergeEngine);
+    expect(response.ok).toBe(true);
+    if (!response.ok || response.type !== 'fuse') return;
+    expect(response.registrations[1].matrix[2]).toBeCloseTo(4, 0);
+    expect(response.crop.width).toBeLessThan(240);
+    expect(response.result.width).toBe(response.crop.width);
+    expect(response.result.height).toBe(response.crop.height);
+    expect(clippedFraction(response.result)).toBeLessThan(clippedFraction(bright) * 0.5);
+    const level = meanLevel(response.result);
+    expect(level).toBeGreaterThan(meanLevel(dark));
+    expect(level).toBeLessThan(meanLevel(bright));
+  }, 30_000);
+
+  test('HDR recovers a radiance map from exposure times and tone-maps it to a usable image', async () => {
+    const response = await handlePhotoMergeRequest(
+      { id: 2, type: 'hdr', model: 'translation', align: true, referenceIndex: 0, sources: bracket(), exposureSeconds: [0.4 / 60, 1 / 60, 2.6 / 60], tonemap: DEFAULT_TONEMAP },
+      loadPhotoMergeEngine,
+    );
+    expect(response.ok).toBe(true);
+    if (!response.ok || response.type !== 'hdr') return;
+    expect(response.result.width).toBe(response.crop.width);
+    const level = meanLevel(response.result);
+    expect(level).toBeGreaterThan(20);
+    expect(level).toBeLessThan(235);
+  }, 30_000);
+
+  test('with alignment off, frames are merged as-is on the full grid', async () => {
+    const scene = cameraPair(120, 90, 0, 0, 12).reference;
+    const response = await handlePhotoMergeRequest(
+      { id: 3, type: 'fuse', model: 'translation', align: false, referenceIndex: 0, sources: [exposed(scene, 0.5), exposed(scene, 1.5)] },
+      loadPhotoMergeEngine,
+    );
+    expect(response).toMatchObject({ ok: true, crop: { x: 0, y: 0, width: 120, height: 90 } });
+    if (response.ok && response.type === 'fuse') expect(response.registrations.every((item) => item.coarse === 'identity')).toBe(true);
+  }, 30_000);
+
+  test('HDR without a valid exposure time and fusion of mismatched sizes are refused before merging', async () => {
+    const frames = bracket();
+    const noTime = await handlePhotoMergeRequest(
+      { id: 4, type: 'hdr', model: 'translation', align: true, referenceIndex: 0, sources: frames, exposureSeconds: [1 / 60, 0, 1 / 15], tonemap: DEFAULT_TONEMAP },
+      vi.fn(),
+    );
+    expect(noTime).toMatchObject({ ok: false, diagnostic: { code: 'invalid-request', sourceIndex: 1 } });
+    const mixed = await handlePhotoMergeRequest(
+      { id: 5, type: 'fuse', model: 'translation', align: true, referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 10, 5)] },
+      vi.fn(),
+    );
+    expect(mixed).toMatchObject({ ok: false, diagnostic: { code: 'dimension-mismatch', sourceIndex: 1 } });
+  });
 });
 
 describe('engine runtime resolution', () => {

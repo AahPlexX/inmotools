@@ -25,6 +25,10 @@ import {
 import { photoNaturalDimensions } from './photo-export-dimensions';
 import { applyLayerMaskGesture, applyLiquifyStroke, applyLocalGesture, applyMeshWarpDrag, placeRetouchPoint } from './photo-interaction';
 import { NEUTRAL_DETAIL_FILTERS } from './photo-detail-filters';
+import { createPhotoMergeClient, PhotoMergeFailure } from './merge/photo-merge-client';
+import { planPhotoMerge } from './merge/photo-merge-plan';
+import { decodeMergeFrame, mergeResultToFile, readMergeFrame, type PhotoMergeFrame } from './merge/photo-merge-sources';
+import { DEFAULT_TONEMAP, type PhotoRegistrationModel, type PhotoTonemapSettings } from './merge/photo-merge-types';
 import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
@@ -104,7 +108,7 @@ import type {
 } from './photo-types';
 import './photo.css';
 
-type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'detail' | 'inspect';
+type InspectorPanel = 'edit' | 'geometry' | 'local' | 'retouch' | 'layers' | 'detail' | 'merge' | 'inspect';
 type ToneCurveChannel = 'master' | 'red' | 'green' | 'blue';
 type MixerOutputChannel = 'red' | 'green' | 'blue';
 type WatermarkAnchor = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
@@ -377,6 +381,14 @@ export default function PhotoWorkspace() {
   const layerStrokeCounterRef = useRef(0);
   const layerFileInputRef = useRef<HTMLInputElement | null>(null);
   const watermarkFileInputRef = useRef<HTMLInputElement | null>(null);
+  const mergeClientRef = useRef<ReturnType<typeof createPhotoMergeClient> | null>(null);
+  const mergeFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [mergeFrames, setMergeFrames] = useState<PhotoMergeFrame[]>([]);
+  const [mergeMode, setMergeMode] = useState<'fuse' | 'hdr'>('fuse');
+  const [mergeAlignment, setMergeAlignment] = useState<PhotoRegistrationModel | 'none'>('translation');
+  const [mergeTonemap, setMergeTonemap] = useState<PhotoTonemapSettings>(DEFAULT_TONEMAP);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeReport, setMergeReport] = useState('');
   const liquifyStrokeCounterRef = useRef(0);
   const [liquifyMode, setLiquifyMode] = useState<PhotoLiquifyMode>('push');
   const [liquifyRadius, setLiquifyRadius] = useState(0.08);
@@ -494,6 +506,7 @@ export default function PhotoWorkspace() {
   }, [refreshStorageStatus]);
 
   useEffect(() => () => {
+    mergeClientRef.current?.dispose();
     importRevisionRef.current += 1;
     renderRevisionRef.current += 1;
     autoAnalysisRevisionRef.current += 1;
@@ -2378,6 +2391,139 @@ export default function PhotoWorkspace() {
     );
   }
 
+  async function chooseMergeFrames(files: File[]) {
+    setMergeReport('');
+    try {
+      const frames = await Promise.all(files.filter(isPhotoImportFile).map(readMergeFrame));
+      setMergeFrames(frames);
+      if (!frames.length) setMergeReport('None of those files is a browser-readable image.');
+    } catch (error) {
+      setMergeFrames([]);
+      setMergeReport(photoImportErrorMessage(error));
+    }
+  }
+
+  function setMergeExposure(index: number, text: string) {
+    const seconds = Number(text);
+    setMergeFrames((frames) => frames.map((frame, i) => (
+      i === index ? { ...frame, exposureSeconds: text !== '' && Number.isFinite(seconds) && seconds > 0 ? seconds : null } : frame
+    )));
+  }
+
+  async function runMerge() {
+    const frames = mergeFrames;
+    setMergeBusy(true);
+    setMergeReport('Aligning and merging…');
+    try {
+      const rasters = [];
+      for (const frame of frames) rasters.push(await decodeMergeFrame(frame)); // One at a time bounds decode memory.
+      const client = (mergeClientRef.current ??= createPhotoMergeClient());
+      const align = mergeAlignment !== 'none';
+      const model = mergeAlignment === 'none' ? 'translation' : mergeAlignment;
+      const merged = mergeMode === 'fuse'
+        ? await client.fuse(model, align, rasters)
+        : await client.hdr(model, align, rasters, frames.map((frame) => frame.exposureSeconds ?? 0), mergeTonemap);
+      const shaky = merged.registrations.filter((item) => item.lowConfidence).map((item) => item.sourceIndex + 1);
+      const label = mergeMode === 'fuse' ? 'Exposure fusion' : 'HDR merge';
+      const file = await mergeResultToFile(merged.result, `${mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr-merge'}-${frames.length}-photos.png`);
+      setMergeReport(`${label} of ${frames.length} photos: ${merged.crop.width} × ${merged.crop.height} after cropping to the area every photo covers.${
+        shaky.length ? ` Alignment confidence was low for photo ${shaky.join(', ')}; check the result for ghosting.` : ''} Opened as a new photo; the originals are unchanged.`);
+      await importPhotoFiles([file], 'file-input');
+    } catch (error) {
+      setMergeReport(error instanceof PhotoMergeFailure ? error.diagnostic.message : `Merging failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setMergeBusy(false);
+    }
+  }
+
+  function renderMergePanel() {
+    const plan = mergeFrames.length ? planPhotoMerge(mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr', mergeFrames) : null;
+    const missingTime = mergeMode === 'hdr' && mergeFrames.some((frame) => !frame.exposureSeconds);
+    const tonemapControl = (key: keyof PhotoTonemapSettings, label: string, min: number, max: number, step: number) => (
+      <SimpleControl label={label} value={mergeTonemap[key]} min={min} max={max} step={step} neutral={DEFAULT_TONEMAP[key]} onChange={(value) => setMergeTonemap((current) => ({ ...current, [key]: value }))} />
+    );
+    return (
+      <>
+        <div className="photo-inspector-header">
+          <h2>Merge photos</h2>
+          <p>Combine a bracketed series of the same scene into one photo. The result opens as a new local photo; the originals are unchanged.</p>
+        </div>
+        <div className="photo-inline-actions">
+          <button type="button" disabled={mergeBusy} onClick={() => mergeFileInputRef.current?.click()}>Choose photos to merge</button>
+          <input
+            ref={mergeFileInputRef}
+            data-testid="photo-merge-file-input"
+            type="file"
+            multiple
+            accept={PHOTO_FILE_ACCEPT}
+            hidden
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = '';
+              if (files.length) void chooseMergeFrames(files);
+            }}
+          />
+        </div>
+        <label>
+          Merge method
+          <select value={mergeMode} disabled={mergeBusy} onChange={(event) => setMergeMode(event.target.value as 'fuse' | 'hdr')}>
+            <option value="fuse">Exposure fusion</option>
+            <option value="hdr">HDR merge with tone mapping</option>
+          </select>
+        </label>
+        <label>
+          Alignment
+          <select value={mergeAlignment} disabled={mergeBusy} onChange={(event) => setMergeAlignment(event.target.value as PhotoRegistrationModel | 'none')}>
+            <option value="translation">Shift only (handheld)</option>
+            <option value="euclidean">Shift and rotation</option>
+            <option value="homography">Perspective</option>
+            <option value="none">None (tripod)</option>
+          </select>
+        </label>
+        {mergeFrames.length ? (
+          <ol className="photo-merge-frames" aria-label="Photos to merge">
+            {mergeFrames.map((frame, index) => (
+              <li key={`${frame.file.name}-${index}`} data-testid="photo-merge-frame">
+                <strong>{frame.file.name}</strong> <span>{frame.width} × {frame.height}</span>
+                {mergeMode === 'hdr' ? (
+                  <label>
+                    Exposure time (seconds)
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      aria-label={`Exposure time for ${frame.file.name}`}
+                      value={frame.exposureSeconds ?? ''}
+                      onChange={(event) => setMergeExposure(index, event.target.value)}
+                    />
+                  </label>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        ) : <p className="photo-export-note">Choose 2 to 9 photos of the same scene taken at different exposures.</p>}
+        {mergeMode === 'hdr' ? (
+          <>
+            {tonemapControl('gamma', 'Tone mapping gamma', 0.1, 3, 0.05)}
+            {tonemapControl('intensity', 'Tone mapping intensity', -8, 8, 0.1)}
+            {tonemapControl('lightAdaptation', 'Light adaptation', 0, 1, 0.05)}
+            {tonemapControl('colorAdaptation', 'Color adaptation', 0, 1, 0.05)}
+          </>
+        ) : null}
+        {plan ? (
+          <p className="photo-export-note" role={plan.ok ? 'status' : 'alert'} data-testid="photo-merge-plan">
+            {plan.ok ? `${plan.sourceCount} photos · ${plan.width} × ${plan.height} · about ${Math.ceil(plan.estimatedBytes / (1024 * 1024))} MiB working memory` : plan.diagnostic.message}
+          </p>
+        ) : null}
+        {missingTime ? <p className="photo-export-note" role="alert">Enter an exposure time for every photo to merge as HDR.</p> : null}
+        <div className="photo-inline-actions">
+          <button type="button" disabled={!plan?.ok || missingTime || mergeBusy} onClick={() => void runMerge()}>{mergeBusy ? 'Merging…' : 'Merge selected photos'}</button>
+        </div>
+        {mergeReport ? <p className="photo-export-note" role="status" data-testid="photo-merge-report">{mergeReport}</p> : null}
+      </>
+    );
+  }
+
   function renderDetailPanel() {
     const filters = recipe.detailFilters ?? NEUTRAL_DETAIL_FILTERS;
     const meshActive = Boolean(recipe.meshWarp && recipe.meshWarp.length > 0);
@@ -2621,6 +2767,7 @@ export default function PhotoWorkspace() {
     if (panel === 'retouch') return renderRetouchPanel();
     if (panel === 'layers') return renderLayersPanel();
     if (panel === 'detail') return renderDetailPanel();
+    if (panel === 'merge') return renderMergePanel();
     if (panel === 'inspect') return renderInspectPanel();
     return renderEditPanel();
   }
@@ -2737,6 +2884,7 @@ export default function PhotoWorkspace() {
             ['retouch', 'Retouch'],
             ['layers', 'Layers'],
             ['detail', 'Warp & detail'],
+            ['merge', 'Merge photos'],
             ['inspect', 'Inspect & workflow'],
           ] as Array<[InspectorPanel, string]>).map(([id, label]) => (
             <button

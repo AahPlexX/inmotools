@@ -11,8 +11,11 @@ export interface CvMat extends CvReleasable {
   empty(): boolean;
   doubleAt(row: number, col: number): number;
   floatAt(row: number, col: number): number;
-  convertTo(destination: CvMat, type: number): void;
+  convertTo(destination: CvMat, type: number, alpha?: number): void;
+  roi(rect: unknown): CvMat;
 }
+export interface CvMatVector extends CvReleasable { push_back(mat: CvMat): void }
+interface CvMergeProcess extends CvReleasable { process(sources: CvMatVector, destination: CvMat, times: CvMat, response: CvMat): void }
 interface CvPoint { x: number; y: number }
 interface CvKeyPointVector extends CvReleasable { size(): number; get(index: number): { pt: CvPoint } }
 interface CvDMatchVector extends CvReleasable { size(): number; get(index: number): { queryIdx: number; trainIdx: number; distance: number; delete?: () => void } }
@@ -28,6 +31,12 @@ export interface PhotoCv {
   BFMatcher: new (norm: number, crossCheck: boolean) => CvMatcher;
   KeyPointVector: new () => CvKeyPointVector;
   DMatchVector: new () => CvDMatchVector;
+  MatVector: new () => CvMatVector;
+  Rect: new (x: number, y: number, width: number, height: number) => unknown;
+  MergeMertens: new (contrastWeight: number, saturationWeight: number, exposureWeight: number) => CvMergeProcess;
+  CalibrateDebevec: new (samples: number, lambda: number, random: boolean) => CvReleasable & { process(sources: CvMatVector, response: CvMat, times: CvMat): void };
+  MergeDebevec: new () => CvMergeProcess;
+  TonemapReinhard: new (gamma: number, intensity: number, lightAdaptation: number, colorAdaptation: number) => CvReleasable & { process(source: CvMat, destination: CvMat): void };
   matFromArray(rows: number, cols: number, type: number, values: number[]): CvMat;
   cvtColor(source: CvMat, destination: CvMat, code: number): void;
   resize(source: CvMat, destination: CvMat, size: unknown, fx: number, fy: number, interpolation: number): void;
@@ -36,11 +45,14 @@ export interface PhotoCv {
   warpPerspective(source: CvMat, destination: CvMat, matrix: CvMat, size: unknown, flags: number, borderMode: number, borderValue: unknown): void;
   countNonZero(mat: CvMat): number;
   exceptionFromPtr?: (pointer: number) => { msg?: string };
+  CV_8UC3: number;
   CV_8UC4: number;
   CV_32F: number;
   CV_64F: number;
   CV_32FC2: number;
   COLOR_RGBA2GRAY: number;
+  COLOR_RGBA2RGB: number;
+  COLOR_RGB2RGBA: number;
   INTER_AREA: number;
   INTER_LINEAR: number;
   WARP_INVERSE_MAP: number;
