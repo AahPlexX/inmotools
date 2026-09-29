@@ -98,18 +98,23 @@
 .fiber-knitting-scroll { max-width: 100%; }
 .fiber-knitting-grid { display: grid; width: max-content; border-top: 1px solid var(--line-strong); border-left: 1px solid var(--line-strong); background: var(--surface); }
 .fiber-knitting-row { display: flex; width: max-content; }
+.fiber-knitting-row-label { box-sizing: border-box; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 5px; width: 72px; padding: 0 7px; border-right: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background: var(--surface-soft); color: var(--ink); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fiber-knitting-row-label > span { font-size: 15px; }
+.fiber-knitting-row-label > b { text-align: center; }
+.fiber-knitting-row-label > small { color: var(--muted); font: inherit; }
 .fiber-knitting-cell { box-sizing: border-box; display: grid; place-items: center; width: 44px; height: auto; aspect-ratio: var(--fiber-knit-aspect); border-right: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .fiber-knitting-cell > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 640px) {
   .fiber-knitting-gauge-controls { grid-template-columns: 1fr; }
+  .fiber-knitting-row-label { width: 64px; padding-inline: 5px; }
   .fiber-knitting-cell { width: 40px; }
 }
 
 @media print {
   .fiber-knitting-gauge-controls { display: none !important; }
   .fiber-knitting-scroll { overflow: visible; max-width: none; }
-  .fiber-knitting-cell { border-color: #000; background: #fff; color: #000; }
+  .fiber-knitting-row-label, .fiber-knitting-cell { border-color: #000; background: #fff; color: #000; }
 }
 
 /* Counted-thread precision chart */
