@@ -1,3 +1,4 @@
+import { knittingRowDirection } from '../knitting-document-engine';
 import { COUNTED_BACKSTITCH_TECHNIQUE_LABELS, countedStitchLabel, generateCountedThreadLegend } from './counted-thread-engine';
 import { crochetSymbolLabel, getKnittingSymbol, type CrochetDialect } from './symbol-library';
 import type { ColorSlot, FiberCraftDocument } from '../fiber-craft-types';
@@ -59,11 +60,15 @@ export function describeKnittingChart(document: FiberCraftDocument): FiberChartT
   if (document.metadata.discipline !== 'knitting' || document.chart.kind !== 'grid') throw new Error('Knitting chart descriptions require a knitting grid.');
   const chart = document.chart;
   const gauge = document.gauge;
+  const construction = document.settings?.knitting?.construction ?? 'flat';
   const worked = chart.cells.filter((cell) => cell.symbolId !== null || cell.colorId !== null);
   const details = Array.from({ length: chart.rows }, (_, row) => {
     const cells = chart.cells.filter((cell) => cell.row === row);
     const charted = cells.filter((cell) => cell.symbolId !== null || cell.colorId !== null);
-    return `Row ${row + 1}: ${charted.length} charted, ${cells.length - charted.length} blank.`;
+    const reading = knittingRowDirection(row, construction);
+    const side = reading.side === 'right' ? 'right side' : 'wrong side';
+    const direction = reading.direction === 'right-to-left' ? 'right to left' : 'left to right';
+    return `Row ${row + 1}: ${charted.length} charted, ${cells.length - charted.length} blank. ${side}, read ${direction}.`;
   });
   const symbols = countValues(worked.flatMap((cell) => cell.symbolId ? [cell.symbolId] : []));
   const colors = countValues(worked.flatMap((cell) => cell.colorId ? [cell.colorId] : []));
@@ -75,7 +80,7 @@ export function describeKnittingChart(document: FiberCraftDocument): FiberChartT
     catch { return id; }
   };
   return {
-    summary: `Knitting grid with ${chart.rows} rows and ${chart.cols} stitches. Cell width-to-height ratio ${chart.aspectRatio.toFixed(2)}.${gaugeText}`,
+    summary: `Knitting grid with ${chart.rows} rows and ${chart.cols} stitches, worked ${construction === 'round' ? 'in the round' : 'flat'}. Cell width-to-height ratio ${chart.aspectRatio.toFixed(2)}.${gaugeText}`,
     details,
     legend: [
       ...(symbols.size > 0 ? [`Used stitches: ${formattedCounts(symbols, symbolLabel)}.`] : []),
