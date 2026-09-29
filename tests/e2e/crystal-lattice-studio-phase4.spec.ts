@@ -41,10 +41,12 @@ test.describe('Crystal Lattice Studio phase 4 — advanced analysis', () => {
 
     await expect(page.getByTestId('crystal-volume-status')).toContainText('2 × 2 × 2');
     await expect(page.getByTestId('crystal-volume-slice-table')).toBeVisible();
+    await expect(page.getByTestId('crystal-field-slice-preview')).toBeVisible();
 
     await page.getByLabel('Positive isosurface level').fill('3.5');
     await page.getByRole('button', { name: 'Update field views' }).click();
     await expect(page.getByTestId('crystal-isosurface-status')).toContainText('triangles');
+    await expect(page.getByTestId('crystal-field-surface-preview')).toBeVisible();
   });
 
   test('runs bounded periodic void analysis and builds an inspectable morphology', async ({ page }) => {
@@ -53,10 +55,12 @@ test.describe('Crystal Lattice Studio phase 4 — advanced analysis', () => {
     await page.getByRole('button', { name: 'Analyze voids' }).click();
     await expect(page.getByTestId('crystal-void-result')).toContainText('void');
     await expect(page.getByTestId('crystal-void-result')).toContainText('accessible');
+    await expect(page.getByTestId('crystal-void-preview')).toBeVisible();
 
     await page.getByRole('button', { name: 'Build morphology' }).click();
     await expect(page.getByTestId('crystal-morphology-status')).toContainText('faces');
     await expect(page.getByTestId('crystal-morphology-table')).toBeVisible();
+    await expect(page.getByTestId('crystal-morphology-preview')).toBeVisible();
   });
 
   test('loads observed reflections and reports Fo/Fc residuals plus difference-density extrema', async ({ page }) => {
