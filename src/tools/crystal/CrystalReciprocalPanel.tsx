@@ -80,14 +80,14 @@ export default function CrystalReciprocalPanel({ document }: CrystalReciprocalPa
               {(() => {
                 const extent = Math.max(1e-9, ...outcome.zone.vertices.map((v) => Math.max(Math.abs(v[0]), Math.abs(v[1]))));
                 const scale = 95 / extent;
-                return outcome.zone.faces.flatMap((face) =>
+                return outcome.zone.faces.flatMap((face, faceIndex) =>
                   face.map((from, index) => {
                     const to = face[(index + 1) % face.length]!;
                     const a = outcome.zone.vertices[from]!;
                     const b = outcome.zone.vertices[to]!;
                     return (
                       <line
-                        key={`${index}-${face[0]}`}
+                        key={`f${faceIndex}-e${index}`}
                         x1={a[0] * scale}
                         y1={-a[1] * scale}
                         x2={b[0] * scale}

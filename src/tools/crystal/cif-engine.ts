@@ -1,4 +1,5 @@
 import type { CrystalDocument, CrystalSite, ImportedCrystalSnapshot, UnitCell, Vec3 } from './crystal-types';
+import { DEFAULT_TOLERANCE, expandSitesBySymmetry, parseSymmetryOperationXyz } from './symmetry-engine';
 
 export type CifVersion = '1.1' | '2.0';
 
@@ -313,6 +314,15 @@ function findAtomLoop(block: CifBlock): CifLoop | undefined {
   });
 }
 
+// IUCr Core CIF: modern `_space_group_symop_operation_xyz` loop, or the
+// legacy `_symmetry_equiv_pos_as_xyz` loop still common in older/exported files.
+const SYMOP_TAGS = ['_space_group_symop_operation_xyz', '_symmetry_equiv_pos_as_xyz'];
+
+function findSymmetryOperationLoop(block: CifBlock): CifLoop | undefined {
+  return block.entries.find((entry): entry is CifLoop =>
+    entry.kind === 'loop' && entry.tags.some((tag) => SYMOP_TAGS.includes(normalizeTag(tag))));
+}
+
 const titleFor = (scalars: Map<string,string>, block: CifBlock): string =>
   cleanOptionalText(scalars.get('_chemical_name_common'))
   ?? cleanOptionalText(scalars.get('_chemical_name_systematic'))
@@ -368,13 +378,29 @@ export function structureFromCif(cif: CifDocument, blockName?: string): CrystalD
     });
   }
 
+  // Most real CIF files list only the asymmetric unit plus a symmetry-operation
+  // loop; the full periodic structure is the symop-expanded set. Expand here so
+  // the working document (viewport, formula, bonds, diffraction) reflects the
+  // actual structure. The raw `cif` block (with its original atom/symop loops)
+  // is preserved unchanged below for lossless round-trip export.
+  const symmetryLoop = findSymmetryOperationLoop(block);
+  let expandedSites = sites;
+  if (symmetryLoop && sites.length > 0) {
+    const symmetryTags = symmetryLoop.tags.map(normalizeTag);
+    const xyzIndex = SYMOP_TAGS.map((tag) => symmetryTags.indexOf(tag)).find((index) => index >= 0);
+    if (xyzIndex !== undefined) {
+      const operations = symmetryLoop.rows.map((row) => parseSymmetryOperationXyz(row[xyzIndex]!));
+      expandedSites = expandSitesBySymmetry(sites, operations, DEFAULT_TOLERANCE);
+    }
+  }
+
   const name = titleFor(scalars, block);
   const snapshot: ImportedCrystalSnapshot = {
     name,
     sourceFormat:'cif',
     sourceText:cif.sourceText,
     cell:{ ...cell },
-    sites:sites.map((site) => ({ ...site, fractional:[...site.fractional] as Vec3 })),
+    sites:expandedSites.map((site) => ({ ...site, fractional:[...site.fractional] as Vec3 })),
   };
   return {
     version:1,
@@ -383,10 +409,15 @@ export function structureFromCif(cif: CifDocument, blockName?: string): CrystalD
     sourceFormat:'cif',
     sourceText:cif.sourceText,
     cell,
-    sites,
+    sites:expandedSites,
     importedSnapshot:snapshot,
     metadata:{ title:name },
-    provenance:[{ kind:'import', label:`Imported CIF data block ${block.name}` }],
+    provenance:[
+      { kind:'import', label:`Imported CIF data block ${block.name}` },
+      ...(expandedSites.length !== sites.length
+        ? [{ kind:'symmetry-expansion', label:`Expanded ${sites.length} asymmetric-unit site${sites.length === 1 ? '' : 's'} to ${expandedSites.length} via the source symmetry operations` }]
+        : []),
+    ],
     cif,
   };
 }

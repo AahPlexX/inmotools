@@ -166,8 +166,12 @@ export function simulatePowderPattern(cell: UnitCell, options: PowderOptions): P
   if (options.document) {
     const document = options.document;
     try {
-      structureFactorIntensity(document, [1, 0, 0]);
-      intensityFactor = (hkl) => structureFactorIntensity(document, hkl);
+      // options.kind selects the per-element amplitude model: Z-based for
+      // X-ray/electron, coherent scattering length (b) for neutron — see
+      // structure-factor-engine.ts. Without this, neutron mode silently
+      // reused the X-ray model, which is physically wrong (b does not track Z).
+      structureFactorIntensity(document, [1, 0, 0], options.kind);
+      intensityFactor = (hkl) => structureFactorIntensity(document, hkl, options.kind);
       intensityModel = 'structure-factor';
     } catch {
       intensityFactor = null;
