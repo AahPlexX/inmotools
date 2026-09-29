@@ -77,7 +77,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1; two-finger touch pan and pinch delivered in 2D)*
 2. Deterministic orthogonal wire routing with automatic T-junction joint dots; left-click commits a waypoint, right-click/Escape cancels the in-progress wire, and a floating "Cancel route" chip appears near the touch point on touch devices. *(Phase 1)*
 3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3; delivered in 3E)*
-4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3)*
+4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3; delivered in 3H)*
 5. Universal logic-gate primitive suite: AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer, tri-state buffer, each configurable from 2–8 inputs from the inspector without losing existing wiring. *(Phase 1)*
 6. Configurable propagation delay / real-world gate physics: an ideal zero-delay mode and a realistic per-gate nanosecond-delay mode that exposes glitch/hazard/race behavior. *(Phase 1)*
 
@@ -100,7 +100,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 18. Priority encoders and binary decoders with valid-output flags. *(Phase 2 — delivered in 2A)*
 
 ### Automated analysis
-19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4.)*
+19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4 — delivered in 3H: open a subcircuit and its ports are the table's inputs and outputs, or tick "selected parts only".)*
 20. Boolean expression extractor: canonical SOP and POS from the drawn circuit or its truth table. *(Phase 1)*
 21. Karnaugh-map solver and Quine–McCluskey minimizer for 2–5 variables with visual grouping loops and one-click minimized-schematic generation. *(Phase 3 — delivered in 3A)*
 22. Electrical rule check (ERC): floating/undriven input nets, output-to-output contention, unbuffered combinational loops — one click, itemized results naming the affected components. *(Phase 1: an undriven net is reported as a floating-input finding on whichever input pins it feeds, rather than as its own separate category.)*

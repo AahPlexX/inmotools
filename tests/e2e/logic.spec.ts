@@ -833,3 +833,77 @@ test('places an RGB matrix, switches it to 16 x 16 from the inspector, and its u
   await expect(ercDock).toContainText('ROW15');
   await expect(ercDock).toContainText('COL15');
 });
+
+test('groups two parts into a subcircuit, opens it by double-click, tries it on its own, and comes back out', async ({ page }) => {
+  // A half adder: two switches feed an XOR (sum) and an AND (carry), each going to an LED. The XOR and AND start selected.
+  let doc = createInitialDocument('Half adder');
+  const add = (type: 'SWITCH' | 'XOR' | 'AND' | 'LED', x: number, y: number, label: string) => {
+    doc = addComponent(doc, type, x, y);
+    const id = doc.components[doc.components.length - 1]!.id;
+    doc = relabelComponent(doc, id, label);
+    return id;
+  };
+  const a = add('SWITCH', 0, 0, 'A');
+  const b = add('SWITCH', 0, 6, 'B');
+  const xor = add('XOR', 10, 0, 'X1');
+  const and = add('AND', 10, 6, 'G1');
+  const sum = add('LED', 20, 0, 'SUM');
+  const carry = add('LED', 20, 6, 'COUT');
+  const wire = (from: string, fromPort: string, to: string, toPort: string) => {
+    doc = addWire(doc, { componentId: from, portId: fromPort }, { componentId: to, portId: toPort });
+  };
+  wire(a, 'Y', xor, 'A');
+  wire(b, 'Y', xor, 'B');
+  wire(a, 'Y', and, 'A');
+  wire(b, 'Y', and, 'B');
+  wire(xor, 'Y', sum, 'A');
+  wire(and, 'Y', carry, 'A');
+  doc = { ...doc, selectedIds: [xor, and] };
+
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'adder.circuit.json', mimeType: 'application/json', buffer: Buffer.from(serializeProject(doc)) });
+  await expect(page.getByRole('button', { name: 'Group into subcircuit' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Group into subcircuit' }).click();
+  await expect(page.getByTestId('logic-notice')).toHaveCount(0);
+  await expect(page.getByTestId('logic-breadcrumbs')).toHaveCount(0);
+
+  // The whole circuit still reads as a half adder from the outside.
+  await page.getByRole('button', { name: 'Truth table', exact: true }).click();
+  const dock = page.getByTestId('logic-truth-table-dock');
+  await expect(dock.locator('tbody tr')).toHaveCount(4);
+  await expect(dock.locator('thead th')).toHaveText(['A', 'B', 'SUM', 'COUT']);
+  const outer = await dock.locator('tbody tr').evaluateAll((rows) => rows.map((row) => Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent)));
+  expect(outer.map((row) => `${row[0]}${row[1]}->${row[2]}${row[3]}`).sort()).toEqual(['00->00', '01->10', '10->10', '11->01']);
+
+  // Double-click the part to go inside; its ports are the inputs and outputs of a table of their own.
+  await page.getByTestId('logic-canvas').dblclick({ position: { x: 13 * GRID, y: 1.5 * GRID } });
+  const trail = page.getByTestId('logic-breadcrumbs');
+  await expect(trail).toBeVisible();
+  await expect(trail).toContainText('Subcircuit 1');
+  await expect(dock.locator('tbody tr')).toHaveCount(16);
+
+  await page.getByRole('button', { name: 'Up one level' }).click();
+  await expect(page.getByTestId('logic-breadcrumbs')).toHaveCount(0);
+  await expect(dock.locator('tbody tr')).toHaveCount(4);
+
+  // Undo takes the grouping back out.
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(dock.locator('thead th')).toHaveText(['A', 'B', 'SUM', 'COUT']);
+});
+
+test('places an input port marker and sets it to a bus from the inspector', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Subcircuit ports' })).toBeVisible();
+  await placeAt(page, 'INPUT PORT', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 4.5 * GRID, y: 2 * GRID } });
+  const { inspector, close } = await openInspectorFor(page);
+  await expect(inspector.getByRole('heading', { name: 'INPUT PORT' })).toBeVisible();
+  await inspector.getByLabel('Signal width').selectOption('8');
+  await expect(inspector.getByLabel('Test value (decimal, used only outside a subcircuit)')).toBeVisible();
+  await close();
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  await expect(page.getByTestId('logic-erc-dock')).toBeVisible();
+});

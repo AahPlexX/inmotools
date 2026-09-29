@@ -232,7 +232,7 @@ export const encapsulateSelection = (document: LogicDocument, selectedIds: reado
         id: nextId('component'),
         type,
         x: isInput ? minX - 6 : maxX + 10,
-        y: minY + index * 2,
+        y: minY + index * 3,
         rotation: 0,
         mirrored: false,
         label: uniqueLabel(insidePort.label.replace(/\[.*\]$/, ''), takenLabels),

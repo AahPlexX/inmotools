@@ -13,6 +13,7 @@ import { getComponentPorts } from './component-library';
 import { findComponentAt } from './gate-shapes';
 import { findPortAt, orthogonalWaypoints, portAbsolutePosition, GRID_SIZE } from './geometry';
 import { readLevel } from './sim-engine';
+import { levelLocation, markerWidthOf } from './subcircuit-ports';
 import { renderScene, screenToWorld, snapToGrid, THEME_PALETTES, type DraftWire } from './render-engine';
 import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
@@ -45,6 +46,8 @@ export interface LogicCanvasProps {
   readonly onSelect: (ids: string[]) => void;
   readonly onAddWire: (from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => void;
   readonly onToggleSwitch: (id: string) => void;
+  /** A double-click (or double-tap) on a part; the workspace opens it if it is a subcircuit. */
+  readonly onOpenComponent: (id: string) => void;
   readonly onPressButton: (id: string, pressed: boolean) => void;
   readonly onViewportChange: (viewport: Partial<LogicDocument['viewport']>) => void;
   readonly onDropComponent: (type: ComponentType, worldX: number, worldY: number) => void;
@@ -61,7 +64,7 @@ const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && win
 const isCoarsePointer = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 export function LogicCanvas(props: LogicCanvasProps) {
-  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onPressButton, onViewportChange, onDropComponent, buildContextActions, cancelDraftWireToken } = props;
+  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onOpenComponent, onPressButton, onViewportChange, onDropComponent, buildContextActions, cancelDraftWireToken } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -198,7 +201,10 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const portTooltip = (component: LogicDocument['components'][number] | undefined, portDef: ReturnType<typeof getComponentPorts>[number] | undefined, portId: string): string => {
     const base = `${component?.label ?? ''} · pin ${portDef?.label ?? portId}`;
     if (!component || !portDef?.bus) return base;
-    return `${component.label} · ${describeBus(portDef.id, busLevels(portDef, (pin) => readLevel(frame, component.id, pin)))}`;
+    return `${component.label} · ${describeBus(portDef.id, busLevels(portDef, (pin) => {
+      const where = levelLocation(component, portDef.id, pin);
+      return readLevel(frame, where.componentId, where.pinId);
+    }))}`;
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -421,7 +427,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
       if (!longPressTriggered) {
         if (!moved && clickTargetId) {
           const component = doc.components.find((candidate) => candidate.id === clickTargetId);
-          if (component?.type === 'SWITCH') onToggleSwitch(component.id);
+          if (component?.type === 'SWITCH' || (component?.type === 'PORT_IN' && markerWidthOf(component.params) === 1)) onToggleSwitch(component.id);
         }
         for (const id of ids) {
           const component = doc.components.find((candidate) => candidate.id === id);
@@ -453,6 +459,12 @@ export function LogicCanvas(props: LogicCanvasProps) {
     onViewportChange(zoomViewportAt(doc.viewport, getScreenPoint(event), event.deltaY < 0 ? 1.12 : 1 / 1.12));
   };
 
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    const point = getScreenPoint(event);
+    const target = componentAt(screenToWorld(point.x, point.y, doc.viewport));
+    if (target) onOpenComponent(target.id);
+  };
+
   const handleContextMenu = (event: ReactMouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
   };
@@ -472,6 +484,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
         onPointerLeave={handlePointerUp}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
+        onDoubleClick={handleDoubleClick}
         role="img"
         aria-label={`${doc.metadata.title} schematic canvas with ${doc.components.length} components`}
       />

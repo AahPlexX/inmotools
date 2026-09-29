@@ -1,8 +1,10 @@
 import { blockSizeLabel, hasSelectableSize, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
 import { ALU_OPERATION_HELP, ALU_OPERATIONS, ALU_WIDTHS, aluSizeLabel, aluWidthOf } from './alu-engine';
-import { clampBusWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
+import { clampBusWidth, clampSignalWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
 import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
 import { isDisplayType } from './display-engine';
+import { SUBCIRCUIT_ICONS } from './subcircuit-engine';
+import { isPortMarker, markerWidthOf, MAX_ICON_LENGTH, MAX_NAME_LENGTH, subcircuitPorts } from './subcircuit-ports';
 import { clampMatrixSize, isMatrixType, MATRIX_SIZES, matrixSizeLabel } from './matrix-engine';
 import { addressBitsOf, DATA_WIDTHS, dataBitsOf, fillOf, formatWord, formatWordCount, isMemoryType, MAX_ADDRESS_BITS, MIN_ADDRESS_BITS, parseHexWord, wordCount } from './memory-engine';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
@@ -25,15 +27,20 @@ export interface LogicInspectorProps {
   readonly onSetTheme: (theme: ThemeName) => void;
   /** Opens the memory editor on one RAM or ROM. */
   readonly onOpenMemoryEditor: (componentId: string) => void;
+  /** Opens a subcircuit part to edit the circuit inside it. */
+  readonly onOpenSubcircuit: (componentId: string) => void;
+  readonly onRenameSubcircuit: (componentId: string, name: string) => void;
+  readonly onSetSubcircuitIcon: (componentId: string, icon: string) => void;
+  readonly onRelabelPort: (componentId: string, portId: string, label: string) => void;
 }
 
-export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpdateMetadata, onSetTheme, onOpenMemoryEditor }: LogicInspectorProps) {
+export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpdateMetadata, onSetTheme, onOpenMemoryEditor, onOpenSubcircuit, onRenameSubcircuit, onSetSubcircuitIcon, onRelabelPort }: LogicInspectorProps) {
   const selected = doc.selectedIds.length === 1 ? doc.components.find((component) => component.id === doc.selectedIds[0]) : undefined;
 
   return (
     <aside className="logic-inspector" data-testid="logic-inspector" aria-label="Component inspector">
       {selected ? (
-        <ComponentInspector component={selected} onRelabel={onRelabel} onUpdateParams={onUpdateParams} onOpenMemoryEditor={onOpenMemoryEditor} />
+        <ComponentInspector component={selected} onRelabel={onRelabel} onUpdateParams={onUpdateParams} onOpenMemoryEditor={onOpenMemoryEditor} onOpenSubcircuit={onOpenSubcircuit} onRenameSubcircuit={onRenameSubcircuit} onSetSubcircuitIcon={onSetSubcircuitIcon} onRelabelPort={onRelabelPort} />
       ) : doc.selectedIds.length > 1 ? (
         <p className="logic-inspector-hint">{doc.selectedIds.length} components selected. Right-click for group actions.</p>
       ) : (
@@ -43,7 +50,7 @@ export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpd
   );
 }
 
-function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemoryEditor }: { component: ComponentInstance; onRelabel: LogicInspectorProps['onRelabel']; onUpdateParams: LogicInspectorProps['onUpdateParams']; onOpenMemoryEditor: LogicInspectorProps['onOpenMemoryEditor'] }) {
+function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemoryEditor, onOpenSubcircuit, onRenameSubcircuit, onSetSubcircuitIcon, onRelabelPort }: Pick<LogicInspectorProps, 'onRelabel' | 'onUpdateParams' | 'onOpenMemoryEditor' | 'onOpenSubcircuit' | 'onRenameSubcircuit' | 'onSetSubcircuitIcon' | 'onRelabelPort'> & { component: ComponentInstance }) {
   return (
     <div>
       <h3>{paletteLabel(component.type)}</h3>
@@ -244,6 +251,62 @@ function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemory
         </>
       ) : null}
 
+      {component.type === 'SUBCIRCUIT' && component.params.subcircuit ? (
+        <>
+          <label className="logic-field">
+            <span>Subcircuit name</span>
+            <input type="text" maxLength={MAX_NAME_LENGTH} value={component.params.subcircuit.name} onChange={(event) => onRenameSubcircuit(component.id, event.target.value)} />
+          </label>
+          <label className="logic-field">
+            <span>Icon (up to {MAX_ICON_LENGTH} characters)</span>
+            <input type="text" maxLength={MAX_ICON_LENGTH * 2} value={component.params.subcircuit.icon} onChange={(event) => onSetSubcircuitIcon(component.id, event.target.value)} />
+          </label>
+          <div className="logic-icon-presets" role="group" aria-label="Icon presets">
+            {SUBCIRCUIT_ICONS.map((icon) => (
+              <button key={icon} type="button" aria-label={`Use icon ${icon}`} aria-pressed={component.params.subcircuit?.icon === icon} onClick={() => onSetSubcircuitIcon(component.id, icon)}>{icon}</button>
+            ))}
+          </div>
+          <fieldset className="logic-port-list">
+            <legend>Ports</legend>
+            {subcircuitPorts(component.params).map((port) => (
+              <label key={port.id} className="logic-field logic-field-inline">
+                <span>{port.direction === 'input' ? 'In' : 'Out'}</span>
+                <input
+                  type="text"
+                  maxLength={MAX_NAME_LENGTH}
+                  aria-label={`${port.direction === 'input' ? 'Input' : 'Output'} port name`}
+                  value={component.params.subcircuit?.components.find((marker) => marker.id === port.id)?.label ?? port.label}
+                  onChange={(event) => onRelabelPort(component.id, port.id, event.target.value)}
+                />
+              </label>
+            ))}
+          </fieldset>
+          <button type="button" className="logic-inspector-action" onClick={() => onOpenSubcircuit(component.id)}>Open subcircuit</button>
+          <p className="logic-inspector-hint">Double-click the part to open it. Ports are the input and output port markers inside; add or remove them there.</p>
+        </>
+      ) : null}
+
+      {isPortMarker(component.type) ? (
+        <>
+          <label className="logic-field">
+            <span>Signal width</span>
+            <select value={markerWidthOf(component.params)} onChange={(event) => onUpdateParams(component.id, { signalWidth: clampSignalWidth(Number(event.target.value)) })}>
+              <option value={1}>1 bit (single signal)</option>
+              {Array.from({ length: MAX_BUS_WIDTH - 1 }, (_, index) => index + 2).map((bits) => (
+                <option key={bits} value={bits}>{bits}-bit bus</option>
+              ))}
+            </select>
+          </label>
+          {component.type === 'PORT_IN' && markerWidthOf(component.params) > 1 ? (
+            <label className="logic-field">
+              <span>Test value (decimal, used only outside a subcircuit)</span>
+              <input type="number" min={0} step={1} value={component.params.portValue ?? 0} onChange={(event) => onUpdateParams(component.id, { portValue: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })} />
+            </label>
+          ) : null}
+          <p className="logic-inspector-hint">A port is where a subcircuit connects to the circuit that uses it. Its name is shown on the subcircuit's pin.</p>
+        </>
+      ) : null}
+
       {isMatrixType(component.type) ? (
         <>
           <label className="logic-field">
@@ -286,7 +349,7 @@ function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemory
         </>
       ) : null}
 
-      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && component.type !== 'BUS_SPLITTER' && !isRegisterType(component.type) && !isDisplayType(component.type) && !isMatrixType(component.type) ? (
+      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && component.type !== 'BUS_SPLITTER' && !isRegisterType(component.type) && !isDisplayType(component.type) && !isMatrixType(component.type) && component.type !== 'SUBCIRCUIT' && !isPortMarker(component.type) ? (
         <label className="logic-field">
           <span>Propagation delay (ns)</span>
           <input

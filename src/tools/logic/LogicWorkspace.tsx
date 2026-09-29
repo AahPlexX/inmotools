@@ -52,6 +52,8 @@ import {
 } from './analyzer-engine';
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
 import { LogicMemoryDock } from './LogicMemoryDock';
+import { applyAtPath, breadcrumbs, documentAtPath, encapsulateSelection, flattenDocument, pathPrefix, relabelSubcircuitPort, renameSubcircuit, scopeFrame, setSubcircuitIcon, trimPath } from './subcircuit-engine';
+import { isPortMarker } from './subcircuit-ports';
 import { LogicMinimizerDock } from './LogicMinimizerDock';
 import { LogicPuzzleDock } from './LogicPuzzleDock';
 import { LogicShortcutsDock } from './LogicShortcutsDock';
@@ -102,6 +104,23 @@ export default function LogicWorkspace() {
   const [history, setHistory] = useState<DocumentHistory>(loadInitialHistory);
   const documentRef = useRef<LogicDocument>(history.present);
   documentRef.current = history.present;
+
+  // Which subcircuit is open: the ids of the subcircuit parts entered, outermost first. Every edit below is
+  // written for a plain document and is applied to the circuit at this path (see `applyAtPath`).
+  const [path, setPath] = useState<readonly string[]>([]);
+  const activePath = useMemo(() => trimPath(history.present, path), [history.present, path]);
+  const pathRef = useRef<readonly string[]>(activePath);
+  pathRef.current = activePath;
+  const scopedCommit = useCallback(
+    (prev: DocumentHistory, label: string, updater: (document: LogicDocument) => LogicDocument): DocumentHistory =>
+      commit(prev, label, (root) => applyAtPath(root, trimPath(root, pathRef.current), updater)),
+    [],
+  );
+  const scopedPreview = useCallback(
+    (prev: DocumentHistory, updater: (document: LogicDocument) => LogicDocument): DocumentHistory => ({ ...prev, present: applyAtPath(prev.present, trimPath(prev.present, pathRef.current), updater) }),
+    [],
+  );
+  const scopedOf = useCallback((root: LogicDocument): LogicDocument => documentAtPath(root, trimPath(root, pathRef.current)), []);
 
   const frameRef = useRef(createInitialFrame(history.present));
   const [, bumpFrame] = useReducer((count: number) => count + 1, 0);
@@ -173,8 +192,10 @@ export default function LogicWorkspace() {
       // realistic-delay update is still pending, or a ripple counter still
       // has higher bits to settle, so skip the net rebuild and React
       // re-render on every idle frame instead of animating forever.
-      const hasClock = documentRef.current.components.some((component) => component.type === 'CLOCK');
-      const isRippleSettling = documentRef.current.components.some((component) => {
+      // Parts inside subcircuits count too: the simulator runs the flattened circuit.
+      const running = flattenDocument(documentRef.current);
+      const hasClock = running.components.some((component) => component.type === 'CLOCK');
+      const isRippleSettling = running.components.some((component) => {
         if (!isRegisterType(component.type)) return false;
         const width = bitWidthOf(component.params);
         return isRippling(restoreRegisterRuntime(frameRef.current.componentState[component.id], width), width);
@@ -206,7 +227,7 @@ export default function LogicWorkspace() {
         case 'cancel':
           setPlacingType(null);
           setCancelDraftWireToken((token) => token + 1);
-          setHistory((prev) => (prev.present.selectedIds.length ? { ...prev, present: setSelection(prev.present, []) } : prev));
+          setHistory((prev) => (scopedOf(prev.present).selectedIds.length ? scopedPreview(prev, (d) => setSelection(d, [])) : prev));
           break;
         case 'undo':
           event.preventDefault();
@@ -218,24 +239,24 @@ export default function LogicWorkspace() {
           break;
         case 'togglePlay':
           event.preventDefault();
-          setHistory((prev) => commit(prev, 'Toggle run', (doc) => setRunning(doc, !doc.simulation.running)));
+          setHistory((prev) => scopedCommit(prev, 'Toggle run', (doc) => setRunning(doc, !doc.simulation.running)));
           break;
         case 'step':
           event.preventDefault();
           runStep(0, true);
           break;
         case 'rotate':
-          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Rotate selection', (doc) => prev.present.selectedIds.reduce((next, id) => rotateComponent(next, id), doc)) : prev));
+          setHistory((prev) => (scopedOf(prev.present).selectedIds.length ? scopedCommit(prev, 'Rotate selection', (doc) => doc.selectedIds.reduce((next, id) => rotateComponent(next, id), doc)) : prev));
           break;
         case 'mirror':
-          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Flip selection', (doc) => prev.present.selectedIds.reduce((next, id) => mirrorComponent(next, id), doc)) : prev));
+          setHistory((prev) => (scopedOf(prev.present).selectedIds.length ? scopedCommit(prev, 'Flip selection', (doc) => doc.selectedIds.reduce((next, id) => mirrorComponent(next, id), doc)) : prev));
           break;
         case 'duplicate':
           event.preventDefault();
-          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Duplicate selection', (doc) => prev.present.selectedIds.reduce((next, id) => duplicateComponent(next, id), doc)) : prev));
+          setHistory((prev) => (scopedOf(prev.present).selectedIds.length ? scopedCommit(prev, 'Duplicate selection', (doc) => doc.selectedIds.reduce((next, id) => duplicateComponent(next, id), doc)) : prev));
           break;
         case 'delete':
-          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Delete selection', (doc) => removeComponents(doc, prev.present.selectedIds)) : prev));
+          setHistory((prev) => (scopedOf(prev.present).selectedIds.length ? scopedCommit(prev, 'Delete selection', (doc) => removeComponents(doc, doc.selectedIds)) : prev));
           break;
         case 'focusPalette':
           event.preventDefault();
@@ -250,20 +271,20 @@ export default function LogicWorkspace() {
   }, [runStep]);
 
   const handleDropComponent = useCallback((type: ComponentType, worldX: number, worldY: number) => {
-    setHistory((prev) => commit(prev, `Add ${type}`, (doc) => addComponent(doc, type, Math.round(worldX), Math.round(worldY))));
+    setHistory((prev) => scopedCommit(prev, `Add ${type}`, (doc) => addComponent(doc, type, Math.round(worldX), Math.round(worldY))));
   }, []);
 
   const handleMoveComponent = useCallback((id: string, x: number, y: number, final: boolean) => {
     // Only the final position of a drag becomes an undo step; intermediate
     // pointer-move updates preview the move live without touching history,
     // so dragging one component across the canvas is one undo, not hundreds.
-    setHistory((prev) => (final ? commit(prev, 'Move', (doc) => moveComponent(doc, id, x, y)) : { ...prev, present: moveComponent(prev.present, id, x, y) }));
+    setHistory((prev) => (final ? scopedCommit(prev, 'Move', (doc) => moveComponent(doc, id, x, y)) : scopedPreview(prev, (doc) => moveComponent(doc, id, x, y))));
   }, []);
 
   const handleSelect = useCallback((ids: string[]) => {
     // Selection is UI state, not a circuit edit; committing it would make
     // every click its own undo step ahead of the edit the user actually cares about.
-    setHistory((prev) => ({ ...prev, present: setSelection(prev.present, ids) }));
+    setHistory((prev) => scopedPreview(prev, (d) => setSelection(d, ids)));
   }, []);
 
   const [notice, setNotice] = useState<string | null>(null);
@@ -276,41 +297,43 @@ export default function LogicWorkspace() {
 
   const handleAddWire = useCallback((from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => {
     // `addWire` quietly refuses a connection that cannot work; say why, so a bus of the wrong width is not a mystery.
-    const problem = wireProblem(documentRef.current, from, to);
+    const problem = wireProblem(scopedOf(documentRef.current), from, to);
     if (problem) {
       showNotice(problem);
       return;
     }
     setNotice(null);
-    setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
+    setHistory((prev) => scopedCommit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
   }, [showNotice]);
 
   // --- Memory editing: contents live in the part's parameters (saved, undoable); a running RAM's own writes are an overlay in the frame. ---
 
   const forgetLiveWrites = useCallback((componentId: string, addresses?: readonly number[]) => {
-    const state = frameRef.current.componentState[componentId];
+    // A memory inside a subcircuit lives in the simulator under the path of the parts entered to reach it.
+    const key = `${pathPrefix(pathRef.current)}${componentId}`;
+    const state = frameRef.current.componentState[key];
     if (!state?.memoryWrites) return;
     frameRef.current = {
       ...frameRef.current,
-      componentState: { ...frameRef.current.componentState, [componentId]: { ...state, memoryWrites: withoutWrites(state.memoryWrites, addresses) } },
+      componentState: { ...frameRef.current.componentState, [key]: { ...state, memoryWrites: withoutWrites(state.memoryWrites, addresses) } },
     };
   }, []);
 
   const handleMemoryEdit = useCallback((componentId: string, edits: readonly WordEdit[]): string | undefined => {
-    const component = documentRef.current.components.find((candidate) => candidate.id === componentId);
+    const component = scopedOf(documentRef.current).components.find((candidate) => candidate.id === componentId);
     if (!component || !isMemoryType(component.type)) return 'That memory is no longer in the circuit.';
     const result = applyWordEdits(component.params, component.params.memoryCells ?? {}, edits);
     if (!result.ok) return result.reason;
     forgetLiveWrites(componentId, edits.map((edit) => edit.address));
     stepAfterEditRef.current = true;
-    setHistory((prev) => commit(prev, 'Edit memory', (d) => updateComponentParams(d, componentId, { memoryCells: result.cells })));
+    setHistory((prev) => scopedCommit(prev, 'Edit memory', (d) => updateComponentParams(d, componentId, { memoryCells: result.cells })));
     return undefined;
   }, [forgetLiveWrites]);
 
   const handleMemoryReplace = useCallback((componentId: string, cells: Record<string, number>, fill: number | undefined, label: string) => {
     forgetLiveWrites(componentId);
     stepAfterEditRef.current = true;
-    setHistory((prev) => commit(prev, label, (d) => updateComponentParams(d, componentId, fill === undefined ? { memoryCells: cells } : { memoryCells: cells, memoryFill: fill })));
+    setHistory((prev) => scopedCommit(prev, label, (d) => updateComponentParams(d, componentId, fill === undefined ? { memoryCells: cells } : { memoryCells: cells, memoryFill: fill })));
   }, [forgetLiveWrites]);
 
   const handleMemoryResetLive = useCallback((componentId: string) => {
@@ -319,11 +342,11 @@ export default function LogicWorkspace() {
   }, [forgetLiveWrites, runStep]);
 
   const handleMemoryKeepLive = useCallback((componentId: string) => {
-    const component = documentRef.current.components.find((candidate) => candidate.id === componentId);
+    const component = scopedOf(documentRef.current).components.find((candidate) => candidate.id === componentId);
     if (!component || !isMemoryType(component.type)) return;
-    const merged = mergeLive(component.params, frameRef.current.componentState[componentId]?.memoryWrites);
+    const merged = mergeLive(component.params, frameRef.current.componentState[`${pathPrefix(pathRef.current)}${componentId}`]?.memoryWrites);
     forgetLiveWrites(componentId);
-    setHistory((prev) => commit(prev, 'Keep live memory values', (d) => updateComponentParams(d, componentId, { memoryCells: merged })));
+    setHistory((prev) => scopedCommit(prev, 'Keep live memory values', (d) => updateComponentParams(d, componentId, { memoryCells: merged })));
   }, [forgetLiveWrites]);
 
   const handleOpenMemoryEditor = useCallback((componentId: string) => {
@@ -332,7 +355,7 @@ export default function LogicWorkspace() {
   }, []);
 
   const handleGenerateCircuit = useCallback((spec: SynthesisSpec) => {
-    setHistory((prev) => commit(prev, 'Add minimized circuit', (document) => {
+    setHistory((prev) => scopedCommit(prev, 'Add minimized circuit', (document) => {
       try {
         const built = synthesizeTwoLevel(document, spec, freeSpaceBelow(document.components));
         return setSelection(built.document, built.addedComponentIds);
@@ -343,47 +366,105 @@ export default function LogicWorkspace() {
     }));
   }, []);
 
+  // The simulator names a part inside a subcircuit by the path of parts entered to reach it, so a switch or
+  // button on screen is addressed with that path in front of its own id.
   const handleToggleSwitch = useCallback((id: string) => {
-    const current = readLevel(frameRef.current, id, 'Y');
-    pendingSwitchOverrideRef.current[id] = current === 1 ? 0 : 1;
+    const scopePrefix = pathPrefix(pathRef.current);
+    const component = scopedOf(documentRef.current).components.find((candidate) => candidate.id === id);
+    if (component?.type === 'PORT_IN' && scopePrefix !== '') {
+      // Inside a subcircuit an input port is fed by whatever the subcircuit is plugged into.
+      showNotice('This input comes from the circuit that uses this subcircuit. Toggle the switch that feeds it there.');
+      return;
+    }
+    const current = readLevel(frameRef.current, `${scopePrefix}${id}`, 'Y');
+    pendingSwitchOverrideRef.current[`${scopePrefix}${id}`] = current === 1 ? 0 : 1;
     runStep(0);
-  }, [runStep]);
+  }, [runStep, scopedOf, showNotice]);
 
   const handlePressButton = useCallback((id: string, pressed: boolean) => {
-    liveButtonLevelsRef.current = { ...liveButtonLevelsRef.current, [id]: pressed ? 1 : 0 };
+    const key = `${pathPrefix(pathRef.current)}${id}`;
+    liveButtonLevelsRef.current = { ...liveButtonLevelsRef.current, [key]: pressed ? 1 : 0 };
     runStep(0);
   }, [runStep]);
 
+  // --- Subcircuits: group a selection into one, open it, close it, and edit its name, icon and ports. ---
+
+  const handleGroupSelection = useCallback(() => {
+    const scoped = scopedOf(documentRef.current);
+    const result = encapsulateSelection(scoped, scoped.selectedIds);
+    if (!result.ok) {
+      showNotice(result.reason);
+      return;
+    }
+    setNotice(null);
+    setHistory((prev) => scopedCommit(prev, 'Group into subcircuit', () => result.document));
+  }, [scopedCommit, scopedOf, showNotice]);
+
+  const handleOpenSubcircuit = useCallback((componentId: string) => {
+    const scoped = scopedOf(documentRef.current);
+    const component = scoped.components.find((candidate) => candidate.id === componentId);
+    if (!component || component.type !== 'SUBCIRCUIT' || !component.params.subcircuit) return;
+    setPath([...pathRef.current, componentId]);
+    setNotice(null);
+    setPlacingType(null);
+  }, [scopedOf]);
+
+  const handleCloseToDepth = useCallback((depth: number) => {
+    setPath(pathRef.current.slice(0, depth));
+    setNotice(null);
+  }, []);
+
+  const handleRenameSubcircuit = useCallback((id: string, name: string) => {
+    setHistory((prev) => scopedCommit(prev, 'Rename subcircuit', (d) => {
+      const renamed = renameSubcircuit(d, id, name);
+      // The part's own label follows its name, as it does when the subcircuit is created.
+      return { ...renamed, components: renamed.components.map((component) => (component.id === id && component.type === 'SUBCIRCUIT' ? { ...component, label: component.params.subcircuit?.name ?? component.label } : component)) };
+    }));
+  }, [scopedCommit]);
+  const handleSetSubcircuitIcon = useCallback((id: string, icon: string) => setHistory((prev) => scopedCommit(prev, 'Subcircuit icon', (d) => setSubcircuitIcon(d, id, icon))), [scopedCommit]);
+  const handleRelabelPort = useCallback((id: string, portId: string, label: string) => setHistory((prev) => scopedCommit(prev, 'Rename port', (d) => relabelSubcircuitPort(d, id, portId, label))), [scopedCommit]);
+
+
   const handleViewportChange = useCallback((viewport: Partial<LogicDocument['viewport']>) => {
-    setHistory((prev) => ({ ...prev, present: setViewport(prev.present, viewport) }));
+    setHistory((prev) => scopedPreview(prev, (d) => setViewport(d, viewport)));
   }, []);
 
   const buildContextActions = useCallback((componentId: string): MenuAction[] => [
-    { key: 'rotate', label: 'Rotate 90°', onSelect: () => setHistory((prev) => commit(prev, 'Rotate', (doc) => rotateComponent(doc, componentId))) },
-    { key: 'mirror', label: 'Flip horizontal', onSelect: () => setHistory((prev) => commit(prev, 'Flip', (doc) => mirrorComponent(doc, componentId))) },
-    { key: 'duplicate', label: 'Duplicate', onSelect: () => setHistory((prev) => commit(prev, 'Duplicate', (doc) => duplicateComponent(doc, componentId))) },
-    { key: 'delete', label: 'Delete', onSelect: () => setHistory((prev) => commit(prev, 'Delete', (doc) => removeComponent(doc, componentId))) },
-  ], []);
+    ...(scopedOf(documentRef.current).components.find((candidate) => candidate.id === componentId)?.type === 'SUBCIRCUIT'
+      ? [{ key: 'open', label: 'Open subcircuit', onSelect: () => handleOpenSubcircuit(componentId) }]
+      : []),
+    { key: 'rotate', label: 'Rotate 90°', onSelect: () => setHistory((prev) => scopedCommit(prev, 'Rotate', (doc) => rotateComponent(doc, componentId))) },
+    { key: 'mirror', label: 'Flip horizontal', onSelect: () => setHistory((prev) => scopedCommit(prev, 'Flip', (doc) => mirrorComponent(doc, componentId))) },
+    { key: 'duplicate', label: 'Duplicate', onSelect: () => setHistory((prev) => scopedCommit(prev, 'Duplicate', (doc) => duplicateComponent(doc, componentId))) },
+    { key: 'delete', label: 'Delete', onSelect: () => setHistory((prev) => scopedCommit(prev, 'Delete', (doc) => removeComponent(doc, componentId))) },
+  ], [handleOpenSubcircuit, scopedCommit, scopedOf]);
 
-  const doc = history.present;
+  const root = history.present;
+  const doc = useMemo(() => documentAtPath(root, activePath), [root, activePath]);
+  const prefix = pathPrefix(activePath);
+  const viewFrame = scopeFrame(frameRef.current, prefix);
+  const trail = useMemo(() => breadcrumbs(root, activePath), [root, activePath]);
   const selectedMemoryId = useMemo(() => {
     if (doc.selectedIds.length !== 1) return null;
     const selected = doc.components.find((component) => component.id === doc.selectedIds[0]);
     return selected && isMemoryType(selected.type) ? selected.id : null;
   }, [doc.selectedIds, doc.components]);
 
-  const truthAvailability = useMemo(() => checkTruthTableAvailability(doc), [doc]);
+  // With "selected parts only" on, the table walks just the selected switches and LEDs, so unrelated parts on the same canvas stay out of it.
+  const [truthScoped, setTruthScoped] = useState(false);
+  const truthOptions = useMemo(() => (truthScoped ? { onlyIds: doc.selectedIds } : undefined), [truthScoped, doc.selectedIds]);
+  const truthAvailability = useMemo(() => checkTruthTableAvailability(doc, truthOptions), [doc, truthOptions]);
   const truthTable: TruthTable | null = useMemo(() => {
     if (activeDock !== 'truth' || !truthAvailability.ok) return null;
-    try { return generateTruthTable(doc); } catch { return null; }
-  }, [activeDock, truthAvailability.ok, doc]);
+    try { return generateTruthTable(doc, truthOptions); } catch { return null; }
+  }, [activeDock, truthAvailability.ok, doc, truthOptions]);
   const expressions = useMemo(() => (truthTable ? extractBooleanExpressions(truthTable) : []), [truthTable]);
   const ercFindings: ErcFinding[] = useMemo(() => (activeDock === 'erc' ? runElectricalRuleCheck(doc) : []), [activeDock, doc]);
 
   // Which signals the analyzer captures follows the circuit (a deleted probe drops out, a new one joins
   // the default set); runStep reads the latest list through a ref so it never records a stale channel.
-  const analyzerChannels = useMemo(() => normalizeChannels(doc, analyzerKeys), [doc.components, analyzerKeys]);
-  const analyzerCandidates = useMemo(() => channelCandidates(doc), [doc.components]);
+  const analyzerChannels = useMemo(() => normalizeChannels(flattenDocument(root), analyzerKeys), [root, analyzerKeys]);
+  const analyzerCandidates = useMemo(() => channelCandidates(root), [root]);
   analyzerChannelsRef.current = analyzerChannels;
   if (!sameChannels(analyzerBufferRef.current.channels, analyzerChannels)) {
     analyzerBufferRef.current = createSampleBuffer(analyzerChannels);
@@ -401,6 +482,7 @@ export default function LogicWorkspace() {
     if (!window.confirm('Start a new blank circuit? This replaces the one on screen, including its autosave and undo history, and cannot be undone. Use Save project first if you want to keep it.')) return;
     const fresh = createInitialDocument();
     setHistory(createHistory(fresh));
+    setPath([]);
     frameRef.current = createInitialFrame(fresh);
     resetLiveInteractions();
     bumpFrame();
@@ -411,6 +493,7 @@ export default function LogicWorkspace() {
     if (!window.confirm(`Start the puzzle "${level.title}"? This replaces the circuit on screen, including its autosave and undo history, and cannot be undone. Use Save project first if you want to keep it.`)) return;
     const starter = buildStarterDocument(level);
     setHistory(createHistory(starter));
+    setPath([]);
     frameRef.current = createInitialFrame(starter);
     resetLiveInteractions();
     bumpFrame();
@@ -420,14 +503,14 @@ export default function LogicWorkspace() {
   // One click into (and back out of) the large-format Junior Explorer look: the theme, plus a
   // larger view. Leaving restores the theme and zoom that were in use before.
   const handleToggleJunior = () => {
-    const current = documentRef.current;
+    const current = scopedOf(documentRef.current);
     if (current.theme === 'junior-explorer') {
       const { theme, zoom } = juniorReturnRef.current;
-      setHistory((prev) => commit(prev, 'Leave Junior Explorer', (document) => setViewport(setTheme(document, theme), { zoom })));
+      setHistory((prev) => scopedCommit(prev, 'Leave Junior Explorer', (document) => setViewport(setTheme(document, theme), { zoom })));
       return;
     }
     juniorReturnRef.current = { theme: current.theme, zoom: current.viewport.zoom };
-    setHistory((prev) => commit(prev, 'Junior Explorer', (document) => setViewport(setTheme(document, 'junior-explorer'), { zoom: Math.max(document.viewport.zoom, JUNIOR_MIN_ZOOM) })));
+    setHistory((prev) => scopedCommit(prev, 'Junior Explorer', (document) => setViewport(setTheme(document, 'junior-explorer'), { zoom: Math.max(document.viewport.zoom, JUNIOR_MIN_ZOOM) })));
   };
 
   const handleOpenClick = () => fileInputRef.current?.click();
@@ -441,6 +524,7 @@ export default function LogicWorkspace() {
       try {
         const parsed = parseProject(text);
         setHistory(loadDocument(parsed));
+        setPath([]);
         frameRef.current = createInitialFrame(parsed);
         resetLiveInteractions();
         bumpFrame();
@@ -450,11 +534,11 @@ export default function LogicWorkspace() {
     });
   };
 
-  const handleExportSvg = () => downloadText(renderSchematicSvg(doc), projectFileName(doc, 'svg'), 'image/svg+xml');
-  const handleExportProject = () => downloadText(serializeProject(doc), projectFileName(doc, 'circuit.json'), 'application/json');
+  const handleExportSvg = () => downloadText(renderSchematicSvg(doc), projectFileName(root, 'svg'), 'image/svg+xml');
+  const handleExportProject = () => downloadText(serializeProject(root), projectFileName(root, 'circuit.json'), 'application/json');
   const handleExportTruthTableCsv = () => {
     try {
-      const table = generateTruthTable(doc);
+      const table = generateTruthTable(doc, truthOptions);
       downloadText(truthTableToCsv(table), projectFileName(doc, 'truth-table.csv'), 'text/csv;charset=utf-8');
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Truth table unavailable.');
@@ -472,14 +556,15 @@ export default function LogicWorkspace() {
         <button type="button" onClick={() => setHistory(undo)} disabled={history.past.length === 0} title="Undo (Ctrl+Z)">Undo</button>
         <button type="button" onClick={() => setHistory(redo)} disabled={history.future.length === 0} title="Redo (Ctrl+Shift+Z)">Redo</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
-        <button type="button" onClick={() => setHistory((prev) => commit(prev, 'Toggle run', (d) => setRunning(d, !d.simulation.running)))} title="Play/pause (Space)">
+        <button type="button" onClick={() => setHistory((prev) => scopedCommit(prev, 'Toggle run', (d) => setRunning(d, !d.simulation.running)))} title="Play/pause (Space)">
           {doc.simulation.running ? 'Pause' : 'Run'}
         </button>
         <button type="button" onClick={() => runStep(0, true)} title="Advance one manual tick, including any clock">Step</button>
-        <button type="button" onClick={() => setHistory((prev) => commit(prev, 'Delay mode', (d) => setDelayMode(d, d.simulation.delayMode === 'ideal' ? 'realistic' : 'ideal')))}>
+        <button type="button" onClick={() => setHistory((prev) => scopedCommit(prev, 'Delay mode', (d) => setDelayMode(d, d.simulation.delayMode === 'ideal' ? 'realistic' : 'ideal')))}>
           {doc.simulation.delayMode === 'ideal' ? 'Ideal delay' : 'Realistic delay'}
         </button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
+        <button type="button" onClick={handleGroupSelection} disabled={doc.selectedIds.length === 0 || doc.selectedIds.every((id) => isPortMarker(doc.components.find((component) => component.id === id)?.type ?? 'AND'))} title="Group the selected parts into one subcircuit">Group into subcircuit</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
         <button type="button" onClick={handleToggleJunior} aria-pressed={doc.theme === 'junior-explorer'}>Junior Explorer</button>
@@ -493,6 +578,23 @@ export default function LogicWorkspace() {
         <button type="button" className="logic-mobile-only" onClick={() => setMobilePanel((current) => (current === 'palette' ? 'none' : 'palette'))}>Components</button>
         <button type="button" className="logic-mobile-only" onClick={() => setMobilePanel((current) => (current === 'inspector' ? 'none' : 'inspector'))}>Inspect</button>
       </div>
+
+      {trail.length > 1 ? (
+        <nav className="logic-breadcrumbs" aria-label="Circuit path" data-testid="logic-breadcrumbs">
+          <button type="button" onClick={() => handleCloseToDepth(activePath.length - 1)}>Up one level</button>
+          <ol>
+            {trail.map((crumb, index) => (
+              <li key={`${crumb.id ?? 'root'}-${index}`}>
+                {index === trail.length - 1 ? (
+                  <span aria-current="location">{crumb.label}</span>
+                ) : (
+                  <button type="button" onClick={() => handleCloseToDepth(index)}>{crumb.label}</button>
+                )}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
 
       {frameRef.current.hazards.length > 0 ? (
         <div className="logic-hazard-banner" role="status">
@@ -533,7 +635,7 @@ export default function LogicWorkspace() {
 
         <LogicCanvas
           document={doc}
-          frame={frameRef.current}
+          frame={viewFrame}
           theme={doc.theme}
           placingType={placingType}
           onMoveComponent={handleMoveComponent}
@@ -543,6 +645,7 @@ export default function LogicWorkspace() {
           onPressButton={handlePressButton}
           onViewportChange={handleViewportChange}
           onDropComponent={handleDropComponent}
+          onOpenComponent={handleOpenSubcircuit}
           buildContextActions={buildContextActions}
           cancelDraftWireToken={cancelDraftWireToken}
         />
@@ -554,17 +657,25 @@ export default function LogicWorkspace() {
           </div>
           <LogicInspector
             document={doc}
-            onRelabel={(id, label) => setHistory((prev) => commit(prev, 'Rename', (d) => relabelComponent(d, id, label)))}
-            onUpdateParams={(id, params) => setHistory((prev) => commit(prev, 'Update parameters', (d) => updateComponentParams(d, id, params.inputCount !== undefined ? { ...params, inputCount: clampInputCount(params.inputCount) } : params)))}
-            onUpdateMetadata={(metadata) => setHistory((prev) => commit(prev, 'Update metadata', (d) => updateMetadata(d, metadata)))}
-            onSetTheme={(theme: ThemeName) => setHistory((prev) => commit(prev, 'Theme', (d) => setTheme(d, theme)))}
+            onRelabel={(id, label) => setHistory((prev) => scopedCommit(prev, 'Rename', (d) => relabelComponent(d, id, label)))}
+            onUpdateParams={(id, params) => setHistory((prev) => scopedCommit(prev, 'Update parameters', (d) => updateComponentParams(d, id, params.inputCount !== undefined ? { ...params, inputCount: clampInputCount(params.inputCount) } : params)))}
+            onUpdateMetadata={(metadata) => setHistory((prev) => scopedCommit(prev, 'Update metadata', (d) => updateMetadata(d, metadata)))}
+            onSetTheme={(theme: ThemeName) => setHistory((prev) => scopedCommit(prev, 'Theme', (d) => setTheme(d, theme)))}
             onOpenMemoryEditor={handleOpenMemoryEditor}
+            onOpenSubcircuit={handleOpenSubcircuit}
+            onRenameSubcircuit={handleRenameSubcircuit}
+            onSetSubcircuitIcon={handleSetSubcircuitIcon}
+            onRelabelPort={handleRelabelPort}
           />
         </div>
       </div>
 
       {activeDock === 'truth' ? (
         <section className="logic-dock" aria-label="Truth table" data-testid="logic-truth-table-dock">
+          <label className="logic-field logic-field-inline">
+            <input type="checkbox" checked={truthScoped} onChange={(event) => setTruthScoped(event.target.checked)} />
+            <span>Selected parts only (select the switches and LEDs to include)</span>
+          </label>
           {!truthAvailability.ok ? (
             <p className="logic-dock-message">{truthAvailability.reason}</p>
           ) : truthTable ? (
@@ -638,7 +749,7 @@ export default function LogicWorkspace() {
         <LogicMemoryDock
           key={memoryFocusId ?? 'first'}
           document={doc}
-          frame={frameRef.current}
+          frame={viewFrame}
           focusId={memoryFocusId}
           onEdit={handleMemoryEdit}
           onReplace={handleMemoryReplace}
