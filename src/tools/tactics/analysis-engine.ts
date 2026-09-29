@@ -1,5 +1,6 @@
 import { createNormalizedPoint, metersToNormalized, normalizedToMeters } from './pitch-engine';
-import { sampleTimelineTrack } from './timeline-engine';
+import { assertGeneratedSampleBudget } from './session-bounds';
+import { sampleTrackAtTimes } from './timeline-engine';
 import type { NormalizedPoint, PitchDimensions, TimelineTrack } from './tactics-types';
 
 const EPSILON = 1e-9;
@@ -452,6 +453,8 @@ function requireIntegerTime(value: number, label: string): number {
   return value;
 }
 
+const trajectoryCache = new WeakMap<TimelineTrack, Map<string, TrajectorySample[]>>();
+
 export function sampleAuthoredTrajectory(
   track: TimelineTrack,
   startMs: number,
@@ -462,15 +465,32 @@ export function sampleAuthoredTrajectory(
   const end = requireIntegerTime(endMs, 'Trajectory end');
   const step = requirePositiveInteger(stepMs, 'Trajectory sample step');
   if (end < start) throw new RangeError('Trajectory end cannot be before start.');
+  assertGeneratedSampleBudget(start, end, step, 'Trajectory sampling');
+
+  const cacheKey = `${start}:${end}:${step}`;
+  const cached = trajectoryCache.get(track)?.get(cacheKey);
+  if (cached) return cached;
 
   const times: number[] = [];
   for (let timeMs = start; timeMs <= end; timeMs += step) times.push(timeMs);
   if (times[times.length - 1] !== end) times.push(end);
-
-  return times.flatMap((timeMs) => {
-    const position = sampleTimelineTrack(track, timeMs).position;
-    return position ? [{ timeMs, position: createNormalizedPoint(position.x, position.y) }] : [];
-  });
+  const states = sampleTrackAtTimes(track, times);
+  const samples: TrajectorySample[] = [];
+  for (let index = 0; index < times.length; index += 1) {
+    const position = states[index]?.position;
+    if (!position) continue;
+    samples.push({
+      timeMs: times[index]!,
+      position: createNormalizedPoint(position.x, position.y),
+    });
+  }
+  let byKey = trajectoryCache.get(track);
+  if (!byKey) {
+    byKey = new Map();
+    trajectoryCache.set(track, byKey);
+  }
+  byKey.set(cacheKey, samples);
+  return samples;
 }
 
 export function buildOccupancyHeatMap(

@@ -807,6 +807,23 @@ export function createLocalMediaObjectRegistry(
   };
 }
 
+export interface HiddenPlaybackDocument {
+  visibilityState: 'visible' | 'hidden' | 'prerender' | 'unloaded';
+  addEventListener(type: 'visibilitychange', listener: () => void): void;
+  removeEventListener(type: 'visibilitychange', listener: () => void): void;
+}
+
+export function bindHiddenDocumentPause(
+  documentTarget: HiddenPlaybackDocument,
+  pause: () => void,
+): () => void {
+  const onChange = () => {
+    if (documentTarget.visibilityState === 'hidden') pause();
+  };
+  documentTarget.addEventListener('visibilitychange', onChange);
+  return () => documentTarget.removeEventListener('visibilitychange', onChange);
+}
+
 export function bindMediaElementListeners(target: MediaListenerTarget, handlers: MediaListenerHandlers): () => void {
   const entries = MEDIA_LISTENER_EVENTS.map(([handlerName, eventName]) => {
     const listener = handlers[handlerName];

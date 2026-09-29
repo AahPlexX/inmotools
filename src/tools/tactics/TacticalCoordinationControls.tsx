@@ -71,6 +71,7 @@ export default function TacticalCoordinationControls({
     [project.playerTokens],
   );
   const [conflicts, setConflicts] = useState<PotentialPathConflict[] | null>(null);
+  const [conflictError, setConflictError] = useState('');
   const [actionPresetId, setActionPresetId] = useState('custom');
   const [unitOperation, setUnitOperation] = useState('translation');
   const selectedPreset = COORDINATED_ACTION_PRESETS.find((preset) => preset.id === actionPresetId);
@@ -231,14 +232,19 @@ export default function TacticalCoordinationControls({
   function submitConflictReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    setConflicts(findPotentialPathConflicts(
-      project.timeline,
-      project.pitch.dimensions,
-      {
-        stepMs: Number(data.get('conflictStepMs')),
-        thresholdMeters: Number(data.get('conflictThresholdMeters')),
-      },
-    ));
+    try {
+      setConflicts(findPotentialPathConflicts(
+        project.timeline,
+        project.pitch.dimensions,
+        {
+          stepMs: Number(data.get('conflictStepMs')),
+          thresholdMeters: Number(data.get('conflictThresholdMeters')),
+        },
+      ));
+      setConflictError('');
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : 'Conflict review stopped.');
+    }
   }
 
   const firstTarget = playerTargets[0] ?? '';
@@ -403,6 +409,7 @@ export default function TacticalCoordinationControls({
         <label>Conflict step (ms)<input name="conflictStepMs" type="number" min="1" step="1" defaultValue="250" required /></label>
         <label>Conflict threshold (m)<input name="conflictThresholdMeters" type="number" min="0.1" step="0.1" defaultValue="1" required /></label>
         <button type="submit">Review path conflicts</button>
+        {conflictError ? <p role="alert">{conflictError}</p> : null}
         {conflicts === null ? (
           <p>Run the review to inspect authored tracks.</p>
         ) : conflicts.length ? (

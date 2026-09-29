@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { importTacticalProjectJson, migrateTacticalProject } from './project-io';
+import { MAX_NAMED_SNAPSHOTS } from './session-bounds';
 import type { TacticalProject } from './tactics-types';
 
 type SnapshotKind = 'autosave' | 'named';
@@ -132,7 +133,13 @@ export class TacticalProjectVault {
   async createSnapshot(project: TacticalProject, rawLabel: string): Promise<TacticalSnapshotRecord> {
     const label = rawLabel.trim();
     if (!label) throw new Error('Snapshot label is required.');
-    return this.db.transaction('rw', this.db.snapshots, () => this.createSnapshotRecord(project, 'named', label));
+    return this.db.transaction('rw', this.db.snapshots, async () => {
+      const existing = await this.db.snapshots.where('[projectId+kind]').equals([project.id, 'named']).count();
+      if (existing >= MAX_NAMED_SNAPSHOTS) {
+        throw new Error(`Named snapshot limit is ${MAX_NAMED_SNAPSHOTS}. Remove a snapshot before creating another.`);
+      }
+      return this.createSnapshotRecord(project, 'named', label);
+    });
   }
 
   private async listSnapshots(projectId: string, kind: SnapshotKind): Promise<TacticalSnapshotRecord[]> {

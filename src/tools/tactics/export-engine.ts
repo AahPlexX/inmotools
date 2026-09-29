@@ -291,6 +291,9 @@ function tick(now) {
   }
   requestAnimationFrame(tick);
 }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stop();
+});
 show(0);
 `.trim();
 

@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import Papa from 'papaparse';
 import { createNormalizedPoint, metersToNormalized } from './pitch-engine';
+import { MAX_TIMELINE_DURATION_MS, MAX_ZIP_ENTRIES } from './session-bounds';
 import { TACTICS_SCHEMA_VERSION, validateTacticalProject } from './tactics-engine';
 import { createEmptyVideoReview } from './video-review-engine';
 import {
@@ -68,6 +69,84 @@ function requireString(value: unknown, label: string): string {
 
 function utf8Bytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
+}
+
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+function csvFormulaSafe(value: string): string {
+  return CSV_FORMULA_PREFIX.test(value) ? `'${value}` : value;
+}
+
+function csvFormulaRestore(value: string): string {
+  if (value.startsWith("'") && CSV_FORMULA_PREFIX.test(value.slice(1))) return value.slice(1);
+  return value;
+}
+
+function zipBytes(data: Uint8Array | ArrayBuffer | Blob): Uint8Array | Promise<Uint8Array> {
+  if (data instanceof Uint8Array) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  return data.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+}
+
+function readU16(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! | (bytes[offset + 1]! << 8);
+}
+
+function readU32(bytes: Uint8Array, offset: number): number {
+  return (
+    bytes[offset]!
+    | (bytes[offset + 1]! << 8)
+    | (bytes[offset + 2]! << 16)
+    | (bytes[offset + 3]! << 24)
+  ) >>> 0;
+}
+
+function readZipDirectory(bytes: Uint8Array): Array<{ name: string; uncompressedSize: number }> {
+  const minimum = Math.max(0, bytes.length - (22 + 0xffff));
+  let endOffset = -1;
+  for (let offset = bytes.length - 22; offset >= minimum; offset -= 1) {
+    if (
+      bytes[offset] !== 0x50
+      || bytes[offset + 1] !== 0x4b
+      || bytes[offset + 2] !== 0x05
+      || bytes[offset + 3] !== 0x06
+    ) continue;
+    const commentLength = readU16(bytes, offset + 20);
+    if (offset + 22 + commentLength !== bytes.length) continue;
+    endOffset = offset;
+    break;
+  }
+  if (endOffset < 0) throw new Error('Tactical project ZIP could not be decoded.');
+  const declaredCount = readU16(bytes, endOffset + 10);
+  if (declaredCount > MAX_ZIP_ENTRIES) {
+    throw new Error(`Tactical ZIP entry count exceeds the ${MAX_ZIP_ENTRIES} entry limit.`);
+  }
+  let offset = readU32(bytes, endOffset + 16);
+  const decoder = new TextDecoder();
+  const entries: Array<{ name: string; uncompressedSize: number }> = [];
+  while (offset + 46 <= endOffset && readU32(bytes, offset) === 0x02014b50) {
+    if (entries.length >= MAX_ZIP_ENTRIES) {
+      throw new Error(`Tactical ZIP entry count exceeds the ${MAX_ZIP_ENTRIES} entry limit.`);
+    }
+    const uncompressedSize = readU32(bytes, offset + 24);
+    const nameLength = readU16(bytes, offset + 28);
+    const extraLength = readU16(bytes, offset + 30);
+    const commentLength = readU16(bytes, offset + 32);
+    const nameStart = offset + 46;
+    const nameEnd = nameStart + nameLength;
+    if (nameEnd + extraLength + commentLength > endOffset) {
+      throw new Error('Tactical project ZIP could not be decoded.');
+    }
+    entries.push({
+      name: decoder.decode(bytes.subarray(nameStart, nameEnd)),
+      uncompressedSize,
+    });
+    offset = nameEnd + extraLength + commentLength;
+  }
+  if (declaredCount > 0 && entries.length === 0) {
+    throw new Error('Tactical project ZIP could not be decoded.');
+  }
+  return entries;
 }
 
 function portableProject(project: TacticalProject): TacticalProject {
@@ -314,12 +393,27 @@ export async function importTacticalProjectZip(
   data: Uint8Array | ArrayBuffer | Blob,
   sourceName: string,
 ): Promise<ImportedTacticalZip> {
-  const inputSize = data instanceof Blob ? data.size : data.byteLength;
-  if (inputSize > MAX_PROJECT_ZIP_BYTES) throw new Error('Tactical project ZIP exceeds the local import size limit.');
+  const bytes = await zipBytes(data);
+  if (bytes.byteLength > MAX_PROJECT_ZIP_BYTES) throw new Error('Tactical project ZIP exceeds the local import size limit.');
+  let declaredTotal = 0;
+  for (const entry of readZipDirectory(bytes)) {
+    if (entry.name.endsWith('/')) continue;
+    const textEntry = entry.name === 'project.json' || entry.name === 'manifest.json';
+    const oversized = entry.uncompressedSize === 0xffffffff
+      || (textEntry && entry.uncompressedSize > MAX_PROJECT_JSON_BYTES)
+      || (!textEntry && entry.uncompressedSize > MAX_ASSET_BYTES);
+    if (oversized) {
+      throw new Error(`Tactical ZIP ${entry.name} exceeds the local import size limit before decompression.`);
+    }
+    declaredTotal += entry.uncompressedSize;
+    if (declaredTotal > MAX_PROJECT_ZIP_BYTES) {
+      throw new Error('Tactical ZIP expanded size exceeds the local import size limit before decompression.');
+    }
+  }
 
   let zip: JSZip;
   try {
-    zip = await JSZip.loadAsync(data, { checkCRC32: true, createFolders: false });
+    zip = await JSZip.loadAsync(bytes, { checkCRC32: true, createFolders: false });
   } catch {
     throw new Error('Tactical project ZIP could not be decoded.');
   }
@@ -401,13 +495,13 @@ function optionalNumber(value: unknown, label: string): number | undefined {
 export function exportTrajectoryCsv(project: TacticalProject): string {
   const rows = trajectorySamples(project).map((sample) => ({
     timestamp_ms: sample.timeMs,
-    entity_id: sample.targetId,
-    team_id: sample.teamId ?? '',
+    entity_id: csvFormulaSafe(sample.targetId),
+    team_id: csvFormulaSafe(sample.teamId ?? ''),
     x: sample.position.x,
     y: sample.position.y,
     z: sample.zMeters ?? '',
     orientation_deg: sample.orientationDeg ?? '',
-    event: sample.event ?? '',
+    event: csvFormulaSafe(sample.event ?? ''),
     coordinate_system: sample.coordinateSystem,
   }));
   return Papa.unparse(rows, {
@@ -448,12 +542,15 @@ function validateTrajectorySamples(
   if (samples.length > MAX_TRAJECTORY_SAMPLES) throw new Error('Trajectory import exceeds the sample-count limit.');
   const result = samples.map((raw, index) => {
     const record = asRecord(raw, `Trajectory sample ${index + 1}`);
-    const targetId = String(record.targetId ?? record.entity_id ?? '').trim();
+    const targetId = csvFormulaRestore(String(record.targetId ?? record.entity_id ?? '').trim());
     if (!targetId) throw new Error('Trajectory target id cannot be empty.');
 
     const timeMs = Number(record.timeMs ?? record.timestamp_ms);
     if (!Number.isInteger(timeMs) || timeMs < 0) {
       throw new Error(`Trajectory sample time must be a non-negative integer in ${sourceName}.`);
+    }
+    if (timeMs > MAX_TIMELINE_DURATION_MS) {
+      throw new Error(`Trajectory sample time exceeds the ${MAX_TIMELINE_DURATION_MS} millisecond session limit.`);
     }
 
     const rawSystem = String(record.coordinateSystem ?? record.coordinate_system ?? 'normalized');
@@ -484,14 +581,15 @@ function validateTrajectorySamples(
     if (zMeters !== undefined && zMeters < 0) throw new Error('Trajectory Z must be non-negative.');
     const orientation = optionalNumber(record.orientationDeg ?? record.orientation_deg, 'Trajectory orientation');
     const event = optionalText(record.event);
+    const teamId = optionalText(record.teamId ?? record.team_id);
     return {
       targetId,
       timeMs,
       position,
-      teamId: optionalText(record.teamId ?? record.team_id),
+      teamId: teamId === undefined ? undefined : csvFormulaRestore(teamId),
       zMeters,
       orientationDeg: orientation === undefined ? undefined : normalizedOrientation(orientation),
-      event,
+      event: event === undefined ? undefined : csvFormulaRestore(event),
       coordinateSystem,
     };
   });

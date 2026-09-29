@@ -1,3 +1,4 @@
+import { MAX_KEYFRAMES_PER_TRACK, MAX_TIMELINE_DURATION_MS, MAX_TIMELINE_MARKERS, MAX_TIMELINE_TRACKS } from './session-bounds';
 import { TIMELINE_MARKER_KINDS } from './tactics-types';
 import type {
   InterpolationKind,
@@ -143,16 +144,46 @@ function easedProgress(kind: InterpolationKind, progress: number, bezier?: [numb
   return t;
 }
 
-function inheritedState(keyframes: TacticalKeyframe[], index: number): SampledTimelineState {
-  const state: SampledTimelineState = {};
-  for (let cursor = 0; cursor <= index; cursor += 1) {
-    const keyframe = keyframes[cursor]!;
-    if (keyframe.position) state.position = { ...keyframe.position };
-    if (keyframe.rotationDeg !== undefined) state.rotationDeg = keyframe.rotationDeg;
-    if (keyframe.elevationMeters !== undefined) state.elevationMeters = keyframe.elevationMeters;
-    if (keyframe.visible !== undefined) state.visible = keyframe.visible;
+function applyKeyframe(state: SampledTimelineState, keyframe: TacticalKeyframe): SampledTimelineState {
+  return {
+    position: keyframe.position ? { ...keyframe.position } : state.position ? { ...state.position } : undefined,
+    rotationDeg: keyframe.rotationDeg !== undefined ? keyframe.rotationDeg : state.rotationDeg,
+    elevationMeters: keyframe.elevationMeters !== undefined ? keyframe.elevationMeters : state.elevationMeters,
+    visible: keyframe.visible !== undefined ? keyframe.visible : state.visible,
+  };
+}
+
+function cloneSampledState(state: SampledTimelineState): SampledTimelineState {
+  return {
+    ...state,
+    position: state.position ? { ...state.position } : undefined,
+  };
+}
+
+function interpolateKeyframeSpan(
+  leftKeyframe: TacticalKeyframe,
+  leftState: SampledTimelineState,
+  rightKeyframe: TacticalKeyframe,
+  rightState: SampledTimelineState,
+  timeMs: number,
+): SampledTimelineState {
+  const rawProgress = (timeMs - leftKeyframe.timeMs) / (rightKeyframe.timeMs - leftKeyframe.timeMs);
+  const progress = easedProgress(leftKeyframe.interpolation, rawProgress, leftKeyframe.bezier);
+  let position: NormalizedPoint | undefined;
+  if (leftState.position && rightState.position) {
+    position = leftKeyframe.motionPath
+      ? sampleMotionPath(leftState.position, rightState.position, leftKeyframe.motionPath, progress)
+      : {
+          x: clampUnit(interpolateNumber(leftState.position.x, rightState.position.x, progress)!),
+          y: clampUnit(interpolateNumber(leftState.position.y, rightState.position.y, progress)!),
+        };
   }
-  return state;
+  return {
+    position,
+    rotationDeg: interpolateNumber(leftState.rotationDeg, rightState.rotationDeg, progress),
+    elevationMeters: interpolateNumber(leftState.elevationMeters, rightState.elevationMeters, progress),
+    visible: leftState.visible,
+  };
 }
 
 function interpolateNumber(left: number | undefined, right: number | undefined, progress: number): number | undefined {
@@ -209,44 +240,49 @@ export function addTimelineVisibilityChange(
   };
 }
 
-export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): SampledTimelineState {
-  requireIntegerTime(timeMs, 'Sample time');
+export function sampleTrackAtTimes(track: TimelineTrack, times: readonly number[]): SampledTimelineState[] {
+  for (const timeMs of times) requireIntegerTime(timeMs, 'Sample time');
   const keyframes = sortedKeyframes(track);
-  if (!keyframes.length) return {};
-  if (timeMs < keyframes[0]!.timeMs) {
-    const future = inheritedState(keyframes, 0);
-    return { ...future, visible: undefined };
-  }
-  if (timeMs === keyframes[0]!.timeMs) return inheritedState(keyframes, 0);
-  const lastIndex = keyframes.length - 1;
-  if (timeMs >= keyframes[lastIndex]!.timeMs) return inheritedState(keyframes, lastIndex);
-  let leftIndex = 0;
-  for (let index = 0; index < lastIndex; index += 1) {
-    if (keyframes[index]!.timeMs <= timeMs && timeMs < keyframes[index + 1]!.timeMs) {
-      leftIndex = index;
-      break;
+  if (!keyframes.length) return times.map(() => ({}));
+
+  const results: SampledTimelineState[] = [];
+  let cursor = 0;
+  let inherited: SampledTimelineState = {};
+  let previousTime = -1;
+  for (const timeMs of times) {
+    if (timeMs < previousTime) {
+      cursor = 0;
+      inherited = {};
     }
+    previousTime = timeMs;
+    if (timeMs < keyframes[0]!.timeMs) {
+      const future = applyKeyframe({}, keyframes[0]!);
+      results.push({ ...cloneSampledState(future), visible: undefined });
+      continue;
+    }
+    while (cursor < keyframes.length && keyframes[cursor]!.timeMs <= timeMs) {
+      inherited = applyKeyframe(inherited, keyframes[cursor]!);
+      cursor += 1;
+    }
+    const leftKeyframe = keyframes[cursor - 1]!;
+    const rightKeyframe = keyframes[cursor];
+    if (!rightKeyframe || timeMs === leftKeyframe.timeMs) {
+      results.push(cloneSampledState(inherited));
+      continue;
+    }
+    results.push(interpolateKeyframeSpan(
+      leftKeyframe,
+      inherited,
+      rightKeyframe,
+      applyKeyframe(inherited, rightKeyframe),
+      timeMs,
+    ));
   }
-  const rightIndex = leftIndex + 1;
-  const leftKeyframe = keyframes[leftIndex]!;
-  const rightKeyframe = keyframes[rightIndex]!;
-  if (timeMs === leftKeyframe.timeMs) return inheritedState(keyframes, leftIndex);
-  const leftState = inheritedState(keyframes, leftIndex);
-  const rightState = inheritedState(keyframes, rightIndex);
-  const rawProgress = (timeMs - leftKeyframe.timeMs) / (rightKeyframe.timeMs - leftKeyframe.timeMs);
-  const progress = easedProgress(leftKeyframe.interpolation, rawProgress, leftKeyframe.bezier);
-  let position: NormalizedPoint | undefined;
-  if (leftState.position && rightState.position) {
-    position = leftKeyframe.motionPath
-      ? sampleMotionPath(leftState.position, rightState.position, leftKeyframe.motionPath, progress)
-      : {
-          x: clampUnit(interpolateNumber(leftState.position.x, rightState.position.x, progress)!),
-          y: clampUnit(interpolateNumber(leftState.position.y, rightState.position.y, progress)!),
-        };
-  }
-  const rotationDeg = interpolateNumber(leftState.rotationDeg, rightState.rotationDeg, progress);
-  const elevationMeters = interpolateNumber(leftState.elevationMeters, rightState.elevationMeters, progress);
-  return { position, rotationDeg, elevationMeters, visible: leftState.visible };
+  return results;
+}
+
+export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): SampledTimelineState {
+  return sampleTrackAtTimes(track, [timeMs])[0] ?? {};
 }
 
 export function offsetTimelineTrack(track: TimelineTrack, deltaMs: number): TimelineTrack {
@@ -518,6 +554,14 @@ export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
   const errors: string[] = [];
   if (!Number.isInteger(timeline.durationMs) || timeline.durationMs < 0) {
     errors.push('Timeline duration must be a non-negative integer number of milliseconds.');
+  } else if (timeline.durationMs > MAX_TIMELINE_DURATION_MS) {
+    errors.push(`Timeline duration exceeds the ${MAX_TIMELINE_DURATION_MS} millisecond session limit.`);
+  }
+  if (timeline.tracks.length > MAX_TIMELINE_TRACKS) {
+    errors.push(`Timeline track count exceeds the ${MAX_TIMELINE_TRACKS} track session limit.`);
+  }
+  if (timeline.markers.length > MAX_TIMELINE_MARKERS) {
+    errors.push(`Timeline marker count exceeds the ${MAX_TIMELINE_MARKERS} marker session limit.`);
   }
   if (!Number.isInteger(timeline.playheadMs) || timeline.playheadMs < 0) {
     errors.push('Timeline playhead must be a non-negative integer number of milliseconds.');
@@ -535,6 +579,10 @@ export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
     if (targetIds.has(track.targetId)) errors.push(`Timeline target ${track.targetId} has multiple tracks.`);
     trackIds.add(track.id);
     targetIds.add(track.targetId);
+    if (track.keyframes.length > MAX_KEYFRAMES_PER_TRACK) {
+      errors.push(`Timeline track ${track.id} exceeds the ${MAX_KEYFRAMES_PER_TRACK} keyframe session limit.`);
+      continue;
+    }
     try {
       const valid = validateTrack(track);
       if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0) {

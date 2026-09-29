@@ -18,6 +18,7 @@ import {
   assertPlaybackRate,
   assertSupportedLocalVideo,
   attachLocalVideo,
+  bindHiddenDocumentPause,
   bindMediaElementListeners,
   createLocalMediaObjectRegistry,
   createVideoPlaylist,
@@ -137,6 +138,12 @@ export default function TacticalVideoPanel({ project, onEdit, onStatus }: Tactic
   const [playlistRun, setPlaylistRun] = useState<PlaylistRun | null>(null);
 
   useEffect(() => { onEditRef.current = onEdit; }, [onEdit]);
+  useEffect(() => bindHiddenDocumentPause(document, () => {
+    primaryVideoRef.current?.pause();
+    comparisonVideoRef.current?.pause();
+    setPlaying(false);
+    setPlaylistRun(null);
+  }), []);
   useEffect(() => () => { registryRef.current.releaseAll(); }, []);
   useEffect(() => { playlistRunRef.current = playlistRun; }, [playlistRun]);
 

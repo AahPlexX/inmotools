@@ -83,6 +83,7 @@ export interface TacticalAnalysisView {
   tether?: TacticalTether;
   heatMap?: OccupancyHeatMap;
   trajectoryMetrics?: TrajectoryMetrics;
+  trajectoryWarning?: string;
 }
 
 function isGoalkeeper(project: TacticalProject, token: PlayerToken): boolean {
@@ -164,14 +165,20 @@ export function deriveTacticalAnalysis(
   const authoredTimes = selectedTrack?.keyframes
     .filter((keyframe) => keyframe.position)
     .map((keyframe) => keyframe.timeMs) ?? [];
-  const trajectorySamples = selectedTrack && authoredTimes.length
-    ? sampleAuthoredTrajectory(
+  let trajectorySamples: ReturnType<typeof sampleAuthoredTrajectory> = [];
+  let trajectoryWarning: string | undefined;
+  if (selectedTrack && authoredTimes.length) {
+    try {
+      trajectorySamples = sampleAuthoredTrajectory(
         selectedTrack,
         Math.min(...authoredTimes),
         Math.max(...authoredTimes),
         settings.trajectoryStepMs,
-      )
-    : [];
+      );
+    } catch (error) {
+      trajectoryWarning = error instanceof Error ? error.message : 'Trajectory sampling stopped.';
+    }
+  }
   const heatMap = settings.heatMap && trajectorySamples.length
     ? buildOccupancyHeatMap(trajectorySamples, settings.heatColumns, settings.heatRows)
     : undefined;
@@ -191,6 +198,7 @@ export function deriveTacticalAnalysis(
     tether,
     heatMap,
     trajectoryMetrics,
+    trajectoryWarning,
   };
 }
 
@@ -478,6 +486,7 @@ export default function TacticalAnalysisPanel({
         <section aria-labelledby="trajectory-metrics-heading">
           <h3 id="trajectory-metrics-heading">Trajectory metrics</h3>
           <div data-testid="trajectory-metrics-summary">
+            {view.trajectoryWarning ? <p role="alert">{view.trajectoryWarning}</p> : null}
             {view.trajectoryMetrics ? (
               <p>
                 Authored trajectory: distance {view.trajectoryMetrics.distanceMeters.toFixed(2)} m; average speed {view.trajectoryMetrics.averageSpeedMetersPerSecond.toFixed(2)} m/s; peak sampled speed {view.trajectoryMetrics.maxSegmentSpeedMetersPerSecond.toFixed(2)} m/s; duration {view.trajectoryMetrics.durationMs} ms.

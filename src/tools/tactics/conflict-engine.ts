@@ -1,3 +1,4 @@
+import { assertGeneratedSampleBudget } from './session-bounds';
 import { sampleTacticalTimeline } from './timeline-engine';
 import type { PitchDimensions, TacticalTimeline } from './tactics-types';
 
@@ -58,6 +59,7 @@ export function findPotentialPathConflicts(
   const thresholdMeters = requirePositiveFinite(options.thresholdMeters, 'Conflict threshold');
   requirePositiveFinite(pitch.lengthMeters, 'Pitch length');
   requirePositiveFinite(pitch.widthMeters, 'Pitch width');
+  assertGeneratedSampleBudget(0, timeline.durationMs, stepMs, 'Conflict review');
 
   const targets = conflictTargets(timeline, options.targetIds);
   const conflicts: PotentialPathConflict[] = [];
