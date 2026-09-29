@@ -51,6 +51,8 @@ import {
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
 import { LogicMinimizerDock } from './LogicMinimizerDock';
 import { LogicPuzzleDock } from './LogicPuzzleDock';
+import { LogicShortcutsDock } from './LogicShortcutsDock';
+import { actionForEvent, DEFAULT_SHORTCUTS, parseShortcuts, serializeShortcuts, type ShortcutMap } from './shortcut-engine';
 import { buildStarterDocument, type PuzzleLevel } from './puzzle-engine';
 import { freeSpaceBelow, synthesizeTwoLevel, type SynthesisSpec } from './synthesis-engine';
 import { LogicCanvas, type MenuAction } from './LogicCanvas';
@@ -60,11 +62,24 @@ import { createInitialFrame, migrateFrame, readLevel, step } from './sim-engine'
 import './LogicWorkspace.css';
 
 const AUTOSAVE_KEY = 'inmotools_logic_workstation_autosave';
+const SHORTCUTS_KEY = 'inmotools_logic_shortcuts';
 /** The Junior Explorer view is at least this zoomed in, so parts read as large blocks. */
 const JUNIOR_MIN_ZOOM = 1.35;
 
 const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
+
+/** A control that Space activates when it has focus, so Space there must not also trigger a shortcut. */
+const isActivatable = (target: EventTarget | null): boolean =>
+  target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement || (target instanceof HTMLElement && target.tagName === 'SUMMARY');
+
+const loadShortcuts = (): ShortcutMap => {
+  try {
+    return parseShortcuts(window.localStorage.getItem(SHORTCUTS_KEY));
+  } catch {
+    return DEFAULT_SHORTCUTS;
+  }
+};
 
 const loadInitialHistory = (): DocumentHistory => {
   try {
@@ -79,17 +94,6 @@ const loadInitialHistory = (): DocumentHistory => {
 const HAZARD_LABEL: Record<string, string> = {
   oscillation: 'This net is oscillating and could not settle under ideal zero-delay simulation.',
 };
-
-/** The functional default keyboard bindings, shown in the toolbar's reference panel. */
-const KEYBOARD_SHORTCUTS: ReadonlyArray<{ readonly keys: string; readonly action: string }> = [
-  { keys: 'Space', action: 'Play or pause the simulation' },
-  { keys: 'R', action: 'Rotate the current selection 90°' },
-  { keys: 'Delete / Backspace', action: 'Delete the current selection' },
-  { keys: 'Ctrl/Cmd + Z', action: 'Undo' },
-  { keys: 'Ctrl/Cmd + Shift + Z, or Ctrl/Cmd + Y', action: 'Redo' },
-  { keys: 'Escape', action: 'Cancel an in-progress wire or component placement, or clear the selection' },
-  { keys: 'Right-click (or long-press on touch)', action: 'Open a component’s rotate/flip/duplicate/delete menu' },
-];
 
 export default function LogicWorkspace() {
   const [history, setHistory] = useState<DocumentHistory>(loadInitialHistory);
@@ -107,6 +111,18 @@ export default function LogicWorkspace() {
   const [analyzerKeys, setAnalyzerKeys] = useState<readonly string[] | null>(null);
   const liveButtonLevelsRef = useRef<Record<string, LogicLevel>>({});
   const pendingSwitchOverrideRef = useRef<Record<string, LogicLevel>>({});
+
+  const [shortcuts, setShortcutsState] = useState<ShortcutMap>(loadShortcuts);
+  const shortcutsRef = useRef(shortcuts);
+  shortcutsRef.current = shortcuts;
+  const setShortcuts = useCallback((next: ShortcutMap) => {
+    setShortcutsState(next);
+    try {
+      window.localStorage.setItem(SHORTCUTS_KEY, serializeShortcuts(next));
+    } catch {
+      /* A full or blocked store only means the choice is not remembered next visit. */
+    }
+  }, []);
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
   const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles'>('none');
@@ -168,38 +184,57 @@ export default function LogicWorkspace() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
-      if (event.key === 'Escape') {
-        setPlacingType(null);
-        setCancelDraftWireToken((token) => token + 1);
-        setHistory((prev) => (prev.present.selectedIds.length ? { ...prev, present: setSelection(prev.present, []) } : prev));
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault();
-        setHistory((prev) => (event.shiftKey ? redo(prev) : undo(prev)));
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
-        event.preventDefault();
-        setHistory(redo);
-        return;
-      }
-      if (event.key === ' ') {
-        event.preventDefault();
-        setHistory((prev) => commit(prev, 'Toggle run', (doc) => setRunning(doc, !doc.simulation.running)));
-        return;
-      }
-      if (event.key.toLowerCase() === 'r') {
-        setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Rotate selection', (doc) => prev.present.selectedIds.reduce((next, id) => rotateComponent(next, id), doc)) : prev));
-        return;
-      }
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Delete selection', (doc) => removeComponents(doc, prev.present.selectedIds)) : prev));
+      const action = actionForEvent(shortcutsRef.current, event);
+      if (!action) return;
+      // Space on a focused button or disclosure activates it; it must not also start or stop the simulation.
+      if (event.key === ' ' && isActivatable(event.target)) return;
+
+      switch (action) {
+        case 'cancel':
+          setPlacingType(null);
+          setCancelDraftWireToken((token) => token + 1);
+          setHistory((prev) => (prev.present.selectedIds.length ? { ...prev, present: setSelection(prev.present, []) } : prev));
+          break;
+        case 'undo':
+          event.preventDefault();
+          setHistory(undo);
+          break;
+        case 'redo':
+          event.preventDefault();
+          setHistory(redo);
+          break;
+        case 'togglePlay':
+          event.preventDefault();
+          setHistory((prev) => commit(prev, 'Toggle run', (doc) => setRunning(doc, !doc.simulation.running)));
+          break;
+        case 'step':
+          event.preventDefault();
+          runStep(0, true);
+          break;
+        case 'rotate':
+          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Rotate selection', (doc) => prev.present.selectedIds.reduce((next, id) => rotateComponent(next, id), doc)) : prev));
+          break;
+        case 'mirror':
+          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Flip selection', (doc) => prev.present.selectedIds.reduce((next, id) => mirrorComponent(next, id), doc)) : prev));
+          break;
+        case 'duplicate':
+          event.preventDefault();
+          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Duplicate selection', (doc) => prev.present.selectedIds.reduce((next, id) => duplicateComponent(next, id), doc)) : prev));
+          break;
+        case 'delete':
+          setHistory((prev) => (prev.present.selectedIds.length ? commit(prev, 'Delete selection', (doc) => removeComponents(doc, prev.present.selectedIds)) : prev));
+          break;
+        case 'focusPalette':
+          event.preventDefault();
+          // On a narrow viewport the palette is a slide-over sheet, so open it before moving focus into it.
+          setMobilePanel('palette');
+          window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="logic-palette"] button.logic-palette-button')?.focus());
+          break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [runStep]);
 
   const handleDropComponent = useCallback((type: ComponentType, worldX: number, worldY: number) => {
     setHistory((prev) => commit(prev, `Add ${type}`, (doc) => addComponent(doc, type, Math.round(worldX), Math.round(worldY))));
@@ -516,18 +551,7 @@ export default function LogicWorkspace() {
         />
       ) : null}
 
-      {activeDock === 'shortcuts' ? (
-        <section className="logic-dock" aria-label="Keyboard shortcuts" data-testid="logic-shortcuts-dock">
-          <dl className="logic-shortcut-list">
-            {KEYBOARD_SHORTCUTS.map((shortcut) => (
-              <div className="logic-shortcut-row" key={shortcut.keys}>
-                <dt>{shortcut.keys}</dt>
-                <dd>{shortcut.action}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ) : null}
+      {activeDock === 'shortcuts' ? <LogicShortcutsDock shortcuts={shortcuts} onChange={setShortcuts} /> : null}
 
       {mobilePanel !== 'none' ? <button type="button" className="logic-mobile-backdrop" aria-label="Close panel" onClick={() => setMobilePanel('none')} /> : null}
     </div>

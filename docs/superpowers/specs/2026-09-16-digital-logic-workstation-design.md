@@ -112,7 +112,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 ### Ergonomics, input model & accessibility
 25. Contextual right-click menu on desktop (rotate 90°, flip horizontal/vertical, duplicate, change bit width, delete, inspect net) and an accessible long-press radial menu on touch. *(Phase 1)*
 26. Non-intrusive, viewport-edge-aware tooltip engine on every tool/pin, suppressed on touch to avoid obstruction (replaced there by tap-and-hold detail). *(Phase 1)*
-27. Keyboard shortcut matrix (wire, rotate, palette focus, play/pause, delete, undo/redo) with a visible reference panel. *(Phase 1: functional default bindings + reference panel; Phase 3: full user remapping UI)*
+27. Keyboard shortcut matrix (wire, rotate, palette focus, play/pause, delete, undo/redo) with a visible reference panel. *(Phase 1: functional default bindings + reference panel; Phase 3: full user remapping UI — delivered in 3D)*
 28. Accessible high-contrast / OLED-dark / paper-light / deuteranopia-and-protanopia-safe palettes where logic High/Low/Z/contention are distinguished by shape and pattern as well as hue. *(Phase 1)*
 
 ### Export, netlists, HDL & metadata

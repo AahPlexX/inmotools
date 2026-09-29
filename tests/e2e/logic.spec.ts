@@ -229,6 +229,66 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   await expect(ercDock).toContainText('DP');
 });
 
+test('a shortcut can be remapped, a conflicting key is refused, the choice survives a reload, and it can be reset', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 6, 6);
+  await page.getByTestId('logic-canvas').click({ position: { x: 6.25 * GRID, y: 6 * GRID } });
+  const rotation = () => page.evaluate(() => {
+    const raw = window.localStorage.getItem('inmotools_logic_workstation_autosave');
+    return raw ? (JSON.parse(raw) as { components: { rotation: number }[] }).components[0]?.rotation : undefined;
+  });
+
+  // The default binding rotates the selection.
+  await page.keyboard.press('r');
+  await expect.poll(rotation).toBe(90);
+
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  const dock = page.getByTestId('logic-shortcuts-dock');
+  await expect(dock).toBeVisible();
+  const rotateRow = dock.locator('tr[data-action="rotate"]');
+  await expect(rotateRow.locator('kbd')).toHaveText('R');
+
+  // A key another action owns is refused, with the reason; Escape then abandons the attempt.
+  await rotateRow.getByRole('button', { name: /^Change R/ }).click();
+  await expect(page.getByTestId('logic-shortcut-recording')).toBeVisible();
+  await page.keyboard.press('s');
+  await expect(page.getByTestId('logic-shortcut-problem')).toContainText('Advance the clock by one step');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('logic-shortcut-recording')).toBeHidden();
+  await expect(rotateRow.locator('kbd')).toHaveText('R');
+
+  // A free key is accepted. Recording it must not also act on the selection.
+  await rotateRow.getByRole('button', { name: /^Change R/ }).click();
+  await page.keyboard.press('x');
+  await expect(rotateRow.locator('kbd')).toHaveText('X');
+  expect(await rotation()).toBe(90);
+
+  // The old key no longer rotates; the new one does.
+  await page.keyboard.press('r');
+  expect(await rotation()).toBe(90);
+  await page.keyboard.press('x');
+  await expect.poll(rotation).toBe(180);
+
+  // The choice is remembered on this device.
+  await page.reload();
+  await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+  await expect(dock.locator('tr[data-action="rotate"] kbd')).toHaveText('X');
+
+  await dock.getByRole('button', { name: /^Reset Rotate the current selection/ }).click();
+  await expect(dock.locator('tr[data-action="rotate"] kbd')).toHaveText('R');
+});
+
+test('Space on a focused button activates the button without also toggling the simulation', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  const run = page.getByRole('button', { name: /^(Pause|Play)$/ });
+  const before = await run.innerText();
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  await step.focus();
+  await page.keyboard.press('Space');
+  // Step was activated, and the run/pause state did not flip as a side effect.
+  await expect(run).toHaveText(before);
+});
+
 test('Junior Explorer swaps the workstation into a large, color-coded mode with one click and back with another', async ({ page }) => {
   await page.goto('./#/tools/digital-logic-workstation');
   const workspace = page.getByTestId('logic-workspace');
