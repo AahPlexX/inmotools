@@ -1,11 +1,12 @@
-import { isBusPort, portWidth } from './bus-engine';
+import { isBusPort, portBits, portWidth } from './bus-engine';
+import { buildNetlist } from './netlist-engine';
 import { expandedSize, MAX_EXPANDED_COMPONENTS, MAX_SUBCIRCUIT_DEPTH } from './subcircuit-engine';
 import { isMatrixType, matrixSizeOf, pixelRects } from './matrix-engine';
 import { isMemoryType, isValidMemoryParams } from './memory-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { isDisplayType } from './display-engine';
 import { digitGeometries } from './segment-shapes';
-import { BUBBLE_RADIUS, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
+import { BUBBLE_RADIUS, blockCaption, componentBodyRect, componentLabelAnchor, componentWorldBounds, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, documentBoundingBox, portAbsolutePosition, GRID_SIZE } from './geometry';
 import type { ComponentInstance, ComponentType, LogicDocument, PortRef, ThemeName, Wire, WirePoint } from './logic-types';
 
@@ -121,18 +122,77 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
   return parts.join('');
 };
 
-export const renderSchematicSvg = (document: LogicDocument): string => {
+export interface SchematicSvgOptions {
+  /** Writes each part's reference designator (`U1`, `SW2`) above it. */
+  readonly designators?: boolean;
+  /** Writes the name of each named net on one of its wires. */
+  readonly netLabels?: boolean;
+  /** Draws a drawing-sheet border with lettered columns and numbered rows around the schematic. */
+  readonly sheet?: boolean;
+}
+
+/** Room for the sheet border and its zone labels around the schematic. */
+const SHEET_PADDING = 40;
+
+const zoneLabel = (index: number): string => String.fromCharCode(65 + (index % 26));
+
+/** The lettered column and numbered row zones of a drawing sheet, between an outer and an inner frame. */
+const sheetFrame = (totalWidth: number, totalHeight: number): string[] => {
+  const outer = 6;
+  const inner = SHEET_PADDING - 10;
+  const columns = Math.max(2, Math.round((totalWidth - inner * 2) / 160));
+  const rows = Math.max(2, Math.round((totalHeight - inner * 2) / 120));
+  const lines: string[] = [];
+  lines.push(`<rect x="${outer}" y="${outer}" width="${svgNum(totalWidth - outer * 2)}" height="${svgNum(totalHeight - outer * 2)}" fill="none" stroke="#1f2933" stroke-width="1.5" />`);
+  lines.push(`<rect x="${inner}" y="${inner}" width="${svgNum(totalWidth - inner * 2)}" height="${svgNum(totalHeight - inner * 2)}" fill="none" stroke="#1f2933" stroke-width="1" />`);
+  const columnWidth = (totalWidth - inner * 2) / columns;
+  const rowHeight = (totalHeight - inner * 2) / rows;
+  for (let index = 0; index < columns; index += 1) {
+    const x = inner + columnWidth * index;
+    if (index > 0) {
+      lines.push(`<line x1="${svgNum(x)}" y1="${outer}" x2="${svgNum(x)}" y2="${inner}" stroke="#1f2933" stroke-width="1" />`);
+      lines.push(`<line x1="${svgNum(x)}" y1="${svgNum(totalHeight - inner)}" x2="${svgNum(x)}" y2="${svgNum(totalHeight - outer)}" stroke="#1f2933" stroke-width="1" />`);
+    }
+    const center = x + columnWidth / 2;
+    lines.push(`<text x="${svgNum(center)}" y="${svgNum(inner - 7)}" font-size="10" text-anchor="middle" fill="#52606d">${zoneLabel(index)}</text>`);
+    lines.push(`<text x="${svgNum(center)}" y="${svgNum(totalHeight - outer - 6)}" font-size="10" text-anchor="middle" fill="#52606d">${zoneLabel(index)}</text>`);
+  }
+  for (let index = 0; index < rows; index += 1) {
+    const y = inner + rowHeight * index;
+    if (index > 0) {
+      lines.push(`<line x1="${outer}" y1="${svgNum(y)}" x2="${inner}" y2="${svgNum(y)}" stroke="#1f2933" stroke-width="1" />`);
+      lines.push(`<line x1="${svgNum(totalWidth - inner)}" y1="${svgNum(y)}" x2="${svgNum(totalWidth - outer)}" y2="${svgNum(y)}" stroke="#1f2933" stroke-width="1" />`);
+    }
+    const center = y + rowHeight / 2 + 3;
+    lines.push(`<text x="${svgNum((outer + inner) / 2)}" y="${svgNum(center)}" font-size="10" text-anchor="middle" fill="#52606d">${index + 1}</text>`);
+    lines.push(`<text x="${svgNum(totalWidth - (outer + inner) / 2)}" y="${svgNum(center)}" font-size="10" text-anchor="middle" fill="#52606d">${index + 1}</text>`);
+  }
+  return lines;
+};
+
+export const renderSchematicSvg = (document: LogicDocument, options: SchematicSvgOptions = {}): string => {
   const box = documentBoundingBox(document.components);
   const margin = GRID_SIZE * 2;
   const titleBlockHeight = 72;
+  const pad = options.sheet ? SHEET_PADDING : 0;
   const width = Math.max(1, box.maxX - box.minX) + margin * 2;
   const height = Math.max(1, box.maxY - box.minY) + margin * 2 + titleBlockHeight;
+  const totalWidth = width + pad * 2;
+  const totalHeight = height + pad * 2;
   const offsetX = margin - box.minX;
   const offsetY = margin - box.minY;
 
   const parts: string[] = [];
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgNum(width)}" height="${svgNum(height)}" viewBox="0 0 ${svgNum(width)} ${svgNum(height)}" font-family="ui-monospace, Menlo, Consolas, monospace">`);
-  parts.push(`<rect x="0" y="0" width="${svgNum(width)}" height="${svgNum(height)}" fill="#ffffff" />`);
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgNum(totalWidth)}" height="${svgNum(totalHeight)}" viewBox="0 0 ${svgNum(totalWidth)} ${svgNum(totalHeight)}" font-family="ui-monospace, Menlo, Consolas, monospace">`);
+  parts.push(`<rect x="0" y="0" width="${svgNum(totalWidth)}" height="${svgNum(totalHeight)}" fill="#ffffff" />`);
+  if (options.sheet) parts.push(...sheetFrame(totalWidth, totalHeight));
+  if (pad > 0) parts.push(`<g transform="translate(${pad},${pad})">`);
+
+  // The reference designators and net names come from the same netlist the text exporters use.
+  const netlist = options.designators || options.netLabels ? buildNetlist(document) : undefined;
+  const partById = new Map((netlist?.parts ?? []).map((part) => [part.id, part] as const));
+  const labeledNets = new Set<number>();
+  const netLabels: string[] = [];
 
   for (const wire of document.wires) {
     const fromComponent = document.components.find((component) => component.id === wire.from.componentId);
@@ -158,9 +218,37 @@ export const renderSchematicSvg = (document: LogicDocument): string => {
       parts.push(`<text x="${svgNum(mx)}" y="${svgNum(my - 8)}" font-size="9" text-anchor="middle" fill="#1f2933">${busWidth}</text>`);
     }
     for (const point of wire.waypoints) parts.push(`<circle cx="${svgNum(point.x + offsetX)}" cy="${svgNum(point.y + offsetY)}" r="2" fill="#1f2933" />`);
+
+    // A named net is labelled once, on the longest run of the first wire found for it.
+    const netPart = partById.get(fromComponent.id);
+    if (options.netLabels && netlist && netPart) {
+      const pinId = fromPort.bus ? portBits(fromPort)[0]! : fromPort.id;
+      const pin = netPart.pins.find((candidate) => candidate.id === pinId);
+      const net = pin ? netlist.nets[pin.net] : undefined;
+      if (net && pin && !labeledNets.has(net.index) && net.members.length >= 2 && !/^n\d+$/.test(net.name)) {
+        labeledNets.add(net.index);
+        let best = { length: -1, from: allPoints[0]!, to: allPoints[1]! };
+        for (let index = 0; index < allPoints.length - 1; index += 1) {
+          const length = Math.hypot(allPoints[index + 1]!.x - allPoints[index]!.x, allPoints[index + 1]!.y - allPoints[index]!.y);
+          if (length > best.length) best = { length, from: allPoints[index]!, to: allPoints[index + 1]! };
+        }
+        const text = net.bit === undefined ? net.name : `${net.name}[${net.bit}]`;
+        netLabels.push(`<text x="${svgNum((best.from.x + best.to.x) / 2 + offsetX)}" y="${svgNum((best.from.y + best.to.y) / 2 + offsetY - 4)}" font-size="8" text-anchor="middle" fill="#1d4ed8">${escapeXml(text)}</text>`);
+      }
+    }
   }
 
   for (const component of document.components) parts.push(renderComponentSvg(component, offsetX, offsetY));
+  parts.push(...netLabels);
+
+  if (options.designators) {
+    for (const component of document.components) {
+      const part = partById.get(component.id);
+      if (!part) continue;
+      const bounds = componentWorldBounds(component, getComponentPorts(component.type, component.params));
+      parts.push(`<text x="${svgNum(bounds.minX + offsetX)}" y="${svgNum(bounds.minY + offsetY - 5)}" font-size="9" font-weight="700" fill="#9a3412">${escapeXml(part.ref)}</text>`);
+    }
+  }
 
   const meta = document.metadata;
   const titleY = height - titleBlockHeight;
@@ -170,6 +258,7 @@ export const renderSchematicSvg = (document: LogicDocument): string => {
   if (meta.description) parts.push(`<text x="12" y="${svgNum(titleY + 38)}" font-size="11">${escapeXml(meta.description)}</text>`);
   parts.push(`<text x="12" y="${svgNum(titleY + 58)}" font-size="10" fill="#52606d">Author: ${escapeXml(meta.author || '—')}   Version: ${escapeXml(meta.version)}   License: ${escapeXml(meta.license)}</text>`);
   parts.push('</g>');
+  if (pad > 0) parts.push('</g>');
   parts.push('</svg>');
   return parts.join('\n');
 };

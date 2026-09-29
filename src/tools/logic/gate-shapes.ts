@@ -118,6 +118,14 @@ const worldBodyCorners = (component: ComponentInstance, ports: readonly PortDefi
   });
 };
 
+/** The box a component's drawn body fills in world pixels, after the same mirror-then-rotate the renderers apply. */
+export const componentWorldBounds = (component: ComponentInstance, ports: readonly PortDefinition[]): { readonly minX: number; readonly minY: number; readonly maxX: number; readonly maxY: number } => {
+  const corners = worldBodyCorners(component, ports);
+  const xs = corners.map((corner) => corner.x);
+  const ys = corners.map((corner) => corner.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+};
+
 /**
  * Where a component's instance label is centered, in world pixels: just below
  * the lowest edge of the body as it actually appears on screen, so a rotated
