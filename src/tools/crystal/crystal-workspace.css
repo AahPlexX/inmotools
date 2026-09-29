@@ -504,3 +504,15 @@
 .crystal-analysis-preview text {
   font-family: inherit;
 }
+
+
+.crystal-supercell-apply {
+  min-height: 44px;
+  scroll-margin-block: 5rem;
+}
+
+@media (max-width: 760px) {
+  .crystal-supercell-apply {
+    width: 100%;
+  }
+}
