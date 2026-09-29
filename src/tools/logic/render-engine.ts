@@ -1,6 +1,6 @@
 import { isBlockType } from './block-engine';
 import { getComponentPorts } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble } from './gate-shapes';
+import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
 import { readLevel } from './sim-engine';
 import type {
@@ -376,11 +376,11 @@ export const renderScene = (
 
     // The instance label sits under the drawn body for every family; placing
     // it by center-line arithmetic put it on top of gate and register edges.
-    const labelBody = componentBodyRect(component, ports);
+    const labelAnchor = componentLabelAnchor(component, ports);
     ctx.fillStyle = palette.label;
     ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(component.label, origin.x + labelBody.x + labelBody.width / 2, origin.y + labelBody.y + labelBody.height + 14);
+    ctx.fillText(component.label, labelAnchor.x, labelAnchor.y);
   }
 
   if (input.marqueeRect) {

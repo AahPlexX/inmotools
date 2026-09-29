@@ -1,6 +1,6 @@
 import { BLOCK_WIDTH_COLS, blockTitle, isBlockType } from './block-engine';
 import { isSequential } from './component-library';
-import { GRID_SIZE } from './geometry';
+import { GRID_SIZE, componentOriginPixels, rotatePoint, type Point } from './geometry';
 import type { ComponentInstance, ComponentType, PortDefinition } from './logic-types';
 
 /** Shared shape constants so the Canvas2D renderer and the SVG exporter draw identical gate bodies. */
@@ -64,4 +64,25 @@ export const componentBodyRect = (component: ComponentInstance, ports: readonly 
   const isIo = component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE';
   if (isIo) return { x: -GRID_SIZE * 0.2, y: -GRID_SIZE * 0.7, width: GRID_SIZE * 1.6, height: GRID_SIZE * 1.4 };
   return { x: 0, y: 0, width: GATE_WIDTH + BUBBLE_RADIUS * 2, height };
+};
+
+/**
+ * Where a component's instance label is centered, in world pixels: just below
+ * the lowest edge of the body as it actually appears on screen. The local body
+ * corners go through the same mirror-then-rotate transform the renderers apply,
+ * so a rotated or mirrored part keeps its label beside the drawn body instead
+ * of under the pre-rotation rectangle.
+ */
+export const componentLabelAnchor = (component: ComponentInstance, ports: readonly PortDefinition[]): Point => {
+  const body = componentBodyRect(component, ports);
+  const origin = componentOriginPixels(component);
+  const corners: Point[] = [
+    { x: body.x, y: body.y },
+    { x: body.x + body.width, y: body.y },
+    { x: body.x, y: body.y + body.height },
+    { x: body.x + body.width, y: body.y + body.height },
+  ].map((corner) => rotatePoint(component.mirrored ? { x: -corner.x, y: corner.y } : corner, component.rotation));
+  const xs = corners.map((corner) => corner.x);
+  const maxY = Math.max(...corners.map((corner) => corner.y));
+  return { x: origin.x + (Math.min(...xs) + Math.max(...xs)) / 2, y: origin.y + maxY + 14 };
 };

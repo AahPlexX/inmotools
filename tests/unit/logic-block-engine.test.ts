@@ -10,7 +10,8 @@ import {
   isBlockType,
   selectBitsOf,
 } from '../../src/tools/logic/block-engine';
-import { addComponent, addWire, createInitialDocument, relabelComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
+import { addComponent, addWire, createInitialDocument, mirrorComponent, relabelComponent, rotateComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
+import { componentLabelAnchor } from '../../src/tools/logic/gate-shapes';
 import { clampInputCount, COMPONENT_CATEGORIES, getComponentPorts } from '../../src/tools/logic/component-library';
 import { parseProject, renderSchematicSvg, serializeProject } from '../../src/tools/logic/export-engine';
 import type { ComponentParams, LogicDocument, LogicLevel } from '../../src/tools/logic/logic-types';
@@ -339,6 +340,38 @@ describe('block model and export integration', () => {
     expect(svg).toContain('>S0<');
     expect(svg).toContain('>Y<');
     expect(svg).not.toContain('NaN');
+  });
+
+  it('keeps the instance label beside the drawn body when a block is rotated or mirrored', () => {
+    let doc: LogicDocument = createInitialDocument();
+    doc = addComponent(doc, 'MUX', 4, 4);
+    const id = doc.components[0]!.id;
+    const anchorOf = (document: LogicDocument) => {
+      const component = document.components[0]!;
+      return componentLabelAnchor(component, getComponentPorts(component.type, component.params));
+    };
+    const upright = anchorOf(doc);
+    // Mirroring flips x about the origin: the label center follows the body to the left of it.
+    const mirrored = anchorOf(mirrorComponent(doc, id));
+    expect(mirrored.x).toBeLessThan(upright.x);
+    expect(mirrored.y).toBeCloseTo(upright.y);
+    // A quarter turn maps the 3-column-wide body onto the y-axis, so the label sits 14px under a
+    // 72px vertical extent measured from the component origin (grid row 4 = 96px).
+    const turned = anchorOf(rotateComponent(doc, id));
+    expect(turned.y).toBeCloseTo(4 * 24 + 3 * 24 + 14);
+    expect(turned.y).toBeLessThan(upright.y);
+    expect(turned.x).not.toBeCloseTo(upright.x);
+  });
+
+  it('exports a block caption that undoes the mirror and half-turn so it never reads backwards', () => {
+    let doc: LogicDocument = createInitialDocument();
+    doc = addComponent(doc, 'MUX', 4, 4);
+    const id = doc.components[0]!.id;
+    expect(renderSchematicSvg(doc)).toMatch(/<text transform="translate\([^)]*\) rotate\(0\) scale\(1,1\)"[^>]*>MUX 4:1</);
+    const mirrored = renderSchematicSvg(mirrorComponent(doc, id));
+    expect(mirrored).toMatch(/rotate\(0\) scale\(-1,1\)"[^>]*>MUX 4:1</);
+    const halfTurn = renderSchematicSvg(rotateComponent(rotateComponent(doc, id), id));
+    expect(halfTurn).toMatch(/rotate\(180\) scale\(1,1\)"[^>]*>MUX 4:1</);
   });
 
   it('escapes hostile text in a block label inside the exported SVG', () => {

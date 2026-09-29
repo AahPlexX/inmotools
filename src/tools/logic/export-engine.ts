@@ -1,6 +1,6 @@
 import { isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble } from './gate-shapes';
+import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble } from './gate-shapes';
 import { componentOriginPixels, documentBoundingBox, portAbsolutePosition, GRID_SIZE } from './geometry';
 import type { ComponentInstance, ComponentType, LogicDocument, PortRef, ThemeName, Wire, WirePoint } from './logic-types';
 
@@ -71,7 +71,9 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
   } else if (isBlockType(component.type)) {
     const body = blockBodyRect(ports);
     parts.push(`<rect x="${body.x}" y="${body.y}" width="${body.width}" height="${body.height}" fill="${GATE_FILL}" stroke="${GATE_STROKE}" stroke-width="1.5" />`);
-    parts.push(`<text x="${body.width / 2}" y="${body.y - 6}" font-size="11" font-weight="700" text-anchor="middle" fill="${GATE_STROKE}">${escapeXml(blockCaption(component))}</text>`);
+    // Undo the group's mirror and 180-degree turn for the text alone, as the canvas does, so the caption never reads backwards or upside down.
+    const captionTurn = component.rotation === 180 ? 180 : 0;
+    parts.push(`<text transform="translate(${svgNum(body.width / 2)},${svgNum(body.y - 6)}) rotate(${captionTurn}) scale(${scaleX},1)" font-size="11" font-weight="700" text-anchor="middle" fill="${GATE_STROKE}">${escapeXml(blockCaption(component))}</text>`);
   } else if (isSequential(component.type)) {
     parts.push(`<rect x="0" y="${-GRID_SIZE * 0.5}" width="${width}" height="${height + GRID_SIZE}" fill="${GATE_FILL}" stroke="${GATE_STROKE}" stroke-width="1.5" />`);
     parts.push(`<text x="${width / 2}" y="${height / 2}" font-size="11" text-anchor="middle" fill="${GATE_STROKE}">${escapeXml(GATE_ABBREVIATION[component.type] ?? component.type)}</text>`);
@@ -86,12 +88,8 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
     parts.push(`<circle cx="${px}" cy="${py}" r="2.5" fill="${port.direction === 'output' ? '#0f766e' : '#1f2933'}" />`);
     parts.push(`<text x="${px + (port.direction === 'output' ? 6 : -6)}" y="${py - 6}" font-size="9" text-anchor="${port.direction === 'output' ? 'start' : 'end'}" fill="#52606d">${escapeXml(port.label)}</text>`);
   }
-  if (isBlockType(component.type)) {
-    const body = blockBodyRect(ports);
-    parts.push(`<text x="${svgNum(cx + body.width / 2)}" y="${svgNum(cy + body.y + body.height + 14)}" font-size="10" text-anchor="middle" fill="#334155">${escapeXml(component.label)}</text>`);
-  } else {
-    parts.push(`<text x="${cx}" y="${cy + height / 2 + 14}" font-size="10" text-anchor="middle" fill="#334155">${escapeXml(component.label)}</text>`);
-  }
+  const labelAnchor = componentLabelAnchor(component, ports);
+  parts.push(`<text x="${svgNum(labelAnchor.x + offsetX)}" y="${svgNum(labelAnchor.y + offsetY)}" font-size="10" text-anchor="middle" fill="#334155">${escapeXml(component.label)}</text>`);
   return parts.join('');
 };
 
