@@ -2,16 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { downloadBlob } from '../../../lib/download';
 import { FIELD_GROUPS, FIELD_GROUP_LABELS, type ExportMetadata, type FieldGroup, type LocationProfile } from '../core/types';
-import { buildCsv, buildIcs, buildJson, fileSlug, resolveMetadata, type ResolvedMetadata } from '../export/formats';
+import { buildCsv, buildGeoJson, buildIcs, buildJson, buildKml, fileSlug, resolveMetadata, type ResolvedMetadata } from '../export/formats';
 import { buildPdf, buildZip, bundleReadme, canvasToPng, cardModel, drawCard, injectPngText, pngTextEntries, svgSize, svgToPng } from '../export/binary';
 import { parseTagInput } from '../net/store';
 import { formatTime } from './format';
 import { saveWithPicker, supportsSavePicker } from './hooks';
 
-type Format = 'json' | 'csv' | 'pdf' | 'ics' | 'png' | 'svg' | 'card';
+type Format = 'json' | 'geojson' | 'kml' | 'csv' | 'pdf' | 'ics' | 'png' | 'svg' | 'card';
 
 const FORMATS: Array<{ id: Format; label: string; tip: string; multi: boolean }> = [
   { id: 'json', label: 'JSON with full provenance', tip: 'Every value with source, record ID, reference year, retrieval time, license and confidence class', multi: true },
+  { id: 'geojson', label: 'GeoJSON', tip: 'Points for QGIS, geojson.io, Leaflet or any GIS tool (RFC 7946), with every value and its provenance', multi: true },
+  { id: 'kml', label: 'KML', tip: 'Placemarks for Google Earth and most GPS and mapping apps', multi: true },
   { id: 'csv', label: 'CSV (flat)', tip: 'One row per location; choose which field groups become columns', multi: true },
   { id: 'pdf', label: 'PDF location brief', tip: 'A printable brief with your title, author, tags and every source listed', multi: false },
   { id: 'ics', label: 'iCalendar holidays (.ics)', tip: 'Public holidays as all-day events for any calendar app', multi: false },
@@ -36,7 +38,7 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
   const [withProvenance, setWithProvenance] = useState(false);
   const [calendarName, setCalendarName] = useState('');
   const [scale, setScale] = useState(2);
-  const [bundle, setBundle] = useState<Format[]>(['json', 'csv', 'pdf', 'ics', 'png', 'svg', 'card']);
+  const [bundle, setBundle] = useState<Format[]>(['json', 'geojson', 'kml', 'csv', 'pdf', 'ics', 'png', 'svg', 'card']);
   const [busy, setBusy] = useState<string | null>(null);
   const [askWhere, setAskWhere] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
@@ -73,6 +75,8 @@ export function ExportDialog({ profiles, metadata, onMetadata, mapSvg, onClose, 
   const make = async (format: Format): Promise<{ name: string; blob: Blob }> => {
     switch (format) {
       case 'json': return { name: `${base}.json`, blob: new Blob([buildJson(profiles, resolved)], { type: 'application/json' }) };
+      case 'geojson': return { name: `${base}.geojson`, blob: new Blob([buildGeoJson(profiles, resolved)], { type: 'application/geo+json' }) };
+      case 'kml': return { name: `${base}.kml`, blob: new Blob([buildKml(profiles, resolved)], { type: 'application/vnd.google-earth.kml+xml' }) };
       case 'csv': return { name: `${base}.csv`, blob: new Blob([buildCsv(profiles, resolved, { groups, provenance: withProvenance })], { type: 'text/csv;charset=utf-8' }) };
       case 'pdf': return { name: `${base}.pdf`, blob: await buildPdf(primary, resolved, timeFmt) };
       case 'ics': return { name: `${base}-holidays.ics`, blob: new Blob([buildIcs(primary, resolved, calendarName)], { type: 'text/calendar;charset=utf-8' }) };

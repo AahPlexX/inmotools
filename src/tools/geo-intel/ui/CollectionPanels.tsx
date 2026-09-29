@@ -105,7 +105,7 @@ export interface HistoryHandlers {
   onMenu: (item: StoredProfile, x: number, y: number) => void;
 }
 
-export function HistoryPanel({ items, handlers }: { items: StoredProfile[]; handlers: HistoryHandlers }) {
+export function HistoryPanel({ items, handlers, onImport }: { items: StoredProfile[]; handlers: HistoryHandlers; onImport: (file: File) => void }) {
   const [filter, setFilter] = useState('');
   const [starredOnly, setStarredOnly] = useState(false);
   const visible = useMemo(() => items.filter((item) => (!starredOnly || item.starred) && `${item.name} ${item.profile.query} ${item.tags.join(' ')}`.toLowerCase().includes(filter.trim().toLowerCase())), [items, filter, starredOnly]);
@@ -113,6 +113,9 @@ export function HistoryPanel({ items, handlers }: { items: StoredProfile[]; hand
     <div data-testid="gi-history">
       <div className="gi-inline">
         <label className="gi-field compact grow"><span>Search history</span><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Name, query or #tag" /></label>
+        <label className="gi-btn file" data-tip="Restore locations from a Geo Intelligence Hub JSON export (e.g. from another device)">Import JSON…
+          <input type="file" accept=".json,application/json" className="gi-visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = ''; }} />
+        </label>
         <label className="gi-check"><input type="checkbox" checked={starredOnly} onChange={(event) => setStarredOnly(event.target.checked)} /> Starred only</label>
       </div>
       <p className="gi-muted">The last 50 lookups are kept on this device; starred ones are kept until you delete them. Nothing is uploaded.</p>

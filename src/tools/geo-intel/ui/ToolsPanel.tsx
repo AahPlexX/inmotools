@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icon';
-import { formatDD, formatDDM, formatDMS, formatUtm, toMgrs } from '../core/coords';
+import { antipode, encodeGeohash, formatDD, formatDDM, formatDMS, formatUtm, toMaidenhead, toMgrs } from '../core/coords';
 import { bboxAreaKm2, compassPoint, distanceKm, finalBearing, initialBearing, midpoint } from '../core/geodesy';
 import { decode, describeArea, encode, isFull, isShort, recoverNearest, shorten } from '../core/olc';
 import { parseQuery } from '../core/query-parser';
@@ -27,6 +27,9 @@ export function allFormats(point: LatLon): Array<[string, string, string]> {
     ['DMS', formatDMS(point), 'Degrees, minutes and seconds with hemisphere letters.'],
     ['DDM', formatDDM(point), 'Degrees and decimal minutes (common on GPS units and charts).'],
     ['Plus Code', encode(point.lat, point.lon, 11), 'Open Location Code at 11 digits (≈3 m cell).'],
+    ['Geohash', encodeGeohash(point, 9), 'Geohash at 9 characters (≈5 m cell); search it as “gh:…”.'],
+    ['Maidenhead', toMaidenhead(point, 4), 'IARU locator for amateur radio; search it as “grid:…”.'],
+    ['Antipode', formatDD(antipode(point)), 'The point on the exact opposite side of the Earth.'],
   ];
   if (point.lat >= -80 && point.lat <= 84) {
     out.push(['UTM', formatUtm(point), 'Universal Transverse Mercator: zone, latitude band, easting and northing in metres.']);

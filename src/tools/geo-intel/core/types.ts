@@ -212,6 +212,8 @@ export interface LocationProfile {
   bbox: BBox | null;
   warnings: string[];
   sourcesUsed: SourceId[];
+  /** Other search matches the user can switch to. */
+  alternatives?: Array<{ label: string; lat: number; lon: number }>;
 }
 
 export interface ExportMetadata {

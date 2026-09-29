@@ -18,11 +18,11 @@ export function fieldHelp(item: ProfileField): string {
 export function FieldRow({ item, zone, units, onInspect }: { item: ProfileField; zone: string | null; units: Units; onInspect: (key: string) => void }) {
   return (
     <div className="gi-row" data-field={item.key}>
-      <dt data-tip={fieldHelp(item)} tabIndex={0}>{item.label}</dt>
+      <dt data-tip={fieldHelp(item)}>{item.label}</dt>
       <dd>
         <span className="gi-value">{displayValue(item, zone, units)}</span>
         {item.reference_year ? <span className="gi-year">{item.reference_year}</span> : null}
-        <button type="button" className="gi-prov" aria-label={`Provenance for ${item.label}`} data-tip="Source, record ID, year, license and confidence for this value" onClick={() => onInspect(item.key)}><Icon name="info" /></button>
+        <button type="button" className="gi-prov" aria-label={`Provenance for ${item.label}`} data-tip={`${fieldHelp(item)} Press for the full record.`} onClick={() => onInspect(item.key)}><Icon name="info" /></button>
       </dd>
     </div>
   );
@@ -31,7 +31,7 @@ export function FieldRow({ item, zone, units, onInspect }: { item: ProfileField;
 function Card({ title, tip, children, id }: { title: string; tip: string; children: ReactNode; id: string }) {
   return (
     <section className="gi-card" aria-labelledby={`gi-card-${id}`}>
-      <h3 id={`gi-card-${id}`} data-tip={tip} tabIndex={0}>{title}</h3>
+      <h3 id={`gi-card-${id}`} data-tip={tip}>{title}</h3>
       {children}
     </section>
   );
@@ -101,13 +101,17 @@ function DaylightBar({ profile }: { profile: LocationProfile }) {
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, i, 1))));
 
-function HolidaysCard({ profile, onExportIcs, onExportCsv }: { profile: LocationProfile; onExportIcs: () => void; onExportCsv: () => void }) {
+function HolidaysCard({ profile, onExportIcs, onExportCsv, onYear }: { profile: LocationProfile; onExportIcs: () => void; onExportCsv: () => void; onYear: (year: number) => void }) {
   const [month, setMonth] = useState<number | 'all'>('all');
   const calendar = profile.holidays;
   if (!calendar) return null;
   const items = calendar.items.filter((item) => month === 'all' || Number(item.date.slice(5, 7)) === month + 1);
   return (
     <Card id="holidays" title={`Public holidays ${calendar.year}`} tip={GROUP_TIPS.holidays}>
+      <div className="gi-inline">
+        <button type="button" className="gi-btn small" onClick={() => onYear(calendar.year - 1)} aria-label={`Holidays for ${calendar.year - 1}`} data-tip="Previous year">‹ {calendar.year - 1}</button>
+        <button type="button" className="gi-btn small" onClick={() => onYear(calendar.year + 1)} aria-label={`Holidays for ${calendar.year + 1}`} data-tip="Next year">{calendar.year + 1} ›</button>
+      </div>
       <div className="gi-chips" role="group" aria-label="Filter holidays by month">
         <button type="button" aria-pressed={month === 'all'} onClick={() => setMonth('all')}>All</button>
         {MONTHS.map((label, i) => <button key={label} type="button" aria-pressed={month === i} onClick={() => setMonth(i)} data-tip={`Holidays in ${label}`}>{label}</button>)}
@@ -154,6 +158,11 @@ export interface ProfilePanelProps {
   onExportIcs: () => void;
   onExportHolidayCsv: () => void;
   onMenu: (x: number, y: number) => void;
+  onShare: () => void;
+  onPickAlternative: (alt: { label: string; lat: number; lon: number }) => void;
+  onCopySummary: () => void;
+  onSolarDate: (date: string) => void;
+  onHolidayYear: (year: number) => void;
 }
 
 export function ProfilePanel(props: ProfilePanelProps) {
@@ -190,8 +199,16 @@ export function ProfilePanel(props: ProfilePanelProps) {
           <button type="button" className="gi-btn" aria-pressed={props.pinned} onClick={props.onPin} data-tip="Add to the side-by-side comparison (up to 6)">{props.pinned ? 'In comparison' : 'Compare'}</button>
           <button type="button" className="gi-btn" aria-pressed={props.starred} onClick={props.onStar} data-tip="Starred locations are never removed from history"><Icon name={props.starred ? 'star' : 'starOutline'} />{props.starred ? 'Starred' : 'Star'}</button>
           <button type="button" className="gi-btn" onClick={() => props.onInspect(null)} data-tip="Open the provenance inspector for every value">Provenance</button>
+          <button type="button" className="gi-btn" onClick={props.onShare} data-tip="Copy a link that re-runs this lookup (nothing is uploaded; the link holds only the query)">Share link</button>
+          <button type="button" className="gi-btn" onClick={props.onCopySummary} data-tip="Copy a short plain-text summary for notes or messages">Copy summary</button>
           <button type="button" className="gi-btn" onClick={props.onRefresh} data-tip="Look this location up again (cached answers are reused until they expire)">Refresh</button>
         </div>
+        {profile.alternatives?.length ? (
+          <div className="gi-alternatives">
+            <p>Not the right place? Other matches:</p>
+            <div className="gi-chips">{profile.alternatives.map((alt) => <button key={`${alt.lat},${alt.lon}`} type="button" onClick={() => props.onPickAlternative(alt)} data-tip={`${alt.lat.toFixed(4)}, ${alt.lon.toFixed(4)}`}>{alt.label}</button>)}</div>
+          </div>
+        ) : null}
         {profile.warnings.length ? (
           <details className="gi-warnings">
             <summary>{profile.warnings.length} note{profile.warnings.length === 1 ? '' : 's'} about this result</summary>
@@ -221,13 +238,20 @@ export function ProfilePanel(props: ProfilePanelProps) {
           if (!content.length) return null;
           return (
             <Card key={group} id={group} title={FIELD_GROUP_LABELS[group]} tip={GROUP_TIPS[group]}>
-              {group === 'solar' ? <DaylightBar profile={profile} /> : null}
+              {group === 'solar' ? (
+                <>
+                  <label className="gi-field compact"><span>Date</span>
+                    <input key={profile.id} type="date" defaultValue={profile.solar?.solarNoon?.slice(0, 10) ?? ''} min="1900-01-01" max="2100-12-31" onChange={(event) => { if (event.target.value) props.onSolarDate(event.target.value); }} data-tip="Show sun, twilight and moon times for another day at this place" />
+                  </label>
+                  <DaylightBar profile={profile} />
+                </>
+              ) : null}
               <dl className="gi-rows">{content}</dl>
               {group === 'solar' ? <p className="gi-source">Sun times: <a href={SOURCES[profile.solar?.provenance.source ?? 'sunrise-sunset-org'].homepage || 'https://sunrise-sunset.org/'} target="_blank" rel="noreferrer">{SOURCES[profile.solar?.provenance.source ?? 'sunrise-sunset-org'].name}</a></p> : null}
             </Card>
           );
         })}
-        <HolidaysCard profile={profile} onExportIcs={props.onExportIcs} onExportCsv={props.onExportHolidayCsv} />
+        <HolidaysCard profile={profile} onExportIcs={props.onExportIcs} onExportCsv={props.onExportHolidayCsv} onYear={props.onHolidayYear} />
 
         <Card id="nearby" title="Nearby places" tip="Populated places from the bundled Natural Earth table within the chosen radius (works offline).">
           <label className="gi-range">

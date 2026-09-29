@@ -13,6 +13,8 @@ export interface AdapterResult {
   recordId: string | null;
   retrievedAt: string;
   stale: boolean;
+  /** Other candidates from a search (label + point), best first. */
+  alternatives?: Array<{ label: string; lat: number; lon: number }>;
 }
 
 export const num = (value: unknown): number | null => {

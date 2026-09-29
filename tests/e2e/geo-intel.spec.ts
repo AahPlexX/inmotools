@@ -11,6 +11,7 @@ const ROUTES: Array<[RegExp, string]> = [
   [/api\.worldbank\.org\/v2\/country\/all\//, 'worldbank-all-density.json'],
   [/api\.worldbank\.org\/v2\/country\/DEU/, 'worldbank-de.json'],
   [/date\.nager\.at\/api\/v3\/PublicHolidays\/\d+\/DE/, 'nager-2026-de.json'],
+  [/api\.sunrisesunset\.io/, 'sunrisesunset-io.json'],
   [/gisco-services\.ec\.europa\.eu/, 'gisco-nuts-berlin.json'],
   [/demo_r_pjanaggr3/, 'eurostat-pop-de300.json'],
   [/demo_r_d3dens/, 'eurostat-dens-de300.json'],
@@ -90,7 +91,7 @@ test('shows tooltips on hover and a viewport-safe context menu on right-click', 
   await page.getByRole('region', { name: 'Resolved location' }).click({ button: 'right', position: { x: 5, y: 5 } });
   const menu = page.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: 'Copy coordinates' })).toBeFocused();
-  await expect(menu.getByRole('menuitem')).toHaveText(['Copy coordinates', 'Open in OpenStreetMap', 'Star', 'Add to comparison', 'Export this location…', 'Delete from history']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Copy coordinates', 'Copy summary as text', 'Copy share link', 'Open in OpenStreetMap', 'Star', 'Add to comparison', 'Export this location…', 'Delete from history']);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
 });
@@ -199,3 +200,46 @@ for (const width of [320, 375, 768, 1024, 1440, 1920, 2560]) {
     await page.screenshot({ path: test.info().outputPath(`layout-${width}.png`), fullPage: false });
   });
 }
+
+test('opens a shared link, offers other matches, and switches sun date and holiday year', async ({ page }) => {
+  await mockNetwork(page);
+  await page.goto('./#/tools/geo-intelligence-hub?q=Berlin');
+  await expect(page.getByTestId('gi-profile-title')).toHaveText('Berlin, Germany', { timeout: 20_000 });
+  expect(page.url()).toContain('?q=Berlin');
+  const profile = page.getByTestId('gi-profile');
+  await expect(profile.locator('[data-field="codes.geohash"]')).toBeVisible();
+  await expect(profile.locator('[data-field="solar.moonPhase"]')).toBeVisible();
+  await profile.getByLabel('Date').fill('2026-12-21');
+  await expect(page.getByRole('status').filter({ hasText: 'Sun times for 2026-12-21.' }).first()).toBeAttached();
+  await profile.getByRole('button', { name: 'Holidays for 2027' }).click();
+  await expect(profile.getByRole('heading', { name: 'Public holidays 2027' })).toBeVisible();
+});
+
+test('exports GeoJSON and KML, and re-imports its own JSON', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  await page.getByRole('button', { name: 'Export…' }).click();
+  const dialog = page.getByTestId('gi-export');
+  const [geojson] = await Promise.all([page.waitForEvent('download'), dialog.getByTestId('gi-export-geojson').click()]);
+  const geo = JSON.parse(readFileSync(await geojson.path(), 'utf8'));
+  expect(geo.features[0].geometry.coordinates[0]).toBeCloseTo(13.395, 2);
+  const [kml] = await Promise.all([page.waitForEvent('download'), dialog.getByTestId('gi-export-kml').click()]);
+  expect(readFileSync(await kml.path(), 'utf8')).toContain('<Placemark');
+  const [json] = await Promise.all([page.waitForEvent('download'), dialog.getByTestId('gi-export-json').click()]);
+  const jsonPath = await json.path();
+  await dialog.getByRole('button', { name: 'Close export' }).click();
+  await page.getByTestId('gi-tab-history').click();
+  await page.locator('input[type=file][accept*="json"]').setInputFiles(jsonPath);
+  await expect(page.getByRole('status').filter({ hasText: /Imported 1 location/ }).first()).toBeAttached();
+});
+
+test('tabs follow the ARIA arrow-key pattern', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'keyboard pattern checked on desktop');
+  await open(page);
+  await page.getByTestId('gi-tab-profile').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('gi-tab-compare')).toBeFocused();
+  await expect(page.getByTestId('gi-tab-compare')).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End');
+  await expect(page.getByTestId('gi-tab-sources')).toBeFocused();
+});

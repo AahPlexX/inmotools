@@ -263,3 +263,5 @@
   .gi-tabs button { font-size: 0.68rem; padding: 0 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gi-count { display: none; }
 }
+.gi-alternatives p { margin: 0 0 6px; font-size: var(--gi-small); color: #c9d6ea; }
+.gi-alternatives .gi-chips button { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.35); color: #fff; }

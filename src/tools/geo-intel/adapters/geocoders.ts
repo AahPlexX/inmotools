@@ -103,12 +103,16 @@ function photonResult(feature: PhotonFeature, retrievedAt: string, stale: boolea
 }
 
 export async function photonSearch(client: HttpClient, text: string, signal?: AbortSignal): Promise<AdapterResult | null> {
-  const url = `https://photon.komoot.io/api/?q=${enc(text)}&limit=1&lang=en`;
+  const url = `https://photon.komoot.io/api/?q=${enc(text)}&limit=5&lang=en`;
   const response = await client.get<{ features: PhotonFeature[] }>(url, { source: 'photon', ttlMs: TTL.week, signal });
   const first = response.data.features?.[0];
   if (!first) return null;
   const result = photonResult(first, response.retrievedAt, response.stale, false);
   const extent = first.properties.extent;
+  result.alternatives = response.data.features.slice(1).map((item) => {
+    const p = item.properties;
+    return { label: [p.name, p.city !== p.name ? p.city : null, p.state, p.country].filter(Boolean).join(', '), lat: item.geometry.coordinates[1], lon: item.geometry.coordinates[0] };
+  }).filter((item) => item.label);
   if (extent) result.fields.push(field('location.extent', 'Feature extent (W,N,E,S)', 'location', extent.join(', '), { source: 'photon', geography: result.fields[0].geography_type, confidence: result.confidence, retrievedAt: response.retrievedAt, recordId: result.recordId }));
   return result;
 }

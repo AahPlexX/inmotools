@@ -130,7 +130,7 @@ async function anchorFor(parsed: ParsedQuery, input: ResolveInput, options: Reso
       const country = parsed.country ?? options.settings.defaultPostalCountry;
       const request = normalizePostal(country, parsed.code);
       if (!parsed.country) warnings.push(`No country given; assumed ${country} (change the default in Sources).`);
-      options.onStep?.('Looking up postal code');
+      options.onStep?.('Looking up the postal code…');
       let primary: AdapterResult | null = null;
       if (country === 'GB') primary = await tryAdapter('Postcodes.io', warnings, () => postcodesLookup(options.client, request, options.signal), options.signal);
       if (!primary?.point) primary = await tryAdapter('Zippopotam.us', warnings, () => zippopotamLookup(options.client, request, options.signal), options.signal);
@@ -148,7 +148,7 @@ async function anchorFor(parsed: ParsedQuery, input: ResolveInput, options: Reso
       return { point: primary.point, kind: 'postal', query: parsed.text, confidence: primary.confidence, source: primary.source, geography: 'postal_code', recordId: primary.recordId, note: primary.fields[0]?.note ?? 'Postal code centroid.', primary };
     }
     case 'place': {
-      options.onStep?.('Geocoding place name');
+      options.onStep?.('Finding the place…');
       const primary = await geocodePlace(parsed.text, options, warnings);
       const geography = primary.fields[0]?.geography_type ?? 'locality';
       return { point: primary.point as LatLon, kind: 'place', query: parsed.text, confidence: primary.confidence, source: primary.source, geography, recordId: primary.recordId, note: 'Best single match from the geocoder.', primary };
@@ -281,7 +281,7 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
   const anchor = await anchorFor(parsed, input, options, warnings);
   const { point } = anchor;
   const { client, signal } = options;
-  options.onStep?.('Resolving country and time zone offline');
+  options.onStep?.('Checking country and time zone…');
   const [countryHit, tzHit, nearest] = await Promise.all([countryAt(point), timezoneAt(point), placesNear(point, 50, 1)]);
   const country = countryHit?.country ?? null;
   const countryCode = country?.a2 ?? anchor.primary?.countryCode ?? null;
@@ -290,7 +290,7 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
   const year = Number(dateHere.slice(0, 4));
   const needsReverse = !anchor.primary || anchor.kind === 'plus-code-short';
 
-  options.onStep?.('Querying keyless sources');
+  options.onStep?.('Gathering details from open data sources…');
   const [reverse, ukDepth, elev, solar, wb, holidays, nuts] = await Promise.all([
     needsReverse ? tryAdapter('Reverse geocoding', warnings, async () => (await photonReverse(client, point.lat, point.lon, signal))
       ?? (options.settings.nominatimEnabled ? nominatimReverse(client, point.lat, point.lon, signal) : null), signal) : Promise.resolve(null),
@@ -368,5 +368,6 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
     bbox: null,
     warnings: [...new Set(warnings)],
     sourcesUsed: [...new Set(sourcesUsed)],
+    alternatives: anchor.primary?.alternatives?.length ? anchor.primary.alternatives : undefined,
   };
 }

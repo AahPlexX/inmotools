@@ -3,11 +3,13 @@ import { Icon } from './ui/Icon';
 import { downloadText } from '../../lib/download';
 import { boundaryLayer, featureAt, boundaryAttribution, type AdmLevel } from './adapters/boundaries';
 import { worldBankAllCountries, WB_INDICATORS } from './adapters/statistics';
+import { nagerHolidays, solarTimes } from './adapters/environment';
 import { formatDD } from './core/coords';
 import { field, SOURCES, upsertFields } from './core/sources';
 import { EMPTY_METADATA, type BBox, type ExportMetadata, type LatLon, type LocationProfile } from './core/types';
-import { resolveLocation, type ResolveInput } from './engine/synthesize';
-import { attributionLines, buildHolidayCsv, buildIcs, fileSlug, resolveMetadata, type ResolvedMetadata } from './export/formats';
+import { holidayFields, resolveLocation, solarFields, type ResolveInput } from './engine/synthesize';
+import { attributionLines, buildHolidayCsv, buildIcs, fileSlug, parseProfileImport, resolveMetadata, type ResolvedMetadata } from './export/formats';
+import { localDate } from './core/timezone';
 import { clearHistory, deleteProfile, listProfiles, recordProfile, updateProfileMeta, type StoredProfile } from './net/store';
 import { loadCountryShapes, placesNear, type NearbyPlace } from './offline/static-data';
 import { boundaryPaths, choropleth, countryPaths, emptyScene, exportSvg, type Arc, type CountryPath, type Legend, type MapScene, type Pin } from './render/scene';
@@ -38,6 +40,41 @@ const fitWidth = (profile: LocationProfile) => {
   const confidence = profile.fields.find((item) => item.key === 'location.lat')?.confidence_class;
   return confidence === 'rooftop' || confidence === 'street' ? 3 : confidence === 'postal_centroid' || confidence === 'locality_centroid' ? 6 : 24;
 };
+/** Deep link: #/tools/geo-intelligence-hub?q=… (typed query) or ?ll=lat,lon (map/device point). */
+export function shareHash(profile: LocationProfile): string {
+  const param = profile.queryKind === 'map' || profile.queryKind === 'device' ? `ll=${profile.lat.toFixed(6)},${profile.lon.toFixed(6)}` : `q=${encodeURIComponent(profile.query)}`;
+  return `#/tools/geo-intelligence-hub?${param}`;
+}
+
+export function readShareHash(hash: string): ResolveInput | null {
+  const query = hash.split('?')[1];
+  if (!query) return null;
+  const params = new URLSearchParams(query);
+  const ll = params.get('ll');
+  if (ll) {
+    const [lat, lon] = ll.split(',').map(Number);
+    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { kind: 'map', lat, lon };
+  }
+  const q = params.get('q');
+  return q && q.trim() ? { kind: 'text', text: q.slice(0, 200) } : null;
+}
+
+/** Plain-text summary for pasting into notes, chat or email. */
+export function summaryText(profile: LocationProfile): string {
+  const get = (key: string) => profile.fields.find((item) => item.key === key)?.value;
+  const lines = [
+    profile.label,
+    `${profile.lat.toFixed(6)}, ${profile.lon.toFixed(6)} (Plus Code ${get('codes.plusCode') ?? '—'})`,
+    get('country.name') ? `Country: ${get('country.name')}` : '',
+    profile.adminChain.length > 1 ? `Region: ${profile.adminChain.slice(1).map((level) => level.name).join(' › ')}` : '',
+    profile.timezone ? `Time zone: ${profile.timezone} (${get('tz.offset') ?? ''})` : '',
+    typeof get('elevation.metres') === 'number' ? `Elevation: ${get('elevation.metres')} m` : '',
+    typeof get('wb.SP.POP.TOTL') === 'number' ? `Country population: ${(get('wb.SP.POP.TOTL') as number).toLocaleString('en-US')}` : '',
+    `Sources: ${profile.sourcesUsed.filter((id) => !['computed', 'user', 'device'].includes(id)).join(', ')}`,
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
 const osmUrl = (point: LatLon) => `https://www.openstreetmap.org/?mlat=${point.lat.toFixed(6)}&mlon=${point.lon.toFixed(6)}#map=15/${point.lat.toFixed(6)}/${point.lon.toFixed(6)}`;
 
 export default function GeoIntelWorkspace() {
@@ -80,6 +117,7 @@ export default function GeoIntelWorkspace() {
   const refreshHistory = useCallback(() => listProfiles().then(setHistory).catch(() => undefined), []);
 
   useEffect(() => { refreshHistory(); }, [refreshHistory]);
+  const deepLinked = useRef(false);
   useEffect(() => { loadCountryShapes().then((shapes) => setCountries(countryPaths(shapes))).catch(() => setError('Could not load the bundled world map.')); }, []);
   useEffect(() => { setChoro((c) => ({ ...c, indicator: settings.choroplethIndicator })); }, [settings.choroplethIndicator]);
   useEffect(() => {
@@ -117,16 +155,18 @@ export default function GeoIntelWorkspace() {
     inflight.current?.abort();
     const controller = new AbortController();
     inflight.current = controller;
-    setBusy('Resolving…'); setError(null);
+    setBusy('Looking it up…'); setError(null);
     try {
       const next = await resolveLocation(input, { client, settings, signal: controller.signal, referencePoint: profile ? { lat: profile.lat, lon: profile.lon } : null, onStep: setBusy });
       if (controller.signal.aborted) return;
       show(next);
       await recordProfile(next).catch(() => undefined);
+      // Keep the address bar shareable without adding a history entry per lookup.
+      if (window.location.hash.startsWith('#/tools/geo-intelligence-hub')) window.history.replaceState(null, '', shareHash(next));
       await refreshHistory();
       setTab('profile');
       if (isMobile) setSheetOpen(false);
-      announce(`Resolved ${next.label}.`);
+      announce(`Found ${next.label}.`);
     } catch (caught) {
       if (controller.signal.aborted) return;
       setError((caught as Error).message);
@@ -134,6 +174,58 @@ export default function GeoIntelWorkspace() {
       if (inflight.current === controller) { inflight.current = null; setBusy(null); }
     }
   }, [client, settings, profile, show, refreshHistory, isMobile, announce]);
+
+  // Open a shared link once, on first render.
+  useEffect(() => {
+    if (deepLinked.current) return;
+    deepLinked.current = true;
+    const input = readShareHash(window.location.hash);
+    if (input) { if (input.kind === 'text') setQuery(input.text); run(input); }
+  }, [run]);
+
+  const share = useCallback(async (target: LocationProfile) => {
+    const url = `${window.location.origin}${window.location.pathname}${shareHash(target)}`;
+    const nav = navigator as Navigator & { share?: (data: { title: string; url: string }) => Promise<void> };
+    if (nav.share && matchMedia('(pointer: coarse)').matches) {
+      try { await nav.share({ title: target.label, url }); return; } catch (error) { if ((error as Error).name === 'AbortError') return; }
+    }
+    announce((await copyText(url)) ? 'Link copied. Anyone who opens it re-runs this lookup in their own browser.' : 'Could not copy the link.');
+  }, [announce]);
+
+  const changeSolarDate = useCallback(async (date: string) => {
+    if (!profile || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    setBusy('Updating sun times…');
+    try {
+      const { solar, warnings } = await solarTimes(client, profile.lat, profile.lon, date);
+      const next = { ...profile, solar, fields: upsertFields(profile.fields, solarFields(solar)), warnings: [...new Set([...profile.warnings, ...warnings])] };
+      setProfile(next);
+      recordProfile(next).then(refreshHistory).catch(() => undefined);
+      announce(`Sun times for ${date}.`);
+    } finally { setBusy(null); }
+  }, [client, profile, refreshHistory, announce]);
+
+  const changeHolidayYear = useCallback(async (year: number) => {
+    if (!profile?.countryCode) return;
+    setBusy(`Loading holidays for ${year}…`);
+    try {
+      const calendar = await nagerHolidays(client, year, profile.countryCode);
+      if (!calendar) { announce(`No holiday calendar for ${year}.`); return; }
+      const today = profile.timezone ? localDate(profile.timezone, new Date()) : new Date().toISOString().slice(0, 10);
+      const next = { ...profile, holidays: calendar, fields: upsertFields(profile.fields, holidayFields(calendar, today)) };
+      setProfile(next);
+      recordProfile(next).then(refreshHistory).catch(() => undefined);
+    } catch (caught) { setError(`Nager.Date: ${(caught as Error).message}`); }
+    finally { setBusy(null); }
+  }, [client, profile, refreshHistory, announce]);
+
+  const importFile = useCallback(async (file: File) => {
+    try {
+      const { profiles, rejected } = parseProfileImport(await file.text());
+      for (const item of profiles) await recordProfile(item);
+      await refreshHistory();
+      announce(`Imported ${profiles.length} location${profiles.length === 1 ? '' : 's'}${rejected ? `; skipped ${rejected} invalid entr${rejected === 1 ? 'y' : 'ies'}` : ''}.`);
+    } catch (caught) { setError((caught as Error).message); }
+  }, [refreshHistory, announce]);
 
   const submit = (event: FormEvent) => { event.preventDefault(); if (query.trim()) run({ kind: 'text', text: query }); };
 
@@ -184,6 +276,8 @@ export default function GeoIntelWorkspace() {
     const pinned = compare.some((item) => item.id === target.id);
     const items: MenuItem[] = [
       { id: 'copy', label: 'Copy coordinates', run: () => copy(formatDD(target), 'Coordinates') },
+      { id: 'summary', label: 'Copy summary as text', run: () => copy(summaryText(target), 'Summary') },
+      { id: 'share', label: 'Copy share link', run: () => share(target) },
       { id: 'osm', label: 'Open in OpenStreetMap', run: () => window.open(osmUrl(target), '_blank', 'noopener,noreferrer') },
       { id: 'star', label: record?.starred ? 'Unstar' : 'Star', disabled: !record, run: () => toggleStar(target.id) },
       { id: 'compare', label: pinned ? 'Remove from comparison' : 'Add to comparison', run: () => togglePin(target) },
@@ -191,7 +285,7 @@ export default function GeoIntelWorkspace() {
       { id: 'delete', label: 'Delete from history', danger: true, disabled: !record, run: () => removeFromHistory(target.id) },
     ];
     setMenu({ x, y, title: target.label, items });
-  }, [history, compare, copy, toggleStar, togglePin, removeFromHistory]);
+  }, [history, compare, copy, share, toggleStar, togglePin, removeFromHistory]);
 
   const pinMenu = useCallback((pinId: string, x: number, y: number) => {
     const target = pinId === 'current' ? profile : compare.find((item) => item.id === pinId) ?? null;
@@ -295,6 +389,8 @@ export default function GeoIntelWorkspace() {
           onRefresh={() => run(profile.queryKind === 'map' || profile.queryKind === 'device' ? { kind: 'map', lat: profile.lat, lon: profile.lon } : { kind: 'text', text: profile.query })}
           onRadius={setRadiusKm} onLookupPlace={(place) => run({ kind: 'map', lat: place.lat, lon: place.lon })} onBoundary={loadBoundary}
           onExportIcs={() => downloadHolidays('ics')} onExportHolidayCsv={() => downloadHolidays('csv')} onMenu={(x, y) => profileMenu(profile, x, y)}
+          onPickAlternative={(alt) => run({ kind: 'map', lat: alt.lat, lon: alt.lon })}
+          onShare={() => share(profile)} onCopySummary={() => copy(summaryText(profile), 'Summary')} onSolarDate={changeSolarDate} onHolidayYear={changeHolidayYear}
         />
       ) : (
         <div className="gi-intro" data-testid="gi-intro">
@@ -312,7 +408,7 @@ export default function GeoIntelWorkspace() {
           onCopy={copy} onChoropleth={toggleChoropleth} onArc={setArc} />
       );
       case 'history': return (
-        <HistoryPanel items={history} handlers={{
+        <HistoryPanel items={history} onImport={importFile} handlers={{
           onOpen: (item) => { show(item.profile); setTab('profile'); },
           onStar: (item) => toggleStar(item.id),
           onRename: (item, name) => updateProfileMeta(item.id, { name }).then(refreshHistory),
@@ -338,9 +434,10 @@ export default function GeoIntelWorkspace() {
         <label className="gi-visually-hidden" htmlFor="gi-query">Search for a place, postal code, coordinates, Plus Code, UTM or MGRS</label>
         <input
           id="gi-query" ref={searchInput} type="search" value={query} onChange={(event) => setQuery(event.target.value)} autoComplete="off" spellCheck={false} enterKeyHint="search"
-          placeholder="Place, postal code, 48.8584, 2.2945, 8FW4V75V+9R, 33UXP04…" data-testid="gi-query"
+          placeholder="Place, postal code, 48.8584, 2.2945, 8FW4V75V+9R, 33UXP04…" data-testid="gi-query" list="gi-recent"
           data-tip="Press / to focus. Examples: “Tokyo”, “US 90210”, “SW1A 1AA”, “48°51′30″N 2°17′40″E”, “V75V+9R Paris”, “31N 448251 5411932”"
         />
+        <datalist id="gi-recent">{[...new Set(history.map((item) => item.profile.query))].filter((q) => !q.startsWith('Map point') && q !== 'Device location').slice(0, 12).map((q) => <option key={q} value={q} />)}</datalist>
         <button type="submit" className="gi-btn primary" disabled={!query.trim() || !!busy} data-testid="gi-search" data-tip="Look it up (Enter). Searches run only when you ask — there is no search-as-you-type.">Look up</button>
         <button type="button" className="gi-btn" onClick={() => setConsent(true)} disabled={!!busy} data-tip="Use this device's location — you will be asked first">Use my location</button>
         <PostalCountrySelect value={settings.defaultPostalCountry} onChange={(code) => updateSettings({ defaultPostalCountry: code })} label="Postal country" tip="Country assumed for postal codes typed without one (e.g. “10115”)" />
@@ -349,7 +446,7 @@ export default function GeoIntelWorkspace() {
       <div className="gi-statusbar">
         {!online ? <span className="gi-badge warn" data-tip="Bundled data and anything you looked up before still work">Offline — using cached and bundled data</span> : null}
         {busy ? <span className="gi-busy" role="status">{busy}</span> : null}
-        {error ? <p className="gi-error" role="alert">{error}</p> : null}
+        {error ? <p className="gi-error" role="alert">{error} <button type="button" className="gi-link" onClick={() => setError(null)}>Dismiss</button></p> : null}
         <span className="gi-visually-hidden" role="status" aria-live="polite">{status}</span>
         {status && !busy ? <span className="gi-muted" aria-hidden="true">{status}</span> : null}
       </div>
@@ -367,9 +464,17 @@ export default function GeoIntelWorkspace() {
         </div>
 
         <div className="gi-side">
-          <div className="gi-tabs" role="tablist" aria-label="Workspace sections">
+          <div className="gi-tabs" role="tablist" aria-label="Workspace sections" onKeyDown={(event) => {
+            const order = TABS.map((t) => t.id);
+            const index = order.indexOf(tab);
+            const next = event.key === 'ArrowRight' ? order[(index + 1) % order.length] : event.key === 'ArrowLeft' ? order[(index - 1 + order.length) % order.length] : event.key === 'Home' ? order[0] : event.key === 'End' ? order[order.length - 1] : null;
+            if (!next) return;
+            event.preventDefault();
+            selectTab(next);
+            document.getElementById(`gi-tab-${next}`)?.focus();
+          }}>
             {TABS.map((item) => (
-              <button key={item.id} type="button" role="tab" id={`gi-tab-${item.id}`} aria-selected={tab === item.id} aria-controls="gi-panel" data-tip={item.tip} onClick={() => selectTab(item.id)} data-testid={`gi-tab-${item.id}`}>
+              <button key={item.id} type="button" role="tab" id={`gi-tab-${item.id}`} aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} aria-controls="gi-panel" data-tip={item.tip} onClick={() => selectTab(item.id)} data-testid={`gi-tab-${item.id}`}>
                 {item.label}{item.id === 'compare' && compare.length ? <span className="gi-count">{compare.length}</span> : null}
               </button>
             ))}
