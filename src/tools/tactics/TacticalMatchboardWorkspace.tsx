@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
+import TacticalExportPanel from './TacticalExportPanel';
 import TacticalPersistencePanel from './TacticalPersistencePanel';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
 import TacticalVideoPanel from './TacticalVideoPanel';
@@ -778,6 +779,13 @@ export default function TacticalMatchboardWorkspace() {
           project={project}
           onEdit={applyEdit}
           onReplaceProject={replaceProject}
+          onStatus={setStatus}
+        />
+
+        <TacticalExportPanel
+          project={project}
+          sceneId={sceneId}
+          onEdit={applyEdit}
           onStatus={setStatus}
         />
 

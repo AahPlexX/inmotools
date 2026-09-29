@@ -852,6 +852,38 @@
   }
 }
 
+.tactical-export .tactical-authoring-grid {
+  padding: clamp(12px, 2vw, 18px);
+  gap: clamp(12px, 2vw, 16px);
+}
+
+.tactical-export textarea {
+  min-height: clamp(88px, 18vh, 180px);
+}
+
+.tactical-export-note {
+  margin: 0;
+  max-width: 78ch;
+}
+
+@media (max-width: 720px) {
+  .tactical-export .tactical-inline-actions > button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactical-export {
+    scroll-behavior: auto;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .tactical-export-note {
+    color: #e2e8f0;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .tactical-video-error {
     color: #ffd7d3;

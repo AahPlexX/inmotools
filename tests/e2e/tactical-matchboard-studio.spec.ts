@@ -917,3 +917,78 @@ test('reviews local video with telestration, tracking, events, clips, and manual
   const severe = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''));
   expect(severe, severe.map((item) => item.id + ': ' + item.help).join('\n')).toEqual([]);
 });
+
+async function readDownload(page: Page, name: string) {
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name, exact: true }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  return { filename: download.suggestedFilename(), bytes: Buffer.concat(chunks) };
+}
+
+test('exports metadata, analytics, playback, and a capability-checked video fallback', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.getByText('Professional export', { exact: true }).click();
+  await page.getByLabel('Export title').fill('Pressing shape');
+  await page.getByLabel('Export notes').fill('Keep the press.');
+  await page.getByRole('button', { name: 'Save export metadata' }).click();
+  await expect(page.locator('.status-line')).toContainText('Export metadata saved.');
+
+  const analytics = await readDownload(page, 'Download analytics JSON');
+  expect(analytics.filename).toBe('pressing-shape-analytics.json');
+  const report = JSON.parse(analytics.bytes.toString('utf8')) as { honesty: string; rows: Array<{ metric: string }> };
+  expect(report.honesty).toMatch(/not a gps reading/i);
+  expect(report.honesty).toMatch(/officiating decision/i);
+  expect(JSON.stringify(report)).not.toMatch(/expected goals|win probability|gps latitude/i);
+  expect(report.rows.some((row) => row.metric === 'length_meters')).toBe(true);
+
+  const html = await readDownload(page, 'Download standalone HTML');
+  expect(html.filename).toBe('pressing-shape-playback.html');
+  const htmlText = html.bytes.toString('utf8');
+  expect(htmlText.startsWith('<!DOCTYPE html>')).toBe(true);
+  expect(htmlText).toContain('Pressing shape');
+  expect(htmlText).not.toContain('<script src');
+
+  const social = await readDownload(page, 'Download social card');
+  expect(social.filename).toBe('pressing-shape-landscape.svg');
+  expect(social.bytes.toString('utf8')).toContain('width="1920"');
+  expect(social.bytes.toString('utf8')).toContain('Pressing shape');
+
+  const pdf = await readDownload(page, 'Download PDF package');
+  expect(pdf.filename).toBe('pressing-shape-coaching.zip');
+  expect(Array.from(pdf.bytes.subarray(0, 2))).toEqual([0x50, 0x4b]);
+
+  const frames = await readDownload(page, 'Download frame-sequence ZIP');
+  expect(frames.filename).toBe('pressing-shape-frames.zip');
+  expect(Array.from(frames.bytes.subarray(0, 2))).toEqual([0x50, 0x4b]);
+
+  await expect(page.getByTestId('tactical-raster-capability')).not.toContainText('Checking');
+  if (await page.getByRole('button', { name: 'Download PNG' }).count()) {
+    const png = await readDownload(page, 'Download PNG');
+    expect(Array.from(png.bytes.subarray(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  }
+
+  await expect(page.getByTestId('tactical-video-capability')).not.toContainText('Checking');
+  const videoStatus = await page.getByTestId('tactical-video-capability').innerText();
+  test.info().annotations.push({ type: 'video-capability', description: videoStatus });
+  const negotiated = page.getByTestId('negotiated-video-export');
+  if (await negotiated.count()) {
+    const downloadPromise = page.waitForEvent('download');
+    await negotiated.first().click();
+    const download = await downloadPromise;
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+    const bytes = Buffer.concat(chunks);
+    const filename = download.suggestedFilename();
+    expect(filename.endsWith('.mp4') || filename.endsWith('.webm')).toBe(true);
+    const isMp4 = bytes.subarray(4, 8).toString('ascii') === 'ftyp';
+    const isWebm = bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
+    expect(isMp4 || isWebm).toBe(true);
+  }
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByLabel('Export title')).toHaveValue('Training board');
+});
