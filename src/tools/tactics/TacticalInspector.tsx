@@ -105,10 +105,10 @@ export default function TacticalInspector({
                 <label className="tactical-include">
                   <input
                     type="checkbox"
+                    aria-label={`Include ${label.name} in group`}
                     checked={groupedTokenIds.includes(token.id)}
                     onChange={() => onToggleGrouped(token.id)}
                   />
-                  <span className="visually-hidden">Include {label.name} in group</span>
                 </label>
               </div>
             );

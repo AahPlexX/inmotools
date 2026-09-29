@@ -25,7 +25,7 @@
 
 .tactical-setup-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 14px;
   padding: 0 16px 16px;
 }
@@ -68,7 +68,7 @@
 
 .tactical-authoring-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 14px;
   padding: 0 16px 16px;
 }
@@ -76,9 +76,11 @@
 .tactical-authoring-grid > section,
 .tactical-authoring-grid > form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
   padding: 12px;
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 10px;
@@ -112,6 +114,13 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tactical-command-bar > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tactical-arrow-label {
@@ -150,7 +159,7 @@
 }
 
 .tactical-board-mode {
-  white-space: nowrap;
+  white-space: normal;
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 999px;
   padding: 7px 10px;
@@ -174,6 +183,8 @@
 .tactical-board-svg svg {
   display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tactical-board-svg svg {
@@ -214,7 +225,7 @@
 
 .tactical-player-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr));
   gap: 8px;
   max-height: 280px;
   overflow: auto;
@@ -305,7 +316,7 @@
 
   .tactical-editor-layout {
     order: 1;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .tactical-command-bar {
@@ -333,7 +344,8 @@
 
   .tactical-command-bar > button,
   .tactical-arrow-label {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   .tactical-board-heading-row {
@@ -450,7 +462,7 @@
 
 .tactical-path-values {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -563,10 +575,21 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tactical-inline-actions > button {
   min-inline-size: 44px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.tactical-matchboard-workspace input:not([type="checkbox"]):not([type="radio"]),
+.tactical-matchboard-workspace select,
+.tactical-matchboard-workspace textarea {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tactical-vault-list {

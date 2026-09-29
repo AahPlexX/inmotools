@@ -592,13 +592,21 @@ export default function TacticalMatchboardWorkspace() {
     setTip(null);
   }
 
+  function focusedTipHost() {
+    const active = document.activeElement;
+    return active instanceof Element ? active.closest<HTMLElement>('[data-tactical-tip]') : null;
+  }
+
   function showTip(target: EventTarget | null) {
-    if (overlayOpen || !(target instanceof Element)) {
+    const focused = focusedTipHost();
+    const source = focused ?? target;
+    if (overlayOpen || !(source instanceof Element)) {
       hideTip();
       return;
     }
-    const host = target.closest<HTMLElement>('[data-tactical-tip]');
+    const host = source.closest<HTMLElement>('[data-tactical-tip]');
     if (!host) {
+      if (focused) return;
       hideTip();
       return;
     }
@@ -720,8 +728,10 @@ export default function TacticalMatchboardWorkspace() {
         }}
         onPointerOver={(event) => showTip(event.target)}
         onPointerOut={(event) => {
+          if (focusedTipHost()) return;
           const next = event.relatedTarget;
-          if (!(next instanceof Element) || !next.closest('[data-tactical-tip]')) hideTip();
+          if (next instanceof Element && next.closest('[data-tactical-tip]')) return;
+          hideTip();
         }}
       >
         <details

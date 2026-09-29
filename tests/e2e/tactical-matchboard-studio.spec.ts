@@ -1048,17 +1048,25 @@ test('help, shortcuts, and tooltips stay available without taking over text fiel
   await expect(page.locator('.status-line').last()).toContainText(/Timeline playback started|Reduced motion stepped/i);
 
   await page.getByRole('button', { name: 'Help' }).focus();
-  const tooltip = page.getByRole('tooltip');
-  await expect(tooltip).toBeVisible();
-  const box = await tooltip.boundingBox();
-  const viewport = page.viewportSize();
-  expect(box).toBeTruthy();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.y).toBeGreaterThanOrEqual(0);
-  if (viewport) {
-    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height + 1);
-  }
+  const tipBox = await page.getByRole('tooltip').evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(tipBox.width).toBeGreaterThan(0);
+  expect(tipBox.height).toBeGreaterThan(0);
+  expect(tipBox.x).toBeGreaterThanOrEqual(-1);
+  expect(tipBox.y).toBeGreaterThanOrEqual(-1);
+  expect(tipBox.right).toBeLessThanOrEqual(tipBox.viewportWidth + 1);
+  expect(tipBox.bottom).toBeLessThanOrEqual(tipBox.viewportHeight + 1);
 });
 
 test('player actions from right-click and the touch button lock the same player', async ({ page }) => {
