@@ -158,6 +158,12 @@ const hasValidFiberSettings = (value: Record<string, unknown>): boolean => {
     if (typeof counted.confettiWarningsEnabled !== 'boolean') return false;
   }
 
+  if (value.settings.knitting !== undefined) {
+    if (!isRecord(value.settings.knitting)) return false;
+    const knitting = value.settings.knitting;
+    if (knitting.construction !== 'flat' && knitting.construction !== 'round') return false;
+  }
+
   return true;
 };
 
