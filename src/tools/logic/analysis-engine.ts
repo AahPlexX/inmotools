@@ -1,4 +1,6 @@
-import { isCombinationalGate, isSequential } from './component-library';
+import { getSimulationPorts, isCombinationalLogic, isStatefulPart } from './component-library';
+import { flattenDocument } from './subcircuit-engine';
+import { markerWidthOf } from './subcircuit-ports';
 import { buildNetIndex, createInitialFrame, readLevel, step } from './sim-engine';
 import { portKey, type ComponentInstance, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
@@ -25,28 +27,49 @@ export interface TruthTableAvailability {
 
 const MAX_TRUTH_TABLE_INPUTS = 12;
 
-const isInputSource = (component: ComponentInstance): boolean => component.type === 'SWITCH' || component.type === 'PUSH_BUTTON';
-const isObservableOutput = (component: ComponentInstance): boolean => component.type === 'LED' || component.type === 'PROBE';
+// A one-bit port marker stands in for a switch or an LED when a subcircuit is opened and tried on its own.
+const isInputSource = (component: ComponentInstance): boolean =>
+  component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || (component.type === 'PORT_IN' && markerWidthOf(component.params) === 1);
+const isObservableOutput = (component: ComponentInstance): boolean =>
+  component.type === 'LED' || component.type === 'PROBE' || (component.type === 'PORT_OUT' && markerWidthOf(component.params) === 1);
 
-export const checkTruthTableAvailability = (document: LogicDocument): TruthTableAvailability => {
-  const hasSequential = document.components.some((component) => isSequential(component.type));
-  if (hasSequential) return { ok: false, reason: 'Truth tables can only be generated for purely combinational circuits. Remove flip-flops/latches or isolate the combinational subcircuit first.' };
+export interface TruthTableOptions {
+  /**
+   * Restricts the table to these parts: only the selected switches and LEDs are walked and shown, so unrelated
+   * parts on the same canvas do not take part. The rest of the circuit still simulates, with its own inputs
+   * left where they are.
+   */
+  readonly onlyIds?: readonly string[];
+}
+
+const participants = (components: readonly ComponentInstance[], options: TruthTableOptions | undefined): { inputs: ComponentInstance[]; outputs: ComponentInstance[] } => {
+  const scope = options?.onlyIds ? new Set(options.onlyIds) : undefined;
+  const inScope = (component: ComponentInstance): boolean => scope === undefined || scope.has(component.id);
+  return { inputs: components.filter((component) => isInputSource(component) && inScope(component)), outputs: components.filter((component) => isObservableOutput(component) && inScope(component)) };
+};
+
+export const checkTruthTableAvailability = (source: LogicDocument, options?: TruthTableOptions): TruthTableAvailability => {
+  const document = flattenDocument(source);
+  const hasSequential = document.components.some((component) => isStatefulPart(component.type));
+  if (hasSequential) return { ok: false, reason: 'Truth tables can only be generated for purely combinational circuits. Remove flip-flops, latches, counters, and registers or isolate the combinational subcircuit first.' };
   const hasClock = document.components.some((component) => component.type === 'CLOCK');
   if (hasClock) return { ok: false, reason: 'A clock source makes this circuit sequential in behavior. Truth tables require combinational-only circuits.' };
-  const inputs = document.components.filter(isInputSource);
-  const outputs = document.components.filter(isObservableOutput);
+  const { inputs, outputs } = participants(document.components, options);
+  if (options?.onlyIds && (inputs.length === 0 || outputs.length === 0)) return { ok: false, reason: 'The selection needs at least one switch (or input port) and one LED (or output port) to make a truth table.' };
   if (inputs.length === 0) return { ok: false, reason: 'Add at least one toggle switch or push button to serve as a truth-table input.' };
   if (outputs.length === 0) return { ok: false, reason: 'Add at least one LED or logic probe to serve as a truth-table output.' };
   if (inputs.length > MAX_TRUTH_TABLE_INPUTS) return { ok: false, reason: `Truth tables are limited to ${MAX_TRUTH_TABLE_INPUTS} inputs (2^${MAX_TRUTH_TABLE_INPUTS} rows) to stay responsive; this circuit has ${inputs.length}.` };
   return { ok: true };
 };
 
-export const generateTruthTable = (document: LogicDocument): TruthTable => {
-  const availability = checkTruthTableAvailability(document);
+export const generateTruthTable = (source: LogicDocument, options?: TruthTableOptions): TruthTable => {
+  const availability = checkTruthTableAvailability(source, options);
   if (!availability.ok) throw new Error(availability.reason ?? 'Truth table unavailable.');
 
-  const inputs: TruthTableSignal[] = document.components.filter(isInputSource).map((component) => ({ componentId: component.id, label: component.label || component.id }));
-  const outputs: TruthTableSignal[] = document.components.filter(isObservableOutput).map((component) => ({ componentId: component.id, label: component.label || component.id }));
+  const document = flattenDocument(source);
+  const chosen = participants(document.components, options);
+  const inputs: TruthTableSignal[] = chosen.inputs.map((component) => ({ componentId: component.id, label: component.label || component.id }));
+  const outputs: TruthTableSignal[] = chosen.outputs.map((component) => ({ componentId: component.id, label: component.label || component.id }));
   // Mechanical bounce is an interactive teaching aid; a truth table must read
   // the stable logical value for each requested input combination, not the
   // transient contact-bounce level a PUSH_BUTTON would emit on its first tick.
@@ -152,29 +175,45 @@ export interface ErcFinding {
 }
 
 const componentIdOf = (key: PortKey): string => key.split(':')[0]!;
+const portIdOf = (key: PortKey): string => key.slice(key.indexOf(':') + 1);
 
-export const runElectricalRuleCheck = (document: LogicDocument): ErcFinding[] => {
+export const runElectricalRuleCheck = (source: LogicDocument): ErcFinding[] => {
+  const document = flattenDocument(source);
   const netIndex = buildNetIndex(document.components, document.wires);
   const findings: ErcFinding[] = [];
   const seenFloating = new Set<string>();
+
+  // "Label.pin" for a port key, so a finding names exactly which pin is unwired.
+  const componentById = new Map(document.components.map((component) => [component.id, component] as const));
+  const pinName = (key: PortKey): string => {
+    const component = componentById.get(componentIdOf(key));
+    if (!component) return key;
+    const port = getSimulationPorts(component.type, component.params).find((candidate) => candidate.id === portIdOf(key));
+    return `${component.label}.${port?.label ?? portIdOf(key)}`;
+  };
 
   for (const members of netIndex.members.values()) {
     const inputKeys = members.filter((key) => netIndex.directionOf.get(key) === 'input');
     const outputKeys = members.filter((key) => netIndex.directionOf.get(key) === 'output');
     if (outputKeys.length === 0 && inputKeys.length > 0) {
-      const ids = inputKeys.map(componentIdOf);
-      const dedupeKey = ids.slice().sort().join(',');
+      // Keyed by the pins themselves, not their components: a part with
+      // several unwired pins owns several separate floating nets.
+      const dedupeKey = inputKeys.slice().sort().join(',');
       if (!seenFloating.has(dedupeKey)) {
         seenFloating.add(dedupeKey);
-        findings.push({ type: 'floating_input', message: `${inputKeys.length} input pin(s) have no driving output on this net and will read as floating (Z).`, componentIds: ids });
+        const names = inputKeys.map(pinName).join(', ');
+        const message = inputKeys.length === 1
+          ? `Floating input ${names}: nothing drives this net, so the pin reads as floating (Z).`
+          : `Floating inputs ${names}: nothing drives these wired-together pins, so they read as floating (Z).`;
+        findings.push({ type: 'floating_input', message, componentIds: inputKeys.map(componentIdOf) });
       }
     }
     if (outputKeys.length >= 2) {
-      findings.push({ type: 'output_contention', message: `${outputKeys.length} outputs are wired to the same net and may contend for its value.`, componentIds: outputKeys.map(componentIdOf) });
+      findings.push({ type: 'output_contention', message: `Outputs ${outputKeys.map(pinName).join(', ')} are wired to the same net and may contend for its value.`, componentIds: outputKeys.map(componentIdOf) });
     }
   }
 
-  const combinationalIds = new Set(document.components.filter((component) => isCombinationalGate(component.type)).map((component) => component.id));
+  const combinationalIds = new Set(document.components.filter((component) => isCombinationalLogic(component.type)).map((component) => component.id));
   const adjacency = new Map<string, Set<string>>();
   for (const wire of document.wires) {
     const fromDirection = netIndex.directionOf.get(portKey(wire.from.componentId, wire.from.portId));

@@ -1,5 +1,5 @@
 import { getComponentPorts } from './component-library';
-import type { ComponentInstance, PortDefinition, Rotation } from './logic-types';
+import type { ComponentInstance, PortDefinition, Rotation, WirePoint } from './logic-types';
 
 /** Pixels per grid unit, shared by canvas rendering and SVG export so both agree on layout. */
 export const GRID_SIZE = 24;
@@ -72,4 +72,16 @@ export const findPortAt = (
     const dy = position.y - worldPoint.y;
     return Math.sqrt(dx * dx + dy * dy) <= tolerancePixels;
   });
+};
+
+/**
+ * A single L-bend between two absolute pixel positions, matching the
+ * "orthogonal wire routing" the schematic canvas promises: horizontal
+ * first when the endpoints are farther apart on that axis, vertical first
+ * otherwise, so the bend reads naturally instead of a diagonal segment.
+ */
+export const orthogonalWaypoints = (start: WirePoint, end: WirePoint): WirePoint[] => {
+  if (start.x === end.x || start.y === end.y) return [];
+  const horizontalFirst = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
+  return horizontalFirst ? [{ x: end.x, y: start.y }] : [{ x: start.x, y: end.y }];
 };

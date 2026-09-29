@@ -1,3 +1,8 @@
+import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
+import { clampAluWidth } from './alu-engine';
+import { checkWireEnds, clampBusWidth, clampSignalWidth } from './bus-engine';
+import { isMemoryType, normalizeMemoryParams } from './memory-engine';
+import { clampBitWidth, isRegisterType } from './register-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
 import type {
   ComponentInstance,
@@ -120,12 +125,19 @@ export const duplicateComponent = (document: LogicDocument, componentId: string)
   return { ...document, components: [...document.components, copy], selectedIds: [copy.id] };
 };
 
-/** Removes wires that reference a port no longer produced by a reduced input count. */
-const pruneOrphanWires = (document: LogicDocument): LogicDocument => {
-  const portMap = new Map(document.components.map((component) => [component.id, new Set(getComponentPorts(component.type, component.params).map((port) => port.id))]));
+/**
+ * Removes wires that reference a port no longer produced by a reduced input count or block size, and wires whose
+ * two ends stopped being compatible (a bus resized so its width no longer matches the bus it was wired to).
+ */
+export const pruneOrphanWires = (document: LogicDocument): LogicDocument => {
+  const portMap = new Map(document.components.map((component) => [component.id, new Map(getComponentPorts(component.type, component.params).map((port) => [port.id, port] as const))]));
   return {
     ...document,
-    wires: document.wires.filter((wire) => portMap.get(wire.from.componentId)?.has(wire.from.portId) && portMap.get(wire.to.componentId)?.has(wire.to.portId)),
+    wires: document.wires.filter((wire) => {
+      const fromPort = portMap.get(wire.from.componentId)?.get(wire.from.portId);
+      const toPort = portMap.get(wire.to.componentId)?.get(wire.to.portId);
+      return fromPort !== undefined && toPort !== undefined && checkWireEnds(fromPort, toPort).ok;
+    }),
   };
 };
 
@@ -135,9 +147,23 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
     components: document.components.map((component) => {
       if (component.id !== componentId) return component;
       const merged: ComponentParams = { ...component.params, ...params };
-      const normalized: ComponentParams = isVariadicGate(component.type) && merged.inputCount !== undefined
-        ? { ...merged, inputCount: clampInputCount(merged.inputCount) }
-        : merged;
+      let normalized: ComponentParams = merged;
+      if (isVariadicGate(component.type) && merged.inputCount !== undefined) {
+        normalized = { ...merged, inputCount: clampInputCount(merged.inputCount) };
+      } else if (isBlockType(component.type) && merged.selectBits !== undefined) {
+        normalized = { ...merged, selectBits: clampSelectBits(merged.selectBits, defaultSelectBits(component.type)) };
+      } else if (isRegisterType(component.type) && merged.bitWidth !== undefined) {
+        normalized = { ...merged, bitWidth: clampBitWidth(merged.bitWidth) };
+      } else if (component.type === 'BUS_SPLITTER' && merged.busWidth !== undefined) {
+        normalized = { ...merged, busWidth: clampBusWidth(merged.busWidth) };
+      } else if (component.type === 'ALU' && merged.aluWidth !== undefined) {
+        normalized = { ...merged, aluWidth: clampAluWidth(merged.aluWidth) };
+      } else if ((component.type === 'PORT_IN' || component.type === 'PORT_OUT') && merged.signalWidth !== undefined) {
+        normalized = { ...merged, signalWidth: clampSignalWidth(merged.signalWidth) };
+      } else if (isMemoryType(component.type)) {
+        // A resized or re-filled memory keeps only the stored words that still fit.
+        normalized = normalizeMemoryParams(merged);
+      }
       return { ...component, params: normalized };
     }),
   };
@@ -156,6 +182,20 @@ const findPort = (document: LogicDocument, ref: PortRef) => {
 };
 
 /**
+ * Why a wire between two ports would be refused, in words for the person who just tried to draw it, or
+ * `undefined` when it is fine. `addWire` applies the same rules and stays silent; this is what a caller
+ * shows when it wants to explain the refusal (a bus of the wrong width, say).
+ */
+export const wireProblem = (document: LogicDocument, from: PortRef, to: PortRef): string | undefined => {
+  if (from.componentId === to.componentId && from.portId === to.portId) return undefined;
+  const fromPort = findPort(document, from);
+  const toPort = findPort(document, to);
+  if (!fromPort || !toPort) return 'That pin no longer exists.';
+  const check = checkWireEnds(fromPort, toPort);
+  return check.ok ? undefined : check.reason;
+};
+
+/**
  * Rejects wires that could never carry a real signal: a reference to a port
  * that does not exist (stale selection, or a hand-edited/corrupted project),
  * and input-to-input connections, which have no possible driver and would
@@ -168,7 +208,7 @@ export const addWire = (document: LogicDocument, from: PortRef, to: PortRef, way
   const fromPort = findPort(document, from);
   const toPort = findPort(document, to);
   if (!fromPort || !toPort) return document;
-  if (fromPort.direction === 'input' && toPort.direction === 'input') return document;
+  if (!checkWireEnds(fromPort, toPort).ok) return document;
   const wire: Wire = { id: nextId('wire'), from, to, waypoints };
   return { ...document, wires: [...document.wires, wire] };
 };

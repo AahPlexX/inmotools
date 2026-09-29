@@ -1,0 +1,209 @@
+.logic-memory {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logic-memory-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 10px;
+}
+
+.logic-memory-summary {
+  margin: 0;
+  flex: 1 1 260px;
+  font-size: 0.85rem;
+}
+
+.logic-memory-range {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.logic-memory-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+}
+
+.logic-memory .logic-memory-field.inline input {
+  width: 9ch;
+  min-height: 0;
+}
+
+.logic-memory-field.inline.grow {
+  flex: 1 1 200px;
+}
+
+.logic-memory-field.inline.grow input {
+  width: auto;
+}
+
+.logic-memory-field input,
+.logic-memory-field select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.logic-memory button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #1f2933;
+}
+
+.logic-memory button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.logic-memory-message {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid #2563eb;
+  font-size: 0.85rem;
+}
+
+.logic-memory-message.problem {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: #dc2626;
+}
+
+.logic-memory-scroll {
+  overflow-x: auto;
+}
+
+.logic-memory-table {
+  border-collapse: collapse;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.logic-memory-table th,
+.logic-memory-table td {
+  padding: 1px 2px;
+  text-align: center;
+}
+
+.logic-memory-table thead th {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.logic-memory-table tbody th {
+  text-align: right;
+  padding-right: 8px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.logic-memory .logic-memory-cell {
+  box-sizing: content-box;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 2px 3px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.logic-memory-cell:hover {
+  border-color: #cbd5e1;
+}
+
+.logic-memory-cell:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+}
+
+.logic-memory-cell.is-live {
+  border: 1px solid #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+}
+
+.logic-memory-cell.is-addressed {
+  background: rgba(234, 179, 8, 0.35);
+  border-color: #ca8a04;
+}
+
+.logic-memory .logic-memory-ascii {
+  box-sizing: content-box;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+  min-width: 16ch;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0.06em;
+}
+
+.logic-memory-ascii:focus {
+  border-color: #2563eb;
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+}
+
+.logic-memory-legend {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.logic-workspace[data-theme="dark"] .logic-memory button,
+.logic-workspace[data-theme="high-contrast"] .logic-memory button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-memory-field input,
+.logic-workspace[data-theme="dark"] .logic-memory-field select,
+.logic-workspace[data-theme="high-contrast"] .logic-memory-field input,
+.logic-workspace[data-theme="high-contrast"] .logic-memory-field select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-memory-legend,
+.logic-workspace[data-theme="high-contrast"] .logic-memory-legend,
+.logic-workspace[data-theme="dark"] .logic-memory-table thead th,
+.logic-workspace[data-theme="high-contrast"] .logic-memory-table thead th,
+.logic-workspace[data-theme="dark"] .logic-memory-table tbody th,
+.logic-workspace[data-theme="high-contrast"] .logic-memory-table tbody th {
+  color: #94a3b8;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-memory button {
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 2px solid #1e293b;
+  border-radius: 12px;
+  background: #fff;
+  color: #1e293b;
+  min-height: 40px;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-memory-cell {
+  min-height: 32px;
+  font-size: 1rem;
+}
