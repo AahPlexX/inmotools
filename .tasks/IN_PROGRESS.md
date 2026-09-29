@@ -1,5 +1,7 @@
 # In Progress
 
+- **Site tool discoverability audit (2026-09-29)** — verify that every workspace integrated into `main` has a catalog link and route loader, and prevent an orphan workspace from entering a future Pages build. Current `main` has 35 registered suites. Branch-only workspaces remain under their own active workstreams; do not advertise them as deployed until their code is integrated and validated. Completion gate: focused registration check, build, landing/route browser checks, integration into `origin/main`, and exact-main Pages evidence.
+
 - **PlanCraft Studio real-world hardening** — the floor-plan tool (`#/floorplan-studio`) was previously recorded complete (TASK-001), but owner field testing found real-world defects. A 2026-09-27 audit verified 22 defects and 16 capability gaps (38 ledger rows, F01–F38).
   - Tool SSOT: `src/tools/floorplan/TRACKING.md` (per-row status, evidence, known limits, verification commands).
   - Branch: `claude/plancraft-hardening`. The session's GitHub integration cannot open PRs (403), so the owner approved integrating by merging current `main` into the branch and fast-forwarding `origin/main` to it (2026-09-29).
