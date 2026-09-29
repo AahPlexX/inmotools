@@ -1,5 +1,6 @@
 import { blockSizeLabel, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
 import { clampInputCount, isVariadicGate } from './component-library';
+import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
 
 const LICENSES: readonly LicenseOption[] = ['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed'];
@@ -88,7 +89,60 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </label>
       ) : null}
 
-      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' ? (
+      {isRegisterType(component.type) ? (
+        <>
+          <label className="logic-field">
+            <span>Width</span>
+            <select value={bitWidthOf(component.params)} onChange={(event) => onUpdateParams(component.id, { bitWidth: Number(event.target.value) })}>
+              {Array.from({ length: MAX_BIT_WIDTH - MIN_BIT_WIDTH + 1 }, (_, index) => MIN_BIT_WIDTH + index).map((bits) => (
+                <option key={bits} value={bits}>{registerSizeLabel(bits)}</option>
+              ))}
+            </select>
+          </label>
+          {component.type === 'COUNTER' ? (
+            <>
+              <label className="logic-field">
+                <span>Direction</span>
+                <select value={component.params.countDown === true ? 'down' : 'up'} onChange={(event) => onUpdateParams(component.id, { countDown: event.target.value === 'down' })}>
+                  <option value="up">Count up</option>
+                  <option value="down">Count down</option>
+                </select>
+              </label>
+              <label className="logic-field">
+                <span>Clocking</span>
+                <select value={component.params.asyncRipple === true ? 'ripple' : 'sync'} onChange={(event) => onUpdateParams(component.id, { asyncRipple: event.target.value === 'ripple' })}>
+                  <option value="sync">Synchronous (all bits together)</option>
+                  <option value="ripple">Asynchronous ripple (bits change in turn)</option>
+                </select>
+              </label>
+              <label className="logic-field logic-field-inline">
+                <input type="checkbox" checked={component.params.hasLoad === true} onChange={(event) => onUpdateParams(component.id, { hasLoad: event.target.checked })} />
+                <span>Synchronous load (LOAD and D pins)</span>
+              </label>
+            </>
+          ) : null}
+          <label className="logic-field logic-field-inline">
+            <input type="checkbox" checked={component.params.hasEnable === true} onChange={(event) => onUpdateParams(component.id, { hasEnable: event.target.checked })} />
+            <span>Enable (EN) input</span>
+          </label>
+          <label className="logic-field">
+            <span>Clock edge</span>
+            <select value={component.params.edge ?? 'rising'} onChange={(event) => onUpdateParams(component.id, { edge: event.target.value as 'rising' | 'falling' })}>
+              <option value="rising">Rising edge</option>
+              <option value="falling">Falling edge</option>
+            </select>
+          </label>
+          <label className="logic-field">
+            <span>{component.type === 'COUNTER' ? 'RST / LOAD polarity' : 'RST polarity'}</span>
+            <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+              <option value="high">Active high</option>
+              <option value="low">Active low</option>
+            </select>
+          </label>
+        </>
+      ) : null}
+
+      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && !isRegisterType(component.type) ? (
         <label className="logic-field">
           <span>Propagation delay (ns)</span>
           <input

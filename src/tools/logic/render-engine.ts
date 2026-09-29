@@ -1,6 +1,5 @@
-import { isBlockType } from './block-engine';
 import { getComponentPorts } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble } from './gate-shapes';
+import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
 import { readLevel } from './sim-engine';
 import type {
@@ -349,7 +348,7 @@ export const renderScene = (
 
     if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE') {
       drawIoComponent(ctx, palette, component, input.frame);
-    } else if (isBlockType(component.type)) {
+    } else if (usesBlockBody(component.type)) {
       drawBlockBody(ctx, palette, component, ports);
     } else if (component.type === 'D_FLIP_FLOP' || component.type === 'JK_FLIP_FLOP' || component.type === 'T_FLIP_FLOP' || component.type === 'SR_LATCH') {
       drawSequentialBody(ctx, palette, GRID_SIZE * 2, height);

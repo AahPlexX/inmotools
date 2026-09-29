@@ -22,7 +22,9 @@ export type ComponentType =
   | 'MUX'
   | 'DEMUX'
   | 'DECODER'
-  | 'PRIORITY_ENCODER';
+  | 'PRIORITY_ENCODER'
+  | 'COUNTER'
+  | 'REGISTER';
 
 export type PortDirection = 'input' | 'output';
 
@@ -52,6 +54,14 @@ export interface ComponentParams {
   readonly selectBits?: number;
   /** Whether a MUX/DEMUX/DECODER exposes an EN input pin. */
   readonly hasEnable?: boolean;
+  /** Bit width of a counter or register (2-8). */
+  readonly bitWidth?: number;
+  /** A counter counts down instead of up. */
+  readonly countDown?: boolean;
+  /** A counter is an asynchronous (ripple) chain whose bits change one tick apart, instead of all at once. */
+  readonly asyncRipple?: boolean;
+  /** A counter exposes a LOAD pin and parallel data inputs for synchronous load. */
+  readonly hasLoad?: boolean;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -137,6 +147,12 @@ export interface ComponentRuntimeState {
   readonly buttonPressed?: boolean;
   readonly clockNextToggleTick?: number;
   readonly bounceRemaining?: number;
+  /** Counter/register bits, least-significant first. */
+  readonly registerBits?: readonly LogicLevel[];
+  /** What a counter's outputs showed before its latest clock edge; used while a ripple is in flight. */
+  readonly registerPreviousBits?: readonly LogicLevel[];
+  /** How many low-order counter bits have taken their new value. */
+  readonly rippleStage?: number;
 }
 
 export interface PendingUpdate {

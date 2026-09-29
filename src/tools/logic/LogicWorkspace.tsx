@@ -13,6 +13,7 @@ import {
   type TruthTable,
 } from './analysis-engine';
 import { clampInputCount, COMPONENT_CATEGORIES } from './component-library';
+import { bitWidthOf, isRegisterType, isRippling, restoreRegisterRuntime } from './register-engine';
 import {
   addComponent,
   addWire,
@@ -117,11 +118,17 @@ export default function LogicWorkspace() {
     const loop = (now: number) => {
       const elapsed = Math.min(250, now - last);
       last = now;
-      // Nothing changes state on its own unless a clock is ticking or a
-      // realistic-delay update is still pending, so skip the net rebuild and
-      // React re-render on every idle frame instead of animating forever.
+      // Nothing changes state on its own unless a clock is ticking, a
+      // realistic-delay update is still pending, or a ripple counter still
+      // has higher bits to settle, so skip the net rebuild and React
+      // re-render on every idle frame instead of animating forever.
       const hasClock = documentRef.current.components.some((component) => component.type === 'CLOCK');
-      if (hasClock || frameRef.current.pendingUpdates.length > 0) runStep(elapsed);
+      const isRippleSettling = documentRef.current.components.some((component) => {
+        if (!isRegisterType(component.type)) return false;
+        const width = bitWidthOf(component.params);
+        return isRippling(restoreRegisterRuntime(frameRef.current.componentState[component.id], width), width);
+      });
+      if (hasClock || isRippleSettling || frameRef.current.pendingUpdates.length > 0) runStep(elapsed);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

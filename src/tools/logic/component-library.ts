@@ -1,7 +1,8 @@
 import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './block-engine';
+import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -79,6 +80,14 @@ const blockDefinition = (type: BlockType, label: string, extra: ComponentParams 
   ports: (params) => blockPorts(type, params),
 });
 
+const registerDefinition = (type: RegisterType, label: string, extra: ComponentParams = {}): ComponentDefinition => ({
+  type,
+  label,
+  category: 'register',
+  defaultParams: { bitWidth: 4, edge: 'rising', activeHigh: true, ...extra },
+  ports: (params) => registerPorts(type, params),
+});
+
 export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefinition>> = {
   AND: { type: 'AND', label: 'AND', category: 'gate', defaultParams: { inputCount: 2, delayNs: 5 }, minInputs: 2, maxInputs: 8, ports: variadicGatePorts },
   OR: { type: 'OR', label: 'OR', category: 'gate', defaultParams: { inputCount: 2, delayNs: 5 }, minInputs: 2, maxInputs: 8, ports: variadicGatePorts },
@@ -113,6 +122,8 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   DEMUX: blockDefinition('DEMUX', 'Demultiplexer'),
   DECODER: blockDefinition('DECODER', 'Binary decoder', { activeHigh: true }),
   PRIORITY_ENCODER: blockDefinition('PRIORITY_ENCODER', 'Priority encoder'),
+  COUNTER: registerDefinition('COUNTER', 'Binary counter'),
+  REGISTER: registerDefinition('REGISTER', 'Register'),
 };
 
 export const getComponentPorts = (type: ComponentType, params: ComponentParams): readonly PortDefinition[] =>
@@ -124,6 +135,9 @@ export const isVariadicGate = (type: ComponentType): boolean =>
 export const isSequential = (type: ComponentType): boolean =>
   type === 'D_FLIP_FLOP' || type === 'JK_FLIP_FLOP' || type === 'T_FLIP_FLOP' || type === 'SR_LATCH';
 
+/** Every part that holds state between clock edges: flip-flops, latches, counters, and registers. */
+export const isStatefulPart = (type: ComponentType): boolean => isSequential(type) || isRegisterType(type);
+
 /** Gates and multi-pin blocks: every part whose outputs are a pure function of its current inputs. */
 export const isCombinationalLogic = (type: ComponentType): boolean =>
   isVariadicGate(type) || type === 'NOT' || type === 'BUFFER' || type === 'TRI_BUFFER' || isBlockType(type);
@@ -132,5 +146,6 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'gate', label: 'Logic gates', types: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUFFER', 'TRI_BUFFER'] },
   { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER'] },
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
+  { category: 'register', label: 'Counters & registers', types: ['COUNTER', 'REGISTER'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];

@@ -171,6 +171,36 @@ test('builds a 2:1 multiplexer circuit and its generated truth table selects the
   expect([...actual].sort()).toEqual([...expected].sort());
 });
 
+test('places a counter, configures it from the inspector, and its pins follow the settings', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Counters & registers' })).toBeVisible();
+
+  await placeAt(page, 'COUNTER', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 5.5 * GRID, y: 2.5 * GRID } });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  await expect(inspector.getByRole('heading', { name: 'COUNTER' })).toBeVisible();
+
+  await inspector.getByLabel('Width').selectOption({ label: '3-bit' });
+  await inspector.getByLabel('Direction').selectOption({ label: 'Count down' });
+  await inspector.getByLabel('Clocking').selectOption({ label: 'Asynchronous ripple (bits change in turn)' });
+  await inspector.getByLabel('Enable (EN) input').check();
+  await inspector.getByLabel('Synchronous load (LOAD and D pins)').check();
+  await expect(inspector.getByLabel('Width')).toHaveValue('3');
+  if (isSheet) await page.getByLabel('Close inspector').click();
+
+  // Left pins (top to bottom): CLK, EN, RST, LOAD, D0..D2 -> grid rows 2..8; ERC lists every unwired one.
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toBeVisible();
+  await expect(ercDock).toContainText('D2');
+  await expect(ercDock).toContainText('LOAD');
+});
+
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/tools/digital-logic-workstation');

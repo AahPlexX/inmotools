@@ -1,6 +1,5 @@
-import { isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
-import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble } from './gate-shapes';
+import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentLabelAnchor, GATE_ABBREVIATION, GATE_WIDTH, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, documentBoundingBox, portAbsolutePosition, GRID_SIZE } from './geometry';
 import type { ComponentInstance, ComponentType, LogicDocument, PortRef, ThemeName, Wire, WirePoint } from './logic-types';
 
@@ -68,7 +67,7 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
   parts.push(`<g transform="translate(${cx},${cy}) rotate(${rotation}) scale(${scaleX},1)">`);
   if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE') {
     parts.push(renderIoBodySvg(component));
-  } else if (isBlockType(component.type)) {
+  } else if (usesBlockBody(component.type)) {
     const body = blockBodyRect(ports);
     parts.push(`<rect x="${body.x}" y="${body.y}" width="${body.width}" height="${body.height}" fill="${GATE_FILL}" stroke="${GATE_STROKE}" stroke-width="1.5" />`);
     // Undo the group's mirror and 180-degree turn for the text alone, as the canvas does, so the caption never reads backwards or upside down.
@@ -147,6 +146,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER',
+  'COUNTER', 'REGISTER',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);

@@ -1,4 +1,5 @@
 import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
+import { clampBitWidth, isRegisterType } from './register-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
 import type {
   ComponentInstance,
@@ -141,6 +142,8 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
         normalized = { ...merged, inputCount: clampInputCount(merged.inputCount) };
       } else if (isBlockType(component.type) && merged.selectBits !== undefined) {
         normalized = { ...merged, selectBits: clampSelectBits(merged.selectBits, defaultSelectBits(component.type)) };
+      } else if (isRegisterType(component.type) && merged.bitWidth !== undefined) {
+        normalized = { ...merged, bitWidth: clampBitWidth(merged.bitWidth) };
       }
       return { ...component, params: normalized };
     }),

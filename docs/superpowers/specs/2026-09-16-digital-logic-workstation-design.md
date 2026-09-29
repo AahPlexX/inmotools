@@ -82,10 +82,10 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 6. Configurable propagation delay / real-world gate physics: an ideal zero-delay mode and a realistic per-gate nanosecond-delay mode that exposes glitch/hazard/race behavior. *(Phase 1)*
 
 ### Sequential logic, clocks & memory
-7. Flip-flop/latch bank: D, T, JK, SR, with active-high/low async set/reset and positive/negative edge triggering. *(Phase 1: D/JK/T/SR; Phase 2: register banks)*
+7. Flip-flop/latch bank: D, T, JK, SR, with active-high/low async set/reset and positive/negative edge triggering. *(Phase 1: D/JK/T/SR; Phase 2 — register banks delivered in 2B)*
 8. Interactive multi-frequency clock generator (0.5 Hz–10 kHz presets) plus a manual single-step tick control. *(Phase 1)*
 9. RAM/ROM memory editor matrix (4-bit–32-bit address space) with a hex/ASCII cell editor and raw binary import. *(Phase 3)*
-10. Synchronous/asynchronous up/down counters with terminal-count flags and synchronous load. *(Phase 2)*
+10. Synchronous/asynchronous up/down counters with terminal-count flags and synchronous load. *(Phase 2 — delivered in 2B)*
 
 ### Interactive I/O & virtual instruments
 11. Interactive switches, push buttons, and a mechanical-bounce emulation toggle for debounce-circuit training. *(Phase 1)*

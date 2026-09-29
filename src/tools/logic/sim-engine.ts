@@ -1,5 +1,6 @@
 import { evaluateBlock, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
+import { bitWidthOf, isRegisterType, registerOutputs, restoreRegisterRuntime, stepRegister } from './register-engine';
 import {
   portKey,
   type ComponentInstance,
@@ -375,6 +376,30 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
     nextState[component.id] = { ...state, lastClockLevel, storedLevel: nextQ };
     levels.set(portKey(component.id, 'Q'), nextQ);
     levels.set(portKey(component.id, 'QN'), storedBit === undefined ? 'X' : storedBit === 1 ? 0 : 1);
+  }
+
+  // --- Counters and registers: clocked multi-bit parts, sampled against the same pre-edge nets as the flip-flops. ---
+  for (const component of document.components) {
+    if (!isRegisterType(component.type)) continue;
+    const readInput = (portId: string): LogicLevel => finalNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
+    const state = nextState[component.id] ?? {};
+    const runtime = stepRegister({
+      type: component.type,
+      params: component.params,
+      runtime: restoreRegisterRuntime(state, bitWidthOf(component.params)),
+      read: readInput,
+      ideal: delayMode === 'ideal',
+    });
+    nextState[component.id] = {
+      ...state,
+      lastClockLevel: runtime.lastClockLevel,
+      registerBits: runtime.bits,
+      registerPreviousBits: runtime.previousBits,
+      rippleStage: runtime.rippleStage,
+    };
+    for (const [portId, level] of Object.entries(registerOutputs(component.type, component.params, runtime))) {
+      levels.set(portKey(component.id, portId), level);
+    }
   }
 
   // Re-resolve nets once more so anything wired directly to a Q/QN output

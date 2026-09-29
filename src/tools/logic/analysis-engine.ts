@@ -1,4 +1,4 @@
-import { isCombinationalLogic, isSequential } from './component-library';
+import { getComponentPorts, isCombinationalLogic, isStatefulPart } from './component-library';
 import { buildNetIndex, createInitialFrame, readLevel, step } from './sim-engine';
 import { portKey, type ComponentInstance, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
@@ -29,8 +29,8 @@ const isInputSource = (component: ComponentInstance): boolean => component.type 
 const isObservableOutput = (component: ComponentInstance): boolean => component.type === 'LED' || component.type === 'PROBE';
 
 export const checkTruthTableAvailability = (document: LogicDocument): TruthTableAvailability => {
-  const hasSequential = document.components.some((component) => isSequential(component.type));
-  if (hasSequential) return { ok: false, reason: 'Truth tables can only be generated for purely combinational circuits. Remove flip-flops/latches or isolate the combinational subcircuit first.' };
+  const hasSequential = document.components.some((component) => isStatefulPart(component.type));
+  if (hasSequential) return { ok: false, reason: 'Truth tables can only be generated for purely combinational circuits. Remove flip-flops, latches, counters, and registers or isolate the combinational subcircuit first.' };
   const hasClock = document.components.some((component) => component.type === 'CLOCK');
   if (hasClock) return { ok: false, reason: 'A clock source makes this circuit sequential in behavior. Truth tables require combinational-only circuits.' };
   const inputs = document.components.filter(isInputSource);
@@ -152,25 +152,40 @@ export interface ErcFinding {
 }
 
 const componentIdOf = (key: PortKey): string => key.split(':')[0]!;
+const portIdOf = (key: PortKey): string => key.slice(key.indexOf(':') + 1);
 
 export const runElectricalRuleCheck = (document: LogicDocument): ErcFinding[] => {
   const netIndex = buildNetIndex(document.components, document.wires);
   const findings: ErcFinding[] = [];
   const seenFloating = new Set<string>();
 
+  // "Label.pin" for a port key, so a finding names exactly which pin is unwired.
+  const componentById = new Map(document.components.map((component) => [component.id, component] as const));
+  const pinName = (key: PortKey): string => {
+    const component = componentById.get(componentIdOf(key));
+    if (!component) return key;
+    const port = getComponentPorts(component.type, component.params).find((candidate) => candidate.id === portIdOf(key));
+    return `${component.label}.${port?.label ?? portIdOf(key)}`;
+  };
+
   for (const members of netIndex.members.values()) {
     const inputKeys = members.filter((key) => netIndex.directionOf.get(key) === 'input');
     const outputKeys = members.filter((key) => netIndex.directionOf.get(key) === 'output');
     if (outputKeys.length === 0 && inputKeys.length > 0) {
-      const ids = inputKeys.map(componentIdOf);
-      const dedupeKey = ids.slice().sort().join(',');
+      // Keyed by the pins themselves, not their components: a part with
+      // several unwired pins owns several separate floating nets.
+      const dedupeKey = inputKeys.slice().sort().join(',');
       if (!seenFloating.has(dedupeKey)) {
         seenFloating.add(dedupeKey);
-        findings.push({ type: 'floating_input', message: `${inputKeys.length} input pin(s) have no driving output on this net and will read as floating (Z).`, componentIds: ids });
+        const names = inputKeys.map(pinName).join(', ');
+        const message = inputKeys.length === 1
+          ? `Floating input ${names}: nothing drives this net, so the pin reads as floating (Z).`
+          : `Floating inputs ${names}: nothing drives these wired-together pins, so they read as floating (Z).`;
+        findings.push({ type: 'floating_input', message, componentIds: inputKeys.map(componentIdOf) });
       }
     }
     if (outputKeys.length >= 2) {
-      findings.push({ type: 'output_contention', message: `${outputKeys.length} outputs are wired to the same net and may contend for its value.`, componentIds: outputKeys.map(componentIdOf) });
+      findings.push({ type: 'output_contention', message: `Outputs ${outputKeys.map(pinName).join(', ')} are wired to the same net and may contend for its value.`, componentIds: outputKeys.map(componentIdOf) });
     }
   }
 
