@@ -154,7 +154,7 @@ test('arranges multiple tracks with split, nudge, fades, crossfade, and zoom', a
   await page.getByLabel('Track 2 name').fill('Keys');
   await page.getByLabel('Track 2 name').press('Enter');
   await expect(page.getByRole('button', { name: /keys\.wav on Keys/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Move Keys up' }).click();
+  await page.getByRole('button', { name: 'Move track 2 (Keys) up' }).click();
   await expect(page.getByLabel('Track 1 name')).toHaveValue('Keys');
   await page.getByRole('button', { name: 'Solo' }).first().click();
   await expect(page.getByRole('button', { name: 'Solo' }).first()).toHaveAttribute('aria-pressed', 'true');
