@@ -1,6 +1,12 @@
 import { type ChangeEvent, useMemo, useRef, useState } from 'react';
 import { consumeFileInput } from '../../lib/file-input';
 import {
+  CrystalIsosurfacePreview,
+  CrystalMorphologyPreview,
+  CrystalSlicePreview,
+  CrystalVoidPreview,
+} from './CrystalAnalysisPreviews';
+import {
   differenceFourierGrid,
   parseObservedReflections,
   rankResidualDensityPeaks,
@@ -14,6 +20,7 @@ import {
   parseCcp4Grid,
   parseCubeGrid,
   parseXsfGrid,
+  type Isosurface,
   type OrthogonalAxis,
   type ScalarGrid,
 } from './volumetric-engine';
@@ -94,6 +101,10 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
   const [negativeLevel, setNegativeLevel] = useState('0');
   const [negativeOpacity, setNegativeOpacity] = useState('0.45');
   const [surfaceStatus, setSurfaceStatus] = useState('Load a scalar field to inspect isosurfaces.');
+  const [surfacePreview, setSurfacePreview] = useState<{
+    readonly positive: Isosurface;
+    readonly negative: Isosurface | null;
+  } | null>(null);
 
   const [voidSpacing, setVoidSpacing] = useState('0.8');
   const [probeRadius, setProbeRadius] = useState('0.5');
@@ -177,6 +188,7 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
         const [min, max] = gridRange(parsed);
         const level = defaultSurfaceLevel(parsed);
         setGrid(parsed);
+        setSurfacePreview(null);
         setSliceAxis('z');
         setSliceIndex('0');
         setPositiveLevel(String(level));
@@ -187,6 +199,7 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
         );
       } catch (error) {
         setGrid(null);
+        setSurfacePreview(null);
         setVolumeStatus(`Could not load ${file.name}: ${error instanceof Error ? error.message : String(error)}`);
         setSurfaceStatus('No field views are available.');
       }
@@ -200,13 +213,20 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
     }
     try {
       const positive = finiteNumber(positiveLevel, 'Positive isosurface level');
-      const positiveSurface = extractIsosurface(grid, positive);
+      const positiveOpacityValue = finiteNumber(positiveOpacity, 'Positive opacity');
       const negative = finiteNumber(negativeLevel, 'Negative isosurface level');
+      const negativeOpacityValue = finiteNumber(negativeOpacity, 'Negative opacity');
+      if (positiveOpacityValue < 0 || positiveOpacityValue > 1 || negativeOpacityValue < 0 || negativeOpacityValue > 1) {
+        throw new RangeError('Isosurface opacity must be between 0 and 1.');
+      }
+      const positiveSurface = extractIsosurface(grid, positive);
       const negativeSurface = negative < 0 ? extractIsosurface(grid, negative) : null;
+      setSurfacePreview({ positive: positiveSurface, negative: negativeSurface });
       setSurfaceStatus(
-        `Positive surface: ${positiveSurface.triangles.length.toLocaleString()} triangles${negativeSurface ? `; negative surface: ${negativeSurface.triangles.length.toLocaleString()} triangles` : ''}. Opacity ${positiveOpacity} / ${negativeOpacity}.`,
+        `Positive surface: ${positiveSurface.triangles.length.toLocaleString()} triangles${negativeSurface ? `; negative surface: ${negativeSurface.triangles.length.toLocaleString()} triangles` : ''}. Opacity ${positiveOpacityValue} / ${negativeOpacityValue}.`,
       );
     } catch (error) {
+      setSurfacePreview(null);
       setSurfaceStatus(error instanceof Error ? error.message : 'Could not build field views.');
     }
   };
@@ -410,10 +430,15 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
               </div>
               <button type="button" onClick={updateFieldViews}>Update field views</button>
               <p role="status" data-testid="crystal-isosurface-status">{surfaceStatus}</p>
+              {surfacePreview ? (
+                <CrystalIsosurfacePreview positive={surfacePreview.positive} negative={surfacePreview.negative} />
+              ) : null}
               {sliceOutcome && 'error' in sliceOutcome ? (
                 <p role="alert" className="crystal-editor-error">{sliceOutcome.error}</p>
               ) : sliceOutcome ? (
-                <div className="crystal-analysis-table-wrap">
+                <>
+                  <CrystalSlicePreview slice={sliceOutcome.slice} />
+                  <div className="crystal-analysis-table-wrap">
                   <table className="crystal-analysis-table" data-testid="crystal-volume-slice-table">
                     <caption>{sliceOutcome.slice.label} · {sliceOutcome.slice.width} × {sliceOutcome.slice.height}</caption>
                     <thead><tr><th>Sample</th><th>Value</th></tr></thead>
@@ -423,7 +448,8 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </>
               ) : null}
             </>
           ) : null}
@@ -457,6 +483,7 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
               <p role="note">
                 Grid {voidResult.dimensions.join(' × ')} · scaled covalent radii · periodic 6-neighbor connectivity.
               </p>
+              <CrystalVoidPreview isolated={selectedVoid} resultDimensions={voidResult.dimensions} />
               {voidResult.components.length > 0 ? (
                 <label>
                   Cavity component
@@ -539,6 +566,7 @@ export default function CrystalAdvancedAnalysisPanel({ document }: CrystalAdvanc
           {morphology ? (
             <>
               <p role="note">{morphology.assumptions}</p>
+              <CrystalMorphologyPreview model={morphology} />
               <div className="crystal-analysis-table-wrap">
                 <table className="crystal-analysis-table" data-testid="crystal-morphology-table">
                   <thead><tr><th>Facet</th><th>d (Å)</th><th>Relative area</th><th>Normal</th></tr></thead>
