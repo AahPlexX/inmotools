@@ -283,7 +283,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'actions',
     title: 'Right-click and touch',
     paragraphs: [
-      'Right-click a player to open player actions. The same dialog opens from the Player actions button or from Shift+F10, so the action is available without a pointer.',
+      'Right-click a player to open player actions. The same dialog opens from the "Player actions" button or from Shift+F10.',
       'Locking a player or a layer blocks later moves until you unlock it. Undo still restores the previous board.',
     ],
   },
@@ -291,7 +291,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'layout',
     title: 'Narrow layout',
     paragraphs: [
-      'On a narrow window the pitch and player controls come before the setup panels. Players sheet and Timeline sheet open those same controls in a bottom sheet, a panel that slides up from the bottom of the screen.',
+      'On a narrow window the pitch and player controls come before the setup panels. "Players sheet" and "Timeline sheet" open those same controls in a bottom sheet, a panel that slides up from the bottom of the screen.',
       'Escape closes a sheet, player actions, or help and returns focus to the button that opened it.',
     ],
   },
@@ -300,7 +300,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     title: 'Layers and groups',
     paragraphs: [
       'Check the players you want to group, name the layer, and group them. The new layer keeps those players together.',
-      'Show, lock, reorder, solo, and focus a layer from the Layers tab. Solo hides every other layer in the scene. Focus selects the first player on that layer.',
+      'Show, lock, reorder, solo, and focus a layer from the "Layers" tab. Solo hides every other layer in the scene. Focus selects the first player on that layer.',
     ],
   },
   {
