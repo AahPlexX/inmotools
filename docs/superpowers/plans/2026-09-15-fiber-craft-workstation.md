@@ -1,9 +1,9 @@
 # Fiber Craft Workstation
 
-**Status:** In progress (Slice 1 shared shell; Slice 2 crochet engine complete; Slice 3 counted-thread in progress; Slice 7 publishing in progress)
+**Status:** In progress (Slice 1 shared shell; Slice 2 crochet complete; Slice 3 counted-thread complete except provenance-blocked FC-37; Slice 4 knitting in progress; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **28/65 complete**
+**Function progress:** **29/65 complete**
 
 ## Goal
 
@@ -71,6 +71,7 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-38** selectable color-plus-symbol or symbols-only counted chart presentation; print and forced-color rendering retain distinct per-floss symbols so thread identity never depends on hue alone.
 - **FC-39** persisted Aida/linen/evenweave fabric-count controls with stitch-over handling, finished-size calculation in inches/centimeters, and deterministic isolated same-color stitch warnings surfaced by shape/text as well as color.
 - **FC-42** automatically regenerated printable symbol key mapping every used project color to a unique symbol plus editable floss brand/palette and code identity.
+- **FC-43** gauge-corrected non-square knitting grid with editable measured stitch/row gauge, responsive physical cell proportions, local/project-file persistence support, and an accessible knitting-grid description.
 - **FC-40** floss skein and yardage calculator, per color, from fabric count, weighted stitch/backstitch/knot totals, and an editable 1–6 strand-count control; uses DMC's manufacturer-published 8 m / 8.7 yd skein length and a clearly-documented planning-estimate per-stitch length (see `engines/counted-thread-engine.ts`) with a 20% safety margin, rounded up to whole skeins.
 - **FC-50** persistent tap-to-track row/round progress.
 - **FC-51** active row/round highlighting plus one-action active-row recentering.
@@ -82,16 +83,16 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-63** generated 1200×630 social preview PNG with project title/details, crochet badge, and canonical chart thumbnail.
 - **FC-64** offline PWA project use verified through the generated service worker plus the same portable `.craftproj` workflow; Fiber reloads and remains usable offline without an account.
 
-Latest acceptance milestone: dedicated Fiber run `36365240251` at code head
-`4c662232dc2afa15e776882eca5dc60fbf5829b6` passed **65/65** focused unit/selector checks,
-the production TypeScript/Vite build, a 151-entry production PWA precache, and **6/6** Playwright
-cases using one worker across desktop and mobile Chromium. FC-39 used two explicit TDD gates: model
-run `36364793454` failed only because the fabric-settings API did not yet exist, and browser run
-`36364977126` passed unit/build before failing only at the missing `Fabric type` UI contract. The
-accepted run verifies persisted Aida/linen/evenweave count and stitch-over controls, physical-size
-reporting, accessible isolated-stitch warnings, portable-project restore, existing image import,
-crochet editing/export/recovery, and offline PWA reload. Earlier unrelated branch commits remain
-preserved rather than rewritten.
+Latest acceptance milestone: dedicated Fiber run `36503415830` at code head
+`e2b9508d5d3143447d3708b374e186ce7eee249d` passed **68/68** focused unit/selector checks,
+the production TypeScript/Vite build, a **383-entry** production PWA precache, and **6/6** sequential
+Playwright cases across desktop and mobile Chromium. FC-43 used two explicit TDD gates: full-suite
+run `36502683591` failed only because the new `knitting-document-engine` contract did not yet
+exist, and dedicated Fiber run `36502900617` passed unit/build before failing both browser variants
+only because the `knitting` chart-mode option did not yet exist. The accepted run verifies that a
+measured knitting gauge controls actual rendered cell width/height proportions, updates when the
+gauge changes, remains responsive inside the existing scroll surface, generates a knitting-specific
+accessible chart description, and survives browser-local IndexedDB restore. No dependency was added.
 
 FC-40 acceptance: a red run confirmed `estimateCountedThreadFlossUsage`, `DMC_SKEIN_YARDS`, and the
 `strandCount` settings field did not yet exist (`TypeError: estimateCountedThreadFlossUsage is not
@@ -117,7 +118,7 @@ authoritative record once available, the same as every other function accepted b
       draft restore, catalog entry, lazy loader, canonical alias, portable `.craftproj`, progress
       tracking, one-action active-row recenter, screen/print themes, gauge scaling, project
       classification, accessible chart descriptions, and verified offline PWA behavior are accepted.
-      Cross-discipline mode switching is now wired for crochet and counted-thread, while shared
+      Cross-discipline mode switching is now wired for crochet, counted-thread, and knitting, while shared
       zoom/pan/rulers, selection transforms, metric/imperial switching across all measurement-bearing
       disciplines, and complete keyboard/touch authoring remain open.
 - [x] **Slice 2 — Crochet engine.** Polar/round canvas, row-and-grid canvas, universal US/UK
@@ -135,8 +136,11 @@ authoritative enough for precise matching. See `docs/fiber-craft-fc37-catalog-pr
 Preserve the original DMC/Anchor/Madeira/Sullivans requirement; do not substitute a hand-picked/community
 table. Every other counted-thread function in this slice is now accepted; move on to Slice 4
 (knitting colorwork) next and return to FC-37 only if a defensible provenance route is found.
-- [ ] **Slice 4 — Knitting colorwork/cable engine.** Gauge-corrected non-square grid, knit/cable
-      symbol matrix, stranded-float analyzer.
+- [ ] **Slice 4 — Knitting colorwork/cable engine.** **In progress:** FC-43 gauge-corrected non-square
+      grid is accepted with measured-gauge persistence, responsive width/height cell proportions,
+      browser-local restore, and accessible description coverage. FC-44 flat/in-the-round chart
+      modes, FC-45 knit/cable symbol authoring, FC-46 stranded-float analysis, FC-47 written knitting
+      compiler, FC-48 repeat/panel marking, and FC-49 dye-lot/quantity planning remain open.
 - [ ] **Slice 5 — Quilting & patchwork engine.** Parametric block designer, foundation
       paper-piecing generator, rotary-cutting calculator, layout/sashing arranger, fabric-swatch
       draping, yardage/backing estimator.
@@ -154,7 +158,7 @@ table. Every other counted-thread function in this slice is now accepted; move o
 ## Testing strategy
 
 - **TDD scope:** add tests for new contracts, demonstrated regressions, and high-value invariants; do not create one test per helper or duplicate coverage already enforced by a dependency-backed integration path.
-- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **66 checks across 5 files**; FC-40 adds one floss-yardage/skein invariant (strand-count and fabric-count sensitivity, cross-craft-type guard) while retaining the existing quantization, legend, matcher, validation, and state coverage without adding a test-only dependency.
+- **Pure engine work:** favor Vitest tables/invariants. The current focused Fiber contract is **68 checks across 5 files**; FC-43 adds the knitting gauge/document invariant while retaining the existing crochet, counted-thread, quantization, legend, matcher, validation, and state coverage without adding a test-only dependency.
 - **Browser cadence:** `.github/workflows/fiber-craft.yml` runs one sequential Playwright worker across **6 cases**: crochet/edit/export/recovery, counted-thread edit/key/save/restore, and offline PWA reload on desktop and mobile Chromium. Keep this coherent matrix instead of multiplying browser loops.
 - **Build gate:** production TypeScript/Vite build is required for user-facing or engine/state changes that can affect bundling. Documentation-only changes do not invalidate accepted code evidence.
 - **Workflow hygiene:** counted-thread coverage is consolidated into existing focused suites; do not recreate a standalone `fiber-craft-cross-stitch.test.ts`. The current workflow contains no stale reference to that deleted file.
@@ -167,7 +171,7 @@ table. Every other counted-thread function in this slice is now accepted; move o
 - FC-35, FC-36, FC-38, FC-39, and FC-42 are accepted. FC-37 is **not** accepted: only its generic CIEDE2000 nearest-match engine exists. Read `docs/fiber-craft-fc37-catalog-provenance-2026-09-19.md` before touching FC-37. Current first-party evidence shows DMC expressly restricts color-card/conversion-card reproduction, Anchor restricts reproduction of site content, Madeira warns digital colors are not authoritative, and no explicit Sullivans redistribution license was found in the official materials reviewed.
 - Preserve the original four-manufacturer FC-37 requirement. Do not replace it with a convenience subset, scraped/transcribed protected material, or third-party/community conversion table. Reuse existing `culori@4.0.2`; no new color-distance dependency is needed. FC-37 may close only after a defensible manufacturer-permission/licensed-data route (or another user-approved provenance route) is evidenced.
 - FC-38, FC-39, FC-40, and FC-41 are accepted. FC-38 reuses FC-42 symbol assignment so print/forced-color output does not rely on hue alone; FC-39 persists fabric/count/stitch-over settings and marks isolated same-color stitches with an accessible non-color warning; FC-40 (`estimateCountedThreadFlossUsage` in `engines/counted-thread-engine.ts`) adds a `strandCount` (1–6) field to `CountedThreadProjectSettings` and reports per-color estimated yardage and whole-skein counts, surfaced in `CountedThreadPanel.tsx` as a "Strands per stitch" control, an overall chart total, and a per-color line in the generated symbol key.
-- FC-41 (backstitch & specialty-technique layer) tags every entry in the existing `chart.backstitches` array with a required `technique: 'backstitch' | 'blackwork' | 'hardanger'` field (`CountedBackstitch` in `fiber-craft-types.ts`; `COUNTED_BACKSTITCH_TECHNIQUES`/`COUNTED_BACKSTITCH_TECHNIQUE_LABELS`/`isCountedBackstitchTechnique` in `engines/counted-thread-engine.ts`). `addCountedBackstitch` takes `technique` as an optional 5th argument (default `'backstitch'`, before the trailing `now` timestamp) so existing callers keep working unchanged. `CountedThreadPanel.tsx` shows a "Line technique" selector only while the backstitch tool is active, renders each technique with a distinct stroke width/dash on the SVG overlay (`data-technique` attribute on each `<line>`; style is a chart-legibility aid, not a claim about the real stitched texture — see the code comment), and reports a per-technique breakdown next to the backstitch-line count in the specialty summary, the removal list, and `describeCountedThreadChart`'s text summary. `persistence-engine.ts` validates the new field on `.craftproj` import. FC-40's yardage estimate is intentionally untouched: all three techniques are still a straight line laid between two half-grid points, so its geometry-based length calculation applies unchanged to every technique. FC-43 (Gauge-corrected non-square grid, the first knitting-colorwork function) is the next independent executable slice; FC-37's provenance path remains blocked.
+- FC-41 (backstitch & specialty-technique layer) tags every entry in the existing `chart.backstitches` array with a required `technique: 'backstitch' | 'blackwork' | 'hardanger'` field (`CountedBackstitch` in `fiber-craft-types.ts`; `COUNTED_BACKSTITCH_TECHNIQUES`/`COUNTED_BACKSTITCH_TECHNIQUE_LABELS`/`isCountedBackstitchTechnique` in `engines/counted-thread-engine.ts`). `addCountedBackstitch` takes `technique` as an optional 5th argument (default `'backstitch'`, before the trailing `now` timestamp) so existing callers keep working unchanged. `CountedThreadPanel.tsx` shows a "Line technique" selector only while the backstitch tool is active, renders each technique with a distinct stroke width/dash on the SVG overlay (`data-technique` attribute on each `<line>`; style is a chart-legibility aid, not a claim about the real stitched texture — see the code comment), and reports a per-technique breakdown next to the backstitch-line count in the specialty summary, the removal list, and `describeCountedThreadChart`'s text summary. `persistence-engine.ts` validates the new field on `.craftproj` import. FC-40's yardage estimate is intentionally untouched: all three techniques are still a straight line laid between two half-grid points, so its geometry-based length calculation applies unchanged to every technique. FC-43 (Gauge-corrected non-square grid) is accepted. `knitting-document-engine.ts` owns the knitting starter/switch/gauge transforms and `KnittingGridPanel.tsx` owns the responsive gauge preview. FC-44 (flat versus in-the-round chart behavior and row-direction semantics) is the next independent knitting slice; FC-37's provenance path remains blocked.
 - Current branch history includes unrelated Vector-only commit `a4ddb40` after FC-36. Preserve it; do not rewrite history to make Fiber commits contiguous.
 
 ## Verification gate (every slice)
