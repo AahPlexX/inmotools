@@ -34,7 +34,12 @@ import {
   getKnittingSymbol,
 } from '../../src/tools/fiber-craft/engines/symbol-library';
 import type { GaugeSwatch } from '../../src/tools/fiber-craft/fiber-craft-types';
-import { createStarterKnittingDocument, setKnittingGauge } from '../../src/tools/fiber-craft/knitting-document-engine';
+import {
+  createStarterKnittingDocument,
+  knittingRowDirection,
+  setKnittingConstruction,
+  setKnittingGauge,
+} from '../../src/tools/fiber-craft/knitting-document-engine';
 
 describe('grid geometry engine', () => {
   it('creates an empty grid with every cell unset', () => {
@@ -173,6 +178,19 @@ describe('knitting gauge-corrected grid', () => {
     if (updated.chart.kind !== 'grid') throw new Error('Expected knitting grid');
     expect(updated.chart.aspectRatio).toBeCloseTo(24 / 18, 5);
     expect(updated.metadata.updatedAt).toBe('2026-09-28T00:01:00.000Z');
+  });
+
+  it('switches flat versus in-the-round row direction semantics', () => {
+    const starter = createStarterKnittingDocument('2026-09-28T00:00:00.000Z');
+    expect(starter.settings?.knitting?.construction).toBe('flat');
+    expect(knittingRowDirection(0, 'flat')).toEqual({ side: 'right', direction: 'right-to-left' });
+    expect(knittingRowDirection(1, 'flat')).toEqual({ side: 'wrong', direction: 'left-to-right' });
+    expect(knittingRowDirection(0, 'round')).toEqual({ side: 'right', direction: 'right-to-left' });
+    expect(knittingRowDirection(5, 'round')).toEqual({ side: 'right', direction: 'right-to-left' });
+
+    const circular = setKnittingConstruction(starter, 'round', '2026-09-28T00:02:00.000Z');
+    expect(circular.settings?.knitting?.construction).toBe('round');
+    expect(circular.metadata.updatedAt).toBe('2026-09-28T00:02:00.000Z');
   });
 });
 
