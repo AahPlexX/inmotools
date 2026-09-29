@@ -26,7 +26,9 @@ export interface PatchworkPatch { readonly id: string; readonly outline: readonl
 export interface PatchworkBlock { readonly kind: 'patchwork-block'; readonly finishedSizeIn: number; readonly seamAllowanceIn: number; readonly patches: readonly PatchworkPatch[]; }
 export type FiberCraftChart = GridChart | PolarChart | CountedThreadChart | EmbroideryChart | PatchworkBlock;
 export interface CrochetProjectSettings { readonly targetRoundCounts: readonly number[]; readonly yarnWeight: number | null; }
-export interface FiberCraftSettings { readonly crochet?: CrochetProjectSettings; readonly countedThread?: CountedThreadProjectSettings; }
+export type KnittingConstruction = 'flat' | 'round';
+export interface KnittingProjectSettings { readonly construction: KnittingConstruction; }
+export interface FiberCraftSettings { readonly crochet?: CrochetProjectSettings; readonly countedThread?: CountedThreadProjectSettings; readonly knitting?: KnittingProjectSettings; }
 export interface FiberCraftDocument { readonly formatVersion: 1; metadata: FiberCraftMetadata; palette: readonly ColorSlot[]; gauge?: GaugeSwatch; chart: FiberCraftChart; settings?: FiberCraftSettings; swatchImages: Readonly<Record<string, string>>; completedSteps: readonly string[]; }
 export const SUPPORTED_EXPORT_TARGETS = ['pdf-pattern-book','svg-vector','dxf-r12','dxf-r2000','png-raster','materials-csv','dst-embroidery','exp-embroidery','jef-embroidery','pes-embroidery','craftproj-bundle','opengraph-card'] as const;
 export type FiberCraftExportTarget = (typeof SUPPORTED_EXPORT_TARGETS)[number];
