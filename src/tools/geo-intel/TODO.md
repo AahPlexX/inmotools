@@ -29,7 +29,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
 - [x] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
 - [x] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
-- [ ] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
+- [x] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
 - [ ] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
 - [ ] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
 - [ ] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
@@ -220,3 +220,15 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `src/tools/geo-intel/export/*.ts` — JSON, CSV, iCal, PDF brief, SVG/PNG map, social card, ZIP bundle, metadata helpers; needs the profile model (G2) and synthesis output (G6).
 - `tests/unit/geo-intel-export.test.ts`.
+
+## Delivery 8 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/render/scene.ts` — MapScene model, base/overlay SVG layers (constant on-screen pin size), standalone export SVG with Dublin Core RDF metadata, legend and attribution; quantile choropleth (ColorBrewer GnBu 7).
+- `src/tools/geo-intel/export/formats.ts` — metadata resolution, JSON (full provenance + source list), flat CSV (group selection, optional provenance columns, formula-injection neutralising), RFC 5545 iCal (all-day events, escaping, 75-octet UTF-8-safe folding), holiday CSV.
+- `src/tools/geo-intel/export/binary.ts` — PNG tEXt metadata (CRC-32), SVG→PNG rasteriser (≤2× DPR), 1200×630 social card, jsPDF brief with document properties and WinAnsi-safe text, JSZip bundle + README with attribution.
+- `tests/unit/geo-intel-export.test.ts` — 10 tests.
+### Gate evidence
+- G7 checked: `vitest run tests/unit/geo-intel-export.test.ts` 10/10; `tsc` exit 0.
+### Next batch (planned)
+- `src/tools/geo-intel/ui/*.tsx` + `ui/geo-intel.css` — hooks (settings/history/client), Tooltip, ContextMenu, MapCanvas, panels (profile, provenance, admin, tools, compare, history, batch, sources, export modal) and `GeoIntelWorkspace.tsx`; needs every engine above.
+- `src/catalog.ts` + `src/tools/workspaces.tsx` registration immediately after, because the loader must point at an existing workspace file.
