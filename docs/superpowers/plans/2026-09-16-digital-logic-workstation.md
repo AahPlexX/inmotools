@@ -61,7 +61,7 @@ Delivers ledger items 3, 4, 9, 13, 16, 21, 23, 24, and the remaining part of 27 
 - RAM/ROM component with hex/ASCII editor and binary import (depends on the bus work landing first, since address/data buses are its interface).
 - RGB LED pixel-matrix component.
 - Configurable ALU component (4/8/16-bit).
-- K-map solver and Quine–McCluskey minimizer (2–5 variables), including one-click minimized-schematic regeneration from the existing SOP/POS extractor.
+- **Delivered (Phase 3A):** K-map solver and Quine–McCluskey minimizer (2–5 variables) with exact essential/Petrick cover selection, SOP and POS, don't-cares, visual grouping loops, and one-click minimized-circuit generation (`minimize-engine.ts`, `synthesis-engine.ts`, `LogicMinimizerDock.tsx`).
 - Gamified puzzle engine with a small built-in level set verified against target truth tables.
 - Junior Explorer elementary theme.
 - Full keyboard-shortcut remapping UI on top of the Phase 1 default bindings.

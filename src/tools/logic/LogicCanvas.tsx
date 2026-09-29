@@ -10,23 +10,11 @@ import {
 } from 'react';
 import { getComponentPorts } from './component-library';
 import { findComponentAt } from './gate-shapes';
-import { findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
+import { findPortAt, orthogonalWaypoints, portAbsolutePosition, GRID_SIZE } from './geometry';
 import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
 import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
-
-/**
- * A single L-bend between two absolute pixel positions, matching the
- * "orthogonal wire routing" the schematic canvas promises: horizontal
- * first when the endpoints are farther apart on that axis, vertical first
- * otherwise, so the bend reads naturally instead of a diagonal segment.
- */
-const orthogonalWaypoints = (start: WirePoint, end: WirePoint): WirePoint[] => {
-  if (start.x === end.x || start.y === end.y) return [];
-  const horizontalFirst = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
-  return horizontalFirst ? [{ x: end.x, y: start.y }] : [{ x: start.x, y: end.y }];
-};
 
 const CLICK_MOVEMENT_THRESHOLD = 6;
 const LONG_PRESS_MS = 550;

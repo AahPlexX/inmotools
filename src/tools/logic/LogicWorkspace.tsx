@@ -49,6 +49,8 @@ import {
   type SampleBuffer,
 } from './analyzer-engine';
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
+import { LogicMinimizerDock } from './LogicMinimizerDock';
+import { freeSpaceBelow, synthesizeTwoLevel, type SynthesisSpec } from './synthesis-engine';
 import { LogicCanvas, type MenuAction } from './LogicCanvas';
 import { LogicInspector } from './LogicInspector';
 import type { ComponentType, DocumentHistory, LogicDocument, LogicLevel, PortRef, ThemeName, WirePoint } from './logic-types';
@@ -102,7 +104,7 @@ export default function LogicWorkspace() {
   const pendingSwitchOverrideRef = useRef<Record<string, LogicLevel>>({});
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer'>('none');
   const [mobilePanel, setMobilePanel] = useState<'none' | 'palette' | 'inspector'>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,6 +215,18 @@ export default function LogicWorkspace() {
 
   const handleAddWire = useCallback((from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => {
     setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
+  }, []);
+
+  const handleGenerateCircuit = useCallback((spec: SynthesisSpec) => {
+    setHistory((prev) => commit(prev, 'Add minimized circuit', (document) => {
+      try {
+        const built = synthesizeTwoLevel(document, spec, freeSpaceBelow(document.components));
+        return setSelection(built.document, built.addedComponentIds);
+      } catch {
+        // A constant or malformed expression has nothing to draw; leave the circuit as it was.
+        return document;
+      }
+    }));
   }, []);
 
   const handleToggleSwitch = useCallback((id: string) => {
@@ -326,6 +340,7 @@ export default function LogicWorkspace() {
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
+        <button type="button" onClick={() => setActiveDock((current) => (current === 'minimizer' ? 'none' : 'minimizer'))} aria-pressed={activeDock === 'minimizer'}>Minimize (K-map)</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'analyzer' ? 'none' : 'analyzer'))} aria-pressed={activeDock === 'analyzer'}>Logic analyzer</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
@@ -448,6 +463,10 @@ export default function LogicWorkspace() {
             </ul>
           )}
         </section>
+      ) : null}
+
+      {activeDock === 'minimizer' ? (
+        <LogicMinimizerDock document={doc} onGenerate={handleGenerateCircuit} onClose={() => setActiveDock('none')} />
       ) : null}
 
       {activeDock === 'analyzer' ? (

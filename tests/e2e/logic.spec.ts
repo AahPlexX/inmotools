@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createInitialDocument } from '../../src/tools/logic/circuit-model';
+import { serializeProject } from '../../src/tools/logic/export-engine';
+import { synthesizeTwoLevel } from '../../src/tools/logic/synthesis-engine';
 
 // Matches GRID_SIZE in src/tools/logic/geometry.ts. The canvas starts at pan
 // (0,0) and zoom 1, so a grid coordinate (gx, gy) sits at pixel (gx*GRID, gy*GRID)
@@ -224,6 +227,47 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   const ercDock = page.getByTestId('logic-erc-dock');
   await expect(ercDock).toContainText('DIG4');
   await expect(ercDock).toContainText('DP');
+});
+
+test('the K-map minimizer reduces an unminimized circuit and adds the minimized circuit to the canvas', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  // Majority of three inputs, drawn the long way: one AND gate per minterm (3, 5, 6, 7).
+  const minterms = [3, 5, 6, 7];
+  const unminimized = synthesizeTwoLevel(
+    createInitialDocument(),
+    {
+      form: 'sop',
+      variables: ['A', 'B', 'C'],
+      terms: minterms.map((minterm) => ['A', 'B', 'C'].map((variable, bit) => ({ variable, negated: ((minterm >> bit) & 1) === 0 }))),
+      outputLabel: 'Y',
+    },
+    { x: 2, y: 2 },
+  ).document;
+  await page.locator('input[type="file"]').setInputFiles({ name: 'majority.circuit.json', mimeType: 'application/json', buffer: Buffer.from(serializeProject(unminimized)) });
+
+  await page.getByRole('button', { name: 'Minimize (K-map)' }).click();
+  const dock = page.getByTestId('logic-minimizer-dock');
+  await expect(dock).toBeVisible();
+  const expression = page.getByTestId('logic-minimizer-expression');
+  await expect(expression).toContainText(/^Y = /);
+  const sum = (await expression.innerText()).replace(/^Y = /, '').split(' + ').sort();
+  expect(sum).toEqual(['AB', 'AC', 'BC']);
+  await expect(page.getByTestId('logic-minimizer-stats')).toContainText('3 terms, 6 literals (from 4 minterms)');
+  await expect(dock.getByRole('img', { name: /Karnaugh map of 3 variables with 3 grouping loops/ })).toBeVisible();
+
+  await dock.getByRole('button', { name: 'Product of sums' }).click();
+  await expect(expression).toContainText('(A + B)');
+  await expect(page.getByTestId('logic-minimizer-stats')).toContainText('3 terms, 6 literals (from 4 maxterms)');
+
+  await dock.getByRole('button', { name: 'Add minimized AND-OR circuit' }).click();
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  await dock.getByRole('button', { name: 'Close the minimizer' }).click();
+
+  // The new circuit is complete (no floating pins) and brought its own three input switches: 3 + 3 = 6 inputs.
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  await expect(page.getByTestId('logic-erc-dock')).toContainText('No floating inputs');
+  await page.getByRole('button', { name: 'Truth table' }).click();
+  await expect(page.getByTestId('logic-truth-table-dock').locator('tbody tr')).toHaveCount(64);
 });
 
 test('the logic analyzer records steps, measures between two cursors, and goes full screen', async ({ page }) => {
