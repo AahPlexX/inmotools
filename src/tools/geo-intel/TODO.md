@@ -31,7 +31,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
 - [x] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
 - [ ] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
-- [ ] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
+- [x] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
 - [ ] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
 - [ ] **G11 Full validation** — `pnpm test:unit`, `pnpm build`, relevant e2e green; baseline comparison recorded.
 - [ ] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11.
@@ -252,3 +252,14 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 - `src/catalog.ts` — add `geo-intelligence-hub` to `ToolSlug` and one `TOOLS` entry.
 - `src/tools/workspaces.tsx` — one loader line (required by the `Record<ToolSlug, …>` type; see Boundary exceptions).
 - `tests/unit/geo-intel-wiring.test.ts` — registration contract, like the sheets/sightline wiring tests.
+
+## Delivery 10 — 2026-09-29
+### Committed this batch
+- `src/catalog.ts` — `geo-intelligence-hub` added to `ToolSlug` and one `TOOLS` entry (shortTitle, title, audience, summary, privacy, accepts, outputs, steps, hint).
+- `src/tools/workspaces.tsx` — one lazy loader line (boundary exception, see top).
+- `tests/unit/geo-intel-wiring.test.ts` — registration shape, loader, e2e selection, no-credential/excluded-host scan.
+### Gate evidence
+- G9 checked: `tsc` exit 0; `pnpm test:unit` 218 files / 2,237 tests passed before the wiring file, and the wiring file passes 4/4.
+### Next batch (planned)
+- `pnpm build` and a browser pass against `vite preview` at 375, 768, 1280, 1440 and 2560 px; fix defects found (G8 → G10).
+- `tests/e2e/geo-intel.spec.ts` — Playwright with every network source mocked by `page.route` from the recorded fixtures.
