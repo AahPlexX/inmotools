@@ -146,3 +146,71 @@ export function buildHolidayCsv(profile: LocationProfile): string {
   if (!calendar) return '';
   return `${Papa.unparse({ fields: ['date', 'name', 'local_name', 'nationwide', 'regions', 'types'], data: calendar.items.map((h) => [h.date, h.name, h.localName, h.global ? 'yes' : 'no', (h.counties ?? []).join('; '), h.types.join('; ')]) })}\r\n`;
 }
+
+// ---------------- GeoJSON (RFC 7946) and KML 2.2 ----------------
+
+const scalar = (profile: LocationProfile) => Object.fromEntries(profile.fields.map((item) => [item.key, item.value]));
+
+export function buildGeoJson(profiles: LocationProfile[], meta: ResolvedMetadata): string {
+  return `${JSON.stringify({
+    type: 'FeatureCollection',
+    // Foreign members are allowed by RFC 7946 §6.1.
+    metadata: { title: meta.title, author: meta.author, description: meta.description, tags: meta.tags, date: meta.date, license: meta.licenseText, notes: meta.notes, generator: GENERATOR },
+    attribution: attributionLines(profiles),
+    features: profiles.map((profile) => ({
+      type: 'Feature',
+      id: profile.id,
+      geometry: { type: 'Point', coordinates: [Number(profile.lon.toFixed(7)), Number(profile.lat.toFixed(7))] },
+      properties: {
+        label: profile.label, query: profile.query, country: profile.countryCode, timezone: profile.timezone, ...scalar(profile),
+        provenance: Object.fromEntries(profile.fields.map((item) => [item.key, { source: item.source, license: item.license, reference_year: item.reference_year, retrieved_at: item.retrieved_at, confidence_class: item.confidence_class }])),
+      },
+    })),
+  }, null, 2)}\n`;
+}
+
+const xml = (text: unknown) => String(text ?? '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c] as string));
+
+export function buildKml(profiles: LocationProfile[], meta: ResolvedMetadata): string {
+  const placemarks = profiles.map((profile) => `    <Placemark id="${xml(profile.id)}">
+      <name>${xml(profile.label)}</name>
+      <description>${xml(`${profile.query} · ${profile.timezone ?? ''}`)}</description>
+      <ExtendedData>
+${profile.fields.filter((item) => item.value !== null).map((item) => `        <Data name="${xml(item.key)}"><displayName>${xml(item.label)}</displayName><value>${xml(item.value)}</value></Data>`).join('\n')}
+      </ExtendedData>
+      <Point><coordinates>${profile.lon.toFixed(7)},${profile.lat.toFixed(7)},0</coordinates></Point>
+    </Placemark>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+  <Document>
+    <name>${xml(meta.title)}</name>
+    ${meta.author ? `<atom:author><atom:name>${xml(meta.author)}</atom:name></atom:author>` : ''}
+    <description>${xml([meta.description, meta.tags.length ? `Tags: ${meta.tags.join(', ')}` : '', `License: ${meta.licenseText}`, meta.notes, `Sources: ${attributionLines(profiles).join(' | ')}`].filter(Boolean).join('\n'))}</description>
+${placemarks}
+  </Document>
+</kml>
+`;
+}
+
+// ---------------- Import (restore saved locations) ----------------
+
+const CONFIDENCE = new Set(['rooftop', 'street', 'postal_centroid', 'locality_centroid', 'admin_centroid', 'modeled_grid']);
+
+function isProfile(value: unknown): value is LocationProfile {
+  const p = value as Partial<LocationProfile> | null;
+  return !!p && p.schema === 'geo-intel-profile/1' && typeof p.id === 'string' && typeof p.label === 'string'
+    && Number.isFinite(p.lat) && Number.isFinite(p.lon) && Math.abs(p.lat as number) <= 90 && Math.abs(p.lon as number) <= 180
+    && Array.isArray(p.fields) && p.fields.every((item) => item && typeof item.key === 'string' && typeof item.source === 'string' && CONFIDENCE.has(item.confidence_class));
+}
+
+/** Accepts this tool's JSON export, a bare profile, or an array of profiles. Invalid entries are counted, not imported. */
+export function parseProfileImport(text: string): { profiles: LocationProfile[]; rejected: number; metadata: Partial<ExportMetadata> | null } {
+  let data: unknown;
+  try { data = JSON.parse(text); } catch { throw new Error('This file is not valid JSON.'); }
+  const root = data as { schema?: string; profiles?: unknown[]; metadata?: Partial<ExportMetadata> };
+  const list = Array.isArray(data) ? data : root?.schema === 'geo-intel-export/1' && Array.isArray(root.profiles) ? root.profiles : [data];
+  const profiles = list.filter(isProfile).map((p) => ({ ...p, adminChain: Array.isArray(p.adminChain) ? p.adminChain : [], warnings: Array.isArray(p.warnings) ? p.warnings : [], sourcesUsed: Array.isArray(p.sourcesUsed) ? p.sourcesUsed : [] }));
+  if (!profiles.length) throw new Error('No Geo Intelligence Hub locations were found in this file.');
+  const metadata = root?.schema === 'geo-intel-export/1' && root.metadata ? { ...root.metadata, tags: Array.isArray(root.metadata.tags) ? root.metadata.tags : [] } : null;
+  return { profiles, rejected: list.length - profiles.length, metadata };
+}

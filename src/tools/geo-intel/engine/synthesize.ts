@@ -6,14 +6,14 @@ import type { AdapterResult } from '../adapters/common';
 import { elevation, nagerHolidays, solarTimes } from '../adapters/environment';
 import { postcodesLookup, postcodesReverse, zippopotamLookup } from '../adapters/postal';
 import { eurostatRegion, nutsForPoint, worldBankCountry } from '../adapters/statistics';
-import { formatDDM, formatDMS, formatUtm, toMgrs } from '../core/coords';
+import { antipode, encodeGeohash, formatDDM, formatDMS, formatUtm, toMaidenhead, toMgrs } from '../core/coords';
 import { metresToFeet } from '../core/geodesy';
 import { decode, describeArea, encode, recoverNearest } from '../core/olc';
 import { normalizePostal } from '../core/postal';
 import { parseQuery, queryKindOf, type ParsedQuery } from '../core/query-parser';
 import { field, upsertFields } from '../core/sources';
 import { abbreviation, formatOffset, isDst, localDate, nextTransition, observesDst, offsetMinutes } from '../core/timezone';
-import type { AdminLevel, ConfidenceClass, GeographyType, LatLon, LocationProfile, ProfileField, QueryKind, SourceId } from '../core/types';
+import type { AdminLevel, ConfidenceClass, GeographyType, HolidayCalendar, LatLon, LocationProfile, ProfileField, QueryKind, SolarTimes, SourceId } from '../core/types';
 import type { HttpClient } from '../net/http';
 import type { GeoIntelSettings } from '../net/store';
 import { admin1Match, countryAt, currencySymbol, languageNames, placesNear, timezoneAt, type CountryRecord } from '../offline/static-data';
@@ -130,7 +130,17 @@ async function anchorFor(parsed: ParsedQuery, input: ResolveInput, options: Reso
       let primary: AdapterResult | null = null;
       if (country === 'GB') primary = await tryAdapter('Postcodes.io', warnings, () => postcodesLookup(options.client, request, options.signal), options.signal);
       if (!primary?.point) primary = await tryAdapter('Zippopotam.us', warnings, () => zippopotamLookup(options.client, request, options.signal), options.signal);
-      if (!primary?.point) throw new ResolveError(`Postal code ${request.display} (${country}) was not found.`);
+      if (!primary?.point) {
+        if (!parsed.country) {
+          // A bare number may be a postal code elsewhere or part of a place name: let the geocoder try.
+          const place = await geocodePlace(parsed.text, options, warnings).catch(() => null);
+          if (place?.point) {
+            warnings.push(`${request.display} is not a ${country} postal code; showing the best geocoder match instead. Add a country, e.g. “DE ${request.display}”.`);
+            return { point: place.point, kind: 'place', query: parsed.text, confidence: place.confidence, source: place.source, geography: place.fields[0]?.geography_type ?? 'locality', recordId: place.recordId, note: 'Best single match from the geocoder.', primary: place };
+          }
+        }
+        throw new ResolveError(`Postal code ${request.display} (${country}) was not found. Check the code, or pick the right country.`);
+      }
       return { point: primary.point, kind: 'postal', query: parsed.text, confidence: primary.confidence, source: primary.source, geography: 'postal_code', recordId: primary.recordId, note: primary.fields[0]?.note ?? 'Postal code centroid.', primary };
     }
     case 'place': {
@@ -152,6 +162,9 @@ function coordinateFields(anchor: Anchor, retrievedAt: string): ProfileField[] {
     field('codes.plusCode', 'Plus Code', 'codes', encode(point.lat, point.lon, 11), { ...computed, source: 'open-location-code' }),
     field('codes.dms', 'Degrees, minutes, seconds', 'codes', formatDMS(point), computed),
     field('codes.ddm', 'Degrees, decimal minutes', 'codes', formatDDM(point), computed),
+    field('codes.geohash', 'Geohash', 'codes', encodeGeohash(point, 9), { ...computed, note: '9 characters ≈ 5 m × 5 m cell.' }),
+    field('codes.maidenhead', 'Maidenhead locator', 'codes', toMaidenhead(point, 4), { ...computed, note: 'IARU locator at extended-square precision (amateur radio).' }),
+    field('codes.antipode', 'Antipode', 'codes', (() => { const a = antipode(point); return `${a.lat.toFixed(6)}, ${a.lon.toFixed(6)}`; })(), { ...computed, note: 'The point on the exact opposite side of the Earth.' }),
   ];
   if (point.lat >= -80 && point.lat <= 84) {
     fields.push(field('codes.utm', 'UTM', 'codes', formatUtm(point), computed));
@@ -214,6 +227,48 @@ function mergeChains(country: CountryRecord | null, chains: AdminLevel[][]): Adm
   return out.sort((a, b) => a.level - b.level);
 }
 
+
+/** Profile fields derived from a SolarTimes record (also used when the user picks another date). */
+export function solarFields(s: SolarTimes): ProfileField[] {
+  const sp = s.provenance;
+  const f = (key: string, label: string, value: string | number | null, unit: string | null = 'ISO 8601 instant'): ProfileField => ({ key, label, group: 'solar', value, ...sp, unit });
+  const out = [
+    f('solar.status', 'Sun status', s.status === 'normal' ? 'Rises and sets' : s.status === 'polar_day' ? 'Midnight sun (does not set)' : 'Polar night (does not rise)', null),
+    f('solar.sunrise', 'Sunrise', s.sunrise), f('solar.sunset', 'Sunset', s.sunset), f('solar.solarNoon', 'Solar noon', s.solarNoon),
+    f('solar.dayLength', 'Daylight duration', s.dayLengthSeconds, 's'),
+    f('solar.civilDawn', 'Civil dawn', s.civilDawn), f('solar.civilDusk', 'Civil dusk', s.civilDusk),
+    f('solar.nauticalDawn', 'Nautical dawn', s.nauticalDawn), f('solar.nauticalDusk', 'Nautical dusk', s.nauticalDusk),
+    f('solar.astronomicalDawn', 'Astronomical dawn', s.astronomicalDawn), f('solar.astronomicalDusk', 'Astronomical dusk', s.astronomicalDusk),
+    f('solar.goldenMorning', 'Golden hour (morning)', s.goldenMorning?.join(' – ') ?? null, 'ISO 8601 interval'),
+    f('solar.goldenEvening', 'Golden hour (evening)', s.goldenEvening?.join(' – ') ?? null, 'ISO 8601 interval'),
+    f('solar.blueMorning', 'Blue hour (morning)', s.blueMorning?.join(' – ') ?? null, 'ISO 8601 interval'),
+    f('solar.blueEvening', 'Blue hour (evening)', s.blueEvening?.join(' – ') ?? null, 'ISO 8601 interval'),
+  ];
+  if (s.moon) {
+    const moonMeta = s.moon.source === 'computed'
+      ? { ...sp, source: 'computed' as const, license: 'n/a', attribution: 'Computed locally', note: 'Mean lunar cycle (about ±½ day); moonrise and moonset need a sun-time service.' }
+      : sp;
+    out.push(
+      { key: 'solar.moonPhase', label: 'Moon phase', group: 'solar', value: s.moon.phase, ...moonMeta, unit: null },
+      { key: 'solar.moonIllumination', label: 'Moon illuminated', group: 'solar', value: s.moon.illumination, ...moonMeta, unit: '%' },
+      { key: 'solar.moonrise', label: 'Moonrise', group: 'solar', value: s.moon.rise, ...moonMeta, unit: 'ISO 8601 instant' },
+      { key: 'solar.moonset', label: 'Moonset', group: 'solar', value: s.moon.set, ...moonMeta, unit: 'ISO 8601 instant' },
+    );
+  }
+  return out;
+}
+
+/** Holiday summary fields relative to `today` (YYYY-MM-DD in the location's zone). */
+export function holidayFields(holidays: HolidayCalendar, today: string): ProfileField[] {
+  const hp = holidays.provenance;
+  const upcoming = holidays.items.find((item) => item.date >= today);
+  return [
+    { key: 'holidays.count', label: `Public holidays in ${holidays.year}`, group: 'holidays', value: holidays.items.length, ...hp, unit: 'days' },
+    { key: 'holidays.nationwide', label: 'Nationwide holidays', group: 'holidays', value: holidays.items.filter((item) => item.global).length, ...hp, unit: 'days' },
+    { key: 'holidays.next', label: 'Next public holiday', group: 'holidays', value: upcoming ? `${upcoming.date} · ${upcoming.name}${upcoming.global ? '' : ' (regional)'}` : null, ...hp, unit: null },
+  ];
+}
+
 export async function resolveLocation(input: ResolveInput, options: ResolveOptions): Promise<LocationProfile> {
   const now = options.now?.() ?? new Date();
   const retrievedAt = now.toISOString();
@@ -239,7 +294,12 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
     elevation(client, point.lat, point.lon, signal),
     solarTimes(client, point.lat, point.lon, dateHere, signal),
     country && !country.withdrawn ? tryAdapter('World Bank', warnings, () => worldBankCountry(client, country.a3, signal), signal) : Promise.resolve(null),
-    countryCode ? tryAdapter('Nager.Date', warnings, () => nagerHolidays(client, year, countryCode, signal), signal) : Promise.resolve(null),
+    countryCode ? tryAdapter('Nager.Date', warnings, async () => {
+      const calendar = await nagerHolidays(client, year, countryCode, signal);
+      // Late in the year every holiday may be past: show next year's calendar instead.
+      if (calendar && calendar.items.length && !calendar.items.some((item) => item.date >= dateHere)) return (await nagerHolidays(client, year + 1, countryCode, signal)) ?? calendar;
+      return calendar;
+    }, signal) : Promise.resolve(null),
     countryCode && NUTS_COUNTRIES.has(countryCode) ? tryAdapter('Eurostat GISCO', warnings, () => nutsForPoint(client, point.lat, point.lon, signal), signal) : Promise.resolve(null),
   ]);
   warnings.push(...elev.warnings, ...solar.warnings);
@@ -265,31 +325,9 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
   }
 
   const s = solar.solar;
-  const sp = s.provenance;
-  const solarField = (key: string, label: string, value: string | number | null, unit: string | null = 'ISO 8601 instant') => ({ key, label, group: 'solar' as const, value, ...sp, unit });
-  fields = upsertFields(fields, [
-    solarField('solar.status', 'Sun status', s.status === 'normal' ? 'Rises and sets' : s.status === 'polar_day' ? 'Midnight sun (does not set)' : 'Polar night (does not rise)', null),
-    solarField('solar.sunrise', 'Sunrise', s.sunrise), solarField('solar.sunset', 'Sunset', s.sunset), solarField('solar.solarNoon', 'Solar noon', s.solarNoon),
-    solarField('solar.dayLength', 'Daylight duration', s.dayLengthSeconds, 's'),
-    solarField('solar.civilDawn', 'Civil dawn', s.civilDawn), solarField('solar.civilDusk', 'Civil dusk', s.civilDusk),
-    solarField('solar.nauticalDawn', 'Nautical dawn', s.nauticalDawn), solarField('solar.nauticalDusk', 'Nautical dusk', s.nauticalDusk),
-    solarField('solar.astronomicalDawn', 'Astronomical dawn', s.astronomicalDawn), solarField('solar.astronomicalDusk', 'Astronomical dusk', s.astronomicalDusk),
-    solarField('solar.goldenMorning', 'Golden hour (morning)', s.goldenMorning?.join(' – ') ?? null, 'ISO 8601 interval'),
-    solarField('solar.goldenEvening', 'Golden hour (evening)', s.goldenEvening?.join(' – ') ?? null, 'ISO 8601 interval'),
-    solarField('solar.blueMorning', 'Blue hour (morning)', s.blueMorning?.join(' – ') ?? null, 'ISO 8601 interval'),
-    solarField('solar.blueEvening', 'Blue hour (evening)', s.blueEvening?.join(' – ') ?? null, 'ISO 8601 interval'),
-  ]);
-
-  if (holidays) {
-    const today = dateHere;
-    const upcoming = holidays.items.find((item) => item.date >= today);
-    const hp = holidays.provenance;
-    fields = upsertFields(fields, [
-      { key: 'holidays.count', label: `Public holidays in ${holidays.year}`, group: 'holidays', value: holidays.items.length, ...hp, unit: 'days' },
-      { key: 'holidays.nationwide', label: 'Nationwide holidays', group: 'holidays', value: holidays.items.filter((item) => item.global).length, ...hp, unit: 'days' },
-      { key: 'holidays.next', label: 'Next public holiday', group: 'holidays', value: upcoming ? `${upcoming.date} · ${upcoming.name}${upcoming.global ? '' : ' (regional)'}` : null, ...hp, unit: null },
-    ]);
-  } else if (countryCode) warnings.push(`Nager.Date publishes no holiday calendar for ${countryCode}.`);
+  fields = upsertFields(fields, solarFields(s));
+  if (holidays) fields = upsertFields(fields, holidayFields(holidays, dateHere));
+  else if (countryCode) warnings.push(`Nager.Date publishes no holiday calendar for ${countryCode}.`);
 
   const place = nearest[0];
   if (place) fields = upsertFields(fields, [field('population.nearestPlace', 'Nearest populated place (bundled)', 'population', `${place.name} · ${place.distanceKm.toFixed(1)} km · pop. ≈${place.popMax.toLocaleString('en-US')}`, { source: 'natural-earth', geography: 'populated_place', confidence: 'locality_centroid', retrievedAt, unit: null, note: 'Natural Earth pop_max is an urban-agglomeration estimate for the named place, not the population of this point or postal code.' })]);

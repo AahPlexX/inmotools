@@ -164,7 +164,18 @@ export interface SolarTimes {
   blueMorning: [string, string] | null;
   blueEvening: [string, string] | null;
   status: 'normal' | 'polar_day' | 'polar_night';
+  /** Optional so profiles saved before moon data existed still load. */
+  moon?: MoonInfo | null;
   provenance: Provenance;
+}
+
+export interface MoonInfo {
+  rise: string | null;
+  set: string | null;
+  phase: string;
+  /** Percent of the disc lit. */
+  illumination: number;
+  source: SourceId;
 }
 
 export type QueryKind =

@@ -41,6 +41,7 @@ interface SsoV2 {
   astronomical_twilight_begin: string | null; astronomical_twilight_end: string | null;
   golden_hour?: { morning: { begin: string | null; end: string | null }; evening: { begin: string | null; end: string | null } };
   blue_hour?: { morning: { begin: string | null; end: string | null }; evening: { begin: string | null; end: string | null } };
+  moonrise?: string | null; moonset?: string | null; moon_phase?: string; moon_illumination?: number;
 }
 
 const toIso = (value: string | null | undefined) => (value ? new Date(value).toISOString() : null);
@@ -67,6 +68,7 @@ export async function sunriseSunsetOrg(client: HttpClient, lat: number, lon: num
     goldenMorning: windowOf(d.golden_hour?.morning) ?? fallback.morning, goldenEvening: windowOf(d.golden_hour?.evening) ?? fallback.evening,
     blueMorning: windowOf(d.blue_hour?.morning), blueEvening: windowOf(d.blue_hour?.evening),
     status,
+    moon: d.moon_phase ? { rise: toIso(d.moonrise), set: toIso(d.moonset), phase: d.moon_phase, illumination: Math.round((num(d.moon_illumination) ?? 0) * 10) / 10, source: 'sunrise-sunset-org' } : null,
     provenance: provenance({ source: 'sunrise-sunset-org', geography: 'point', confidence: 'modeled_grid', retrievedAt: response.retrievedAt, recordId: `${lat.toFixed(5)},${lon.toFixed(5)}@${date}`, year: Number(date.slice(0, 4)), note: `Computed by the provider for ${date} (${d.tzid}); golden and blue hour use the provider's sun-altitude windows.` }),
   };
 }
@@ -103,6 +105,7 @@ export async function sunriseSunsetIo(client: HttpClient, lat: number, lon: numb
     goldenMorning: unixWindow(r.golden_hour_morning) ?? fallback.morning, goldenEvening: unixWindow(r.golden_hour_evening) ?? fallback.evening,
     blueMorning: unixWindow(r.blue_hour_morning), blueEvening: unixWindow(r.blue_hour_evening),
     status: statusFrom(r.sun_status ?? 'normal'),
+    moon: typeof r.moon_phase === 'string' ? { rise: unix(r.moonrise), set: unix(r.moonset), phase: r.moon_phase, illumination: Math.round((num(r.moon_illumination) ?? 0) * 10) / 10, source: 'sunrisesunset-io' } : null,
     provenance: provenance({ source: 'sunrisesunset-io', geography: 'point', confidence: 'modeled_grid', retrievedAt: response.retrievedAt, recordId: `${lat.toFixed(5)},${lon.toFixed(5)}@${date}`, year: Number(date.slice(0, 4)), note: `Computed by the provider for ${date}${response.data.tzid ? ` (${response.data.tzid})` : ''}; the provider applies terrain elevation, so times can differ by a minute from sea-level models.` }),
   };
 }

@@ -279,3 +279,77 @@ export function formatUtm(point: LatLon): string {
   const utm = toUtm(point);
   return `${utm.zone}${utm.band} ${Math.floor(utm.easting)}mE ${Math.floor(utm.northing)}mN`;
 }
+
+// ---------------- Geohash (public domain, G. Niemeyer 2008) ----------------
+
+const GEOHASH_ALPHABET = '0123456789bcdefghjkmnpqrstuvwxyz';
+
+export function encodeGeohash(point: LatLon, precision = 9): string {
+  const lat: [number, number] = [-90, 90];
+  const lon: [number, number] = [-180, 180];
+  let hash = ''; let bits = 0; let value = 0; let even = true;
+  while (hash.length < precision) {
+    const range = even ? lon : lat;
+    const coordinate = even ? point.lon : point.lat;
+    const mid = (range[0] + range[1]) / 2;
+    if (coordinate >= mid) { value = (value << 1) | 1; range[0] = mid; } else { value <<= 1; range[1] = mid; }
+    even = !even;
+    bits += 1;
+    if (bits === 5) { hash += GEOHASH_ALPHABET[value]; bits = 0; value = 0; }
+  }
+  return hash;
+}
+
+export function decodeGeohash(input: string): { center: LatLon; south: number; west: number; north: number; east: number } {
+  const hash = input.trim().toLowerCase();
+  if (!hash || [...hash].some((c) => !GEOHASH_ALPHABET.includes(c))) throw new Error('Not a geohash');
+  const lat: [number, number] = [-90, 90];
+  const lon: [number, number] = [-180, 180];
+  let even = true;
+  for (const char of hash) {
+    const value = GEOHASH_ALPHABET.indexOf(char);
+    for (let bit = 4; bit >= 0; bit -= 1) {
+      const range = even ? lon : lat;
+      const mid = (range[0] + range[1]) / 2;
+      if ((value >> bit) & 1) range[0] = mid; else range[1] = mid;
+      even = !even;
+    }
+  }
+  return { center: { lat: (lat[0] + lat[1]) / 2, lon: (lon[0] + lon[1]) / 2 }, south: lat[0], north: lat[1], west: lon[0], east: lon[1] };
+}
+
+// ---------------- Maidenhead / IARU locator ----------------
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWX';
+
+/** IARU locator; 3 pairs = subsquare (≈5′ × 2.5′), 4 pairs = extended square. Upper case per IARU 2019. */
+export function toMaidenhead(point: LatLon, pairs: 2 | 3 | 4 = 3): string {
+  let lon = Math.min(359.999999, Math.max(0, point.lon + 180));
+  let lat = Math.min(179.999999, Math.max(0, point.lat + 90));
+  let out = LETTERS[Math.floor(lon / 20)] + LETTERS[Math.floor(lat / 10)];
+  lon %= 20; lat %= 10;
+  out += `${Math.floor(lon / 2)}${Math.floor(lat)}`;
+  lon %= 2; lat %= 1;
+  if (pairs >= 3) {
+    out += LETTERS[Math.floor(lon * 12)] + LETTERS[Math.floor(lat * 24)];
+    lon = (lon * 12) % 1; lat = (lat * 24) % 1;
+  }
+  if (pairs >= 4) out += `${Math.floor(lon * 10)}${Math.floor(lat * 10)}`;
+  return out;
+}
+
+export function fromMaidenhead(input: string): { center: LatLon; south: number; west: number; north: number; east: number } {
+  const text = input.trim().toUpperCase();
+  if (!/^[A-R]{2}(\d{2}([A-X]{2}(\d{2})?)?)?$/.test(text)) throw new Error('Not a Maidenhead locator');
+  let west = (text.charCodeAt(0) - 65) * 20 - 180;
+  let south = (text.charCodeAt(1) - 65) * 10 - 90;
+  let w = 20; let h = 10;
+  if (text.length >= 4) { w = 2; h = 1; west += Number(text[2]) * w; south += Number(text[3]) * h; }
+  if (text.length >= 6) { w = 2 / 24; h = 1 / 24; west += (text.charCodeAt(4) - 65) * w; south += (text.charCodeAt(5) - 65) * h; }
+  if (text.length >= 8) { w /= 10; h /= 10; west += Number(text[6]) * w; south += Number(text[7]) * h; }
+  return { center: { lat: south + h / 2, lon: west + w / 2 }, south, west, north: south + h, east: west + w };
+}
+
+export function antipode(point: LatLon): LatLon {
+  return { lat: -point.lat, lon: point.lon > 0 ? point.lon - 180 : point.lon + 180 };
+}

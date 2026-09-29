@@ -97,6 +97,7 @@ export function computeSolarTimes(ymd: string, lat: number, lon: number, provena
     blueMorning: pair(at(CIVIL, true), at(BLUE_UPPER, true)),
     blueEvening: pair(at(BLUE_UPPER, false), at(CIVIL, false)),
     status,
+    moon: (() => { const m = moonPhaseAt(noon); return { rise: null, set: null, phase: m.phase, illumination: Math.round(m.illumination * 10) / 10, source: 'computed' as const }; })(),
     provenance,
   };
 }
@@ -115,4 +116,29 @@ export function formatDuration(seconds: number | null): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return `${h} h ${String(m).padStart(2, '0')} min`;
+}
+
+/** Sun altitude (geometric, no refraction) and azimuth (clockwise from true north) at an instant. */
+export function sunPositionAt(ms: number, lat: number, lon: number): { altitude: number; azimuth: number } {
+  const { declination, equationOfTimeMinutes } = sunPosition(ms);
+  const d = new Date(ms);
+  const utcMinutes = d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60;
+  const trueSolar = (((utcMinutes + equationOfTimeMinutes + 4 * lon) % 1440) + 1440) % 1440;
+  const hourAngle = rad(trueSolar / 4 - 180);
+  const φ = rad(lat); const δ = rad(declination);
+  const altitude = Math.asin(Math.sin(φ) * Math.sin(δ) + Math.cos(φ) * Math.cos(δ) * Math.cos(hourAngle));
+  const azimuth = Math.atan2(Math.sin(hourAngle), Math.cos(hourAngle) * Math.sin(φ) - Math.tan(δ) * Math.cos(φ));
+  return { altitude: deg(altitude), azimuth: (deg(azimuth) + 540) % 360 };
+}
+
+const SYNODIC_MONTH = 29.530588853;
+const REFERENCE_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
+const PHASES = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
+
+/** Mean-lunation moon phase (accurate to about half a day); rise/set need a provider. */
+export function moonPhaseAt(ms: number): { fraction: number; illumination: number; phase: string; ageDays: number } {
+  const days = (ms - REFERENCE_NEW_MOON) / 86_400_000;
+  const age = ((days % SYNODIC_MONTH) + SYNODIC_MONTH) % SYNODIC_MONTH;
+  const fraction = age / SYNODIC_MONTH;
+  return { fraction, illumination: ((1 - Math.cos(2 * Math.PI * fraction)) / 2) * 100, phase: PHASES[Math.round(fraction * 8) % 8], ageDays: age };
 }
