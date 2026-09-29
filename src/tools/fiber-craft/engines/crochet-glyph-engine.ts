@@ -1,3 +1,4 @@
+import type { CrochetLoopMode } from '../fiber-craft-types';
 import { getCrochetSymbol } from './symbol-library';
 
 export interface GlyphPoint {
@@ -28,7 +29,29 @@ const tallStitch = (diagonalBars: number): readonly CrochetGlyphPrimitive[] => {
   return primitives;
 };
 
-export function crochetGlyphPrimitives(symbolId: string): readonly CrochetGlyphPrimitive[] {
+/** Extra marks drawn at the base of a stitch that is worked in one loop only. */
+const loopMarks = (loop: CrochetLoopMode): readonly CrochetGlyphPrimitive[] => loop === 'back'
+  ? [{ kind: 'arc', cx: 0, cy: 0.98, r: 0.42, startAngle: Math.PI, endAngle: 0 }]
+  : [line(-0.42, 0.98, 0.42, 0.98), line(-0.42, 0.9, -0.42, 1.06), line(0.42, 0.9, 0.42, 1.06)];
+
+const tallDecrease = (legs: 2 | 3): readonly CrochetGlyphPrimitive[] => [
+  line(-0.55, 0.7, 0, -0.66),
+  line(0.55, 0.7, 0, -0.66),
+  ...(legs === 3 ? [line(0, 0.78, 0, -0.66)] : []),
+  line(-0.34, -0.5, 0.34, -0.5),
+  line(-0.3, 0.05, 0.3, -0.25),
+];
+
+export interface CrochetGlyphModifiers {
+  readonly loop?: CrochetLoopMode | null;
+}
+
+export function crochetGlyphPrimitives(symbolId: string, modifiers: CrochetGlyphModifiers = {}): readonly CrochetGlyphPrimitive[] {
+  const base = baseGlyphPrimitives(symbolId);
+  return modifiers.loop ? [...base, ...loopMarks(modifiers.loop)] : base;
+}
+
+function baseGlyphPrimitives(symbolId: string): readonly CrochetGlyphPrimitive[] {
   const { glyph } = getCrochetSymbol(symbolId);
 
   switch (glyph) {
@@ -90,6 +113,17 @@ export function crochetGlyphPrimitives(symbolId: string): readonly CrochetGlyphP
         line(0.55, 0.7, 0, -0.66),
         line(-0.22, -0.5, 0.22, -0.5),
       ];
+    case 'decrease-3':
+      return [
+        line(-0.62, 0.7, 0, -0.66),
+        line(0, 0.78, 0, -0.66),
+        line(0.62, 0.7, 0, -0.66),
+        line(-0.22, -0.5, 0.22, -0.5),
+      ];
+    case 'decrease-tall-2':
+      return tallDecrease(2);
+    case 'decrease-tall-3':
+      return tallDecrease(3);
     default: {
       const unreachable: never = glyph;
       return unreachable;

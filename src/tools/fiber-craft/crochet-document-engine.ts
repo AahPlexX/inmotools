@@ -2,15 +2,16 @@ import {
   createEmptyGridChart,
   createEmptyPolarChart,
   setGridCell,
-  setPolarNode,
 } from './engines/geometry-engine';
 import { getCrochetSymbol } from './engines/symbol-library';
 import {
   createEmptyMetadata,
   type FiberCraftDocument,
+  type CrochetLoopMode,
   type GaugeSwatch,
   type GridChart,
   type PolarChart,
+  type PolarStitchNode,
 } from './fiber-craft-types';
 
 export const STARTER_CROCHET_STITCHES = 6;
@@ -99,24 +100,153 @@ export const addCrochetRound = (
   }, now);
 };
 
+/** Optional per-stitch modifiers; see `PolarStitchNode` for their meaning. */
+export interface CrochetStitchModifiers {
+  readonly sharedBase?: boolean;
+  readonly loop?: CrochetLoopMode | null;
+}
+
+const requireRoundPosition = (chart: PolarChart, round: number, angleIndex: number): PolarStitchNode => {
+  if (!Number.isInteger(round) || round < 0 || round >= chart.rounds) {
+    throw new Error('Round is outside this chart.');
+  }
+  const node = chart.nodes.find((candidate) => candidate.round === round && candidate.angleIndex === angleIndex);
+  if (!Number.isInteger(angleIndex) || !node) throw new Error('Position is outside this round.');
+  return node;
+};
+
+const requirePaletteColor = (document: FiberCraftDocument, colorId: string | null): void => {
+  if (colorId !== null && !document.palette.some((color) => color.id === colorId)) {
+    throw new Error('Selected color is not in this project palette.');
+  }
+};
+
+/** Builds a node from scratch so a cleared or replaced stitch never keeps a stale modifier. */
+const stitchedNode = (
+  node: PolarStitchNode,
+  symbolId: string | null,
+  colorId: string | null,
+  modifiers: CrochetStitchModifiers,
+): PolarStitchNode => {
+  const base: PolarStitchNode = {
+    round: node.round,
+    angleIndex: node.angleIndex,
+    stitchesInRound: node.stitchesInRound,
+    symbolId,
+    colorId: symbolId === null ? null : colorId,
+  };
+  if (symbolId === null) return base;
+  return {
+    ...base,
+    ...(modifiers.sharedBase ? { sharedBase: true as const } : {}),
+    ...(modifiers.loop ? { loop: modifiers.loop } : {}),
+  };
+};
+
+const validatedModifiers = (node: PolarStitchNode, symbolId: string | null, modifiers: CrochetStitchModifiers): void => {
+  if (symbolId === null) return;
+  if (modifiers.sharedBase && node.angleIndex === 0) {
+    throw new Error('The first stitch in a round starts a new base stitch, so it cannot share a base with a previous stitch.');
+  }
+  if (modifiers.loop !== undefined && modifiers.loop !== null && modifiers.loop !== 'front' && modifiers.loop !== 'back') {
+    throw new Error('Loop must be front, back, or unset.');
+  }
+};
+
+/**
+ * Sets, replaces, or clears (`symbolId` null) any single stitch position in a round chart. Editing one
+ * position leaves every other position untouched, which is what makes correcting a mistake mid-round
+ * possible without undoing everything after it.
+ */
+export const setCrochetRoundStitch = (
+  document: FiberCraftDocument,
+  round: number,
+  angleIndex: number,
+  symbolId: string | null,
+  colorId: string | null,
+  modifiers: CrochetStitchModifiers = {},
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  if (symbolId !== null) getCrochetSymbol(symbolId);
+  const chart = requirePolarChart(document);
+  const target = requireRoundPosition(chart, round, angleIndex);
+  requirePaletteColor(document, colorId);
+  validatedModifiers(target, symbolId, modifiers);
+  const nodes = chart.nodes.map((node) => node === target ? stitchedNode(node, symbolId, colorId, modifiers) : node);
+  return withUpdatedChart(document, { ...chart, nodes }, now);
+};
+
 export const workNextCrochetStitch = (
   document: FiberCraftDocument,
   round: number,
   symbolId: string,
   colorId: string | null,
   now = new Date().toISOString(),
+  modifiers: CrochetStitchModifiers = {},
 ): FiberCraftDocument => {
   getCrochetSymbol(symbolId);
   const chart = requirePolarChart(document);
   if (!Number.isInteger(round) || round < 0 || round >= chart.rounds) {
     throw new Error('Round is outside this chart.');
   }
-  if (colorId !== null && !document.palette.some((color) => color.id === colorId)) {
-    throw new Error('Selected color is not in this project palette.');
-  }
   const target = chart.nodes.find((node) => node.round === round && node.symbolId === null);
   if (!target) throw new Error('Every stitch in this round is already worked.');
-  return withUpdatedChart(document, setPolarNode(chart, round, target.angleIndex, colorId, symbolId), now);
+  return setCrochetRoundStitch(document, round, target.angleIndex, symbolId, colorId, modifiers, now);
+};
+
+/**
+ * Fills every position in a round with one stitch. With `sharedBase` requested the round is filled in
+ * increase pairs (positions 2, 4, 6… share the base of the position before), which is the standard
+ * "2 stitches in every stitch" shaping round in one action instead of twelve.
+ */
+export const fillCrochetRound = (
+  document: FiberCraftDocument,
+  round: number,
+  symbolId: string,
+  colorId: string | null,
+  modifiers: CrochetStitchModifiers = {},
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  getCrochetSymbol(symbolId);
+  const chart = requirePolarChart(document);
+  requireRoundPosition(chart, round, 0);
+  requirePaletteColor(document, colorId);
+  const nodes = chart.nodes.map((node) => node.round === round
+    ? stitchedNode(node, symbolId, colorId, { ...modifiers, sharedBase: modifiers.sharedBase === true && node.angleIndex % 2 === 1 })
+    : node);
+  return withUpdatedChart(document, { ...chart, nodes }, now);
+};
+
+export const clearCrochetRound = (
+  document: FiberCraftDocument,
+  round: number,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requirePolarChart(document);
+  requireRoundPosition(chart, round, 0);
+  const nodes = chart.nodes.map((node) => node.round === round ? stitchedNode(node, null, null, {}) : node);
+  return withUpdatedChart(document, { ...chart, nodes }, now);
+};
+
+/**
+ * Removes the outermost round and the bookkeeping that referred to it (its progress marker and any
+ * shaping target beyond the new last round). A round chart always keeps at least one round.
+ */
+export const removeLastCrochetRound = (
+  document: FiberCraftDocument,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requirePolarChart(document);
+  if (chart.rounds <= 1) throw new Error('This is the only round, and a round chart needs at least one.');
+  const lastRound = chart.rounds - 1;
+  const trimmed = withUpdatedChart(document, {
+    ...chart,
+    rounds: lastRound,
+    nodes: chart.nodes.filter((node) => node.round !== lastRound),
+  }, now);
+  const targets = trimmed.settings?.crochet?.targetRoundCounts ?? [];
+  const withTargets = targets.length > lastRound ? withCrochetSettings(trimmed, { targetRoundCounts: targets.slice(0, lastRound) }) : trimmed;
+  return { ...withTargets, completedSteps: withTargets.completedSteps.filter((step) => step !== `round:${lastRound}`) };
 };
 
 export const crochetRoundProgress = (

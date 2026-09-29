@@ -1,6 +1,6 @@
-import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './crochet-glyph-engine';
+import { crochetGlyphPrimitives, type CrochetGlyphModifiers, type CrochetGlyphPrimitive } from './crochet-glyph-engine';
 import { polarNodeToCartesian } from './geometry-engine';
-import type { ColorSlot, GridChart, PolarChart } from '../fiber-craft-types';
+import type { ColorSlot, GridChart, PolarChart, PolarStitchNode } from '../fiber-craft-types';
 
 export type CrochetChartTheme = 'light' | 'dark-room' | 'high-contrast';
 export type CrochetPngScale = 1 | 2 | 3 | 4;
@@ -15,6 +15,8 @@ export interface CrochetChartRenderOptions {
   readonly activeRound?: number;
   readonly completedSteps?: readonly string[];
   readonly showProgress?: boolean;
+  /** Round chart only: the stitch position that has keyboard/pointer focus. */
+  readonly selectedNode?: { readonly round: number; readonly angleIndex: number } | null;
 }
 
 const THEME_COLORS: Record<CrochetChartTheme, {
@@ -97,6 +99,7 @@ const drawCrochetGlyph = (
   size: number,
   rotation: number,
   ink: string,
+  modifiers: CrochetGlyphModifiers = {},
 ): void => {
   context.save();
   context.translate(x, y);
@@ -107,9 +110,52 @@ const drawCrochetGlyph = (
   context.lineWidth = 0.12;
   context.lineCap = 'round';
   context.lineJoin = 'round';
-  for (const primitive of crochetGlyphPrimitives(symbolId)) drawGlyphPrimitive(context, primitive);
+  for (const primitive of crochetGlyphPrimitives(symbolId, modifiers)) drawGlyphPrimitive(context, primitive);
   context.restore();
 };
+
+interface PolarLayout {
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly spacing: number;
+  readonly nodeRadius: number;
+  readonly pixelScale: number;
+}
+
+/** One source of truth for round-chart geometry so drawing and pointer hit-testing cannot drift apart. */
+const polarLayout = (chart: PolarChart, width: number, height: number): PolarLayout => {
+  const pixelScale = Math.min(width / CROCHET_EXPORT_BASE_WIDTH, height / CROCHET_EXPORT_BASE_HEIGHT);
+  const padding = 24 * pixelScale;
+  const spacing = Math.min(width - padding * 2, height - padding * 2) / (2 * (Math.max(chart.rounds, 1) + 1));
+  const nodeRadius = Math.max(10 * pixelScale, Math.min(20 * pixelScale, spacing * 0.3));
+  return { centerX: width / 2, centerY: height / 2, spacing, nodeRadius, pixelScale };
+};
+
+/**
+ * Finds the stitch position under a canvas-space point. Points within a stitch circle (plus a small
+ * touch allowance) select it; when circles overlap on a crowded round the nearest centre wins.
+ */
+export const hitTestPolarNode = (
+  chart: PolarChart,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+): { readonly round: number; readonly angleIndex: number } | null => {
+  const layout = polarLayout(chart, width, height);
+  const allowance = layout.nodeRadius + 6 * layout.pixelScale;
+  let best: { readonly round: number; readonly angleIndex: number; readonly distance: number } | null = null;
+  for (const node of chart.nodes) {
+    const point = polarNodeToCartesian(node, layout.spacing);
+    const distance = Math.hypot(layout.centerX + point.x - x, layout.centerY + point.y - y);
+    if (distance <= allowance && (best === null || distance < best.distance)) {
+      best = { round: node.round, angleIndex: node.angleIndex, distance };
+    }
+  }
+  return best ? { round: best.round, angleIndex: best.angleIndex } : null;
+};
+
+const glyphModifiers = (node: PolarStitchNode): CrochetGlyphModifiers => ({ loop: node.loop ?? null });
 
 const renderPolarChart = (
   context: CanvasRenderingContext2D,
@@ -119,13 +165,7 @@ const renderPolarChart = (
 ): void => {
   const theme = options.theme ?? 'light';
   const colors = THEME_COLORS[theme];
-  const pixelScale = Math.min(options.width / CROCHET_EXPORT_BASE_WIDTH, options.height / CROCHET_EXPORT_BASE_HEIGHT);
-  const centerX = options.width / 2;
-  const centerY = options.height / 2;
-  const padding = 24 * pixelScale;
-  const spacing = Math.min(options.width - padding * 2, options.height - padding * 2)
-    / (2 * (Math.max(chart.rounds, 1) + 1));
-  const nodeRadius = Math.max(10 * pixelScale, Math.min(20 * pixelScale, spacing * 0.3));
+  const { centerX, centerY, spacing, nodeRadius, pixelScale } = polarLayout(chart, options.width, options.height);
   const completed = new Set(options.completedSteps ?? []);
   const showProgress = options.showProgress ?? false;
 
@@ -140,6 +180,23 @@ const renderPolarChart = (
     context.stroke();
   }
   context.setLineDash([]);
+
+  // Increase legs: a stitch worked into the same base as the previous position is joined to it so the
+  // shared base reads on the chart itself, not only in the written pattern.
+  const nodeAt = new Map(chart.nodes.map((node) => [`${node.round}:${node.angleIndex}`, node]));
+  for (const node of chart.nodes) {
+    if (!node.sharedBase || node.angleIndex === 0) continue;
+    const previous = nodeAt.get(`${node.round}:${node.angleIndex - 1}`);
+    if (!previous) continue;
+    const from = polarNodeToCartesian(previous, spacing);
+    const to = polarNodeToCartesian(node, spacing);
+    context.beginPath();
+    context.moveTo(centerX + from.x, centerY + from.y);
+    context.lineTo(centerX + to.x, centerY + to.y);
+    context.lineWidth = 4 * pixelScale;
+    context.strokeStyle = theme === 'high-contrast' ? '#000000' : colors.active;
+    context.stroke();
+  }
 
   for (const node of chart.nodes) {
     const point = polarNodeToCartesian(node, spacing);
@@ -157,8 +214,20 @@ const renderPolarChart = (
     context.stroke();
     if (node.symbolId) {
       const angle = (2 * Math.PI * node.angleIndex) / node.stitchesInRound;
-      drawCrochetGlyph(context, node.symbolId, x, y, nodeRadius * 0.82, angle + Math.PI / 2, ink);
+      drawCrochetGlyph(context, node.symbolId, x, y, nodeRadius * 0.82, angle + Math.PI / 2, ink, glyphModifiers(node));
     }
+  }
+
+  const selected = options.selectedNode;
+  const selectedNode = selected ? nodeAt.get(`${selected.round}:${selected.angleIndex}`) : undefined;
+  if (selectedNode) {
+    const point = polarNodeToCartesian(selectedNode, spacing);
+    context.beginPath();
+    context.arc(centerX + point.x, centerY + point.y, nodeRadius + 5 * pixelScale, 0, Math.PI * 2);
+    context.lineWidth = 3.5 * pixelScale;
+    context.strokeStyle = colors.active;
+    context.setLineDash([]);
+    context.stroke();
   }
 };
 

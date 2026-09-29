@@ -1,4 +1,5 @@
 import type {
+  CrochetLoopMode,
   FiberCraftDocument,
   GridCell,
   GridChart,
@@ -113,26 +114,62 @@ export interface CrochetWrittenRound {
   readonly text: string;
 }
 
-interface StitchRun {
-  readonly symbolId: string | null;
-  readonly colorId: string | null;
+/**
+ * A working unit is one base stitch: the stitch worked into it plus any later positions that share that
+ * same base (the extra legs of an increase). Units, not positions, are what a written pattern counts.
+ */
+interface WorkUnit {
+  readonly legs: readonly PolarStitchNode[];
+}
+
+interface UnitRun {
+  readonly unit: WorkUnit;
+  readonly key: string;
   readonly count: number;
 }
 
 const sortedRoundNodes = (chart: PolarChart, round: number): readonly PolarStitchNode[] =>
   chart.nodes.filter((node) => node.round === round).toSorted((a, b) => a.angleIndex - b.angleIndex);
 
-const compressRoundNodes = (nodes: readonly PolarStitchNode[]): readonly StitchRun[] => {
-  const runs: StitchRun[] = [];
+const legKey = (node: PolarStitchNode): string => `${node.symbolId ?? '-'}|${node.colorId ?? '-'}|${node.loop ?? '-'}`;
+
+const groupWorkUnits = (nodes: readonly PolarStitchNode[]): readonly WorkUnit[] => {
+  const units: WorkUnit[] = [];
   for (const node of nodes) {
+    const previous = units.at(-1);
+    if (node.symbolId !== null && node.sharedBase && previous) units[units.length - 1] = { legs: [...previous.legs, node] };
+    else units.push({ legs: [node] });
+  }
+  return units;
+};
+
+const compressWorkUnits = (units: readonly WorkUnit[]): readonly UnitRun[] => {
+  const runs: UnitRun[] = [];
+  for (const unit of units) {
+    const key = unit.legs.map(legKey).join('/');
     const previous = runs.at(-1);
-    if (previous && previous.symbolId === node.symbolId && previous.colorId === node.colorId) {
-      runs[runs.length - 1] = { ...previous, count: previous.count + 1 };
-    } else {
-      runs.push({ symbolId: node.symbolId, colorId: node.colorId, count: 1 });
-    }
+    if (previous && previous.key === key) runs[runs.length - 1] = { ...previous, count: previous.count + 1 };
+    else runs.push({ unit, key, count: 1 });
   }
   return runs;
+};
+
+const LOOP_ABBREVIATIONS: Record<CrochetLoopMode, string> = { back: 'BLO', front: 'FLO' };
+
+const legText = (node: PolarStitchNode, dialect: CrochetDialect): string =>
+  `${crochetSymbolAbbreviation(node.symbolId ?? '', dialect)}${node.loop ? ` ${LOOP_ABBREVIATIONS[node.loop]}` : ''}`;
+
+/** Written text for one run of identical units, e.g. `6 sc BLO [Primary]` or `(2 sc in next st) 6 times`. */
+const unitRunText = (run: UnitRun, dialect: CrochetDialect, paletteNames: ReadonlyMap<string, string>): string => {
+  const legs = run.unit.legs;
+  const first = legs[0];
+  if (first.symbolId === null) return `${run.count} unworked`;
+  const color = first.colorId ? paletteNames.get(first.colorId) : undefined;
+  const colorText = color ? ` [${color}]` : '';
+  if (legs.length === 1) return `${run.count} ${legText(first, dialect)}${colorText}`;
+  const sameLeg = legs.every((leg) => leg.symbolId === first.symbolId && leg.loop === first.loop);
+  const group = sameLeg ? `${legs.length} ${legText(first, dialect)} in next st` : `${legs.map((leg) => legText(leg, dialect)).join(', ')} in next st`;
+  return run.count === 1 ? `(${group})${colorText}` : `(${group}) ${run.count} times${colorText}`;
 };
 
 const requirePolarCrochetDocument = (document: FiberCraftDocument): PolarChart => {
@@ -150,20 +187,19 @@ export const compileCrochetWrittenPattern = (
   const paletteNames = new Map(document.palette.map((color) => [color.id, color.label]));
   return Array.from({ length: chart.rounds }, (_, round) => {
     const nodes = sortedRoundNodes(chart, round);
-    const runs = compressRoundNodes(nodes);
+    const runs = compressWorkUnits(groupWorkUnits(nodes));
     let worked = 0;
     let consumedStitches = 0;
     let producedStitches = 0;
-    const instructions = runs.map((run) => {
-      if (run.symbolId === null) return `${run.count} unworked`;
-      const definition = getCrochetSymbol(run.symbolId);
-      worked += run.count;
-      consumedStitches += definition.stitchesConsumed * run.count;
-      producedStitches += definition.stitchesProduced * run.count;
-      const abbreviation = crochetSymbolAbbreviation(run.symbolId, dialect);
-      const color = run.colorId ? paletteNames.get(run.colorId) : undefined;
-      return `${run.count} ${abbreviation}${color ? ` [${color}]` : ''}`;
-    });
+    for (const node of nodes) {
+      if (node.symbolId === null) continue;
+      const definition = getCrochetSymbol(node.symbolId);
+      worked += 1;
+      // A stitch sharing its base with the previous position consumes no new base stitch.
+      consumedStitches += node.sharedBase ? 0 : definition.stitchesConsumed;
+      producedStitches += definition.stitchesProduced;
+    }
+    const instructions = runs.map((run) => unitRunText(run, dialect, paletteNames));
     return {
       round,
       complete: worked === nodes.length,
@@ -234,10 +270,10 @@ export const validateCrochetPattern = (
 
     if (round > 0 && workedNodes.length === capacity && workedNodes.every((node) => {
       if (node.symbolId === null) return false;
-      return getCrochetSymbol(node.symbolId).stitchesConsumed > 0;
+      return node.sharedBase === true || getCrochetSymbol(node.symbolId).stitchesConsumed > 0;
     })) {
       const consumed = workedNodes.reduce((sum, node) => {
-        if (node.symbolId === null) return sum;
+        if (node.symbolId === null || node.sharedBase === true) return sum;
         return sum + getCrochetSymbol(node.symbolId).stitchesConsumed;
       }, 0);
       const previousCapacity = sortedRoundNodes(chart, round - 1).length;

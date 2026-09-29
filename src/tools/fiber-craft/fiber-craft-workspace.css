@@ -19,6 +19,10 @@
 .fiber-craft-inline-controls .fiber-craft-field { width: min(150px, 100%); }
 .fiber-craft-inline-controls .action-button { min-height: 44px; }
 .fiber-craft-canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; background: #fbfcfd; }
+.fiber-craft-canvas-interactive { cursor: pointer; touch-action: manipulation; }
+.fiber-craft-canvas-interactive:focus-visible { outline: 3px solid var(--accent, #205bd6); outline-offset: -3px; }
+.fiber-craft-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 14px; line-height: 1.4; }
+.fiber-craft-check input { flex: 0 0 auto; width: 22px; height: 22px; margin-top: 1px; }
 .fiber-craft-inspector { display: grid; gap: 12px; min-width: 0; }
 .fiber-craft-inspector > section { display: grid; gap: 12px; padding: 14px; }
 .fiber-craft-wide { width: 100%; min-height: 44px; }

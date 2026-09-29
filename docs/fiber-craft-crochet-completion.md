@@ -1,0 +1,102 @@
+# Fiber Craft — crochet completion ledger
+
+**As of:** 2026-09-29
+
+This is the single handoff record for the **crochet** part of the Fiber Craft Workstation
+(`src/tools/fiber-craft/`, route `#/fiber-craft-workstation`). Counted-thread and knitting work is tracked
+separately in `.tasks/IN_PROGRESS.md` and the Fiber Craft design/plan under `docs/superpowers/`. Nothing
+in this file changes those scopes.
+
+The crochet workstream is complete when every `CR-` function below is **Done** with fresh evidence, its
+work is on `origin/main`, and the Fiber entry in `.tasks/IN_PROGRESS.md` reflects it.
+
+## Already accepted before this ledger
+
+Design functions FC-09 (round canvas), FC-10 (US/UK symbol library), FC-11 (C2C compiler), FC-12
+(filet), FC-13 (amigurumi shaping), FC-14 (written-pattern compiler), FC-15 (count validator), and FC-16
+(CYC yarn/hook reference) are implemented, together with the shared functions crochet relies on: FC-02,
+FC-03, FC-04, FC-07, FC-50–FC-52, FC-54–FC-56, FC-59, FC-63, FC-64. Their design text is in
+`docs/superpowers/specs/2026-09-15-fiber-craft-workstation-design.md`.
+
+## Ledger
+
+| ID | Function | Design ref | Status |
+|----|----------|------------|--------|
+| CR-01 | Edit any stitch position in a round chart: click or keyboard select, place, replace, clear, fill a round, clear a round, remove the last round | FC-08, FC-09 | **Done** |
+| CR-02 | Increases, decreases and loop work: same-base increase legs, sc3tog/dc2tog/dc3tog symbols, front/back loop only; validation, written text, description, PNG and PDF all understand them | FC-10, FC-13–FC-15 | **Done** |
+| CR-03 | Grid tools: resize the C2C/filet grid, apply the gauge-recommended size, clear, mirror and rotate | FC-06, FC-52 | Open |
+| CR-04 | Pattern details studio: edit title, author, license and notes, with a review step before export | FC-61, FC-62 | Open |
+| CR-05 | Copy or download the written pattern (rounds, C2C rows, filet rows) as text | FC-14 | Open |
+| CR-06 | Materials and shopping list export (CSV) | FC-60 | Open |
+| CR-07 | Chart zoom and pan | FC-05 | Open |
+| CR-08 | Metric/imperial toggle covering gauge, sizes and hook display | FC-53 | Open |
+| CR-09 | One-click "export everything" for a full pattern release | FC-65 | Open |
+| CR-10 | Final UX, copy, SEO, accessibility and responsive audit, including the catalog entry wording | — | Open |
+| CR-11 | Integration onto `origin/main` and closing the crochet items in `.tasks/` | Governance §4 | Blocked, see Integration |
+
+**Progress: 2 of 11 complete.** Update this count, the table, and the Fiber entry in `.tasks/IN_PROGRESS.md`
+in the same commit as any change to a row.
+
+## How crochet is modelled
+
+- **Round chart** (`PolarChart`): every position is a `PolarStitchNode`. A round's capacity is the number
+  of stitches the round *produces*. `symbolId` is one of the ids in `engines/symbol-library.ts`.
+- **Increases are not a symbol.** They follow the Craft Yarn Council convention that parentheses group
+  stitches worked into one stitch: the second and later legs carry `sharedBase: true` and consume no new
+  base stitch. A 6 → 12 round is therefore six pairs (`sc`, then `sc` with `sharedBase`), and it
+  validates. Position 1 of a round can never share a base.
+- **Loop work** is `loop: 'front' | 'back'`, written FLO/BLO (Craft Yarn Council abbreviations).
+- Both modifiers are optional, so drafts and `.craftproj` files saved earlier still open. Malformed values
+  are rejected by `persistence-engine.ts`.
+- **Written text is derived, never authored.** `engines/crochet-pattern-engine.ts` groups nodes into
+  base-stitch units, then compresses identical neighbours: `6 sc [Primary]`, `(2 sc in next st) 6 times
+  [Primary]`, `2 sc BLO [Primary]`.
+- **Grid chart** (`GridChart`) is one model for both C2C and filet; a cell is filled when it has a color or
+  symbol.
+
+## Where things live
+
+| Concern | File |
+|---------|------|
+| Document edits (pure, tested) | `crochet-document-engine.ts` |
+| Symbols, US/UK names | `engines/symbol-library.ts` |
+| Glyph geometry and modifier marks | `engines/crochet-glyph-engine.ts` |
+| Canvas and PNG drawing, pointer hit-testing | `engines/crochet-chart-renderer.ts` |
+| Written pattern, validator, growth | `engines/crochet-pattern-engine.ts` |
+| Accessible description | `engines/chart-description-engine.ts` |
+| Project file validation | `persistence-engine.ts`, `project-bundle-engine.ts` |
+| Pattern-book PDF | `pattern-export-engine.ts` |
+| Workspace shell and handlers | `FiberCraftWorkspace.tsx` |
+| Stitch editing panel | `CrochetStitchEditor.tsx` |
+| Grid, insights, yarn, gauge, details panels | `CrochetPatternPanels.tsx` |
+| Tests | `tests/unit/fiber-craft-crochet-editing.test.ts`, `fiber-craft-crochet-pattern.test.ts`, `fiber-craft-state.test.ts`, `fiber-craft-geometry.test.ts`, `fiber-craft-project.test.ts`; browser: `tests/e2e/fiber-craft.spec.ts` |
+
+## Working rules for the next agent
+
+- Fetch first: `git fetch origin feature/fiber-craft-workstation:refs/remotes/origin/feature/fiber-craft-workstation`
+  (a bare `git fetch origin <branch>` does not update the tracking ref). Another session edits
+  `FiberCraftWorkspace.tsx` for knitting and counted-thread work, so keep crochet changes in crochet
+  files or in small, additive edits to the shared shell.
+- Write the failing test first, but only for uncovered contracts. Reuse existing engines; do not add a
+  dependency for anything the repository already provides.
+- Validation commands: `pnpm exec vitest run tests/unit/fiber-craft-*.test.ts`, `pnpm build`, and
+  `pnpm exec playwright test tests/e2e/fiber-craft.spec.ts --workers=1`. In the cloud sandbox the
+  pre-installed Chromium is at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; pass it through a
+  local, uncommitted Playwright config as `launchOptions.executablePath`.
+- Glyph marks for modifiers are original geometric marks that follow the Council's functional
+  conventions; do not import the Council's downloadable artwork.
+
+## Integration
+
+Governance requires all intended work to reach `origin/main`. Open pull request
+`feat: continue Fiber Craft Workstation crochet shell` (`feature/fiber-craft-workstation` → `main`)
+already carries the Fiber Craft branch, and `.tasks/IN_PROGRESS.md` states that no second Fiber Craft
+branch is authorized. Crochet commits therefore need to land on that branch (or be merged into it) rather
+than open a competing pull request. Until that is settled, CR-11 stays blocked.
+
+## Evidence log
+
+| Date | What | Result |
+|------|------|--------|
+| 2026-09-29 | Baseline on merged `feature/fiber-craft-workstation` + `origin/main` | Fiber unit files 4/4, 67/67 tests |
+| 2026-09-29 | CR-01, CR-02 | Fiber unit files 5/5, 85/85 tests; `tsc --noEmit` clean; production build passes (383-entry precache); Fiber browser spec 8/8 across desktop and mobile Chromium, including offline reopen |

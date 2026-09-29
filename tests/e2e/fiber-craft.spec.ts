@@ -153,6 +153,71 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.locator('#fiber-project-level')).toHaveValue('Intermediate');
   });
 
+  test('edits individual crochet stitches by pointer and keyboard and charts an amigurumi increase round', async ({ page }) => {
+    await page.goto('./#/fiber-craft-workstation');
+    await expect(page.getByRole('heading', { name: 'Fiber Craft Workstation' })).toBeVisible();
+
+    const canvas = page.getByTestId('crochet-round-canvas');
+    const summary = page.getByTestId('selected-stitch-summary');
+    await page.locator('#fiber-stitch-symbol').selectOption('sc-dc');
+    await page.getByRole('button', { name: 'Fill round 1 with this stitch' }).click();
+    await expect(page.getByTestId('active-round-progress')).toHaveText('6 of 6 stitches worked');
+    await expect(page.getByTestId('written-pattern')).toContainText('Round 1: 6 sc [Primary].');
+
+    // Keyboard: move to position 3, replace it with a half double crochet, then clear it again.
+    await canvas.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(summary).toContainText('Round 1, position 3 of 6: single crochet (sc)');
+    await page.locator('#fiber-stitch-symbol').selectOption('hdc-htr');
+    await canvas.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('written-pattern')).toContainText('2 sc [Primary], 1 hdc [Primary], 3 sc [Primary]');
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await canvas.focus();
+    await page.keyboard.press('Delete');
+    await expect(page.getByTestId('active-round-progress')).toHaveText('5 of 6 stitches worked');
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByTestId('active-round-progress')).toHaveText('6 of 6 stitches worked');
+
+    // Pointer: clicking a stitch on the canvas selects it.
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Round canvas has no layout box');
+    const scale = Math.min(box.width / 960, box.height / 720);
+    const spacing = (720 - 48) / (2 * (1 + 1));
+    const angle = (2 * Math.PI * 4) / 6;
+    await canvas.click({
+      position: {
+        x: (box.width - 960 * scale) / 2 + (480 + spacing * Math.cos(angle)) * scale,
+        y: (box.height - 720 * scale) / 2 + (360 + spacing * Math.sin(angle)) * scale,
+      },
+    });
+    await expect(summary).toContainText('Round 1, position 5 of 6');
+
+    // Amigurumi round 2: 12 positions filled with increase pairs validates with no count issues.
+    await page.locator('#fiber-round-stitches').fill('12');
+    await page.getByRole('button', { name: 'Add round' }).click();
+    await page.locator('#fiber-stitch-symbol').selectOption('sc-dc');
+    await page.getByLabel(/Same base stitch as the previous position/).check();
+    await page.getByRole('button', { name: 'Fill round 2 with this stitch' }).click();
+    await expect(page.getByTestId('written-pattern')).toContainText('Round 2: (2 sc in next st) 6 times [Primary].');
+    await expect(page.getByTestId('pattern-validation')).toContainText('No stitch-count issues found.');
+    await expect(page.getByTestId('chart-description')).toContainText('6 stitches worked into the same base stitch');
+
+    // Loop modifiers and round removal.
+    await page.getByLabel(/Same base stitch as the previous position/).uncheck();
+    await page.getByLabel('Worked in').selectOption('back');
+    await page.getByLabel(/Stitch position in round 2/).fill('1');
+    await page.getByRole('button', { name: 'Place at selected position' }).click();
+    await expect(page.getByTestId('written-pattern')).toContainText('(sc BLO, sc in next st) [Primary]');
+    await page.getByRole('button', { name: 'Remove last round' }).click();
+    await expect(page.getByLabel('Active round')).toHaveValue('0');
+    await expect(page.getByRole('button', { name: 'Remove last round' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByLabel('Active round').locator('option')).toHaveCount(2);
+  });
+
   test('edits, keys, saves, and restores a counted-thread chart', async ({ page }) => {
     await page.goto('./#/fiber-craft-workstation');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Counted-Thread Pattern Workbench');

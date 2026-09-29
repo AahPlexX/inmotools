@@ -294,7 +294,7 @@ const drawPolarPdfDiagram = (
     page.drawCircle({ x: nodeX, y: nodeY, size: nodeRadius, color: fill, borderWidth: 0.8, borderColor: node.symbolId ? ink : grayscale(0.55) });
     if (!node.symbolId) continue;
     const rotation = (2 * Math.PI * node.angleIndex) / node.stitchesInRound + Math.PI / 2;
-    for (const primitive of crochetGlyphPrimitives(node.symbolId)) {
+    for (const primitive of crochetGlyphPrimitives(node.symbolId, { loop: node.loop ?? null })) {
       drawPdfGlyphPrimitive(page, primitive, nodeX, nodeY, nodeRadius * 0.82, rotation, ink);
     }
   }

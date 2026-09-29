@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { downloadBlob, downloadBytes, downloadText } from '../../lib/download';
 import {
   addCrochetRound,
+  clearCrochetRound,
   createStarterCrochetDocument,
   crochetRoundProgress,
+  fillCrochetRound,
+  removeLastCrochetRound,
+  setCrochetRoundStitch,
   setCrochetGauge,
   setCrochetPatternClassification,
   setCrochetTargetRoundCounts,
@@ -12,8 +16,10 @@ import {
   toggleCrochetGridCell,
   toggleCrochetProgressStep,
   workNextCrochetStitch,
+  type CrochetStitchModifiers,
   type CycProjectLevel,
 } from './crochet-document-engine';
+import { CrochetStitchEditor, type CrochetLoopChoice } from './CrochetStitchEditor';
 import {
   CrochetGridPanel,
   CrochetRoundInsights,
@@ -32,6 +38,7 @@ import {
 } from './FiberCraftAccessibility';
 import {
   crochetPngDimensions,
+  hitTestPolarNode,
   renderCrochetChartCanvas,
   type CrochetPngScale,
 } from './engines/crochet-chart-renderer';
@@ -84,12 +91,27 @@ const canvasToPngBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
     );
   });
 
-function CrochetCanvas({ chart, palette, activeRound, completedSteps, theme }: {
+/**
+ * Maps a pointer position to canvas bitmap coordinates. The canvas is letterboxed (`object-fit:
+ * contain`) on narrow screens, so the scale is the smaller axis ratio and the bitmap is centred.
+ */
+const pointerToCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, clientY: number): { readonly x: number; readonly y: number } => {
+  const rect = canvas.getBoundingClientRect();
+  const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+  const offsetX = (rect.width - canvas.width * scale) / 2;
+  const offsetY = (rect.height - canvas.height * scale) / 2;
+  return { x: (clientX - rect.left - offsetX) / scale, y: (clientY - rect.top - offsetY) / scale };
+};
+
+function CrochetCanvas({ chart, palette, activeRound, selectedAngle, completedSteps, theme, onSelectNode, onKeyDown }: {
   chart: PolarChart;
   palette: readonly ColorSlot[];
   activeRound: number;
+  selectedAngle: number;
   completedSteps: readonly string[];
   theme: FiberCraftTheme;
+  onSelectNode: (round: number, angleIndex: number) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLCanvasElement>) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderedSymbols = chart.nodes.filter((node) => node.symbolId !== null).length;
@@ -105,21 +127,33 @@ function CrochetCanvas({ chart, palette, activeRound, completedSteps, theme }: {
       activeRound,
       completedSteps,
       showProgress: true,
+      selectedNode: { round: activeRound, angleIndex: selectedAngle },
     });
-  }, [activeRound, chart, completedSteps, palette, theme]);
+  }, [activeRound, chart, completedSteps, palette, selectedAngle, theme]);
+
+  const selectFromPointer = (event: MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const point = pointerToCanvasPoint(canvas, event.clientX, event.clientY);
+    const hit = hitTestPolarNode(chart, canvas.width, canvas.height, point.x, point.y);
+    if (hit) onSelectNode(hit.round, hit.angleIndex);
+  };
 
   return (
     <canvas
       ref={canvasRef}
-      className="fiber-craft-canvas"
+      className="fiber-craft-canvas fiber-craft-canvas-interactive"
       width={960}
       height={720}
-      aria-label={`Crochet round chart with vector stitch symbols. Round ${activeRound + 1} is active.`}
+      tabIndex={0}
+      aria-label={`Crochet round chart with vector stitch symbols. Round ${activeRound + 1} is active. Use the arrow keys to move between stitches, Enter to place a stitch, and Delete to clear one.`}
       aria-describedby={FIBER_CRAFT_DESCRIPTION_ID}
       data-testid="crochet-round-canvas"
       data-symbol-rendering="vector"
       data-rendered-symbols={renderedSymbols}
       data-canvas-theme={theme}
+      onClick={selectFromPointer}
+      onKeyDown={onKeyDown}
     >
       Crochet round chart with {chart.rounds} rounds. Round {activeRound + 1} is active.
     </canvas>
@@ -137,6 +171,9 @@ export default function FiberCraftWorkspace() {
   const [selectedSymbol, setSelectedSymbol] = useState('sc-dc');
   const [selectedColor, setSelectedColor] = useState('primary');
   const [newRoundStitches, setNewRoundStitches] = useState('6');
+  const [selectedAngle, setSelectedAngle] = useState(0);
+  const [sharedBase, setSharedBase] = useState(false);
+  const [loopChoice, setLoopChoice] = useState<CrochetLoopChoice>('both');
   const [targetText, setTargetText] = useState('6');
   const [status, setStatus] = useState('Preparing local autosave…');
   const [storageReady, setStorageReady] = useState(false);
@@ -182,15 +219,92 @@ export default function FiberCraftWorkspace() {
   useEffect(() => { setTargetText((document.settings?.crochet?.targetRoundCounts ?? []).join(', ')); }, [document.settings?.crochet?.targetRoundCounts]);
 
   const commit = (next: FiberCraftDocument, message: string) => { dispatch({ type: 'commit', document: next }); setStatus(message); };
+  const activeRoundPositions = roundChart ? roundChart.nodes.filter((node) => node.round === activeRound).length : 0;
+  const currentAngle = Math.min(selectedAngle, Math.max(0, activeRoundPositions - 1));
+  const modifiersFor = (angle: number): CrochetStitchModifiers => ({
+    sharedBase: sharedBase && angle > 0,
+    loop: loopChoice === 'both' ? null : loopChoice,
+  });
+  const describePosition = (round: number, angle: number): string => {
+    if (!roundChart) return '';
+    const count = roundChart.nodes.filter((node) => node.round === round).length;
+    const node = roundChart.nodes.find((candidate) => candidate.round === round && candidate.angleIndex === angle);
+    const where = `Round ${round + 1}, position ${angle + 1} of ${count}`;
+    if (!node || node.symbolId === null) return `${where}: unworked.`;
+    const color = document.palette.find((slot) => slot.id === node.colorId)?.label;
+    const notes = [node.sharedBase ? 'same base as the previous position' : '', node.loop === 'back' ? 'back loop only' : node.loop === 'front' ? 'front loop only' : ''].filter(Boolean);
+    return `${where}: ${crochetSymbolLabel(node.symbolId, dialect)}${color ? `, ${color}` : ''}${notes.length > 0 ? `, ${notes.join(', ')}` : ''}.`;
+  };
+  const selectPosition = (round: number, angle: number) => {
+    setActiveRound(round);
+    setSelectedAngle(angle);
+    setStatus(describePosition(round, angle));
+  };
   const placeNextStitch = () => {
     if (!roundChart) return;
-    try { commit(workNextCrochetStitch(document, activeRound, selectedSymbol, selectedColor), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} in round ${activeRound + 1}.`); }
-    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+    const next = roundChart.nodes.find((node) => node.round === activeRound && node.symbolId === null);
+    try {
+      commit(workNextCrochetStitch(document, activeRound, selectedSymbol, selectedColor, new Date().toISOString(), modifiersFor(next?.angleIndex ?? 0)), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} in round ${activeRound + 1}.`);
+      if (next) setSelectedAngle(next.angleIndex);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+  };
+  const placeSelectedStitch = () => {
+    if (!roundChart) return;
+    try {
+      commit(setCrochetRoundStitch(document, activeRound, currentAngle, selectedSymbol, selectedColor, modifiersFor(currentAngle)), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} at round ${activeRound + 1}, position ${currentAngle + 1}.`);
+      setSelectedAngle((currentAngle + 1) % Math.max(1, activeRoundPositions));
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+  };
+  const clearSelectedStitch = () => {
+    if (!roundChart) return;
+    try { commit(setCrochetRoundStitch(document, activeRound, currentAngle, null, null), `Cleared round ${activeRound + 1}, position ${currentAngle + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear this stitch.'); }
+  };
+  const fillActiveRound = () => {
+    if (!roundChart) return;
+    try {
+      commit(fillCrochetRound(document, activeRound, selectedSymbol, selectedColor, { sharedBase, loop: loopChoice === 'both' ? null : loopChoice }), sharedBase
+        ? `Filled round ${activeRound + 1} with ${crochetSymbolLabel(selectedSymbol, dialect)} in increase pairs.`
+        : `Filled round ${activeRound + 1} with ${crochetSymbolLabel(selectedSymbol, dialect)}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not fill this round.'); }
+  };
+  const clearActiveRound = () => {
+    if (!roundChart) return;
+    try { commit(clearCrochetRound(document, activeRound), `Cleared every stitch in round ${activeRound + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear this round.'); }
+  };
+  const removeLastRound = () => {
+    if (!roundChart) return;
+    try {
+      const removed = roundChart.rounds;
+      commit(removeLastCrochetRound(document), `Removed round ${removed}. Undo brings it back.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not remove the last round.'); }
+  };
+  const handleCanvasKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    if (!roundChart || event.altKey || event.ctrlKey || event.metaKey) return;
+    const count = Math.max(1, activeRoundPositions);
+    const moveToRound = (round: number) => {
+      const clamped = Math.min(Math.max(round, 0), roundChart.rounds - 1);
+      const nextCount = roundChart.nodes.filter((node) => node.round === clamped).length;
+      selectPosition(clamped, Math.min(nextCount - 1, Math.floor((currentAngle / count) * nextCount)));
+    };
+    switch (event.key) {
+      case 'ArrowRight': selectPosition(activeRound, (currentAngle + 1) % count); break;
+      case 'ArrowLeft': selectPosition(activeRound, (currentAngle - 1 + count) % count); break;
+      case 'Home': selectPosition(activeRound, 0); break;
+      case 'End': selectPosition(activeRound, count - 1); break;
+      case 'ArrowUp': moveToRound(activeRound - 1); break;
+      case 'ArrowDown': moveToRound(activeRound + 1); break;
+      case 'Enter': case ' ': placeSelectedStitch(); break;
+      case 'Delete': case 'Backspace': clearSelectedStitch(); break;
+      default: return;
+    }
+    event.preventDefault();
   };
   const addRound = () => {
     if (!roundChart) return;
     const count = Number(newRoundStitches);
-    try { commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`); setActiveRound(roundChart.rounds); }
+    try { commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`); setActiveRound(roundChart.rounds); setSelectedAngle(0); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add this round.'); }
   };
   const changeChartMode = (mode: 'round' | 'grid' | 'counted' | 'knitting') => {
@@ -337,13 +451,13 @@ export default function FiberCraftWorkspace() {
         </div>
 
         <div className="fiber-craft-main">
-          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} completedSteps={document.completedSteps} theme={theme} /></section>
+          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} selectedAngle={currentAngle} completedSteps={document.completedSteps} theme={theme} onSelectNode={selectPosition} onKeyDown={handleCanvasKeyDown} /></section>
             : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} />
               : knittingChart ? <KnittingGridPanel document={document} chart={knittingChart} onCommit={commit} onStatus={setStatus} />
                 : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
 
           <aside className="fiber-craft-inspector" aria-label="Fiber Craft chart inspector">
-            {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
+            {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><CrochetStitchEditor round={activeRound} positions={activeRoundPositions} selectedAngle={currentAngle} selectedLabel={describePosition(activeRound, currentAngle)} sharedBase={sharedBase} loop={loopChoice} canRemoveRound={roundChart.rounds > 1} onSelectAngle={(angle) => selectPosition(activeRound, angle)} onSharedBaseChange={setSharedBase} onLoopChange={setLoopChoice} onPlaceSelected={placeSelectedStitch} onClearSelected={clearSelectedStitch} onFillRound={fillActiveRound} onClearRound={clearActiveRound} onRemoveLastRound={removeLastRound} /><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
               : gridChart ? <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>
                 : knittingChart ? <section><h3>Knitting gauge</h3><p className="fiber-craft-muted">Save your measured stitch and row gauge above the chart. Cell proportions update from the same project gauge used for the preview.</p></section>
                   : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}

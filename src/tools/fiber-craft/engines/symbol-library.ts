@@ -27,7 +27,10 @@ export type CrochetGlyphKind =
   | 'cluster'
   | 'puff'
   | 'popcorn'
-  | 'decrease';
+  | 'decrease'
+  | 'decrease-3' // sc3tog (US) / dc3tog (UK)
+  | 'decrease-tall-2' // dc2tog (US) / tr2tog (UK)
+  | 'decrease-tall-3'; // dc3tog (US) / tr3tog (UK)
 
 export interface CrochetSymbolDefinition {
   readonly id: string;
@@ -42,6 +45,11 @@ export interface CrochetSymbolDefinition {
   readonly stitchesProduced: number;
 }
 
+// Increases are not separate symbols: like the Craft Yarn Council's `( )` convention ("work a group of
+// stitches all in the same stitch"), an increase is several stitch symbols sharing one base, expressed
+// by `PolarStitchNode.sharedBase` on the second and later legs. Front/back-loop-only work is likewise a
+// node modifier (`PolarStitchNode.loop`), matching the Council's BLO/FLO abbreviations.
+//
 // Ordered from shortest to tallest, matching the Craft Yarn Council's published symbol set.
 export const CROCHET_SYMBOLS: readonly CrochetSymbolDefinition[] = [
   { id: 'chain', usName: 'chain', usAbbreviation: 'ch', ukName: 'chain', ukAbbreviation: 'ch', glyph: 'oval', stitchesConsumed: 0, stitchesProduced: 1 },
@@ -58,6 +66,9 @@ export const CROCHET_SYMBOLS: readonly CrochetSymbolDefinition[] = [
   { id: 'puff', usName: 'puff stitch', usAbbreviation: 'puff', ukName: 'puff stitch', ukAbbreviation: 'puff', glyph: 'puff', stitchesConsumed: 1, stitchesProduced: 1 },
   { id: 'popcorn-5dc', usName: '5-dc popcorn', usAbbreviation: 'pc', ukName: '5-tr popcorn', ukAbbreviation: 'pc', glyph: 'popcorn', stitchesConsumed: 5, stitchesProduced: 1 },
   { id: 'sc2tog-dc2tog', usName: 'single crochet 2 together', usAbbreviation: 'sc2tog', ukName: 'double crochet 2 together', ukAbbreviation: 'dc2tog', glyph: 'decrease', stitchesConsumed: 2, stitchesProduced: 1 },
+  { id: 'sc3tog-dc3tog', usName: 'single crochet 3 together', usAbbreviation: 'sc3tog', ukName: 'double crochet 3 together', ukAbbreviation: 'dc3tog', glyph: 'decrease-3', stitchesConsumed: 3, stitchesProduced: 1 },
+  { id: 'dc2tog-tr2tog', usName: 'double crochet 2 together', usAbbreviation: 'dc2tog', ukName: 'treble 2 together', ukAbbreviation: 'tr2tog', glyph: 'decrease-tall-2', stitchesConsumed: 2, stitchesProduced: 1 },
+  { id: 'dc3tog-tr3tog', usName: 'double crochet 3 together', usAbbreviation: 'dc3tog', ukName: 'treble 3 together', ukAbbreviation: 'tr3tog', glyph: 'decrease-tall-3', stitchesConsumed: 3, stitchesProduced: 1 },
 ];
 
 const CROCHET_SYMBOLS_BY_ID = new Map(CROCHET_SYMBOLS.map((symbol) => [symbol.id, symbol]));

@@ -69,7 +69,9 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
       && Number.isInteger(angleIndex) && angleIndex >= 0 && angleIndex < stitchesInRound
       && Number.isInteger(stitchesInRound) && stitchesInRound > 0
       && (node.symbolId === null || (typeof node.symbolId === 'string' && CROCHET_SYMBOL_IDS.has(node.symbolId)))
-      && (node.colorId === null || (typeof node.colorId === 'string' && paletteIds.has(node.colorId)));
+      && (node.colorId === null || (typeof node.colorId === 'string' && paletteIds.has(node.colorId)))
+      && (node.sharedBase === undefined || typeof node.sharedBase === 'boolean')
+      && (node.loop === undefined || node.loop === 'front' || node.loop === 'back');
   });
   if (!validNodes) return false;
   for (let round = 0; round < rounds; round += 1) {

@@ -6,7 +6,13 @@ export interface FiberCraftMetadata { title: string; author: string; difficulty:
 export type ColorSlot = { readonly id: string; readonly hex: string; readonly label: string; readonly paletteCode?: string; readonly paletteName?: string; };
 export interface GridCell { readonly row: number; readonly col: number; readonly colorId: string | null; readonly symbolId: string | null; }
 export interface GridChart { readonly kind: 'grid'; readonly rows: number; readonly cols: number; readonly aspectRatio: number; readonly cells: readonly GridCell[]; }
-export interface PolarStitchNode { readonly round: number; readonly angleIndex: number; readonly stitchesInRound: number; readonly symbolId: string | null; readonly colorId: string | null; }
+export type CrochetLoopMode = 'front' | 'back';
+/**
+ * One stitch position in a round. `sharedBase` marks a stitch worked into the same base stitch as the
+ * previous position (the second and later legs of an increase). `loop` marks a stitch worked in the
+ * front or back loop only. Both are optional so drafts saved before they existed remain valid.
+ */
+export interface PolarStitchNode { readonly round: number; readonly angleIndex: number; readonly stitchesInRound: number; readonly symbolId: string | null; readonly colorId: string | null; readonly sharedBase?: boolean; readonly loop?: CrochetLoopMode; }
 export interface PolarChart { readonly kind: 'polar'; readonly rounds: number; readonly nodes: readonly PolarStitchNode[]; }
 export type CountedStitchKind = 'full-cross' | 'half-forward' | 'half-back' | 'quarter-nw' | 'quarter-ne' | 'quarter-sw' | 'quarter-se' | 'three-quarter-nw' | 'three-quarter-ne' | 'three-quarter-sw' | 'three-quarter-se';
 export interface CountedThreadCell { readonly row: number; readonly col: number; readonly stitchKind: CountedStitchKind | null; readonly colorId: string | null; }
