@@ -31,6 +31,10 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/photo-workflow.spec.ts',
       'tests/e2e/photo-editing-extras.spec.ts',
     ]);
+    expect(selectE2eSpecs(['src/tools/music/MasteringWorkspace.tsx'])).toEqual([
+      'tests/e2e/music.spec.ts',
+      'tests/e2e/mastering.spec.ts',
+    ]);
     expect(selectE2eSpecs(['src/tools/svg/VectorCanvas.tsx'])).toEqual([
       'tests/e2e/svg.spec.ts',
       'tests/e2e/vector-nested-composition.spec.ts',

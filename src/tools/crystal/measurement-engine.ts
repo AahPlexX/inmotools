@@ -1,5 +1,6 @@
-import { fractionalToCartesian } from './cell-engine';
+import { cellToMatrix, fractionalToCartesian } from './cell-engine';
 import { minimumImageFractionalDelta, periodicDistance } from './periodic-engine';
+import { planeNormal, type MillerIndex } from './reciprocal-engine';
 import type { UnitCell, Vec3 } from './crystal-types';
 
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -47,4 +48,25 @@ export function measureDihedral(a: Vec3, b: Vec3, c: Vec3, d: Vec3, cell: UnitCe
   const x = dot(v, w);
   const y = dot(cross(b1Unit, v), w);
   return Math.atan2(y, x) * 180 / Math.PI;
+}
+
+/** Angle in degrees between two (hkl) plane normals; planes and normals share one angle. */
+export function measurePlaneAngle(cell: UnitCell, first: MillerIndex, second: MillerIndex): number {
+  return Math.acos(clamp(dot(planeNormal(cell, first), planeNormal(cell, second)))) * 180 / Math.PI;
+}
+
+/** Angle in degrees between two [uvw] lattice directions, from the real-space cell metric. */
+export function measureDirectionAngle(cell: UnitCell, first: Vec3, second: Vec3): number {
+  const [a, b, c] = cellToMatrix(cell);
+  const toCartesian = ([u, v, w]: Vec3): Vec3 => [
+    u * a[0] + v * b[0] + w * c[0],
+    u * a[1] + v * b[1] + w * c[1],
+    u * a[2] + v * b[2] + w * c[2],
+  ];
+  const p = toCartesian(first);
+  const q = toCartesian(second);
+  const pLength = norm(p);
+  const qLength = norm(q);
+  if (pLength <= 1e-12 || qLength <= 1e-12) throw new RangeError('Direction angle requires nonzero [uvw] directions.');
+  return Math.acos(clamp(dot(p, q) / (pLength * qLength))) * 180 / Math.PI;
 }

@@ -20,7 +20,7 @@ const TOOL_SPECS = new Map([
   ['lattice', ['tests/e2e/lattice.spec.ts']],
   ['logs', ['tests/e2e/audit-hardening.spec.ts']],
   ['markdown', ['tests/e2e/markdown-workbench.spec.ts', 'tests/e2e/markdown-workbench-ux.spec.ts', 'tests/e2e/markdown-mermaid.spec.ts']],
-  ['music', ['tests/e2e/music.spec.ts']],
+  ['music', ['tests/e2e/music.spec.ts', 'tests/e2e/mastering.spec.ts']],
   ['nutrition', ['tests/e2e/nutrition.spec.ts']],
   ['otel', ['tests/e2e/otel.spec.ts']],
   ['pdf', ['tests/e2e/pdf.spec.ts']],
