@@ -1,6 +1,7 @@
 import { aggregateLevel, busLevels, portWidth } from './bus-engine';
 import { COMPONENT_LIBRARY, getComponentPorts, type ComponentCategory } from './component-library';
 import { isDisplayType, restoreSegmentLit, segmentIdsOf, type DisplayType } from './display-engine';
+import { COLOR_HEX, isMatrixType, matrixSizeOf, pixelRects, restoreMatrixPixels } from './matrix-engine';
 import { digitGeometries } from './segment-shapes';
 import { BUBBLE_RADIUS, type BodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
@@ -48,7 +49,7 @@ export const THEME_PALETTES: Readonly<Record<ThemeName, ThemePalette>> = {
     levelHigh: '#16a34a', levelLow: '#2563eb', levelFloating: '#9ca3af', levelContention: '#dc2626',
     emphasis: 1.5,
     flow: true,
-    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8', memory: '#a5f3fc' },
+    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8', memory: '#a5f3fc', matrix: '#d9f99d' },
   },
   'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#b35a00', levelFloating: '#999999', levelContention: '#d55e00' },
 };
@@ -290,7 +291,37 @@ const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   drawPinLabels(ctx, palette, component, ports);
   if (isDisplayType(component.type)) drawDisplayGlyphs(ctx, palette, component.type, body, restoreSegmentLit(frame.componentState[component.id]?.segmentLit, component.type));
 
+  if (isMatrixType(component.type)) drawMatrixPixels(ctx, palette, component, body, frame);
+
   drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, `bold ${10 * fontScaleOf(palette)}px ui-monospace, monospace`);
+};
+
+/**
+ * The pixels of an RGB matrix: a lit pixel is a solid colored square with a light rim, an unlit one a faint
+ * hollow square, so lit and unlit differ by fill and outline as well as by hue.
+ */
+const drawMatrixPixels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, body: BodyRect, frame: SimulationFrame): void => {
+  const size = matrixSizeOf(component.params);
+  const pixels = restoreMatrixPixels(frame.componentState[component.id]?.matrixPixels, size);
+  for (const rect of pixelRects(size, body)) {
+    const color = pixels[rect.row * size + rect.column] ?? 0;
+    const inset = Math.max(1, rect.size * 0.1);
+    ctx.beginPath();
+    ctx.rect(rect.x + inset, rect.y + inset, rect.size - inset * 2, rect.size - inset * 2);
+    if (color === 0) {
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = palette.levelFloating;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = COLOR_HEX[color] ?? '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = palette.componentStroke;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
 };
 
 /**

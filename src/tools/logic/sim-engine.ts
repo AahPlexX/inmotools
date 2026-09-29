@@ -1,4 +1,5 @@
 import { evaluateAlu } from './alu-engine';
+import { isMatrixType, restoreMatrixPixels, matrixSizeOf, updateMatrixPixels } from './matrix-engine';
 import { isMemoryType, memoryOutputs, restoreMemoryRuntime, stepMemoryWrite } from './memory-engine';
 import { evaluateBlock, isBlockType } from './block-engine';
 import { portBits } from './bus-engine';
@@ -460,6 +461,18 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
       read: (portId) => displayNets.get(net.find(portKey(component.id, portId))) ?? 'Z',
     });
     nextState[component.id] = { ...state, segmentLit };
+  }
+
+  // --- RGB matrices: sinks that record each pixel's color, holding a pixel while its row is not selected. ---
+  for (const component of document.components) {
+    if (!isMatrixType(component.type)) continue;
+    const state = nextState[component.id] ?? {};
+    const pixels = updateMatrixPixels({
+      params: component.params,
+      previous: restoreMatrixPixels(state.matrixPixels, matrixSizeOf(component.params)),
+      read: (portId) => displayNets.get(net.find(portKey(component.id, portId))) ?? 'Z',
+    });
+    nextState[component.id] = { ...state, matrixPixels: pixels };
   }
 
   const hazards: Hazard[] = [];

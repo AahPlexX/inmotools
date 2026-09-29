@@ -32,7 +32,8 @@ export type ComponentType =
   | 'BUS_SPLITTER'
   | 'ALU'
   | 'RAM'
-  | 'ROM';
+  | 'ROM'
+  | 'RGB_MATRIX';
 
 /**
  * `passive` pins neither drive nor load a net: a bus splitter's pins are passive because the same part
@@ -99,6 +100,8 @@ export interface ComponentParams {
   readonly memoryCells?: Readonly<Record<string, number>>;
   /** The value of every address that is not in `memoryCells`. */
   readonly memoryFill?: number;
+  /** Side length of an RGB pixel matrix: 8 or 16. */
+  readonly matrixSize?: number;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -196,6 +199,8 @@ export interface ComponentRuntimeState {
   readonly memoryWrites?: Readonly<Record<string, number>>;
   /** Why a RAM's latest clock edge did not write, while that is still the case. */
   readonly memoryFault?: string;
+  /** Each pixel of an RGB matrix as a color mask (1 red, 2 green, 4 blue; 0 unlit), row-major. */
+  readonly matrixPixels?: readonly number[];
 }
 
 export interface PendingUpdate {

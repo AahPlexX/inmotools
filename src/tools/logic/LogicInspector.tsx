@@ -3,6 +3,7 @@ import { ALU_OPERATION_HELP, ALU_OPERATIONS, ALU_WIDTHS, aluSizeLabel, aluWidthO
 import { clampBusWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
 import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
 import { isDisplayType } from './display-engine';
+import { clampMatrixSize, isMatrixType, MATRIX_SIZES, matrixSizeLabel } from './matrix-engine';
 import { addressBitsOf, DATA_WIDTHS, dataBitsOf, fillOf, formatWord, formatWordCount, isMemoryType, MAX_ADDRESS_BITS, MIN_ADDRESS_BITS, parseHexWord, wordCount } from './memory-engine';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
@@ -243,6 +244,27 @@ function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemory
         </>
       ) : null}
 
+      {isMatrixType(component.type) ? (
+        <>
+          <label className="logic-field">
+            <span>Matrix size</span>
+            <select value={clampMatrixSize(component.params.matrixSize)} onChange={(event) => onUpdateParams(component.id, { matrixSize: Number(event.target.value) })}>
+              {MATRIX_SIZES.map((size) => (
+                <option key={size} value={size}>{matrixSizeLabel(size)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="logic-field">
+            <span>Row and column polarity</span>
+            <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+              <option value="high">Active high</option>
+              <option value="low">Active low</option>
+            </select>
+          </label>
+          <p className="logic-inspector-hint">A pixel lights where an asserted column crosses the selected row, in the color the R, G and B pins show. It keeps its state until its row is selected again, so scanning rows in turn draws a steady picture.</p>
+        </>
+      ) : null}
+
       {isDisplayType(component.type) ? (
         <>
           <label className="logic-field">
@@ -264,7 +286,7 @@ function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemory
         </>
       ) : null}
 
-      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && component.type !== 'BUS_SPLITTER' && !isRegisterType(component.type) && !isDisplayType(component.type) ? (
+      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && component.type !== 'BUS_SPLITTER' && !isRegisterType(component.type) && !isDisplayType(component.type) && !isMatrixType(component.type) ? (
         <label className="logic-field">
           <span>Propagation delay (ns)</span>
           <input

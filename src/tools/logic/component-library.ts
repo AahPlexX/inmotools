@@ -2,11 +2,12 @@ import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './bl
 import { aluPorts } from './alu-engine';
 import { busLabel, clampBusWidth } from './bus-engine';
 import { displayPorts, type DisplayType } from './display-engine';
+import { matrixPorts } from './matrix-engine';
 import { memoryPorts } from './memory-engine';
 import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus' | 'arithmetic' | 'memory';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus' | 'arithmetic' | 'memory' | 'matrix';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -159,6 +160,7 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   BUS_SPLITTER: { type: 'BUS_SPLITTER', label: 'Bus splitter', category: 'bus', defaultParams: { busWidth: 4 }, ports: splitterPorts },
   ALU: { type: 'ALU', label: 'ALU', category: 'arithmetic', defaultParams: { aluWidth: 4, delayNs: 20 }, ports: aluPorts },
   RAM: { type: 'RAM', label: 'RAM', category: 'memory', defaultParams: { addressBits: 8, dataBits: 8, memoryFill: 0, memoryCells: {}, edge: 'rising', activeHigh: true, delayNs: 30 }, ports: (params) => memoryPorts('RAM', params) },
+  RGB_MATRIX: { type: 'RGB_MATRIX', label: 'RGB matrix', category: 'matrix', defaultParams: { matrixSize: 8, activeHigh: true }, ports: matrixPorts },
   ROM: { type: 'ROM', label: 'ROM', category: 'memory', defaultParams: { addressBits: 8, dataBits: 8, memoryFill: 0, memoryCells: {}, activeHigh: true, delayNs: 30 }, ports: (params) => memoryPorts('ROM', params) },
 };
 
@@ -197,6 +199,7 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'bus', label: 'Buses', types: ['BUS_SPLITTER'] },
   { category: 'arithmetic', label: 'Arithmetic', types: ['ALU'] },
   { category: 'memory', label: 'Memory', types: ['RAM', 'ROM'] },
+  { category: 'matrix', label: 'Pixel displays', types: ['RGB_MATRIX'] },
   { category: 'display', label: 'Segment displays', types: ['SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];
@@ -207,6 +210,7 @@ const PALETTE_LABELS: Readonly<Partial<Record<ComponentType, string>>> = {
   SEVEN_SEGMENT_4: '4-DIGIT 7-SEG',
   SIXTEEN_SEGMENT: '16-SEGMENT',
   BUS_SPLITTER: 'BUS SPLITTER',
+  RGB_MATRIX: 'RGB MATRIX',
 };
 
 /** The name shown on a palette button, in the inspector heading, and in placement hints. */

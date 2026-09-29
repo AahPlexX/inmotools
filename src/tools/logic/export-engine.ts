@@ -1,4 +1,5 @@
 import { isBusPort, portWidth } from './bus-engine';
+import { isMatrixType, matrixSizeOf, pixelRects } from './matrix-engine';
 import { isMemoryType, isValidMemoryParams } from './memory-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { isDisplayType } from './display-engine';
@@ -81,6 +82,11 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
           parts.push(`<polygon points="${segment.points.map((point) => `${svgNum(point.x)},${svgNum(point.y)}`).join(' ')}" fill="#cbd5e1" />`);
         }
         parts.push(`<circle cx="${svgNum(digit.dot.cx)}" cy="${svgNum(digit.dot.cy)}" r="${svgNum(digit.dot.r)}" fill="#cbd5e1" />`);
+      }
+    }
+    if (isMatrixType(component.type)) {
+      for (const rect of pixelRects(matrixSizeOf(component.params), body)) {
+        parts.push(`<rect x="${svgNum(rect.x + 1)}" y="${svgNum(rect.y + 1)}" width="${svgNum(Math.max(1, rect.size - 2))}" height="${svgNum(Math.max(1, rect.size - 2))}" rx="1.5" fill="#cbd5e1" />`);
       }
     }
     // Undo the group's mirror and 180-degree turn for the text alone, as the canvas does, so the caption never reads backwards or upside down.
@@ -174,7 +180,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG',
-  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU', 'RAM', 'ROM',
+  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU', 'RAM', 'ROM', 'RGB_MATRIX',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);

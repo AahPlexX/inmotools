@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addComponent, addWire, createInitialDocument, relabelComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
+import { getComponentPorts } from '../../src/tools/logic/component-library';
 import { serializeProject } from '../../src/tools/logic/export-engine';
+import { componentBodyRect } from '../../src/tools/logic/gate-shapes';
+import { pixelRects } from '../../src/tools/logic/matrix-engine';
 import { synthesizeTwoLevel } from '../../src/tools/logic/synthesis-engine';
 
 // Matches GRID_SIZE in src/tools/logic/geometry.ts. The canvas starts at pan
@@ -752,4 +755,81 @@ test('a ROM read through an address bus shows every stored word in the truth tab
     seen.add(address);
   }
   expect(seen.size).toBe(16);
+});
+
+test('an RGB matrix lights the pixel where the selected row meets an asserted column, in the driven color, and keeps it', async ({ page }) => {
+  let doc = createInitialDocument('Matrix');
+  const add = (type: 'SWITCH' | 'RGB_MATRIX', x: number, y: number, label: string) => {
+    doc = addComponent(doc, type, x, y);
+    const id = doc.components[doc.components.length - 1]!.id;
+    return { id, label };
+  };
+  const matrix = add('RGB_MATRIX', 8, 2, 'Matrix');
+  const drive = (portId: string, gridY: number) => {
+    const sw = add('SWITCH', 1, gridY, portId);
+    doc = addWire(doc, { componentId: sw.id, portId: 'Y' }, { componentId: matrix.id, portId });
+    return gridY;
+  };
+  const rowY = drive('ROW0', 2);
+  const colY = drive('COL0', 4);
+  const redY = drive('R', 6);
+
+  const component = doc.components.find((candidate) => candidate.id === matrix.id)!;
+  const body = componentBodyRect(component, getComponentPorts(component.type, component.params));
+  const first = pixelRects(8, body)[0]!;
+  const pixel = { x: component.x * GRID + first.x + first.size / 2, y: component.y * GRID + first.y + first.size / 2 };
+
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'matrix.circuit.json', mimeType: 'application/json', buffer: Buffer.from(serializeProject(doc)) });
+  const canvas = page.getByTestId('logic-canvas');
+  await expect(canvas).toBeVisible();
+
+  const colorAtPixel = async (): Promise<number[]> =>
+    canvas.evaluate((element, point) => {
+      const target = element as HTMLCanvasElement;
+      const ratio = target.width / target.clientWidth;
+      const context = target.getContext('2d')!;
+      return Array.from(context.getImageData(Math.round(point.x * ratio), Math.round(point.y * ratio), 1, 1).data);
+    }, pixel);
+  const toggle = async (gridY: number) => {
+    await canvas.click({ position: { x: 1.25 * GRID, y: gridY * GRID } });
+    // Selecting a part opens nothing that could cover the canvas; give the frame a moment to repaint.
+    await page.waitForTimeout(60);
+  };
+
+  const before = await colorAtPixel();
+  expect(before[0]! > 200 && before[1]! < 120 && before[2]! < 120).toBe(false);
+  await toggle(redY);
+  await toggle(colY);
+  await toggle(rowY);
+  await expect.poll(async () => {
+    const [r, g, b] = await colorAtPixel();
+    return r! > 200 && g! < 120 && b! < 120;
+  }).toBe(true);
+
+  // Deselecting the row leaves the pixel showing what it was given while selected.
+  await toggle(rowY);
+  await toggle(colY);
+  await page.waitForTimeout(60);
+  const [r, g, b] = await colorAtPixel();
+  expect(r! > 200 && g! < 120 && b! < 120).toBe(true);
+});
+
+test('places an RGB matrix, switches it to 16 x 16 from the inspector, and its unwired pins are named', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Pixel displays' })).toBeVisible();
+  await placeAt(page, 'RGB MATRIX', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 8 * GRID, y: 6 * GRID } });
+  const { inspector, close } = await openInspectorFor(page);
+  await expect(inspector.getByRole('heading', { name: 'RGB MATRIX' })).toBeVisible();
+  await inspector.getByLabel('Matrix size').selectOption('16');
+  await expect(inspector.getByLabel('Matrix size')).toHaveValue('16');
+  await close();
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toContainText('ROW15');
+  await expect(ercDock).toContainText('COL15');
 });

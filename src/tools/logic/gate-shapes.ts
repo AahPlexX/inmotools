@@ -3,6 +3,7 @@ import { BLOCK_WIDTH_COLS, blockTitle, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { clampBusWidth } from './bus-engine';
 import { displayTitle, displayWidthCols, isDisplayType } from './display-engine';
+import { isMatrixType, matrixTitle, matrixSizeOf, matrixWidthCols } from './matrix-engine';
 import { isMemoryType, MEMORY_WIDTH_COLS, memoryTitle } from './memory-engine';
 import { isRegisterType, registerTitle } from './register-engine';
 import { GRID_SIZE, componentOriginPixels, rotatePoint, type Point } from './geometry';
@@ -32,7 +33,7 @@ export const GATE_ABBREVIATION: Readonly<Record<ComponentType, string>> = {
   BUFFER: '1', TRI_BUFFER: '1', SWITCH: 'SW', PUSH_BUTTON: 'PB', CLOCK: 'CLK', LED: 'LED',
   PROBE: 'PRB', D_FLIP_FLOP: 'D', JK_FLIP_FLOP: 'JK', T_FLIP_FLOP: 'T', SR_LATCH: 'SR',
   MUX: 'MUX', DEMUX: 'DEMUX', DECODER: 'DEC', PRIORITY_ENCODER: 'ENC', BCD_7SEG: 'BCD', COUNTER: 'CTR', REGISTER: 'REG',
-  SEVEN_SEGMENT: '7SEG', SEVEN_SEGMENT_4: '4x7', SIXTEEN_SEGMENT: '16SEG', BUS_SPLITTER: 'BUS', ALU: 'ALU', RAM: 'RAM', ROM: 'ROM',
+  SEVEN_SEGMENT: '7SEG', SEVEN_SEGMENT_4: '4x7', SIXTEEN_SEGMENT: '16SEG', BUS_SPLITTER: 'BUS', ALU: 'ALU', RAM: 'RAM', ROM: 'ROM', RGB_MATRIX: 'RGB',
 };
 
 /** A rectangle in a component's local (pre-rotation, pre-mirror) pixel space. */
@@ -59,13 +60,14 @@ export const blockCaption = (component: ComponentInstance): string => {
   if (isRegisterType(component.type)) return registerTitle(component.type, component.params);
   if (isDisplayType(component.type)) return displayTitle(component.type);
   if (component.type === 'ALU') return aluTitle(component.params);
+  if (isMatrixType(component.type)) return matrixTitle(component.params);
   if (isMemoryType(component.type)) return memoryTitle(component.type, component.params);
   if (component.type === 'BUS_SPLITTER') return `SPLIT ${clampBusWidth(component.params.busWidth)}b`;
   return GATE_ABBREVIATION[component.type];
 };
 
 /** Multi-pin parts (blocks, counters, registers, displays) share one body: a box sized by its pin layout with a caption above it. */
-export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type) || isDisplayType(type) || type === 'BUS_SPLITTER' || type === 'ALU' || isMemoryType(type);
+export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type) || isDisplayType(type) || type === 'BUS_SPLITTER' || type === 'ALU' || isMemoryType(type) || isMatrixType(type);
 
 /**
  * Where a component's body is drawn, in local pixels. Used to size the
@@ -75,6 +77,7 @@ export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type)
 export const componentBodyRect = (component: ComponentInstance, ports: readonly PortDefinition[]): BodyRect => {
   if (isDisplayType(component.type)) return blockBodyRect(ports, displayWidthCols(component.type));
   if (component.type === 'ALU') return blockBodyRect(ports, ALU_WIDTH_COLS);
+  if (isMatrixType(component.type)) return blockBodyRect(ports, matrixWidthCols(matrixSizeOf(component.params)));
   if (isMemoryType(component.type)) return blockBodyRect(ports, MEMORY_WIDTH_COLS);
   if (usesBlockBody(component.type)) return blockBodyRect(ports);
   const inputCount = ports.filter((port) => port.direction === 'input').length;
