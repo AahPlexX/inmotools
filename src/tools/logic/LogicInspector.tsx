@@ -1,3 +1,4 @@
+import { blockSizeLabel, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
 import { clampInputCount, isVariadicGate } from './component-library';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
 
@@ -53,6 +54,37 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
             value={clampInputCount(component.params.inputCount)}
             onChange={(event) => onUpdateParams(component.id, { inputCount: Number(event.target.value) })}
           />
+        </label>
+      ) : null}
+
+      {isBlockType(component.type) ? (
+        <label className="logic-field">
+          <span>Size</span>
+          <select
+            value={selectBitsOf(component.type, component.params)}
+            onChange={(event) => onUpdateParams(component.id, { selectBits: Number(event.target.value) })}
+          >
+            {Array.from({ length: MAX_SELECT_BITS - MIN_SELECT_BITS + 1 }, (_, index) => MIN_SELECT_BITS + index).map((bits) => (
+              <option key={bits} value={bits}>{blockSizeLabel(component.type as BlockType, bits)}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      {isBlockType(component.type) && supportsEnable(component.type) ? (
+        <label className="logic-field logic-field-inline">
+          <input type="checkbox" checked={component.params.hasEnable === true} onChange={(event) => onUpdateParams(component.id, { hasEnable: event.target.checked })} />
+          <span>Enable (EN) input</span>
+        </label>
+      ) : null}
+
+      {component.type === 'DECODER' ? (
+        <label className="logic-field">
+          <span>Output polarity</span>
+          <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+            <option value="high">Active high (selected line = 1)</option>
+            <option value="low">Active low (selected line = 0)</option>
+          </select>
         </label>
       ) : null}
 

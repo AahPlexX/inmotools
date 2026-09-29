@@ -18,7 +18,11 @@ export type ComponentType =
   | 'D_FLIP_FLOP'
   | 'JK_FLIP_FLOP'
   | 'T_FLIP_FLOP'
-  | 'SR_LATCH';
+  | 'SR_LATCH'
+  | 'MUX'
+  | 'DEMUX'
+  | 'DECODER'
+  | 'PRIORITY_ENCODER';
 
 export type PortDirection = 'input' | 'output';
 
@@ -44,6 +48,10 @@ export interface ComponentParams {
   readonly frequencyHz?: number;
   readonly bounce?: boolean;
   readonly initialLevel?: 0 | 1;
+  /** Address/select width of a multiplexer, demultiplexer, decoder, or priority encoder (2^n data lines). */
+  readonly selectBits?: number;
+  /** Whether a MUX/DEMUX/DECODER exposes an EN input pin. */
+  readonly hasEnable?: boolean;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;

@@ -1,6 +1,7 @@
+import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './block-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -36,8 +37,10 @@ const variadicGatePorts = (params: ComponentParams): PortDefinition[] => {
   return [...inputs, { id: 'Y', direction: 'output', label: 'Y', x: 2, y: gateBodyRows(count) / 2 }];
 };
 
-export const clampInputCount = (value: number | undefined): number => {
-  const raw = value ?? 2;
+export const clampInputCount = (value: unknown): number => {
+  // An imported project can carry any JSON value here; a non-finite number
+  // must fall back to the default instead of collapsing the pin count to 0.
+  const raw = typeof value === 'number' && Number.isFinite(value) ? value : 2;
   return Math.min(8, Math.max(2, Math.round(raw)));
 };
 
@@ -65,8 +68,16 @@ const flipFlopPorts = (clockLabel: string, dataInputs: string[]): PortDefinition
   { id: 'SET', direction: 'input', label: 'SET', x: 0, y: dataInputs.length + 1 },
   { id: 'RST', direction: 'input', label: 'RST', x: 0, y: dataInputs.length + 2 },
   { id: 'Q', direction: 'output', label: 'Q', x: 2, y: 0 },
-  { id: 'QN', direction: 'output', label: 'Q̄', x: 2, y: 1 },
+  { id: 'QN', direction: 'output', label: 'QN', x: 2, y: 1 },
 ];
+
+const blockDefinition = (type: BlockType, label: string, extra: ComponentParams = {}): ComponentDefinition => ({
+  type,
+  label,
+  category: 'combinational',
+  defaultParams: { selectBits: defaultSelectBits(type), delayNs: 10, ...extra },
+  ports: (params) => blockPorts(type, params),
+});
 
 export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefinition>> = {
   AND: { type: 'AND', label: 'AND', category: 'gate', defaultParams: { inputCount: 2, delayNs: 5 }, minInputs: 2, maxInputs: 8, ports: variadicGatePorts },
@@ -95,9 +106,13 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
       { id: 'S', direction: 'input', label: 'S', x: 0, y: 0 },
       { id: 'R', direction: 'input', label: 'R', x: 0, y: 1 },
       { id: 'Q', direction: 'output', label: 'Q', x: 2, y: 0 },
-      { id: 'QN', direction: 'output', label: 'Q̄', x: 2, y: 1 },
+      { id: 'QN', direction: 'output', label: 'QN', x: 2, y: 1 },
     ],
   },
+  MUX: blockDefinition('MUX', 'Multiplexer'),
+  DEMUX: blockDefinition('DEMUX', 'Demultiplexer'),
+  DECODER: blockDefinition('DECODER', 'Binary decoder', { activeHigh: true }),
+  PRIORITY_ENCODER: blockDefinition('PRIORITY_ENCODER', 'Priority encoder'),
 };
 
 export const getComponentPorts = (type: ComponentType, params: ComponentParams): readonly PortDefinition[] =>
@@ -109,11 +124,13 @@ export const isVariadicGate = (type: ComponentType): boolean =>
 export const isSequential = (type: ComponentType): boolean =>
   type === 'D_FLIP_FLOP' || type === 'JK_FLIP_FLOP' || type === 'T_FLIP_FLOP' || type === 'SR_LATCH';
 
-export const isCombinationalGate = (type: ComponentType): boolean =>
-  isVariadicGate(type) || type === 'NOT' || type === 'BUFFER' || type === 'TRI_BUFFER';
+/** Gates and multi-pin blocks: every part whose outputs are a pure function of its current inputs. */
+export const isCombinationalLogic = (type: ComponentType): boolean =>
+  isVariadicGate(type) || type === 'NOT' || type === 'BUFFER' || type === 'TRI_BUFFER' || isBlockType(type);
 
 export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCategory; readonly label: string; readonly types: readonly ComponentType[] }[] = [
   { category: 'gate', label: 'Logic gates', types: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUFFER', 'TRI_BUFFER'] },
+  { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER'] },
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];

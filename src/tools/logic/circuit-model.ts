@@ -1,3 +1,4 @@
+import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
 import type {
   ComponentInstance,
@@ -120,7 +121,7 @@ export const duplicateComponent = (document: LogicDocument, componentId: string)
   return { ...document, components: [...document.components, copy], selectedIds: [copy.id] };
 };
 
-/** Removes wires that reference a port no longer produced by a reduced input count. */
+/** Removes wires that reference a port no longer produced by a reduced input count or block size. */
 const pruneOrphanWires = (document: LogicDocument): LogicDocument => {
   const portMap = new Map(document.components.map((component) => [component.id, new Set(getComponentPorts(component.type, component.params).map((port) => port.id))]));
   return {
@@ -135,9 +136,12 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
     components: document.components.map((component) => {
       if (component.id !== componentId) return component;
       const merged: ComponentParams = { ...component.params, ...params };
-      const normalized: ComponentParams = isVariadicGate(component.type) && merged.inputCount !== undefined
-        ? { ...merged, inputCount: clampInputCount(merged.inputCount) }
-        : merged;
+      let normalized: ComponentParams = merged;
+      if (isVariadicGate(component.type) && merged.inputCount !== undefined) {
+        normalized = { ...merged, inputCount: clampInputCount(merged.inputCount) };
+      } else if (isBlockType(component.type) && merged.selectBits !== undefined) {
+        normalized = { ...merged, selectBits: clampSelectBits(merged.selectBits, defaultSelectBits(component.type)) };
+      }
       return { ...component, params: normalized };
     }),
   };

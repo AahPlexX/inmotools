@@ -96,8 +96,8 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 
 ### Combinational & arithmetic blocks
 16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3)*
-17. Multiplexer/demultiplexer arrays (2:1, 4:1, 8:1, 16:1) with address and enable lines. *(Phase 2)*
-18. Priority encoders and binary decoders with valid-output flags. *(Phase 2)*
+17. Multiplexer/demultiplexer arrays (2:1, 4:1, 8:1, 16:1) with address and enable lines. *(Phase 2 — delivered in 2A)*
+18. Priority encoders and binary decoders with valid-output flags. *(Phase 2 — delivered in 2A)*
 
 ### Automated analysis
 19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4.)*

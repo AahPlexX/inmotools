@@ -1,5 +1,6 @@
+import { isBlockType } from './block-engine';
 import { getComponentPorts } from './component-library';
-import { BUBBLE_RADIUS, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble } from './gate-shapes';
+import { BUBBLE_RADIUS, blockBodyRect, blockCaption, componentBodyRect, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
 import { readLevel } from './sim-engine';
 import type {
@@ -193,6 +194,68 @@ const drawSequentialBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette
   ctx.stroke();
 };
 
+/**
+ * Draws a caption in the component's local space while keeping it upright and
+ * unmirrored on screen (a mirror or 180-degree turn would otherwise render it
+ * backwards or upside down).
+ */
+const drawUprightText = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, text: string, x: number, y: number, font: string): void => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(component.rotation === 180 ? Math.PI : 0);
+  ctx.scale(component.mirrored ? -1 : 1, 1);
+  ctx.fillStyle = palette.label;
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+};
+
+/**
+ * Prints each pin's name just inside the body edge it sits on. Text is drawn
+ * in the component's local space, so a mirror or a 180-degree turn (which
+ * reverses the local x-axis on screen) is undone for the text and its
+ * alignment swaps, keeping every label readable and extending into the body.
+ */
+const drawPinLabels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[]): void => {
+  const unmirror = component.mirrored ? -1 : 1;
+  const textTurn = component.rotation === 180 ? Math.PI : 0;
+  const reversed = component.mirrored !== (component.rotation === 180);
+  ctx.fillStyle = palette.label;
+  ctx.textBaseline = 'middle';
+  ctx.font = '9px ui-monospace, monospace';
+  for (const port of ports) {
+    const isOutput = port.direction === 'output';
+    ctx.save();
+    ctx.translate(port.x * GRID_SIZE + (isOutput ? -4 : 4), port.y * GRID_SIZE);
+    ctx.rotate(textTurn);
+    ctx.scale(unmirror, 1);
+    ctx.textAlign = isOutput !== reversed ? 'right' : 'left';
+    ctx.fillText(port.label, 0, 0);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic';
+};
+
+/**
+ * A multi-pin block: a box sized from the pin layout, its type caption above
+ * the top edge (inside, it would collide with the pin names), and the pin
+ * names just inside the edges.
+ */
+const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[]): void => {
+  const body = blockBodyRect(ports);
+  ctx.fillStyle = palette.componentFill;
+  ctx.strokeStyle = palette.componentStroke;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.rect(body.x, body.y, body.width, body.height);
+  ctx.fill();
+  ctx.stroke();
+  drawPinLabels(ctx, palette, component, ports);
+
+  drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, 'bold 10px ui-monospace, monospace');
+};
+
 const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[], frame: SimulationFrame, hoverPort: PortRef | undefined): void => {
   for (const port of ports) {
     const position = portAbsolutePosition(component, port);
@@ -286,32 +349,38 @@ export const renderScene = (
 
     if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || component.type === 'CLOCK' || component.type === 'LED' || component.type === 'PROBE') {
       drawIoComponent(ctx, palette, component, input.frame);
+    } else if (isBlockType(component.type)) {
+      drawBlockBody(ctx, palette, component, ports);
     } else if (component.type === 'D_FLIP_FLOP' || component.type === 'JK_FLIP_FLOP' || component.type === 'T_FLIP_FLOP' || component.type === 'SR_LATCH') {
       drawSequentialBody(ctx, palette, GRID_SIZE * 2, height);
-      ctx.fillStyle = palette.label;
-      ctx.font = '10px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(GATE_ABBREVIATION[component.type], GRID_SIZE, height / 2);
+      drawPinLabels(ctx, palette, component, ports);
+      drawUprightText(ctx, palette, component, GATE_ABBREVIATION[component.type], GRID_SIZE, -GRID_SIZE * 0.5 - 6, 'bold 10px ui-monospace, monospace');
     } else {
       drawGateBody(ctx, palette, component, GRID_SIZE * 2, height);
     }
-    ctx.restore();
 
     if (input.document.selectedIds.includes(component.id)) {
-      ctx.save();
+      // Drawn inside the component's own transform so the outline hugs the
+      // body for every family and follows rotation and mirroring.
+      const body = componentBodyRect(component, ports);
+      const pad = 6;
       ctx.strokeStyle = palette.selection;
       ctx.setLineDash([4, 3]);
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(origin.x - GRID_SIZE * 1.2, origin.y - height / 2 - GRID_SIZE * 0.4, GRID_SIZE * 2.4 + 8, height + GRID_SIZE * 0.8);
-      ctx.restore();
+      ctx.strokeRect(body.x - pad, body.y - pad, body.width + pad * 2, body.height + pad * 2);
+      ctx.setLineDash([]);
     }
+    ctx.restore();
 
     drawPorts(ctx, palette, component, ports, input.frame, input.hoverPort);
 
+    // The instance label sits under the drawn body for every family; placing
+    // it by center-line arithmetic put it on top of gate and register edges.
+    const labelBody = componentBodyRect(component, ports);
     ctx.fillStyle = palette.label;
     ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(component.label, origin.x + GRID_SIZE, origin.y + height / 2 + GRID_SIZE * 0.9);
+    ctx.fillText(component.label, origin.x + labelBody.x + labelBody.width / 2, origin.y + labelBody.y + labelBody.height + 14);
   }
 
   if (input.marqueeRect) {

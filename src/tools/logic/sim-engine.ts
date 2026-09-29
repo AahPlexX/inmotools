@@ -1,3 +1,4 @@
+import { evaluateBlock, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import {
   portKey,
@@ -273,27 +274,36 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
       const inputPorts = ports.filter((port) => port.direction === 'input');
       const readInput = (portId: string): LogicLevel => resolvedNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
 
-      let nextOutput: LogicLevel | undefined;
+      // Every combinational part reduces to "these output pins should now
+      // read these levels": gates drive their single Y pin, blocks drive
+      // however many pins their layout defines.
+      let nextOutputs: Readonly<Record<string, LogicLevel>> | undefined;
       if (component.type === 'TRI_BUFFER') {
-        nextOutput = evaluateTriBuffer(readInput('A'), readInput('EN'));
+        nextOutputs = { Y: evaluateTriBuffer(readInput('A'), readInput('EN')) };
       } else if (
         component.type === 'AND' || component.type === 'OR' || component.type === 'NAND' ||
         component.type === 'NOR' || component.type === 'XOR' || component.type === 'XNOR' ||
         component.type === 'NOT' || component.type === 'BUFFER'
       ) {
         const inputLevels = inputPorts.map((port) => readInput(port.id));
-        nextOutput = evaluateGateOutput(component.type, inputLevels);
+        nextOutputs = { Y: evaluateGateOutput(component.type, inputLevels) };
+      } else if (isBlockType(component.type)) {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = evaluateBlock(component.type, component.params, inputLevels);
       }
-      if (nextOutput === undefined) continue;
+      if (nextOutputs === undefined) continue;
 
-      const outKey = portKey(component.id, 'Y');
-      const currentOutput = levels.get(outKey) ?? 'Z';
-      if (currentOutput === nextOutput) continue;
-      changed = true;
-      if (schedule) {
-        stillPending.push({ dueTick: tick + delayTicksFor(component.params.delayNs), componentId: component.id, portId: 'Y', level: nextOutput });
-      } else {
-        levels.set(outKey, nextOutput);
+      for (const [portId, nextLevel] of Object.entries(nextOutputs)) {
+        const outKey = portKey(component.id, portId);
+        const currentOutput = levels.get(outKey) ?? 'Z';
+        if (currentOutput === nextLevel) continue;
+        changed = true;
+        if (schedule) {
+          stillPending.push({ dueTick: tick + delayTicksFor(component.params.delayNs), componentId: component.id, portId, level: nextLevel });
+        } else {
+          levels.set(outKey, nextLevel);
+        }
       }
     }
     return changed;

@@ -1,4 +1,4 @@
-import { isCombinationalGate, isSequential } from './component-library';
+import { isCombinationalLogic, isSequential } from './component-library';
 import { buildNetIndex, createInitialFrame, readLevel, step } from './sim-engine';
 import { portKey, type ComponentInstance, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
@@ -174,7 +174,7 @@ export const runElectricalRuleCheck = (document: LogicDocument): ErcFinding[] =>
     }
   }
 
-  const combinationalIds = new Set(document.components.filter((component) => isCombinationalGate(component.type)).map((component) => component.id));
+  const combinationalIds = new Set(document.components.filter((component) => isCombinationalLogic(component.type)).map((component) => component.id));
   const adjacency = new Map<string, Set<string>>();
   for (const wire of document.wires) {
     const fromDirection = netIndex.directionOf.get(portKey(wire.from.componentId, wire.from.portId));

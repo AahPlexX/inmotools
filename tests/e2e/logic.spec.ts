@@ -124,6 +124,53 @@ test('a right-click while placing a component cancels the drop instead of also p
   await page.keyboard.press('Escape');
 });
 
+test('builds a 2:1 multiplexer circuit and its generated truth table selects the addressed input', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Multiplexers & decoders' })).toBeVisible();
+
+  await placeAt(page, 'SWITCH', 1, 1);
+  await placeAt(page, 'SWITCH', 1, 4);
+  await placeAt(page, 'SWITCH', 1, 7);
+  await placeAt(page, 'MUX', 6, 1);
+  await placeAt(page, 'LED', 11, 2);
+
+  // A new multiplexer is 4:1; shrink it to 2:1 from the inspector. On a
+  // narrow viewport the inspector is a slide-over sheet that must be opened.
+  const canvas = page.getByTestId('logic-canvas');
+  await canvas.click({ position: { x: 7.5 * GRID, y: 1.5 * GRID } });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  await expect(inspector.getByRole('heading', { name: 'MUX' })).toBeVisible();
+  await inspector.getByLabel('Size').selectOption({ label: '2:1 multiplexer' });
+  if (isSheet) await page.getByLabel('Close inspector').click();
+
+  // 2:1 mux at grid (6,1): D0 (6,1), D1 (6,2), S0 (6,3), Y (9,2).
+  await wire(page, { x: 2 * GRID, y: 1 * GRID }, { x: 6 * GRID, y: 1 * GRID });
+  await wire(page, { x: 2 * GRID, y: 4 * GRID }, { x: 6 * GRID, y: 2 * GRID });
+  await wire(page, { x: 2 * GRID, y: 7 * GRID }, { x: 6 * GRID, y: 3 * GRID });
+  await wire(page, { x: 9 * GRID, y: 2 * GRID }, { x: 11 * GRID, y: 2 * GRID });
+
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  await expect(page.getByTestId('logic-erc-dock')).toContainText('No floating inputs');
+
+  await page.getByRole('button', { name: 'Truth table' }).click();
+  const rows = page.getByTestId('logic-truth-table-dock').locator('tbody tr');
+  await expect(rows).toHaveCount(8);
+  // Columns are the three switches (D0, D1, S) then the LED; Y = S ? D1 : D0.
+  const expected = Array.from({ length: 8 }, (_, mask) => {
+    const d0 = mask & 1;
+    const d1 = (mask >> 1) & 1;
+    const select = (mask >> 2) & 1;
+    return `${d0}${d1}${select}${select ? d1 : d0}`;
+  });
+  const actual = (await rows.allTextContents()).map((text) => text.replace(/\s+/g, ''));
+  expect([...actual].sort()).toEqual([...expected].sort());
+});
+
 test('collapses the palette and inspector into slide-over sheets on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/tools/digital-logic-workstation');
