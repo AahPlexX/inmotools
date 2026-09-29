@@ -206,6 +206,20 @@ export default function FiberCraftWorkspace() {
   const knittingChart = document.metadata.discipline === 'knitting' && document.chart.kind === 'grid' ? document.chart : null;
   const progress = useMemo(() => roundChart ? crochetRoundProgress(document, Math.min(activeRound, Math.max(0, roundChart.rounds - 1))) : null, [activeRound, document, roundChart]);
 
+  // Give the tab, bookmarks, and history a meaningful title while the tool is open, then hand the page
+  // back exactly as found. The site is one hash-routed page, so this cannot change what search engines index.
+  useEffect(() => {
+    const previousTitle = window.document.title;
+    const description = window.document.querySelector('meta[name="description"]');
+    const previousDescription = description?.getAttribute('content') ?? null;
+    window.document.title = 'Fiber Craft Workstation — Crochet Chart Maker & Pattern Writer | InMo Tools';
+    description?.setAttribute('content', 'Chart crochet in rounds or on a C2C/filet grid and get the written pattern, stitch counts, and finished size as you work. Free, private, and everything stays in your browser.');
+    return () => {
+      window.document.title = previousTitle;
+      if (previousDescription !== null) description?.setAttribute('content', previousDescription);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof indexedDB === 'undefined') { setStatus('Local autosave is unavailable in this browser. Current work remains on screen.'); return; }
     const store = createIndexedDbFiberCraftStore();

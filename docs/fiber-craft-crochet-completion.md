@@ -31,11 +31,41 @@ FC-03, FC-04, FC-07, FC-50–FC-52, FC-54–FC-56, FC-59, FC-63, FC-64. Their de
 | CR-07 | Chart zoom (60–300%, buttons or `+` `-` `0` on the chart) and pan (scroll, drag, keyboard) for round and grid charts | FC-05 | **Done** |
 | CR-08 | Metric/imperial: switching the gauge unit converts the swatch span and size fields instead of relabelling them; sizes, recommendations and the materials list follow. Hooks already show mm and US together | FC-53 | **Done** |
 | CR-09 | "Export everything (.zip)": PDF, chart PNG, share card, written pattern, materials CSV and project file in one download | FC-65 | **Done** |
-| CR-10 | Final UX, copy, SEO, accessibility and responsive audit, including the catalog entry wording | — | Open |
+| CR-10 | Final UX, copy, SEO, accessibility and responsive audit, including the catalog entry wording | — | **Done**, see "CR-10 audit notes" |
 | CR-11 | Integration onto `origin/main` and closing the crochet items in `.tasks/` | Governance §4 | In progress, see Integration |
 
-**Progress: 9 of 11 complete.** Update this count, the table, and the Fiber entry in `.tasks/IN_PROGRESS.md`
+**Progress: 10 of 11 complete.** Update this count, the table, and the Fiber entry in `.tasks/IN_PROGRESS.md`
 in the same commit as any change to a row.
+
+## CR-10 audit notes
+
+Audited on desktop (1440 px) and phone (iPhone 13 profile) in Chromium, round and grid modes, in the
+light, dark-room and high-contrast themes.
+
+Found and fixed:
+
+- Dark-room secondary buttons turned light on hover while their text stayed light (contrast 1.07:1),
+  because `--surface-strong` was not defined for the Fiber themes. Defined for dark-room and
+  high-contrast.
+- The "same base stitch" checkbox was 22 px; now 24 px inside a 44 px label.
+- The C2C/filet grid hard-coded 12 columns, so resized grids wrapped; it now follows the chart size and
+  zoom.
+- Switching the gauge unit relabelled the numbers instead of converting them.
+- Catalog copy was generic and did not describe what crochet users can do; rewritten in plain language,
+  keeping the "Counted-Thread Pattern Workbench" phrase another test asserts.
+
+Checked and clean: no horizontal page overflow at either width; axe reports no violations in all three
+themes for round and grid modes, including with a secondary button hovered (kept as a permanent browser
+test).
+
+Known limits, deliberately not changed here:
+
+- The site is one hash-routed page with a single static `<title>` and description, so search engines
+  cannot index individual tools. The workspace sets a descriptive title and description while it is open
+  (tab, bookmarks, history) and restores the originals on leave. Per-tool indexable pages are a
+  site-wide change already tracked in `.tasks/BACKLOG.md` ("Tool-route search indexing").
+- The desktop inspector column is long (stitch editing, title & credit, export, project file). Grouping
+  it into collapsible sections is tracked in `.tasks/BACKLOG.md`.
 
 ## How crochet is modelled
 
@@ -103,3 +133,4 @@ pull request has merged into `main` and the Fiber entry in `.tasks/` has been re
 | 2026-09-29 | CR-03, CR-04, CR-05 | Fiber unit files 6/6, 97/97 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
 | 2026-09-29 | CR-06, CR-07, CR-08; also fixed a hard-coded 12-column grid layout that broke resized grids | Fiber unit files 6/6, 102/102 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
 | 2026-09-29 | CR-09 | Fiber unit files 6/6, 104/104 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
+| 2026-09-29 | CR-10 | Full unit suite 216 files, 2218/2218 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 12/12 across desktop and mobile Chromium (adds axe in every theme, overflow, and page-title checks) |

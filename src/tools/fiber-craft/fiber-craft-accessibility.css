@@ -17,6 +17,7 @@
 .fiber-craft-workspace[data-fiber-theme="dark-room"] {
   color-scheme: dark;
   --surface: #111820;
+  --surface-strong: #1d2833;
   --ink: #f7f9fb;
   --muted: #c5d0da;
   --line: #485765;
@@ -38,6 +39,7 @@
 .fiber-craft-workspace[data-fiber-theme="high-contrast"] {
   color-scheme: light;
   --surface: #ffffff;
+  --surface-strong: #e6e6e6;
   --ink: #000000;
   --muted: #1a1a1a;
   --line: #000000;

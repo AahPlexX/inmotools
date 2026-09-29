@@ -30,7 +30,7 @@
 .fiber-craft-grid-tools .action-button { min-height: 44px; }
 .fiber-craft-field textarea { width: 100%; min-height: 88px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); padding: 8px 11px; font: inherit; resize: vertical; }
 .fiber-craft-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; font-size: 14px; line-height: 1.4; }
-.fiber-craft-check input { flex: 0 0 auto; width: 22px; height: 22px; margin-top: 1px; }
+.fiber-craft-check input { flex: 0 0 auto; width: 24px; height: 24px; margin-top: 1px; }
 .fiber-craft-inspector { display: grid; gap: 12px; min-width: 0; }
 .fiber-craft-inspector > section { display: grid; gap: 12px; padding: 14px; }
 .fiber-craft-wide { width: 100%; min-height: 44px; }

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Download } from '@playwright/test';
 
 const inspectPngDownload = async (download: Download) => {
@@ -310,6 +311,24 @@ test.describe('Fiber Craft Workstation', () => {
     const saved = JSON.parse(await readFile((await project.path())!, 'utf8')) as { document?: { metadata?: { author?: string; license?: string } }; metadata?: { author?: string; license?: string } };
     const metadata = saved.document?.metadata ?? saved.metadata;
     expect(metadata).toMatchObject({ author: 'Ana Rivera', license: 'CC BY 4.0' });
+  });
+
+  test('crochet views pass axe in every theme (including hovered buttons), fit the viewport, and set a useful page title', async ({ page }) => {
+    await page.goto('./#/fiber-craft-workstation');
+    await expect(page).toHaveTitle(/Fiber Craft Workstation — Crochet Chart Maker/);
+    await page.getByRole('button', { name: 'Fill round 1 with this stitch' }).click();
+    for (const mode of ['round', 'grid']) {
+      if (mode === 'grid') await page.getByLabel('Chart mode').selectOption('grid');
+      for (const theme of ['light', 'dark-room', 'high-contrast']) {
+        await page.locator('#fiber-display-theme').selectOption(theme);
+        await page.locator('.fiber-craft-inspector .action-button.secondary:not([disabled])').first().hover();
+        const results = await new AxeBuilder({ page }).include('.fiber-craft-workspace').analyze();
+        expect(results.violations.map((violation) => `${mode}/${theme}: ${violation.id}`)).toEqual([]);
+      }
+      await page.locator('#fiber-display-theme').selectOption('light');
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(10);
+    }
   });
 
   test('edits, keys, saves, and restores a counted-thread chart', async ({ page }) => {
