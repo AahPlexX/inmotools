@@ -39,6 +39,16 @@ import {
   updateMetadata,
 } from './circuit-model';
 import { parseProject, projectFileName, renderSchematicSvg, serializeProject } from './export-engine';
+import {
+  channelCandidates,
+  createSampleBuffer,
+  normalizeChannels,
+  recordSample,
+  sameChannels,
+  type AnalyzerChannel,
+  type SampleBuffer,
+} from './analyzer-engine';
+import { LogicAnalyzerDock } from './LogicAnalyzerDock';
 import { LogicCanvas, type MenuAction } from './LogicCanvas';
 import { LogicInspector } from './LogicInspector';
 import type { ComponentType, DocumentHistory, LogicDocument, LogicLevel, PortRef, ThemeName, WirePoint } from './logic-types';
@@ -82,11 +92,17 @@ export default function LogicWorkspace() {
 
   const frameRef = useRef(createInitialFrame(history.present));
   const [, bumpFrame] = useReducer((count: number) => count + 1, 0);
+  // The analyzer records every simulation step whether or not its dock is open, so
+  // opening it shows what already happened. The buffer is mutated in place as steps
+  // arrive; a change of channels swaps in a fresh one.
+  const analyzerBufferRef = useRef<SampleBuffer>(createSampleBuffer([]));
+  const analyzerChannelsRef = useRef<readonly AnalyzerChannel[]>([]);
+  const [analyzerKeys, setAnalyzerKeys] = useState<readonly string[] | null>(null);
   const liveButtonLevelsRef = useRef<Record<string, LogicLevel>>({});
   const pendingSwitchOverrideRef = useRef<Record<string, LogicLevel>>({});
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer'>('none');
   const [mobilePanel, setMobilePanel] = useState<'none' | 'palette' | 'inspector'>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,6 +124,11 @@ export default function LogicWorkspace() {
     const interactions = { ...liveButtonLevelsRef.current, ...pendingSwitchOverrideRef.current };
     pendingSwitchOverrideRef.current = {};
     frameRef.current = step({ document: documentRef.current, previous: frameRef.current, elapsedMs, interactions, forceClockStep });
+    if (!sameChannels(analyzerBufferRef.current.channels, analyzerChannelsRef.current)) {
+      analyzerBufferRef.current = createSampleBuffer(analyzerChannelsRef.current);
+    }
+    const latestFrame = frameRef.current;
+    recordSample(analyzerBufferRef.current, latestFrame.tick, (key) => latestFrame.portLevels[key] ?? 'Z');
     bumpFrame();
   }, []);
 
@@ -226,6 +247,15 @@ export default function LogicWorkspace() {
   const expressions = useMemo(() => (truthTable ? extractBooleanExpressions(truthTable) : []), [truthTable]);
   const ercFindings: ErcFinding[] = useMemo(() => (activeDock === 'erc' ? runElectricalRuleCheck(doc) : []), [activeDock, doc]);
 
+  // Which signals the analyzer captures follows the circuit (a deleted probe drops out, a new one joins
+  // the default set); runStep reads the latest list through a ref so it never records a stale channel.
+  const analyzerChannels = useMemo(() => normalizeChannels(doc, analyzerKeys), [doc.components, analyzerKeys]);
+  const analyzerCandidates = useMemo(() => channelCandidates(doc), [doc.components]);
+  analyzerChannelsRef.current = analyzerChannels;
+  if (!sameChannels(analyzerBufferRef.current.channels, analyzerChannels)) {
+    analyzerBufferRef.current = createSampleBuffer(analyzerChannels);
+  }
+
   // Replacing the live document without also dropping these would let a
   // held button or a queued switch toggle from the old circuit apply to
   // the new one if it happens to reuse a component id.
@@ -296,6 +326,7 @@ export default function LogicWorkspace() {
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
+        <button type="button" onClick={() => setActiveDock((current) => (current === 'analyzer' ? 'none' : 'analyzer'))} aria-pressed={activeDock === 'analyzer'}>Logic analyzer</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={handleExportSvg}>Export SVG</button>
@@ -417,6 +448,19 @@ export default function LogicWorkspace() {
             </ul>
           )}
         </section>
+      ) : null}
+
+      {activeDock === 'analyzer' ? (
+        <LogicAnalyzerDock
+          buffer={analyzerBufferRef.current}
+          tick={frameRef.current.tick}
+          candidates={analyzerCandidates}
+          selectedKeys={analyzerKeys}
+          delayMode={doc.simulation.delayMode}
+          theme={doc.theme}
+          onChannelsChange={(keys) => setAnalyzerKeys(keys)}
+          onClose={() => setActiveDock('none')}
+        />
       ) : null}
 
       {activeDock === 'shortcuts' ? (

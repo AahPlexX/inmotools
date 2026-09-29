@@ -226,6 +226,60 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   await expect(ercDock).toContainText('DP');
 });
 
+test('the logic analyzer records steps, measures between two cursors, and goes full screen', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 1, 1);
+  await placeAt(page, 'PROBE', 6, 1);
+  // Switch output pin (grid 2,1) -> probe input pin (grid 6,1).
+  await wire(page, { x: 2 * GRID, y: 1 * GRID }, { x: 6 * GRID, y: 1 * GRID });
+
+  // Every simulation step is one recorded tick, whether or not the dock is open: single-step,
+  // flip the switch, step again, and only then open the analyzer to find the history already there.
+  const stepButton = page.getByRole('button', { name: 'Step', exact: true });
+  const canvas = page.getByTestId('logic-canvas');
+  for (let index = 0; index < 3; index += 1) await stepButton.click();
+  await canvas.click({ position: { x: 1.25 * GRID, y: 1 * GRID } });
+  for (let index = 0; index < 3; index += 1) await stepButton.click();
+
+  await page.getByRole('button', { name: 'Logic analyzer' }).click();
+  const dock = page.getByTestId('logic-analyzer-dock');
+  await expect(dock).toBeVisible();
+  await expect(dock.getByText('Channels (1 of 16)')).toBeVisible();
+  await expect(dock).not.toContainText('Nothing recorded yet');
+  await expect(dock).toContainText('Showing ticks 1–7 of 1–7');
+
+  const analyzerCanvas = page.getByTestId('logic-analyzer-canvas');
+  const readout = page.getByTestId('logic-analyzer-readout');
+  await analyzerCanvas.scrollIntoViewIfNeeded();
+  const box = (await analyzerCanvas.boundingBox())!;
+  await page.mouse.click(box.x + 140, box.y + 40);
+  await expect(readout).toContainText('Cursor A at tick');
+  await page.mouse.click(box.x + box.width - 6, box.y + 40);
+  await expect(readout).toContainText(/A at tick \d+, B at tick \d+: \d+ ticks?\./);
+  // Ideal-delay mode has no nanosecond scale, so the measurement is in ticks only.
+  await expect(readout).not.toContainText('ns');
+
+  await dock.getByRole('button', { name: 'Clear cursors' }).click();
+  await expect(readout).toContainText('Click the diagram to place cursor A');
+
+  await dock.getByRole('button', { name: 'Full screen' }).click();
+  await expect(dock).toHaveClass(/logic-analyzer-fullscreen/);
+  // Fixed to the layout viewport, which a classic page scrollbar narrows: measure against <html> itself.
+  const client = await page.evaluate(() => ({ width: document.documentElement.getBoundingClientRect().width, height: window.innerHeight }));
+  const fullBox = (await dock.boundingBox())!;
+  expect(fullBox.width).toBeGreaterThanOrEqual(client.width - 1);
+  expect(fullBox.height).toBeGreaterThanOrEqual(client.height - 1);
+  await dock.getByRole('button', { name: 'Exit full screen' }).click();
+
+  await dock.getByText('Channels (1 of 16)').click();
+  await dock.getByLabel(/probe/i).first().uncheck();
+  await expect(dock.getByText('Channels (0 of 16)')).toBeVisible();
+  await expect(dock).toContainText('No signals are being captured');
+
+  await dock.getByRole('button', { name: 'Close the logic analyzer' }).click();
+  await expect(dock).toBeHidden();
+});
+
 test('two fingers pan and pinch-zoom the canvas without moving or creating anything', async ({ page }) => {
   await page.goto('./#/tools/digital-logic-workstation');
   await placeAt(page, 'SWITCH', 6, 6);

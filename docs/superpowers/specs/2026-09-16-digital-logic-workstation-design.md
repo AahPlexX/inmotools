@@ -92,7 +92,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 12. Multi-segment/alphanumeric display drivers: 7-segment (single and multiplexed 4-digit) and 16-segment, wired directly or through a BCD decoder. *(Phase 2 — delivered in 2C)*
 13. RGB LED pixel-matrix canvas (8×8 / 16×16) with row/column drive for scanning demos. *(Phase 3)*
 14. Integrated logic probe / voltage-level indicator: High/Low/High-Z/Contention shown by both color and shape/pattern. *(Phase 1)*
-15. Virtual multi-channel logic analyzer / oscilloscope dock: up to 16 probes, synchronized scrolling timing diagram, edge markers, time-delta cursor measurements; the dock collapses to a full-screen mode on narrow viewports. *(Phase 2)*
+15. Virtual multi-channel logic analyzer / oscilloscope dock: up to 16 probes, synchronized scrolling timing diagram, edge markers, time-delta cursor measurements; the dock collapses to a full-screen mode on narrow viewports. *(Phase 2 — delivered in 2E)*
 
 ### Combinational & arithmetic blocks
 16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3)*

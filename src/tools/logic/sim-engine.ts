@@ -24,7 +24,7 @@ import {
  * configured gates stay proportionally correct while remaining fast
  * enough to observe interactively.
  */
-const DELAY_SCALE_NS = 100;
+export const DELAY_SCALE_NS = 100;
 const MAX_SETTLE_ITERATIONS_PER_COMPONENT = 64;
 
 const toBit = (level: LogicLevel): 0 | 1 | undefined => (level === 0 || level === 1 ? level : undefined);
