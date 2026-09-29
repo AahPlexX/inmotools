@@ -275,7 +275,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'move',
     title: 'Move a player',
     paragraphs: [
-      'Select a player from the list or the pitch. Click or tap the pitch to place that player, use the arrow buttons, or type X and Y percentages.',
+      'Select a player from the list or the pitch. Click or tap the pitch to place that player, use the arrow buttons, or type X and Y percentages from 0 to 100 across the pitch.',
       'Arrow keys nudge the selected player when focus is on the pitch or the page background. They do not nudge while a text field, button, or other control has focus.',
     ],
   },
@@ -291,7 +291,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'layout',
     title: 'Narrow layout',
     paragraphs: [
-      'On a narrow window the pitch and player controls come before the setup panels. Players sheet and Timeline sheet open those same controls in a bottom sheet.',
+      'On a narrow window the pitch and player controls come before the setup panels. Players sheet and Timeline sheet open those same controls in a bottom sheet, a panel that slides up from the bottom of the screen.',
       'Escape closes a sheet, player actions, or help and returns focus to the button that opened it.',
     ],
   },
@@ -307,7 +307,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'motion',
     title: 'Playback and reduced motion',
     paragraphs: [
-      'K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. Shift+K stops and returns to 0 ms.',
+      'K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. A keyframe is a saved time on the timeline. Shift+K stops and returns to 0 ms.',
       'When the device asks for reduced motion, Play and K step to the next keyframe instead of animating. Authoring, scrubbing, and frame steps stay available.',
     ],
   },
