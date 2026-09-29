@@ -307,15 +307,15 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'motion',
     title: 'Playback and reduced motion',
     paragraphs: [
-      'A keyframe is a saved time on the timeline. K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. Shift+K stops and returns to 0 ms.',
-      'When the device asks for reduced motion, Play and K step to the next keyframe instead of animating. Authoring, timeline scrubbing (dragging the playhead), and frame steps stay available.',
+      'A keyframe is a saved time on the motion timeline (the row of times for player motion). K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. Shift+K stops and returns to 0 ms.',
+      'When the device asks for reduced motion, Play and K step to the next keyframe instead of animating. Authoring, timeline scrubbing (dragging the current-time marker), and frame steps stay available.',
     ],
   },
   {
     id: 'recovery',
     title: 'Local recovery',
     paragraphs: [
-      'The project vault — projects, snapshots, and autosaves stored in this browser — keeps that data on this device. Nothing is uploaded.',
+      'The project vault — projects, snapshots (saved copies of the project at a moment), and autosaves stored in this browser — keeps that data on this device. Nothing is uploaded.',
       'If a previous autosave is waiting, autosave stays paused until you restore it or keep the current board.',
     ],
   },
