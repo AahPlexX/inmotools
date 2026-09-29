@@ -10,7 +10,7 @@ import { BUBBLE_RADIUS, blockCaption, componentBodyRect, componentLabelAnchor, c
 import { componentOriginPixels, documentBoundingBox, portAbsolutePosition, GRID_SIZE } from './geometry';
 import type { ComponentInstance, ComponentType, LogicDocument, PortRef, ThemeName, Wire, WirePoint } from './logic-types';
 
-const escapeXml = (value: string): string =>
+export const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Coerces a value that must already be a finite number to one, defending exported SVG attributes against a corrupted or crafted document reaching this renderer. */
@@ -129,6 +129,8 @@ export interface SchematicSvgOptions {
   readonly netLabels?: boolean;
   /** Draws a drawing-sheet border with lettered columns and numbered rows around the schematic. */
   readonly sheet?: boolean;
+  /** Draws the title, description, author, version and license box under the schematic (default true). */
+  readonly titleBlock?: boolean;
 }
 
 /** Room for the sheet border and its zone labels around the schematic. */
@@ -173,7 +175,7 @@ const sheetFrame = (totalWidth: number, totalHeight: number): string[] => {
 export const renderSchematicSvg = (document: LogicDocument, options: SchematicSvgOptions = {}): string => {
   const box = documentBoundingBox(document.components);
   const margin = GRID_SIZE * 2;
-  const titleBlockHeight = 72;
+  const titleBlockHeight = options.titleBlock === false ? 0 : 72;
   const pad = options.sheet ? SHEET_PADDING : 0;
   const width = Math.max(1, box.maxX - box.minX) + margin * 2;
   const height = Math.max(1, box.maxY - box.minY) + margin * 2 + titleBlockHeight;
@@ -250,14 +252,16 @@ export const renderSchematicSvg = (document: LogicDocument, options: SchematicSv
     }
   }
 
-  const meta = document.metadata;
-  const titleY = height - titleBlockHeight;
-  parts.push(`<g fill="#1f2933">`);
-  parts.push(`<rect x="0" y="${svgNum(titleY)}" width="${svgNum(width)}" height="${svgNum(titleBlockHeight)}" fill="none" stroke="#1f2933" stroke-width="1" />`);
-  parts.push(`<text x="12" y="${svgNum(titleY + 20)}" font-size="15" font-weight="700">${escapeXml(meta.title)}</text>`);
-  if (meta.description) parts.push(`<text x="12" y="${svgNum(titleY + 38)}" font-size="11">${escapeXml(meta.description)}</text>`);
-  parts.push(`<text x="12" y="${svgNum(titleY + 58)}" font-size="10" fill="#52606d">Author: ${escapeXml(meta.author || '—')}   Version: ${escapeXml(meta.version)}   License: ${escapeXml(meta.license)}</text>`);
-  parts.push('</g>');
+  if (titleBlockHeight > 0) {
+    const meta = document.metadata;
+    const titleY = height - titleBlockHeight;
+    parts.push(`<g fill="#1f2933">`);
+    parts.push(`<rect x="0" y="${svgNum(titleY)}" width="${svgNum(width)}" height="${svgNum(titleBlockHeight)}" fill="none" stroke="#1f2933" stroke-width="1" />`);
+    parts.push(`<text x="12" y="${svgNum(titleY + 20)}" font-size="15" font-weight="700">${escapeXml(meta.title)}</text>`);
+    if (meta.description) parts.push(`<text x="12" y="${svgNum(titleY + 38)}" font-size="11">${escapeXml(meta.description)}</text>`);
+    parts.push(`<text x="12" y="${svgNum(titleY + 58)}" font-size="10" fill="#52606d">Author: ${escapeXml(meta.author || '—')}   Version: ${escapeXml(meta.version)}   License: ${escapeXml(meta.license)}</text>`);
+    parts.push('</g>');
+  }
   if (pad > 0) parts.push('</g>');
   parts.push('</svg>');
   return parts.join('\n');

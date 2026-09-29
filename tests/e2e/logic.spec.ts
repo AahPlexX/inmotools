@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 import { addComponent, addWire, createInitialDocument, relabelComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
 import { getComponentPorts } from '../../src/tools/logic/component-library';
 import { serializeProject } from '../../src/tools/logic/export-engine';
@@ -906,4 +906,94 @@ test('places an input port marker and sets it to a bus from the inspector', asyn
   await close();
   await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
   await expect(page.getByTestId('logic-erc-dock')).toBeVisible();
+});
+
+const readDownload = async (download: Download): Promise<Buffer> => {
+  const chunks: Buffer[] = [];
+  const stream = await download.createReadStream();
+  if (!stream) throw new Error('The download has no content.');
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
+};
+
+test('exports the circuit as HDL, a PDF drawing, a social card and its meta tags from the Export dock', async ({ page }) => {
+  let doc = createInitialDocument('Half adder');
+  doc = { ...doc, metadata: { ...doc.metadata, author: 'Ada', description: 'Adds two bits.', tags: ['adder'] } };
+  const ids: Record<string, string> = {};
+  const add = (type: 'SWITCH' | 'XOR' | 'LED', label: string, x: number, y: number) => {
+    doc = addComponent(doc, type, x, y);
+    ids[label] = doc.components[doc.components.length - 1]!.id;
+    doc = relabelComponent(doc, ids[label]!, label);
+  };
+  add('SWITCH', 'A', 1, 1);
+  add('SWITCH', 'B', 1, 4);
+  add('XOR', 'X1', 6, 2);
+  add('LED', 'SUM', 12, 2);
+  const connect = (from: string, fromPort: string, to: string, toPort: string) => {
+    doc = addWire(doc, { componentId: ids[from]!, portId: fromPort }, { componentId: ids[to]!, portId: toPort });
+  };
+  connect('A', 'Y', 'X1', 'A');
+  connect('B', 'Y', 'X1', 'B');
+  connect('X1', 'Y', 'SUM', 'A');
+
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'adder.circuit.json', mimeType: 'application/json', buffer: Buffer.from(serializeProject(doc)) });
+
+  await page.getByRole('button', { name: 'Export…' }).click();
+  const dock = page.getByTestId('logic-export-dock');
+  await expect(dock).toBeVisible();
+  for (const group of ['Drawings', 'Hardware description', 'Netlists', 'Parts list', 'Sharing', 'Project']) await expect(dock.getByRole('heading', { name: group })).toBeVisible();
+
+  const save = async (id: string) => {
+    const pending = page.waitForEvent('download');
+    await page.getByTestId(`logic-export-${id}`).click();
+    const download = await pending;
+    return { name: download.suggestedFilename(), body: await readDownload(download) };
+  };
+
+  const verilog = await save('verilog');
+  expect(verilog.name).toBe('half-adder.v');
+  expect(verilog.body.toString('utf8')).toContain('module ');
+  await expect(page.getByTestId('logic-export-outcome')).toContainText('Saved half-adder.v');
+
+  const vhdl = await save('vhdl');
+  expect(vhdl.name).toBe('half-adder.vhd');
+  expect(vhdl.body.toString('utf8')).toContain('entity ');
+
+  await page.getByTestId('logic-export-paper').selectOption('letter');
+  const pdf = await save('pdf');
+  expect(pdf.name).toBe('half-adder.pdf');
+  expect(pdf.body.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+  const bom = await save('bom-csv');
+  expect(bom.name).toBe('half-adder.bom.csv');
+  expect(bom.body.toString('utf8').split('\n')[0]).toBe('Item,Part,Description,Package,Quantity,References,Notes');
+  await expect(page.getByTestId('logic-export-warnings')).toContainText('logic family');
+
+  // The social card: fields typed here shape this export only, and the preview follows them.
+  const preview = page.getByTestId('logic-export-card-preview');
+  const before = await preview.getAttribute('src');
+  await page.getByTestId('logic-export-og-title').fill('Adder demo');
+  await expect(preview).not.toHaveAttribute('src', before ?? '');
+  await expect(preview).toHaveAttribute('alt', /Adder demo/);
+
+  const png = await save('og-png');
+  expect(png.name).toBe('half-adder.og-card.png');
+  expect([...png.body.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  // The PNG header's width and height (bytes 16-23) are the card's 1200 x 630.
+  expect(png.body.readUInt32BE(16)).toBe(1200);
+  expect(png.body.readUInt32BE(20)).toBe(630);
+
+  await page.getByTestId('logic-export-og-url').fill('https://example.com/adder');
+  const meta = await save('og-meta');
+  expect(meta.name).toBe('half-adder.og-meta.html');
+  const tags = meta.body.toString('utf8');
+  expect(tags).toContain('<meta property="og:title" content="Adder demo" />');
+  expect(tags).toContain('<meta property="og:url" content="https://example.com/adder" />');
+  await expect(page.getByTestId('logic-export-warnings')).toContainText('og:image');
+
+  // A saved project file is a valid circuit again.
+  const project = await save('project');
+  expect(JSON.parse(project.body.toString('utf8')).metadata.title).toBe('Half adder');
 });

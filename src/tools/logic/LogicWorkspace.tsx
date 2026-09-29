@@ -51,6 +51,7 @@ import {
   type SampleBuffer,
 } from './analyzer-engine';
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
+import { LogicExportDock } from './LogicExportDock';
 import { LogicMemoryDock } from './LogicMemoryDock';
 import { applyAtPath, breadcrumbs, documentAtPath, encapsulateSelection, flattenDocument, pathPrefix, relabelSubcircuitPort, renameSubcircuit, scopeFrame, setSubcircuitIcon, trimPath } from './subcircuit-engine';
 import { isPortMarker } from './subcircuit-ports';
@@ -147,7 +148,7 @@ export default function LogicWorkspace() {
   }, []);
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles' | 'memory'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles' | 'memory' | 'export'>('none');
   const [memoryFocusId, setMemoryFocusId] = useState<string | null>(null);
   // Set by an edit made outside the simulation (a memory word typed in the editor) so the next commit also takes one step
   // and every output that reads the changed contents follows at once, instead of waiting for the next switch or clock.
@@ -575,6 +576,7 @@ export default function LogicWorkspace() {
         <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={handleExportSvg}>Export SVG</button>
+        <button type="button" onClick={() => setActiveDock((current) => (current === 'export' ? 'none' : 'export'))} aria-pressed={activeDock === 'export'}>Export…</button>
         <button type="button" className="logic-mobile-only" onClick={() => setMobilePanel((current) => (current === 'palette' ? 'none' : 'palette'))}>Components</button>
         <button type="button" className="logic-mobile-only" onClick={() => setMobilePanel((current) => (current === 'inspector' ? 'none' : 'inspector'))}>Inspect</button>
       </div>
@@ -758,6 +760,8 @@ export default function LogicWorkspace() {
           onClose={() => setActiveDock('none')}
         />
       ) : null}
+
+      {activeDock === 'export' ? <LogicExportDock document={root} onClose={() => setActiveDock('none')} /> : null}
 
       {activeDock === 'shortcuts' ? <LogicShortcutsDock shortcuts={shortcuts} onChange={setShortcuts} /> : null}
 
