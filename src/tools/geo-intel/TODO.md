@@ -24,7 +24,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 
 - [x] **G0 Plan** — TODO, source registry, feature list, decisions recorded.
 - [x] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
-- [ ] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
+- [x] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
 - [ ] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
 - [ ] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
 - [ ] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
@@ -150,3 +150,24 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 - `src/tools/geo-intel/core/sources.ts` — source registry (license, attribution, policy) referenced by provenance.
 - `src/tools/geo-intel/core/geodesy.ts`, `core/olc.ts`, `core/coords.ts`, `core/projection.ts`, `core/timezone.ts`, `core/solar.ts`, `core/query-parser.ts` — pure math; the parser depends on olc/coords so they ship together.
 - `tests/unit/geo-intel-core.test.ts` — official OLC + MGRS vectors, geodesy, parser, solar, timezone.
+
+## Delivery 3 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/core/types.ts` — provenance, field, profile, solar, holiday, metadata types.
+- `src/tools/geo-intel/core/sources.ts` — source registry (license, attribution, enforced policy) + `field()`/`upsertFields()`.
+- `src/tools/geo-intel/core/geodesy.ts` — haversine, bearings, midpoint, destination, great-circle points, spherical bbox/ring area.
+- `src/tools/geo-intel/core/olc.ts` — Open Location Code encode/decode/validate/shorten/recover.
+- `src/tools/geo-intel/core/coords.ts` — DD/DMS/DDM parse + format, UTM (Krüger), MGRS forward/inverse.
+- `src/tools/geo-intel/core/projection.ts` — Equal Earth forward/inverse + SVG path builders.
+- `src/tools/geo-intel/core/timezone.ts` — Intl offsets, DST, next transition, nautical zones.
+- `src/tools/geo-intel/core/solar.ts` — offline NOAA solar model, golden/blue hour, rule-of-thumb fallback.
+- `src/tools/geo-intel/core/postal.ts` — Zippopotam coverage (70 countries), UK/CA patterns, per-country normalisation.
+- `src/tools/geo-intel/core/query-parser.ts` — universal search classification incl. geo: URIs and map links.
+- `tests/unit/geo-intel-core.test.ts`, `tests/fixtures/geo-intel/olc-*.csv` — 46 tests; official OLC test_data, proj4js/mgrs vectors, sunrise-sunset.org reference times.
+### Gate evidence
+- G2 checked: `vitest run tests/unit/geo-intel-core.test.ts` 46/46 pass; `tsc --noEmit -p tsconfig.app.json` exit 0.
+- OLC float encoding differs from the CSV on 13/302 rows, each exactly one integer unit from floating-point flooring (same as the reference JS); integer encoding is exact on all rows.
+### Next batch (planned)
+- `src/tools/geo-intel/net/http.ts` — timeout, backoff, circuit breaker, dedupe, throttle gate; adapters depend on it.
+- `src/tools/geo-intel/net/store.ts` — Dexie database (response cache with TTL, history, saved profiles, metadata, settings); adapters and UI depend on it.
+- `tests/unit/geo-intel-net.test.ts` — fake timers + fake-indexeddb.
