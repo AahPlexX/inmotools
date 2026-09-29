@@ -34,7 +34,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
 - [x] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
 - [x] **G11 Full validation** — `pnpm test:unit`, `pnpm build`, relevant e2e green; baseline comparison recorded.
-- [ ] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11.
+- [ ] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11. *(PR #89 open; CI green; remaining: `.tasks` reconciliation + merge on owner go-ahead.)*
 
 Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` 211 files / 2,119 tests passed.
 
@@ -288,3 +288,12 @@ F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F1
 - Country polygons are 1:50m; coastal points ≤40 km offshore snap to the nearest country and say so in the note.
 - PDF uses the standard Helvetica font (WinAnsi), so non-Latin names are transliterated or dropped in the PDF only; JSON/CSV/SVG keep full Unicode.
 - Nominatim cannot be remotely switched off without a new deploy (static hosting); it is therefore off by default and opt-in.
+
+## Delivery 12 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/TODO.md` — integration status.
+### Gate evidence
+- PR https://github.com/AahPlexX/inmotools/pull/89 opened from `feature/geo-intelligence-hub` into `main`.
+- "Validate and deploy Pages" (full unit suite, build, full browser suite) — success; "Sightline Velocity validation" — success.
+### Next batch (planned)
+- On the owner's go-ahead: add the Geo Intelligence Hub entry to `.tasks/DONE.md` and `.tasks/WORK_LOG.md` (with this evidence), re-sync the branch with `origin/main`, re-run CI, merge PR #89, then confirm the Pages deployment and tick G12.
