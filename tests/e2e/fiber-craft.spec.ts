@@ -218,6 +218,58 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByLabel('Active round').locator('option')).toHaveCount(2);
   });
 
+  test('resizes, mirrors, and clears the crochet grid and stamps title and credit on exports', async ({ page }) => {
+    await page.goto('./#/fiber-craft-workstation');
+    await page.getByLabel('Chart mode').selectOption('grid');
+
+    await page.getByRole('button', { name: 'Row 1, column 1, open' }).click();
+    await page.getByLabel('Rows', { exact: true }).fill('6');
+    await page.getByLabel('Columns', { exact: true }).fill('8');
+    await page.getByRole('button', { name: 'Resize grid' }).click();
+    await expect(page.getByTestId('chart-description')).toContainText('6 rows and 8 columns');
+    await expect(page.getByRole('button', { name: /Row 1, column 1, filled/ })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Mirror left–right' }).click();
+    await expect(page.getByRole('button', { name: /Row 1, column 8, filled/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Flip top–bottom' }).click();
+    await expect(page.getByRole('button', { name: /Row 6, column 8, filled/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Rotate 90°' }).click();
+    await expect(page.getByTestId('chart-description')).toContainText('8 rows and 6 columns');
+    await page.getByRole('button', { name: 'Clear grid' }).click();
+    await expect(page.getByTestId('c2c-summary')).toContainText('0 filled blocks');
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByTestId('c2c-summary')).toContainText('1 filled block');
+
+    await page.locator('#fiber-gauge-stitches').fill('20');
+    await page.locator('#fiber-gauge-rows').fill('28');
+    await page.locator('#fiber-gauge-span').fill('4');
+    await page.locator('#fiber-finished-width').fill('4');
+    await page.locator('#fiber-finished-height').fill('4');
+    await expect(page.getByTestId('gauge-recommendation')).toContainText('20 columns × 28 rows');
+    await page.getByRole('button', { name: 'Resize chart to this size' }).click();
+    await expect(page.getByTestId('chart-description')).toContainText('28 rows and 20 columns');
+
+    await page.getByLabel('Pattern title').fill('Moss Bunny');
+    await page.getByLabel('Designer / author').fill('Ana Rivera');
+    await page.getByLabel('License or credit line').fill('CC BY 4.0');
+    await expect(page.getByRole('button', { name: 'Export pattern PDF' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Save title and credit' }).click();
+    await expect(page.getByRole('button', { name: 'Export pattern PDF' })).toBeEnabled();
+    const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export pattern PDF' }).click()]);
+    expect(pdf.suggestedFilename()).toBe('moss-bunny-pattern-book.pdf');
+    await inspectPdfDownload(pdf);
+    const [text] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save written pattern (.txt)' }).click()]);
+    expect(text.suggestedFilename()).toBe('moss-bunny-pattern.txt');
+    const written = await readFile((await text.path())!, 'utf8');
+    expect(written).toContain('Moss Bunny\nby Ana Rivera\nLicense: CC BY 4.0');
+    expect(written).toContain('Row 1:');
+    const [project] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save .craftproj' }).click()]);
+    expect(project.suggestedFilename()).toBe('moss-bunny.craftproj');
+    const saved = JSON.parse(await readFile((await project.path())!, 'utf8')) as { document?: { metadata?: { author?: string; license?: string } }; metadata?: { author?: string; license?: string } };
+    const metadata = saved.document?.metadata ?? saved.metadata;
+    expect(metadata).toMatchObject({ author: 'Ana Rivera', license: 'CC BY 4.0' });
+  });
+
   test('edits, keys, saves, and restores a counted-thread chart', async ({ page }) => {
     await page.goto('./#/fiber-craft-workstation');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Counted-Thread Pattern Workbench');

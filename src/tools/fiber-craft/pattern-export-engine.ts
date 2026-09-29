@@ -25,6 +25,8 @@ const LIGHT_LINE = grayscale(0.78);
 export interface CrochetPatternBookModel {
   readonly title: string;
   readonly author: string;
+  readonly license: string;
+  readonly notes: string;
   readonly materials: readonly string[];
   readonly legend: readonly string[];
   readonly instructions: readonly string[];
@@ -141,11 +143,30 @@ export function buildCrochetPatternBookModel(
   return {
     title: document.metadata.title || 'Untitled pattern',
     author: document.metadata.author,
+    license: document.metadata.license,
+    notes: document.metadata.notes,
     materials,
     legend,
     instructions,
   };
 }
+
+/**
+ * Plain-text pattern for pasting into a blog, chat, or notes app. It reads the same book model as the
+ * PDF, so the two can never disagree about the instructions.
+ */
+export const buildCrochetPatternText = (document: FiberCraftDocument, dialect: CrochetDialect): string => {
+  const model = buildCrochetPatternBookModel(document, dialect);
+  const lines = [model.title];
+  if (model.author) lines.push(`by ${model.author}`);
+  if (model.license) lines.push(`License: ${model.license}`);
+  lines.push('', 'MATERIALS', ...model.materials, '', 'KEY', ...model.legend, '', 'INSTRUCTIONS', ...model.instructions);
+  if (model.notes) lines.push('', `Notes: ${model.notes}`);
+  return `${lines.join('\n')}\n`;
+};
+
+export const fiberCraftPatternTextFilename = (title: string): string =>
+  `${fiberCraftFilenameStem(title)}-pattern.txt`;
 
 export const fiberCraftPatternPdfFilename = (title: string): string =>
   `${fiberCraftFilenameStem(title)}-pattern-book.pdf`;
@@ -355,7 +376,7 @@ export async function buildCrochetPatternPdf(
 
   pdf.setTitle(document.metadata.title || 'Untitled pattern', { showInWindowTitleBar: true });
   if (document.metadata.author) pdf.setAuthor(document.metadata.author);
-  pdf.setSubject('InmoTools Fiber Craft crochet pattern book');
+  pdf.setSubject(document.metadata.license ? `Crochet pattern book. License: ${document.metadata.license}` : 'Crochet pattern book');
   pdf.setKeywords(['crochet', document.metadata.difficulty, ...document.metadata.techniqueTags].filter(Boolean));
   pdf.setCreator('InmoTools Fiber Craft Workstation');
   pdf.setProducer('InmoTools Fiber Craft Workstation');
@@ -368,7 +389,9 @@ export async function buildCrochetPatternPdf(
   y -= 28;
   y = drawWrappedText(cover, bodyFont, `Craft: Crochet`, PAGE_MARGIN, y, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18);
   y = drawWrappedText(cover, bodyFont, `Project level: ${document.metadata.difficulty || 'Not recorded'}`, PAGE_MARGIN, y, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18);
-  drawWrappedText(cover, bodyFont, `Techniques: ${document.metadata.techniqueTags.join(', ') || 'None recorded'}`, PAGE_MARGIN, y, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18);
+  y = drawWrappedText(cover, bodyFont, `Techniques: ${document.metadata.techniqueTags.join(', ') || 'None recorded'}`, PAGE_MARGIN, y, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18);
+  if (model.license) y = drawWrappedText(cover, bodyFont, `License: ${model.license}`, PAGE_MARGIN, y - 10, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18);
+  if (model.notes) drawWrappedText(cover, bodyFont, `Notes: ${model.notes.length > 700 ? `${model.notes.slice(0, 699).trimEnd()}… (full notes stay in the project file)` : model.notes}`, PAGE_MARGIN, y - 10, 12, LETTER_WIDTH - PAGE_MARGIN * 2, 18, MUTED);
 
   const reference = pdf.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
   reference.drawText('Materials & legend', { x: PAGE_MARGIN, y: 730, size: 22, font: boldFont, color: BLACK });

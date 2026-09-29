@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CYC_PROJECT_LEVELS, type CycProjectLevel } from './crochet-document-engine';
+import { CYC_PROJECT_LEVELS, MAX_CROCHET_GRID_SIZE, type CrochetGridTransform, type CrochetPatternCredit, type CycProjectLevel } from './crochet-document-engine';
 import {
   analyzeAmigurumiGrowth,
   compileC2CRows,
@@ -31,6 +31,9 @@ export function CrochetGridPanel({
   onActiveRowChange,
   onToggleCell,
   onToggleRowComplete,
+  onResize,
+  onClear,
+  onTransform,
 }: {
   chart: GridChart;
   palette: readonly ColorSlot[];
@@ -40,7 +43,13 @@ export function CrochetGridPanel({
   onActiveRowChange: (row: number) => void;
   onToggleCell: (row: number, col: number) => void;
   onToggleRowComplete: (row: number) => void;
+  onResize: (rows: number, cols: number) => void;
+  onClear: () => void;
+  onTransform: (transform: CrochetGridTransform) => void;
 }) {
+  const [rowsText, setRowsText] = useState(String(chart.rows));
+  const [colsText, setColsText] = useState(String(chart.cols));
+  useEffect(() => { setRowsText(String(chart.rows)); setColsText(String(chart.cols)); }, [chart.cols, chart.rows]);
   const gridScrollRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLDivElement>(null);
   const c2c = useMemo(() => compileC2CRows(chart), [chart]);
@@ -79,6 +88,22 @@ export function CrochetGridPanel({
             {activeComplete ? 'Mark row unfinished' : 'Mark row complete'}
           </button>
         </div>
+      </div>
+
+      <div className="fiber-craft-grid-tools" role="group" aria-label="Grid size and transforms">
+        <label className="fiber-craft-field" htmlFor="fiber-grid-rows">
+          <span>Rows</span>
+          <input id="fiber-grid-rows" type="number" min="1" max={MAX_CROCHET_GRID_SIZE} step="1" inputMode="numeric" value={rowsText} onChange={(event) => setRowsText(event.target.value)} />
+        </label>
+        <label className="fiber-craft-field" htmlFor="fiber-grid-cols">
+          <span>Columns</span>
+          <input id="fiber-grid-cols" type="number" min="1" max={MAX_CROCHET_GRID_SIZE} step="1" inputMode="numeric" value={colsText} onChange={(event) => setColsText(event.target.value)} />
+        </label>
+        <button className="action-button secondary" type="button" onClick={() => onResize(Number(rowsText), Number(colsText))}>Resize grid</button>
+        <button className="action-button secondary" type="button" onClick={() => onTransform('mirror-horizontal')}>Mirror left–right</button>
+        <button className="action-button secondary" type="button" onClick={() => onTransform('mirror-vertical')}>Flip top–bottom</button>
+        <button className="action-button secondary" type="button" onClick={() => onTransform('rotate-90')}>Rotate 90°</button>
+        <button className="action-button secondary" type="button" onClick={onClear}>Clear grid</button>
       </div>
 
       <div ref={gridScrollRef} className="fiber-craft-grid-scroll" tabIndex={0} aria-label="Scrollable crochet chart grid">
@@ -276,9 +301,10 @@ const positiveNumber = (value: string): number | null => {
 
 const formatMeasurement = (value: number): string => value.toFixed(value >= 10 ? 1 : 2);
 
-export function GaugeScalingPanel({ document, onSaveGauge }: {
+export function GaugeScalingPanel({ document, onSaveGauge, onApplyGridSize }: {
   document: FiberCraftDocument;
   onSaveGauge: (gauge: GaugeSwatch) => void;
+  onApplyGridSize: (rows: number, cols: number) => void;
 }) {
   const [stitchCount, setStitchCount] = useState(String(document.gauge?.stitchCount ?? 16));
   const [rowCount, setRowCount] = useState(String(document.gauge?.rowCount ?? 20));
@@ -395,7 +421,12 @@ export function GaugeScalingPanel({ document, onSaveGauge }: {
             <span>Desired finished height ({unit})</span>
             <input id="fiber-finished-height" type="number" min="0.01" step="0.01" inputMode="decimal" value={desiredHeight} onChange={(event) => setDesiredHeight(event.target.value)} />
           </label>
-          {recommendation?.kind === 'grid' ? <p className="fiber-craft-good" data-testid="gauge-recommendation">Recommended chart: {recommendation.cols} columns × {recommendation.rows} rows.</p> : null}
+          {recommendation?.kind === 'grid' ? (
+            <>
+              <p className="fiber-craft-good" data-testid="gauge-recommendation">Recommended chart: {recommendation.cols} columns × {recommendation.rows} rows.</p>
+              <button className="action-button secondary fiber-craft-wide" type="button" onClick={() => onApplyGridSize(recommendation.rows, recommendation.cols)}>Resize chart to this size</button>
+            </>
+          ) : null}
         </>
       ) : document.chart.kind === 'polar' ? (
         <>
@@ -452,6 +483,53 @@ export function PatternDetailsPanel({ document, onSaveClassification }: {
         <strong>{document.metadata.difficulty}</strong>
         <span>{document.metadata.techniqueTags.length > 0 ? document.metadata.techniqueTags.join(' · ') : 'No technique tags saved yet.'}</span>
       </div>
+    </section>
+  );
+}
+
+export function PatternCreditPanel({ document, onSaveCredit, onDirtyChange }: {
+  document: FiberCraftDocument;
+  onSaveCredit: (credit: CrochetPatternCredit) => void;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
+  const saved = document.metadata;
+  const [title, setTitle] = useState(saved.title);
+  const [author, setAuthor] = useState(saved.author);
+  const [license, setLicense] = useState(saved.license);
+  const [notes, setNotes] = useState(saved.notes);
+
+  useEffect(() => {
+    setTitle(saved.title);
+    setAuthor(saved.author);
+    setLicense(saved.license);
+    setNotes(saved.notes);
+  }, [saved.author, saved.license, saved.notes, saved.title]);
+
+  const dirty = title.trim() !== saved.title || author.trim() !== saved.author || license.trim() !== saved.license || notes.trim() !== saved.notes;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+
+  return (
+    <section aria-labelledby="fiber-credit-heading" data-testid="pattern-credit">
+      <h3 id="fiber-credit-heading">Title & credit</h3>
+      <p className="fiber-craft-muted">These appear on the PDF cover, the share card, and in the file name and details of every export.</p>
+      <label className="fiber-craft-field" htmlFor="fiber-pattern-title">
+        <span>Pattern title</span>
+        <input id="fiber-pattern-title" value={title} maxLength={120} autoComplete="off" onChange={(event) => setTitle(event.target.value)} />
+      </label>
+      <label className="fiber-craft-field" htmlFor="fiber-pattern-author">
+        <span>Designer / author</span>
+        <input id="fiber-pattern-author" value={author} maxLength={120} autoComplete="name" onChange={(event) => setAuthor(event.target.value)} />
+      </label>
+      <label className="fiber-craft-field" htmlFor="fiber-pattern-license">
+        <span>License or credit line</span>
+        <input id="fiber-pattern-license" value={license} maxLength={500} placeholder="All rights reserved" onChange={(event) => setLicense(event.target.value)} />
+      </label>
+      <label className="fiber-craft-field" htmlFor="fiber-pattern-notes">
+        <span>Notes for makers</span>
+        <textarea id="fiber-pattern-notes" value={notes} maxLength={4000} rows={3} onChange={(event) => setNotes(event.target.value)} />
+      </label>
+      <button className="action-button fiber-craft-wide" type="button" disabled={!dirty} onClick={() => onSaveCredit({ title, author, license, notes })}>Save title and credit</button>
+      {dirty ? <p className="fiber-craft-muted" role="note">You have unsaved changes. Save them first so exports use the new title and credit.</p> : null}
     </section>
   );
 }

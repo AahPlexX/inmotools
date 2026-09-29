@@ -2,11 +2,14 @@ import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, typ
 import { downloadBlob, downloadBytes, downloadText } from '../../lib/download';
 import {
   addCrochetRound,
+  clearCrochetGrid,
   clearCrochetRound,
   createStarterCrochetDocument,
   crochetRoundProgress,
   fillCrochetRound,
   removeLastCrochetRound,
+  resizeCrochetGrid,
+  setCrochetPatternCredit,
   setCrochetRoundStitch,
   setCrochetGauge,
   setCrochetPatternClassification,
@@ -15,7 +18,10 @@ import {
   switchCrochetChartMode,
   toggleCrochetGridCell,
   toggleCrochetProgressStep,
+  transformCrochetGrid,
   workNextCrochetStitch,
+  type CrochetGridTransform,
+  type CrochetPatternCredit,
   type CrochetStitchModifiers,
   type CycProjectLevel,
 } from './crochet-document-engine';
@@ -24,6 +30,7 @@ import {
   CrochetGridPanel,
   CrochetRoundInsights,
   GaugeScalingPanel,
+  PatternCreditPanel,
   PatternDetailsPanel,
   YarnReferencePanel,
 } from './CrochetPatternPanels';
@@ -174,6 +181,7 @@ export default function FiberCraftWorkspace() {
   const [selectedAngle, setSelectedAngle] = useState(0);
   const [sharedBase, setSharedBase] = useState(false);
   const [loopChoice, setLoopChoice] = useState<CrochetLoopChoice>('both');
+  const [creditDirty, setCreditDirty] = useState(false);
   const [targetText, setTargetText] = useState('6');
   const [status, setStatus] = useState('Preparing local autosave…');
   const [storageReady, setStorageReady] = useState(false);
@@ -348,6 +356,23 @@ export default function FiberCraftWorkspace() {
     try { commit(setCrochetPatternClassification(document, difficulty, techniqueTags), 'Saved the project level and technique tags.'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save pattern details.'); }
   };
+  const resizeGrid = (rows: number, cols: number) => {
+    try { commit(resizeCrochetGrid(document, rows, cols), `Resized the grid to ${rows} rows × ${cols} columns.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not resize the grid.'); }
+  };
+  const clearGrid = () => {
+    try { commit(clearCrochetGrid(document), 'Cleared the grid. Undo brings the design back.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear the grid.'); }
+  };
+  const transformGrid = (transform: CrochetGridTransform) => {
+    const labels: Record<CrochetGridTransform, string> = { 'mirror-horizontal': 'Mirrored the design left to right', 'mirror-vertical': 'Flipped the design top to bottom', 'rotate-90': 'Rotated the design 90° clockwise' };
+    try { commit(transformCrochetGrid(document, transform), `${labels[transform]}. Row progress was reset; Undo restores it.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not transform the grid.'); }
+  };
+  const saveCredit = (credit: CrochetPatternCredit) => {
+    try { commit(setCrochetPatternCredit(document, credit), 'Saved the pattern title and credit.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the title and credit.'); }
+  };
   const saveProjectFile = () => {
     try {
       const filename = fiberCraftProjectFilename(document.metadata.title);
@@ -383,6 +408,22 @@ export default function FiberCraftWorkspace() {
       downloadBytes(bytes, filename, 'application/pdf');
       setStatus(`Exported ${filename}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the pattern PDF.'); }
+  };
+  const patternText = async () => (await import('./pattern-export-engine')).buildCrochetPatternText(document, dialect);
+  const copyPatternText = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('This browser blocked copying. Download the .txt file instead.');
+      await navigator.clipboard.writeText(await patternText());
+      setStatus('Copied the written pattern.');
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not copy the pattern. Download the .txt file instead.'); }
+  };
+  const downloadPatternText = async () => {
+    try {
+      const { fiberCraftPatternTextFilename } = await import('./pattern-export-engine');
+      const filename = fiberCraftPatternTextFilename(document.metadata.title);
+      downloadText(await patternText(), filename);
+      setStatus(`Saved ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the written pattern.'); }
   };
   const exportSocialPreview = async () => {
     try {
@@ -452,7 +493,7 @@ export default function FiberCraftWorkspace() {
 
         <div className="fiber-craft-main">
           {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} selectedAngle={currentAngle} completedSteps={document.completedSteps} theme={theme} onSelectNode={selectPosition} onKeyDown={handleCanvasKeyDown} /></section>
-            : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} />
+            : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} onResize={resizeGrid} onClear={clearGrid} onTransform={transformGrid} />
               : knittingChart ? <KnittingGridPanel document={document} chart={knittingChart} onCommit={commit} onStatus={setStatus} />
                 : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
 
@@ -462,14 +503,15 @@ export default function FiberCraftWorkspace() {
                 : knittingChart ? <section><h3>Knitting gauge</h3><p className="fiber-craft-muted">Save your measured stitch and row gauge above the chart. Cell proportions update from the same project gauge used for the preview.</p></section>
                   : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
-            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportSocialPreview()}>Export social preview</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart.</p></section> : null}
+            {document.metadata.discipline === 'crochet' ? <PatternCreditPanel document={document} onSaveCredit={saveCredit} onDirtyChange={setCreditDirty} /> : null}
+            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere.</p></section> : null}
             <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
           </aside>
         </div>
 
         <div className="fiber-craft-analysis-grid">
           {roundChart ? <CrochetRoundInsights document={document} dialect={dialect} targetText={targetText} onTargetTextChange={setTargetText} onApplyTargets={applyTargets} /> : null}
-          {document.metadata.discipline === 'crochet' ? <><YarnReferencePanel document={document} onSaveReference={saveYarnReference} /><GaugeScalingPanel document={document} onSaveGauge={saveGauge} /><PatternDetailsPanel document={document} onSaveClassification={savePatternClassification} /></> : null}
+          {document.metadata.discipline === 'crochet' ? <><YarnReferencePanel document={document} onSaveReference={saveYarnReference} /><GaugeScalingPanel document={document} onSaveGauge={saveGauge} onApplyGridSize={resizeGrid} /><PatternDetailsPanel document={document} onSaveClassification={savePatternClassification} /></> : null}
           <FiberCraftChartDescription document={document} dialect={dialect} visible={descriptionVisible} />
         </div>
 

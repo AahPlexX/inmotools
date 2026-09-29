@@ -1,6 +1,10 @@
 import {
   createEmptyGridChart,
   createEmptyPolarChart,
+  mirrorGridHorizontal,
+  mirrorGridVertical,
+  resizeGridChart,
+  rotateGrid90,
   setGridCell,
 } from './engines/geometry-engine';
 import { getCrochetSymbol } from './engines/symbol-library';
@@ -383,4 +387,95 @@ export const toggleCrochetProgressStep = (
     metadata: { ...document.metadata, updatedAt: now },
     completedSteps: [...completed],
   };
+};
+
+// --- Grid tools (C2C / filet) ---
+
+/** Largest side, in cells, the editable grid supports; every cell is a real button, so this bounds the page. */
+export const MAX_CROCHET_GRID_SIZE = 80;
+
+const isGridSize = (value: number): boolean => Number.isInteger(value) && value >= 1 && value <= MAX_CROCHET_GRID_SIZE;
+
+const isCompletedRowBeyond = (step: string, rows: number): boolean => {
+  if (!step.startsWith('row:')) return false;
+  const row = Number(step.slice('row:'.length));
+  return Number.isInteger(row) && row >= rows;
+};
+
+/** Grows or shrinks the grid. Cells inside the new size keep their paint; row progress for dropped rows is removed. */
+export const resizeCrochetGrid = (
+  document: FiberCraftDocument,
+  rows: number,
+  cols: number,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requireGridChart(document);
+  if (!isGridSize(rows) || !isGridSize(cols)) {
+    throw new Error(`Rows and columns must each be a whole number from 1 to ${MAX_CROCHET_GRID_SIZE}.`);
+  }
+  const resized = withUpdatedChart(document, resizeGridChart(chart, rows, cols), now);
+  return { ...resized, completedSteps: resized.completedSteps.filter((step) => !isCompletedRowBeyond(step, rows)) };
+};
+
+const withoutRowProgress = (document: FiberCraftDocument): FiberCraftDocument => ({
+  ...document,
+  completedSteps: document.completedSteps.filter((step) => !step.startsWith('row:')),
+});
+
+/** Empties every cell. Row progress goes too, since nothing is left to have been worked. */
+export const clearCrochetGrid = (
+  document: FiberCraftDocument,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requireGridChart(document);
+  const cells = chart.cells.map((cell) => ({ row: cell.row, col: cell.col, colorId: null, symbolId: null }));
+  return withoutRowProgress(withUpdatedChart(document, { ...chart, cells }, now));
+};
+
+export type CrochetGridTransform = 'mirror-horizontal' | 'mirror-vertical' | 'rotate-90';
+
+/**
+ * Mirrors, flips, or rotates the painted design. Row progress is dropped because the rows a crocheter
+ * already finished no longer describe the same stitches afterwards.
+ */
+export const transformCrochetGrid = (
+  document: FiberCraftDocument,
+  transform: CrochetGridTransform,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const chart = requireGridChart(document);
+  const next = transform === 'mirror-horizontal' ? mirrorGridHorizontal(chart)
+    : transform === 'mirror-vertical' ? mirrorGridVertical(chart)
+      : rotateGrid90(chart);
+  const cells = next.cells.toSorted((a, b) => a.row - b.row || a.col - b.col);
+  return withoutRowProgress(withUpdatedChart(document, { ...next, cells }, now));
+};
+
+// --- Pattern title and credit ---
+
+export interface CrochetPatternCredit {
+  readonly title: string;
+  readonly author: string;
+  readonly license: string;
+  readonly notes: string;
+}
+
+const CREDIT_LIMITS = { title: 120, author: 120, license: 500, notes: 4_000 } as const;
+
+/** Saves the title, author, license and notes that every export carries. */
+export const setCrochetPatternCredit = (
+  document: FiberCraftDocument,
+  credit: CrochetPatternCredit,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  const title = credit.title.trim();
+  const author = credit.author.trim();
+  const license = credit.license.trim();
+  const notes = credit.notes.trim();
+  if (!title) throw new Error('Give the pattern a title before saving.');
+  if (title.length > CREDIT_LIMITS.title) throw new Error(`Keep the title to ${CREDIT_LIMITS.title} characters or fewer.`);
+  if (author.length > CREDIT_LIMITS.author) throw new Error(`Keep the author name to ${CREDIT_LIMITS.author} characters or fewer.`);
+  if (license.length > CREDIT_LIMITS.license) throw new Error(`Keep the license to ${CREDIT_LIMITS.license} characters or fewer.`);
+  if (notes.length > CREDIT_LIMITS.notes) throw new Error('Keep the notes to 4,000 characters or fewer.');
+  return { ...document, metadata: { ...document.metadata, title, author, license, notes, updatedAt: now } };
 };
