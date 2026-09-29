@@ -27,14 +27,14 @@ FC-03, FC-04, FC-07, FC-50–FC-52, FC-54–FC-56, FC-59, FC-63, FC-64. Their de
 | CR-03 | Grid tools: resize the C2C/filet grid (1–80 per side), apply the gauge-recommended size, clear, mirror, flip and rotate | FC-06, FC-52 | **Done** |
 | CR-04 | Title & credit: edit title, author, license and notes; exports are disabled while edits are unsaved; the PDF cover and PDF subject carry the license and notes | FC-61, FC-62 | **Done** |
 | CR-05 | Copy or download the written pattern (rounds, C2C rows, filet rows) as plain text, built from the same model as the PDF | FC-14 | **Done** |
-| CR-06 | Materials and shopping list export (CSV) | FC-60 | Open |
-| CR-07 | Chart zoom and pan | FC-05 | Open |
-| CR-08 | Metric/imperial toggle covering gauge, sizes and hook display | FC-53 | Open |
+| CR-06 | Materials list (CSV): project, yarn, weight class, hook, gauge, finished size, every used color and stitch with counts. Yarn amount is intentionally not estimated (no authoritative method); the file says so | FC-60 | **Done** |
+| CR-07 | Chart zoom (60–300%, buttons or `+` `-` `0` on the chart) and pan (scroll, drag, keyboard) for round and grid charts | FC-05 | **Done** |
+| CR-08 | Metric/imperial: switching the gauge unit converts the swatch span and size fields instead of relabelling them; sizes, recommendations and the materials list follow. Hooks already show mm and US together | FC-53 | **Done** |
 | CR-09 | One-click "export everything" for a full pattern release | FC-65 | Open |
 | CR-10 | Final UX, copy, SEO, accessibility and responsive audit, including the catalog entry wording | — | Open |
 | CR-11 | Integration onto `origin/main` and closing the crochet items in `.tasks/` | Governance §4 | In progress, see Integration |
 
-**Progress: 5 of 11 complete.** Update this count, the table, and the Fiber entry in `.tasks/IN_PROGRESS.md`
+**Progress: 8 of 11 complete.** Update this count, the table, and the Fiber entry in `.tasks/IN_PROGRESS.md`
 in the same commit as any change to a row.
 
 ## How crochet is modelled
@@ -68,7 +68,7 @@ in the same commit as any change to a row.
 | Pattern-book PDF | `pattern-export-engine.ts` |
 | Workspace shell and handlers | `FiberCraftWorkspace.tsx` |
 | Stitch editing panel | `CrochetStitchEditor.tsx` |
-| Grid tools, insights, yarn, gauge, details, title & credit panels | `CrochetPatternPanels.tsx` |
+| Zoom, grid tools, insights, yarn, gauge, details, title & credit panels | `CrochetPatternPanels.tsx` |
 | Tests | `tests/unit/fiber-craft-crochet-editing.test.ts`, `fiber-craft-crochet-pattern.test.ts`, `fiber-craft-state.test.ts`, `fiber-craft-geometry.test.ts`, `fiber-craft-project.test.ts`; browser: `tests/e2e/fiber-craft.spec.ts` |
 
 ## Working rules for the next agent
@@ -101,3 +101,4 @@ pull request has merged into `main` and the Fiber entry in `.tasks/` has been re
 | 2026-09-29 | Baseline on merged `feature/fiber-craft-workstation` + `origin/main` | Fiber unit files 4/4, 67/67 tests |
 | 2026-09-29 | CR-01, CR-02 | Fiber unit files 5/5, 85/85 tests; `tsc --noEmit` clean; production build passes (383-entry precache); Fiber browser spec 8/8 across desktop and mobile Chromium, including offline reopen |
 | 2026-09-29 | CR-03, CR-04, CR-05 | Fiber unit files 6/6, 97/97 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
+| 2026-09-29 | CR-06, CR-07, CR-08; also fixed a hard-coded 12-column grid layout that broke resized grids | Fiber unit files 6/6, 102/102 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |

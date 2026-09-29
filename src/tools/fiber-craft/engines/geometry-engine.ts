@@ -170,6 +170,16 @@ export function convertLength(value: number, from: LengthUnit, to: LengthUnit): 
   return from === 'in' ? value * CM_PER_INCH : value / CM_PER_INCH;
 }
 
+/**
+ * Re-expresses a measured swatch in another unit without changing the physical gauge: the stitch and row
+ * counts stay put and only the span the crocheter measured is converted.
+ */
+export function convertGaugeUnit(gauge: GaugeSwatch, unit: LengthUnit): GaugeSwatch {
+  requireGauge(gauge);
+  if (gauge.unit === unit) return gauge;
+  return { ...gauge, span: convertLength(gauge.span, gauge.unit, unit), unit };
+}
+
 export function gaugeDensity(gauge: GaugeSwatch, unit: LengthUnit): number {
   requireGauge(gauge);
   const spanInUnit = convertLength(gauge.span, gauge.unit, unit);

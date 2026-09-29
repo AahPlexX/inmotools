@@ -228,3 +228,15 @@ describe('knitting symbol library', () => {
   });
   it('rejects a cable narrower than one stitch per side', () => expect(() => createCableCrossSymbol(0, 'right')).toThrow());
 });
+
+describe('gauge unit conversion', () => {
+  it('converts the measured span and keeps the physical gauge identical in both directions', async () => {
+    const { convertGaugeUnit, gaugeDensity } = await import('../../src/tools/fiber-craft/engines/geometry-engine');
+    const inches = { stitchCount: 16, rowCount: 20, span: 4, unit: 'in' as const };
+    const metric = convertGaugeUnit(inches, 'cm');
+    expect(metric).toEqual({ stitchCount: 16, rowCount: 20, span: 10.16, unit: 'cm' });
+    expect(gaugeDensity(metric, 'in')).toBeCloseTo(gaugeDensity(inches, 'in'), 10);
+    expect(convertGaugeUnit(metric, 'in').span).toBeCloseTo(4, 10);
+    expect(convertGaugeUnit(inches, 'in')).toBe(inches);
+  });
+});

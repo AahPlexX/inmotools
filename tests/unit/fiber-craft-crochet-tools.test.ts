@@ -5,13 +5,16 @@ import {
   createStarterCrochetDocument,
   fillCrochetRound,
   resizeCrochetGrid,
+  setCrochetGauge,
   setCrochetPatternCredit,
+  setCrochetYarnReference,
   switchCrochetChartMode,
   toggleCrochetGridCell,
   toggleCrochetProgressStep,
   transformCrochetGrid,
 } from '../../src/tools/fiber-craft/crochet-document-engine';
-import { buildCrochetPatternBookModel, buildCrochetPatternText, fiberCraftPatternTextFilename } from '../../src/tools/fiber-craft/pattern-export-engine';
+import Papa from 'papaparse';
+import { buildCrochetMaterialsCsv, buildCrochetPatternBookModel, buildCrochetPatternText, fiberCraftMaterialsFilename, fiberCraftPatternTextFilename } from '../../src/tools/fiber-craft/pattern-export-engine';
 import type { FiberCraftDocument, GridChart } from '../../src/tools/fiber-craft/fiber-craft-types';
 
 const NOW = '2026-09-29T00:00:00.000Z';
@@ -130,5 +133,52 @@ describe('plain-text written pattern', () => {
     expect(text).toContain('Row 1: 1 filled mesh, 11 open meshes.');
     expect(text).toContain('C2C diagonal 1: 1 filled of 1 block.');
     expect(fiberCraftPatternTextFilename('Moss Bunny')).toBe('moss-bunny-pattern.txt');
+  });
+});
+
+describe('materials and shopping list CSV', () => {
+  const parse = (csv: string) => Papa.parse<string[]>(csv, { skipEmptyLines: true }).data;
+
+  const roundProject = (): FiberCraftDocument => {
+    let document = setCrochetPatternCredit(createStarterCrochetDocument(NOW), { title: 'Moss Bunny', author: 'Ana', license: 'CC BY 4.0', notes: '' }, NOW);
+    document = setCrochetYarnReference(document, 4, '100% cotton worsted', '5.0 mm', NOW);
+    document = setCrochetGauge(document, { stitchCount: 16, rowCount: 20, span: 4, unit: 'in' }, NOW);
+    document = fillCrochetRound(document, 0, 'sc-dc', 'primary', {}, NOW);
+    return document;
+  };
+
+  test('lists project, yarn, hook, gauge, every used color with its stitch count, and every used stitch', () => {
+    const rows = parse(buildCrochetMaterialsCsv(roundProject(), 'us'));
+    expect(rows[0]).toEqual(['Section', 'Item', 'Detail', 'Quantity']);
+    const has = (section: string, item: string) => rows.find((row) => row[0] === section && row[1] === item);
+    expect(has('Project', 'Title')?.[2]).toBe('Moss Bunny');
+    expect(has('Yarn', 'Material')?.[2]).toBe('100% cotton worsted');
+    expect(has('Yarn', 'Weight class')?.[2]).toContain('4');
+    expect(has('Tools', 'Hook')?.[2]).toBe('5.0 mm');
+    expect(has('Gauge', 'Measured swatch')?.[2]).toBe('16 stitches and 20 rows over 4 in');
+    expect(has('Colors', 'Primary')).toEqual(['Colors', 'Primary', '#205BD6', '6 stitches']);
+    expect(has('Stitches', 'single crochet (sc)')?.[3]).toBe('6 stitches');
+  });
+
+  test('says plainly that yarn amount is not estimated and uses UK stitch names on request', () => {
+    const csv = buildCrochetMaterialsCsv(roundProject(), 'uk');
+    expect(parse(csv).some((row) => row[0] === 'Note' && /yarn amount/i.test(row[2]))).toBe(true);
+    expect(csv).toContain('double crochet (dc)');
+  });
+
+  test('counts filled blocks for grid charts and reports the finished size from the gauge', () => {
+    let document = setCrochetGauge(switchCrochetChartMode(createStarterCrochetDocument(NOW), 'grid', NOW), { stitchCount: 20, rowCount: 20, span: 4, unit: 'in' }, NOW);
+    document = toggleCrochetGridCell(toggleCrochetGridCell(document, 0, 0, 'accent', NOW), 0, 1, 'accent', NOW);
+    const rows = parse(buildCrochetMaterialsCsv(document, 'us'));
+    expect(rows.find((row) => row[0] === 'Colors' && row[1] === 'Accent')?.[3]).toBe('2 blocks');
+    expect(rows.find((row) => row[0] === 'Gauge' && row[1] === 'Finished size')?.[2]).toBe('2.40 in wide × 2.40 in tall');
+  });
+
+  test('neutralises spreadsheet formulas in user-entered text and names the file after the title', () => {
+    const document = setCrochetYarnReference(createStarterCrochetDocument(NOW), 4, '=HYPERLINK("http://x")', '@cmd', NOW);
+    const csv = buildCrochetMaterialsCsv(document, 'us');
+    expect(csv).not.toMatch(/(^|,|")=HYPERLINK/);
+    expect(csv).not.toMatch(/(^|,|")@cmd/);
+    expect(fiberCraftMaterialsFilename('Moss Bunny')).toBe('moss-bunny-materials.csv');
   });
 });

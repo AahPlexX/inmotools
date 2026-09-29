@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { CYC_PROJECT_LEVELS, MAX_CROCHET_GRID_SIZE, type CrochetGridTransform, type CrochetPatternCredit, type CycProjectLevel } from './crochet-document-engine';
 import {
   analyzeAmigurumiGrowth,
@@ -8,6 +8,8 @@ import {
   validateCrochetPattern,
 } from './engines/crochet-pattern-engine';
 import {
+  convertGaugeUnit,
+  convertLength,
   gridCountsForPhysicalSize,
   gridPhysicalDimensions,
   polarRoundPhysicalDimensions,
@@ -31,6 +33,7 @@ export function CrochetGridPanel({
   onActiveRowChange,
   onToggleCell,
   onToggleRowComplete,
+  zoom,
   onResize,
   onClear,
   onTransform,
@@ -43,6 +46,7 @@ export function CrochetGridPanel({
   onActiveRowChange: (row: number) => void;
   onToggleCell: (row: number, col: number) => void;
   onToggleRowComplete: (row: number) => void;
+  zoom: number;
   onResize: (rows: number, cols: number) => void;
   onClear: () => void;
   onTransform: (transform: CrochetGridTransform) => void;
@@ -107,7 +111,7 @@ export function CrochetGridPanel({
       </div>
 
       <div ref={gridScrollRef} className="fiber-craft-grid-scroll" tabIndex={0} aria-label="Scrollable crochet chart grid">
-        <div className="fiber-craft-grid" role="group" aria-label={`${chart.rows} by ${chart.cols} crochet grid`}>
+        <div className="fiber-craft-grid" role="group" aria-label={`${chart.rows} by ${chart.cols} crochet grid`} style={{ ['--fiber-cols']: chart.cols, ['--fiber-zoom']: zoom / 100 } as CSSProperties}>
           {Array.from({ length: chart.rows }, (_, row) => {
             const cells = chart.cells.filter((cell) => cell.row === row).toSorted((a, b) => a.col - b.col);
             const rowComplete = completedSteps.includes(`row:${row}`);
@@ -323,6 +327,23 @@ export function GaugeScalingPanel({ document, onSaveGauge, onApplyGridSize }: {
     setUnit(gauge.unit);
   }, [document.gauge]);
 
+  const formatConverted = (text: string, next: LengthUnit): string => {
+    const value = positiveNumber(text);
+    return value === null ? text : String(Number(convertLength(value, unit, next).toFixed(2)));
+  };
+
+  // Switching units converts what the crocheter already typed instead of relabelling it, so a swatch
+  // measured over 4 in becomes 10.16 cm rather than "4 cm".
+  const changeUnit = (next: LengthUnit) => {
+    if (next === unit) return;
+    const measured = positiveNumber(span);
+    if (measured !== null) setSpan(String(Number(convertGaugeUnit({ stitchCount: 1, rowCount: 1, span: measured, unit }, next).span.toFixed(2))));
+    setDesiredWidth(formatConverted(desiredWidth, next));
+    setDesiredHeight(formatConverted(desiredHeight, next));
+    setDesiredDiameter(formatConverted(desiredDiameter, next));
+    setUnit(next);
+  };
+
   const draftGauge = useMemo<GaugeSwatch | null>(() => {
     const stitches = positiveNumber(stitchCount);
     const rows = positiveNumber(rowCount);
@@ -387,8 +408,8 @@ export function GaugeScalingPanel({ document, onSaveGauge, onApplyGridSize }: {
         <input id="fiber-gauge-span" type="number" min="0.01" step="0.01" inputMode="decimal" value={span} onChange={(event) => setSpan(event.target.value)} />
       </label>
       <label className="fiber-craft-field" htmlFor="fiber-gauge-unit">
-        <span>Gauge unit</span>
-        <select id="fiber-gauge-unit" value={unit} onChange={(event) => setUnit(event.target.value as LengthUnit)}>
+        <span>Measure in</span>
+        <select id="fiber-gauge-unit" value={unit} onChange={(event) => changeUnit(event.target.value as LengthUnit)}>
           <option value="in">inches</option>
           <option value="cm">centimeters</option>
         </select>

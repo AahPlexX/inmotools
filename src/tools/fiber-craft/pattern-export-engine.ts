@@ -1,3 +1,4 @@
+import { unparse } from 'papaparse';
 import {
   PDFDocument,
   StandardFonts,
@@ -10,7 +11,8 @@ import {
 } from 'pdf-lib';
 import { compileC2CRows, compileCrochetWrittenPattern, compileFiletRows } from './engines/crochet-pattern-engine';
 import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './engines/crochet-glyph-engine';
-import { polarNodeToCartesian } from './engines/geometry-engine';
+import { gridPhysicalDimensions, polarNodeToCartesian, polarRoundPhysicalDimensions } from './engines/geometry-engine';
+import { getYarnWeightStandard } from './engines/yarn-standard-library';
 import { crochetSymbolLabel, type CrochetDialect } from './engines/symbol-library';
 import { fiberCraftFilenameStem } from './project-bundle-engine';
 import type { ColorSlot, FiberCraftDocument, GridChart, PolarChart } from './fiber-craft-types';
@@ -167,6 +169,71 @@ export const buildCrochetPatternText = (document: FiberCraftDocument, dialect: C
 
 export const fiberCraftPatternTextFilename = (title: string): string =>
   `${fiberCraftFilenameStem(title)}-pattern.txt`;
+
+const CSV_HEADER = ['Section', 'Item', 'Detail', 'Quantity'] as const;
+
+/**
+ * Shopping list for a crochet project. Yarn amount is deliberately not estimated: it depends on the
+ * yarn, hook, and the crocheter's tension, and no published method applies to every chart.
+ */
+export const buildCrochetMaterialsCsv = (document: FiberCraftDocument, dialect: CrochetDialect): string => {
+  const chart = document.chart;
+  if (document.metadata.discipline !== 'crochet' || (chart.kind !== 'polar' && chart.kind !== 'grid')) {
+    throw new Error('The materials list requires a crochet round or grid chart.');
+  }
+  const meta = document.metadata;
+  const rows: string[][] = [
+    ['Project', 'Title', meta.title || 'Untitled pattern', ''],
+    ['Project', 'Author', meta.author || 'Not recorded', ''],
+    ['Project', 'License', meta.license || 'Not recorded', ''],
+    ['Project', 'Project level', meta.difficulty || 'Not recorded', ''],
+    ['Yarn', 'Material', meta.materialClass || 'Not recorded', ''],
+  ];
+  const weight = document.settings?.crochet?.yarnWeight;
+  if (weight !== null && weight !== undefined) {
+    const standard = getYarnWeightStandard(weight);
+    rows.push(['Yarn', 'Weight class', `${standard.weight} ${standard.name}`, '']);
+  }
+  rows.push(['Tools', 'Hook', meta.toolSize || 'Not recorded', '']);
+  if (document.gauge) {
+    const { stitchCount, rowCount, span, unit } = document.gauge;
+    rows.push(['Gauge', 'Measured swatch', `${stitchCount} stitches and ${rowCount} rows over ${span} ${unit}`, '']);
+    if (chart.kind === 'grid') {
+      const size = gridPhysicalDimensions(chart, document.gauge, unit);
+      rows.push(['Gauge', 'Finished size', `${size.width.toFixed(2)} ${unit} wide × ${size.height.toFixed(2)} ${unit} tall`, '']);
+    } else {
+      const outer = polarRoundPhysicalDimensions(chart, chart.rounds - 1, document.gauge, unit);
+      rows.push(['Gauge', 'Finished size', `about ${outer.diameter.toFixed(2)} ${unit} across the outer round`, '']);
+    }
+  }
+
+  const colorCounts = new Map<string, number>();
+  const symbolCounts = new Map<string, number>();
+  const noun = chart.kind === 'polar' ? 'stitch' : 'block';
+  if (chart.kind === 'polar') {
+    for (const node of chart.nodes) {
+      if (node.symbolId === null) continue;
+      symbolCounts.set(node.symbolId, (symbolCounts.get(node.symbolId) ?? 0) + 1);
+      if (node.colorId) colorCounts.set(node.colorId, (colorCounts.get(node.colorId) ?? 0) + 1);
+    }
+  } else {
+    for (const cell of chart.cells) {
+      if (cell.colorId) colorCounts.set(cell.colorId, (colorCounts.get(cell.colorId) ?? 0) + 1);
+    }
+  }
+  const plural = (count: number) => `${count} ${count === 1 ? noun : `${noun}${noun === 'stitch' ? 'es' : 's'}`}`;
+  for (const color of document.palette) {
+    const count = colorCounts.get(color.id);
+    if (count) rows.push(['Colors', color.label, color.hex.toUpperCase(), plural(count)]);
+  }
+  for (const [symbolId, count] of symbolCounts) rows.push(['Stitches', crochetSymbolLabel(symbolId, dialect), '', plural(count)]);
+  rows.push(['Note', 'Yarn amount', 'Yarn amount is not estimated. Swatch with your yarn and check the label for yardage.', '']);
+
+  return `${unparse({ fields: [...CSV_HEADER], data: rows }, { escapeFormulae: true, newline: '\r\n' })}\r\n`;
+};
+
+export const fiberCraftMaterialsFilename = (title: string): string =>
+  `${fiberCraftFilenameStem(title)}-materials.csv`;
 
 export const fiberCraftPatternPdfFilename = (title: string): string =>
   `${fiberCraftFilenameStem(title)}-pattern-book.pdf`;

@@ -205,6 +205,13 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByTestId('pattern-validation')).toContainText('No stitch-count issues found.');
     await expect(page.getByTestId('chart-description')).toContainText('6 stitches worked into the same base stitch');
 
+    // Zoom by keyboard from the chart.
+    await canvas.focus();
+    await page.keyboard.press('+');
+    await expect(page.getByLabel('Zoom level')).toHaveText('125%');
+    await page.keyboard.press('0');
+    await expect(page.getByLabel('Zoom level')).toHaveText('100%');
+
     // Loop modifiers and round removal.
     await page.getByLabel(/Same base stitch as the previous position/).uncheck();
     await page.getByLabel('Worked in').selectOption('back');
@@ -249,6 +256,29 @@ test.describe('Fiber Craft Workstation', () => {
     await page.getByRole('button', { name: 'Resize chart to this size' }).click();
     await expect(page.getByTestId('chart-description')).toContainText('28 rows and 20 columns');
 
+    // A wide grid must stay on one line per row (regression guard for a hard-coded 12-column layout).
+    const rowTops = await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('.fiber-craft-grid-row')[0].querySelectorAll('button')];
+      return { count: buttons.length, tops: new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().top))).size };
+    });
+    expect(rowTops).toEqual({ count: 20, tops: 1 });
+    const firstCell = await page.getByRole('button', { name: /^Row 1, column 1,/ }).boundingBox();
+
+    // Zoom scales the cells; the readout and buttons stay in sync.
+    await page.getByRole('button', { name: 'Zoom in' }).click();
+    await expect(page.getByLabel('Zoom level')).toHaveText('125%');
+    const zoomed = await page.getByRole('button', { name: /^Row 1, column 1,/ }).boundingBox();
+    expect(zoomed && firstCell && zoomed.width > firstCell.width * 1.2).toBe(true);
+    await page.getByRole('button', { name: 'Fit' }).click();
+    await expect(page.getByLabel('Zoom level')).toHaveText('100%');
+
+    // Switching units converts the swatch instead of relabelling it.
+    await page.locator('#fiber-gauge-unit').selectOption('cm');
+    await expect(page.locator('#fiber-gauge-span')).toHaveValue('10.16');
+    await expect(page.getByTestId('gauge-scaling')).toContainText('cm wide');
+    await page.locator('#fiber-gauge-unit').selectOption('in');
+    await expect(page.locator('#fiber-gauge-span')).toHaveValue('4');
+
     await page.getByLabel('Pattern title').fill('Moss Bunny');
     await page.getByLabel('Designer / author').fill('Ana Rivera');
     await page.getByLabel('License or credit line').fill('CC BY 4.0');
@@ -263,6 +293,11 @@ test.describe('Fiber Craft Workstation', () => {
     const written = await readFile((await text.path())!, 'utf8');
     expect(written).toContain('Moss Bunny\nby Ana Rivera\nLicense: CC BY 4.0');
     expect(written).toContain('Row 1:');
+    const [materials] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save materials list (.csv)' }).click()]);
+    expect(materials.suggestedFilename()).toBe('moss-bunny-materials.csv');
+    const csv = await readFile((await materials.path())!, 'utf8');
+    expect(csv).toContain('Section,Item,Detail,Quantity');
+    expect(csv).toContain('Project,Title,Moss Bunny');
     const [project] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save .craftproj' }).click()]);
     expect(project.suggestedFilename()).toBe('moss-bunny.craftproj');
     const saved = JSON.parse(await readFile((await project.path())!, 'utf8')) as { document?: { metadata?: { author?: string; license?: string } }; metadata?: { author?: string; license?: string } };

@@ -90,6 +90,14 @@ const historyReducer = (history: FiberCraftHistory, action: HistoryAction): Fibe
   }
 };
 
+/** Zoom steps in percent. The floor keeps grid cells at least 26px, above the 24px WCAG 2.2 target-size minimum. */
+const ZOOM_STEPS = [60, 80, 100, 125, 150, 200, 300] as const;
+const stepZoom = (zoom: number, direction: 1 | -1): number => {
+  const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
+  const current = index === -1 ? ZOOM_STEPS.length - 1 : index;
+  return ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, current + direction))];
+};
+
 const canvasToPngBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
   new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -110,13 +118,14 @@ const pointerToCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, client
   return { x: (clientX - rect.left - offsetX) / scale, y: (clientY - rect.top - offsetY) / scale };
 };
 
-function CrochetCanvas({ chart, palette, activeRound, selectedAngle, completedSteps, theme, onSelectNode, onKeyDown }: {
+function CrochetCanvas({ chart, palette, activeRound, selectedAngle, completedSteps, theme, zoom, onSelectNode, onKeyDown }: {
   chart: PolarChart;
   palette: readonly ColorSlot[];
   activeRound: number;
   selectedAngle: number;
   completedSteps: readonly string[];
   theme: FiberCraftTheme;
+  zoom: number;
   onSelectNode: (round: number, angleIndex: number) => void;
   onKeyDown: (event: KeyboardEvent<HTMLCanvasElement>) => void;
 }) {
@@ -159,6 +168,7 @@ function CrochetCanvas({ chart, palette, activeRound, selectedAngle, completedSt
       data-symbol-rendering="vector"
       data-rendered-symbols={renderedSymbols}
       data-canvas-theme={theme}
+      style={{ width: `${zoom}%` }}
       onClick={selectFromPointer}
       onKeyDown={onKeyDown}
     >
@@ -182,6 +192,7 @@ export default function FiberCraftWorkspace() {
   const [sharedBase, setSharedBase] = useState(false);
   const [loopChoice, setLoopChoice] = useState<CrochetLoopChoice>('both');
   const [creditDirty, setCreditDirty] = useState(false);
+  const [zoom, setZoom] = useState(100);
   const [targetText, setTargetText] = useState('6');
   const [status, setStatus] = useState('Preparing local autosave…');
   const [storageReady, setStorageReady] = useState(false);
@@ -303,6 +314,9 @@ export default function FiberCraftWorkspace() {
       case 'End': selectPosition(activeRound, count - 1); break;
       case 'ArrowUp': moveToRound(activeRound - 1); break;
       case 'ArrowDown': moveToRound(activeRound + 1); break;
+      case '+': case '=': setZoom((value) => stepZoom(value, 1)); break;
+      case '-': case '_': setZoom((value) => stepZoom(value, -1)); break;
+      case '0': setZoom(100); break;
       case 'Enter': case ' ': placeSelectedStitch(); break;
       case 'Delete': case 'Backspace': clearSelectedStitch(); break;
       default: return;
@@ -425,6 +439,14 @@ export default function FiberCraftWorkspace() {
       setStatus(`Saved ${filename}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the written pattern.'); }
   };
+  const downloadMaterialsList = async () => {
+    try {
+      const { buildCrochetMaterialsCsv, fiberCraftMaterialsFilename } = await import('./pattern-export-engine');
+      const filename = fiberCraftMaterialsFilename(document.metadata.title);
+      downloadText(buildCrochetMaterialsCsv(document, dialect), filename, 'text/csv;charset=utf-8');
+      setStatus(`Saved ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the materials list.'); }
+  };
   const exportSocialPreview = async () => {
     try {
       if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('Social preview currently supports crochet round and grid charts.');
@@ -488,12 +510,13 @@ export default function FiberCraftWorkspace() {
           {document.metadata.discipline === 'crochet' ? <label><span>Terminology</span><select value={dialect} onChange={(event) => setDialect(event.target.value as CrochetDialect)}><option value="us">US</option><option value="uk">UK</option></select></label> : null}
           <label htmlFor="fiber-display-theme"><span>Display theme</span><select id="fiber-display-theme" value={theme} onChange={(event) => setTheme(event.target.value as FiberCraftTheme)}><option value="light">Light</option><option value="dark-room">Dark room</option><option value="high-contrast">High contrast</option></select></label>
           <button className="action-button secondary" type="button" aria-pressed={descriptionVisible} onClick={() => setDescriptionVisible((visible) => !visible)}>{descriptionVisible ? 'Hide chart description' : 'Show chart description'}</button>
+          {document.metadata.discipline === 'crochet' ? <div className="fiber-craft-zoom-controls" role="group" aria-label="Chart zoom"><button className="action-button secondary" type="button" aria-label="Zoom out" disabled={zoom <= ZOOM_STEPS[0]} onClick={() => setZoom((value) => stepZoom(value, -1))}>−</button><output aria-live="polite" aria-label="Zoom level">{zoom}%</output><button className="action-button secondary" type="button" aria-label="Zoom in" disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]} onClick={() => setZoom((value) => stepZoom(value, 1))}>+</button><button className="action-button secondary" type="button" disabled={zoom === 100} onClick={() => setZoom(100)}>Fit</button></div> : null}
           {roundChart ? <label><span>Active round</span><select value={activeRound} onChange={(event) => setActiveRound(Number(event.target.value))}>{Array.from({ length: roundChart.rounds }, (_, round) => <option key={round} value={round}>Round {round + 1}</option>)}</select></label> : null}
         </div>
 
         <div className="fiber-craft-main">
-          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} selectedAngle={currentAngle} completedSteps={document.completedSteps} theme={theme} onSelectNode={selectPosition} onKeyDown={handleCanvasKeyDown} /></section>
-            : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} onResize={resizeGrid} onClear={clearGrid} onTransform={transformGrid} />
+          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><div className="fiber-craft-zoom-viewport" tabIndex={0} role="region" aria-label="Scrollable round chart viewport"><CrochetCanvas zoom={zoom} chart={roundChart} palette={document.palette} activeRound={activeRound} selectedAngle={currentAngle} completedSteps={document.completedSteps} theme={theme} onSelectNode={selectPosition} onKeyDown={handleCanvasKeyDown} /></div></section>
+            : gridChart ? <CrochetGridPanel zoom={zoom} chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} onResize={resizeGrid} onClear={clearGrid} onTransform={transformGrid} />
               : knittingChart ? <KnittingGridPanel document={document} chart={knittingChart} onCommit={commit} onStatus={setStatus} />
                 : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
 
@@ -504,7 +527,7 @@ export default function FiberCraftWorkspace() {
                   : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
             {document.metadata.discipline === 'crochet' ? <PatternCreditPanel document={document} onSaveCredit={saveCredit} onDirtyChange={setCreditDirty} /> : null}
-            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere.</p></section> : null}
+            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadMaterialsList()}>Save materials list (.csv)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere, and the materials list opens in any spreadsheet.</p></section> : null}
             <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
           </aside>
         </div>
