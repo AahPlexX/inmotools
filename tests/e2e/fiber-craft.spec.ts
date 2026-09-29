@@ -245,6 +245,32 @@ test.describe('Fiber Craft Workstation', () => {
     await expect(page.getByRole('grid', { name: 'Counted-thread grid, 3 rows by 4 columns' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Full cross, Image color 1/ })).toHaveCount(12);
     await expect(page.getByTestId('counted-thread-legend')).toContainText('Image color 1');
+
+    await page.getByLabel('Chart mode').selectOption('knitting');
+    await expect(page.getByRole('heading', { name: 'Gauge-corrected knitting grid' })).toBeVisible();
+    await expect(page.getByLabel('Stitches in gauge')).toHaveValue('20');
+    await expect(page.getByLabel('Rows in gauge')).toHaveValue('25');
+    const knittingCell = page.getByTestId('knitting-cell-0-0');
+    const starterRatio = await knittingCell.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return box.width / box.height;
+    });
+    expect(starterRatio).toBeCloseTo(1.25, 1);
+
+    await page.getByLabel('Rows in gauge').fill('30');
+    await page.getByRole('button', { name: 'Save knitting gauge' }).click();
+    await expect(page.getByTestId('knitting-gauge-summary')).toContainText('20 stitches × 30 rows over 4 in');
+    const updatedRatio = await knittingCell.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return box.width / box.height;
+    });
+    expect(updatedRatio).toBeCloseTo(1.5, 1);
+
+    await expect(page.locator('p.fiber-craft-status')).toContainText('Saved locally', { timeout: 3_000 });
+    await page.reload();
+    await page.getByRole('button', { name: 'Restore last session' }).click();
+    await expect(page.getByLabel('Chart mode')).toHaveValue('knitting');
+    await expect(page.getByLabel('Rows in gauge')).toHaveValue('30');
   });
 
   test('reopens the Fiber workspace while offline after the PWA is installed', async ({ page, context }) => {
