@@ -50,6 +50,8 @@ import {
 } from './analyzer-engine';
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
 import { LogicMinimizerDock } from './LogicMinimizerDock';
+import { LogicPuzzleDock } from './LogicPuzzleDock';
+import { buildStarterDocument, type PuzzleLevel } from './puzzle-engine';
 import { freeSpaceBelow, synthesizeTwoLevel, type SynthesisSpec } from './synthesis-engine';
 import { LogicCanvas, type MenuAction } from './LogicCanvas';
 import { LogicInspector } from './LogicInspector';
@@ -104,7 +106,7 @@ export default function LogicWorkspace() {
   const pendingSwitchOverrideRef = useRef<Record<string, LogicLevel>>({});
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles'>('none');
   const [mobilePanel, setMobilePanel] = useState<'none' | 'palette' | 'inspector'>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -288,6 +290,16 @@ export default function LogicWorkspace() {
     setPlacingType(null);
   };
 
+  const handleStartPuzzleLevel = (level: PuzzleLevel) => {
+    if (!window.confirm(`Start the puzzle "${level.title}"? This replaces the circuit on screen, including its autosave and undo history, and cannot be undone. Use Save project first if you want to keep it.`)) return;
+    const starter = buildStarterDocument(level);
+    setHistory(createHistory(starter));
+    frameRef.current = createInitialFrame(starter);
+    resetLiveInteractions();
+    bumpFrame();
+    setPlacingType(null);
+  };
+
   const handleOpenClick = () => fileInputRef.current?.click();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -340,6 +352,7 @@ export default function LogicWorkspace() {
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
+        <button type="button" onClick={() => setActiveDock((current) => (current === 'puzzles' ? 'none' : 'puzzles'))} aria-pressed={activeDock === 'puzzles'}>Puzzles</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'minimizer' ? 'none' : 'minimizer'))} aria-pressed={activeDock === 'minimizer'}>Minimize (K-map)</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'analyzer' ? 'none' : 'analyzer'))} aria-pressed={activeDock === 'analyzer'}>Logic analyzer</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
@@ -463,6 +476,10 @@ export default function LogicWorkspace() {
             </ul>
           )}
         </section>
+      ) : null}
+
+      {activeDock === 'puzzles' ? (
+        <LogicPuzzleDock document={doc} onStartLevel={handleStartPuzzleLevel} onClose={() => setActiveDock('none')} />
       ) : null}
 
       {activeDock === 'minimizer' ? (

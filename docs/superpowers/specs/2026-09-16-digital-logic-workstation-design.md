@@ -106,7 +106,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 22. Electrical rule check (ERC): floating/undriven input nets, output-to-output contention, unbuffered combinational loops — one click, itemized results naming the affected components. *(Phase 1: an undriven net is reported as a floating-input finding on whichever input pins it feeds, rather than as its own separate category.)*
 
 ### Educational & accessible modes
-23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3)*
+23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3 — delivered in 3B)*
 24. Junior Explorer color-coded elementary mode: one-click swap to large, bright, animated blocks for first-time/young learners. *(Phase 3)*
 
 ### Ergonomics, input model & accessibility

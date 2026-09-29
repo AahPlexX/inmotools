@@ -229,6 +229,44 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   await expect(ercDock).toContainText('DP');
 });
 
+test('a puzzle level starts from its own circuit, checks a wrong and a right answer, and remembers progress', async ({ page }) => {
+  page.on('dialog', (dialog) => void dialog.accept());
+  await page.goto('./#/tools/digital-logic-workstation');
+  await page.getByRole('button', { name: 'Puzzles', exact: true }).click();
+  const dock = page.getByTestId('logic-puzzle-dock');
+  await expect(dock).toBeVisible();
+  await expect(page.getByTestId('logic-puzzle-count')).toHaveText('0 of 11 solved');
+
+  // Level 1 opens first: a switch A and a bulb, no gates allowed.
+  await expect(dock.getByRole('heading', { name: 'Light the bulb' })).toBeVisible();
+  await dock.getByRole('button', { name: 'Start this level' }).click();
+  await dock.getByRole('button', { name: 'Check my circuit' }).click();
+  await expect(page.getByTestId('logic-puzzle-result')).toContainText('Not yet');
+
+  // Switch A's output pin (grid 2,2) to the bulb's input pin (grid 13,2).
+  await wire(page, { x: 2 * GRID, y: 2 * GRID }, { x: 13 * GRID, y: 2 * GRID });
+  await dock.getByRole('button', { name: 'Check my circuit' }).click();
+  await expect(page.getByTestId('logic-puzzle-result')).toContainText('Solved!');
+  await expect(page.getByTestId('logic-puzzle-count')).toHaveText('1 of 11 solved');
+
+  // Level 2 needs a NOT gate: the starter for it replaces the circuit.
+  await dock.getByRole('button', { name: 'Next level' }).click();
+  await expect(dock.getByRole('heading', { name: 'Flip it' })).toBeVisible();
+  await dock.getByRole('button', { name: 'Start this level' }).click();
+  await placeAt(page, 'NOT', 6, 2);
+  // NOT at (6,2): input pin (6,3), output pin (8,3).
+  await wire(page, { x: 2 * GRID, y: 2 * GRID }, { x: 6 * GRID, y: 3 * GRID });
+  await wire(page, { x: 8 * GRID, y: 3 * GRID }, { x: 13 * GRID, y: 2 * GRID });
+  await dock.getByRole('button', { name: 'Check my circuit' }).click();
+  await expect(page.getByTestId('logic-puzzle-result')).toContainText('Solved!');
+  await expect(page.getByTestId('logic-puzzle-count')).toHaveText('2 of 11 solved');
+
+  // Progress survives a reload.
+  await page.reload();
+  await page.getByRole('button', { name: 'Puzzles', exact: true }).click();
+  await expect(page.getByTestId('logic-puzzle-count')).toHaveText('2 of 11 solved');
+});
+
 test('the K-map minimizer reduces an unminimized circuit and adds the minimized circuit to the canvas', async ({ page }) => {
   await page.goto('./#/tools/digital-logic-workstation');
   // Majority of three inputs, drawn the long way: one AND gate per minterm (3, 5, 6, 7).
