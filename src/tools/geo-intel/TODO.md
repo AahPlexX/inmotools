@@ -25,7 +25,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G0 Plan** — TODO, source registry, feature list, decisions recorded.
 - [x] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
 - [x] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
-- [ ] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
+- [x] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
 - [ ] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
 - [ ] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
 - [ ] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
@@ -171,3 +171,14 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 - `src/tools/geo-intel/net/http.ts` — timeout, backoff, circuit breaker, dedupe, throttle gate; adapters depend on it.
 - `src/tools/geo-intel/net/store.ts` — Dexie database (response cache with TTL, history, saved profiles, metadata, settings); adapters and UI depend on it.
 - `tests/unit/geo-intel-net.test.ts` — fake timers + fake-indexeddb.
+
+## Delivery 4 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/net/http.ts` — HttpClient: TTL cache lookup, in-flight dedupe, per-source throttle gate (Nominatim 1.1 s, Photon/BigDataCloud/Zippopotam 1 s), timeout, exponential backoff + Retry-After, circuit breaker, stale fallback, health snapshots.
+- `src/tools/geo-intel/net/store.ts` — Dexie DB `inmotools-geo-intelligence-hub`: response cache (pruned at 2,000), profiles (50 unstarred history, starred kept), settings (Nominatim opt-in default off).
+- `tests/unit/geo-intel-net.test.ts` — 12 tests (injected clock/sleep, fake-indexeddb).
+### Gate evidence
+- G3 checked: `vitest run tests/unit/geo-intel-net.test.ts` 12/12; `tsc` exit 0.
+### Next batch (planned)
+- `src/tools/geo-intel/adapters/*.ts` — one module per source, each returning ProfileFields; needs `net/http.ts` and `core/sources.ts`.
+- `tests/unit/geo-intel-adapters.test.ts` + `tests/fixtures/geo-intel/responses/*.json` — recorded live responses from 2026-09-29.
