@@ -460,9 +460,12 @@ export const step = ({ document: sourceDocument, previous, elapsedMs, interactio
   const postSequentialNets = resolveAllNets();
   for (const [key, value] of postSequentialNets) levels.set(key, value);
   settleIdealIfNeeded();
+  // The settling above moved outputs; carry them onto every pin they reach, or an LED behind a gate that
+  // follows a flip-flop would still show the level from before the clock edge until the next tick.
+  const displayNets = resolveAllNets();
+  for (const [key, value] of displayNets) levels.set(key, value);
 
   // --- Segment displays: sinks that record which segments are lit, holding a multiplexed digit between selects. ---
-  const displayNets = resolveAllNets();
   for (const component of document.components) {
     if (!isDisplayType(component.type)) continue;
     const state = nextState[component.id] ?? {};
