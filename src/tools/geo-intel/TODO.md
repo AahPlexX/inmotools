@@ -297,3 +297,41 @@ F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F1
 - "Validate and deploy Pages" (full unit suite, build, full browser suite) — success; "Sightline Velocity validation" — success.
 ### Next batch (planned)
 - On the owner's go-ahead: add the Geo Intelligence Hub entry to `.tasks/DONE.md` and `.tasks/WORK_LOG.md` (with this evidence), re-sync the branch with `origin/main`, re-run CI, merge PR #89, then confirm the Pages deployment and tick G12.
+
+## Production audit — 2026-09-29 (after merging `origin/main` @ `189bae6` into the branch)
+
+### Findings and resolutions
+| # | Area | Finding | Resolution |
+| --- | --- | --- | --- |
+| A1 | Bug | A bare number such as `10115` was treated as a postal code in the default country (US) and failed outright | When no country was typed and the postal lookup finds nothing, the query falls back to the geocoder, with a note suggesting `DE 10115` |
+| A2 | Bug | Late in the year, "Next public holiday" was empty because every holiday had passed | The calendar rolls over to next year when no holidays remain; ‹ year › buttons browse any year |
+| A3 | Missing function | Sun times only for today; no way to plan a date | Date picker on the Sun card recomputes sun, twilight and moon through the same provider chain |
+| A4 | Missing function | Moon data from both providers was discarded | Moon phase, illumination, moonrise and moonset added; offline mean-lunation fallback labelled as such |
+| A5 | Parity | Search returned one match with no way to correct it (competitors show candidates) | Photon now returns up to 5 matches; "Not the right place?" chips switch to another one |
+| A6 | Parity | No shareable URL | `#/tools/geo-intelligence-hub?q=…` / `?ll=lat,lon` deep links, updated with `replaceState`; Share link button + Web Share on touch devices |
+| A7 | Parity | Formats common in GIS/radio tools missing | Geohash and Maidenhead in profile + converter, searchable as `gh:…` / `grid:…`; antipode |
+| A8 | Parity | No GIS-native export | GeoJSON (RFC 7946, lon/lat order, provenance per property) and KML 2.2 in the dialog and ZIP |
+| A9 | QoL | History could not move between devices | Import JSON (own export, a profile, or an array; invalid entries counted and skipped) |
+| A10 | QoL | No quick text to paste | "Copy summary" button and context-menu item; "Copy share link" in the menu |
+| A11 | QoL | Search box had no recall | `<datalist>` of recent queries |
+| A12 | QoL | Errors could not be dismissed | Dismiss link on the error line |
+| A13 | Keyboard | Every field label and card heading was a tab stop (dozens per profile) | Labels keep hover tooltips; the ⓘ button carries the same help text, so there is one tab stop per value |
+| A14 | Keyboard | Tabs lacked the ARIA arrow-key pattern | ←/→/Home/End with roving `tabIndex` |
+| A15 | Copy | Status text sounded mechanical ("Resolving…", "Querying keyless sources") | Rewritten ("Looking it up…", "Gathering details from open data sources…", "Found Berlin, Germany.") |
+| A16 | Typography | Catalog title ran to five lines at 1440 px; a step used `ⓘ`, which the site font renders as a box | Shorter title; the step describes the button in words; GeoJSON/KML/geohash/locator listed in the accepts/outputs copy |
+| A17 | Stale input | The sun-date input kept the previous location's date | Keyed by profile id |
+
+### Evaluated and not done
+- **Autocomplete / search-as-you-type:** no keyless provider permits it (Nominatim forbids it; Photon's demo asks for reasonable volume). Replaced by the recent-query list and the other-matches chips.
+- **Route and travel-time distances:** OSRM's public demo has a usage policy against application use, and every other routing API needs a key. Great-circle distance stays.
+- **Satellite or slippy base map tiles:** OSM's tile policy forbids heavy app use and imagery providers need keys. The bundled vector map stays.
+- **Weather:** Open-Meteo is excluded by its license, and the other options need a key.
+- **Tooltips on disabled buttons:** browsers send no pointer events to disabled controls; the reason is shown in text next to them instead (for example "— no holiday calendar").
+
+### Evidence
+- `pnpm test:unit`: 223 files / 2,287 tests passed. The new file `tests/unit/geo-intel-audit.test.ts` checks the published geohash example (`u4pruydqqvj`), ARRL W1AW = `FN31PR`, sun azimuth/altitude and moon phase against the SunriseSunset.io fixture, GeoJSON/KML/import, and the postal fallback.
+- `tests/e2e/geo-intel.spec.ts`: 52/52 over `--repeat-each=2 --retries=0` (new: shared link, sun date, holiday year, GeoJSON, KML, import, tab keys).
+- `accessibility.spec.ts` + `app.spec.ts`: 94/94 passed.
+
+### Next batch (planned)
+- Push, let PR #89 CI run the full suite, then G12 as recorded above.
