@@ -129,16 +129,16 @@
 - **Reverse-safe:** complete.
 
 ### T11-01 — Responsive/accessibility/QoL hardening
-- **Status:** READY
+- **Status:** DONE
 - **Depends on:** T10-01 DONE
 - **Primary files:** tactical UI/CSS/help/shortcuts + e2e
-- **Action:** complete desktop/touch/keyboard equivalents, help, shortcuts, narrow-layout drawers/sheets, focus/status/reduced-motion/target/reflow/zoom/enlarged-text hardening.
-- **Exit evidence:** viewport matrix + Axe + keyboard/touch-equivalent results.
-- **Reverse-safe:** no.
+- **Implementation:** runtime source `b538a655b7efdd35de83cd20478976f46494a1b8` adds a help dialog, collision-safe tooltips, conflict-safe shortcuts, Players/Timeline sheets, reduced-motion transport, and scene-layer grouping/reorder/solo/focus/lock. The workspace header instructional sentence was not rewritten.
+- **Exit evidence:** focused Tactical units **130/130** plus e2e selector **3/3**, `tsc --noEmit -p tsconfig.app.json` exit 0, production build, and the full Tactical Playwright spec **68 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Viewport matrix, desktop Axe with help open, and desktop/mobile keyboard/touch equivalents are green. Rows **51, 52, 53, 54, 55** are verified; numerator is **51/60**. Rows 43–48, 50, and 56–60 were not reopened. Help reference copy changed.
+- **Reverse-safe:** complete.
 
 ### T12-01 — Performance and adversarial audit
-- **Status:** BLOCKED
-- **Depends on:** T11-01
+- **Status:** READY
+- **Depends on:** T11-01 DONE
 - **Primary files:** tactical scope only
 - **Action:** realistic complex sessions, history/resource bounds, inactivity pausing, input/export adversarial review, source/spec drift audit.
 - **Exit evidence:** measured findings resolved or explicitly tracked.

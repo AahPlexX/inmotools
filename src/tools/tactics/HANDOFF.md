@@ -4,17 +4,21 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `48489a4b0a32ac8aed3455314af817dc790ac07b`
+- Last fully browser-validated source tip: `b538a655b7efdd35de83cd20478976f46494a1b8`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 10 closed — professional export and metadata.** Next is T11-01.
-- Verified functional features: **46/60**
+- Milestone: **Task 11 closed — responsive/accessibility/QoL hardening.** Next is T12-01.
+- Verified functional features: **51/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-**T11-01 — responsive/accessibility/QoL hardening is READY.** Do not start it from this Task 10 close-out. Keep later export work local. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Do not reopen rows 43–48 or 60.
+**T12-01 — performance and adversarial audit is READY.** Do not start it from this Task 11 close-out. Help reference copy changed, so the Stage 2 instructional writer may review that dialog copy; that review does not block T12-01. The workspace header instructional sentence was not rewritten. Do not reopen rows 43–48, 50, or 56–60.
+
+## Task 11 closure evidence
+
+Task 11 is **DONE** at runtime source `b538a655b7efdd35de83cd20478976f46494a1b8`. Focused Tactical units pass **130/130** and the e2e selector check passes **3/3**. TypeScript and the production build pass. The full Tactical Playwright spec passes **68 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Desktop Axe on the workspace, with the layer panel and help dialog open, reports no serious or critical violations for WCAG 2 A/AA, 2.1 A/AA, and 2.2 AA. The viewport matrix is phone portrait 320×740, phone landscape 844×390, tablet portrait 768×1024, tablet landscape 1080×810, laptop 1024×768, desktop 1440×900, large desktop 1920×1080, 32px enlarged text, and 1.5 page zoom; document and workspace overflow stay ≤1px and essential targets stay ≥44px. Desktop and mobile coverage includes shortcut chords that leave text fields alone, right-click and Player actions equivalents, narrow Players/Timeline sheets with focus return, and reduced-motion keyframe stepping. Rows **51, 52, 53, 54, 55** are verified. Grouping is scene-layer membership, not a separate group schema. A long-press timer was not added.
 
 ## Task 10 closure evidence
 
@@ -42,9 +46,9 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 56, 57, 58, 59, 60**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60**.
 
-In progress: **3, 4, 5, 7, 8, 51, 52, 55**.
+In progress: **3, 4, 5, 7, 8**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 
