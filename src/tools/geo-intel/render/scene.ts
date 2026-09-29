@@ -46,7 +46,7 @@ function graticule(): string {
 const GRATICULE = graticule();
 const OUTLINE = linePath([...Array.from({ length: 37 }, (_, i) => ({ lat: -90 + i * 5, lon: -180 })), ...Array.from({ length: 37 }, (_, i) => ({ lat: 90 - i * 5, lon: 180 }))]) + 'Z';
 
-export function baseLayerSvg(scene: MapScene): string {
+export function baseLayerSvg(scene: Pick<MapScene, 'countries' | 'fills' | 'highlight'>): string {
   const paths = scene.countries.map((country) => {
     const fill = scene.fills?.get(country.a3);
     const cls = `gi-country${country.a3 === scene.highlight ? ' is-active' : ''}${fill ? ' has-fill' : ''}`;
