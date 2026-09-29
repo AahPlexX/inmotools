@@ -22,7 +22,7 @@ This file is the single live progress record for this tool while it is developed
 
 Each gate is checked only with fresh evidence (command + result recorded in the Delivery Record).
 
-- [ ] **G0 Plan** — TODO, source registry, feature list, decisions recorded.
+- [x] **G0 Plan** — TODO, source registry, feature list, decisions recorded.
 - [ ] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
 - [ ] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
 - [ ] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
@@ -123,3 +123,12 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 - "Population of a ZIP code" is never fabricated. Postal lookups report the geography actually returned; population is shown at the geography that has it (country via World Bank, NUTS-3 via Eurostat, populated place via Natural Earth `pop_max`) with that geography type and reference year.
 
 ## Delivery Records
+
+## Delivery 1 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/TODO.md` — live tracker: gates G0–G12, verified source registry, exclusions, feature list F01–F44, decisions.
+### Gate evidence
+- G0 checked: plan, registry, and feature list recorded; every endpoint was fetched from `https://aahplexx.github.io` in Chromium on 2026-09-29.
+### Next batch (planned)
+- `src/tools/geo-intel/scripts/build-data.mjs` — reproducible static-data builder; needs G0's source decisions (datasets, licenses) first.
+- `src/tools/geo-intel/data/*.json` — generated country table, geometry, places, admin-1 names, timezones, manifest; can only exist once the builder exists.
