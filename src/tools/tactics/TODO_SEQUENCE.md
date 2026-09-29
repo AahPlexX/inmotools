@@ -1,9 +1,9 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-28
+**Updated:** 2026-09-29
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**Validated Task 9 runtime tip:** `c3ad7fb603f78456740f954b833c8db496d19d9e`
+**Validated Task 10 runtime tip:** `48489a4b0a32ac8aed3455314af817dc790ac07b`
 
 ## Purpose and source-of-truth roles
 
@@ -121,16 +121,16 @@
 - **Reverse-safe:** complete.
 
 ### T10-01 — Professional export and metadata
-- **Status:** ACTIVE
+- **Status:** DONE
 - **Depends on:** T09-01
 - **Primary files:** tactical export modules + UI/tests
-- **Action:** metadata editor, raster/social/standalone HTML, PDF/contact sheets, analytics CSV/JSON, project JSON/ZIP, capability-negotiated video export/fallback.
-- **Exit evidence:** format/capability tests and representative artifact inspection.
-- **Reverse-safe:** no.
+- **Implementation:** runtime source `48489a4b0a32ac8aed3455314af817dc790ac07b` adds a local metadata editor and still, social, standalone HTML, vector PDF/contact-sheet, analytics CSV/JSON, and project JSON/ZIP downloads. Video buttons appear only after Mediabunny `1.55.4` `canEncodeVideo` confirms the container, codec, size, and bitrate; frame-sequence ZIP remains the fallback.
+- **Exit evidence:** focused Tactical units **125/125** plus e2e selector **3/3**, `tsc --noEmit -p tsconfig.app.json` exit 0, production build, and the full Tactical Playwright spec **58 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Artifact checks cover analytics honesty, HTML script isolation, social SVG, PDF ZIP literals, frame-sequence ZIP, raster magic bytes, and the first confirmed video container. Rows **50, 57, 58, 59** are verified; numerator is **46/60**. Rows 43–48 and 60 were not reopened.
+- **Reverse-safe:** complete.
 
 ### T11-01 — Responsive/accessibility/QoL hardening
-- **Status:** BLOCKED
-- **Depends on:** T10-01
+- **Status:** READY
+- **Depends on:** T10-01 DONE
 - **Primary files:** tactical UI/CSS/help/shortcuts + e2e
 - **Action:** complete desktop/touch/keyboard equivalents, help, shortcuts, narrow-layout drawers/sheets, focus/status/reduced-motion/target/reflow/zoom/enlarged-text hardening.
 - **Exit evidence:** viewport matrix + Axe + keyboard/touch-equivalent results.

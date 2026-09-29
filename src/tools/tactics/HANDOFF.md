@@ -4,17 +4,21 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `c3ad7fb603f78456740f954b833c8db496d19d9e`
+- Last fully browser-validated source tip: `48489a4b0a32ac8aed3455314af817dc790ac07b`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 10 — professional export and metadata**
-- Verified functional features: **42/60**
+- Milestone: **Task 10 closed — professional export and metadata.** Next is T11-01.
+- Verified functional features: **46/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
 Documentation commits after the validated source tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-**T10-01 — professional export and metadata is ACTIVE.** Keep export local and capability-negotiated. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Analytics report export remains row 50; do not reopen rows 43–48.
+**T11-01 — responsive/accessibility/QoL hardening is READY.** Do not start it from this Task 10 close-out. Keep later export work local. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Do not reopen rows 43–48 or 60.
+
+## Task 10 closure evidence
+
+Task 10 is **DONE** at runtime source `48489a4b0a32ac8aed3455314af817dc790ac07b`. Focused Tactical units pass **125/125** and the e2e selector check passes **3/3**. TypeScript and the production build pass. The full Tactical Playwright spec passes **58 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Desktop and mobile coverage saves export metadata and restores the prior title with undo, downloads source-honest analytics JSON, standalone HTML, a landscape social SVG, a PDF package ZIP, and a frame-sequence ZIP, and downloads PNG plus the first encoder-confirmed video when this Chromium probe succeeds. A production-build probe listed `mp4-avc-1280x720-30`, `mp4-avc-1920x1080-30`, `webm-vp9-1280x720-30`, and `webm-vp8-1280x720-30`, plus PNG, JPEG, and WebP. Rows **50, 57, 58, 59** are verified. The workspace header instructional sentence was not rewritten.
 
 ## Task 9 closure evidence
 
@@ -38,9 +42,9 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 56, 60**.
+Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 56, 57, 58, 59, 60**.
 
-In progress: **3, 4, 5, 7, 8, 51, 52, 55, 59**.
+In progress: **3, 4, 5, 7, 8, 51, 52, 55**.
 
 All other accepted rows remain planned until their dependency-ordered work begins. The deterministic denominator remains 60.
 

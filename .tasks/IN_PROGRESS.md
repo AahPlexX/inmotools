@@ -5,10 +5,10 @@
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`
   - Feature ledger: `src/tools/tactics/FEATURE_MATRIX.md`; handoff: `src/tools/tactics/HANDOFF.md`; deterministic execution/concurrency queue: `src/tools/tactics/TODO_SEQUENCE.md`.
   - Branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`; existing draft PR #76 only — do not create a parallel Tactical Matchboard PR.
-  - Current milestone: **Task 10 — professional export and metadata.** Task 9 is closed; T10-01 is ACTIVE in an isolated Tactical worktree.
-  - Current verified feature count: **42/60**. Verified rows: 1, 2, 9–38, 42–49, 56, 60. The feature-matrix header that lagged at 32/60 after Task 8 is reconciled to this verified-row count. Analytics report export row 50 remains Task 10.
-  - Current evidence: exact Task-9 runtime source `c3ad7fb603f78456740f954b833c8db496d19d9e` passes 117/117 focused Tactical/selector units, TypeScript/production/PWA build, and the full Tactical Playwright spec with 56 passes, 2 intentional duplicate mobile Axe/reflow skips and 0 failures, including local video failure paths, telestration, manual tracking, event tags, clip playlists, manual multi-angle sync, Axe and responsive controls.
-  - Tasks 5–9 are complete: deterministic timeline/coordinated motion, physical-metre spatial analysis, browser-local persistence/interchange/session planning, synchronized resource-safe 3D presentation, and local video review/telestration are verified.
+  - Current milestone: **Task 10 closed — professional export and metadata.** T11-01 is READY and not started.
+  - Current verified feature count: **46/60**. Verified rows: 1, 2, 9–38, 42–50, 56–60. Newly verified by Task 10: 50, 57, 58, 59. Rows 43–48 and 60 were not reopened.
+  - Current evidence: exact Task-10 runtime source `48489a4b0a32ac8aed3455314af817dc790ac07b` passes 125/125 focused Tactical units plus 3/3 e2e selector checks, TypeScript/production build, and the full Tactical Playwright spec with 58 passes, 2 intentional duplicate mobile Axe/reflow skips and 0 failures. Browser coverage includes metadata undo, analytics honesty, social SVG, standalone HTML, PDF ZIP, frame-sequence ZIP, raster magic bytes, and the first Mediabunny-confirmed video container.
+  - Tasks 5–10 are complete: deterministic timeline/coordinated motion, physical-metre spatial analysis, browser-local persistence/interchange/session planning, synchronized resource-safe 3D presentation, local video review/telestration, and local professional export are verified.
   - Scope boundary: browser-local only; no auth, backend database, telemetry, remote processing, cloud project storage, client secret/API key, or AI product surface.
   - Completion gate: satisfy the branch-complete and integrated-complete contracts in the Tactical design/plan and repository `.tasks/PROJECT_COMPLETION.md`; do not merge partial work.
 
