@@ -7,11 +7,13 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/crystal-lattice-studio.spec.ts',
       'tests/e2e/crystal-lattice-studio-phase2.spec.ts',
       'tests/e2e/crystal-lattice-studio-phase3.spec.ts',
+      'tests/e2e/crystal-lattice-studio-phase4.spec.ts',
     ]);
     expect(selectE2eSpecs(['src/tools/crystal/crystal-workspace.css'])).toEqual([
       'tests/e2e/crystal-lattice-studio.spec.ts',
       'tests/e2e/crystal-lattice-studio-phase2.spec.ts',
       'tests/e2e/crystal-lattice-studio-phase3.spec.ts',
+      'tests/e2e/crystal-lattice-studio-phase4.spec.ts',
     ]);
   });
 
