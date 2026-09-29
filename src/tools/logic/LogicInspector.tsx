@@ -1,4 +1,5 @@
 import { blockSizeLabel, hasSelectableSize, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
+import { ALU_OPERATION_HELP, ALU_OPERATIONS, ALU_WIDTHS, aluSizeLabel, aluWidthOf } from './alu-engine';
 import { clampBusWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
 import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
 import { isDisplayType } from './display-engine';
@@ -101,6 +102,28 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
             ))}
           </select>
         </label>
+      ) : null}
+
+      {component.type === 'ALU' ? (
+        <>
+          <label className="logic-field">
+            <span>Operand width</span>
+            <select value={aluWidthOf(component.params)} onChange={(event) => onUpdateParams(component.id, { aluWidth: Number(event.target.value) })}>
+              {ALU_WIDTHS.map((bits) => (
+                <option key={bits} value={bits}>{aluSizeLabel(bits)}</option>
+              ))}
+            </select>
+          </label>
+          <dl className="logic-alu-operations" aria-label="Operation codes (OP2 OP1 OP0)">
+            {ALU_OPERATIONS.map((operation, code) => (
+              <div key={operation}>
+                <dt>{code.toString(2).padStart(3, '0')} {operation}</dt>
+                <dd>{ALU_OPERATION_HELP[operation]}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="logic-inspector-hint">EQ, LT, and GT compare A with B (unsigned) whatever the operation is.</p>
+        </>
       ) : null}
 
       {isRegisterType(component.type) ? (

@@ -1,4 +1,5 @@
 import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
+import { clampAluWidth } from './alu-engine';
 import { checkWireEnds, clampBusWidth } from './bus-engine';
 import { clampBitWidth, isRegisterType } from './register-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
@@ -154,6 +155,8 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
         normalized = { ...merged, bitWidth: clampBitWidth(merged.bitWidth) };
       } else if (component.type === 'BUS_SPLITTER' && merged.busWidth !== undefined) {
         normalized = { ...merged, busWidth: clampBusWidth(merged.busWidth) };
+      } else if (component.type === 'ALU' && merged.aluWidth !== undefined) {
+        normalized = { ...merged, aluWidth: clampAluWidth(merged.aluWidth) };
       }
       return { ...component, params: normalized };
     }),

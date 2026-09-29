@@ -1,10 +1,11 @@
 import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './block-engine';
+import { aluPorts } from './alu-engine';
 import { busLabel, clampBusWidth } from './bus-engine';
 import { displayPorts, type DisplayType } from './display-engine';
 import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus' | 'arithmetic';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -155,6 +156,7 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   SEVEN_SEGMENT_4: displayDefinition('SEVEN_SEGMENT_4', 'Multiplexed 4-digit display'),
   SIXTEEN_SEGMENT: displayDefinition('SIXTEEN_SEGMENT', '16-segment display'),
   BUS_SPLITTER: { type: 'BUS_SPLITTER', label: 'Bus splitter', category: 'bus', defaultParams: { busWidth: 4 }, ports: splitterPorts },
+  ALU: { type: 'ALU', label: 'ALU', category: 'arithmetic', defaultParams: { aluWidth: 4, delayNs: 20 }, ports: aluPorts },
 };
 
 /**
@@ -182,7 +184,7 @@ export const isStatefulPart = (type: ComponentType): boolean => isSequential(typ
 
 /** Gates and multi-pin blocks: every part whose outputs are a pure function of its current inputs. */
 export const isCombinationalLogic = (type: ComponentType): boolean =>
-  isVariadicGate(type) || type === 'NOT' || type === 'BUFFER' || type === 'TRI_BUFFER' || isBlockType(type);
+  isVariadicGate(type) || type === 'NOT' || type === 'BUFFER' || type === 'TRI_BUFFER' || isBlockType(type) || type === 'ALU';
 
 export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCategory; readonly label: string; readonly types: readonly ComponentType[] }[] = [
   { category: 'gate', label: 'Logic gates', types: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUFFER', 'TRI_BUFFER'] },
@@ -190,6 +192,7 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
   { category: 'register', label: 'Counters & registers', types: ['COUNTER', 'REGISTER'] },
   { category: 'bus', label: 'Buses', types: ['BUS_SPLITTER'] },
+  { category: 'arithmetic', label: 'Arithmetic', types: ['ALU'] },
   { category: 'display', label: 'Segment displays', types: ['SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];

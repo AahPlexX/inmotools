@@ -29,7 +29,8 @@ export type ComponentType =
   | 'SEVEN_SEGMENT'
   | 'SEVEN_SEGMENT_4'
   | 'SIXTEEN_SEGMENT'
-  | 'BUS_SPLITTER';
+  | 'BUS_SPLITTER'
+  | 'ALU';
 
 /**
  * `passive` pins neither drive nor load a net: a bus splitter's pins are passive because the same part
@@ -86,6 +87,8 @@ export interface ComponentParams {
   readonly busWidth?: number;
   /** A register or counter exposes its data pins as single bus ports (D and Q) instead of one pin per bit. */
   readonly busPins?: boolean;
+  /** Operand width of an ALU: 4, 8, or 16 bits. */
+  readonly aluWidth?: number;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;

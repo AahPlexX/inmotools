@@ -12,10 +12,11 @@ import type { LogicLevel, PortDefinition } from './logic-types';
  */
 
 export const MIN_BUS_WIDTH = 2;
-export const MAX_BUS_WIDTH = 16;
+/** 32 bits: the widest memory address bus (ledger item 9). */
+export const MAX_BUS_WIDTH = 32;
 export const DEFAULT_BUS_WIDTH = 4;
 
-/** Coerces an untrusted bus width (an imported project can hold any JSON value) into 2-16. */
+/** Coerces an untrusted bus width (an imported project can hold any JSON value) into 2-32. */
 export const clampBusWidth = (value: unknown, fallback: number = DEFAULT_BUS_WIDTH): number => {
   const raw = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   return Math.min(MAX_BUS_WIDTH, Math.max(MIN_BUS_WIDTH, Math.round(raw)));

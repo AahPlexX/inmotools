@@ -57,6 +57,22 @@
   font-size: 0.82rem;
 }
 
+.logic-alu-operations {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+}
+
+.logic-alu-operations dt {
+  font-weight: 700;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.logic-alu-operations dd {
+  margin: 0 0 0.35rem;
+  color: inherit;
+  opacity: 0.85;
+}
+
 .logic-notice {
   margin: 0;
   padding: 0.5rem 0.75rem;
@@ -426,6 +442,7 @@
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="io"] .logic-palette-button { background: #bbf7d0; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="display"] .logic-palette-button { background: #fef08a; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="bus"] .logic-palette-button { background: #c7d2fe; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="arithmetic"] .logic-palette-button { background: #fbcfe8; }
 
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-button.active {
   outline: 4px solid #7c3aed;

@@ -1,3 +1,4 @@
+import { evaluateAlu } from './alu-engine';
 import { evaluateBlock, isBlockType } from './block-engine';
 import { portBits } from './bus-engine';
 import { getComponentPorts, getSimulationPorts, isSequential } from './component-library';
@@ -311,6 +312,10 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
         const inputLevels: Record<string, LogicLevel> = {};
         for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
         nextOutputs = evaluateBlock(component.type, component.params, inputLevels);
+      } else if (component.type === 'ALU') {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = evaluateAlu(component.params, inputLevels);
       }
       if (nextOutputs === undefined) continue;
 

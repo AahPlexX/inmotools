@@ -36,7 +36,7 @@ const bus = (id: string, direction: PortDefinition['direction'], width: number):
 });
 
 describe('bus widths and ports', () => {
-  it('clamps a hostile width into 2-16 and falls back for non-numbers', () => {
+  it('clamps a hostile width into 2-32 and falls back for non-numbers', () => {
     expect(clampBusWidth(1)).toBe(MIN_BUS_WIDTH);
     expect(clampBusWidth(99)).toBe(MAX_BUS_WIDTH);
     expect(clampBusWidth(7.6)).toBe(8);
@@ -169,7 +169,7 @@ describe('bus splitter', () => {
 
   it('follows its width parameter and clamps a hostile one', () => {
     expect(getComponentPorts('BUS_SPLITTER', { busWidth: 16 }).filter((port) => port.id.startsWith('S'))).toHaveLength(16);
-    expect(getComponentPorts('BUS_SPLITTER', { busWidth: 500 }).filter((port) => port.id.startsWith('S'))).toHaveLength(16);
+    expect(getComponentPorts('BUS_SPLITTER', { busWidth: 500 }).filter((port) => port.id.startsWith('S'))).toHaveLength(32);
     expect(getComponentPorts('BUS_SPLITTER', { busWidth: 'lots' as unknown as number }).filter((port) => port.id.startsWith('S'))).toHaveLength(4);
   });
 
@@ -362,7 +362,7 @@ describe('register and counter bus pins', () => {
     const wide = updateComponentParams(doc, split, { busWidth: 4 });
     expect(wide.wires).toHaveLength(1);
     expect(updateComponentParams(doc, split, { busWidth: 6 }).wires).toHaveLength(0);
-    expect(updateComponentParams(doc, split, { busWidth: 999 }).components.find((c) => c.id === split)?.params.busWidth).toBe(16);
+    expect(updateComponentParams(doc, split, { busWidth: 999 }).components.find((c) => c.id === split)?.params.busWidth).toBe(32);
   });
 
   it('leaves the single-pin ERC findings for an unwired bus input, one per hidden bit, named by their part', () => {

@@ -1,3 +1,4 @@
+import { aluTitle } from './alu-engine';
 import { BLOCK_WIDTH_COLS, blockTitle, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { clampBusWidth } from './bus-engine';
@@ -30,7 +31,7 @@ export const GATE_ABBREVIATION: Readonly<Record<ComponentType, string>> = {
   BUFFER: '1', TRI_BUFFER: '1', SWITCH: 'SW', PUSH_BUTTON: 'PB', CLOCK: 'CLK', LED: 'LED',
   PROBE: 'PRB', D_FLIP_FLOP: 'D', JK_FLIP_FLOP: 'JK', T_FLIP_FLOP: 'T', SR_LATCH: 'SR',
   MUX: 'MUX', DEMUX: 'DEMUX', DECODER: 'DEC', PRIORITY_ENCODER: 'ENC', BCD_7SEG: 'BCD', COUNTER: 'CTR', REGISTER: 'REG',
-  SEVEN_SEGMENT: '7SEG', SEVEN_SEGMENT_4: '4x7', SIXTEEN_SEGMENT: '16SEG', BUS_SPLITTER: 'BUS',
+  SEVEN_SEGMENT: '7SEG', SEVEN_SEGMENT_4: '4x7', SIXTEEN_SEGMENT: '16SEG', BUS_SPLITTER: 'BUS', ALU: 'ALU',
 };
 
 /** A rectangle in a component's local (pre-rotation, pre-mirror) pixel space. */
@@ -56,12 +57,13 @@ export const blockCaption = (component: ComponentInstance): string => {
   if (isBlockType(component.type)) return blockTitle(component.type, component.params);
   if (isRegisterType(component.type)) return registerTitle(component.type, component.params);
   if (isDisplayType(component.type)) return displayTitle(component.type);
+  if (component.type === 'ALU') return aluTitle(component.params);
   if (component.type === 'BUS_SPLITTER') return `SPLIT ${clampBusWidth(component.params.busWidth)}b`;
   return GATE_ABBREVIATION[component.type];
 };
 
 /** Multi-pin parts (blocks, counters, registers, displays) share one body: a box sized by its pin layout with a caption above it. */
-export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type) || isDisplayType(type) || type === 'BUS_SPLITTER';
+export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type) || isRegisterType(type) || isDisplayType(type) || type === 'BUS_SPLITTER' || type === 'ALU';
 
 /**
  * Where a component's body is drawn, in local pixels. Used to size the

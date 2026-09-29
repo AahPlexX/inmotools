@@ -612,3 +612,28 @@ test('a bus of one width cannot be wired to a bus of another, says why, and a ma
   const svg = Buffer.concat(chunks).toString('utf8');
   expect(svg).toMatch(/<polyline [^>]*stroke-width="4"/);
 });
+
+test('places an ALU, widens it from the inspector, and its unwired pins are named by the rule check', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Arithmetic' })).toBeVisible();
+
+  await placeAt(page, 'ALU', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 5.5 * GRID, y: 4 * GRID } });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  await expect(inspector.getByRole('heading', { name: 'ALU' })).toBeVisible();
+  await inspector.getByLabel('Operand width').selectOption('8');
+  await expect(inspector.getByLabel('Operand width')).toHaveValue('8');
+  await expect(inspector.getByLabel('Operation codes (OP2 OP1 OP0)')).toContainText('101 SHL');
+  if (isSheet) await page.getByLabel('Close inspector').click();
+
+  await page.getByRole('button', { name: 'Check circuit (ERC)' }).click();
+  const ercDock = page.getByTestId('logic-erc-dock');
+  await expect(ercDock).toContainText('CIN');
+  await expect(ercDock).toContainText('OP2');
+  await expect(ercDock).toContainText('A7');
+});
