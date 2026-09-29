@@ -226,6 +226,68 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   await expect(ercDock).toContainText('DP');
 });
 
+test('two fingers pan and pinch-zoom the canvas without moving or creating anything', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await placeAt(page, 'SWITCH', 6, 6);
+  const canvas = page.getByTestId('logic-canvas');
+
+  const readDocument = () => page.evaluate(() => {
+    const raw = window.localStorage.getItem('inmotools_logic_workstation_autosave');
+    return raw ? (JSON.parse(raw) as { viewport: { panX: number; panY: number; zoom: number }; components: { x: number; y: number }[] }) : undefined;
+  });
+  const touch = (type: 'pointerdown' | 'pointermove' | 'pointerup', id: number, x: number, y: number) =>
+    canvas.evaluate((element, args) => {
+      const rect = element.getBoundingClientRect();
+      element.dispatchEvent(new PointerEvent(args.type, {
+        bubbles: true, cancelable: true, pointerId: args.id, pointerType: 'touch', isPrimary: args.id === 1,
+        clientX: rect.left + args.x, clientY: rect.top + args.y, button: 0, buttons: args.type === 'pointerup' ? 0 : 1,
+      }));
+    }, { type, id, x, y });
+
+  const before = await readDocument();
+  expect(before?.viewport.zoom).toBe(1);
+  expect(before?.components).toHaveLength(1);
+  const startPosition = { x: before!.components[0]!.x, y: before!.components[0]!.y };
+
+  // Both fingers land on empty canvas, spread to twice the distance about their midpoint, then lift.
+  await touch('pointerdown', 1, 300, 300);
+  await touch('pointerdown', 2, 400, 300);
+  await touch('pointermove', 1, 250, 300);
+  await touch('pointermove', 2, 450, 300);
+  await touch('pointerup', 1, 250, 300);
+  await touch('pointerup', 2, 450, 300);
+  await expect.poll(async () => (await readDocument())?.viewport.zoom).toBeCloseTo(2, 5);
+  let after = await readDocument();
+  // The drawing point under the starting midpoint (350, 300) is still under it.
+  expect(after!.viewport.panX).toBeCloseTo(350 - 350 * 2, 4);
+  expect(after!.viewport.panY).toBeCloseTo(300 - 300 * 2, 4);
+
+  // Two fingers sliding together pan by the same amount and leave the zoom alone.
+  await touch('pointerdown', 1, 300, 300);
+  await touch('pointerdown', 2, 400, 300);
+  await touch('pointermove', 1, 340, 270);
+  await touch('pointermove', 2, 440, 270);
+  await touch('pointerup', 1, 340, 270);
+  await touch('pointerup', 2, 440, 270);
+  await expect.poll(async () => (await readDocument())?.viewport.panX).toBeCloseTo(after!.viewport.panX + 40, 5);
+  const panned = await readDocument();
+  expect(panned!.viewport.zoom).toBeCloseTo(2, 5);
+  expect(panned!.viewport.panY).toBeCloseTo(after!.viewport.panY - 30, 5);
+
+  // Fingers that land on the switch itself must not toggle, move, or select-drag it; nothing new appears either.
+  const switchScreen = { x: (6 + 0.25) * GRID * 2 + panned!.viewport.panX, y: 6 * GRID * 2 + panned!.viewport.panY };
+  await touch('pointerdown', 1, switchScreen.x, switchScreen.y);
+  await touch('pointerdown', 2, switchScreen.x + 90, switchScreen.y);
+  await touch('pointermove', 1, switchScreen.x + 30, switchScreen.y + 30);
+  await touch('pointermove', 2, switchScreen.x + 120, switchScreen.y + 30);
+  await touch('pointerup', 1, switchScreen.x + 30, switchScreen.y + 30);
+  await touch('pointerup', 2, switchScreen.x + 120, switchScreen.y + 30);
+  await expect.poll(async () => (await readDocument())?.viewport.panX).toBeCloseTo(panned!.viewport.panX + 30, 5);
+  after = await readDocument();
+  expect(after!.components).toHaveLength(1);
+  expect({ x: after!.components[0]!.x, y: after!.components[0]!.y }).toEqual(startPosition);
+});
+
 test('a click on the lower of two closely spaced switches selects that switch, not its neighbor', async ({ page }) => {
   await page.goto('./#/tools/digital-logic-workstation');
   await placeAt(page, 'SWITCH', 1, 1);

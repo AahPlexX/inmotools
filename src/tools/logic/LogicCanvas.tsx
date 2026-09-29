@@ -12,6 +12,7 @@ import { getComponentPorts } from './component-library';
 import { findComponentAt } from './gate-shapes';
 import { findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
 import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
+import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
 
@@ -82,6 +83,11 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const marqueeStartRef = useRef<ScreenPoint | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
+  /** Every finger currently on the canvas, by pointer id, so a second one can turn the gesture into a pan/zoom. */
+  const touchPointsRef = useRef(new Map<number, ScreenPoint>());
+  const pinchRef = useRef<PinchStart | null>(null);
+  /** A component drop started by a finger, held until that finger lifts so a pinch that follows it never drops one. */
+  const pendingTouchDropRef = useRef<{ pointerId: number; type: ComponentType; worldX: number; worldY: number } | null>(null);
 
   useEffect(() => {
     setDraftWire(null);
@@ -142,17 +148,63 @@ export function LogicCanvas(props: LogicCanvasProps) {
     }
   };
 
+  /**
+   * Drops whatever a single finger had started (a component drag, a held push
+   * button, a rubber-band box, a pending long press) so a second finger can
+   * take over as a pan/zoom. A drag already previewed on screen is put back
+   * where it began, so a pinch never leaves a component displaced.
+   */
+  const abandonSingleTouchGesture = () => {
+    clearLongPress();
+    pendingTouchDropRef.current = null;
+    const drag = dragRef.current;
+    if (drag) {
+      if (drag.moved) {
+        for (const id of drag.ids) {
+          const origin = drag.originals[id];
+          if (origin) onMoveComponent(id, origin.x, origin.y, false);
+        }
+      }
+      for (const id of drag.ids) {
+        if (doc.components.find((candidate) => candidate.id === id)?.type === 'PUSH_BUTTON') onPressButton(id, false);
+      }
+      dragRef.current = null;
+    }
+    marqueeStartRef.current = null;
+    setMarquee(null);
+  };
+
+  const touchPair = (): [ScreenPoint, ScreenPoint] | undefined => {
+    const points = Array.from(touchPointsRef.current.values());
+    return points.length >= 2 ? [points[0]!, points[1]!] : undefined;
+  };
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     setMenu(null);
     longPressFiredRef.current = false;
     const screenPoint = getScreenPoint(event);
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
 
+    // A second finger never clicks, drags, or wires on its own: together with
+    // the first it pans and zooms the view.
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.set(event.pointerId, screenPoint);
+      if (touchPointsRef.current.size >= 2) {
+        abandonSingleTouchGesture();
+        const pair = touchPair();
+        pinchRef.current = pair ? (beginPinch(pair[0], pair[1], doc.viewport) ?? null) : null;
+        return;
+      }
+    }
+
     if (placingType) {
       // Only the primary button places a component: a right-click would
       // otherwise both open a wire-cancel/context-menu gesture AND drop a
       // component, and a middle-click would drop one instead of panning.
-      if (event.button === 0) onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
+      if (event.button === 0) {
+        if (event.pointerType === 'touch') pendingTouchDropRef.current = { pointerId: event.pointerId, type: placingType, worldX: worldPoint.x / GRID_SIZE, worldY: worldPoint.y / GRID_SIZE };
+        else onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
+      }
       return;
     }
 
@@ -220,6 +272,18 @@ export function LogicCanvas(props: LogicCanvasProps) {
     const screenPoint = getScreenPoint(event);
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
 
+    if (event.pointerType === 'touch' && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, screenPoint);
+      const pair = touchPair();
+      if (pair) {
+        // Fingers that started too close together define no scale yet; retry as they spread.
+        if (!pinchRef.current) pinchRef.current = beginPinch(pair[0], pair[1], doc.viewport) ?? null;
+        if (pinchRef.current) onViewportChange(updatePinch(pinchRef.current, pair[0], pair[1]));
+        return;
+      }
+      if (pendingTouchDropRef.current?.pointerId === event.pointerId) return;
+    }
+
     if (panRef.current) {
       const dx = screenPoint.x - panRef.current.startScreen.x;
       const dy = screenPoint.y - panRef.current.startScreen.y;
@@ -281,6 +345,20 @@ export function LogicCanvas(props: LogicCanvasProps) {
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     clearLongPress();
+    if (event.pointerType === 'touch') {
+      const wasPinching = touchPointsRef.current.size >= 2;
+      touchPointsRef.current.delete(event.pointerId);
+      if (touchPointsRef.current.size < 2) pinchRef.current = null;
+      // Lifting a finger out of a two-finger gesture ends it; the finger left
+      // down must not then read as a tap, drag, or drop.
+      if (wasPinching) return;
+      const pendingDrop = pendingTouchDropRef.current;
+      if (pendingDrop?.pointerId === event.pointerId) {
+        pendingTouchDropRef.current = null;
+        if (event.type === 'pointerup') onDropComponent(pendingDrop.type, pendingDrop.worldX, pendingDrop.worldY);
+        return;
+      }
+    }
     if (panRef.current) { panRef.current = null; return; }
 
     if (dragRef.current) {
@@ -314,15 +392,17 @@ export function LogicCanvas(props: LogicCanvasProps) {
     setMarquee(null);
   };
 
+  /** The browser took the touch over (a system gesture, an incoming call): end it without acting on it. */
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    touchPointsRef.current.delete(event.pointerId);
+    if (touchPointsRef.current.size < 2) pinchRef.current = null;
+    abandonSingleTouchGesture();
+    panRef.current = null;
+  };
+
   const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    const screenPoint = getScreenPoint(event);
-    const worldBefore = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
-    const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
-    const zoom = Math.min(3, Math.max(0.25, doc.viewport.zoom * factor));
-    const panX = screenPoint.x - worldBefore.x * zoom;
-    const panY = screenPoint.y - worldBefore.y * zoom;
-    onViewportChange({ zoom, panX, panY });
+    onViewportChange(zoomViewportAt(doc.viewport, getScreenPoint(event), event.deltaY < 0 ? 1.12 : 1 / 1.12));
   };
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -340,6 +420,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onPointerLeave={handlePointerUp}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}

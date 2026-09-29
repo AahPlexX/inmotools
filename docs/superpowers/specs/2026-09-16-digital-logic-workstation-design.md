@@ -74,7 +74,7 @@ The simulation engine consumes only the component/net graph (never React state) 
 Every item below is a required, functional (non-decorative) capability. Each is tagged with the phase in the accompanying plan that delivers it; nothing here is dropped, only sequenced. "Traditional" tool comparisons (Logisim-evolution, CircuitVerse, Digital, KiCad, LTspice, EasyEDA, Tinkercad, Proteus) are the baseline this ledger is required to meet or exceed for the digital-logic domain; the word "AI" never appears in shipped copy.
 
 ### Core canvas & schematic capture
-1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1)*
+1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1; two-finger touch pan and pinch delivered in 2D)*
 2. Deterministic orthogonal wire routing with automatic T-junction joint dots; left-click commits a waypoint, right-click/Escape cancels the in-progress wire, and a floating "Cancel route" chip appears near the touch point on touch devices. *(Phase 1)*
 3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3)*
 4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3)*
