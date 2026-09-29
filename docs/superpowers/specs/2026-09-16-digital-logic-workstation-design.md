@@ -76,7 +76,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 ### Core canvas & schematic capture
 1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1; two-finger touch pan and pinch delivered in 2D)*
 2. Deterministic orthogonal wire routing with automatic T-junction joint dots; left-click commits a waypoint, right-click/Escape cancels the in-progress wire, and a floating "Cancel route" chip appears near the touch point on touch devices. *(Phase 1)*
-3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3)*
+3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3; delivered in 3E)*
 4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3)*
 5. Universal logic-gate primitive suite: AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer, tri-state buffer, each configurable from 2–8 inputs from the inspector without losing existing wiring. *(Phase 1)*
 6. Configurable propagation delay / real-world gate physics: an ideal zero-delay mode and a realistic per-gate nanosecond-delay mode that exposes glitch/hazard/race behavior. *(Phase 1)*

@@ -56,7 +56,7 @@ Delivers ledger items 9 (deferred to Phase 3 — memory needs the bus work first
 
 Delivers ledger items 3, 4, 9, 13, 16, 21, 23, 24, and the remaining part of 27 (full keyboard remapping UI).
 
-- Multi-bit bus wire type, bus splitter/tap components, per-bit and aggregate value readouts.
+- ~~Multi-bit bus wire type, bus splitter/tap components, per-bit and aggregate value readouts.~~ Delivered in 3E (below).
 - Subcircuit packaging: selection → named subcircuit with port map and custom icon; breadcrumb navigation; nested `LogicDocument` persistence.
 - RAM/ROM component with hex/ASCII editor and binary import (depends on the bus work landing first, since address/data buses are its interface).
 - RGB LED pixel-matrix component.
@@ -65,6 +65,7 @@ Delivers ledger items 3, 4, 9, 13, 16, 21, 23, 24, and the remaining part of 27 
 - **Delivered (Phase 3B):** gamified puzzle engine with an 11-level built-in set verified against target truth tables through the simulator (`puzzle-engine.ts`, `LogicPuzzleDock.tsx`).
 - **Delivered (Phase 3C):** the Junior Explorer elementary theme: large-format, family-color-coded, animated signal flow, one-click swap in and out (`render-engine.ts` palette extensions, `LogicWorkspace`/`.css`).
 - **Delivered (Phase 3D):** full keyboard-shortcut remapping on top of the Phase 1 default bindings, with conflict and reserved-key checks and local persistence (`shortcut-engine.ts`, `LogicShortcutsDock.tsx`).
+- **Delivered (Phase 3E):** multi-bit buses (`bus-engine.ts`, `BUS_SPLITTER`, bus pins on REGISTER/COUNTER via the "Bus pins" inspector option). The simulator stays scalar: a bus port is a handle over per-bit pins, `buildNetIndex` unions bus bit groups pairwise, and splitter tap pins are aliases of the bus bits. Bus-to-single and width-mismatched wires are refused with a spoken reason (`wireProblem`, notice in the workspace); resizing a bus drops wires that no longer fit; imported files that join mismatched ends are rejected. Bus wires draw thick with a slash-and-count mark on the canvas and in the SVG export; hover (or touch hold) on a bus pin reads it as `Q[3:0] = 0101 (0x5, 5)`. Later phases build on it: the ALU and memory in 3F use bus ports for their operands, address, and data.
 
 **Gate:** same shape as prior phases; subcircuit and bus changes require additional unit coverage for nested-document persistence and bus-width mismatch handling.
 

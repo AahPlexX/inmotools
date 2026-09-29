@@ -1,4 +1,4 @@
-import { getComponentPorts } from './component-library';
+import { getSimulationPorts } from './component-library';
 import { DELAY_SCALE_NS } from './sim-engine';
 import { portKey, type DelayMode, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
@@ -41,7 +41,7 @@ export const channelCandidates = (document: LogicDocument): ChannelCandidate[] =
   const probes: ChannelCandidate[] = [];
   const signals: ChannelCandidate[] = [];
   for (const component of document.components) {
-    const ports = getComponentPorts(component.type, component.params);
+    const ports = getSimulationPorts(component.type, component.params);
     if (isObserver(component.type)) {
       probes.push({ key: portKey(component.id, 'A'), label: component.label, kind: 'probe' });
       continue;

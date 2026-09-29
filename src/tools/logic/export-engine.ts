@@ -1,3 +1,4 @@
+import { isBusPort, portWidth } from './bus-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { isDisplayType } from './display-engine';
 import { digitGeometries } from './segment-shapes';
@@ -95,7 +96,11 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
     const position = portAbsolutePosition(component, port);
     const px = svgNum(position.x + offsetX);
     const py = svgNum(position.y + offsetY);
-    parts.push(`<circle cx="${px}" cy="${py}" r="2.5" fill="${port.direction === 'output' ? '#0f766e' : '#1f2933'}" />`);
+    const pinFill = port.direction === 'output' ? '#0f766e' : '#1f2933';
+    // A bus pin is a square, as on the canvas, so a multi-bit connection is recognisable in print without color.
+    parts.push(isBusPort(port)
+      ? `<rect x="${svgNum(position.x + offsetX - 3.5)}" y="${svgNum(position.y + offsetY - 3.5)}" width="7" height="7" fill="${pinFill}" />`
+      : `<circle cx="${px}" cy="${py}" r="2.5" fill="${pinFill}" />`);
     parts.push(`<text x="${px + (port.x > 0 ? 6 : -6)}" y="${py - 6}" font-size="9" text-anchor="${port.x > 0 ? 'start' : 'end'}" fill="#52606d">${escapeXml(port.label)}</text>`);
   }
   const labelAnchor = componentLabelAnchor(component, ports);
@@ -127,7 +132,18 @@ export const renderSchematicSvg = (document: LogicDocument): string => {
     const end = portAbsolutePosition(toComponent, toPort);
     const allPoints = [start, ...wire.waypoints, end];
     const pointsAttribute = allPoints.map((point) => `${svgNum(point.x + offsetX)},${svgNum(point.y + offsetY)}`).join(' ');
-    parts.push(`<polyline points="${pointsAttribute}" fill="none" stroke="#1f2933" stroke-width="1.5" />`);
+    const busWidth = portWidth(fromPort);
+    parts.push(`<polyline points="${pointsAttribute}" fill="none" stroke="#1f2933" stroke-width="${busWidth > 1 ? 4 : 1.5}" />`);
+    if (busWidth > 1) {
+      // The slash-and-count mark that engineers draw on a bus, placed on the wire's middle segment.
+      const middle = Math.floor((allPoints.length - 1) / 2);
+      const a = allPoints[middle]!;
+      const b = allPoints[middle + 1]!;
+      const mx = (a.x + b.x) / 2 + offsetX;
+      const my = (a.y + b.y) / 2 + offsetY;
+      parts.push(`<line x1="${svgNum(mx - 4)}" y1="${svgNum(my + 6)}" x2="${svgNum(mx + 4)}" y2="${svgNum(my - 6)}" stroke="#ffffff" stroke-width="1.5" />`);
+      parts.push(`<text x="${svgNum(mx)}" y="${svgNum(my - 8)}" font-size="9" text-anchor="middle" fill="#1f2933">${busWidth}</text>`);
+    }
     for (const point of wire.waypoints) parts.push(`<circle cx="${svgNum(point.x + offsetX)}" cy="${svgNum(point.y + offsetY)}" r="2" fill="#1f2933" />`);
   }
 
@@ -157,7 +173,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG',
-  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT',
+  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);
@@ -235,8 +251,11 @@ const isValidLogicDocument = (value: unknown): value is LogicDocument => {
     if (!fromComponent || !toComponent) return false;
     const fromPorts = getComponentPorts(fromComponent.type, fromComponent.params);
     const toPorts = getComponentPorts(toComponent.type, toComponent.params);
-    if (!fromPorts.some((port) => port.id === wire.from.portId)) return false;
-    if (!toPorts.some((port) => port.id === wire.to.portId)) return false;
+    const fromPort = fromPorts.find((port) => port.id === wire.from.portId);
+    const toPort = toPorts.find((port) => port.id === wire.to.portId);
+    if (!fromPort || !toPort) return false;
+    // A hand-edited file must not join a bus to a single pin or to a bus of another width.
+    if (isBusPort(fromPort) !== isBusPort(toPort) || portWidth(fromPort) !== portWidth(toPort)) return false;
   }
 
   return true;

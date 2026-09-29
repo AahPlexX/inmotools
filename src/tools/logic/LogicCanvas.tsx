@@ -8,9 +8,11 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
+import { busLevels, describeBus } from './bus-engine';
 import { getComponentPorts } from './component-library';
 import { findComponentAt } from './gate-shapes';
 import { findPortAt, orthogonalWaypoints, portAbsolutePosition, GRID_SIZE } from './geometry';
+import { readLevel } from './sim-engine';
 import { renderScene, screenToWorld, snapToGrid, THEME_PALETTES, type DraftWire } from './render-engine';
 import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
@@ -96,6 +98,9 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const touchPointsRef = useRef(new Map<number, ScreenPoint>());
   const pinchRef = useRef<PinchStart | null>(null);
   /** A component drop started by a finger, held until that finger lifts so a pinch that follows it never drops one. */
+  /** A wire action on a bus pin that a touch has started but not yet finished (see the hold-to-read handling). */
+  const pendingPortTapRef = useRef<{ activate: () => void } | null>(null);
+  const tooltipTimerRef = useRef<number | null>(null);
   const pendingTouchDropRef = useRef<{ pointerId: number; type: ComponentType; worldX: number; worldY: number } | null>(null);
 
   useEffect(() => {
@@ -166,6 +171,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const abandonSingleTouchGesture = () => {
     clearLongPress();
     pendingTouchDropRef.current = null;
+    pendingPortTapRef.current = null;
     const drag = dragRef.current;
     if (drag) {
       if (drag.moved) {
@@ -186,6 +192,13 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const touchPair = (): [ScreenPoint, ScreenPoint] | undefined => {
     const points = Array.from(touchPointsRef.current.values());
     return points.length >= 2 ? [points[0]!, points[1]!] : undefined;
+  };
+
+  /** What hovering (or, on touch, holding) a pin says: the part, the pin, and for a bus its value in binary, hex, and decimal. */
+  const portTooltip = (component: LogicDocument['components'][number] | undefined, portDef: ReturnType<typeof getComponentPorts>[number] | undefined, portId: string): string => {
+    const base = `${component?.label ?? ''} · pin ${portDef?.label ?? portId}`;
+    if (!component || !portDef?.bus) return base;
+    return `${component.label} · ${describeBus(portDef.id, busLevels(portDef, (pin) => readLevel(frame, component.id, pin)))}`;
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -231,17 +244,36 @@ export function LogicCanvas(props: LogicCanvasProps) {
 
     const port = portAt(worldPoint);
     if (port) {
-      if (draftWire) {
-        if (draftWire.from.componentId !== port.componentId || draftWire.from.portId !== port.portId) {
-          const targetComponent = doc.components.find((candidate) => candidate.id === port.componentId);
-          const targetPort = targetComponent ? getComponentPorts(targetComponent.type, targetComponent.params).find((candidate) => candidate.id === port.portId) : undefined;
-          const endPosition = targetComponent && targetPort ? portAbsolutePosition(targetComponent, targetPort) : worldPoint;
-          onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId }, orthogonalWaypoints(draftWire.fromPosition, endPosition));
+      const activate = () => {
+        if (draftWire) {
+          if (draftWire.from.componentId !== port.componentId || draftWire.from.portId !== port.portId) {
+            const targetComponent = doc.components.find((candidate) => candidate.id === port.componentId);
+            const targetPort = targetComponent ? getComponentPorts(targetComponent.type, targetComponent.params).find((candidate) => candidate.id === port.portId) : undefined;
+            const endPosition = targetComponent && targetPort ? portAbsolutePosition(targetComponent, targetPort) : worldPoint;
+            onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId }, orthogonalWaypoints(draftWire.fromPosition, endPosition));
+          }
+          setDraftWire(null);
+        } else {
+          setDraftWire({ from: { componentId: port.componentId, portId: port.portId }, fromPosition: worldPoint, waypoints: [], cursor: worldPoint });
         }
-        setDraftWire(null);
-      } else {
-        setDraftWire({ from: { componentId: port.componentId, portId: port.portId }, fromPosition: worldPoint, waypoints: [], cursor: worldPoint });
+      };
+      const owner = doc.components.find((candidate) => candidate.id === port.componentId);
+      const definition = owner ? getComponentPorts(owner.type, owner.params).find((candidate) => candidate.id === port.portId) : undefined;
+      if (event.pointerType === 'touch' && definition?.bus) {
+        // On touch there is no hover, so a bus pin's value is shown by holding it. A quick tap still wires, but
+        // only once the finger lifts, so a hold never also starts or finishes a wire.
+        pendingPortTapRef.current = { activate };
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressFiredRef.current = true;
+          pendingPortTapRef.current = null;
+          const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y - 48, size.width, size.height);
+          setTooltip({ x: clamped.x, y: clamped.y, text: portTooltip(owner, definition, port.portId) });
+          if (tooltipTimerRef.current !== null) window.clearTimeout(tooltipTimerRef.current);
+          tooltipTimerRef.current = window.setTimeout(() => setTooltip(null), 3500);
+        }, LONG_PRESS_MS);
+        return;
       }
+      activate();
       return;
     }
 
@@ -340,7 +372,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
         const component = doc.components.find((candidate) => candidate.id === port.componentId);
         const portDef = component ? getComponentPorts(component.type, component.params).find((candidate) => candidate.id === port.portId) : undefined;
         const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y + 14, size.width, size.height);
-        setTooltip({ x: clamped.x, y: clamped.y, text: `${component?.label ?? ''} · pin ${portDef?.label ?? port.portId}` });
+        setTooltip({ x: clamped.x, y: clamped.y, text: portTooltip(component, portDef, port.portId) });
       }
       return;
     }
@@ -361,6 +393,12 @@ export function LogicCanvas(props: LogicCanvasProps) {
       // Lifting a finger out of a two-finger gesture ends it; the finger left
       // down must not then read as a tap, drag, or drop.
       if (wasPinching) return;
+      const pendingTap = pendingPortTapRef.current;
+      pendingPortTapRef.current = null;
+      if (pendingTap && event.type === 'pointerup' && !longPressFiredRef.current) {
+        pendingTap.activate();
+        return;
+      }
       const pendingDrop = pendingTouchDropRef.current;
       if (pendingDrop?.pointerId === event.pointerId) {
         pendingTouchDropRef.current = null;
@@ -406,6 +444,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
     touchPointsRef.current.delete(event.pointerId);
     if (touchPointsRef.current.size < 2) pinchRef.current = null;
     abandonSingleTouchGesture();
+    pendingPortTapRef.current = null;
     panRef.current = null;
   };
 

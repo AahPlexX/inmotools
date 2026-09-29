@@ -1,9 +1,10 @@
 import { blockPorts, defaultSelectBits, isBlockType, type BlockType } from './block-engine';
+import { busLabel, clampBusWidth } from './bus-engine';
 import { displayPorts, type DisplayType } from './display-engine';
 import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -73,6 +74,22 @@ const flipFlopPorts = (clockLabel: string, dataInputs: string[]): PortDefinition
   { id: 'QN', direction: 'output', label: 'QN', x: 2, y: 1 },
 ];
 
+/**
+ * A bus splitter joins one bus to its single bits: bit `i` of the bus port `B` and the tap `Si` are the same
+ * net. Every pin is passive, so the part works in either direction: drive the taps to gather a bus, or drive
+ * the bus to fan it out. The bus's own bits are hidden pins the netlist ties to the taps.
+ */
+const splitterPorts = (params: ComponentParams): PortDefinition[] => {
+  const width = clampBusWidth(params.busWidth);
+  const busBits = Array.from({ length: width }, (_, index) => `B${index}`);
+  const busY = Math.floor((width - 1) / 2);
+  return [
+    { id: 'B', direction: 'passive', label: busLabel('B', width), x: 0, y: busY, bus: { bits: busBits } },
+    ...Array.from({ length: width }, (_, index): PortDefinition => ({ id: `S${index}`, direction: 'passive', label: `S${index}`, x: 3, y: index })),
+    ...busBits.map((id, index): PortDefinition => ({ id, direction: 'passive', label: id, x: 0, y: busY, hidden: true, alias: `S${index}` })),
+  ];
+};
+
 const blockDefinition = (type: BlockType, label: string, extra: ComponentParams = {}): ComponentDefinition => ({
   type,
   label,
@@ -137,10 +154,22 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   SEVEN_SEGMENT: displayDefinition('SEVEN_SEGMENT', '7-segment display'),
   SEVEN_SEGMENT_4: displayDefinition('SEVEN_SEGMENT_4', 'Multiplexed 4-digit display'),
   SIXTEEN_SEGMENT: displayDefinition('SIXTEEN_SEGMENT', '16-segment display'),
+  BUS_SPLITTER: { type: 'BUS_SPLITTER', label: 'Bus splitter', category: 'bus', defaultParams: { busWidth: 4 }, ports: splitterPorts },
 };
 
+/**
+ * The pins a person can see and wire: every pin that is not hidden, plus bus ports. This is what the renderers,
+ * hit-testing, and the wiring rules work with.
+ */
 export const getComponentPorts = (type: ComponentType, params: ComponentParams): readonly PortDefinition[] =>
-  COMPONENT_LIBRARY[type].ports(params);
+  COMPONENT_LIBRARY[type].ports(params).filter((port) => port.hidden !== true);
+
+/**
+ * The single pins the simulator drives and reads: every pin except bus ports, which are only handles that stand
+ * for a group of these. Hidden pins are included.
+ */
+export const getSimulationPorts = (type: ComponentType, params: ComponentParams): readonly PortDefinition[] =>
+  COMPONENT_LIBRARY[type].ports(params).filter((port) => port.bus === undefined);
 
 export const isVariadicGate = (type: ComponentType): boolean =>
   type === 'AND' || type === 'OR' || type === 'NAND' || type === 'NOR' || type === 'XOR' || type === 'XNOR';
@@ -160,6 +189,7 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG'] },
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
   { category: 'register', label: 'Counters & registers', types: ['COUNTER', 'REGISTER'] },
+  { category: 'bus', label: 'Buses', types: ['BUS_SPLITTER'] },
   { category: 'display', label: 'Segment displays', types: ['SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];
@@ -169,6 +199,7 @@ const PALETTE_LABELS: Readonly<Partial<Record<ComponentType, string>>> = {
   SEVEN_SEGMENT: '7-SEGMENT',
   SEVEN_SEGMENT_4: '4-DIGIT 7-SEG',
   SIXTEEN_SEGMENT: '16-SEGMENT',
+  BUS_SPLITTER: 'BUS SPLITTER',
 };
 
 /** The name shown on a palette button, in the inspector heading, and in placement hints. */

@@ -571,3 +571,44 @@ test('collapses the palette and inspector into slide-over sheets on a narrow vie
   await page.getByLabel('Close inspector').click();
   await expect(inspector).not.toHaveClass(/sheet-open/);
 });
+
+test('a bus of one width cannot be wired to a bus of another, says why, and a matching pair wires and exports as a bus', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Buses' })).toBeVisible();
+
+  await placeAt(page, 'BUS SPLITTER', 2, 2);
+  await placeAt(page, 'BUS SPLITTER', 10, 2);
+
+  // Make the second splitter 8 bits wide from the inspector.
+  await page.getByTestId('logic-canvas').click({ position: { x: 11.5 * GRID, y: 3 * GRID } });
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const inspector = page.locator('.logic-inspector-shell');
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  await expect(inspector.getByRole('heading', { name: 'BUS SPLITTER' })).toBeVisible();
+  await inspector.getByLabel('Bus width').selectOption('8');
+  if (isSheet) await page.getByLabel('Close inspector').click();
+
+  // 4-bit bus pin at (2,3) to the 8-bit bus pin at (10,5): refused, with the reason on screen.
+  await wire(page, { x: 2 * GRID, y: 3 * GRID }, { x: 10 * GRID, y: 5 * GRID });
+  await expect(page.getByTestId('logic-notice')).toContainText('Bus widths differ');
+
+  // Match the widths and the same connection goes through.
+  await page.getByTestId('logic-canvas').click({ position: { x: 11.5 * GRID, y: 3 * GRID } });
+  if (isSheet) await inspectToggle.click();
+  await inspector.getByLabel('Bus width').selectOption('4');
+  if (isSheet) await page.getByLabel('Close inspector').click();
+  await wire(page, { x: 2 * GRID, y: 3 * GRID }, { x: 10 * GRID, y: 3 * GRID });
+  await expect(page.getByTestId('logic-notice')).toHaveCount(0);
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SVG' }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const svg = Buffer.concat(chunks).toString('utf8');
+  expect(svg).toMatch(/<polyline [^>]*stroke-width="4"/);
+});

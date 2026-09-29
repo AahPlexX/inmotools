@@ -1,5 +1,6 @@
 import { evaluateBlock, isBlockType } from './block-engine';
-import { getComponentPorts, isSequential } from './component-library';
+import { portBits } from './bus-engine';
+import { getComponentPorts, getSimulationPorts, isSequential } from './component-library';
 import { isDisplayType, restoreSegmentLit, updateSegmentLit } from './display-engine';
 import { bitWidthOf, isRegisterType, registerOutputs, restoreRegisterRuntime, stepRegister } from './register-engine';
 import {
@@ -46,7 +47,7 @@ export interface NetIndex {
 
 const buildComponentPortMap = (components: readonly ComponentInstance[]): Map<string, readonly PortDefinition[]> => {
   const map = new Map<string, readonly PortDefinition[]>();
-  for (const component of components) map.set(component.id, getComponentPorts(component.type, component.params));
+  for (const component of components) map.set(component.id, getSimulationPorts(component.type, component.params));
   return map;
 };
 
@@ -73,20 +74,37 @@ export const buildNetIndex = (components: readonly ComponentInstance[], wires: r
     if (rootA !== rootB) parent.set(rootB, rootA);
   };
 
+  // The pins a person can wire, by component: a wire endpoint may name a bus port, which the simulator never sees.
+  const visiblePorts = new Map<string, ReadonlyMap<string, PortDefinition>>();
+  const aliases: (readonly [PortKey, PortKey])[] = [];
   for (const component of components) {
     const ports = portMap.get(component.id) ?? [];
     for (const port of ports) {
       const key = portKey(component.id, port.id);
       parent.set(key, key);
-      directionOf.set(key, port.direction);
+      // Passive pins (a bus splitter's) neither drive nor load a net, so they have no direction to record.
+      if (port.direction !== 'passive') directionOf.set(key, port.direction);
+      if (port.alias !== undefined) aliases.push([key, portKey(component.id, port.alias)]);
     }
+    visiblePorts.set(component.id, new Map(getComponentPorts(component.type, component.params).map((port) => [port.id, port] as const)));
   }
 
+  // A part's own permanent joins (a splitter's bus bit and its tap are one net).
+  for (const [a, b] of aliases) if (parent.has(a) && parent.has(b)) union(a, b);
+
   for (const wire of wires) {
-    const fromKey = portKey(wire.from.componentId, wire.from.portId);
-    const toKey = portKey(wire.to.componentId, wire.to.portId);
-    if (!parent.has(fromKey) || !parent.has(toKey)) continue;
-    union(fromKey, toKey);
+    const fromPort = visiblePorts.get(wire.from.componentId)?.get(wire.from.portId);
+    const toPort = visiblePorts.get(wire.to.componentId)?.get(wire.to.portId);
+    if (!fromPort || !toPort) continue;
+    // A single pin is a one-bit "bus"; a bus wire joins its two groups bit by bit. Mismatched widths join nothing.
+    const fromBits = portBits(fromPort);
+    const toBits = portBits(toPort);
+    if (fromBits.length !== toBits.length) continue;
+    fromBits.forEach((bit, index) => {
+      const fromKey = portKey(wire.from.componentId, bit);
+      const toKey = portKey(wire.to.componentId, toBits[index]!);
+      if (parent.has(fromKey) && parent.has(toKey)) union(fromKey, toKey);
+    });
   }
 
   const members = new Map<PortKey, PortKey[]>();
@@ -178,7 +196,7 @@ export const createInitialFrame = (document: LogicDocument): SimulationFrame => 
   const levels: Record<PortKey, LogicLevel> = {};
   const state: Record<string, ComponentRuntimeState> = {};
   for (const component of document.components) {
-    for (const port of getComponentPorts(component.type, component.params)) {
+    for (const port of getSimulationPorts(component.type, component.params)) {
       levels[portKey(component.id, port.id)] = 'Z';
     }
     if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON') {

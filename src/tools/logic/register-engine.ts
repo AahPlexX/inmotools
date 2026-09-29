@@ -1,4 +1,5 @@
 import { BLOCK_WIDTH_COLS } from './block-engine';
+import { busLabel } from './bus-engine';
 import type { ComponentParams, ComponentType, LogicLevel, PortDefinition } from './logic-types';
 
 /**
@@ -54,9 +55,15 @@ const rightPin = (id: string, y: number): PortDefinition => ({ id, direction: 'o
 /**
  * Control pins sit above the data pins on the left edge; the count/data bits
  * run down the right edge, with the terminal-count flag under the last bit.
+ *
+ * With `busPins` on, the data inputs (D) and the outputs (Q) are each one bus
+ * port instead of one pin per bit. The single-bit pins still exist, hidden, so
+ * the simulator and the analyzer keep working on them; the bus port is a
+ * wireable handle that joins them to another bus bit by bit.
  */
 export const registerPorts = (type: RegisterType, params: ComponentParams): readonly PortDefinition[] => {
   const width = bitWidthOf(params);
+  const useBus = params.busPins === true;
   const left: PortDefinition[] = [];
   const push = (id: string): void => {
     left.push(leftPin(id, left.length));
@@ -65,11 +72,31 @@ export const registerPorts = (type: RegisterType, params: ComponentParams): read
   if (hasEnablePin(params)) push('EN');
   push('RST');
   if (hasLoadPin(type, params)) push('LOAD');
-  if (hasDataPins(type, params)) for (const index of range(width)) push(`D${index}`);
 
-  const right: PortDefinition[] = range(width).map((index) => rightPin(`Q${index}`, index));
-  if (type === 'COUNTER') right.push(rightPin('TC', width));
-  return [...left, ...right];
+  const dataBits = hasDataPins(type, params) ? range(width).map((index) => `D${index}`) : [];
+  const outputBits = range(width).map((index) => `Q${index}`);
+  const hidden: PortDefinition[] = [];
+
+  if (useBus) {
+    if (dataBits.length > 0) {
+      const y = left.length;
+      left.push({ id: 'D', direction: 'input', label: busLabel('D', width), x: 0, y, bus: { bits: dataBits } });
+      for (const id of dataBits) hidden.push({ id, direction: 'input', label: id, x: 0, y, hidden: true });
+    }
+  } else {
+    for (const id of dataBits) push(id);
+  }
+
+  const right: PortDefinition[] = [];
+  if (useBus) {
+    right.push({ id: 'Q', direction: 'output', label: busLabel('Q', width), x: BLOCK_WIDTH_COLS, y: 0, bus: { bits: outputBits } });
+    for (const id of outputBits) hidden.push({ id, direction: 'output', label: id, x: BLOCK_WIDTH_COLS, y: 0, hidden: true });
+    if (type === 'COUNTER') right.push(rightPin('TC', 1));
+  } else {
+    right.push(...outputBits.map((id, index) => rightPin(id, index)));
+    if (type === 'COUNTER') right.push(rightPin('TC', width));
+  }
+  return [...left, ...right, ...hidden];
 };
 
 /** Short caption drawn above the body, such as `CTR 4b UP` or `REG 8b`. */

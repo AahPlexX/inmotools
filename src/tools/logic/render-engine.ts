@@ -1,3 +1,4 @@
+import { aggregateLevel, busLevels, portWidth } from './bus-engine';
 import { COMPONENT_LIBRARY, getComponentPorts, type ComponentCategory } from './component-library';
 import { isDisplayType, restoreSegmentLit, segmentIdsOf, type DisplayType } from './display-engine';
 import { digitGeometries } from './segment-shapes';
@@ -47,7 +48,7 @@ export const THEME_PALETTES: Readonly<Record<ThemeName, ThemePalette>> = {
     levelHigh: '#16a34a', levelLow: '#2563eb', levelFloating: '#9ca3af', levelContention: '#dc2626',
     emphasis: 1.5,
     flow: true,
-    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a' },
+    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe' },
   },
   'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#b35a00', levelFloating: '#999999', levelContention: '#d55e00' },
 };
@@ -319,14 +320,31 @@ const drawDisplayGlyphs = (ctx: CanvasRenderingContext2D, palette: ThemePalette,
   }
 };
 
+/**
+ * The level a pin is drawn with. A bus port has no level of its own: it stands for a group of pins, so it is
+ * drawn with one level summarizing them (unknown beats floating beats a good value).
+ */
+const portLevel = (frame: SimulationFrame, component: ComponentInstance, port: PortDefinition): LogicLevel =>
+  port.bus ? aggregateLevel(busLevels(port, (pin) => readLevel(frame, component.id, pin))) : readLevel(frame, component.id, port.id);
+
+/** A bus carries many values at once, so a good one is drawn in the outline color rather than as a single high or low. */
+const busColor = (palette: ThemePalette, level: LogicLevel): string => (level === 1 ? palette.componentStroke : levelColor(palette, level));
+
 const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[], frame: SimulationFrame, hoverPort: PortRef | undefined): void => {
   for (const port of ports) {
     const position = portAbsolutePosition(component, port);
-    const level = readLevel(frame, component.id, port.id);
+    const level = portLevel(frame, component, port);
     const isHovered = hoverPort?.componentId === component.id && hoverPort.portId === port.id;
     ctx.beginPath();
-    ctx.fillStyle = levelColor(palette, level);
-    ctx.arc(position.x, position.y, (isHovered ? 6 : 3.5) * emphasisOf(palette), 0, Math.PI * 2);
+    if (port.bus) {
+      // A bus pin is a square, so it reads as "many wires" and can be told from a single pin at a glance.
+      const half = (isHovered ? 6.5 : 5) * emphasisOf(palette);
+      ctx.fillStyle = busColor(palette, level);
+      ctx.rect(position.x - half, position.y - half, half * 2, half * 2);
+    } else {
+      ctx.fillStyle = levelColor(palette, level);
+      ctx.arc(position.x, position.y, (isHovered ? 6 : 3.5) * emphasisOf(palette), 0, Math.PI * 2);
+    }
     ctx.fill();
     if (isHovered) {
       ctx.beginPath();
@@ -338,6 +356,37 @@ const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, compone
   }
 };
 
+/**
+ * The conventional bus mark: a short slash across the wire with the bit count beside it, placed at the middle of
+ * the wire's longest run so it stays readable on a wire with several bends.
+ */
+const drawBusMark = (ctx: CanvasRenderingContext2D, palette: ThemePalette, points: readonly Point[], width: number): void => {
+  let best = { length: -1, from: points[0]!, to: points[points.length - 1]! };
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1]!;
+    const to = points[index]!;
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    if (length > best.length) best = { length, from, to };
+  }
+  if (best.length < 24) return;
+  const cx = (best.from.x + best.to.x) / 2;
+  const cy = (best.from.y + best.to.y) / 2;
+  const scale = emphasisOf(palette);
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = palette.componentStroke;
+  ctx.lineWidth = 1.6 * scale;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * scale, cy + 7 * scale);
+  ctx.lineTo(cx + 5 * scale, cy - 7 * scale);
+  ctx.stroke();
+  ctx.fillStyle = palette.label;
+  ctx.font = `bold ${10 * fontScaleOf(palette)}px ui-monospace, monospace`;
+  ctx.textAlign = 'left';
+  ctx.fillText(String(width), cx + 8 * scale, cy - 6 * scale);
+  ctx.restore();
+};
+
 const drawWire = (ctx: CanvasRenderingContext2D, palette: ThemePalette, document: LogicDocument, frame: SimulationFrame, wire: Wire, animationTime: number | undefined): void => {
   const fromComponent = document.components.find((component) => component.id === wire.from.componentId);
   const toComponent = document.components.find((component) => component.id === wire.to.componentId);
@@ -347,15 +396,24 @@ const drawWire = (ctx: CanvasRenderingContext2D, palette: ThemePalette, document
   if (!fromPort || !toPort) return;
   const start = portAbsolutePosition(fromComponent, fromPort);
   const end = portAbsolutePosition(toComponent, toPort);
-  const level = readLevel(frame, wire.from.componentId, wire.from.portId);
-  setLevelLineStyle(ctx, palette, level);
+  const isBus = fromPort.bus !== undefined || toPort.bus !== undefined;
+  const level = portLevel(frame, fromComponent, fromPort);
+  if (isBus) {
+    // A bus wire is heavier than a single wire; its color reports the bus as a whole (see `busColor`).
+    setLevelLineStyle(ctx, palette, level);
+    ctx.strokeStyle = busColor(palette, level);
+    ctx.lineWidth = 3.6 * emphasisOf(palette);
+  } else {
+    setLevelLineStyle(ctx, palette, level);
+  }
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
   for (const point of wire.waypoints) ctx.lineTo(point.x, point.y);
   ctx.lineTo(end.x, end.y);
   ctx.stroke();
+  if (isBus) drawBusMark(ctx, palette, [start, ...wire.waypoints, end], portWidth(fromPort));
   // Themes that ask for it show a high signal as light dashes travelling from the driver to the load.
-  if (palette.flow && level === 1 && animationTime !== undefined) {
+  if (!isBus && palette.flow && level === 1 && animationTime !== undefined) {
     ctx.save();
     ctx.strokeStyle = '#ffffff';
     ctx.globalAlpha = 0.85;

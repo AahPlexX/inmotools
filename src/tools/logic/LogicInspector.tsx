@@ -1,4 +1,5 @@
 import { blockSizeLabel, hasSelectableSize, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
+import { clampBusWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
 import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
 import { isDisplayType } from './display-engine';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
@@ -91,8 +92,23 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </label>
       ) : null}
 
+      {component.type === 'BUS_SPLITTER' ? (
+        <label className="logic-field">
+          <span>Bus width</span>
+          <select value={clampBusWidth(component.params.busWidth)} onChange={(event) => onUpdateParams(component.id, { busWidth: Number(event.target.value) })}>
+            {Array.from({ length: MAX_BUS_WIDTH - MIN_BUS_WIDTH + 1 }, (_, index) => MIN_BUS_WIDTH + index).map((bits) => (
+              <option key={bits} value={bits}>{bits} bits</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
       {isRegisterType(component.type) ? (
         <>
+          <label className="logic-field logic-field-inline">
+            <input type="checkbox" checked={component.params.busPins === true} onChange={(event) => onUpdateParams(component.id, { busPins: event.target.checked })} />
+            <span>Bus pins (D and Q as single buses)</span>
+          </label>
           <label className="logic-field">
             <span>Width</span>
             <select value={bitWidthOf(component.params)} onChange={(event) => onUpdateParams(component.id, { bitWidth: Number(event.target.value) })}>
@@ -165,7 +181,7 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </>
       ) : null}
 
-      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && !isRegisterType(component.type) && !isDisplayType(component.type) ? (
+      {component.type !== 'SWITCH' && component.type !== 'PUSH_BUTTON' && component.type !== 'LED' && component.type !== 'PROBE' && component.type !== 'CLOCK' && component.type !== 'BUS_SPLITTER' && !isRegisterType(component.type) && !isDisplayType(component.type) ? (
         <label className="logic-field">
           <span>Propagation delay (ns)</span>
           <input

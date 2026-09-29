@@ -28,9 +28,14 @@ export type ComponentType =
   | 'REGISTER'
   | 'SEVEN_SEGMENT'
   | 'SEVEN_SEGMENT_4'
-  | 'SIXTEEN_SEGMENT';
+  | 'SIXTEEN_SEGMENT'
+  | 'BUS_SPLITTER';
 
-export type PortDirection = 'input' | 'output';
+/**
+ * `passive` pins neither drive nor load a net: a bus splitter's pins are passive because the same part
+ * splits a bus into single pins or gathers pins into a bus depending on which side is driven.
+ */
+export type PortDirection = 'input' | 'output' | 'passive';
 
 export interface PortRef {
   readonly componentId: string;
@@ -44,6 +49,15 @@ export interface PortDefinition {
   /** Local offset from the component origin, in grid units. */
   readonly x: number;
   readonly y: number;
+  /**
+   * Present on a bus port: a wireable pin that stands for several single pins at once. `bits` names those
+   * single pins, least significant first. A bus port is never simulated itself; the netlist joins its bits.
+   */
+  readonly bus?: { readonly bits: readonly string[] };
+  /** A single pin that still exists for the simulator but is not drawn or wired directly (it is reached through a bus port). */
+  readonly hidden?: boolean;
+  /** The id of a pin on the same part this pin is permanently joined to, as on a bus splitter. */
+  readonly alias?: string;
 }
 
 export interface ComponentParams {
@@ -68,6 +82,10 @@ export interface ComponentParams {
   readonly hasLoad?: boolean;
   /** A multiplexed display's digit-select pins are asserted high (true, the default) or low. */
   readonly digitActiveHigh?: boolean;
+  /** Width of a bus splitter's bus (2-16 bits). */
+  readonly busWidth?: number;
+  /** A register or counter exposes its data pins as single bus ports (D and Q) instead of one pin per bit. */
+  readonly busPins?: boolean;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;

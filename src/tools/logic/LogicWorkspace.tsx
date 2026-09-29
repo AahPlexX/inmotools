@@ -37,6 +37,7 @@ import {
   undo,
   updateComponentParams,
   updateMetadata,
+  wireProblem,
 } from './circuit-model';
 import { parseProject, projectFileName, renderSchematicSvg, serializeProject } from './export-engine';
 import {
@@ -253,9 +254,24 @@ export default function LogicWorkspace() {
     setHistory((prev) => ({ ...prev, present: setSelection(prev.present, ids) }));
   }, []);
 
-  const handleAddWire = useCallback((from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => {
-    setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+  const showNotice = useCallback((message: string) => {
+    setNotice(message);
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 5000);
   }, []);
+
+  const handleAddWire = useCallback((from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => {
+    // `addWire` quietly refuses a connection that cannot work; say why, so a bus of the wrong width is not a mystery.
+    const problem = wireProblem(documentRef.current, from, to);
+    if (problem) {
+      showNotice(problem);
+      return;
+    }
+    setNotice(null);
+    setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
+  }, [showNotice]);
 
   const handleGenerateCircuit = useCallback((spec: SynthesisSpec) => {
     setHistory((prev) => commit(prev, 'Add minimized circuit', (document) => {
@@ -419,6 +435,8 @@ export default function LogicWorkspace() {
           {frameRef.current.hazards.map((hazard, index) => <span key={`${hazard.type}-${index}`}>{HAZARD_LABEL[hazard.type] ?? hazard.message}</span>)}
         </div>
       ) : null}
+
+      {notice ? <p className="logic-notice" role="status" data-testid="logic-notice">{notice}</p> : null}
 
       <div className="logic-workspace-body">
         <nav className={`logic-palette ${mobilePanel === 'palette' ? 'sheet-open' : ''}`} aria-label="Component palette" data-testid="logic-palette">

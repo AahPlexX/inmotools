@@ -57,6 +57,21 @@
   font-size: 0.82rem;
 }
 
+.logic-notice {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: #e0e7ff;
+  color: #312e81;
+  font-size: 0.82rem;
+}
+
+.logic-workspace[data-theme="dark"] .logic-notice,
+.logic-workspace[data-theme="high-contrast"] .logic-notice {
+  background: #312e81;
+  color: #e0e7ff;
+}
+
 .logic-workspace-body {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 260px;
@@ -410,6 +425,7 @@
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="register"] .logic-palette-button { background: #fed7aa; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="io"] .logic-palette-button { background: #bbf7d0; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="display"] .logic-palette-button { background: #fef08a; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="bus"] .logic-palette-button { background: #c7d2fe; }
 
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-button.active {
   outline: 4px solid #7c3aed;

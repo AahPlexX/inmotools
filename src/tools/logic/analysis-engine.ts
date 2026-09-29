@@ -1,4 +1,4 @@
-import { getComponentPorts, isCombinationalLogic, isStatefulPart } from './component-library';
+import { getSimulationPorts, isCombinationalLogic, isStatefulPart } from './component-library';
 import { buildNetIndex, createInitialFrame, readLevel, step } from './sim-engine';
 import { portKey, type ComponentInstance, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
@@ -164,7 +164,7 @@ export const runElectricalRuleCheck = (document: LogicDocument): ErcFinding[] =>
   const pinName = (key: PortKey): string => {
     const component = componentById.get(componentIdOf(key));
     if (!component) return key;
-    const port = getComponentPorts(component.type, component.params).find((candidate) => candidate.id === portIdOf(key));
+    const port = getSimulationPorts(component.type, component.params).find((candidate) => candidate.id === portIdOf(key));
     return `${component.label}.${port?.label ?? portIdOf(key)}`;
   };
 
