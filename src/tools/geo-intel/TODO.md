@@ -28,7 +28,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
 - [x] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
 - [x] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
-- [ ] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
+- [x] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
 - [ ] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
 - [ ] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
 - [ ] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
@@ -209,3 +209,14 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 - `src/tools/geo-intel/engine/synthesize.ts` — query routing + adapter chains → one LocationProfile; needs adapters (G4) and offline lookups (G5).
 - `src/tools/geo-intel/engine/batch.ts` — CSV postal batch (throttled, cancelable, progress) built on synthesize's postal chain.
 - `tests/unit/geo-intel-engine.test.ts`.
+
+## Delivery 7 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/engine/synthesize.ts` — `resolveLocation()`: parses input, anchors (device → BigDataCloud; postal → Postcodes.io/Zippopotam; place → Photon → Nominatim opt-in; coordinates/Plus/UTM/MGRS/map), then in parallel: offline country/timezone/nearest place, reverse geocode (Photon → Nominatim opt-in), UK depth, elevation chain, sun chain, World Bank, Nager.Date, GISCO → Eurostat; merges into one profile, with precision-derived confidence for typed coordinates and a warning (no fabricated figure) for postal-code population.
+- `src/tools/geo-intel/engine/batch.ts` — CSV column detection, ≤1,000 rows, per-code dedupe, postal chain only, offline country/timezone enrichment, progress + cancel, CSV writer.
+- `tests/unit/geo-intel-engine.test.ts` — 8 tests (full synthesis provenance audit, postal, coordinates, total offline, Nominatim opt-in, short Plus Code, batch, cancel).
+### Gate evidence
+- G6 checked: `vitest run tests/unit/geo-intel-engine.test.ts` 8/8; `tsc` exit 0.
+### Next batch (planned)
+- `src/tools/geo-intel/export/*.ts` — JSON, CSV, iCal, PDF brief, SVG/PNG map, social card, ZIP bundle, metadata helpers; needs the profile model (G2) and synthesis output (G6).
+- `tests/unit/geo-intel-export.test.ts`.
