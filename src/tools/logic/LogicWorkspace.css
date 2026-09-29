@@ -365,3 +365,81 @@
 .logic-workspace[data-theme="high-contrast"] .logic-shortcut-row dt {
   color: #e2e8f0;
 }
+
+/* --- Junior Explorer: large, bright, color-coded, for first-time and young learners. --- */
+.logic-workspace[data-theme="junior-explorer"] {
+  font-size: 1.1rem;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-toolbar,
+.logic-workspace[data-theme="junior-explorer"] .logic-palette,
+.logic-workspace[data-theme="junior-explorer"] .logic-inspector-shell,
+.logic-workspace[data-theme="junior-explorer"] .logic-dock {
+  background: #fffdf5;
+  border: 2px solid #fdba74;
+  border-radius: 16px;
+  color: #1e293b;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-toolbar button,
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-button {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.65rem 1rem;
+  border: 2px solid #1e293b;
+  border-radius: 14px;
+  background: #fff;
+  color: #1e293b;
+  min-height: 44px;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-toolbar button[aria-pressed="true"] {
+  background: #fde68a;
+  border-color: #b45309;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group h3 {
+  font-size: 1rem;
+  color: #7c2d12;
+}
+
+/* The palette uses the same family colors as the parts on the canvas. */
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="gate"] .logic-palette-button { background: #bfdbfe; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="combinational"] .logic-palette-button { background: #e9d5ff; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="sequential"] .logic-palette-button { background: #fecdd3; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="register"] .logic-palette-button { background: #fed7aa; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="io"] .logic-palette-button { background: #bbf7d0; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="display"] .logic-palette-button { background: #fef08a; }
+
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-button.active {
+  outline: 4px solid #7c3aed;
+  outline-offset: 2px;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-dock-message {
+  color: #1e293b;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-field span,
+.logic-workspace[data-theme="junior-explorer"] .logic-inspector h3 {
+  font-size: 1.05rem;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-analyzer button,
+.logic-workspace[data-theme="junior-explorer"] .logic-minimizer button,
+.logic-workspace[data-theme="junior-explorer"] .logic-puzzles button {
+  font-size: 1rem;
+  font-weight: 700;
+  border: 2px solid #1e293b;
+  border-radius: 14px;
+  background: #fff;
+  color: #1e293b;
+  min-height: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logic-workspace[data-theme="junior-explorer"] * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

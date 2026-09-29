@@ -229,6 +229,37 @@ test('places a multiplexed 4-digit display and exposes its polarity controls', a
   await expect(ercDock).toContainText('DP');
 });
 
+test('Junior Explorer swaps the workstation into a large, color-coded mode with one click and back with another', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  const workspace = page.getByTestId('logic-workspace');
+  await expect(workspace).toHaveAttribute('data-theme', 'light');
+  const zoom = () => page.evaluate(() => {
+    const raw = window.localStorage.getItem('inmotools_logic_workstation_autosave');
+    return raw ? (JSON.parse(raw) as { viewport: { zoom: number }; theme: string }) : undefined;
+  });
+
+  const toggle = page.getByRole('button', { name: 'Junior Explorer', exact: true });
+  await toggle.click();
+  await expect(workspace).toHaveAttribute('data-theme', 'junior-explorer');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await zoom())?.viewport.zoom).toBeGreaterThanOrEqual(1.35);
+  await expect.poll(async () => (await zoom())?.theme).toBe('junior-explorer');
+
+  // Palette buttons take their family color, and are large enough to tap.
+  await ensurePaletteOpen(page);
+  const andButton = page.getByTestId('logic-palette').getByRole('button', { name: 'AND', exact: true });
+  await expect(andButton).toHaveCSS('background-color', 'rgb(191, 219, 254)');
+  expect((await andButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // On a narrow viewport the palette is a slide-over sheet that would cover the toolbar.
+  const closePalette = page.getByLabel('Close component palette');
+  if (await closePalette.isVisible()) await closePalette.click();
+
+  await toggle.click();
+  await expect(workspace).toHaveAttribute('data-theme', 'light');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(async () => (await zoom())?.viewport.zoom).toBe(1);
+});
+
 test('a puzzle level starts from its own circuit, checks a wrong and a right answer, and remembers progress', async ({ page }) => {
   page.on('dialog', (dialog) => void dialog.accept());
   await page.goto('./#/tools/digital-logic-workstation');

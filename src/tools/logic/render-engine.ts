@@ -1,4 +1,4 @@
-import { getComponentPorts } from './component-library';
+import { COMPONENT_LIBRARY, getComponentPorts, type ComponentCategory } from './component-library';
 import { isDisplayType, restoreSegmentLit, segmentIdsOf, type DisplayType } from './display-engine';
 import { digitGeometries } from './segment-shapes';
 import { BUBBLE_RADIUS, type BodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
@@ -6,6 +6,7 @@ import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, ty
 import { readLevel } from './sim-engine';
 import type {
   ComponentInstance,
+  ComponentType,
   LogicDocument,
   LogicLevel,
   PortDefinition,
@@ -26,13 +27,29 @@ export interface ThemePalette {
   readonly levelLow: string;
   readonly levelFloating: string;
   readonly levelContention: string;
+  /**
+   * How much heavier a theme draws lines, pins, and text than the default (1). A
+   * large-format theme raises it so small parts stay legible at a glance.
+   */
+  readonly emphasis?: number;
+  /** A body color per component family, so a learner can tell gates from memory from displays by color alone. */
+  readonly familyFill?: Readonly<Partial<Record<ComponentCategory, string>>>;
+  /** Whether high signals are drawn with moving dashes, showing the direction the signal travels. */
+  readonly flow?: boolean;
 }
 
 export const THEME_PALETTES: Readonly<Record<ThemeName, ThemePalette>> = {
   light: { background: '#f8fafc', grid: '#e2e8f0', componentFill: '#ffffff', componentStroke: '#1f2933', label: '#334155', selection: '#2563eb', levelHigh: '#15803d', levelLow: '#1d4ed8', levelFloating: '#94a3b8', levelContention: '#dc2626' },
   dark: { background: '#0f172a', grid: '#1e293b', componentFill: '#111827', componentStroke: '#e2e8f0', label: '#cbd5f5', selection: '#60a5fa', levelHigh: '#4ade80', levelLow: '#60a5fa', levelFloating: '#64748b', levelContention: '#f87171' },
   'high-contrast': { background: '#000000', grid: '#333333', componentFill: '#000000', componentStroke: '#ffffff', label: '#ffffff', selection: '#ffff00', levelHigh: '#00ff66', levelLow: '#00aaff', levelFloating: '#aaaaaa', levelContention: '#ff2222' },
-  'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#e69f00', levelFloating: '#999999', levelContention: '#d55e00' },
+  'junior-explorer': {
+    background: '#fff8e1', grid: '#ffe0b2', componentFill: '#ffffff', componentStroke: '#1e293b', label: '#1e293b', selection: '#7c3aed',
+    levelHigh: '#16a34a', levelLow: '#2563eb', levelFloating: '#9ca3af', levelContention: '#dc2626',
+    emphasis: 1.5,
+    flow: true,
+    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a' },
+  },
+  'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#b35a00', levelFloating: '#999999', levelContention: '#d55e00' },
 };
 
 const levelColor = (palette: ThemePalette, level: LogicLevel): string => {
@@ -42,12 +59,28 @@ const levelColor = (palette: ThemePalette, level: LogicLevel): string => {
   return palette.levelFloating;
 };
 
+const emphasisOf = (palette: ThemePalette): number => palette.emphasis ?? 1;
+
+/** Text grows more gently than lines do: a body only has so much room for its pin names. */
+const fontScaleOf = (palette: ThemePalette): number => 1 + (emphasisOf(palette) - 1) * 0.5;
+
+const bodyFillFor = (palette: ThemePalette, type: ComponentType): string =>
+  palette.familyFill?.[COMPONENT_LIBRARY[type].category] ?? palette.componentFill;
+
+/** The fill, outline color, and outline weight every component body is drawn with in this theme. */
+const applyBodyStyle = (ctx: CanvasRenderingContext2D, palette: ThemePalette, type: ComponentType): void => {
+  ctx.fillStyle = bodyFillFor(palette, type);
+  ctx.strokeStyle = palette.componentStroke;
+  ctx.lineWidth = 1.6 * emphasisOf(palette);
+};
+
 const setLevelLineStyle = (ctx: CanvasRenderingContext2D, palette: ThemePalette, level: LogicLevel): void => {
+  const emphasis = emphasisOf(palette);
   ctx.strokeStyle = levelColor(palette, level);
-  if (level === 1) { ctx.setLineDash([]); ctx.lineWidth = 2.4; }
-  else if (level === 0) { ctx.setLineDash([]); ctx.lineWidth = 1.4; }
-  else if (level === 'X') { ctx.setLineDash([6, 3]); ctx.lineWidth = 2; }
-  else { ctx.setLineDash([2, 4]); ctx.lineWidth = 1.2; }
+  if (level === 1) { ctx.setLineDash([]); ctx.lineWidth = 2.4 * emphasis; }
+  else if (level === 0) { ctx.setLineDash([]); ctx.lineWidth = 1.4 * emphasis; }
+  else if (level === 'X') { ctx.setLineDash([6, 3]); ctx.lineWidth = 2 * emphasis; }
+  else { ctx.setLineDash([2, 4]); ctx.lineWidth = 1.2 * emphasis; }
 };
 
 export interface DraftWire {
@@ -63,6 +96,8 @@ export interface RenderInput {
   readonly hoverPort?: PortRef;
   readonly draftWire?: DraftWire;
   readonly marqueeRect?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  /** Milliseconds on a free-running clock, used only to animate signal flow in themes that ask for it. */
+  readonly animationTime?: number;
 }
 
 const drawGrid = (ctx: CanvasRenderingContext2D, palette: ThemePalette, viewX0: number, viewY0: number, viewX1: number, viewY1: number): void => {
@@ -78,9 +113,7 @@ const drawGrid = (ctx: CanvasRenderingContext2D, palette: ThemePalette, viewX0: 
 
 const drawGateBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, width: number, height: number): void => {
   const family = gateFamilyOf(component.type);
-  ctx.fillStyle = palette.componentFill;
-  ctx.strokeStyle = palette.componentStroke;
-  ctx.lineWidth = 1.6;
+  applyBodyStyle(ctx, palette, component.type);
   ctx.beginPath();
   if (family === 'and') {
     const straightWidth = width * 0.55;
@@ -119,16 +152,14 @@ const drawGateBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, comp
     const tipX = family === 'and' ? width * 0.55 + height / 2 : width;
     ctx.beginPath();
     ctx.arc(tipX + BUBBLE_RADIUS, height / 2, BUBBLE_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = palette.componentFill;
+    ctx.fillStyle = bodyFillFor(palette, component.type);
     ctx.fill();
     ctx.stroke();
   }
 };
 
 const drawIoComponent = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, frame: SimulationFrame): void => {
-  ctx.fillStyle = palette.componentFill;
-  ctx.strokeStyle = palette.componentStroke;
-  ctx.lineWidth = 1.6;
+  applyBodyStyle(ctx, palette, component.type);
   if (component.type === 'SWITCH') {
     const level = readLevel(frame, component.id, 'Y');
     ctx.beginPath();
@@ -143,7 +174,7 @@ const drawIoComponent = (ctx: CanvasRenderingContext2D, palette: ThemePalette, c
     const pressed = frame.componentState[component.id]?.buttonPressed ?? false;
     ctx.beginPath();
     ctx.arc(GRID_SIZE * 0.5, 0, GRID_SIZE * 0.7, 0, Math.PI * 2);
-    ctx.fillStyle = pressed ? palette.levelHigh : palette.componentFill;
+    ctx.fillStyle = pressed ? palette.levelHigh : bodyFillFor(palette, component.type);
     ctx.fill();
     ctx.stroke();
   } else if (component.type === 'CLOCK') {
@@ -154,7 +185,7 @@ const drawIoComponent = (ctx: CanvasRenderingContext2D, palette: ThemePalette, c
     const level = readLevel(frame, component.id, 'Y');
     ctx.beginPath();
     ctx.strokeStyle = levelColor(palette, level);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * emphasisOf(palette);
     ctx.moveTo(GRID_SIZE * 0.15, 0);
     ctx.lineTo(GRID_SIZE * 0.5, 0);
     ctx.lineTo(GRID_SIZE * 0.5, -GRID_SIZE * 0.35);
@@ -166,10 +197,16 @@ const drawIoComponent = (ctx: CanvasRenderingContext2D, palette: ThemePalette, c
     const level = readLevel(frame, component.id, 'A');
     ctx.beginPath();
     ctx.arc(GRID_SIZE * 0.5, 0, GRID_SIZE * 0.6, 0, Math.PI * 2);
-    ctx.fillStyle = level === 1 ? '#fbbf24' : palette.componentFill;
+    ctx.fillStyle = level === 1 ? '#fbbf24' : bodyFillFor(palette, component.type);
+    // A lit LED glows in the large-format theme, so "on" is unmistakable from across the room.
+    if (level === 1 && palette.flow) {
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 18;
+    }
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.strokeStyle = levelColor(palette, level);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * emphasisOf(palette);
     ctx.stroke();
   } else if (component.type === 'PROBE') {
     const level = readLevel(frame, component.id, 'A');
@@ -185,10 +222,8 @@ const drawIoComponent = (ctx: CanvasRenderingContext2D, palette: ThemePalette, c
   }
 };
 
-const drawSequentialBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, width: number, height: number): void => {
-  ctx.fillStyle = palette.componentFill;
-  ctx.strokeStyle = palette.componentStroke;
-  ctx.lineWidth = 1.6;
+const drawSequentialBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, type: ComponentType, width: number, height: number): void => {
+  applyBodyStyle(ctx, palette, type);
   ctx.beginPath();
   ctx.rect(0, -GRID_SIZE * 0.5, width, height + GRID_SIZE);
   ctx.fill();
@@ -224,7 +259,7 @@ const drawPinLabels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   const reversed = component.mirrored !== (component.rotation === 180);
   ctx.fillStyle = palette.label;
   ctx.textBaseline = 'middle';
-  ctx.font = '9px ui-monospace, monospace';
+  ctx.font = `${9 * fontScaleOf(palette)}px ui-monospace, monospace`;
   for (const port of ports) {
     // The side a pin sits on, not its direction: a display's digit selects are inputs on the right edge.
     const rightSide = port.x > 0;
@@ -246,9 +281,7 @@ const drawPinLabels = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
  */
 const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, component: ComponentInstance, ports: readonly PortDefinition[], frame: SimulationFrame): void => {
   const body = componentBodyRect(component, ports);
-  ctx.fillStyle = palette.componentFill;
-  ctx.strokeStyle = palette.componentStroke;
-  ctx.lineWidth = 1.6;
+  applyBodyStyle(ctx, palette, component.type);
   ctx.beginPath();
   ctx.rect(body.x, body.y, body.width, body.height);
   ctx.fill();
@@ -256,7 +289,7 @@ const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   drawPinLabels(ctx, palette, component, ports);
   if (isDisplayType(component.type)) drawDisplayGlyphs(ctx, palette, component.type, body, restoreSegmentLit(frame.componentState[component.id]?.segmentLit, component.type));
 
-  drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, 'bold 10px ui-monospace, monospace');
+  drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, `bold ${10 * fontScaleOf(palette)}px ui-monospace, monospace`);
 };
 
 /**
@@ -293,7 +326,7 @@ const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, compone
     const isHovered = hoverPort?.componentId === component.id && hoverPort.portId === port.id;
     ctx.beginPath();
     ctx.fillStyle = levelColor(palette, level);
-    ctx.arc(position.x, position.y, isHovered ? 6 : 3.5, 0, Math.PI * 2);
+    ctx.arc(position.x, position.y, (isHovered ? 6 : 3.5) * emphasisOf(palette), 0, Math.PI * 2);
     ctx.fill();
     if (isHovered) {
       ctx.beginPath();
@@ -305,7 +338,7 @@ const drawPorts = (ctx: CanvasRenderingContext2D, palette: ThemePalette, compone
   }
 };
 
-const drawWire = (ctx: CanvasRenderingContext2D, palette: ThemePalette, document: LogicDocument, frame: SimulationFrame, wire: Wire): void => {
+const drawWire = (ctx: CanvasRenderingContext2D, palette: ThemePalette, document: LogicDocument, frame: SimulationFrame, wire: Wire, animationTime: number | undefined): void => {
   const fromComponent = document.components.find((component) => component.id === wire.from.componentId);
   const toComponent = document.components.find((component) => component.id === wire.to.componentId);
   if (!fromComponent || !toComponent) return;
@@ -321,11 +354,26 @@ const drawWire = (ctx: CanvasRenderingContext2D, palette: ThemePalette, document
   for (const point of wire.waypoints) ctx.lineTo(point.x, point.y);
   ctx.lineTo(end.x, end.y);
   ctx.stroke();
+  // Themes that ask for it show a high signal as light dashes travelling from the driver to the load.
+  if (palette.flow && level === 1 && animationTime !== undefined) {
+    ctx.save();
+    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth *= 0.4;
+    ctx.setLineDash([6, 14]);
+    ctx.lineDashOffset = -((animationTime / 40) % 20);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    for (const point of wire.waypoints) ctx.lineTo(point.x, point.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.setLineDash([]);
   for (const point of wire.waypoints) {
     ctx.beginPath();
     ctx.fillStyle = ctx.strokeStyle as string;
-    ctx.arc(point.x, point.y, 2.5, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, 2.5 * emphasisOf(palette), 0, Math.PI * 2);
     ctx.fill();
   }
 };
@@ -352,7 +400,7 @@ export const renderScene = (
   const viewY1 = viewY0 + heightPx / viewport.zoom;
   drawGrid(ctx, palette, viewX0, viewY0, viewX1, viewY1);
 
-  for (const wire of input.document.wires) drawWire(ctx, palette, input.document, input.frame, wire);
+  for (const wire of input.document.wires) drawWire(ctx, palette, input.document, input.frame, wire, input.animationTime);
 
   if (input.draftWire) {
     ctx.save();
@@ -382,9 +430,9 @@ export const renderScene = (
     } else if (usesBlockBody(component.type)) {
       drawBlockBody(ctx, palette, component, ports, input.frame);
     } else if (component.type === 'D_FLIP_FLOP' || component.type === 'JK_FLIP_FLOP' || component.type === 'T_FLIP_FLOP' || component.type === 'SR_LATCH') {
-      drawSequentialBody(ctx, palette, GRID_SIZE * 2, height);
+      drawSequentialBody(ctx, palette, component.type, GRID_SIZE * 2, height);
       drawPinLabels(ctx, palette, component, ports);
-      drawUprightText(ctx, palette, component, GATE_ABBREVIATION[component.type], GRID_SIZE, -GRID_SIZE * 0.5 - 6, 'bold 10px ui-monospace, monospace');
+      drawUprightText(ctx, palette, component, GATE_ABBREVIATION[component.type], GRID_SIZE, -GRID_SIZE * 0.5 - 6, `bold ${10 * fontScaleOf(palette)}px ui-monospace, monospace`);
     } else {
       drawGateBody(ctx, palette, component, GRID_SIZE * 2, height);
     }
@@ -408,7 +456,7 @@ export const renderScene = (
     // it by center-line arithmetic put it on top of gate and register edges.
     const labelAnchor = componentLabelAnchor(component, ports);
     ctx.fillStyle = palette.label;
-    ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = `${10 * fontScaleOf(palette)}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(component.label, labelAnchor.x, labelAnchor.y);
   }

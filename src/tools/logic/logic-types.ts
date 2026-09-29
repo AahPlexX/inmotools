@@ -120,7 +120,7 @@ export interface ViewportState {
   readonly zoom: number;
 }
 
-export type ThemeName = 'light' | 'dark' | 'high-contrast' | 'color-vision-safe';
+export type ThemeName = 'light' | 'dark' | 'high-contrast' | 'color-vision-safe' | 'junior-explorer';
 
 export interface LogicDocument {
   readonly schemaVersion: 1;

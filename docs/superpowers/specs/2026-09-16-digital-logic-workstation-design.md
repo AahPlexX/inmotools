@@ -107,7 +107,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 
 ### Educational & accessible modes
 23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3 — delivered in 3B)*
-24. Junior Explorer color-coded elementary mode: one-click swap to large, bright, animated blocks for first-time/young learners. *(Phase 3)*
+24. Junior Explorer color-coded elementary mode: one-click swap to large, bright, animated blocks for first-time/young learners. *(Phase 3 — delivered in 3C)*
 
 ### Ergonomics, input model & accessibility
 25. Contextual right-click menu on desktop (rotate 90°, flip horizontal/vertical, duplicate, change bit width, delete, inspect net) and an accessible long-press radial menu on touch. *(Phase 1)*

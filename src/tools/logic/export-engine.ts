@@ -161,7 +161,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);
-const THEMES = new Set<ThemeName>(['light', 'dark', 'high-contrast', 'color-vision-safe']);
+const THEMES = new Set<ThemeName>(['light', 'dark', 'high-contrast', 'color-vision-safe', 'junior-explorer']);
 const DELAY_MODES = new Set(['ideal', 'realistic']);
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);

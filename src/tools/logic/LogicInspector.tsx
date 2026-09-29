@@ -10,6 +10,7 @@ const THEMES: readonly { readonly value: ThemeName; readonly label: string }[] =
   { value: 'dark', label: 'OLED dark' },
   { value: 'high-contrast', label: 'High contrast' },
   { value: 'color-vision-safe', label: 'Color-vision safe' },
+  { value: 'junior-explorer', label: 'Junior Explorer' },
 ];
 
 export interface LogicInspectorProps {

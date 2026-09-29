@@ -60,6 +60,8 @@ import { createInitialFrame, migrateFrame, readLevel, step } from './sim-engine'
 import './LogicWorkspace.css';
 
 const AUTOSAVE_KEY = 'inmotools_logic_workstation_autosave';
+/** The Junior Explorer view is at least this zoomed in, so parts read as large blocks. */
+const JUNIOR_MIN_ZOOM = 1.35;
 
 const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
@@ -99,6 +101,7 @@ export default function LogicWorkspace() {
   // The analyzer records every simulation step whether or not its dock is open, so
   // opening it shows what already happened. The buffer is mutated in place as steps
   // arrive; a change of channels swaps in a fresh one.
+  const juniorReturnRef = useRef<{ theme: ThemeName; zoom: number }>({ theme: 'light', zoom: 1 });
   const analyzerBufferRef = useRef<SampleBuffer>(createSampleBuffer([]));
   const analyzerChannelsRef = useRef<readonly AnalyzerChannel[]>([]);
   const [analyzerKeys, setAnalyzerKeys] = useState<readonly string[] | null>(null);
@@ -300,6 +303,19 @@ export default function LogicWorkspace() {
     setPlacingType(null);
   };
 
+  // One click into (and back out of) the large-format Junior Explorer look: the theme, plus a
+  // larger view. Leaving restores the theme and zoom that were in use before.
+  const handleToggleJunior = () => {
+    const current = documentRef.current;
+    if (current.theme === 'junior-explorer') {
+      const { theme, zoom } = juniorReturnRef.current;
+      setHistory((prev) => commit(prev, 'Leave Junior Explorer', (document) => setViewport(setTheme(document, theme), { zoom })));
+      return;
+    }
+    juniorReturnRef.current = { theme: current.theme, zoom: current.viewport.zoom };
+    setHistory((prev) => commit(prev, 'Junior Explorer', (document) => setViewport(setTheme(document, 'junior-explorer'), { zoom: Math.max(document.viewport.zoom, JUNIOR_MIN_ZOOM) })));
+  };
+
   const handleOpenClick = () => fileInputRef.current?.click();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -352,6 +368,7 @@ export default function LogicWorkspace() {
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={() => setActiveDock((current) => (current === 'truth' ? 'none' : 'truth'))} aria-pressed={activeDock === 'truth'}>Truth table</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'erc' ? 'none' : 'erc'))} aria-pressed={activeDock === 'erc'}>Check circuit (ERC)</button>
+        <button type="button" onClick={handleToggleJunior} aria-pressed={doc.theme === 'junior-explorer'}>Junior Explorer</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'puzzles' ? 'none' : 'puzzles'))} aria-pressed={activeDock === 'puzzles'}>Puzzles</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'minimizer' ? 'none' : 'minimizer'))} aria-pressed={activeDock === 'minimizer'}>Minimize (K-map)</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'analyzer' ? 'none' : 'analyzer'))} aria-pressed={activeDock === 'analyzer'}>Logic analyzer</button>
@@ -378,7 +395,7 @@ export default function LogicWorkspace() {
             <p className="logic-palette-hint">Placing {paletteLabel(placingType)} — click the canvas, or press Escape to stop.</p>
           ) : null}
           {COMPONENT_CATEGORIES.map((category) => (
-            <div key={category.category} className="logic-palette-group">
+            <div key={category.category} className="logic-palette-group" data-category={category.category}>
               <h3>{category.label}</h3>
               <div className="logic-palette-grid">
                 {category.types.map((type) => (

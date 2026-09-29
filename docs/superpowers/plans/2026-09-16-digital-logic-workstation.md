@@ -63,7 +63,7 @@ Delivers ledger items 3, 4, 9, 13, 16, 21, 23, 24, and the remaining part of 27 
 - Configurable ALU component (4/8/16-bit).
 - **Delivered (Phase 3A):** K-map solver and Quine–McCluskey minimizer (2–5 variables) with exact essential/Petrick cover selection, SOP and POS, don't-cares, visual grouping loops, and one-click minimized-circuit generation (`minimize-engine.ts`, `synthesis-engine.ts`, `LogicMinimizerDock.tsx`).
 - **Delivered (Phase 3B):** gamified puzzle engine with an 11-level built-in set verified against target truth tables through the simulator (`puzzle-engine.ts`, `LogicPuzzleDock.tsx`).
-- Junior Explorer elementary theme.
+- **Delivered (Phase 3C):** the Junior Explorer elementary theme: large-format, family-color-coded, animated signal flow, one-click swap in and out (`render-engine.ts` palette extensions, `LogicWorkspace`/`.css`).
 - Full keyboard-shortcut remapping UI on top of the Phase 1 default bindings.
 
 **Gate:** same shape as prior phases; subcircuit and bus changes require additional unit coverage for nested-document persistence and bus-width mismatch handling.

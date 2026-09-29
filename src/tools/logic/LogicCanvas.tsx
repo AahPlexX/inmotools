@@ -11,7 +11,7 @@ import {
 import { getComponentPorts } from './component-library';
 import { findComponentAt } from './gate-shapes';
 import { findPortAt, orthogonalWaypoints, portAbsolutePosition, GRID_SIZE } from './geometry';
-import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
+import { renderScene, screenToWorld, snapToGrid, THEME_PALETTES, type DraftWire } from './render-engine';
 import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
@@ -53,6 +53,9 @@ export interface LogicCanvasProps {
 
 interface ScreenPoint { readonly x: number; readonly y: number; }
 
+/** Whether the person asked their system to reduce motion; animated themes then hold still. */
+const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
 const isCoarsePointer = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 export function LogicCanvas(props: LogicCanvasProps) {
@@ -64,6 +67,24 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [draftWire, setDraftWire] = useState<DraftWire | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Themes that draw moving signal flow need a free-running clock; everyone else redraws only when the circuit changes.
+  const animates = THEME_PALETTES[theme].flow === true && !prefersReducedMotion();
+  const [animationTime, setAnimationTime] = useState(0);
+  useEffect(() => {
+    if (!animates) return;
+    let raf = 0;
+    let last = 0;
+    const loop = (now: number) => {
+      // About 30 frames a second is plenty for a dash pattern and halves the redraw cost.
+      if (now - last >= 33) {
+        last = now;
+        setAnimationTime(now);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [animates]);
   const [menu, setMenu] = useState<{ x: number; y: number; radial: boolean; actions: readonly MenuAction[]; label: string } | null>(null);
 
   const dragRef = useRef<{ ids: string[]; startWorld: ScreenPoint; originals: Record<string, ScreenPoint>; moved: boolean; clickTargetId?: string; lastDx: number; lastDy: number } | null>(null);
@@ -104,8 +125,8 @@ export function LogicCanvas(props: LogicCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    renderScene(ctx, size.width, size.height, doc.viewport, { document: doc, frame, hoverPort, draftWire: draftWire ?? undefined, marqueeRect: marquee ?? undefined }, theme);
-  }, [doc, frame, theme, size, hoverPort, draftWire, marquee]);
+    renderScene(ctx, size.width, size.height, doc.viewport, { document: doc, frame, hoverPort, draftWire: draftWire ?? undefined, marqueeRect: marquee ?? undefined, animationTime: animates ? animationTime : undefined }, theme);
+  }, [doc, frame, theme, size, hoverPort, draftWire, marquee, animates, animationTime]);
 
   const getScreenPoint = useCallback((event: { clientX: number; clientY: number }): ScreenPoint => {
     const rect = canvasRef.current?.getBoundingClientRect();
