@@ -1,4 +1,5 @@
 import { evaluateAlu } from './alu-engine';
+import { isMemoryType, memoryOutputs, restoreMemoryRuntime, stepMemoryWrite } from './memory-engine';
 import { evaluateBlock, isBlockType } from './block-engine';
 import { portBits } from './bus-engine';
 import { getComponentPorts, getSimulationPorts, isSequential } from './component-library';
@@ -316,6 +317,10 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
         const inputLevels: Record<string, LogicLevel> = {};
         for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
         nextOutputs = evaluateAlu(component.params, inputLevels);
+      } else if (isMemoryType(component.type)) {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = memoryOutputs(component.params, nextState[component.id]?.memoryWrites, inputLevels);
       }
       if (nextOutputs === undefined) continue;
 
@@ -426,6 +431,15 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
     }
   }
 
+  // --- RAM: writes on the active clock edge, sampled against the same pre-edge nets as every other clocked part. ---
+  for (const component of document.components) {
+    if (component.type !== 'RAM') continue;
+    const readInput = (portId: string): LogicLevel => finalNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
+    const state = nextState[component.id] ?? {};
+    const runtime = stepMemoryWrite({ params: component.params, runtime: restoreMemoryRuntime(state), read: readInput });
+    nextState[component.id] = { ...state, lastClockLevel: runtime.lastClockLevel, memoryWrites: runtime.writes, memoryFault: runtime.fault };
+  }
+
   // Re-resolve nets once more so anything wired directly to a Q/QN output
   // (an LED, a probe, another flip-flop's D/CLK, or a downstream gate) reads
   // the new value this same tick instead of one tick later, and let ideal
@@ -451,6 +465,14 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
   const hazards: Hazard[] = [];
   for (const root of oscillatingNets) {
     hazards.push({ type: 'oscillation', netKey: root, message: 'This net could not settle to a stable level within the ideal zero-delay model. Switch to realistic propagation delay to observe it as an oscillator.' });
+  }
+
+  // A RAM whose latest write could not be carried out says so for as long as that is true.
+  for (const component of document.components) {
+    const fault = nextState[component.id]?.memoryFault;
+    if (component.type === 'RAM' && fault !== undefined) {
+      hazards.push({ type: 'memory_write_skipped', netKey: portKey(component.id, 'WE'), message: `${component.label}: ${fault}` });
+    }
   }
 
   const finalLevels: Record<PortKey, LogicLevel> = {};

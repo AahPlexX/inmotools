@@ -30,7 +30,9 @@ export type ComponentType =
   | 'SEVEN_SEGMENT_4'
   | 'SIXTEEN_SEGMENT'
   | 'BUS_SPLITTER'
-  | 'ALU';
+  | 'ALU'
+  | 'RAM'
+  | 'ROM';
 
 /**
  * `passive` pins neither drive nor load a net: a bus splitter's pins are passive because the same part
@@ -89,6 +91,14 @@ export interface ComponentParams {
   readonly busPins?: boolean;
   /** Operand width of an ALU: 4, 8, or 16 bits. */
   readonly aluWidth?: number;
+  /** Address width of a RAM or ROM (4-32 bits). */
+  readonly addressBits?: number;
+  /** Word width of a RAM or ROM: 4, 8, 16, or 32 bits. */
+  readonly dataBits?: number;
+  /** Stored words of a RAM or ROM, keyed by address (sparse: words equal to `memoryFill` are omitted). */
+  readonly memoryCells?: Readonly<Record<string, number>>;
+  /** The value of every address that is not in `memoryCells`. */
+  readonly memoryFill?: number;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -182,6 +192,10 @@ export interface ComponentRuntimeState {
   readonly rippleStage?: number;
   /** Which segments of a display are lit, digit-major (1 = lit). */
   readonly segmentLit?: readonly LogicLevel[];
+  /** Words a running RAM has written, keyed by address; laid over its stored contents. */
+  readonly memoryWrites?: Readonly<Record<string, number>>;
+  /** Why a RAM's latest clock edge did not write, while that is still the case. */
+  readonly memoryFault?: string;
 }
 
 export interface PendingUpdate {
@@ -191,7 +205,7 @@ export interface PendingUpdate {
   readonly level: LogicLevel;
 }
 
-export type HazardType = 'floating_input' | 'output_contention' | 'undriven_net' | 'oscillation';
+export type HazardType = 'floating_input' | 'output_contention' | 'undriven_net' | 'oscillation' | 'memory_write_skipped';
 
 export interface Hazard {
   readonly type: HazardType;

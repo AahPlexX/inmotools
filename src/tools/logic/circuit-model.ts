@@ -1,6 +1,7 @@
 import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
 import { clampAluWidth } from './alu-engine';
 import { checkWireEnds, clampBusWidth } from './bus-engine';
+import { isMemoryType, normalizeMemoryParams } from './memory-engine';
 import { clampBitWidth, isRegisterType } from './register-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
 import type {
@@ -157,6 +158,9 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
         normalized = { ...merged, busWidth: clampBusWidth(merged.busWidth) };
       } else if (component.type === 'ALU' && merged.aluWidth !== undefined) {
         normalized = { ...merged, aluWidth: clampAluWidth(merged.aluWidth) };
+      } else if (isMemoryType(component.type)) {
+        // A resized or re-filled memory keeps only the stored words that still fit.
+        normalized = normalizeMemoryParams(merged);
       }
       return { ...component, params: normalized };
     }),

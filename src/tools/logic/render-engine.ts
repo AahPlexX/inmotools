@@ -48,7 +48,7 @@ export const THEME_PALETTES: Readonly<Record<ThemeName, ThemePalette>> = {
     levelHigh: '#16a34a', levelLow: '#2563eb', levelFloating: '#9ca3af', levelContention: '#dc2626',
     emphasis: 1.5,
     flow: true,
-    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8' },
+    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8', memory: '#a5f3fc' },
   },
   'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#b35a00', levelFloating: '#999999', levelContention: '#d55e00' },
 };

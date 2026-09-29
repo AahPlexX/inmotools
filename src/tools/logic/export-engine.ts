@@ -1,4 +1,5 @@
 import { isBusPort, portWidth } from './bus-engine';
+import { isMemoryType, isValidMemoryParams } from './memory-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { isDisplayType } from './display-engine';
 import { digitGeometries } from './segment-shapes';
@@ -173,7 +174,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG',
-  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU',
+  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU', 'RAM', 'ROM',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);
@@ -198,7 +199,8 @@ const isValidComponent = (value: unknown): value is ComponentInstance => {
     typeof value.rotation === 'number' && ROTATIONS.has(value.rotation) &&
     typeof value.mirrored === 'boolean' &&
     typeof value.label === 'string' &&
-    isNonEmptyRecord(value.params)
+    isNonEmptyRecord(value.params) &&
+    (!isMemoryType(value.type as ComponentType) || isValidMemoryParams(value.params))
   );
 };
 
