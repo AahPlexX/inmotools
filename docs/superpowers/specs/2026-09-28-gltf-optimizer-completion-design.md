@@ -1,6 +1,6 @@
 # glTF / GLB Optimizer Completion Design
 
-**Status:** Proposed for review; no product implementation is authorized by this document alone.
+**Status:** Approved for planning on 2026-09-28; product implementation still requires approval of the separate implementation plan.
 **Baseline:** `origin/main` at `796f3afa371fba151cbcecb51889b135680998e7` (2026-09-28).
 **Scope:** Finish and accurately describe the existing local-first GLB optimizer without replacing its architecture or adding runtime dependencies.
 
