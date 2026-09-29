@@ -26,7 +26,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
 - [x] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
 - [x] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
-- [ ] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
+- [x] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
 - [ ] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
 - [ ] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
 - [ ] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
@@ -42,8 +42,8 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 
 | Adapter | Endpoint | Keyless | CORS | Policy / limits honoured | License / attribution |
 | --- | --- | --- | --- | --- | --- |
-| Zippopotam.us | `api.zippopotam.us/{cc}/{code}` | yes | yes | user-triggered, cached, 1 req/s in batch | attribution link |
-| Postcodes.io | `api.postcodes.io/postcodes/{pc}` | yes | yes | user-triggered, cached | OGL v3 (ONS/OS/Royal Mail data), MIT service |
+| Zippopotam.us | `api.zippopotam.us/{cc}/{code}` | yes | yes | user-triggered, cached, 1 req/s | ODbL 1.0 / DbCL 1.0 (per its coverage page) |
+| Postcodes.io | `api.postcodes.io/postcodes/{pc}`, `/outcodes/{oc}`, reverse `?lon&lat` | yes | yes | user-triggered, cached | OS OpenData (GB); ONSPD non-commercial only for NI `BT` codes (warning shown); service MIT |
 | World Bank v2 | `api.worldbank.org/v2/country/{iso}/indicator/{ids}?source=2` | yes | yes | cached 7 days | CC BY 4.0 |
 | Eurostat dissemination | `ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/{dataset}` | yes | yes | cached 7 days | Eurostat reuse, attribution |
 | Eurostat GISCO ID | `gisco-services.ec.europa.eu/id/nuts?x&y&geometry=N` | yes | yes | code only, no geometry | "© EuroGeographics for the administrative boundaries"; GISCO geodata is non-commercial |
@@ -182,3 +182,19 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `src/tools/geo-intel/adapters/*.ts` — one module per source, each returning ProfileFields; needs `net/http.ts` and `core/sources.ts`.
 - `tests/unit/geo-intel-adapters.test.ts` + `tests/fixtures/geo-intel/responses/*.json` — recorded live responses from 2026-09-29.
+
+## Delivery 5 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/adapters/common.ts` — AdapterResult shape + coercion helpers.
+- `src/tools/geo-intel/adapters/postal.ts` — Zippopotam, Postcodes.io full/outward/reverse (ONS positional quality → confidence).
+- `src/tools/geo-intel/adapters/statistics.ts` — World Bank country + all-country indicators, JSON-stat parser, GISCO NUTS lookup, Eurostat NUTS 1–3 population, density, GDP/inhabitant, employment rate.
+- `src/tools/geo-intel/adapters/boundaries.ts` — geoBoundaries metadata + simplified GeoJSON via CORS-safe media host, point-in-polygon.
+- `src/tools/geo-intel/adapters/geocoders.ts` — BigDataCloud (device only), Photon search/reverse, Nominatim search/reverse (rank → confidence).
+- `src/tools/geo-intel/adapters/environment.ts` — Nager.Date, Sunrise-Sunset.org v2 → SunriseSunset.io → offline model, Terrain Tiles (in-tool PNG decoder) → Open-Elevation.
+- `src/tools/geo-intel/net/http.ts` — 204 No Content now returns `null` (Nager unsupported countries) instead of retrying.
+- `tests/unit/geo-intel-adapters.test.ts`, `tests/fixtures/geo-intel/responses/*` — 15 tests on responses recorded 2026-09-29.
+### Gate evidence
+- G4 checked: `vitest run tests/unit/geo-intel-adapters.test.ts` 15/15; `tsc` exit 0.
+### Next batch (planned)
+- `src/tools/geo-intel/offline/static-data.ts` — lazy `?raw` loaders + country/timezone point-in-polygon, nearest-country fallback, nearby places, admin-1 matching; needs G1 data and G2 types.
+- `tests/unit/geo-intel-offline.test.ts`.
