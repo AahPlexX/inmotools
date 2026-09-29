@@ -1,5 +1,5 @@
 import { isCountedBackstitchTechnique, isCountedStitchKind } from './engines/counted-thread-engine';
-import { CROCHET_SYMBOLS } from './engines/symbol-library';
+import { CROCHET_SYMBOLS, KNITTING_SYMBOLS } from './engines/symbol-library';
 import type {
   CountedThreadChart,
   CountedThreadPoint,
@@ -19,6 +19,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'projects';
 const AUTOSAVE_KEY = 'autosave';
 const CROCHET_SYMBOL_IDS = new Set(CROCHET_SYMBOLS.map((symbol) => symbol.id));
+const KNITTING_SYMBOL_IDS = new Set(KNITTING_SYMBOLS.map((symbol) => symbol.id));
 const COLOR_HEX = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -27,7 +28,7 @@ const isFinitePositiveNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
 
 const isFiberMetadata = (value: unknown): value is FiberCraftDocument['metadata'] => {
-  if (!isRecord(value) || (value.discipline !== 'crochet' && value.discipline !== 'cross-stitch')) return false;
+  if (!isRecord(value) || (value.discipline !== 'crochet' && value.discipline !== 'cross-stitch' && value.discipline !== 'knitting')) return false;
   const stringFields = ['title','author','difficulty','materialClass','toolSize','license','notes','createdAt','updatedAt'] as const;
   return stringFields.every((field) => typeof value[field] === 'string')
     && Array.isArray(value.techniqueTags)
@@ -80,7 +81,11 @@ const isPolarChart = (value: unknown, paletteIds: ReadonlySet<string>): value is
   return true;
 };
 
-const isGridChart = (value: unknown, paletteIds: ReadonlySet<string>): value is GridChart => {
+const isGridChart = (
+  value: unknown,
+  paletteIds: ReadonlySet<string>,
+  symbolIds: ReadonlySet<string>,
+): value is GridChart => {
   if (!isRecord(value) || value.kind !== 'grid') return false;
   const rows = Number(value.rows); const cols = Number(value.cols); const aspectRatio = Number(value.aspectRatio);
   if (!Number.isInteger(rows) || rows <= 0 || !Number.isInteger(cols) || cols <= 0 || !Number.isFinite(aspectRatio) || aspectRatio <= 0 || !Array.isArray(value.cells) || value.cells.length !== rows * cols) return false;
@@ -90,7 +95,7 @@ const isGridChart = (value: unknown, paletteIds: ReadonlySet<string>): value is 
     const row = Number(cell.row); const col = Number(cell.col); const key = `${row}:${col}`;
     if (seen.has(key)) return false; seen.add(key);
     return Number.isInteger(row) && row >= 0 && row < rows && Number.isInteger(col) && col >= 0 && col < cols
-      && (cell.symbolId === null || (typeof cell.symbolId === 'string' && CROCHET_SYMBOL_IDS.has(cell.symbolId)))
+      && (cell.symbolId === null || (typeof cell.symbolId === 'string' && symbolIds.has(cell.symbolId)))
       && (cell.colorId === null || (typeof cell.colorId === 'string' && paletteIds.has(cell.colorId)));
   });
 };
@@ -162,8 +167,10 @@ export const isRestorableFiberCraftDocument = (value: unknown): value is FiberCr
   if (!isRecord(value) || value.formatVersion !== 1 || !isFiberMetadata(value.metadata) || !isPalette(value.palette)) return false;
   const paletteIds = new Set(value.palette.map((color) => color.id));
   const chartValid = value.metadata.discipline === 'crochet'
-    ? isPolarChart(value.chart, paletteIds) || isGridChart(value.chart, paletteIds)
-    : isCountedThreadChart(value.chart, paletteIds);
+    ? isPolarChart(value.chart, paletteIds) || isGridChart(value.chart, paletteIds, CROCHET_SYMBOL_IDS)
+    : value.metadata.discipline === 'knitting'
+      ? isGridChart(value.chart, paletteIds, KNITTING_SYMBOL_IDS)
+      : isCountedThreadChart(value.chart, paletteIds);
   return chartValid && hasValidFiberSettings(value)
     && isGauge(value.gauge) && hasValidSwatchImages(value.swatchImages)
     && Array.isArray(value.completedSteps) && value.completedSteps.every((step) => typeof step === 'string' && step.trim() !== '');
