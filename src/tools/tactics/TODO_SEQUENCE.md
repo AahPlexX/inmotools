@@ -121,7 +121,7 @@
 - **Reverse-safe:** complete.
 
 ### T10-01 — Professional export and metadata
-- **Status:** READY
+- **Status:** ACTIVE
 - **Depends on:** T09-01
 - **Primary files:** tactical export modules + UI/tests
 - **Action:** metadata editor, raster/social/standalone HTML, PDF/contact sheets, analytics CSV/JSON, project JSON/ZIP, capability-negotiated video export/fallback.

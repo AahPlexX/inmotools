@@ -14,7 +14,7 @@ Documentation commits after the validated source tip do not change Tactical runt
 
 ## Exact next sequential action
 
-Execute **T10-01 — professional export and metadata**. Keep export local and capability-negotiated. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Analytics report export remains row 50; do not reopen rows 43–48.
+**T10-01 — professional export and metadata is ACTIVE.** Keep export local and capability-negotiated. Do not expose a video format combination before `VideoEncoder.isConfigSupported()` or the pinned Mediabunny API confirms it, and keep the frame-sequence ZIP plus project JSON/ZIP fallbacks. Analytics report export remains row 50; do not reopen rows 43–48.
 
 ## Task 9 closure evidence
 

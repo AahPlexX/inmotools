@@ -4,6 +4,7 @@
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 42/60
+**Current milestone:** Task 10 professional export and metadata is ACTIVE; verified rows remain unchanged until its complete export contract is proven.
 **Current executable evidence:** Task 9 is closed at runtime source `c3ad7fb603f78456740f954b833c8db496d19d9e`. The header previously lagged at 32/60 after Task 8 had already verified rows 35–38 (36/60); this count is the verified-row total. Fresh focused Tactical/selector units pass 117/117, TypeScript/production/PWA build passes, and the complete Tactical Playwright spec passes 56 tests with 2 intentional duplicate mobile Axe/reflow skips and 0 failures. Browser evidence covers unsupported-file and undecodable-video failures, integer-millisecond review, non-destructive telestration, manual hold/linear tracking, event tags, ordered clip playback, manual multi-angle sync, 44px controls, panel overflow, and Axe. Rows 43–48 are verified. Row 50 remains planned for Task 10 analytics report export.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |
