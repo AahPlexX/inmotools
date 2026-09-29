@@ -14,6 +14,8 @@ import {
   transformCrochetGrid,
 } from '../../src/tools/fiber-craft/crochet-document-engine';
 import Papa from 'papaparse';
+import { unzipSync, strFromU8 } from 'fflate';
+import { buildCrochetReleaseFiles, fiberCraftReleaseZipFilename, zipCrochetRelease } from '../../src/tools/fiber-craft/pattern-export-engine';
 import { buildCrochetMaterialsCsv, buildCrochetPatternBookModel, buildCrochetPatternText, fiberCraftMaterialsFilename, fiberCraftPatternTextFilename } from '../../src/tools/fiber-craft/pattern-export-engine';
 import type { FiberCraftDocument, GridChart } from '../../src/tools/fiber-craft/fiber-craft-types';
 
@@ -180,5 +182,32 @@ describe('materials and shopping list CSV', () => {
     expect(csv).not.toMatch(/(^|,|")=HYPERLINK/);
     expect(csv).not.toMatch(/(^|,|")@cmd/);
     expect(fiberCraftMaterialsFilename('Moss Bunny')).toBe('moss-bunny-materials.csv');
+  });
+});
+
+describe('one-click pattern release bundle', () => {
+  const document = (): FiberCraftDocument => fillCrochetRound(
+    setCrochetPatternCredit(createStarterCrochetDocument(NOW), { title: 'Moss Bunny', author: 'Ana', license: 'CC BY 4.0', notes: '' }, NOW),
+    0, 'sc-dc', 'primary', {}, NOW,
+  );
+
+  test('builds the PDF, written pattern, materials list, and project file under the title-based names', async () => {
+    const files = await buildCrochetReleaseFiles(document(), 'us');
+    expect(Object.keys(files).sort()).toEqual([
+      'moss-bunny-materials.csv',
+      'moss-bunny-pattern-book.pdf',
+      'moss-bunny-pattern.txt',
+      'moss-bunny.craftproj',
+    ]);
+    expect(strFromU8(files['moss-bunny-pattern.txt'])).toContain('Round 1: 6 sc [Primary].');
+    expect(strFromU8(files['moss-bunny-pattern-book.pdf'].subarray(0, 5))).toBe('%PDF-');
+  });
+
+  test('zips every file so it can be unpacked byte for byte, and names the archive after the title', async () => {
+    const files = { ...(await buildCrochetReleaseFiles(document(), 'us')), 'moss-bunny-4x.png': new Uint8Array([137, 80, 78, 71]) };
+    const unpacked = unzipSync(zipCrochetRelease(files));
+    expect(Object.keys(unpacked).sort()).toEqual(Object.keys(files).sort());
+    for (const name of Object.keys(files)) expect(unpacked[name]).toEqual(files[name]);
+    expect(fiberCraftReleaseZipFilename('Moss Bunny')).toBe('moss-bunny-pattern-release.zip');
   });
 });

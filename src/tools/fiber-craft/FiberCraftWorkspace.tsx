@@ -394,24 +394,39 @@ export default function FiberCraftWorkspace() {
       setStatus(`Saved ${filename}.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the project file.'); }
   };
+  const renderChartPng = async (scale: CrochetPngScale): Promise<{ readonly blob: Blob; readonly width: number; readonly height: number }> => {
+    if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('PNG export currently supports crochet round and grid charts.');
+    const dimensions = crochetPngDimensions(scale);
+    const canvas = window.document.createElement('canvas');
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('This browser could not create a PNG rendering canvas.');
+    renderCrochetChartCanvas(context, document.chart, document.palette, { ...dimensions, theme: 'light', showProgress: false });
+    return { blob: await canvasToPngBlob(canvas), ...dimensions };
+  };
+  const renderSocialPng = async (): Promise<Blob> => {
+    if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('Social preview currently supports crochet round and grid charts.');
+    const chartCanvas = window.document.createElement('canvas');
+    chartCanvas.width = 560;
+    chartCanvas.height = 420;
+    const chartContext = chartCanvas.getContext('2d');
+    if (!chartContext) throw new Error('This browser could not create the preview chart canvas.');
+    renderCrochetChartCanvas(chartContext, document.chart, document.palette, { width: chartCanvas.width, height: chartCanvas.height, theme: 'light', showProgress: false });
+    const socialCanvas = window.document.createElement('canvas');
+    socialCanvas.width = FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH;
+    socialCanvas.height = FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT;
+    const socialContext = socialCanvas.getContext('2d');
+    if (!socialContext) throw new Error('This browser could not create the social preview canvas.');
+    renderFiberCraftSocialPreview(socialContext, chartCanvas, document);
+    return canvasToPngBlob(socialCanvas);
+  };
   const exportPng = async () => {
     try {
-      if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('PNG export currently supports crochet round and grid charts.');
-      const dimensions = crochetPngDimensions(pngScale);
-      const canvas = window.document.createElement('canvas');
-      canvas.width = dimensions.width;
-      canvas.height = dimensions.height;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('This browser could not create a PNG rendering canvas.');
-      renderCrochetChartCanvas(context, document.chart, document.palette, {
-        ...dimensions,
-        theme: 'light',
-        showProgress: false,
-      });
-      const blob = await canvasToPngBlob(canvas);
+      const { blob, width, height } = await renderChartPng(pngScale);
       const filename = `${fiberCraftFilenameStem(document.metadata.title)}-${pngScale}x.png`;
       downloadBlob(blob, filename);
-      setStatus(`Exported ${filename} at ${dimensions.width} × ${dimensions.height} pixels.`);
+      setStatus(`Exported ${filename} at ${width} × ${height} pixels.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the PNG.'); }
   };
   const exportPatternPdf = async () => {
@@ -449,29 +464,23 @@ export default function FiberCraftWorkspace() {
   };
   const exportSocialPreview = async () => {
     try {
-      if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('Social preview currently supports crochet round and grid charts.');
-      const chartCanvas = window.document.createElement('canvas');
-      chartCanvas.width = 560;
-      chartCanvas.height = 420;
-      const chartContext = chartCanvas.getContext('2d');
-      if (!chartContext) throw new Error('This browser could not create the preview chart canvas.');
-      renderCrochetChartCanvas(chartContext, document.chart, document.palette, {
-        width: chartCanvas.width,
-        height: chartCanvas.height,
-        theme: 'light',
-        showProgress: false,
-      });
-
-      const socialCanvas = window.document.createElement('canvas');
-      socialCanvas.width = FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH;
-      socialCanvas.height = FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT;
-      const socialContext = socialCanvas.getContext('2d');
-      if (!socialContext) throw new Error('This browser could not create the social preview canvas.');
-      renderFiberCraftSocialPreview(socialContext, chartCanvas, document);
       const filename = fiberCraftSocialPreviewFilename(document.metadata.title);
-      downloadBlob(await canvasToPngBlob(socialCanvas), filename);
+      downloadBlob(await renderSocialPng(), filename);
       setStatus(`Exported ${filename} at ${FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH} × ${FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT} pixels.`);
     } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the social preview.'); }
+  };
+  const exportRelease = async () => {
+    try {
+      setStatus('Building the release bundle…');
+      const { buildCrochetReleaseFiles, fiberCraftReleaseZipFilename, zipCrochetRelease } = await import('./pattern-export-engine');
+      const files = await buildCrochetReleaseFiles(document, dialect);
+      const stem = fiberCraftFilenameStem(document.metadata.title);
+      files[`${stem}-${pngScale}x.png`] = new Uint8Array(await (await renderChartPng(pngScale)).blob.arrayBuffer());
+      files[fiberCraftSocialPreviewFilename(document.metadata.title)] = new Uint8Array(await (await renderSocialPng()).arrayBuffer());
+      const filename = fiberCraftReleaseZipFilename(document.metadata.title);
+      downloadBytes(zipCrochetRelease(files), filename, 'application/zip');
+      setStatus(`Saved ${filename} with ${Object.keys(files).length} files.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not build the release bundle.'); }
   };
   const openProjectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -527,7 +536,7 @@ export default function FiberCraftWorkspace() {
                   : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
             {document.metadata.discipline === 'crochet' ? <PatternCreditPanel document={document} onSaveCredit={saveCredit} onDirtyChange={setCreditDirty} /> : null}
-            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadMaterialsList()}>Save materials list (.csv)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere, and the materials list opens in any spreadsheet.</p></section> : null}
+            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadMaterialsList()}>Save materials list (.csv)</button><button className="action-button fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportRelease()}>Export everything (.zip)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere, and the materials list opens in any spreadsheet. “Export everything” packs the PDF, PNG, share card, written pattern, materials list, and project file into one zip.</p></section> : null}
             <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
           </aside>
         </div>

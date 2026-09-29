@@ -1,3 +1,4 @@
+import { strToU8, zipSync } from 'fflate';
 import { unparse } from 'papaparse';
 import {
   PDFDocument,
@@ -14,7 +15,7 @@ import { crochetGlyphPrimitives, type CrochetGlyphPrimitive } from './engines/cr
 import { gridPhysicalDimensions, polarNodeToCartesian, polarRoundPhysicalDimensions } from './engines/geometry-engine';
 import { getYarnWeightStandard } from './engines/yarn-standard-library';
 import { crochetSymbolLabel, type CrochetDialect } from './engines/symbol-library';
-import { fiberCraftFilenameStem } from './project-bundle-engine';
+import { fiberCraftFilenameStem, fiberCraftProjectFilename, serializeFiberCraftProject } from './project-bundle-engine';
 import type { ColorSlot, FiberCraftDocument, GridChart, PolarChart } from './fiber-craft-types';
 
 const LETTER_WIDTH = 612;
@@ -491,3 +492,23 @@ export async function buildCrochetPatternPdf(
 
   return pdf.save();
 }
+
+/**
+ * Every export that does not need a canvas, keyed by file name. The workspace adds the PNG and share
+ * card, which do, before zipping.
+ */
+export const buildCrochetReleaseFiles = async (
+  document: FiberCraftDocument,
+  dialect: CrochetDialect,
+): Promise<Record<string, Uint8Array>> => ({
+  [fiberCraftPatternPdfFilename(document.metadata.title)]: await buildCrochetPatternPdf(document, dialect),
+  [fiberCraftPatternTextFilename(document.metadata.title)]: strToU8(buildCrochetPatternText(document, dialect)),
+  [fiberCraftMaterialsFilename(document.metadata.title)]: strToU8(buildCrochetMaterialsCsv(document, dialect)),
+  [fiberCraftProjectFilename(document.metadata.title)]: strToU8(serializeFiberCraftProject(document)),
+});
+
+/** PNG and PDF are already compressed, so the archive stores them as-is. */
+export const zipCrochetRelease = (files: Record<string, Uint8Array>): Uint8Array => zipSync(files, { level: 0 });
+
+export const fiberCraftReleaseZipFilename = (title: string): string =>
+  `${fiberCraftFilenameStem(title)}-pattern-release.zip`;
