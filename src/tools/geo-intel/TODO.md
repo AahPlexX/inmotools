@@ -23,7 +23,7 @@ This file is the single live progress record for this tool while it is developed
 Each gate is checked only with fresh evidence (command + result recorded in the Delivery Record).
 
 - [x] **G0 Plan** — TODO, source registry, feature list, decisions recorded.
-- [ ] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
+- [x] **G1 Static data** — reproducible build script; bundled country table, country geometry, populated places, admin-1 names, IANA timezone polygons; manifest with sources, licenses, versions, sizes, timezone accuracy.
 - [ ] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
 - [ ] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
 - [ ] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
@@ -132,3 +132,21 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `src/tools/geo-intel/scripts/build-data.mjs` — reproducible static-data builder; needs G0's source decisions (datasets, licenses) first.
 - `src/tools/geo-intel/data/*.json` — generated country table, geometry, places, admin-1 names, timezones, manifest; can only exist once the builder exists.
+
+## Delivery 2 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/scripts/build-data.mjs` — downloads (if missing) and reduces all bundled sources; run `node --max-old-space-size=8192 src/tools/geo-intel/scripts/build-data.mjs <cache-dir>`.
+- `src/tools/geo-intel/data/countries.topo.json` — Natural Earth 5.1.2 1:50m countries, 242 features (492 KB, 162 KB gzip).
+- `src/tools/geo-intel/data/country-table.json` — 252 GeoNames countries + NE region/subregion/label point + Wikidata driving side (247 with side).
+- `src/tools/geo-intel/data/admin1.json` — 3,865 GeoNames admin-1 names + geonameIds.
+- `src/tools/geo-intel/data/places.json` — 7,342 Natural Earth populated places (columnar).
+- `src/tools/geo-intel/data/timezones.topo.json` — 444 IANA zones incl. oceans, tbb 2026d (1.09 MB, 310 KB gzip).
+- `src/tools/geo-intel/data/manifest.json` — sources, versions, licenses, sizes, timezone accuracy.
+### Gate evidence
+- G1 checked: two consecutive builds produce identical SHA-256 for every data file; timezone agreement vs full resolution 0.9998 (4,000 points), land 0.9993 (1,388 points).
+- Loading rule for later batches: import data with `import('./data/<file>.json?raw')` + `JSON.parse` so `tsc` does not infer types for megabyte literals.
+### Next batch (planned)
+- `src/tools/geo-intel/core/types.ts` — provenance + profile types; everything else imports it.
+- `src/tools/geo-intel/core/sources.ts` — source registry (license, attribution, policy) referenced by provenance.
+- `src/tools/geo-intel/core/geodesy.ts`, `core/olc.ts`, `core/coords.ts`, `core/projection.ts`, `core/timezone.ts`, `core/solar.ts`, `core/query-parser.ts` — pure math; the parser depends on olc/coords so they ship together.
+- `tests/unit/geo-intel-core.test.ts` — official OLC + MGRS vectors, geodesy, parser, solar, timezone.
