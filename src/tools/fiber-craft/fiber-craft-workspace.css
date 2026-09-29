@@ -89,6 +89,29 @@
 }
 
 
+
+/* Gauge-corrected knitting chart */
+.fiber-knitting-panel { min-width: 0; }
+.fiber-knitting-gauge-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; align-items: end; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.fiber-knitting-gauge-controls .action-button { min-height: 44px; }
+.fiber-knitting-gauge-controls .fiber-craft-muted { grid-column: 1 / -1; }
+.fiber-knitting-scroll { max-width: 100%; }
+.fiber-knitting-grid { display: grid; width: max-content; border-top: 1px solid var(--line-strong); border-left: 1px solid var(--line-strong); background: var(--surface); }
+.fiber-knitting-row { display: flex; width: max-content; }
+.fiber-knitting-cell { box-sizing: border-box; display: grid; place-items: center; width: 44px; height: auto; aspect-ratio: var(--fiber-knit-aspect); border-right: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fiber-knitting-cell > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .fiber-knitting-gauge-controls { grid-template-columns: 1fr; }
+  .fiber-knitting-cell { width: 40px; }
+}
+
+@media print {
+  .fiber-knitting-gauge-controls { display: none !important; }
+  .fiber-knitting-scroll { overflow: visible; max-width: none; }
+  .fiber-knitting-cell { border-color: #000; background: #fff; color: #000; }
+}
+
 /* Counted-thread precision chart */
 .fiber-counted-panel { min-width: 0; }
 .fiber-counted-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 12px; align-items: end; margin: 14px 0; }
