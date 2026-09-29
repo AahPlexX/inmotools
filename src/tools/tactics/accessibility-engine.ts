@@ -276,7 +276,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     title: 'Move a player',
     paragraphs: [
       'Select a player from the list or the pitch. Click or tap the pitch to place that player, use the arrow buttons, or type X and Y percentages from 0 to 100 across the pitch.',
-      'Arrow keys nudge the selected player when focus is on the pitch or the page background. They do not nudge while a text field, button, or other control has focus.',
+      'Arrow keys nudge (move a small step) the selected player when focus is on the pitch or the page background. They do not nudge while a text field, button, or other control has focus.',
     ],
   },
   {
@@ -307,15 +307,15 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'motion',
     title: 'Playback and reduced motion',
     paragraphs: [
-      'K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. A keyframe is a saved time on the timeline. Shift+K stops and returns to 0 ms.',
-      'When the device asks for reduced motion, Play and K step to the next keyframe instead of animating. Authoring, scrubbing, and frame steps stay available.',
+      'A keyframe is a saved time on the timeline. K plays or pauses when focus is on the pitch or the page background. J and L step one frame. [ and ] move between keyframes. Shift+K stops and returns to 0 ms.',
+      'When the device asks for reduced motion, Play and K step to the next keyframe instead of animating. Authoring, timeline scrubbing (dragging the playhead), and frame steps stay available.',
     ],
   },
   {
     id: 'recovery',
     title: 'Local recovery',
     paragraphs: [
-      'The project vault stores projects, snapshots, and autosaves in this browser. Nothing is uploaded.',
+      'The project vault — projects, snapshots, and autosaves stored in this browser — keeps that data on this device. Nothing is uploaded.',
       'If a previous autosave is waiting, autosave stays paused until you restore it or keep the current board.',
     ],
   },
