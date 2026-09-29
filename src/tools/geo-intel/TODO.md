@@ -232,3 +232,23 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `src/tools/geo-intel/ui/*.tsx` + `ui/geo-intel.css` — hooks (settings/history/client), Tooltip, ContextMenu, MapCanvas, panels (profile, provenance, admin, tools, compare, history, batch, sources, export modal) and `GeoIntelWorkspace.tsx`; needs every engine above.
 - `src/catalog.ts` + `src/tools/workspaces.tsx` registration immediately after, because the loader must point at an existing workspace file.
+
+## Delivery 9 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/GeoIntelWorkspace.tsx` — orchestrator: search, consented device location, map picks, tabs/bottom sheets, comparison, history, boundaries, choropleth, context menus, dialogs.
+- `src/tools/geo-intel/geo-intel.css` — scoped `.gi` styles, clamp-based sizing, ≥2200 px, ≤1100 px stacked, ≤760 px bottom tab bar + sheets, reduced-motion.
+- `src/tools/geo-intel/ui/format.ts`, `ui/hooks.ts` — display formatting, shared client, settings, media query, clipboard, long-press, save-picker progressive enhancement.
+- `src/tools/geo-intel/ui/Tooltip.tsx` — single tooltip layer (hover delay, focus-visible, touch press-and-hold, drag/scroll cancel, viewport clamping, aria-describedby).
+- `src/tools/geo-intel/ui/ContextMenu.tsx` — right-click/long-press menu with edge-aware placement and arrow-key navigation.
+- `src/tools/geo-intel/ui/MapCanvas.tsx` — SVG map: drag/wheel/pinch/keyboard pan-zoom, select/measure/box modes, hover names, pin + map menus.
+- `src/tools/geo-intel/ui/ProfilePanel.tsx` — summary + live clock, field rows with provenance buttons, admin chain, daylight chart, holidays with month filter, nearby radius, boundaries, attribution, provenance inspector.
+- `src/tools/geo-intel/ui/ToolsPanel.tsx` — converter, Plus Codes, distance/bearing, bounding box/area, choropleth.
+- `src/tools/geo-intel/ui/CollectionPanels.tsx` — comparison grid (≤6), history (star, rename, tag, filter, clear).
+- `src/tools/geo-intel/ui/OpsPanels.tsx` — batch CSV, sources/health/settings/cache/bundled-data manifest.
+- `src/tools/geo-intel/ui/ExportDialog.tsx` — metadata/tag editor (persisted per profile), per-format options, downloads, ZIP.
+### Gate evidence
+- `tsc --noEmit -p tsconfig.app.json` exit 0. G8 stays open until browser verification (G10) confirms behaviour at all viewports.
+### Next batch (planned)
+- `src/catalog.ts` — add `geo-intelligence-hub` to `ToolSlug` and one `TOOLS` entry.
+- `src/tools/workspaces.tsx` — one loader line (required by the `Record<ToolSlug, …>` type; see Boundary exceptions).
+- `tests/unit/geo-intel-wiring.test.ts` — registration contract, like the sheets/sightline wiring tests.
