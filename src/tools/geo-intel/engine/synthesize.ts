@@ -103,6 +103,10 @@ async function anchorFor(parsed: ParsedQuery, input: ResolveInput, options: Reso
       const metres = parsed.kind === 'decimal' ? decimalPrecisionMetres(parsed.text) : parsed.kind === 'utm' ? 1 : 30;
       return { point: parsed.point, kind: parsed.kind, query: parsed.text, confidence: confidenceForPrecision(metres), source: 'user', geography: 'point', recordId: null, note: parsed.detail, primary: null };
     }
+    case 'geohash': case 'maidenhead': {
+      const metres = parsed.cellMetres ?? 1_000;
+      return { point: parsed.point, kind: parsed.kind, query: parsed.text, confidence: confidenceForPrecision(metres), source: 'computed', geography: 'grid_cell', recordId: parsed.text.split(/[:=]/)[1]?.trim() ?? null, note: `Centre of the ${parsed.detail} cell.`, primary: null };
+    }
     case 'mgrs': {
       const metres = Number(/\((\d+) m\)/.exec(parsed.detail)?.[1] ?? 100_000);
       return { point: parsed.point, kind: 'mgrs', query: parsed.text, confidence: confidenceForPrecision(metres), source: 'user', geography: 'grid_cell', recordId: parsed.text.replace(/\s/g, '').toUpperCase(), note: `Centre of the ${parsed.detail}.`, primary: null };

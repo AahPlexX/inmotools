@@ -1,13 +1,13 @@
 // Classifies whatever the user typed into the universal search bar.
 
-import { parseDegrees, parseMgrs, parseUtm } from './coords';
+import { decodeGeohash, fromMaidenhead, parseDegrees, parseMgrs, parseUtm } from './coords';
 import { decode, isFull, isShort } from './olc';
 import { CA_POSTAL, isPostalCountry, UK_FULL, UK_OUTWARD } from './postal';
 import type { LatLon, QueryKind } from './types';
 
 export type ParsedQuery =
   | { kind: 'empty' }
-  | { kind: 'decimal' | 'dms' | 'utm' | 'mgrs' | 'plus-code-full'; point: LatLon; text: string; detail: string }
+  | { kind: 'decimal' | 'dms' | 'utm' | 'mgrs' | 'plus-code-full' | 'geohash' | 'maidenhead'; point: LatLon; text: string; detail: string; cellMetres?: number }
   | { kind: 'plus-code-short'; code: string; locality: string; text: string }
   | { kind: 'postal'; country: string | null; code: string; text: string }
   | { kind: 'place'; text: string }
@@ -74,6 +74,20 @@ export function parseQuery(input: string): ParsedQuery {
 
   const fromUrl = extractFromUrl(text);
   if (fromUrl) return inRange(fromUrl) ? { kind: 'decimal', point: fromUrl, text, detail: 'Coordinates from link' } : { kind: 'invalid', text, error: 'Link coordinates are out of range' };
+
+  // Geohash and Maidenhead need a prefix: bare values collide with words and UK postcodes (e.g. AB12CD).
+  const prefixed = /^(geohash|gh|grid|locator|loc|qth)\s*[:=]\s*(\S+)$/i.exec(text);
+  if (prefixed) {
+    const [, scheme, value] = prefixed;
+    try {
+      if (/^(geohash|gh)$/i.test(scheme)) {
+        const cell = decodeGeohash(value);
+        return { kind: 'geohash', point: cell.center, text, detail: `Geohash ${value.toLowerCase()}`, cellMetres: (cell.north - cell.south) * 111_320 };
+      }
+      const cell = fromMaidenhead(value);
+      return { kind: 'maidenhead', point: cell.center, text, detail: `Maidenhead locator ${value.toUpperCase()}`, cellMetres: (cell.north - cell.south) * 111_320 };
+    } catch (error) { return { kind: 'invalid', text, error: (error as Error).message }; }
+  }
 
   const plus = PLUS.exec(text);
   if (plus) {

@@ -126,3 +126,13 @@ describe('GeoJSON, KML and import', () => {
     expect(() => parseProfileImport('[]')).toThrow(/No Geo Intelligence Hub locations/);
   });
 });
+
+describe('prefixed geohash / locator search', async () => {
+  const { parseQuery } = await import('../../src/tools/geo-intel/core/query-parser');
+  it('parses prefixed codes and leaves UK postcodes alone', () => {
+    expect(parseQuery('geohash: u4pruydqqvj')).toMatchObject({ kind: 'geohash' });
+    expect(parseQuery('grid:FN31pr')).toMatchObject({ kind: 'maidenhead' });
+    expect(parseQuery('AB12DE')).toMatchObject({ kind: 'postal', country: 'GB' });
+    expect(parseQuery('gh:abc!')).toMatchObject({ kind: 'invalid' });
+  });
+});

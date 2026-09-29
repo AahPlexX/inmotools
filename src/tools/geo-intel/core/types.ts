@@ -186,6 +186,8 @@ export type QueryKind =
   | 'plus-code-short'
   | 'utm'
   | 'mgrs'
+  | 'geohash'
+  | 'maidenhead'
   | 'postal'
   | 'place'
   | 'device'
