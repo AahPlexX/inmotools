@@ -7,6 +7,7 @@ import {
   clampSelectBits,
   evaluateBlock,
   hasEnablePin,
+  hasSelectableSize,
   isBlockType,
   selectBitsOf,
 } from '../../src/tools/logic/block-engine';
@@ -87,7 +88,7 @@ describe('block-engine pin layouts', () => {
     expect(isBlockType('MUX')).toBe(true);
     expect(isBlockType('AND')).toBe(false);
     const group = COMPONENT_CATEGORIES.find((category) => category.category === 'combinational');
-    expect(group?.types).toEqual(['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER']);
+    expect(group?.types).toEqual(['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG']);
   });
 });
 
@@ -378,5 +379,54 @@ describe('block model and export integration', () => {
     const { doc, mux } = buildMuxCircuit();
     const svg = renderSchematicSvg(relabelComponent(doc, mux, '"><script>alert(1)</script>'));
     expect(svg).not.toContain('<script>');
+  });
+});
+
+describe('BCD-to-7-segment decoder', () => {
+  const bcd = (code: number | readonly LogicLevel[], params: ComponentParams = {}) => {
+    const bits: readonly LogicLevel[] = typeof code === 'number' ? [0, 1, 2, 3].map((index) => ((code >> index) & 1) as LogicLevel) : code;
+    return evaluateBlock('BCD_7SEG', params, Object.fromEntries(bits.map((level, index) => [`D${index}`, level])));
+  };
+  const lit = (outputs: Record<string, LogicLevel>) => 'ABCDEFG'.split('').map((id) => outputs[id]).join('');
+
+  it('lays out four data pins, an optional enable, and seven segment outputs', () => {
+    expect(portIds('BCD_7SEG', {}, 'input')).toEqual(['D0', 'D1', 'D2', 'D3']);
+    expect(portIds('BCD_7SEG', { hasEnable: true }, 'input')).toEqual(['D0', 'D1', 'D2', 'D3', 'EN']);
+    expect(portIds('BCD_7SEG', {}, 'output')).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    expect(blockTitle('BCD_7SEG', {})).toBe('BCD-7SEG');
+  });
+
+  it('draws every decimal digit with the standard segment pattern', () => {
+    const expected = ['1111110', '0110000', '1101101', '1111001', '0110011', '1011011', '1011111', '1110000', '1111111', '1111011'];
+    expected.forEach((pattern, digit) => expect(lit(bcd(digit))).toBe(pattern));
+  });
+
+  it('blanks the display for the six invalid codes', () => {
+    for (let code = 10; code < 16; code += 1) expect(lit(bcd(code))).toBe('0000000');
+  });
+
+  it('inverts every segment for an active-low display', () => {
+    expect(lit(bcd(1, { activeHigh: false }))).toBe('1001111');
+    expect(lit(bcd(12, { activeHigh: false }))).toBe('1111111');
+  });
+
+  it('turns every segment unknown when any input bit is unknown or floating', () => {
+    expect(lit(bcd([1, 'X', 0, 0]))).toBe('XXXXXXX');
+    expect(lit(bcd([1, 'Z', 0, 0]))).toBe('XXXXXXX');
+  });
+
+  it('blanks on a low enable regardless of the data, and goes unknown on a floating enable', () => {
+    const withEnable = (enable: LogicLevel, data: readonly LogicLevel[] = [0, 0, 0, 0]) =>
+      evaluateBlock('BCD_7SEG', { hasEnable: true }, { D0: data[0]!, D1: data[1]!, D2: data[2]!, D3: data[3]!, EN: enable });
+    expect(lit(withEnable(0))).toBe('0000000');
+    expect(lit(withEnable(0, ['X', 'X', 'X', 'X']))).toBe('0000000');
+    expect(lit(withEnable(1))).toBe('1111110');
+    expect(lit(withEnable('Z'))).toBe('XXXXXXX');
+  });
+
+  it('is offered with the other decoders and exposes no size choice', () => {
+    expect(COMPONENT_CATEGORIES.find((entry) => entry.category === 'combinational')?.types).toContain('BCD_7SEG');
+    expect(hasSelectableSize('BCD_7SEG')).toBe(false);
+    expect(hasSelectableSize('MUX')).toBe(true);
   });
 });

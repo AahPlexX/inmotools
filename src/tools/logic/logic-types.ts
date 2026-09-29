@@ -23,6 +23,7 @@ export type ComponentType =
   | 'DEMUX'
   | 'DECODER'
   | 'PRIORITY_ENCODER'
+  | 'BCD_7SEG'
   | 'COUNTER'
   | 'REGISTER';
 

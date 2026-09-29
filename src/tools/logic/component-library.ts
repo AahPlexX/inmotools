@@ -122,6 +122,7 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   DEMUX: blockDefinition('DEMUX', 'Demultiplexer'),
   DECODER: blockDefinition('DECODER', 'Binary decoder', { activeHigh: true }),
   PRIORITY_ENCODER: blockDefinition('PRIORITY_ENCODER', 'Priority encoder'),
+  BCD_7SEG: blockDefinition('BCD_7SEG', 'BCD to 7-segment decoder', { activeHigh: true }),
   COUNTER: registerDefinition('COUNTER', 'Binary counter'),
   REGISTER: registerDefinition('REGISTER', 'Register'),
 };
@@ -144,7 +145,7 @@ export const isCombinationalLogic = (type: ComponentType): boolean =>
 
 export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCategory; readonly label: string; readonly types: readonly ComponentType[] }[] = [
   { category: 'gate', label: 'Logic gates', types: ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'BUFFER', 'TRI_BUFFER'] },
-  { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER'] },
+  { category: 'combinational', label: 'Multiplexers & decoders', types: ['MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG'] },
   { category: 'sequential', label: 'Flip-flops & latches', types: ['D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH'] },
   { category: 'register', label: 'Counters & registers', types: ['COUNTER', 'REGISTER'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },

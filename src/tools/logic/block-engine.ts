@@ -12,7 +12,7 @@ import type { ComponentParams, ComponentType, LogicLevel, PortDefinition } from 
  * behavior, and drawn body can never drift apart.
  */
 
-export type BlockType = 'MUX' | 'DEMUX' | 'DECODER' | 'PRIORITY_ENCODER';
+export type BlockType = 'MUX' | 'DEMUX' | 'DECODER' | 'PRIORITY_ENCODER' | 'BCD_7SEG';
 
 /** Body width, in grid units, shared by the pin layout and both renderers. */
 export const BLOCK_WIDTH_COLS = 3;
@@ -21,7 +21,7 @@ export const MIN_SELECT_BITS = 1;
 export const MAX_SELECT_BITS = 4;
 
 export const isBlockType = (type: ComponentType): type is BlockType =>
-  type === 'MUX' || type === 'DEMUX' || type === 'DECODER' || type === 'PRIORITY_ENCODER';
+  type === 'MUX' || type === 'DEMUX' || type === 'DECODER' || type === 'PRIORITY_ENCODER' || type === 'BCD_7SEG';
 
 /** An 8-to-3 priority encoder is the familiar default; the others default to the 4-way (2-bit) size. */
 export const defaultSelectBits = (type: BlockType): number => (type === 'PRIORITY_ENCODER' ? 3 : 2);
@@ -42,6 +42,26 @@ export const selectBitsOf = (type: BlockType, params: ComponentParams): number =
 /** Whether this block type can expose an EN pin at all (priority encoders report validity through `V` instead). */
 export const supportsEnable = (type: BlockType): boolean => type !== 'PRIORITY_ENCODER';
 
+/** Whether the block's size comes from `selectBits`; the BCD-to-7-segment decoder is always 4 bits in, 7 segments out. */
+export const hasSelectableSize = (type: BlockType): boolean => type !== 'BCD_7SEG';
+
+/** The seven segment lines, in the order a display's pins use. */
+export const SEVEN_SEGMENT_IDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const;
+
+/** Lit segments (A-G) for the decimal digits 0-9; every other 4-bit code blanks the display. */
+const BCD_SEGMENT_PATTERNS: readonly (readonly (0 | 1)[])[] = [
+  [1, 1, 1, 1, 1, 1, 0],
+  [0, 1, 1, 0, 0, 0, 0],
+  [1, 1, 0, 1, 1, 0, 1],
+  [1, 1, 1, 1, 0, 0, 1],
+  [0, 1, 1, 0, 0, 1, 1],
+  [1, 0, 1, 1, 0, 1, 1],
+  [1, 0, 1, 1, 1, 1, 1],
+  [1, 1, 1, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1],
+  [1, 1, 1, 1, 0, 1, 1],
+];
+
 export const hasEnablePin = (type: BlockType, params: ComponentParams): boolean =>
   supportsEnable(type) && params.hasEnable === true;
 
@@ -51,6 +71,13 @@ const leftPin = (id: string, y: number): PortDefinition => ({ id, direction: 'in
 const rightPin = (id: string, y: number): PortDefinition => ({ id, direction: 'output', label: id, x: BLOCK_WIDTH_COLS, y });
 
 export const blockPorts = (type: BlockType, params: ComponentParams): readonly PortDefinition[] => {
+  if (type === 'BCD_7SEG') {
+    return [
+      ...range(4).map((index) => leftPin(`D${index}`, index)),
+      ...(hasEnablePin(type, params) ? [leftPin('EN', 4)] : []),
+      ...SEVEN_SEGMENT_IDS.map((id, index) => rightPin(id, index)),
+    ];
+  }
   const bits = selectBitsOf(type, params);
   const lines = 1 << bits;
   const enable = hasEnablePin(type, params);
@@ -91,6 +118,7 @@ export const blockPorts = (type: BlockType, params: ComponentParams): readonly P
 
 /** A short caption for the body, such as `MUX 4:1`, `DEMUX 1:8`, `DEC 3:8`, or `ENC 8:3`. */
 export const blockTitle = (type: BlockType, params: ComponentParams): string => {
+  if (type === 'BCD_7SEG') return 'BCD-7SEG';
   const bits = selectBitsOf(type, params);
   const lines = 1 << bits;
   if (type === 'MUX') return `MUX ${lines}:1`;
@@ -101,6 +129,7 @@ export const blockTitle = (type: BlockType, params: ComponentParams): string => 
 
 /** The label shown for one selectable size in the inspector. */
 export const blockSizeLabel = (type: BlockType, bits: number): string => {
+  if (type === 'BCD_7SEG') return '4-bit BCD to 7 segments';
   const lines = 1 << clampSelectBits(bits, defaultSelectBits(type));
   if (type === 'MUX') return `${lines}:1 multiplexer`;
   if (type === 'DEMUX') return `1:${lines} demultiplexer`;
@@ -213,12 +242,36 @@ const evaluatePriorityEncoder = (inputs: Readonly<Record<string, LogicLevel>>, b
 };
 
 /**
+ * BCD-to-7-segment decoding. Codes 10-15 blank the display, and an unknown
+ * input bit makes every segment unknown (a real decoder's glyph for that
+ * code would be a guess). A low EN blanks the display whatever the data is.
+ */
+const evaluateBcdDecoder = (inputs: Readonly<Record<string, LogicLevel>>, enable: boolean, activeHigh: boolean): Record<string, LogicLevel> => {
+  const enabled = enable ? toBit(inputs.EN) : 1;
+  const digits = range(4).map((index) => toBit(inputs[`D${index}`]));
+  let lit: readonly (Bit | 'X')[];
+  if (enabled === 0) lit = SEVEN_SEGMENT_IDS.map(() => 0 as Bit);
+  else if (enabled === undefined || digits.some((digit) => digit === undefined)) lit = SEVEN_SEGMENT_IDS.map(() => 'X' as const);
+  else {
+    const code = digits.reduce<number>((total, digit, index) => total + (digit as Bit) * (1 << index), 0);
+    lit = BCD_SEGMENT_PATTERNS[code] ?? SEVEN_SEGMENT_IDS.map(() => 0 as Bit);
+  }
+  const outputs: Record<string, LogicLevel> = {};
+  SEVEN_SEGMENT_IDS.forEach((id, index) => {
+    const segment = lit[index] ?? 0;
+    outputs[id] = segment === 'X' ? 'X' : activeHigh ? segment : invert(segment);
+  });
+  return outputs;
+};
+
+/**
  * Evaluates one block from its resolved input-pin levels (missing pins read
  * as floating). Returns a level for every output pin of `blockPorts`.
  */
 export const evaluateBlock = (type: BlockType, params: ComponentParams, inputs: Readonly<Record<string, LogicLevel>>): Record<string, LogicLevel> => {
   const bits = selectBitsOf(type, params);
   const enable = hasEnablePin(type, params);
+  if (type === 'BCD_7SEG') return evaluateBcdDecoder(inputs, enable, params.activeHigh !== false);
   if (type === 'MUX') return evaluateMux(inputs, bits, enable);
   if (type === 'DEMUX') return evaluateDemux(inputs, bits, enable);
   if (type === 'DECODER') return evaluateDecoder(inputs, bits, enable, params.activeHigh !== false);

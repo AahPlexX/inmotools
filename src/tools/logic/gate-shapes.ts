@@ -27,7 +27,7 @@ export const GATE_ABBREVIATION: Readonly<Record<ComponentType, string>> = {
   AND: 'AND', OR: 'OR', NOT: '1', NAND: 'NAND', NOR: 'NOR', XOR: 'XOR', XNOR: 'XNOR',
   BUFFER: '1', TRI_BUFFER: '1', SWITCH: 'SW', PUSH_BUTTON: 'PB', CLOCK: 'CLK', LED: 'LED',
   PROBE: 'PRB', D_FLIP_FLOP: 'D', JK_FLIP_FLOP: 'JK', T_FLIP_FLOP: 'T', SR_LATCH: 'SR',
-  MUX: 'MUX', DEMUX: 'DEMUX', DECODER: 'DEC', PRIORITY_ENCODER: 'ENC', COUNTER: 'CTR', REGISTER: 'REG',
+  MUX: 'MUX', DEMUX: 'DEMUX', DECODER: 'DEC', PRIORITY_ENCODER: 'ENC', BCD_7SEG: 'BCD', COUNTER: 'CTR', REGISTER: 'REG',
 };
 
 /** A rectangle in a component's local (pre-rotation, pre-mirror) pixel space. */

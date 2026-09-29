@@ -1,4 +1,4 @@
-import { blockSizeLabel, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
+import { blockSizeLabel, hasSelectableSize, isBlockType, MAX_SELECT_BITS, MIN_SELECT_BITS, selectBitsOf, supportsEnable, type BlockType } from './block-engine';
 import { clampInputCount, isVariadicGate } from './component-library';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
@@ -58,7 +58,7 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </label>
       ) : null}
 
-      {isBlockType(component.type) ? (
+      {isBlockType(component.type) && hasSelectableSize(component.type) ? (
         <label className="logic-field">
           <span>Size</span>
           <select
@@ -79,12 +79,12 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
         </label>
       ) : null}
 
-      {component.type === 'DECODER' ? (
+      {component.type === 'DECODER' || component.type === 'BCD_7SEG' ? (
         <label className="logic-field">
           <span>Output polarity</span>
           <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
-            <option value="high">Active high (selected line = 1)</option>
-            <option value="low">Active low (selected line = 0)</option>
+            <option value="high">{component.type === 'BCD_7SEG' ? 'Active high (lit segment = 1)' : 'Active high (selected line = 1)'}</option>
+            <option value="low">{component.type === 'BCD_7SEG' ? 'Active low (lit segment = 0)' : 'Active low (selected line = 0)'}</option>
           </select>
         </label>
       ) : null}
