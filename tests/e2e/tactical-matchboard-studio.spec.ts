@@ -341,6 +341,10 @@ test('has no serious or critical accessibility violations in the tactical worksp
   await voronoiToggle.focus();
   await page.keyboard.press('Space');
   await expect(voronoiToggle).toBeChecked();
+  await page.getByRole('button', { name: 'Show layers' }).click();
+  await expect(page.getByRole('button', { name: 'Solo Tactics' })).toBeVisible();
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(page.getByRole('dialog', { name: 'Tactical Matchboard help' })).toBeVisible();
   const results = await new AxeBuilder({ page })
     .include('[data-testid="suite-workspace"]')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -351,17 +355,27 @@ test('has no serious or critical accessibility violations in the tactical worksp
 
 test('reflows and preserves 44px essential targets across phone, tablet, laptop, and desktop widths', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'CSS-width coverage is deterministic in one Chromium project.');
-  const viewports = [
+  const viewports: Array<{ name: string; width: number; height: number; enlarge?: boolean; zoom?: string }> = [
     { name: 'phone portrait', width: 320, height: 740 },
     { name: 'phone landscape', width: 844, height: 390 },
     { name: 'tablet portrait', width: 768, height: 1024 },
+    { name: 'tablet landscape', width: 1080, height: 810 },
     { name: 'laptop', width: 1024, height: 768 },
     { name: 'desktop', width: 1440, height: 900 },
+    { name: 'large desktop', width: 1920, height: 1080 },
+    { name: 'enlarged text', width: 1280, height: 800, enlarge: true },
+    { name: 'page zoom', width: 1280, height: 900, zoom: '1.5' },
   ];
 
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('./#/tools/tactical-matchboard-studio');
+    if (viewport.enlarge) {
+      await page.evaluate(() => { document.documentElement.style.fontSize = '32px'; });
+    }
+    if (viewport.zoom) {
+      await page.evaluate((zoom) => { document.documentElement.style.zoom = zoom; }, viewport.zoom);
+    }
     await expect(page.locator('.tactical-board')).toBeVisible();
     await page.getByText('Rules, formations & restarts', { exact: true }).click();
     await page.getByText('Spatial analysis', { exact: true }).click();
@@ -369,6 +383,8 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${viewport.name} document overflow`).toBeLessThanOrEqual(1);
+    const workspaceOverflow = await page.locator('.tactical-matchboard-workspace').evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(workspaceOverflow, `${viewport.name} workspace overflow`).toBeLessThanOrEqual(1);
 
     const undersizedTargets = await page.locator([
       '.tactical-setup > summary',
@@ -391,6 +407,18 @@ test('reflows and preserves 44px essential targets across phone, tablet, laptop,
         return `${element.textContent?.trim() || element.tagName}: ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`;
       }));
     expect(undersizedTargets, `${viewport.name} essential target size`).toEqual([]);
+
+    await page.getByRole('button', { name: 'Show layers' }).click();
+    const layerTargets = await page.locator('.tactical-layer-panel button, .tactical-layer-panel .tactical-include').evaluateAll((elements) => elements
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && (rect.width < 44 || rect.height < 44);
+      })
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return `${element.textContent?.trim() || element.tagName}: ${rect.width.toFixed(1)}x${rect.height.toFixed(1)}`;
+      }));
+    expect(layerTargets, `${viewport.name} layer target size`).toEqual([]);
   }
 });
 
@@ -991,4 +1019,128 @@ test('exports metadata, analytics, playback, and a capability-checked video fall
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByLabel('Export title')).toHaveValue('Training board');
+});
+
+test('help, shortcuts, and tooltips stay available without taking over text fields', async ({ page }) => {
+  await page.getByRole('button', { name: 'Help' }).click();
+  const help = page.getByRole('dialog', { name: 'Tactical Matchboard help' });
+  await expect(help).toBeVisible();
+  await expect(help).toContainText('Shift+F10');
+  await expect(help).toContainText('Players sheet');
+  await expect(help.getByRole('button', { name: 'Close help' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(help).toHaveCount(0);
+  await expect(page.locator('.status-line').last()).toContainText('Help reference closed.');
+
+  await page.locator('#tactical-board-heading').click();
+  await page.keyboard.press('Shift+A');
+  await expect(page.locator('.tactical-board')).toHaveAttribute('data-interaction-mode', 'arrow');
+  await page.getByLabel('Arrow label').focus();
+  await page.keyboard.press('m');
+  await expect(page.locator('.tactical-board')).toHaveAttribute('data-interaction-mode', 'arrow');
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('dialog', { name: 'Player actions' })).toHaveCount(0);
+
+  await page.locator('#tactical-board-heading').click();
+  await page.keyboard.press('m');
+  await expect(page.locator('.tactical-board')).toHaveAttribute('data-interaction-mode', 'move');
+  await page.keyboard.press('k');
+  await expect(page.locator('.status-line').last()).toContainText(/Timeline playback started|Reduced motion stepped/i);
+
+  await page.getByRole('button', { name: 'Help' }).focus();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toBeVisible();
+  const box = await tooltip.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).toBeTruthy();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  if (viewport) {
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
+});
+
+test('player actions from right-click and the touch button lock the same player', async ({ page }) => {
+  await page.locator('.tactical-board-svg g[data-tactical-kind="player"]').first().click({ button: 'right' });
+  const dialog = page.getByRole('dialog', { name: 'Player actions' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Lock selected player' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Selected player locked.');
+  await dialog.getByRole('button', { name: 'Close player actions' }).click();
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  await expect(page.locator('.status-line').last()).toContainText(/locked/i);
+
+  await page.getByRole('button', { name: 'Unlock selected player' }).click();
+  await page.getByRole('button', { name: 'Player actions' }).click();
+  await expect(page.getByRole('dialog', { name: 'Player actions' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Player actions' })).toHaveCount(0);
+});
+
+test('groups, reorders, solos, and focuses scene layers', async ({ page }) => {
+  await page.getByRole('checkbox', { name: 'Include Goalkeeper 1 in group' }).check();
+  await page.getByRole('checkbox', { name: 'Include Player 2 in group' }).check();
+  await page.getByLabel('Group layer name').fill('Pressing unit');
+  await page.getByRole('button', { name: 'Group checked players' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Grouped 2 players on Pressing unit.');
+  await expect(page.getByRole('button', { name: 'Solo Pressing unit' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Move Pressing unit up' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Layer moved up.');
+  await page.getByRole('button', { name: 'Solo Pressing unit' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Focus Pressing unit' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Focused layer Pressing unit.');
+  await expect(page.locator('.tactical-board')).toHaveAttribute('data-selected-token', 'token-1');
+
+  await page.getByRole('button', { name: 'Show players' }).click();
+  await page.locator('.tactical-player-list button', { hasText: 'Player 3' }).click();
+  await page.getByRole('button', { name: 'Show layers' }).click();
+  await page.getByRole('checkbox', { name: 'Lock Tactics' }).check();
+  await page.getByRole('button', { name: 'Show players' }).click();
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  await expect(page.locator('.status-line').last()).toContainText(/locked/i);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Undid the last board edit.');
+});
+
+test('narrow sheets keep the pitch first and return focus', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const boardBox = await page.locator('.tactical-board').boundingBox();
+  const setupBox = await page.locator('.tactical-setup').first().boundingBox();
+  expect(boardBox && setupBox && boardBox.y < setupBox.y).toBe(true);
+
+  await page.getByRole('button', { name: 'Players sheet' }).click();
+  await expect(page.locator('.tactical-matchboard-workspace')).toHaveAttribute('data-inspector-sheet', 'open');
+  await expect(page.getByRole('button', { name: 'Close players sheet' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.tactical-matchboard-workspace')).toHaveAttribute('data-inspector-sheet', 'closed');
+  await expect(page.getByRole('button', { name: 'Players sheet' })).toBeFocused();
+
+  await page.getByRole('button', { name: 'Timeline sheet' }).click();
+  await expect(page.locator('.tactical-timeline-panel')).toHaveClass(/tactical-sheet-active/);
+  await expect(page.getByRole('button', { name: 'Close timeline sheet' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Play timeline' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.tactical-matchboard-workspace')).toHaveAttribute('data-timeline-sheet', 'closed');
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('reduced motion steps playback instead of animating it', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await expect(page.locator('.tactical-matchboard-workspace')).toHaveAttribute('data-reduced-motion', 'reduce');
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Motion target').selectOption('token-1');
+  await page.getByLabel('Motion start (ms)').fill('0');
+  await page.getByLabel('Motion end (ms)').fill('1000');
+  await page.getByLabel('Motion end X %').fill('80');
+  await page.getByLabel('Motion end Y %').fill('20');
+  await page.getByRole('button', { name: 'Author motion segment' }).click();
+  await page.getByRole('button', { name: 'Play timeline' }).click();
+  await expect(page.getByTestId('timeline-preview-time')).toHaveText('1000 ms');
+  await expect(page.locator('.status-line').last()).toContainText('Reduced motion stepped to the next keyframe.');
+  await expect(page.getByRole('button', { name: 'Play timeline' })).toBeEnabled();
 });

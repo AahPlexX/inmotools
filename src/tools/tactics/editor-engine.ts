@@ -267,23 +267,159 @@ export function setSceneLayerState(
   layerId: string,
   patch: Partial<Pick<TacticalLayer, 'name' | 'visible' | 'locked'>>,
 ): TacticalProject {
-  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
-  if (!scene) throw new Error(`Scene "${sceneId}" does not exist.`);
+  const scene = requireScene(project, sceneId);
   if (!scene.layers.some((layer) => layer.id === layerId)) {
     throw new Error(`Layer "${layerId}" does not exist in scene "${sceneId}".`);
   }
 
+  return replaceScene(project, sceneId, {
+    ...scene,
+    layers: scene.layers.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer)),
+  });
+}
+
+function requireScene(project: TacticalProject, sceneId: string) {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (!scene) throw new Error(`Scene "${sceneId}" does not exist.`);
+  return scene;
+}
+
+function replaceScene(
+  project: TacticalProject,
+  sceneId: string,
+  scene: TacticalProject['scenes'][number],
+): TacticalProject {
   return {
     ...project,
-    scenes: project.scenes.map((candidate) =>
-      candidate.id === sceneId
-        ? {
-            ...candidate,
-            layers: candidate.layers.map((layer) =>
-              layer.id === layerId ? { ...layer, ...patch } : layer
-            ),
-          }
-        : candidate
-    ),
+    scenes: project.scenes.map((candidate) => (candidate.id === sceneId ? scene : candidate)),
+  };
+}
+
+function requireLayerName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Layer name is required.');
+  if (trimmed.length > 80) throw new Error('Layer name must be 80 characters or fewer.');
+  return trimmed;
+}
+
+export function addSceneLayer(
+  project: TacticalProject,
+  sceneId: string,
+  layer: TacticalLayer,
+): TacticalProject {
+  const scene = requireScene(project, sceneId);
+  requireUniqueId(project, layer.id);
+  const name = requireLayerName(layer.name);
+  return replaceScene(project, sceneId, {
+    ...scene,
+    layers: [...scene.layers, { ...layer, name, visible: layer.visible, locked: layer.locked }],
+  });
+}
+
+export function reorderSceneLayer(
+  project: TacticalProject,
+  sceneId: string,
+  layerId: string,
+  direction: -1 | 1,
+): TacticalProject {
+  const scene = requireScene(project, sceneId);
+  const index = scene.layers.findIndex((layer) => layer.id === layerId);
+  if (index < 0) throw new Error(`Layer "${layerId}" does not exist in scene "${sceneId}".`);
+  const nextIndex = index + direction;
+  if (nextIndex < 0) throw new RangeError(`Layer "${layerId}" is already at the start of the layer order.`);
+  if (nextIndex >= scene.layers.length) {
+    throw new RangeError(`Layer "${layerId}" is already at the end of the layer order.`);
+  }
+  const layers = [...scene.layers];
+  const [layer] = layers.splice(index, 1);
+  layers.splice(nextIndex, 0, layer!);
+  return replaceScene(project, sceneId, { ...scene, layers });
+}
+
+export function soloSceneLayer(
+  project: TacticalProject,
+  sceneId: string,
+  layerId: string,
+): TacticalProject {
+  const scene = requireScene(project, sceneId);
+  if (!scene.layers.some((layer) => layer.id === layerId)) {
+    throw new Error(`Layer "${layerId}" does not exist in scene "${sceneId}".`);
+  }
+  return replaceScene(project, sceneId, {
+    ...scene,
+    layers: scene.layers.map((layer) => ({ ...layer, visible: layer.id === layerId })),
+  });
+}
+
+export function layerPlayerTokenIds(
+  project: TacticalProject,
+  sceneId: string,
+  layerId: string,
+): string[] {
+  const scene = requireScene(project, sceneId);
+  if (!scene.layers.some((layer) => layer.id === layerId)) {
+    throw new Error(`Layer "${layerId}" does not exist in scene "${sceneId}".`);
+  }
+  return project.playerTokens
+    .filter((token) => token.sceneId === sceneId && token.layerId === layerId)
+    .map((token) => token.id);
+}
+
+export function setPlayerTokenLocked(
+  project: TacticalProject,
+  tokenId: string,
+  locked: boolean,
+): TacticalProject {
+  const token = project.playerTokens.find((candidate) => candidate.id === tokenId);
+  if (!token) throw new Error(`Player token "${tokenId}" does not exist.`);
+  return {
+    ...project,
+    playerTokens: project.playerTokens.map((candidate) => (
+      candidate.id === tokenId ? { ...candidate, locked } : candidate
+    )),
+  };
+}
+
+export function groupPlayerTokens(
+  project: TacticalProject,
+  sceneId: string,
+  tokenIds: string[],
+  layerName: string,
+): TacticalProject {
+  const name = requireLayerName(layerName);
+  const uniqueIds = [...new Set(tokenIds)];
+  if (!uniqueIds.length) throw new Error('Select at least one player to group.');
+  const scene = requireScene(project, sceneId);
+  for (const tokenId of uniqueIds) {
+    const token = project.playerTokens.find((candidate) => candidate.id === tokenId);
+    if (!token) throw new Error(`Player token "${tokenId}" does not exist.`);
+    if (token.sceneId !== sceneId) {
+      throw new Error(`Player token "${tokenId}" is not in scene "${sceneId}".`);
+    }
+    if (token.locked) throw new Error(`Player token "${tokenId}" is locked.`);
+    const source = scene.layers.find((layer) => layer.id === token.layerId);
+    if (!source) throw new Error(`Layer "${token.layerId}" does not exist in scene "${sceneId}".`);
+    if (source.locked) throw new Error(`Layer "${source.id}" is locked.`);
+  }
+
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'group';
+  let layerId = `layer-${base}`;
+  let suffix = 2;
+  while (hasProjectId(project, layerId)) {
+    layerId = `layer-${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  const withLayer = addSceneLayer(project, sceneId, {
+    id: layerId,
+    name,
+    visible: true,
+    locked: false,
+  });
+  return {
+    ...withLayer,
+    playerTokens: withLayer.playerTokens.map((token) => (
+      uniqueIds.includes(token.id) ? { ...token, layerId } : token
+    )),
   };
 }

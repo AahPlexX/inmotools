@@ -1,4 +1,4 @@
-import { useMemo, type PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
   TacticalAnalysisOverlay,
@@ -16,6 +16,7 @@ export interface TacticalBoardProps {
   analysisSettings?: AnalysisDisplaySettings;
   onSelectToken: (tokenId: string) => void;
   onPitchPoint: (point: NormalizedPoint) => void;
+  onOpenActions: (tokenId?: string) => void;
 }
 
 function tokenIdFromTarget(target: EventTarget | null): string | undefined {
@@ -33,6 +34,7 @@ export default function TacticalBoard({
   analysisSettings,
   onSelectToken,
   onPitchPoint,
+  onOpenActions,
 }: TacticalBoardProps) {
   const svg = useMemo(
     () => serializeTacticalBoardSvg(project, sceneId),
@@ -49,6 +51,11 @@ export default function TacticalBoard({
 
     const rect = event.currentTarget.getBoundingClientRect();
     onPitchPoint(clientPointToNormalized(event, rect));
+  }
+
+  function handleContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    event.preventDefault();
+    onOpenActions(tokenIdFromTarget(event.target));
   }
 
   const instruction = interactionMode === 'arrow'
@@ -75,6 +82,7 @@ export default function TacticalBoard({
         data-interaction-mode={interactionMode}
         data-selected-token={selectedTokenId ?? ''}
         onPointerDown={handlePointerDown}
+        onContextMenu={handleContextMenu}
         role="group"
         aria-label={instruction}
       >

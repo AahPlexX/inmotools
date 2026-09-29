@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import type { TacticalTransportRequest } from './accessibility-engine';
+import { reducedMotionTransportStep } from './accessibility-engine';
+import { useFocusTrap } from './TacticalOverlay';
 import TacticalBezierPathEditor from './TacticalBezierPathEditor';
 import TacticalCoordinationControls from './TacticalCoordinationControls';
 import TacticalTimingControls from './TacticalTimingControls';
@@ -34,6 +37,10 @@ export interface TacticalTimelinePanelProps {
     updater: (current: TacticalProject) => TacticalProject,
     message: string,
   ) => void;
+  transportRequest?: TacticalTransportRequest | null;
+  reducedMotion?: boolean;
+  sheetActive?: boolean;
+  onSheetDismiss?: () => void;
 }
 
 function nextId(prefix: string, existing: string[]): string {
@@ -129,6 +136,10 @@ export default function TacticalTimelinePanel({
   onPreviewTimeChange,
   onTransportStatus,
   onEdit,
+  transportRequest = null,
+  reducedMotion = false,
+  sheetActive = false,
+  onSheetDismiss,
 }: TacticalTimelinePanelProps) {
   const targets = useMemo(
     () => [...project.playerTokens.map((token) => token.id), 'ball'],
@@ -146,12 +157,26 @@ export default function TacticalTimelinePanel({
   const [interpolation, setInterpolation] = useState<InterpolationKind>('smooth');
   const [frameRate, setFrameRate] = useState(30);
   const [playing, setPlaying] = useState(false);
+  const [sheetReady, setSheetReady] = useState(false);
   const previewTimeRef = useRef(previewTimeMs);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const transportSerialRef = useRef(0);
+  useFocusTrap(sheetReady, sheetRef, () => onSheetDismiss?.());
   const keyframeTimes = useMemo(() => timelineKeyframeTimes(project.timeline), [project.timeline]);
 
   useEffect(() => {
     previewTimeRef.current = previewTimeMs;
   }, [previewTimeMs]);
+
+  useEffect(() => {
+    if (!sheetActive) {
+      setSheetReady(false);
+      return;
+    }
+    if (detailsRef.current) detailsRef.current.open = true;
+    setSheetReady(true);
+  }, [sheetActive]);
 
   useEffect(() => {
     if (!targets.includes(motionTarget)) setMotionTarget(targets[0] ?? 'ball');
@@ -229,6 +254,13 @@ export default function TacticalTimelinePanel({
 
   function play() {
     if (project.timeline.durationMs <= 0) return;
+    if (reducedMotion) {
+      const step = reducedMotionTransportStep(previewTimeRef.current, project.timeline.durationMs, keyframeTimes);
+      setPlaying(false);
+      setPreviewTime(step.timeMs);
+      onTransportStatus(step.message);
+      return;
+    }
     if (previewTimeRef.current >= project.timeline.durationMs && !project.timeline.loop) {
       setPreviewTime(0);
     }
@@ -266,6 +298,24 @@ export default function TacticalTimelinePanel({
     setPreviewTime(next);
     onTransportStatus(direction > 0 ? 'Moved forward one frame.' : 'Moved back one frame.');
   }
+
+  useEffect(() => {
+    if (!transportRequest || transportRequest.serial === transportSerialRef.current) return;
+    transportSerialRef.current = transportRequest.serial;
+    if (transportRequest.action === 'toggle-playback') {
+      if (playing) pause();
+      else play();
+      return;
+    }
+    if (transportRequest.action === 'stop-playback') {
+      stop();
+      return;
+    }
+    if (transportRequest.action === 'previous-frame') stepFrame(-1);
+    else if (transportRequest.action === 'next-frame') stepFrame(1);
+    else if (transportRequest.action === 'previous-keyframe') moveToKeyframe(-1);
+    else moveToKeyframe(1);
+  }, [transportRequest]);
 
   function submitPlayhead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -335,9 +385,20 @@ export default function TacticalTimelinePanel({
   }
 
   return (
-    <details className="tactical-setup tactical-authoring">
+    <details
+      ref={detailsRef}
+      className={`tactical-setup tactical-authoring tactical-timeline-panel${sheetActive ? ' tactical-sheet-active' : ''}`}
+      onToggle={(event) => {
+        if (!event.currentTarget.open) onSheetDismiss?.();
+      }}
+    >
       <summary>Timeline &amp; motion</summary>
-      <div className="tactical-authoring-grid">
+      <div className="tactical-authoring-grid" ref={sheetRef}>
+        {sheetActive ? (
+          <button id="tactical-close-timeline-sheet" type="button" className="action-button secondary tactical-sheet-close" onClick={() => onSheetDismiss?.()}>
+            Close timeline sheet
+          </button>
+        ) : null}
         <section className="tactical-transport" aria-labelledby="timeline-transport-heading">
           <h3 id="timeline-transport-heading">Transport</h3>
           <div className="tactical-transport-status">

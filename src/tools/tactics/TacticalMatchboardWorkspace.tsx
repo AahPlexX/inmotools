@@ -1,17 +1,33 @@
-import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import TacticalAnalysisPanel, { DEFAULT_ANALYSIS_DISPLAY_SETTINGS } from './TacticalAnalysisPanel';
 import TacticalBoard from './TacticalBoard';
 import TacticalExportPanel from './TacticalExportPanel';
+import TacticalInspector from './TacticalInspector';
+import { TacticalDialog } from './TacticalOverlay';
 import TacticalPersistencePanel from './TacticalPersistencePanel';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
 import TacticalVideoPanel from './TacticalVideoPanel';
+import {
+  TACTICAL_HELP_SECTIONS,
+  TACTICAL_SHORTCUTS,
+  classifyTacticalFocus,
+  placeCollisionSafeTooltip,
+  resolveTacticalShortcut,
+  type TacticalTransportRequest,
+} from './accessibility-engine';
 import { serializeTacticalBoardSvg } from './board-engine';
 import {
   commitTacticalProject,
   createTacticalHistory,
+  groupPlayerTokens,
+  layerPlayerTokenIds,
   movePlayerToken,
   redoTacticalProject,
+  reorderSceneLayer,
+  setPlayerTokenLocked,
+  setSceneLayerState,
+  soloSceneLayer,
   undoTacticalProject,
 } from './editor-engine';
 import {
@@ -146,6 +162,19 @@ export default function TacticalMatchboardWorkspace() {
   const [cameraPresetId, setCameraPresetId] = useState<CameraPresetId>('tactical');
   const [cameraDraft, setCameraDraft] = useState<CameraState | null>(null);
   const [status, setStatus] = useState('Board ready. Select a player or choose the arrow tool.');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [inspectorSheet, setInspectorSheet] = useState(false);
+  const [timelineSheet, setTimelineSheet] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<'players' | 'layers'>('players');
+  const [groupedTokenIds, setGroupedTokenIds] = useState<string[]>([]);
+  const [transportRequest, setTransportRequest] = useState<TacticalTransportRequest | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [tip, setTip] = useState<{ text: string; top: number; left: number; width: number; height: number } | null>(null);
+  const tipHostRef = useRef<HTMLElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const transportSerialRef = useRef(0);
+  const overlayOpen = helpOpen || actionsOpen || inspectorSheet || timelineSheet;
 
   const project = history.present;
   const presentationProject = useMemo(
@@ -185,12 +214,14 @@ export default function TacticalMatchboardWorkspace() {
     [activeFormation, project, sceneId],
   );
 
-  function applyEdit(label: string, updater: (current: TacticalProject) => TacticalProject, message: string) {
+  function applyEdit(label: string, updater: (current: TacticalProject) => TacticalProject, message: string): boolean {
     try {
       setHistory(commitTacticalProject(history, label, updater));
       setStatus(message);
+      return true;
     } catch (error) {
       setStatus(errorMessage(error));
+      return false;
     }
   }
 
@@ -521,6 +552,154 @@ export default function TacticalMatchboardWorkspace() {
     setStatus(next === history ? 'Nothing to redo.' : 'Redid the next board edit.');
   }
 
+  function closeOverlay() {
+    if (helpOpen) setHelpOpen(false);
+    else if (actionsOpen) setActionsOpen(false);
+    else if (inspectorSheet) setInspectorSheet(false);
+    else if (timelineSheet) setTimelineSheet(false);
+  }
+
+  function openHelp() {
+    setActionsOpen(false);
+    setInspectorSheet(false);
+    setTimelineSheet(false);
+    setHelpOpen(true);
+    setStatus('Help reference opened.');
+  }
+
+  function openActions(tokenId?: string) {
+    const nextToken = tokenId ?? selectedTokenId;
+    if (!nextToken || !sceneTokens.some((token) => token.id === nextToken)) {
+      setStatus('Select a player before opening player actions.');
+      return;
+    }
+    if (tokenId) setSelectedTokenId(tokenId);
+    setHelpOpen(false);
+    setInspectorSheet(false);
+    setTimelineSheet(false);
+    setActionsOpen(true);
+    setStatus('Player actions opened.');
+  }
+
+  function issueTransport(action: TacticalTransportRequest['action']) {
+    transportSerialRef.current += 1;
+    setTransportRequest({ serial: transportSerialRef.current, action });
+  }
+
+  function hideTip() {
+    if (tipHostRef.current) tipHostRef.current.removeAttribute('aria-describedby');
+    tipHostRef.current = null;
+    setTip(null);
+  }
+
+  function showTip(target: EventTarget | null) {
+    if (overlayOpen || !(target instanceof Element)) {
+      hideTip();
+      return;
+    }
+    const host = target.closest<HTMLElement>('[data-tactical-tip]');
+    if (!host) {
+      hideTip();
+      return;
+    }
+    if (tipHostRef.current === host) return;
+    if (tipHostRef.current) tipHostRef.current.removeAttribute('aria-describedby');
+    host.setAttribute('aria-describedby', 'tactical-tooltip');
+    tipHostRef.current = host;
+    const rect = host.getBoundingClientRect();
+    setTip({
+      text: host.getAttribute('data-tactical-tip') ?? '',
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    });
+  }
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => setReducedMotion(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
+  useEffect(() => {
+    if (overlayOpen) hideTip();
+  }, [overlayOpen]);
+
+  useLayoutEffect(() => {
+    const node = tooltipRef.current;
+    if (!node || !tip) return;
+    const place = placeCollisionSafeTooltip(
+      tip,
+      { width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    node.style.top = `${place.top}px`;
+    node.style.left = `${place.left}px`;
+  }, [tip]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target;
+      const focus = classifyTacticalFocus({
+        inBoard: target instanceof Element && Boolean(target.closest('.tactical-board')),
+        editable: target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]')),
+        activation: target instanceof Element && Boolean(target.closest('button, a, summary, [role="button"]')),
+      });
+      const action = resolveTacticalShortcut(event, { focus, overlayOpen });
+      if (!action) return;
+      event.preventDefault();
+      if (action === 'close-overlay') {
+        closeOverlay();
+        setStatus('Closed the open tactical surface.');
+        return;
+      }
+      if (action === 'help') {
+        openHelp();
+        return;
+      }
+      if (action === 'undo') {
+        undo();
+        return;
+      }
+      if (action === 'redo') {
+        redo();
+        return;
+      }
+      if (action === 'move-tool') {
+        setMode('move');
+        setArrowStart(null);
+        setStatus('Move tool active.');
+        return;
+      }
+      if (action === 'arrow-tool') {
+        setMode('arrow');
+        setArrowStart(null);
+        setStatus('Arrow tool active. Choose a start point.');
+        return;
+      }
+      if (action === 'nudge-up') nudge(0, -0.02);
+      else if (action === 'nudge-down') nudge(0, 0.02);
+      else if (action === 'nudge-left') nudge(-0.02, 0);
+      else if (action === 'nudge-right') nudge(0.02, 0);
+      else if (action === 'player-actions') openActions();
+      else if (
+        action === 'toggle-playback'
+        || action === 'stop-playback'
+        || action === 'previous-frame'
+        || action === 'next-frame'
+        || action === 'previous-keyframe'
+        || action === 'next-keyframe'
+      ) {
+        issueTransport(action);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
     <>
       <div className="workspace-header tactical-workspace-header">
@@ -529,7 +708,22 @@ export default function TacticalMatchboardWorkspace() {
           <p>Build a local tactical board, place a formation, move players precisely, add arrows, and export SVG.</p>
         </div>
       </div>
-      <div className="workspace-body tactical-matchboard-workspace">
+      <div
+        className="workspace-body tactical-matchboard-workspace"
+        data-inspector-sheet={inspectorSheet ? 'open' : 'closed'}
+        data-timeline-sheet={timelineSheet ? 'open' : 'closed'}
+        data-reduced-motion={reducedMotion ? 'reduce' : 'no-preference'}
+        onFocus={(event) => showTip(event.target)}
+        onBlur={(event) => {
+          const next = event.relatedTarget;
+          if (!(next instanceof Element) || !next.closest('[data-tactical-tip]')) hideTip();
+        }}
+        onPointerOver={(event) => showTip(event.target)}
+        onPointerOut={(event) => {
+          const next = event.relatedTarget;
+          if (!(next instanceof Element) || !next.closest('[data-tactical-tip]')) hideTip();
+        }}
+      >
         <details
           className="tactical-setup"
           open={setupOpen}
@@ -752,6 +946,10 @@ export default function TacticalMatchboardWorkspace() {
           onPreviewTimeChange={(timeMs) => { setPreviewTimeMs(timeMs); setCameraDraft(null); }}
           onTransportStatus={setStatus}
           onEdit={applyEdit}
+          transportRequest={transportRequest}
+          reducedMotion={reducedMotion}
+          sheetActive={timelineSheet}
+          onSheetDismiss={() => setTimelineSheet(false)}
         />
 
         <TacticalAnalysisPanel
@@ -812,6 +1010,7 @@ export default function TacticalMatchboardWorkspace() {
             className={`action-button ${mode === 'move' ? '' : 'secondary'}`}
             type="button"
             aria-pressed={mode === 'move'}
+            data-tactical-tip="Place the selected player by clicking or tapping the pitch."
             onClick={() => { setMode('move'); setArrowStart(null); setStatus('Move tool active.'); }}
           >
             Move
@@ -820,6 +1019,7 @@ export default function TacticalMatchboardWorkspace() {
             className={`action-button ${mode === 'arrow' ? '' : 'secondary'}`}
             type="button"
             aria-pressed={mode === 'arrow'}
+            data-tactical-tip="Choose a start point, then an end point, to draw an arrow."
             onClick={() => { setMode('arrow'); setArrowStart(null); setStatus('Arrow tool active. Choose a start point.'); }}
           >
             Arrow
@@ -828,9 +1028,42 @@ export default function TacticalMatchboardWorkspace() {
             Arrow label
             <input value={arrowLabel} onChange={(event) => setArrowLabel(event.target.value)} />
           </label>
-          <button className="action-button secondary" type="button" disabled={!history.past.length} onClick={undo}>Undo</button>
-          <button className="action-button secondary" type="button" disabled={!history.future.length} onClick={redo}>Redo</button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Undo the last board edit." disabled={!history.past.length} onClick={undo}>Undo</button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Redo the next board edit." disabled={!history.future.length} onClick={redo}>Redo</button>
           <button className="action-button secondary" type="button" onClick={exportSvg}>Export SVG</button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Open the help reference. Tooltips are extra; the labels and help stay available." onClick={openHelp}>Help</button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Open the same player actions as a right-click." onClick={() => openActions()}>Player actions</button>
+          <button
+            className="action-button secondary"
+            type="button"
+            aria-pressed={inspectorSheet}
+            data-tactical-tip="Open player and layer controls in a bottom sheet."
+            onClick={() => {
+              setHelpOpen(false);
+              setActionsOpen(false);
+              setTimelineSheet(false);
+              setInspectorTab('players');
+              setInspectorSheet(true);
+              setStatus('Players sheet opened.');
+            }}
+          >
+            Players sheet
+          </button>
+          <button
+            className="action-button secondary"
+            type="button"
+            aria-pressed={timelineSheet}
+            data-tactical-tip="Open timeline transport in a bottom sheet."
+            onClick={() => {
+              setHelpOpen(false);
+              setActionsOpen(false);
+              setInspectorSheet(false);
+              setTimelineSheet(true);
+              setStatus('Timeline sheet opened.');
+            }}
+          >
+            Timeline sheet
+          </button>
           <button
             className="action-button secondary"
             type="button"
@@ -889,73 +1122,151 @@ export default function TacticalMatchboardWorkspace() {
               setStatus(`Selected ${tokenId}.`);
             }}
             onPitchPoint={handlePitchPoint}
+            onOpenActions={openActions}
           />
 
-          <aside className="tactical-inspector" aria-label="Player precision controls">
-            <h3>Players</h3>
-            <div className="tactical-player-list">
-              {sceneTokens.map((token) => {
-                const team = project.teams.find((candidate) => candidate.id === token.teamId);
-                const player = team?.roster.find((candidate) => candidate.id === token.playerId);
-                return (
-                  <button
-                    key={token.id}
-                    type="button"
-                    className={token.id === selectedTokenId ? 'selected' : ''}
-                    aria-pressed={token.id === selectedTokenId}
-                    onClick={() => setSelectedTokenId(token.id)}
-                  >
-                    <strong>{player?.jerseyNumber ?? '\u2014'}</strong>
-                    <span>{player?.displayName ?? token.id}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <h3>Precision move</h3>
-            <div className="tactical-dpad" role="group" aria-label="Nudge selected player">
-              <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up">\u2191</button>
-              <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left">\u2190</button>
-              <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right">\u2192</button>
-              <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down">\u2193</button>
-            </div>
-
-            {selectedToken ? (
-              <form
-                className="tactical-coordinate-form"
-                onSubmit={setPrecisePosition}
-                key={`${selectedToken.id}-${selectedToken.position.x}-${selectedToken.position.y}`}
-              >
-                <label>
-                  X %
-                  <input
-                    name="xPercent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    defaultValue={(selectedToken.position.x * 100).toFixed(1)}
-                  />
-                </label>
-                <label>
-                  Y %
-                  <input
-                    name="yPercent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    defaultValue={(selectedToken.position.y * 100).toFixed(1)}
-                  />
-                </label>
-                <button type="submit">Set position</button>
-              </form>
-            ) : <p>Select a player to enable exact coordinates.</p>}
-          </aside>
+          <TacticalInspector
+            project={project}
+            sceneId={sceneId}
+            sceneTokens={sceneTokens}
+            selectedTokenId={selectedTokenId}
+            groupedTokenIds={groupedTokenIds}
+            tab={inspectorTab}
+            sheetOpen={inspectorSheet}
+            onTabChange={setInspectorTab}
+            onSelectToken={setSelectedTokenId}
+            onToggleGrouped={(tokenId) => {
+              setGroupedTokenIds((current) => (
+                current.includes(tokenId) ? current.filter((id) => id !== tokenId) : [...current, tokenId]
+              ));
+            }}
+            onGroup={(layerName) => {
+              const grouped = applyEdit(
+                'Group players',
+                (current) => groupPlayerTokens(current, sceneId, groupedTokenIds, layerName),
+                `Grouped ${groupedTokenIds.length} players on ${layerName.trim()}.`,
+              );
+              if (!grouped) return;
+              setGroupedTokenIds([]);
+              setInspectorTab('layers');
+            }}
+            onToggleTokenLock={(tokenId, locked) => {
+              applyEdit(
+                locked ? 'Lock player' : 'Unlock player',
+                (current) => setPlayerTokenLocked(current, tokenId, locked),
+                locked ? 'Selected player locked.' : 'Selected player unlocked.',
+              );
+            }}
+            onLayerVisibility={(layerId, visible) => {
+              applyEdit(
+                visible ? 'Show layer' : 'Hide layer',
+                (current) => setSceneLayerState(current, sceneId, layerId, { visible }),
+                visible ? 'Layer shown.' : 'Layer hidden.',
+              );
+            }}
+            onLayerLocked={(layerId, locked) => {
+              applyEdit(
+                locked ? 'Lock layer' : 'Unlock layer',
+                (current) => setSceneLayerState(current, sceneId, layerId, { locked }),
+                locked ? 'Layer locked.' : 'Layer unlocked.',
+              );
+            }}
+            onReorderLayer={(layerId, direction) => {
+              applyEdit(
+                'Reorder layer',
+                (current) => reorderSceneLayer(current, sceneId, layerId, direction),
+                direction < 0 ? 'Layer moved up.' : 'Layer moved down.',
+              );
+            }}
+            onSoloLayer={(layerId) => {
+              const layer = activeScene?.layers.find((candidate) => candidate.id === layerId);
+              applyEdit(
+                'Solo layer',
+                (current) => soloSceneLayer(current, sceneId, layerId),
+                `Solo ${layer?.name ?? 'layer'}. Other layers in this scene are hidden.`,
+              );
+            }}
+            onFocusLayer={(layerId) => {
+              try {
+                const tokenIds = layerPlayerTokenIds(project, sceneId, layerId);
+                const layer = activeScene?.layers.find((candidate) => candidate.id === layerId);
+                const tokenId = tokenIds[0];
+                if (!tokenId) {
+                  setStatus(`${layer?.name ?? 'Layer'} has no players to focus.`);
+                  return;
+                }
+                setSelectedTokenId(tokenId);
+                setInspectorTab('players');
+                setStatus(`Focused layer ${layer?.name ?? layerId}.`);
+              } catch (error) {
+                setStatus(errorMessage(error));
+              }
+            }}
+            onNudge={nudge}
+            onSetPosition={setPrecisePosition}
+            onCloseSheet={() => {
+              setInspectorSheet(false);
+              setStatus('Players sheet closed.');
+            }}
+          />
         </div>
 
         <div className="status-line good" role="status" aria-live="polite">{status}</div>
       </div>
+      {tip ? (
+        <div
+          ref={tooltipRef}
+          id="tactical-tooltip"
+          role="tooltip"
+          className="tactical-tooltip"
+        >
+          {tip.text}
+        </div>
+      ) : null}
+      {helpOpen ? (
+        <TacticalDialog title="Tactical Matchboard help" labelledBy="tactical-help-title" closeLabel="Close help" onClose={() => { setHelpOpen(false); setStatus('Help reference closed.'); }}>
+          {TACTICAL_HELP_SECTIONS.map((section) => (
+            <section key={section.id} aria-labelledby={`tactical-help-${section.id}`}>
+              <h3 id={`tactical-help-${section.id}`}>{section.title}</h3>
+              {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            </section>
+          ))}
+          <section aria-labelledby="tactical-help-shortcuts">
+            <h3 id="tactical-help-shortcuts">Shortcuts</h3>
+            <ul>
+              {TACTICAL_SHORTCUTS.map((shortcut) => (
+                <li key={shortcut.id}><strong>{shortcut.display}</strong> — {shortcut.summary}</li>
+              ))}
+            </ul>
+          </section>
+        </TacticalDialog>
+      ) : null}
+      {actionsOpen && selectedToken ? (
+        <TacticalDialog title="Player actions" labelledBy="tactical-player-actions-title" closeLabel="Close player actions" onClose={() => { setActionsOpen(false); setStatus('Player actions closed.'); }}>
+          <p>These actions match the player buttons. A right-click, Shift+F10, and the Player actions button open this same dialog.</p>
+          <div className="tactical-dialog-actions">
+            <button
+              type="button"
+              className="action-button secondary"
+              onClick={() => {
+                applyEdit(
+                  selectedToken.locked ? 'Unlock player' : 'Lock player',
+                  (current) => setPlayerTokenLocked(current, selectedToken.id, !selectedToken.locked),
+                  selectedToken.locked ? 'Selected player unlocked.' : 'Selected player locked.',
+                );
+              }}
+            >
+              {selectedToken.locked ? 'Unlock selected player' : 'Lock selected player'}
+            </button>
+            <button type="button" className="action-button secondary" onClick={() => { setMode('move'); setArrowStart(null); setStatus('Move tool active.'); }}>Move tool</button>
+            <button type="button" className="action-button secondary" onClick={() => { setMode('arrow'); setArrowStart(null); setStatus('Arrow tool active. Choose a start point.'); }}>Arrow tool</button>
+            <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up from actions">Move up</button>
+            <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left from actions">Move left</button>
+            <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right from actions">Move right</button>
+            <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down from actions">Move down</button>
+          </div>
+        </TacticalDialog>
+      ) : null}
     </>
   );
 }

@@ -293,8 +293,23 @@
 }
 
 @media (max-width: 900px) {
+  .tactical-matchboard-workspace {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+  }
+
+  .tactical-matchboard-workspace > * {
+    order: 10;
+  }
+
   .tactical-editor-layout {
+    order: 1;
     grid-template-columns: 1fr;
+  }
+
+  .tactical-command-bar {
+    order: 2;
   }
 
   .tactical-inspector {
@@ -889,5 +904,210 @@
     color: #ffd7d3;
     background: #4a1d1d;
     border-color: #e2aaa6;
+  }
+}
+
+.tactical-matchboard-workspace {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tactical-matchboard-workspace button,
+.tactical-matchboard-workspace input,
+.tactical-matchboard-workspace select,
+.tactical-matchboard-workspace textarea,
+.tactical-matchboard-workspace summary,
+.tactical-dialog button,
+.tactical-dialog input,
+.tactical-dialog select,
+.tactical-dialog textarea {
+  font-size: 1rem;
+  min-height: max(44px, 2.75rem);
+  height: auto;
+}
+
+.tactical-player-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.tactical-player-row > button {
+  min-width: 0;
+  min-height: max(44px, 2.75rem);
+}
+
+.tactical-include {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: max(44px, 2.75rem);
+  min-width: 44px;
+  font-weight: 650;
+}
+
+.tactical-include input {
+  width: 44px;
+  min-width: 44px;
+  min-height: max(44px, 2.75rem);
+}
+
+.tactical-inspector-tabs,
+.tactical-layer-actions,
+.tactical-dialog-actions,
+.tactical-group-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tactical-inspector-tabs button,
+.tactical-layer-actions button,
+.tactical-dialog-actions button,
+.tactical-group-form button,
+.tactical-sheet-close {
+  min-height: max(44px, 2.75rem);
+  min-width: 44px;
+}
+
+.tactical-group-form {
+  display: grid;
+}
+
+.tactical-layer-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #cbd5e1);
+}
+
+.tactical-layer-row h4,
+.tactical-layer-row p,
+.tactical-dialog p,
+.tactical-dialog h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tactical-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  background: rgb(16 24 32 / 48%);
+}
+
+.tactical-dialog {
+  width: min(640px, 100%);
+  max-height: min(78dvh, 760px);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: clamp(12px, 2vw, 20px);
+  border-radius: 16px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #101820);
+  box-shadow: 0 18px 48px rgb(15 23 42 / 28%);
+}
+
+.tactical-dialog ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.tactical-tooltip {
+  position: fixed;
+  z-index: 45;
+  width: min(280px, calc(100vw - 16px));
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #101820);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 18%);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.tactical-matchboard-workspace[data-inspector-sheet="open"] .tactical-inspector {
+  position: fixed;
+  z-index: 40;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  top: auto;
+  max-height: min(78dvh, 720px);
+  overflow: auto;
+  box-shadow: 0 16px 40px rgb(15 23 42 / 28%);
+}
+
+.tactical-timeline-panel.tactical-sheet-active > .tactical-authoring-grid {
+  position: fixed;
+  z-index: 40;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  max-height: min(78dvh, 720px);
+  overflow: auto;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 16px 40px rgb(15 23 42 / 28%);
+}
+
+.tactical-board :focus-visible,
+.tactical-path-handle:focus-visible,
+.tactical-dialog :focus-visible,
+.tactical-inspector :focus-visible {
+  outline: 3px solid var(--focus, #0b66ff);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .tactical-layer-actions > button,
+  .tactical-dialog-actions > button,
+  .tactical-inspector-tabs > button {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tactical-matchboard-workspace,
+  .tactical-dialog,
+  .tactical-inspector,
+  .tactical-timeline-panel,
+  .tactical-tooltip {
+    scroll-behavior: auto;
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .tactical-dialog,
+  .tactical-tooltip,
+  .tactical-matchboard-workspace[data-inspector-sheet="open"] .tactical-inspector,
+  .tactical-timeline-panel.tactical-sheet-active > .tactical-authoring-grid {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .tactical-dialog,
+  .tactical-tooltip,
+  .tactical-command-bar,
+  .tactical-timeline-panel.tactical-sheet-active > .tactical-authoring-grid {
+    background: var(--surface, #111820);
+    color: var(--ink, #e8eef5);
   }
 }
