@@ -5,6 +5,7 @@ import {
   type FiberCraftDocument,
   type GaugeSwatch,
   type GridChart,
+  type KnittingConstruction,
 } from './fiber-craft-types';
 
 const STARTER_ROWS = 12;
@@ -50,6 +51,7 @@ export const createStarterKnittingDocument = (
     palette: STARTER_PALETTE,
     gauge,
     chart: createEmptyGridChart(STARTER_ROWS, STARTER_COLS, gaugeAspectRatio(gauge)),
+    settings: { knitting: { construction: 'flat' } },
     swatchImages: {},
     completedSteps: [],
   };
@@ -95,6 +97,44 @@ export const setKnittingGauge = (
     ...document,
     gauge: { ...gauge },
     chart: { ...chart, aspectRatio },
+    metadata: { ...document.metadata, updatedAt: now },
+  };
+};
+
+
+export interface KnittingRowDirection {
+  readonly side: 'right' | 'wrong';
+  readonly direction: 'right-to-left' | 'left-to-right';
+}
+
+export const knittingRowDirection = (
+  rowIndex: number,
+  construction: KnittingConstruction,
+): KnittingRowDirection => {
+  if (!Number.isInteger(rowIndex) || rowIndex < 0) {
+    throw new Error('Knitting row index must be a non-negative integer.');
+  }
+  if (construction === 'round' || rowIndex % 2 === 0) {
+    return { side: 'right', direction: 'right-to-left' };
+  }
+  return { side: 'wrong', direction: 'left-to-right' };
+};
+
+export const setKnittingConstruction = (
+  document: FiberCraftDocument,
+  construction: KnittingConstruction,
+  now = new Date().toISOString(),
+): FiberCraftDocument => {
+  requireKnittingGrid(document);
+  if (construction !== 'flat' && construction !== 'round') {
+    throw new Error('Knitting construction must be flat or in the round.');
+  }
+  return {
+    ...document,
+    settings: {
+      ...document.settings,
+      knitting: { construction },
+    },
     metadata: { ...document.metadata, updatedAt: now },
   };
 };
