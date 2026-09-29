@@ -4,9 +4,9 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated source tip: `b538a655b7efdd35de83cd20478976f46494a1b8`
+- Last fully browser-validated source tip: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Task 11 closed — responsive/accessibility/QoL hardening.** Next is T12-01.
+- Milestone: **Task 12 closed — performance and adversarial audit.** Next is T13-01. Branch-complete is not claimed.
 - Verified functional features: **51/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
@@ -14,7 +14,31 @@ Documentation commits after the validated source tip do not change Tactical runt
 
 ## Exact next sequential action
 
-**T12-01 — performance and adversarial audit is READY.** Do not start it from this Task 11 close-out. Help reference copy changed, so the Stage 2 instructional writer may review that dialog copy; that review does not block T12-01. The workspace header instructional sentence was not rewritten. Do not reopen rows 43–48, 50, or 56–60.
+**T13-01 — branch-complete gate is READY.** Do not claim branch-complete from this Task 12 close-out. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 43–48, 50, or 56–60. Newly verified rows: none.
+
+## Task 12 closure evidence
+
+Task 12 is **DONE** at runtime source `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`. Focused Tactical units pass **144/144** across 19 `tactics-*.test.ts` files and the e2e selector check passes **3/3**. TypeScript and the production build pass (`✓ built in 5.78s`). The full Tactical Playwright spec passes **68 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. The verified numerator stays **51/60**.
+
+Measured findings:
+
+- **Dense trajectory sampling — fixed.** A 12,000-keyframe span sampled every 10 ms took 7869.5 ms before the change. `sampleTrackAtTimes` now walks each track once, and `sampleAuthoredTrajectory` caches by track identity. The same span stays under 750 ms and keeps the first position and last time.
+- **Unbounded analysis and conflict loops — fixed.** Sampling that would exceed 120,000 times throws before the loop. Analysis shows `trajectoryWarning` and keeps the selected token. Conflict review shows `role="alert"` and keeps the last successful review.
+- **Hostile project import — fixed.** Duration above 6 hours, more than 256 tracks, more than 100,000 keyframes on one track, more than 8,000 markers, and trajectory times past 6 hours are rejected. The opened project identity is unchanged.
+- **Hostile ZIP — fixed.** An end-of-directory count above 256 is rejected. Extra central-directory headers are counted even when that record understates them. Declared uncompressed sizes are checked before `JSZip.loadAsync`, including a lied 30,000,000-byte `project.json`.
+- **CSV formula text — fixed.** `entity_id`, `team_id`, and `event` values that start with `=`, `+`, `-`, `@`, tab, or carriage return are prefixed on export and restored on import. The event `=press` round-trips.
+- **Hidden playback — fixed.** Local video review pauses both elements when the document is hidden and does not auto-resume. Standalone HTML playback calls `stop()` when `document.hidden` is true.
+- **Named snapshots — fixed.** The 41st named snapshot throws. The existing 40 snapshots and the saved project title stay in place. Autosave pruning is unchanged.
+- **History bound — already satisfied.** `HISTORY_LIMIT` remains 100. One hundred ten commits keep the past stack at or below 100, and one hundred undos keep the future stack at or below 100. No history implementation change.
+- **3D disposal and hidden-tab pause — already satisfied.** Existing presentation runtime tests cover disposal and hidden-tab scheduling. Not reimplemented.
+- **Timeline playback pause — already satisfied.** Playback already stops while `document.hidden` and does not schedule frames while stopped. Collapsing the timeline details element does not pause board playback.
+- **Realistic 11v11 session — already inside budget.** Twenty-two players, 30 equipment items, and 22 tracks of 10 keyframes over 90 seconds validate cleanly. Thirty playback samples stay under 1 second, SVG serialization stays under 500 ms, and 30 analysis derives stay under 1 second. No further optimization was applied.
+- **Timeline virtualization — tracked residual, not required.** Two hundred fifty-six tracks validate, and each track is one text row. Virtualization was not added.
+- **Squad size — tracked residual, intentionally uncapped.** Row 3 still requires arbitrary roster growth, so player and roster counts were not capped.
+- **Scene-diff memoization — tracked residual.** The spec names efficient scene diffs. The measured 11v11 session did not miss its budgets, so no scene-diff cache was added.
+- **Gauntlet.** The audited paths match the approved performance and import-security contract. No competitor trade dress was copied. Remaining spec gaps are the unfinished rows below, not untracked audit defects.
+
+In progress remains **3, 4, 5, 7, 8**. Planned remains **6, 39, 40, 41**.
 
 ## Task 11 closure evidence
 
