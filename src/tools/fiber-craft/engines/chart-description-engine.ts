@@ -1,5 +1,5 @@
 import { COUNTED_BACKSTITCH_TECHNIQUE_LABELS, countedStitchLabel, generateCountedThreadLegend } from './counted-thread-engine';
-import { crochetSymbolLabel, type CrochetDialect } from './symbol-library';
+import { crochetSymbolLabel, getKnittingSymbol, type CrochetDialect } from './symbol-library';
 import type { ColorSlot, FiberCraftDocument } from '../fiber-craft-types';
 
 export interface FiberChartTextDescription { readonly summary: string; readonly details: readonly string[]; readonly legend: readonly string[]; }
@@ -55,8 +55,38 @@ export function describeCountedThreadChart(document: FiberCraftDocument): FiberC
   return { summary: `Counted-thread chart with ${chart.rows} rows and ${chart.cols} columns. ${plural(worked.length, 'counted stitch')} placed, ${plural(chart.knots.length, 'French knot')}, and ${lineText}.`, details, legend: legend.map((entry) => { const code = [entry.paletteName, entry.code].filter(Boolean).join(' '); return `${entry.symbol}: ${entry.label}${code ? `, ${code}` : ''}, ${plural(entry.usageCount, 'mark')}.`; }) };
 }
 
+export function describeKnittingChart(document: FiberCraftDocument): FiberChartTextDescription {
+  if (document.metadata.discipline !== 'knitting' || document.chart.kind !== 'grid') throw new Error('Knitting chart descriptions require a knitting grid.');
+  const chart = document.chart;
+  const gauge = document.gauge;
+  const worked = chart.cells.filter((cell) => cell.symbolId !== null || cell.colorId !== null);
+  const details = Array.from({ length: chart.rows }, (_, row) => {
+    const cells = chart.cells.filter((cell) => cell.row === row);
+    const charted = cells.filter((cell) => cell.symbolId !== null || cell.colorId !== null);
+    return `Row ${row + 1}: ${charted.length} charted, ${cells.length - charted.length} blank.`;
+  });
+  const symbols = countValues(worked.flatMap((cell) => cell.symbolId ? [cell.symbolId] : []));
+  const colors = countValues(worked.flatMap((cell) => cell.colorId ? [cell.colorId] : []));
+  const gaugeText = gauge
+    ? ` Gauge: ${gauge.stitchCount} stitches and ${gauge.rowCount} rows over ${gauge.span} ${gauge.unit}.`
+    : '';
+  const symbolLabel = (id: string) => {
+    try { return getKnittingSymbol(id).name; }
+    catch { return id; }
+  };
+  return {
+    summary: `Knitting grid with ${chart.rows} rows and ${chart.cols} stitches. Cell width-to-height ratio ${chart.aspectRatio.toFixed(2)}.${gaugeText}`,
+    details,
+    legend: [
+      ...(symbols.size > 0 ? [`Used stitches: ${formattedCounts(symbols, symbolLabel)}.`] : []),
+      ...(colors.size > 0 ? [`Used colors: ${formattedCounts(colors, (id) => paletteLabel(document.palette, id))}.`] : []),
+    ],
+  };
+}
+
 export function describeFiberCraftChart(document: FiberCraftDocument, dialect: CrochetDialect): FiberChartTextDescription {
   if (document.metadata.discipline === 'crochet') return describeCrochetChart(document, dialect);
   if (document.metadata.discipline === 'cross-stitch') return describeCountedThreadChart(document);
+  if (document.metadata.discipline === 'knitting') return describeKnittingChart(document);
   throw new Error('This Fiber Craft discipline does not have a text description yet.');
 }
