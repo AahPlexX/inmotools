@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-29  
 **Design:** `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md` (163 numbered capabilities)  
-**Tally:** 75 done · 39 partial · 49 missing (of 163)
+**Tally:** 75 done · 42 partial · 46 missing (of 163)
 
 Status is judged from code and tests on `main`. **Done** means engine plus a reachable surface (UI or export) with tests. **Partial** names the exact gap. **Missing** means no implementation. The design exclusions (macromolecular building, CSD/ICSD, SHELX executables, magnetic-space-group solving) need owner-approved wording before they count as excluded; none is recorded as excluded here.
 
@@ -118,9 +118,9 @@ Update the status of an item here whenever its implementation changes; keep this
 | 106 | Compare observed versus simulated traces with residual curves and explicit numeric fi... | Partial | overlayResiduals peak deltas; no residual curve or R-metrics |
 | 107 | Simulate multiple structural phases in one powder pattern with adjustable phase scales. | Missing | No multi-phase patterns |
 | 108 | Estimate phase fractions from fitted scale parameters only when the required assumpti... | Missing | No multi-phase patterns |
-| 109 | Provide a bounded least-squares powder fitting core for scale, zero shift, lattice pa... | Missing | Phase 4 not started |
-| 110 | Allow parameters to be fixed/free and bounded, with the active parameter set visible... | Missing | Phase 4 not started |
-| 111 | Report convergence, parameter changes, residual metrics, iteration count, and termina... | Missing | Phase 4 not started |
+| 109 | Provide a bounded least-squares powder fitting core for scale, zero shift, lattice pa... | Partial | fit-engine.ts bounded LM core with fixed/free/bounds and honest termination (crystal-fit test); powder model wrapper and UI pending |
+| 110 | Allow parameters to be fixed/free and bounded, with the active parameter set visible... | Partial | fit-engine.ts bounded LM core with fixed/free/bounds and honest termination (crystal-fit test); powder model wrapper and UI pending |
+| 111 | Report convergence, parameter changes, residual metrics, iteration count, and termina... | Partial | fit-engine.ts bounded LM core with fixed/free/bounds and honest termination (crystal-fit test); powder model wrapper and UI pending |
 | 112 | Provide an observed-reflection workspace for CIF/SHELX-style reflection data with Fc/... | Missing | Phase 4 not started |
 | 113 | Compute common residual summaries such as R1-style and weighted residual metrics with... | Missing | Phase 4 not started |
 | 114 | Calculate difference-Fourier-style scalar grids from suitable observed/calculated ref... | Missing | Phase 4 not started |
