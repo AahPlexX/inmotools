@@ -3,6 +3,7 @@ import { ALU_OPERATION_HELP, ALU_OPERATIONS, ALU_WIDTHS, aluSizeLabel, aluWidthO
 import { clampBusWidth, MAX_BUS_WIDTH, MIN_BUS_WIDTH } from './bus-engine';
 import { clampInputCount, isVariadicGate, paletteLabel } from './component-library';
 import { isDisplayType } from './display-engine';
+import { addressBitsOf, DATA_WIDTHS, dataBitsOf, fillOf, formatWord, formatWordCount, isMemoryType, MAX_ADDRESS_BITS, MIN_ADDRESS_BITS, parseHexWord, wordCount } from './memory-engine';
 import { bitWidthOf, isRegisterType, MAX_BIT_WIDTH, MIN_BIT_WIDTH, registerSizeLabel } from './register-engine';
 import type { ComponentInstance, LicenseOption, LogicDocument, ThemeName } from './logic-types';
 
@@ -21,15 +22,17 @@ export interface LogicInspectorProps {
   readonly onUpdateParams: (id: string, params: Partial<ComponentInstance['params']>) => void;
   readonly onUpdateMetadata: (metadata: Partial<LogicDocument['metadata']>) => void;
   readonly onSetTheme: (theme: ThemeName) => void;
+  /** Opens the memory editor on one RAM or ROM. */
+  readonly onOpenMemoryEditor: (componentId: string) => void;
 }
 
-export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpdateMetadata, onSetTheme }: LogicInspectorProps) {
+export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpdateMetadata, onSetTheme, onOpenMemoryEditor }: LogicInspectorProps) {
   const selected = doc.selectedIds.length === 1 ? doc.components.find((component) => component.id === doc.selectedIds[0]) : undefined;
 
   return (
     <aside className="logic-inspector" data-testid="logic-inspector" aria-label="Component inspector">
       {selected ? (
-        <ComponentInspector component={selected} onRelabel={onRelabel} onUpdateParams={onUpdateParams} />
+        <ComponentInspector component={selected} onRelabel={onRelabel} onUpdateParams={onUpdateParams} onOpenMemoryEditor={onOpenMemoryEditor} />
       ) : doc.selectedIds.length > 1 ? (
         <p className="logic-inspector-hint">{doc.selectedIds.length} components selected. Right-click for group actions.</p>
       ) : (
@@ -39,7 +42,7 @@ export function LogicInspector({ document: doc, onRelabel, onUpdateParams, onUpd
   );
 }
 
-function ComponentInspector({ component, onRelabel, onUpdateParams }: { component: ComponentInstance; onRelabel: LogicInspectorProps['onRelabel']; onUpdateParams: LogicInspectorProps['onUpdateParams'] }) {
+function ComponentInspector({ component, onRelabel, onUpdateParams, onOpenMemoryEditor }: { component: ComponentInstance; onRelabel: LogicInspectorProps['onRelabel']; onUpdateParams: LogicInspectorProps['onUpdateParams']; onOpenMemoryEditor: LogicInspectorProps['onOpenMemoryEditor'] }) {
   return (
     <div>
       <h3>{paletteLabel(component.type)}</h3>
@@ -123,6 +126,63 @@ function ComponentInspector({ component, onRelabel, onUpdateParams }: { componen
             ))}
           </dl>
           <p className="logic-inspector-hint">EQ, LT, and GT compare A with B (unsigned) whatever the operation is.</p>
+        </>
+      ) : null}
+
+      {isMemoryType(component.type) ? (
+        <>
+          <label className="logic-field">
+            <span>Address width</span>
+            <select value={addressBitsOf(component.params)} onChange={(event) => onUpdateParams(component.id, { addressBits: Number(event.target.value) })}>
+              {Array.from({ length: MAX_ADDRESS_BITS - MIN_ADDRESS_BITS + 1 }, (_, index) => MIN_ADDRESS_BITS + index).map((bits) => (
+                <option key={bits} value={bits}>{bits}-bit ({formatWordCount(wordCount(bits))} words)</option>
+              ))}
+            </select>
+          </label>
+          <label className="logic-field">
+            <span>Word width</span>
+            <select value={dataBitsOf(component.params)} onChange={(event) => onUpdateParams(component.id, { dataBits: Number(event.target.value) })}>
+              {DATA_WIDTHS.map((bits) => (
+                <option key={bits} value={bits}>{bits}-bit words</option>
+              ))}
+            </select>
+          </label>
+          <label className="logic-field">
+            <span>Fill value (hex, every unwritten word)</span>
+            <input
+              key={`${component.id}-${dataBitsOf(component.params)}-${fillOf(component.params)}`}
+              type="text"
+              inputMode="text"
+              spellCheck={false}
+              defaultValue={formatWord(fillOf(component.params), dataBitsOf(component.params))}
+              onBlur={(event) => {
+                const parsed = parseHexWord(event.target.value, dataBitsOf(component.params));
+                if (parsed === undefined) event.target.value = formatWord(fillOf(component.params), dataBitsOf(component.params));
+                else onUpdateParams(component.id, { memoryFill: parsed });
+              }}
+            />
+          </label>
+          <label className="logic-field logic-field-inline">
+            <input type="checkbox" checked={component.params.hasEnable === true} onChange={(event) => onUpdateParams(component.id, { hasEnable: event.target.checked })} />
+            <span>Output enable (OE) pin</span>
+          </label>
+          {component.type === 'RAM' ? (
+            <label className="logic-field">
+              <span>Write clock edge</span>
+              <select value={component.params.edge ?? 'rising'} onChange={(event) => onUpdateParams(component.id, { edge: event.target.value as 'rising' | 'falling' })}>
+                <option value="rising">Rising edge</option>
+                <option value="falling">Falling edge</option>
+              </select>
+            </label>
+          ) : null}
+          <label className="logic-field">
+            <span>{component.type === 'RAM' ? 'WE / OE polarity' : 'OE polarity'}</span>
+            <select value={component.params.activeHigh === false ? 'low' : 'high'} onChange={(event) => onUpdateParams(component.id, { activeHigh: event.target.value !== 'low' })}>
+              <option value="high">Active high</option>
+              <option value="low">Active low</option>
+            </select>
+          </label>
+          <button type="button" className="logic-inspector-action" onClick={() => onOpenMemoryEditor(component.id)}>Open memory editor</button>
         </>
       ) : null}
 

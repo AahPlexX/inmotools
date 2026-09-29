@@ -1,4 +1,3 @@
-import { BLOCK_WIDTH_COLS } from './block-engine';
 import { busLabel } from './bus-engine';
 import type { ComponentParams, LogicLevel, PortDefinition } from './logic-types';
 
@@ -19,6 +18,9 @@ import type { ComponentParams, LogicLevel, PortDefinition } from './logic-types'
  * right. The single-bit pins behind each bus exist but are hidden, exactly as on
  * a bus-pin register, so the simulator and the analyzer keep working on them.
  */
+
+/** Body width in grid units: wide enough for two bus labels such as `A[15:0]` and `Y[15:0]` to sit side by side. */
+export const ALU_WIDTH_COLS = 5;
 
 export const ALU_WIDTHS = [4, 8, 16] as const;
 export type AluWidth = (typeof ALU_WIDTHS)[number];
@@ -60,7 +62,7 @@ export const aluPorts = (params: ComponentParams): readonly PortDefinition[] => 
   const bBits = range(width).map((index) => `B${index}`);
   const yBits = range(width).map((index) => `Y${index}`);
   const left = (id: string, y: number): PortDefinition => ({ id, direction: 'input', label: id, x: 0, y });
-  const right = (id: string, y: number): PortDefinition => ({ id, direction: 'output', label: id, x: BLOCK_WIDTH_COLS, y });
+  const right = (id: string, y: number): PortDefinition => ({ id, direction: 'output', label: id, x: ALU_WIDTH_COLS, y });
   return [
     { id: 'A', direction: 'input', label: busLabel('A', width), x: 0, y: 0, bus: { bits: aBits } },
     { id: 'B', direction: 'input', label: busLabel('B', width), x: 0, y: 1, bus: { bits: bBits } },
@@ -68,11 +70,11 @@ export const aluPorts = (params: ComponentParams): readonly PortDefinition[] => 
     left('OP1', 3),
     left('OP2', 4),
     left('CIN', 5),
-    { id: 'Y', direction: 'output', label: busLabel('Y', width), x: BLOCK_WIDTH_COLS, y: 0, bus: { bits: yBits } },
+    { id: 'Y', direction: 'output', label: busLabel('Y', width), x: ALU_WIDTH_COLS, y: 0, bus: { bits: yBits } },
     ...ALU_FLAG_IDS.map((id, index) => right(id, index + 1)),
     ...aBits.map((id): PortDefinition => ({ id, direction: 'input', label: id, x: 0, y: 0, hidden: true })),
     ...bBits.map((id): PortDefinition => ({ id, direction: 'input', label: id, x: 0, y: 1, hidden: true })),
-    ...yBits.map((id): PortDefinition => ({ id, direction: 'output', label: id, x: BLOCK_WIDTH_COLS, y: 0, hidden: true })),
+    ...yBits.map((id): PortDefinition => ({ id, direction: 'output', label: id, x: ALU_WIDTH_COLS, y: 0, hidden: true })),
   ];
 };
 

@@ -1,4 +1,3 @@
-import { BLOCK_WIDTH_COLS } from './block-engine';
 import { busLabel } from './bus-engine';
 import type { ComponentParams, ComponentType, LogicLevel, PortDefinition } from './logic-types';
 
@@ -24,6 +23,9 @@ import type { ComponentParams, ComponentType, LogicLevel, PortDefinition } from 
  * the clock edge) is skipped and reported instead of silently corrupting a
  * word.
  */
+
+/** Body width in grid units: wide enough for `ADDR[31:0]` on the left and `DOUT[31:0]` on the right. */
+export const MEMORY_WIDTH_COLS = 6;
 
 export type MemoryType = 'RAM' | 'ROM';
 
@@ -101,8 +103,10 @@ export const memoryPorts = (type: MemoryType, params: ComponentParams): readonly
     visible.push(left('OE', 1));
   }
 
-  visible.push({ id: 'DOUT', direction: 'output', label: busLabel('DOUT', dataBits), x: BLOCK_WIDTH_COLS, y: 0, bus: { bits: dataOutIds } });
-  hidden.push(...dataOutIds.map((id): PortDefinition => ({ id, direction: 'output', label: id, x: BLOCK_WIDTH_COLS, y: 0, hidden: true })));
+  // A ROM has one input row, so its data pin sits on the second row to keep the body two rows tall.
+  const dataOutY = type === 'ROM' ? 1 : 0;
+  visible.push({ id: 'DOUT', direction: 'output', label: busLabel('DOUT', dataBits), x: MEMORY_WIDTH_COLS, y: dataOutY, bus: { bits: dataOutIds } });
+  hidden.push(...dataOutIds.map((id): PortDefinition => ({ id, direction: 'output', label: id, x: MEMORY_WIDTH_COLS, y: dataOutY, hidden: true })));
   return [...visible, ...hidden];
 };
 
@@ -370,6 +374,33 @@ export const wordsFromAscii = (text: string, dataBits: number): number[] => {
   }
   return words;
 };
+
+/**
+ * A row of words after the person typed over its ASCII text. Only a character
+ * that differs from what the row already shows changes its byte, so the `.`
+ * that stands for an unprintable byte keeps that byte unless it is replaced.
+ * Characters beyond the row's width are ignored.
+ */
+export const applyAsciiText = (words: readonly number[], text: string, dataBits: number): number[] => {
+  const size = bytesPerWord(dataBits);
+  const bytes = words.flatMap((word) => wordBytes(word, dataBits));
+  const shown = bytes.map(printable);
+  const typed = Array.from(text);
+  for (let index = 0; index < Math.min(typed.length, bytes.length); index += 1) {
+    if (typed[index] === shown[index]) continue;
+    const code = typed[index]!.charCodeAt(0);
+    bytes[index] = code <= 255 ? code : 0x3f;
+  }
+  return words.map((_, wordIndex) => {
+    let value = 0;
+    for (let index = 0; index < size; index += 1) value = value * 256 + (bytes[wordIndex * size + index] ?? 0);
+    return normalizeWord(value, dataBits) ?? 0;
+  });
+};
+
+/** The address the address pins currently hold, or undefined while any of them is unknown. */
+export const addressFromPins = (params: ComponentParams, read: (portId: string) => LogicLevel): number | undefined =>
+  bitsToNumber(range(addressBitsOf(params)).map((index) => read(`ADDR${index}`)));
 
 // --- SECTION: binary import and export ---
 

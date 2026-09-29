@@ -84,7 +84,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 ### Sequential logic, clocks & memory
 7. Flip-flop/latch bank: D, T, JK, SR, with active-high/low async set/reset and positive/negative edge triggering. *(Phase 1: D/JK/T/SR; Phase 2 — register banks delivered in 2B)*
 8. Interactive multi-frequency clock generator (0.5 Hz–10 kHz presets) plus a manual single-step tick control. *(Phase 1)*
-9. RAM/ROM memory editor matrix (4-bit–32-bit address space) with a hex/ASCII cell editor and raw binary import. *(Phase 3)*
+9. RAM/ROM memory editor matrix (4-bit–32-bit address space) with a hex/ASCII cell editor and raw binary import. *(Phase 3; delivered in 3F)*
 10. Synchronous/asynchronous up/down counters with terminal-count flags and synchronous load. *(Phase 2 — delivered in 2B)*
 
 ### Interactive I/O & virtual instruments
@@ -95,7 +95,7 @@ Every item below is a required, functional (non-decorative) capability. Each is 
 15. Virtual multi-channel logic analyzer / oscilloscope dock: up to 16 probes, synchronized scrolling timing diagram, edge markers, time-delta cursor measurements; the dock collapses to a full-screen mode on narrow viewports. *(Phase 2 — delivered in 2E)*
 
 ### Combinational & arithmetic blocks
-16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3)*
+16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3; delivered in 3F)*
 17. Multiplexer/demultiplexer arrays (2:1, 4:1, 8:1, 16:1) with address and enable lines. *(Phase 2 — delivered in 2A)*
 18. Priority encoders and binary decoders with valid-output flags. *(Phase 2 — delivered in 2A)*
 

@@ -13,6 +13,7 @@ import {
   type TruthTable,
 } from './analysis-engine';
 import { clampInputCount, COMPONENT_CATEGORIES, paletteLabel } from './component-library';
+import { applyWordEdits, isMemoryType, mergeLive, withoutWrites, type WordEdit } from './memory-engine';
 import { bitWidthOf, isRegisterType, isRippling, restoreRegisterRuntime } from './register-engine';
 import {
   addComponent,
@@ -50,6 +51,7 @@ import {
   type SampleBuffer,
 } from './analyzer-engine';
 import { LogicAnalyzerDock } from './LogicAnalyzerDock';
+import { LogicMemoryDock } from './LogicMemoryDock';
 import { LogicMinimizerDock } from './LogicMinimizerDock';
 import { LogicPuzzleDock } from './LogicPuzzleDock';
 import { LogicShortcutsDock } from './LogicShortcutsDock';
@@ -126,7 +128,11 @@ export default function LogicWorkspace() {
   }, []);
 
   const [placingType, setPlacingType] = useState<ComponentType | null>(null);
-  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles'>('none');
+  const [activeDock, setActiveDock] = useState<'none' | 'truth' | 'erc' | 'shortcuts' | 'analyzer' | 'minimizer' | 'puzzles' | 'memory'>('none');
+  const [memoryFocusId, setMemoryFocusId] = useState<string | null>(null);
+  // Set by an edit made outside the simulation (a memory word typed in the editor) so the next commit also takes one step
+  // and every output that reads the changed contents follows at once, instead of waiting for the next switch or clock.
+  const stepAfterEditRef = useRef(false);
   const [mobilePanel, setMobilePanel] = useState<'none' | 'palette' | 'inspector'>('none');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -179,6 +185,12 @@ export default function LogicWorkspace() {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [history.present.simulation.running, runStep]);
+
+  useLayoutEffect(() => {
+    if (!stepAfterEditRef.current) return;
+    stepAfterEditRef.current = false;
+    runStep(0);
+  }, [history.present, runStep]);
 
   const [cancelDraftWireToken, setCancelDraftWireToken] = useState(0);
 
@@ -273,6 +285,52 @@ export default function LogicWorkspace() {
     setHistory((prev) => commit(prev, 'Wire', (doc) => addWire(doc, from, to, waypoints)));
   }, [showNotice]);
 
+  // --- Memory editing: contents live in the part's parameters (saved, undoable); a running RAM's own writes are an overlay in the frame. ---
+
+  const forgetLiveWrites = useCallback((componentId: string, addresses?: readonly number[]) => {
+    const state = frameRef.current.componentState[componentId];
+    if (!state?.memoryWrites) return;
+    frameRef.current = {
+      ...frameRef.current,
+      componentState: { ...frameRef.current.componentState, [componentId]: { ...state, memoryWrites: withoutWrites(state.memoryWrites, addresses) } },
+    };
+  }, []);
+
+  const handleMemoryEdit = useCallback((componentId: string, edits: readonly WordEdit[]): string | undefined => {
+    const component = documentRef.current.components.find((candidate) => candidate.id === componentId);
+    if (!component || !isMemoryType(component.type)) return 'That memory is no longer in the circuit.';
+    const result = applyWordEdits(component.params, component.params.memoryCells ?? {}, edits);
+    if (!result.ok) return result.reason;
+    forgetLiveWrites(componentId, edits.map((edit) => edit.address));
+    stepAfterEditRef.current = true;
+    setHistory((prev) => commit(prev, 'Edit memory', (d) => updateComponentParams(d, componentId, { memoryCells: result.cells })));
+    return undefined;
+  }, [forgetLiveWrites]);
+
+  const handleMemoryReplace = useCallback((componentId: string, cells: Record<string, number>, fill: number | undefined, label: string) => {
+    forgetLiveWrites(componentId);
+    stepAfterEditRef.current = true;
+    setHistory((prev) => commit(prev, label, (d) => updateComponentParams(d, componentId, fill === undefined ? { memoryCells: cells } : { memoryCells: cells, memoryFill: fill })));
+  }, [forgetLiveWrites]);
+
+  const handleMemoryResetLive = useCallback((componentId: string) => {
+    forgetLiveWrites(componentId);
+    runStep(0);
+  }, [forgetLiveWrites, runStep]);
+
+  const handleMemoryKeepLive = useCallback((componentId: string) => {
+    const component = documentRef.current.components.find((candidate) => candidate.id === componentId);
+    if (!component || !isMemoryType(component.type)) return;
+    const merged = mergeLive(component.params, frameRef.current.componentState[componentId]?.memoryWrites);
+    forgetLiveWrites(componentId);
+    setHistory((prev) => commit(prev, 'Keep live memory values', (d) => updateComponentParams(d, componentId, { memoryCells: merged })));
+  }, [forgetLiveWrites]);
+
+  const handleOpenMemoryEditor = useCallback((componentId: string) => {
+    setMemoryFocusId(componentId);
+    setActiveDock('memory');
+  }, []);
+
   const handleGenerateCircuit = useCallback((spec: SynthesisSpec) => {
     setHistory((prev) => commit(prev, 'Add minimized circuit', (document) => {
       try {
@@ -308,6 +366,11 @@ export default function LogicWorkspace() {
   ], []);
 
   const doc = history.present;
+  const selectedMemoryId = useMemo(() => {
+    if (doc.selectedIds.length !== 1) return null;
+    const selected = doc.components.find((component) => component.id === doc.selectedIds[0]);
+    return selected && isMemoryType(selected.type) ? selected.id : null;
+  }, [doc.selectedIds, doc.components]);
 
   const truthAvailability = useMemo(() => checkTruthTableAvailability(doc), [doc]);
   const truthTable: TruthTable | null = useMemo(() => {
@@ -423,6 +486,7 @@ export default function LogicWorkspace() {
         <button type="button" onClick={() => setActiveDock((current) => (current === 'puzzles' ? 'none' : 'puzzles'))} aria-pressed={activeDock === 'puzzles'}>Puzzles</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'minimizer' ? 'none' : 'minimizer'))} aria-pressed={activeDock === 'minimizer'}>Minimize (K-map)</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'analyzer' ? 'none' : 'analyzer'))} aria-pressed={activeDock === 'analyzer'}>Logic analyzer</button>
+        <button type="button" onClick={() => { setMemoryFocusId(selectedMemoryId); setActiveDock((current) => (current === 'memory' ? 'none' : 'memory')); }} aria-pressed={activeDock === 'memory'}>Memory editor</button>
         <button type="button" onClick={() => setActiveDock((current) => (current === 'shortcuts' ? 'none' : 'shortcuts'))} aria-pressed={activeDock === 'shortcuts'}>Keyboard shortcuts</button>
         <span className="logic-toolbar-divider" aria-hidden="true" />
         <button type="button" onClick={handleExportSvg}>Export SVG</button>
@@ -494,6 +558,7 @@ export default function LogicWorkspace() {
             onUpdateParams={(id, params) => setHistory((prev) => commit(prev, 'Update parameters', (d) => updateComponentParams(d, id, params.inputCount !== undefined ? { ...params, inputCount: clampInputCount(params.inputCount) } : params)))}
             onUpdateMetadata={(metadata) => setHistory((prev) => commit(prev, 'Update metadata', (d) => updateMetadata(d, metadata)))}
             onSetTheme={(theme: ThemeName) => setHistory((prev) => commit(prev, 'Theme', (d) => setTheme(d, theme)))}
+            onOpenMemoryEditor={handleOpenMemoryEditor}
           />
         </div>
       </div>
@@ -565,6 +630,20 @@ export default function LogicWorkspace() {
           delayMode={doc.simulation.delayMode}
           theme={doc.theme}
           onChannelsChange={(keys) => setAnalyzerKeys(keys)}
+          onClose={() => setActiveDock('none')}
+        />
+      ) : null}
+
+      {activeDock === 'memory' ? (
+        <LogicMemoryDock
+          key={memoryFocusId ?? 'first'}
+          document={doc}
+          frame={frameRef.current}
+          focusId={memoryFocusId}
+          onEdit={handleMemoryEdit}
+          onReplace={handleMemoryReplace}
+          onResetLive={handleMemoryResetLive}
+          onKeepLive={handleMemoryKeepLive}
           onClose={() => setActiveDock('none')}
         />
       ) : null}

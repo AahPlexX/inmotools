@@ -5,6 +5,8 @@ import { getComponentPorts, getSimulationPorts, isCombinationalLogic, isStateful
 import { parseProject, renderSchematicSvg, serializeProject } from '../../src/tools/logic/export-engine';
 import type { ComponentParams, LogicDocument, LogicLevel, SimulationFrame } from '../../src/tools/logic/logic-types';
 import {
+  addressFromPins,
+  applyAsciiText,
   applyWordEdits,
   asciiOf,
   canonicalCells,
@@ -220,6 +222,30 @@ describe('memory editor text', () => {
       const words = wordsFromAscii('Hello, world!!!!', width);
       expect(words.map((word) => asciiOf(word, width)).join('')).toBe('Hello, world!!!!');
     }
+  });
+});
+
+describe('typing over a row of ASCII text', () => {
+  it('changes only the characters that differ and keeps unprintable bytes behind a dot', () => {
+    expect(applyAsciiText([0x41, 0x1f, 0x43], 'AXC', 8)).toEqual([0x41, 0x58, 0x43]);
+    expect(applyAsciiText([0x41, 0x1f, 0x43], 'A.C', 8)).toEqual([0x41, 0x1f, 0x43]);
+    expect(applyAsciiText([0x41, 0x42], 'Z', 8)).toEqual([0x5a, 0x42]);
+    expect(applyAsciiText([0x41, 0x42], 'ABCDEF', 8)).toEqual([0x41, 0x42]);
+  });
+
+  it('edits single bytes inside wider words', () => {
+    expect(applyAsciiText([0x4142, 0x4344], 'AXCD', 16)).toEqual([0x4158, 0x4344]);
+    expect(applyAsciiText([0x48454c4c], 'HELP', 32)).toEqual([0x48454c50]);
+  });
+
+  it('turns a character above 255 into a question mark', () => {
+    expect(applyAsciiText([0x41], '\u20ac', 8)).toEqual([0x3f]);
+  });
+
+  it('reads the address from the pins, unknown while any is unknown', () => {
+    const levels: Record<string, LogicLevel> = { ADDR0: 1, ADDR1: 0, ADDR2: 1, ADDR3: 1 };
+    expect(addressFromPins({ addressBits: 4 }, (id) => levels[id] ?? 'Z')).toBe(13);
+    expect(addressFromPins({ addressBits: 4 }, (id) => (id === 'ADDR2' ? 'X' : levels[id] ?? 'Z'))).toBeUndefined();
   });
 });
 

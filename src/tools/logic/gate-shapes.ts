@@ -1,9 +1,9 @@
-import { aluTitle } from './alu-engine';
+import { ALU_WIDTH_COLS, aluTitle } from './alu-engine';
 import { BLOCK_WIDTH_COLS, blockTitle, isBlockType } from './block-engine';
 import { getComponentPorts, isSequential } from './component-library';
 import { clampBusWidth } from './bus-engine';
 import { displayTitle, displayWidthCols, isDisplayType } from './display-engine';
-import { isMemoryType, memoryTitle } from './memory-engine';
+import { isMemoryType, MEMORY_WIDTH_COLS, memoryTitle } from './memory-engine';
 import { isRegisterType, registerTitle } from './register-engine';
 import { GRID_SIZE, componentOriginPixels, rotatePoint, type Point } from './geometry';
 import type { ComponentInstance, ComponentType, PortDefinition } from './logic-types';
@@ -74,6 +74,8 @@ export const usesBlockBody = (type: ComponentType): boolean => isBlockType(type)
  */
 export const componentBodyRect = (component: ComponentInstance, ports: readonly PortDefinition[]): BodyRect => {
   if (isDisplayType(component.type)) return blockBodyRect(ports, displayWidthCols(component.type));
+  if (component.type === 'ALU') return blockBodyRect(ports, ALU_WIDTH_COLS);
+  if (isMemoryType(component.type)) return blockBodyRect(ports, MEMORY_WIDTH_COLS);
   if (usesBlockBody(component.type)) return blockBodyRect(ports);
   const inputCount = ports.filter((port) => port.direction === 'input').length;
   const height = gateBodyHeight(inputCount);

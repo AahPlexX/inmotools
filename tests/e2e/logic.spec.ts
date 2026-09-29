@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createInitialDocument } from '../../src/tools/logic/circuit-model';
+import { addComponent, addWire, createInitialDocument, relabelComponent, updateComponentParams } from '../../src/tools/logic/circuit-model';
 import { serializeProject } from '../../src/tools/logic/export-engine';
 import { synthesizeTwoLevel } from '../../src/tools/logic/synthesis-engine';
 
@@ -636,4 +636,120 @@ test('places an ALU, widens it from the inspector, and its unwired pins are name
   await expect(ercDock).toContainText('CIN');
   await expect(ercDock).toContainText('OP2');
   await expect(ercDock).toContainText('A7');
+});
+
+const openInspectorFor = async (page: Page) => {
+  const inspectToggle = page.getByRole('button', { name: 'Inspect', exact: true });
+  const isSheet = await inspectToggle.isVisible();
+  if (isSheet) await inspectToggle.click();
+  return { inspector: page.locator('.logic-inspector-shell'), close: async () => { if (isSheet) await page.getByLabel('Close inspector').click(); } };
+};
+
+test('the memory editor edits words in hex, jumps to an address, imports a binary file, and exports it back byte for byte', async ({ page }) => {
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await ensurePaletteOpen(page);
+  await expect(page.getByTestId('logic-palette').getByRole('heading', { name: 'Memory' })).toBeVisible();
+
+  await placeAt(page, 'ROM', 4, 2);
+  await page.getByTestId('logic-canvas').click({ position: { x: 5.5 * GRID, y: 2.5 * GRID } });
+  const { inspector, close } = await openInspectorFor(page);
+  await expect(inspector.getByRole('heading', { name: 'ROM' })).toBeVisible();
+  await inspector.getByLabel('Address width').selectOption('12');
+  await inspector.getByLabel('Word width').selectOption('16');
+  await close();
+
+  await page.getByRole('button', { name: 'Memory editor', exact: true }).click();
+  const dock = page.getByTestId('logic-memory-dock');
+  await expect(dock).toBeVisible();
+  await expect(page.getByTestId('logic-memory-summary')).toContainText('4K words × 16 bits');
+  await expect(page.getByTestId('logic-memory-range')).toHaveText('000–07F');
+
+  const first = dock.getByLabel('Word at address 000', { exact: true });
+  await first.fill('1234');
+  await first.press('Enter');
+  await expect(first).toHaveValue('1234');
+  await expect(page.getByTestId('logic-memory-summary')).toContainText('1 stored word differ');
+
+  // A word that does not fit is refused and the box goes back to what the memory holds.
+  const second = dock.getByLabel('Word at address 001', { exact: true });
+  await second.fill('12345');
+  await second.press('Enter');
+  await expect(dock.getByRole('alert')).toContainText('not a 16-bit hexadecimal word');
+  await expect(second).toHaveValue('0000');
+
+  await dock.getByLabel('Go to address (hex)').fill('FF0');
+  await dock.getByRole('button', { name: 'Go', exact: true }).click();
+  await expect(page.getByTestId('logic-memory-range')).toHaveText('F80–FFF');
+  await dock.getByLabel('Go to address (hex)').fill('1000');
+  await dock.getByRole('button', { name: 'Go', exact: true }).click();
+  await expect(dock.getByRole('alert')).toContainText('not a hexadecimal address');
+
+  await page.getByTestId('logic-memory-file-input').setInputFiles({ name: 'program.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0x34, 0x12, 0x78, 0x56]) });
+  await expect(dock.getByRole('status')).toContainText('Imported 2 words');
+  await expect(page.getByTestId('logic-memory-range')).toHaveText('000–07F');
+  await expect(dock.getByLabel('Word at address 000', { exact: true })).toHaveValue('1234');
+  await expect(dock.getByLabel('Word at address 001', { exact: true })).toHaveValue('5678');
+  await expect(page.getByTestId('logic-memory-summary')).toContainText('2 stored words differ');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dock.getByRole('button', { name: 'Export binary' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.bin$/);
+  const chunks: Buffer[] = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(Buffer.from(chunk));
+  expect([...Buffer.concat(chunks)]).toEqual([0x34, 0x12, 0x78, 0x56]);
+
+  // The ASCII column spells each word's bytes; typing over a character changes just that byte, and a dot keeps its byte.
+  const ascii = dock.getByLabel('ASCII text for addresses 000 to 007');
+  await expect(ascii).toHaveValue('.4Vx' + '.'.repeat(12));
+  await ascii.fill('A4Vx' + '.'.repeat(12));
+  await ascii.press('Enter');
+  await expect(dock.getByLabel('Word at address 000', { exact: true })).toHaveValue('4134');
+  await expect(dock.getByLabel('Word at address 001', { exact: true })).toHaveValue('5678');
+});
+
+test('a ROM read through an address bus shows every stored word in the truth table', async ({ page }) => {
+  // Four switches feed the ROM's address through a splitter; its data bus splits back out to four LEDs.
+  const word = (address: number): number => (address * 7 + 3) & 0xf;
+  let doc = createInitialDocument('Rom lookup');
+  const add = (type: 'SWITCH' | 'LED' | 'BUS_SPLITTER' | 'ROM', x: number, y: number, label: string) => {
+    doc = addComponent(doc, type, x, y);
+    const id = doc.components[doc.components.length - 1]!.id;
+    doc = relabelComponent(doc, id, label);
+    return id;
+  };
+  const cells: Record<string, number> = {};
+  for (let address = 0; address < 16; address += 1) if (word(address) !== 0) cells[String(address)] = word(address);
+  const rom = add('ROM', 14, 2, 'ROM');
+  doc = updateComponentParams(doc, rom, { addressBits: 4, dataBits: 4, memoryCells: cells });
+  const addressSplit = add('BUS_SPLITTER', 8, 2, 'Address');
+  const dataSplit = add('BUS_SPLITTER', 22, 2, 'Data');
+  for (let index = 0; index < 4; index += 1) {
+    const sw = add('SWITCH', 2, 2 + index * 2, `A${index}`);
+    doc = addWire(doc, { componentId: sw, portId: 'Y' }, { componentId: addressSplit, portId: `S${index}` });
+    const led = add('LED', 30, 2 + index * 2, `D${index}`);
+    doc = addWire(doc, { componentId: dataSplit, portId: `S${index}` }, { componentId: led, portId: 'A' });
+  }
+  doc = addWire(doc, { componentId: addressSplit, portId: 'B' }, { componentId: rom, portId: 'ADDR' });
+  doc = addWire(doc, { componentId: rom, portId: 'DOUT' }, { componentId: dataSplit, portId: 'B' });
+
+  await page.goto('./#/tools/digital-logic-workstation');
+  await expect(page.getByTestId('logic-workspace')).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'rom.circuit.json', mimeType: 'application/json', buffer: Buffer.from(serializeProject(doc)) });
+  await page.getByRole('button', { name: 'Truth table', exact: true }).click();
+  const dock = page.getByTestId('logic-truth-table-dock');
+  await expect(dock.locator('tbody tr')).toHaveCount(16);
+
+  const headers = await dock.locator('thead th').allTextContents();
+  const column = (label: string): number => headers.indexOf(label);
+  const rows = await dock.locator('tbody tr').evaluateAll((elements) => elements.map((element) => Array.from(element.querySelectorAll('td')).map((cell) => cell.textContent ?? '')));
+  const seen = new Set<number>();
+  for (const cellsInRow of rows) {
+    const address = [0, 1, 2, 3].reduce((total, index) => total + Number(cellsInRow[column(`A${index}`)]) * 2 ** index, 0);
+    const value = [0, 1, 2, 3].reduce((total, index) => total + Number(cellsInRow[column(`D${index}`)]) * 2 ** index, 0);
+    expect(value, `word at address ${address}`).toBe(word(address));
+    seen.add(address);
+  }
+  expect(seen.size).toBe(16);
 });
