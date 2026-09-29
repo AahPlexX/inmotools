@@ -237,6 +237,7 @@ export class HttpClient {
         if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
         const response = await this.fetchImpl(url, { signal: controller.signal, headers: { Accept: options.parse === 'arrayBuffer' ? '*/*' : 'application/json' }, referrerPolicy: 'strict-origin-when-cross-origin' });
         if (response.status === 404) throw new NotFoundError(options.source, url);
+        if (response.status === 204) return null as T;
         if (!response.ok) {
           const header = response.headers.get('Retry-After');
           if (header && /^\d+$/.test(header)) retryAfterMs = Math.min(10_000, Number(header) * 1000);
