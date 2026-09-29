@@ -22,7 +22,9 @@ import {
   YarnReferencePanel,
 } from './CrochetPatternPanels';
 import { CountedThreadPanel } from './CountedThreadPanel';
+import { KnittingGridPanel } from './KnittingGridPanel';
 import { switchToCountedThreadDocument } from './engines/counted-thread-engine';
+import { switchToKnittingDocument } from './knitting-document-engine';
 import {
   FIBER_CRAFT_DESCRIPTION_ID,
   FiberCraftChartDescription,
@@ -145,6 +147,7 @@ export default function FiberCraftWorkspace() {
   const roundChart = document.metadata.discipline === 'crochet' && document.chart.kind === 'polar' ? document.chart : null;
   const gridChart = document.metadata.discipline === 'crochet' && document.chart.kind === 'grid' ? document.chart : null;
   const countedChart = document.metadata.discipline === 'cross-stitch' && document.chart.kind === 'counted-thread' ? document.chart : null;
+  const knittingChart = document.metadata.discipline === 'knitting' && document.chart.kind === 'grid' ? document.chart : null;
   const progress = useMemo(() => roundChart ? crochetRoundProgress(document, Math.min(activeRound, Math.max(0, roundChart.rounds - 1))) : null, [activeRound, document, roundChart]);
 
   useEffect(() => {
@@ -190,10 +193,14 @@ export default function FiberCraftWorkspace() {
     try { commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`); setActiveRound(roundChart.rounds); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add this round.'); }
   };
-  const changeChartMode = (mode: 'round' | 'grid' | 'counted') => {
-    if ((mode === 'round' && roundChart) || (mode === 'grid' && gridChart) || (mode === 'counted' && countedChart)) return;
+  const changeChartMode = (mode: 'round' | 'grid' | 'counted' | 'knitting') => {
+    if ((mode === 'round' && roundChart) || (mode === 'grid' && gridChart) || (mode === 'counted' && countedChart) || (mode === 'knitting' && knittingChart)) return;
     if (mode === 'counted') {
       commit(switchToCountedThreadDocument(document), 'Opened a fresh counted-thread chart. Undo restores the previous chart.');
+      return;
+    }
+    if (mode === 'knitting') {
+      commit(switchToKnittingDocument(document), 'Opened a gauge-corrected knitting grid. Undo restores the previous chart.');
       return;
     }
     commit(switchCrochetChartMode(document, mode), mode === 'round' ? 'Opened a fresh round chart. Undo restores the previous chart.' : 'Opened a fresh C2C / filet grid. Undo restores the previous chart.');
@@ -315,15 +322,15 @@ export default function FiberCraftWorkspace() {
 
   return (
     <>
-      <div className="workspace-header fiber-craft-header"><div><h2>Fiber Craft pattern workspace</h2><p>Crochet and counted-thread charting with synchronized instructions and browser-local recovery.</p></div><span className="fiber-craft-local-badge">Local draft</span></div>
+      <div className="workspace-header fiber-craft-header"><div><h2>Fiber Craft pattern workspace</h2><p>Crochet, counted-thread, and gauge-corrected knitting charts with browser-local recovery.</p></div><span className="fiber-craft-local-badge">Local draft</span></div>
       <div className="workspace-body fiber-craft-workspace" data-fiber-theme={theme}>
         {pendingRestore ? <section className="fiber-craft-restore" aria-labelledby="fiber-restore-title"><div><h3 id="fiber-restore-title">Continue your last local session?</h3><p>A browser-local Fiber Craft draft was found. Restoring does not upload or replace a file on disk.</p></div><div className="fiber-craft-actions"><button className="action-button" type="button" onClick={restoreDraft}>Restore last session</button><button className="action-button secondary" type="button" onClick={startFresh}>Start fresh</button></div></section> : null}
 
         <div className="fiber-craft-toolbar" role="toolbar" aria-label="Fiber Craft chart history, mode, terminology, and display">
           <button className="action-button secondary" type="button" disabled={history.past.length === 0} onClick={() => dispatch({ type: 'undo' })}>Undo</button>
           <button className="action-button secondary" type="button" disabled={history.future.length === 0} onClick={() => dispatch({ type: 'redo' })}>Redo</button>
-          <label><span>Chart mode</span><select value={countedChart ? 'counted' : roundChart ? 'round' : 'grid'} onChange={(event) => changeChartMode(event.target.value as 'round' | 'grid' | 'counted')}><option value="round">Round / amigurumi</option><option value="grid">C2C / filet grid</option><option value="counted">Counted thread / cross-stitch</option></select></label>
-          <label><span>Terminology</span><select value={dialect} onChange={(event) => setDialect(event.target.value as CrochetDialect)}><option value="us">US</option><option value="uk">UK</option></select></label>
+          <label><span>Chart mode</span><select value={knittingChart ? 'knitting' : countedChart ? 'counted' : roundChart ? 'round' : 'grid'} onChange={(event) => changeChartMode(event.target.value as 'round' | 'grid' | 'counted' | 'knitting')}><option value="round">Round / amigurumi</option><option value="grid">C2C / filet grid</option><option value="counted">Counted thread / cross-stitch</option><option value="knitting">Knitting colorwork</option></select></label>
+          {document.metadata.discipline === 'crochet' ? <label><span>Terminology</span><select value={dialect} onChange={(event) => setDialect(event.target.value as CrochetDialect)}><option value="us">US</option><option value="uk">UK</option></select></label> : null}
           <label htmlFor="fiber-display-theme"><span>Display theme</span><select id="fiber-display-theme" value={theme} onChange={(event) => setTheme(event.target.value as FiberCraftTheme)}><option value="light">Light</option><option value="dark-room">Dark room</option><option value="high-contrast">High contrast</option></select></label>
           <button className="action-button secondary" type="button" aria-pressed={descriptionVisible} onClick={() => setDescriptionVisible((visible) => !visible)}>{descriptionVisible ? 'Hide chart description' : 'Show chart description'}</button>
           {roundChart ? <label><span>Active round</span><select value={activeRound} onChange={(event) => setActiveRound(Number(event.target.value))}>{Array.from({ length: roundChart.rounds }, (_, round) => <option key={round} value={round}>Round {round + 1}</option>)}</select></label> : null}
@@ -332,11 +339,14 @@ export default function FiberCraftWorkspace() {
         <div className="fiber-craft-main">
           {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><CrochetCanvas chart={roundChart} palette={document.palette} activeRound={activeRound} completedSteps={document.completedSteps} theme={theme} /></section>
             : gridChart ? <CrochetGridPanel chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} />
-              : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
+              : knittingChart ? <KnittingGridPanel document={document} chart={knittingChart} onCommit={commit} onStatus={setStatus} />
+                : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
 
           <aside className="fiber-craft-inspector" aria-label="Fiber Craft chart inspector">
             {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
-              : gridChart ? <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section> : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
+              : gridChart ? <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>
+                : knittingChart ? <section><h3>Knitting gauge</h3><p className="fiber-craft-muted">Save your measured stitch and row gauge above the chart. Cell proportions update from the same project gauge used for the preview.</p></section>
+                  : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
             <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
             {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" onClick={() => void exportSocialPreview()}>Export social preview</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart.</p></section> : null}
             <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
