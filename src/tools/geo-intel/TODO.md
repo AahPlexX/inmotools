@@ -27,7 +27,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G2 Core math** — provenance types, geodesy (distance, bearing, area, midpoint, destination), Plus Codes, DD/DMS/DDM/UTM/MGRS, query parser, projection, timezone math, offline solar model. Unit tests incl. official OLC and MGRS vectors.
 - [x] **G3 Resilience + cache** — timeout, exponential backoff, circuit breaker, dedupe, per-host throttle gate, Dexie TTL cache, offline fallback. Unit tests with fake timers / fake-indexeddb.
 - [x] **G4 Adapters** — one module per keyless source, normalized to provenance fields; fixture-driven unit tests.
-- [ ] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
+- [x] **G5 Offline engines** — country point-in-polygon, timezone lookup, nearby places, admin-1 resolution; unit tests.
 - [ ] **G6 Synthesis** — query routing, adapter chains, unified provenance-tracked profile, batch postal pipeline; unit tests.
 - [ ] **G7 Exports** — JSON, CSV, PDF, iCal, SVG, PNG, ZIP, social card, metadata editor model; unit tests validate output structure.
 - [ ] **G8 UI** — workspace, map canvas, panels, tooltips, context menu, bottom-sheet drawers, responsive CSS.
@@ -198,3 +198,14 @@ Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.ap
 ### Next batch (planned)
 - `src/tools/geo-intel/offline/static-data.ts` — lazy `?raw` loaders + country/timezone point-in-polygon, nearest-country fallback, nearby places, admin-1 matching; needs G1 data and G2 types.
 - `tests/unit/geo-intel-offline.test.ts`.
+
+## Delivery 6 — 2026-09-29
+### Committed this batch
+- `src/tools/geo-intel/offline/static-data.ts` — in-tool TopoJSON decoder (no dependency on another tool's type shim), memoised `?raw` loaders, country point-in-polygon with ≤40 km coastal snap, timezone polygons with nautical fallback, radius place finder (antimeridian-safe), GeoNames admin-1 matching, flag/currency/language helpers.
+- `tests/unit/geo-intel-offline.test.ts` — 23 tests.
+### Gate evidence
+- G5 checked: `vitest run tests/unit/geo-intel-offline.test.ts` 23/23; `tsc` exit 0.
+### Next batch (planned)
+- `src/tools/geo-intel/engine/synthesize.ts` — query routing + adapter chains → one LocationProfile; needs adapters (G4) and offline lookups (G5).
+- `src/tools/geo-intel/engine/batch.ts` — CSV postal batch (throttled, cancelable, progress) built on synthesize's postal chain.
+- `tests/unit/geo-intel-engine.test.ts`.
