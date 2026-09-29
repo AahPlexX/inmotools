@@ -11,7 +11,7 @@ const TOOL_SPECS = new Map([
   ['dedupe', ['tests/e2e/dedupe.spec.ts']],
   ['duckdb', ['tests/e2e/duckdb.spec.ts']],
   ['exif', ['tests/e2e/exif.spec.ts']],
-  ['floorplan', ['tests/e2e/floorplan.spec.ts']],
+  ['floorplan', ['tests/e2e/floorplan.spec.ts', 'tests/e2e/floorplan-audit.spec.ts', 'tests/e2e/floorplan-hardening.spec.ts']],
   ['font', ['tests/e2e/font.spec.ts']],
   ['geo', ['tests/e2e/geo.spec.ts']],
   ['gltf', ['tests/e2e/gltf.spec.ts']],

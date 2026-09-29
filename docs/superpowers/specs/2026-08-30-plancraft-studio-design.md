@@ -1,5 +1,7 @@
 # PlanCraft Studio Design
 
+> **Current status lives in `src/tools/floorplan/TRACKING.md`.** This is the original 2026-08-30 design. The 2026-09-27 hardening pass changed the clearance model, export formats, interactions, and layout; where this document and the ledger differ, the ledger and the code are authoritative.
+
 **Source:** User-provided PlanCraft Studio PRD, approved for implementation on 2026-08-30.
 
 ## Goal

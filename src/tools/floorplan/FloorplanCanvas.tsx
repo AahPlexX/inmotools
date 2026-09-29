@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { screenToWorld } from './geometry-engine';
 import { drawBaseScene, drawOverlayScene } from './render-engine';
 import type { FloorplanAnalysis } from './floorplan-analysis';
@@ -18,8 +18,15 @@ interface FloorplanCanvasProps {
   readonly spacePressed: boolean;
   readonly onWorldMove: (point: Point2D, shiftKey: boolean) => void;
   readonly onWorldClick: (point: Point2D, shiftKey: boolean) => void;
+  /** Select tool only: return true when the press lands on something draggable (it is then selected). */
+  readonly onDragStart: (point: Point2D) => boolean;
+  readonly onDragMove: (point: Point2D, shiftKey: boolean) => void;
+  readonly onDragEnd: () => void;
   readonly onPan: (dx: number, dy: number) => void;
   readonly onZoomAt: (screenPoint: Point2D, factor: number) => void;
+  readonly onFit: () => void;
+  readonly onHoverChange: (inside: boolean) => void;
+  readonly onResize: (width: number, height: number) => void;
 }
 
 interface ActivePointer {
@@ -27,42 +34,74 @@ interface ActivePointer {
   readonly y: number;
 }
 
-interface TouchSelectGesture {
-  readonly pointerId: number;
-  readonly start: Point2D;
-  last: Point2D;
-  moved: boolean;
-  readonly shiftKey: boolean;
-}
+/**
+ * One gesture at a time:
+ * - `tap`: a touch press that becomes a click if it lifts without moving, or a pan if it moves;
+ * - `pan`: panning the view (Space/middle button);
+ * - `maybe-pan`: a mouse press on empty canvas with Select that pans once it moves;
+ * - `drag`: moving the selected component or corner.
+ */
+type Gesture =
+  | { readonly kind: 'tap'; readonly pointerId: number; readonly start: Point2D; last: Point2D; moved: boolean; readonly shiftKey: boolean }
+  | { readonly kind: 'pan'; readonly pointerId: number; last: Point2D }
+  | { readonly kind: 'maybe-pan'; readonly pointerId: number; readonly start: Point2D; last: Point2D; moved: boolean }
+  | { readonly kind: 'drag'; readonly pointerId: number };
 
-const TOUCH_PAN_THRESHOLD_PX = 8;
+const MOVE_THRESHOLD_PX = 8;
 const VIEWPORT_PAN_STEP_PX = 48;
 const VIEWPORT_ZOOM_FACTOR = 1.2;
+const LINE_HEIGHT_PX = 16;
 
 export const FloorplanCanvas = ({
   project, analysis, mode, pointerWorld, snapWorld, draftStart, draftEnd, spacePressed,
-  onWorldMove, onWorldClick, onPan, onZoomAt,
+  onWorldMove, onWorldClick, onDragStart, onDragMove, onDragEnd, onPan, onZoomAt, onFit, onHoverChange, onResize,
 }: FloorplanCanvasProps) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const pointersRef = useRef(new Map<number, ActivePointer>());
-  const lastPanRef = useRef<Point2D | undefined>(undefined);
   const pinchRef = useRef<{ distance: number; midpoint: Point2D } | undefined>(undefined);
-  const touchSelectRef = useRef<TouchSelectGesture | undefined>(undefined);
+  const gestureRef = useRef<Gesture | undefined>(undefined);
   const [resizeVersion, setResizeVersion] = useState(0);
+  // Native listeners read the latest callbacks through refs.
+  const zoomRef = useRef(onZoomAt);
+  zoomRef.current = onZoomAt;
+  const resizeRef = useRef(onResize);
+  resizeRef.current = onResize;
 
   const localPoint = (clientX: number, clientY: number): Point2D => {
     const rect = overlayRef.current?.getBoundingClientRect();
     return rect ? { x: clientX - rect.left, y: clientY - rect.top } : { x: 0, y: 0 };
   };
+  const toWorld = (screen: Point2D) => screenToWorld(screen, project.viewport);
 
   useEffect(() => {
     const element = wrapRef.current;
     if (!element) return undefined;
-    const observer = new ResizeObserver(() => setResizeVersion((value) => value + 1));
+    const observer = new ResizeObserver((entries) => {
+      setResizeVersion((value) => value + 1);
+      const box = entries[0]?.contentRect;
+      if (box) resizeRef.current(box.width, box.height);
+    });
     observer.observe(element);
     return () => observer.disconnect();
+  }, []);
+
+  // React registers onWheel as a passive listener, where preventDefault() is ignored and the
+  // page scrolls while zooming (react/react#19651). A native non-passive listener fixes that.
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return undefined;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = overlay.getBoundingClientRect();
+      const deltaY = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+      // Trackpad pinch arrives as a ctrl+wheel event with small deltas; give it a stronger response.
+      const sensitivity = event.ctrlKey ? 0.01 : 0.0015;
+      zoomRef.current({ x: event.clientX - rect.left, y: event.clientY - rect.top }, Math.exp(-deltaY * sensitivity));
+    };
+    overlay.addEventListener('wheel', handleWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleWheel);
   }, []);
 
   useEffect(() => {
@@ -78,8 +117,9 @@ export const FloorplanCanvas = ({
       draftEnd,
       selectedId: project.selectedId,
       violations: analysis.clearanceViolations,
+      showHandles: mode === 'select',
     });
-  }, [analysis.clearanceViolations, draftEnd, draftStart, pointerWorld, project, resizeVersion, snapWorld]);
+  }, [analysis.clearanceViolations, draftEnd, draftStart, mode, pointerWorld, project, resizeVersion, snapWorld]);
 
   const updatePinch = () => {
     const values = [...pointersRef.current.values()];
@@ -88,7 +128,11 @@ export const FloorplanCanvas = ({
     const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const distance = Math.hypot(b.x - a.x, b.y - a.y);
     const previous = pinchRef.current;
-    if (previous && previous.distance > 0 && distance > 0) onZoomAt(midpoint, distance / previous.distance);
+    if (previous) {
+      // Two fingers both pan (midpoint travel) and zoom (spread).
+      onPan(midpoint.x - previous.midpoint.x, midpoint.y - previous.midpoint.y);
+      if (previous.distance > 0 && distance > 0) onZoomAt(midpoint, distance / previous.distance);
+    }
     pinchRef.current = { distance, midpoint };
   };
 
@@ -102,6 +146,14 @@ export const FloorplanCanvas = ({
     try { target.setPointerCapture(pointerId); } catch { /* Capture is helpful, not required. */ }
   };
 
+  const endGesture = (commitClick: Point2D | undefined) => {
+    const gesture = gestureRef.current;
+    gestureRef.current = undefined;
+    if (!gesture) return;
+    if (gesture.kind === 'drag') onDragEnd();
+    if (gesture.kind === 'tap' && !gesture.moved && commitClick) onWorldClick(toWorld(commitClick), gesture.shiftKey);
+  };
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
     dropReleasedPointers(event.currentTarget, event.pointerId);
@@ -109,81 +161,55 @@ export const FloorplanCanvas = ({
     capturePointer(event.currentTarget, event.pointerId);
 
     if (pointersRef.current.size >= 2) {
-      touchSelectRef.current = undefined;
-      lastPanRef.current = undefined;
+      // A second finger turns whatever was starting into a pan/zoom; nothing gets placed.
+      if (gestureRef.current?.kind === 'drag') onDragEnd();
+      gestureRef.current = undefined;
       updatePinch();
       return;
     }
+    if (event.button === 2) return;
+    if (spacePressed || event.button === 1) { gestureRef.current = { kind: 'pan', pointerId: event.pointerId, last: screen }; return; }
 
-    if (event.pointerType === 'touch' && mode === 'select' && !spacePressed) {
-      touchSelectRef.current = { pointerId: event.pointerId, start: screen, last: screen, moved: false, shiftKey: event.shiftKey };
+    const world = toWorld(screen);
+    if (mode === 'select' && onDragStart(world)) { gestureRef.current = { kind: 'drag', pointerId: event.pointerId }; return; }
+    if (event.pointerType === 'touch') {
+      gestureRef.current = { kind: 'tap', pointerId: event.pointerId, start: screen, last: screen, moved: false, shiftKey: event.shiftKey };
       return;
     }
-
-    const shouldPan = spacePressed || event.button === 1;
-    if (shouldPan) { lastPanRef.current = screen; return; }
-    onWorldClick(screenToWorld(screen, project.viewport), event.shiftKey);
+    onWorldClick(world, event.shiftKey);
+    if (mode === 'select') gestureRef.current = { kind: 'maybe-pan', pointerId: event.pointerId, start: screen, last: screen, moved: false };
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
     dropReleasedPointers(event.currentTarget, event.pointerId);
     if (pointersRef.current.has(event.pointerId)) pointersRef.current.set(event.pointerId, screen);
+    if (pointersRef.current.size >= 2) { updatePinch(); return; }
 
-    if (pointersRef.current.size >= 2) {
-      touchSelectRef.current = undefined;
-      lastPanRef.current = undefined;
-      updatePinch();
+    const gesture = gestureRef.current;
+    if (gesture && gesture.pointerId === event.pointerId) {
+      if (gesture.kind === 'drag') { onDragMove(toWorld(screen), event.shiftKey); return; }
+      if (gesture.kind === 'pan') { onPan(screen.x - gesture.last.x, screen.y - gesture.last.y); gesture.last = screen; return; }
+      if (!gesture.moved && Math.hypot(screen.x - gesture.start.x, screen.y - gesture.start.y) > MOVE_THRESHOLD_PX) gesture.moved = true;
+      if (gesture.moved) onPan(screen.x - gesture.last.x, screen.y - gesture.last.y);
+      gesture.last = screen;
       return;
     }
-
-    const touchSelect = touchSelectRef.current;
-    if (touchSelect?.pointerId === event.pointerId) {
-      if (!touchSelect.moved && Math.hypot(screen.x - touchSelect.start.x, screen.y - touchSelect.start.y) > TOUCH_PAN_THRESHOLD_PX) {
-        touchSelect.moved = true;
-        lastPanRef.current = touchSelect.last;
-      }
-      if (touchSelect.moved) {
-        const previous = lastPanRef.current ?? touchSelect.last;
-        onPan(screen.x - previous.x, screen.y - previous.y);
-        lastPanRef.current = screen;
-      }
-      touchSelect.last = screen;
-      return;
-    }
-
-    if (lastPanRef.current) {
-      onPan(screen.x - lastPanRef.current.x, screen.y - lastPanRef.current.y);
-      lastPanRef.current = screen;
-      return;
-    }
-    onWorldMove(screenToWorld(screen, project.viewport), event.shiftKey);
+    onWorldMove(toWorld(screen), event.shiftKey);
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event.clientX, event.clientY);
-    const touchSelect = touchSelectRef.current;
-    const wasSinglePointer = pointersRef.current.size <= 1;
-    if (touchSelect?.pointerId === event.pointerId && !touchSelect.moved && wasSinglePointer) {
-      onWorldClick(screenToWorld(screen, project.viewport), touchSelect.shiftKey);
-    }
-    if (touchSelect?.pointerId === event.pointerId) touchSelectRef.current = undefined;
+    const singlePointer = pointersRef.current.size <= 1;
+    if (gestureRef.current?.pointerId === event.pointerId) endGesture(singlePointer ? screen : undefined);
     pointersRef.current.delete(event.pointerId);
-    lastPanRef.current = undefined;
     updatePinch();
   };
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (touchSelectRef.current?.pointerId === event.pointerId) touchSelectRef.current = undefined;
+    if (gestureRef.current?.pointerId === event.pointerId) endGesture(undefined);
     pointersRef.current.delete(event.pointerId);
-    lastPanRef.current = undefined;
     updatePinch();
-  };
-
-  const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
-    event.preventDefault();
-    const screen = localPoint(event.clientX, event.clientY);
-    onZoomAt(screen, Math.exp(-event.deltaY * 0.0015));
   };
 
   const zoomAtCenter = (factor: number) => {
@@ -206,14 +232,17 @@ export const FloorplanCanvas = ({
           className="plancraft-canvas plancraft-overlay"
           ref={overlayRef}
           data-testid="floorplan-overlay"
-          aria-label="Interactive floor plan drafting canvas"
+          data-mode={mode}
+          aria-label="Floor plan drawing area. Pick a drafting tool, then click or tap to place points. Arrow keys move the selected item."
           role="application"
           tabIndex={0}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
-          onWheel={handleWheel}
+          onPointerEnter={() => onHoverChange(true)}
+          onPointerLeave={() => onHoverChange(false)}
+          onContextMenu={(event) => event.preventDefault()}
         />
       </div>
       <div className="plancraft-view-controls" role="group" aria-label="Viewport controls">
@@ -223,6 +252,7 @@ export const FloorplanCanvas = ({
         <button type="button" aria-label="Pan view right" onClick={() => onPan(-VIEWPORT_PAN_STEP_PX, 0)}>→</button>
         <button type="button" aria-label="Zoom view out" onClick={() => zoomAtCenter(1 / VIEWPORT_ZOOM_FACTOR)}>−</button>
         <button type="button" aria-label="Zoom view in" onClick={() => zoomAtCenter(VIEWPORT_ZOOM_FACTOR)}>+</button>
+        <button type="button" aria-label="Fit the whole plan in view" title="Fit plan (0)" className="plancraft-fit" onClick={onFit}>Fit</button>
       </div>
     </div>
   );

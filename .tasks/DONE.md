@@ -1,5 +1,19 @@
 # Done
 
+## PlanCraft Studio real-world hardening — 38/38 complete
+
+Owner field testing showed the floor-plan tool (`#/floorplan-studio`, TASK-001) was not fit for real
+use despite its earlier "complete" status. The 2026-09-27 pass verified and closed 22 defects and 16
+capability gaps (F01–F38). The per-row ledger, evidence, and known limits are in
+`src/tools/floorplan/TRACKING.md`. Highlights: DXF R2000 is now a valid R2000 file and both DXF
+versions are no longer mirrored; clearance checks separate real collisions from access zones and
+toilets use the 2010 ADA 604.3.1 clearance; walls split at T junctions so rooms divide correctly;
+wheel zoom no longer scrolls the page; touch taps and two-finger gestures behave; furniture and
+corners drag with single-step undo; inspector fields commit cleanly and accept feet-and-inches;
+selection is visible; PDF sheet/scale pickers explain oversize plans; phones get tools above the
+drawing. Integrated to `main` at `8b09048` by owner-approved fast-forward, because PR creation
+returned 403 for the working session.
+
 ## Markdown Workbench real-world remediation + historical reconciliation — 10/10 complete
 
 The 2026-09-27 Markdown real-world pass is complete on `origin/main`. F01–F07 close dirty-safe

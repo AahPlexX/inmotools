@@ -1,5 +1,7 @@
 # PlanCraft Studio Implementation Plan
 
+> **Historical plan; do not execute.** The work shipped as TASK-001 and was reworked by the 2026-09-27 hardening pass. Unchecked boxes below are not open work. Current status and any new work: `src/tools/floorplan/TRACKING.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add PlanCraft Studio as a production-ready local-first architectural floor-plan drafting tool in InmoTools.
