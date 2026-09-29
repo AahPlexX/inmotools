@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-29  
 **Design:** `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md` (163 numbered capabilities)  
-**Tally:** 75 done · 38 partial · 50 missing (of 163)
+**Tally:** 75 done · 39 partial · 49 missing (of 163)
 
 Status is judged from code and tests on `main`. **Done** means engine plus a reachable surface (UI or export) with tests. **Partial** names the exact gap. **Missing** means no implementation. The design exclusions (macromolecular building, CSD/ICSD, SHELX executables, magnetic-space-group solving) need owner-approved wording before they count as excluded; none is recorded as excluded here.
 
@@ -73,7 +73,7 @@ Update the status of an item here whenever its implementation changes; keep this
 | 61 | Measure periodic nearest-image distances. | Done | measurement-engine; crystal-geometry test |
 | 62 | Measure bond angles. | Done | measurement-engine; crystal-geometry test |
 | 63 | Measure torsion/dihedral angles. | Done | measurement-engine; crystal-geometry test |
-| 64 | Measure plane-plane and direction-direction angles. | Missing | No plane-plane / direction-direction angles |
+| 64 | Measure plane-plane and direction-direction angles. | Partial | measurePlaneAngle/measureDirectionAngle engine + test (crystal-geometry); no UI control yet |
 | 65 | Detect bonds from configurable covalent-radius criteria with periodic boundaries. | Done | periodic / local-environment / structure-health engines and panels; crystal-environment, crystal-health tests |
 | 66 | Detect short contacts with explicit threshold controls. | Done | periodic / local-environment / structure-health engines and panels; crystal-environment, crystal-health tests |
 | 67 | Detect likely hydrogen bonds from configurable donor/acceptor and angular/distance cr... | Done | periodic / local-environment / structure-health engines and panels; crystal-environment, crystal-health tests |
