@@ -3,11 +3,12 @@ import { aluPorts } from './alu-engine';
 import { busLabel, clampBusWidth } from './bus-engine';
 import { displayPorts, type DisplayType } from './display-engine';
 import { matrixPorts } from './matrix-engine';
+import { emptySubcircuit, inputMarkerPorts, outputMarkerPorts, subcircuitPorts, tiePorts } from './subcircuit-ports';
 import { memoryPorts } from './memory-engine';
 import { isRegisterType, registerPorts, type RegisterType } from './register-engine';
 import type { ComponentParams, ComponentType, PortDefinition } from './logic-types';
 
-export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus' | 'arithmetic' | 'memory' | 'matrix';
+export type ComponentCategory = 'gate' | 'io' | 'sequential' | 'combinational' | 'register' | 'display' | 'bus' | 'arithmetic' | 'memory' | 'matrix' | 'subcircuit';
 
 export interface ComponentDefinition {
   readonly type: ComponentType;
@@ -161,6 +162,10 @@ export const COMPONENT_LIBRARY: Readonly<Record<ComponentType, ComponentDefiniti
   ALU: { type: 'ALU', label: 'ALU', category: 'arithmetic', defaultParams: { aluWidth: 4, delayNs: 20 }, ports: aluPorts },
   RAM: { type: 'RAM', label: 'RAM', category: 'memory', defaultParams: { addressBits: 8, dataBits: 8, memoryFill: 0, memoryCells: {}, edge: 'rising', activeHigh: true, delayNs: 30 }, ports: (params) => memoryPorts('RAM', params) },
   RGB_MATRIX: { type: 'RGB_MATRIX', label: 'RGB matrix', category: 'matrix', defaultParams: { matrixSize: 8, activeHigh: true }, ports: matrixPorts },
+  SUBCIRCUIT: { type: 'SUBCIRCUIT', label: 'Subcircuit', category: 'subcircuit', defaultParams: { subcircuit: emptySubcircuit() }, ports: subcircuitPorts },
+  PORT_IN: { type: 'PORT_IN', label: 'Input port', category: 'subcircuit', defaultParams: { signalWidth: 1, portValue: 0, initialLevel: 0 }, ports: inputMarkerPorts },
+  PORT_OUT: { type: 'PORT_OUT', label: 'Output port', category: 'subcircuit', defaultParams: { signalWidth: 1 }, ports: outputMarkerPorts },
+  NET_TIE: { type: 'NET_TIE', label: 'Net tie', category: 'subcircuit', defaultParams: { signalWidth: 1 }, ports: tiePorts },
   ROM: { type: 'ROM', label: 'ROM', category: 'memory', defaultParams: { addressBits: 8, dataBits: 8, memoryFill: 0, memoryCells: {}, activeHigh: true, delayNs: 30 }, ports: (params) => memoryPorts('ROM', params) },
 };
 
@@ -200,6 +205,7 @@ export const COMPONENT_CATEGORIES: readonly { readonly category: ComponentCatego
   { category: 'arithmetic', label: 'Arithmetic', types: ['ALU'] },
   { category: 'memory', label: 'Memory', types: ['RAM', 'ROM'] },
   { category: 'matrix', label: 'Pixel displays', types: ['RGB_MATRIX'] },
+  { category: 'subcircuit', label: 'Subcircuit ports', types: ['PORT_IN', 'PORT_OUT'] },
   { category: 'display', label: 'Segment displays', types: ['SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT'] },
   { category: 'io', label: 'Input, output & probes', types: ['SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE'] },
 ];
@@ -211,6 +217,8 @@ const PALETTE_LABELS: Readonly<Partial<Record<ComponentType, string>>> = {
   SIXTEEN_SEGMENT: '16-SEGMENT',
   BUS_SPLITTER: 'BUS SPLITTER',
   RGB_MATRIX: 'RGB MATRIX',
+  PORT_IN: 'INPUT PORT',
+  PORT_OUT: 'OUTPUT PORT',
 };
 
 /** The name shown on a palette button, in the inspector heading, and in placement hints. */

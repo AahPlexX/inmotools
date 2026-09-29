@@ -1,6 +1,6 @@
 import { clampSelectBits, defaultSelectBits, isBlockType } from './block-engine';
 import { clampAluWidth } from './alu-engine';
-import { checkWireEnds, clampBusWidth } from './bus-engine';
+import { checkWireEnds, clampBusWidth, clampSignalWidth } from './bus-engine';
 import { isMemoryType, normalizeMemoryParams } from './memory-engine';
 import { clampBitWidth, isRegisterType } from './register-engine';
 import { clampInputCount, COMPONENT_LIBRARY, getComponentPorts, isVariadicGate } from './component-library';
@@ -129,7 +129,7 @@ export const duplicateComponent = (document: LogicDocument, componentId: string)
  * Removes wires that reference a port no longer produced by a reduced input count or block size, and wires whose
  * two ends stopped being compatible (a bus resized so its width no longer matches the bus it was wired to).
  */
-const pruneOrphanWires = (document: LogicDocument): LogicDocument => {
+export const pruneOrphanWires = (document: LogicDocument): LogicDocument => {
   const portMap = new Map(document.components.map((component) => [component.id, new Map(getComponentPorts(component.type, component.params).map((port) => [port.id, port] as const))]));
   return {
     ...document,
@@ -158,6 +158,8 @@ export const updateComponentParams = (document: LogicDocument, componentId: stri
         normalized = { ...merged, busWidth: clampBusWidth(merged.busWidth) };
       } else if (component.type === 'ALU' && merged.aluWidth !== undefined) {
         normalized = { ...merged, aluWidth: clampAluWidth(merged.aluWidth) };
+      } else if ((component.type === 'PORT_IN' || component.type === 'PORT_OUT') && merged.signalWidth !== undefined) {
+        normalized = { ...merged, signalWidth: clampSignalWidth(merged.signalWidth) };
       } else if (isMemoryType(component.type)) {
         // A resized or re-filled memory keeps only the stored words that still fit.
         normalized = normalizeMemoryParams(merged);

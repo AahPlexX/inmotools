@@ -1,5 +1,6 @@
 import { getSimulationPorts } from './component-library';
 import { DELAY_SCALE_NS } from './sim-engine';
+import { flattenDocument } from './subcircuit-engine';
 import { portKey, type DelayMode, type LogicDocument, type LogicLevel, type PortKey } from './logic-types';
 
 /**
@@ -30,14 +31,15 @@ export interface ChannelCandidate extends AnalyzerChannel {
   readonly kind: 'probe' | 'signal';
 }
 
-const isObserver = (type: string): boolean => type === 'PROBE' || type === 'LED';
+const isObserver = (type: string): boolean => type === 'PROBE' || type === 'LED' || type === 'PORT_OUT';
 
 /**
  * Every signal the analyzer can capture: the input pin of each probe and LED,
  * then the output pins of every other component. A single-output part is
  * labeled by its own name; a multi-output part gets `name.pin`.
  */
-export const channelCandidates = (document: LogicDocument): ChannelCandidate[] => {
+export const channelCandidates = (source: LogicDocument): ChannelCandidate[] => {
+  const document = flattenDocument(source);
   const probes: ChannelCandidate[] = [];
   const signals: ChannelCandidate[] = [];
   for (const component of document.components) {

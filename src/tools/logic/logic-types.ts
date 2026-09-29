@@ -33,7 +33,11 @@ export type ComponentType =
   | 'ALU'
   | 'RAM'
   | 'ROM'
-  | 'RGB_MATRIX';
+  | 'RGB_MATRIX'
+  | 'SUBCIRCUIT'
+  | 'PORT_IN'
+  | 'PORT_OUT'
+  | 'NET_TIE';
 
 /**
  * `passive` pins neither drive nor load a net: a bus splitter's pins are passive because the same part
@@ -102,9 +106,30 @@ export interface ComponentParams {
   readonly memoryFill?: number;
   /** Side length of an RGB pixel matrix: 8 or 16. */
   readonly matrixSize?: number;
+  /** The circuit inside a SUBCIRCUIT, stored by value so a project file is self-contained. */
+  readonly subcircuit?: SubcircuitDefinition;
+  /** Width of a subcircuit port marker (1 for a single signal, 2-32 for a bus). */
+  readonly signalWidth?: number;
+  /** The constant an input port marker drives when it is a bus and is not inside a subcircuit. */
+  readonly portValue?: number;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
+
+/**
+ * A subcircuit: a named circuit with its own components and wires, used as one part elsewhere. Its
+ * connections to the outside are the port markers (`PORT_IN`, `PORT_OUT`) among its components.
+ */
+export interface SubcircuitDefinition {
+  readonly name: string;
+  /** A short glyph drawn on the part's body (a few characters). */
+  readonly icon: string;
+  readonly components: readonly ComponentInstance[];
+  readonly wires: readonly Wire[];
+  /** Where the person was looking last time they opened it, and what they had selected. */
+  readonly viewport?: ViewportState;
+  readonly selectedIds?: readonly string[];
+}
 
 export interface ComponentInstance {
   readonly id: string;

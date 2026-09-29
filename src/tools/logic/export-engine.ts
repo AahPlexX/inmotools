@@ -1,4 +1,5 @@
 import { isBusPort, portWidth } from './bus-engine';
+import { expandedSize, MAX_EXPANDED_COMPONENTS, MAX_SUBCIRCUIT_DEPTH } from './subcircuit-engine';
 import { isMatrixType, matrixSizeOf, pixelRects } from './matrix-engine';
 import { isMemoryType, isValidMemoryParams } from './memory-engine';
 import { getComponentPorts, isSequential } from './component-library';
@@ -83,6 +84,11 @@ const renderComponentSvg = (component: ComponentInstance, offsetX: number, offse
         }
         parts.push(`<circle cx="${svgNum(digit.dot.cx)}" cy="${svgNum(digit.dot.cy)}" r="${svgNum(digit.dot.r)}" fill="#cbd5e1" />`);
       }
+    }
+    if (component.type === 'SUBCIRCUIT') {
+      // The icon, upright like the caption, centered in the body.
+      const iconTurn = component.rotation === 180 ? 180 : 0;
+      parts.push(`<text transform="translate(${svgNum(body.x + body.width / 2)},${svgNum(body.y + body.height / 2 + 8)}) rotate(${iconTurn}) scale(${scaleX},1)" font-size="24" text-anchor="middle" fill="${GATE_STROKE}">${escapeXml(component.params.subcircuit?.icon ?? '')}</text>`);
     }
     if (isMatrixType(component.type)) {
       for (const rect of pixelRects(matrixSizeOf(component.params), body)) {
@@ -180,7 +186,7 @@ const COMPONENT_TYPES = new Set<ComponentType>([
   'SWITCH', 'PUSH_BUTTON', 'CLOCK', 'LED', 'PROBE',
   'D_FLIP_FLOP', 'JK_FLIP_FLOP', 'T_FLIP_FLOP', 'SR_LATCH',
   'MUX', 'DEMUX', 'DECODER', 'PRIORITY_ENCODER', 'BCD_7SEG',
-  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU', 'RAM', 'ROM', 'RGB_MATRIX',
+  'COUNTER', 'REGISTER', 'SEVEN_SEGMENT', 'SEVEN_SEGMENT_4', 'SIXTEEN_SEGMENT', 'BUS_SPLITTER', 'ALU', 'RAM', 'ROM', 'RGB_MATRIX', 'SUBCIRCUIT', 'PORT_IN', 'PORT_OUT',
 ]);
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const LICENSES = new Set(['MIT', 'CERN-OHL-P-2.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'Unlicensed']);
@@ -196,7 +202,7 @@ const isValidPortRef = (value: unknown): value is PortRef =>
 const isValidWirePoint = (value: unknown): value is WirePoint =>
   isNonEmptyRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y);
 
-const isValidComponent = (value: unknown): value is ComponentInstance => {
+const isValidComponent = (value: unknown, depth = 0): value is ComponentInstance => {
   if (!isNonEmptyRecord(value)) return false;
   return (
     typeof value.id === 'string' &&
@@ -206,8 +212,41 @@ const isValidComponent = (value: unknown): value is ComponentInstance => {
     typeof value.mirrored === 'boolean' &&
     typeof value.label === 'string' &&
     isNonEmptyRecord(value.params) &&
-    (!isMemoryType(value.type as ComponentType) || isValidMemoryParams(value.params))
+    (!isMemoryType(value.type as ComponentType) || isValidMemoryParams(value.params)) &&
+    (value.type !== 'SUBCIRCUIT' || isValidSubcircuit(value.params.subcircuit, depth + 1))
   );
+};
+
+/** Whether every wire ends on a part and pin that exist and joins a bus only to a bus of the same width. */
+const wiresResolve = (components: readonly ComponentInstance[], wires: readonly Wire[]): boolean => {
+  const componentById = new Map(components.map((component) => [component.id, component] as const));
+  for (const wire of wires) {
+    const fromComponent = componentById.get(wire.from.componentId);
+    const toComponent = componentById.get(wire.to.componentId);
+    if (!fromComponent || !toComponent) return false;
+    const fromPort = getComponentPorts(fromComponent.type, fromComponent.params).find((port) => port.id === wire.from.portId);
+    const toPort = getComponentPorts(toComponent.type, toComponent.params).find((port) => port.id === wire.to.portId);
+    if (!fromPort || !toPort) return false;
+    // A hand-edited file must not join a bus to a single pin or to a bus of another width.
+    if (isBusPort(fromPort) !== isBusPort(toPort) || portWidth(fromPort) !== portWidth(toPort)) return false;
+  }
+  return true;
+};
+
+/**
+ * A subcircuit's stored circuit must be as sound as the project around it: real parts, wires that resolve, a
+ * bounded depth, and a bounded size once every nested subcircuit is expanded, so a crafted file cannot make the
+ * simulator build an enormous circuit.
+ */
+const isValidSubcircuit = (value: unknown, depth: number): boolean => {
+  if (depth > MAX_SUBCIRCUIT_DEPTH || !isNonEmptyRecord(value)) return false;
+  if (typeof value.name !== 'string' || value.name.length > 200 || typeof value.icon !== 'string' || value.icon.length > 16) return false;
+  if (!Array.isArray(value.components) || !value.components.every((component) => isValidComponent(component, depth))) return false;
+  if (!Array.isArray(value.wires) || !value.wires.every(isValidWire)) return false;
+  if (value.viewport !== undefined && !(isNonEmptyRecord(value.viewport) && isFiniteNumber(value.viewport.panX) && isFiniteNumber(value.viewport.panY) && isFiniteNumber(value.viewport.zoom))) return false;
+  if (value.selectedIds !== undefined && !(Array.isArray(value.selectedIds) && value.selectedIds.every((id) => typeof id === 'string'))) return false;
+  if (expandedSize(value.components as ComponentInstance[], depth) > MAX_EXPANDED_COMPONENTS) return false;
+  return wiresResolve(value.components as ComponentInstance[], value.wires as Wire[]);
 };
 
 const isValidWire = (value: unknown): value is Wire =>
@@ -236,7 +275,7 @@ const isValidLogicDocument = (value: unknown): value is LogicDocument => {
   if (typeof metadata.license !== 'string' || !LICENSES.has(metadata.license)) return false;
   if (!Array.isArray(metadata.tags) || !metadata.tags.every((tag) => typeof tag === 'string')) return false;
 
-  if (!Array.isArray(value.components) || !value.components.every(isValidComponent)) return false;
+  if (!Array.isArray(value.components) || !value.components.every((component) => isValidComponent(component))) return false;
   if (!Array.isArray(value.wires) || !value.wires.every(isValidWire)) return false;
 
   const viewport = value.viewport;
@@ -250,21 +289,8 @@ const isValidLogicDocument = (value: unknown): value is LogicDocument => {
   if (!Array.isArray(value.selectedIds) || !value.selectedIds.every((id) => typeof id === 'string')) return false;
   if (typeof value.updatedAt !== 'string') return false;
 
-  const components = value.components as ComponentInstance[];
-  const wires = value.wires as Wire[];
-  const componentById = new Map(components.map((component) => [component.id, component]));
-  for (const wire of wires) {
-    const fromComponent = componentById.get(wire.from.componentId);
-    const toComponent = componentById.get(wire.to.componentId);
-    if (!fromComponent || !toComponent) return false;
-    const fromPorts = getComponentPorts(fromComponent.type, fromComponent.params);
-    const toPorts = getComponentPorts(toComponent.type, toComponent.params);
-    const fromPort = fromPorts.find((port) => port.id === wire.from.portId);
-    const toPort = toPorts.find((port) => port.id === wire.to.portId);
-    if (!fromPort || !toPort) return false;
-    // A hand-edited file must not join a bus to a single pin or to a bus of another width.
-    if (isBusPort(fromPort) !== isBusPort(toPort) || portWidth(fromPort) !== portWidth(toPort)) return false;
-  }
+  if (expandedSize(value.components as ComponentInstance[]) > MAX_EXPANDED_COMPONENTS) return false;
+  if (!wiresResolve(value.components as ComponentInstance[], value.wires as Wire[])) return false;
 
   return true;
 };

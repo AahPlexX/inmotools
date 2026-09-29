@@ -463,6 +463,7 @@
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="arithmetic"] .logic-palette-button { background: #fbcfe8; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="memory"] .logic-palette-button { background: #a5f3fc; }
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="matrix"] .logic-palette-button { background: #d9f99d; }
+.logic-workspace[data-theme="junior-explorer"] .logic-palette-group[data-category="subcircuit"] .logic-palette-button { background: #d6d3d1; }
 
 .logic-workspace[data-theme="junior-explorer"] .logic-palette-button.active {
   outline: 4px solid #7c3aed;

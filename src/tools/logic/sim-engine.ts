@@ -1,4 +1,6 @@
 import { evaluateAlu } from './alu-engine';
+import { flattenDocument } from './subcircuit-engine';
+import { markerWidthOf } from './subcircuit-ports';
 import { isMatrixType, restoreMatrixPixels, matrixSizeOf, updateMatrixPixels } from './matrix-engine';
 import { isMemoryType, memoryOutputs, restoreMemoryRuntime, stepMemoryWrite } from './memory-engine';
 import { evaluateBlock, isBlockType } from './block-engine';
@@ -184,6 +186,10 @@ const isRisingEdge = (previous: LogicLevel | undefined, current: LogicLevel): bo
 const isFallingEdge = (previous: LogicLevel | undefined, current: LogicLevel): boolean =>
   toBit(current) === 0 && toBit(previous ?? 1) === 1;
 
+/** A one-bit input port marker outside a subcircuit: it behaves like a toggle switch, so a subcircuit can be tried on its own. */
+const isSingleInputPort = (component: { readonly type: string; readonly params: LogicDocument['components'][number]['params'] }): boolean =>
+  component.type === 'PORT_IN' && markerWidthOf(component.params) === 1;
+
 export interface StepInput {
   readonly document: LogicDocument;
   readonly previous: SimulationFrame;
@@ -195,21 +201,23 @@ export interface StepInput {
   readonly forceClockStep?: boolean;
 }
 
-export const createInitialFrame = (document: LogicDocument): SimulationFrame => {
+export const createInitialFrame = (source: LogicDocument): SimulationFrame => {
+  const document = flattenDocument(source);
   const levels: Record<PortKey, LogicLevel> = {};
   const state: Record<string, ComponentRuntimeState> = {};
   for (const component of document.components) {
     for (const port of getSimulationPorts(component.type, component.params)) {
       levels[portKey(component.id, port.id)] = 'Z';
     }
-    if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON') {
+    if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || isSingleInputPort(component)) {
       state[component.id] = { switchLevel: component.params.initialLevel ?? 0 };
     }
   }
   return { tick: 0, portLevels: levels, componentState: state, pendingUpdates: [], hazards: [] };
 };
 
-export const step = ({ document, previous, elapsedMs, interactions = {}, forceClockStep = false }: StepInput): SimulationFrame => {
+export const step = ({ document: sourceDocument, previous, elapsedMs, interactions = {}, forceClockStep = false }: StepInput): SimulationFrame => {
+  const document = flattenDocument(sourceDocument);
   const tick = previous.tick + 1;
   const net = buildNetIndex(document.components, document.wires);
   const portMap = buildComponentPortMap(document.components);
@@ -227,7 +235,11 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
   // --- Source components: switches, push buttons, and clock generators drive their own net directly. ---
   for (const component of document.components) {
     const outKey = portKey(component.id, 'Y');
-    if (component.type === 'SWITCH') {
+    if (component.type === 'PORT_IN' && markerWidthOf(component.params) > 1) {
+      // A bus input port that is not inside a subcircuit drives the constant set in the inspector.
+      const value = Math.max(0, Math.trunc(component.params.portValue ?? 0));
+      for (let index = 0; index < markerWidthOf(component.params); index += 1) levels.set(portKey(component.id, `Y${index}`), (Math.floor(value / 2 ** index) % 2) as LogicLevel);
+    } else if (component.type === 'SWITCH' || isSingleInputPort(component)) {
       const forced = interactions[component.id];
       const current = nextState[component.id]?.switchLevel ?? component.params.initialLevel ?? 0;
       const level = forced ?? current;
@@ -502,7 +514,8 @@ export const readLevel = (frame: SimulationFrame, componentId: string, portId: s
  * updates) forward across a document edit instead of resetting the whole
  * circuit, so editing an unrelated component never blanks live switch state.
  */
-export const migrateFrame = (previous: SimulationFrame, document: LogicDocument): SimulationFrame => {
+export const migrateFrame = (previous: SimulationFrame, source: LogicDocument): SimulationFrame => {
+  const document = flattenDocument(source);
   const fresh = createInitialFrame(document);
   const portLevels: Record<PortKey, LogicLevel> = { ...fresh.portLevels };
   for (const key of Object.keys(portLevels)) {

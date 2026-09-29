@@ -22,6 +22,10 @@ export const clampBusWidth = (value: unknown, fallback: number = DEFAULT_BUS_WID
   return Math.min(MAX_BUS_WIDTH, Math.max(MIN_BUS_WIDTH, Math.round(raw)));
 };
 
+/** A port marker's width: 1 for a single signal, otherwise a bus width. */
+export const clampSignalWidth = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 2 ? clampBusWidth(value) : 1;
+
 export const isBusPort = (port: PortDefinition): boolean => port.bus !== undefined;
 
 /** The single pins a port stands for: its own bits for a bus port, otherwise just itself. */

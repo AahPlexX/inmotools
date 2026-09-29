@@ -3,6 +3,7 @@ import { COMPONENT_LIBRARY, getComponentPorts, type ComponentCategory } from './
 import { isDisplayType, restoreSegmentLit, segmentIdsOf, type DisplayType } from './display-engine';
 import { COLOR_HEX, isMatrixType, matrixSizeOf, pixelRects, restoreMatrixPixels } from './matrix-engine';
 import { digitGeometries } from './segment-shapes';
+import { levelLocation } from './subcircuit-ports';
 import { BUBBLE_RADIUS, type BodyRect, blockCaption, componentBodyRect, componentLabelAnchor, GATE_ABBREVIATION, gateFamilyOf, hasOutputBubble, usesBlockBody } from './gate-shapes';
 import { componentOriginPixels, GRID_SIZE, portAbsolutePosition, rotatePoint, type Point } from './geometry';
 import { readLevel } from './sim-engine';
@@ -49,7 +50,7 @@ export const THEME_PALETTES: Readonly<Record<ThemeName, ThemePalette>> = {
     levelHigh: '#16a34a', levelLow: '#2563eb', levelFloating: '#9ca3af', levelContention: '#dc2626',
     emphasis: 1.5,
     flow: true,
-    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8', memory: '#a5f3fc', matrix: '#d9f99d' },
+    familyFill: { gate: '#bfdbfe', combinational: '#e9d5ff', sequential: '#fecdd3', register: '#fed7aa', io: '#bbf7d0', display: '#fef08a', bus: '#c7d2fe', arithmetic: '#fbcfe8', memory: '#a5f3fc', matrix: '#d9f99d', subcircuit: '#d6d3d1' },
   },
   'color-vision-safe': { background: '#fefefe', grid: '#dddddd', componentFill: '#ffffff', componentStroke: '#111111', label: '#111111', selection: '#0072b2', levelHigh: '#0072b2', levelLow: '#b35a00', levelFloating: '#999999', levelContention: '#d55e00' },
 };
@@ -292,6 +293,7 @@ const drawBlockBody = (ctx: CanvasRenderingContext2D, palette: ThemePalette, com
   if (isDisplayType(component.type)) drawDisplayGlyphs(ctx, palette, component.type, body, restoreSegmentLit(frame.componentState[component.id]?.segmentLit, component.type));
 
   if (isMatrixType(component.type)) drawMatrixPixels(ctx, palette, component, body, frame);
+  if (component.type === 'SUBCIRCUIT') drawUprightText(ctx, palette, component, component.params.subcircuit?.icon ?? '', body.width / 2, body.y + body.height / 2 + 8, `${24 * fontScaleOf(palette)}px ui-monospace, monospace`);
 
   drawUprightText(ctx, palette, component, blockCaption(component), body.width / 2, body.y - 6, `bold ${10 * fontScaleOf(palette)}px ui-monospace, monospace`);
 };
@@ -356,7 +358,15 @@ const drawDisplayGlyphs = (ctx: CanvasRenderingContext2D, palette: ThemePalette,
  * drawn with one level summarizing them (unknown beats floating beats a good value).
  */
 const portLevel = (frame: SimulationFrame, component: ComponentInstance, port: PortDefinition): LogicLevel =>
-  port.bus ? aggregateLevel(busLevels(port, (pin) => readLevel(frame, component.id, pin))) : readLevel(frame, component.id, port.id);
+  port.bus
+    ? aggregateLevel(busLevels(port, (pin) => readPin(frame, component, port.id, pin)))
+    : readPin(frame, component, port.id, port.id);
+
+/** A pin's level from the frame; a subcircuit part has no pins there, so its ports are read from their internal junctions. */
+const readPin = (frame: SimulationFrame, component: ComponentInstance, portId: string, pinId: string): LogicLevel => {
+  const location = levelLocation(component, portId, pinId);
+  return readLevel(frame, location.componentId, location.pinId);
+};
 
 /** A bus carries many values at once, so a good one is drawn in the outline color rather than as a single high or low. */
 const busColor = (palette: ThemePalette, level: LogicLevel): string => (level === 1 ? palette.componentStroke : levelColor(palette, level));
