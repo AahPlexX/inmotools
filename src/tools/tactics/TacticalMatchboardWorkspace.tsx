@@ -1029,7 +1029,7 @@ export default function TacticalMatchboardWorkspace() {
               />
             </label>
             <div className="tactical-setup-action">
-              <button className="action-button" type="submit" data-tactical-tip="Choose Build board. The dialog says Build board replaces this board and clears undo. Choose OK. A new board appears from these settings, and undo for the previous board is cleared. Choose Cancel. The board and undo stay unchanged.">Build board</button>
+              <button className="action-button" type="submit" data-tactical-tip={'Choose "Build board". The dialog says "Build board" replaces this board and clears undo. Choose OK. A new board appears from these settings, and undo for the previous board is cleared. Choose Cancel. The board and undo stay unchanged.'}>Build board</button>
               <small>Dimensions are editable training inputs unless a sourced rules profile explicitly states otherwise.</small>
             </div>
           </form>
@@ -1266,7 +1266,7 @@ export default function TacticalMatchboardWorkspace() {
             className={`action-button ${mode === 'freehand' ? '' : 'secondary'}`}
             type="button"
             aria-pressed={mode === 'freehand'}
-            data-tactical-tip="Choose Freehand (a stroke you draw by hand). Drag on the pitch (the drawn field) and release. The stroke appears. Or choose Add freehand point at least twice, up to 2,000 points, then choose Save freehand. The stroke appears. That 2 to 2,000 point limit matches a freehand mark on a local match video."
+            data-tactical-tip={'Choose "Freehand" (a stroke you draw by hand). Drag on the pitch (the drawn field) and release. The stroke appears. Or choose "Add freehand point" at least twice, up to 2,000 points, then choose "Save freehand". The stroke appears. That 2 to 2,000 point limit matches a freehand mark on a local match video.'}
             onClick={() => { setMode('freehand'); setArrowStart(null); setStatus('Freehand (a stroke you draw by hand) is on. Drag on the pitch and release, and the stroke appears. Or choose Add freehand point, then Save freehand.'); }}
           >
             Freehand
@@ -1289,7 +1289,7 @@ export default function TacticalMatchboardWorkspace() {
             <input
               value={oppositionName}
               aria-label="Opposition name"
-              data-tactical-tip="Type the opposition name (the other team) here. Choose Place opposition. That name appears on the formation (the starting arrangement) you chose in Opposition formation."
+              data-tactical-tip={'Type the opposition name (the other team) here. Choose "Place opposition". That name appears on the formation (the starting arrangement) you chose in "Opposition formation".'}
               onChange={(event) => setOppositionName(event.target.value)}
             />
           </label>
@@ -1309,7 +1309,7 @@ export default function TacticalMatchboardWorkspace() {
               aria-label="Opposition formation"
               value={oppositionFormationId}
               onChange={(event) => setOppositionFormationId(event.target.value)}
-              data-tactical-tip="Choose a formation (the other team’s starting arrangement) here. This list is separate from Formation in Board setup. Choose Place opposition and this formation appears in the other half."
+              data-tactical-tip={'Choose a formation (the other team’s starting arrangement) here. This list is separate from "Formation" in Board setup. Choose "Place opposition" and this formation appears in the other half.'}
             >
               {availableFormations.map((formation) => (
                 <option key={formation.id} value={formation.id}>{formation.label}</option>
@@ -1319,7 +1319,7 @@ export default function TacticalMatchboardWorkspace() {
           <button
             className="action-button secondary"
             type="button"
-            data-tactical-tip="Choose Place opposition after your squad (your players) is visible on the pitch (the drawn field). Your squad fits into one half. The formation you chose in Opposition formation fits into the other half. It does not have to match your squad. If the kits (shirt colors) match, the other team’s kit changes so the colors stay different. Choose Place opposition again. The other team updates. A second squad does not appear. Choose Undo. The previous board comes back."
+            data-tactical-tip={'Choose "Place opposition" after your squad (your players) is visible on the pitch (the drawn field). Your squad fits into one half. The formation you chose in "Opposition formation" fits into the other half. It does not have to match your squad. If the kits (shirt colors) match, the other team’s kit changes so the colors stay different. Choose "Place opposition" again. The other team updates. A second squad does not appear. Choose "Undo". The previous board comes back.'}
             onClick={placeOpposition}
           >
             Place opposition

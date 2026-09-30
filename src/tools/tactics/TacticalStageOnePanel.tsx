@@ -275,7 +275,7 @@ export default function TacticalStageOnePanel({
             <button type="button" onClick={() => addParticipant('neutral')}>Add neutral player</button>
             <button type="button" onClick={() => addParticipant('coach')}>Add coach</button>
           </div>
-          <small>Type an active-player count, then choose Scale squad. The count can pass the formation (the starting arrangement) size. The team stops at {MAX_ROSTER_PLAYERS_PER_TEAM} players. {MAX_ROSTER_PLAYERS_PER_TEAM} is the Pages-safe ceiling (the most players you can add on one team from this page), not a format cap (not the player count of a 7v7 or 11v11 formation). Neutral players and coaches stay out of the active count.</small>
+          <small>Type an active-player count, then choose "Scale squad". The count can pass the formation (the starting arrangement) size. The team stops at {MAX_ROSTER_PLAYERS_PER_TEAM} players. {MAX_ROSTER_PLAYERS_PER_TEAM} is the Pages-safe ceiling (the most players you can add on one team from this page), not a format cap (not the player count of a 7v7 or 11v11 formation). Neutral players and coaches stay out of the active count.</small>
         </section>
 
         <section aria-labelledby="token-editor-heading">
