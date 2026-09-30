@@ -74,53 +74,53 @@ The simulation engine consumes only the component/net graph (never React state) 
 Every item below is a required, functional (non-decorative) capability. Each is tagged with the phase in the accompanying plan that delivers it; nothing here is dropped, only sequenced. "Traditional" tool comparisons (Logisim-evolution, CircuitVerse, Digital, KiCad, LTspice, EasyEDA, Tinkercad, Proteus) are the baseline this ledger is required to meet or exceed for the digital-logic domain; the word "AI" never appears in shipped copy.
 
 ### Core canvas & schematic capture
-1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1)*
+1. Fluid multi-resolution infinite schematic canvas — pan (drag/two-finger touch), pinch/scroll zoom, crisp text and pins at every zoom level. *(Phase 1; two-finger touch pan and pinch delivered in 2D)*
 2. Deterministic orthogonal wire routing with automatic T-junction joint dots; left-click commits a waypoint, right-click/Escape cancels the in-progress wire, and a floating "Cancel route" chip appears near the touch point on touch devices. *(Phase 1)*
-3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3)*
-4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3)*
+3. Multi-bit bus architecture: bus wires, a bus-splitter component with configurable width, and per-bit tap connections, with hover/tap-and-hold value readouts in binary/hex/decimal. *(Phase 3; delivered in 3E)*
+4. Custom subcircuit encapsulation: group a selection into a named subcircuit with assigned ports and a custom icon; double-click to descend, breadcrumb trail to return. *(Phase 3; delivered in 3H)*
 5. Universal logic-gate primitive suite: AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer, tri-state buffer, each configurable from 2–8 inputs from the inspector without losing existing wiring. *(Phase 1)*
 6. Configurable propagation delay / real-world gate physics: an ideal zero-delay mode and a realistic per-gate nanosecond-delay mode that exposes glitch/hazard/race behavior. *(Phase 1)*
 
 ### Sequential logic, clocks & memory
-7. Flip-flop/latch bank: D, T, JK, SR, with active-high/low async set/reset and positive/negative edge triggering. *(Phase 1: D/JK/T/SR; Phase 2: register banks)*
+7. Flip-flop/latch bank: D, T, JK, SR, with active-high/low async set/reset and positive/negative edge triggering. *(Phase 1: D/JK/T/SR; Phase 2 — register banks delivered in 2B)*
 8. Interactive multi-frequency clock generator (0.5 Hz–10 kHz presets) plus a manual single-step tick control. *(Phase 1)*
-9. RAM/ROM memory editor matrix (4-bit–32-bit address space) with a hex/ASCII cell editor and raw binary import. *(Phase 3)*
-10. Synchronous/asynchronous up/down counters with terminal-count flags and synchronous load. *(Phase 2)*
+9. RAM/ROM memory editor matrix (4-bit–32-bit address space) with a hex/ASCII cell editor and raw binary import. *(Phase 3; delivered in 3F)*
+10. Synchronous/asynchronous up/down counters with terminal-count flags and synchronous load. *(Phase 2 — delivered in 2B)*
 
 ### Interactive I/O & virtual instruments
 11. Interactive switches, push buttons, and a mechanical-bounce emulation toggle for debounce-circuit training. *(Phase 1)*
-12. Multi-segment/alphanumeric display drivers: 7-segment (single and multiplexed 4-digit) and 16-segment, wired directly or through a BCD decoder. *(Phase 2)*
-13. RGB LED pixel-matrix canvas (8×8 / 16×16) with row/column drive for scanning demos. *(Phase 3)*
+12. Multi-segment/alphanumeric display drivers: 7-segment (single and multiplexed 4-digit) and 16-segment, wired directly or through a BCD decoder. *(Phase 2 — delivered in 2C)*
+13. RGB LED pixel-matrix canvas (8×8 / 16×16) with row/column drive for scanning demos. *(Phase 3; delivered in 3G)*
 14. Integrated logic probe / voltage-level indicator: High/Low/High-Z/Contention shown by both color and shape/pattern. *(Phase 1)*
-15. Virtual multi-channel logic analyzer / oscilloscope dock: up to 16 probes, synchronized scrolling timing diagram, edge markers, time-delta cursor measurements; the dock collapses to a full-screen mode on narrow viewports. *(Phase 2)*
+15. Virtual multi-channel logic analyzer / oscilloscope dock: up to 16 probes, synchronized scrolling timing diagram, edge markers, time-delta cursor measurements; the dock collapses to a full-screen mode on narrow viewports. *(Phase 2 — delivered in 2E)*
 
 ### Combinational & arithmetic blocks
-16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3)*
-17. Multiplexer/demultiplexer arrays (2:1, 4:1, 8:1, 16:1) with address and enable lines. *(Phase 2)*
-18. Priority encoders and binary decoders with valid-output flags. *(Phase 2)*
+16. Configurable 4/8/16-bit ALU (add, subtract, AND, OR, XOR, compare, barrel shift). *(Phase 3; delivered in 3F)*
+17. Multiplexer/demultiplexer arrays (2:1, 4:1, 8:1, 16:1) with address and enable lines. *(Phase 2 — delivered in 2A)*
+18. Priority encoders and binary decoders with valid-output flags. *(Phase 2 — delivered in 2A)*
 
 ### Automated analysis
-19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4.)*
+19. Automated truth-table generator (walks every input permutation), sortable and interactive. *(Phase 1: every switch/push-button in the document is an input and every LED/probe is an output, which requires the circuit to be purely combinational; scoping the walk to a user-selected subcircuit — so unrelated components on the same canvas don't participate — is Phase 3 work, delivered together with subcircuit encapsulation, ledger item 4 — delivered in 3H: open a subcircuit and its ports are the table's inputs and outputs, or tick "selected parts only".)*
 20. Boolean expression extractor: canonical SOP and POS from the drawn circuit or its truth table. *(Phase 1)*
-21. Karnaugh-map solver and Quine–McCluskey minimizer for 2–5 variables with visual grouping loops and one-click minimized-schematic generation. *(Phase 3)*
+21. Karnaugh-map solver and Quine–McCluskey minimizer for 2–5 variables with visual grouping loops and one-click minimized-schematic generation. *(Phase 3 — delivered in 3A)*
 22. Electrical rule check (ERC): floating/undriven input nets, output-to-output contention, unbuffered combinational loops — one click, itemized results naming the affected components. *(Phase 1: an undriven net is reported as a floating-input finding on whichever input pins it feeds, rather than as its own separate category.)*
 
 ### Educational & accessible modes
-23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3)*
-24. Junior Explorer color-coded elementary mode: one-click swap to large, bright, animated blocks for first-time/young learners. *(Phase 3)*
+23. Gamified logic-puzzle challenge engine ("light the bulb," "build XOR from NAND only," "build a full adder") with automatic pass/fail verification against the target truth table. *(Phase 3 — delivered in 3B)*
+24. Junior Explorer color-coded elementary mode: one-click swap to large, bright, animated blocks for first-time/young learners. *(Phase 3 — delivered in 3C)*
 
 ### Ergonomics, input model & accessibility
 25. Contextual right-click menu on desktop (rotate 90°, flip horizontal/vertical, duplicate, change bit width, delete, inspect net) and an accessible long-press radial menu on touch. *(Phase 1)*
 26. Non-intrusive, viewport-edge-aware tooltip engine on every tool/pin, suppressed on touch to avoid obstruction (replaced there by tap-and-hold detail). *(Phase 1)*
-27. Keyboard shortcut matrix (wire, rotate, palette focus, play/pause, delete, undo/redo) with a visible reference panel. *(Phase 1: functional default bindings + reference panel; Phase 3: full user remapping UI)*
+27. Keyboard shortcut matrix (wire, rotate, palette focus, play/pause, delete, undo/redo) with a visible reference panel. *(Phase 1: functional default bindings + reference panel; Phase 3: full user remapping UI — delivered in 3D)*
 28. Accessible high-contrast / OLED-dark / paper-light / deuteranopia-and-protanopia-safe palettes where logic High/Low/Z/contention are distinguished by shape and pattern as well as hue. *(Phase 1)*
 
 ### Export, netlists, HDL & metadata
-29. HDL exporter: synthesis-formatted structural Verilog (`.v`) and VHDL (`.vhd`) with standard module headers and port declarations. *(Phase 4)*
-30. Industry-standard netlist exporter: SPICE `.cir` subcircuits, KiCad schematic netlist text, and EDIF. *(Phase 4)*
-31. Vector SVG and print-ready PDF schematic exporter with title block, border grid, reference designators, and net labels. *(Phase 1: SVG; Phase 4: PDF/title-block)*
-32. Bill-of-materials exporter: CSV/JSON itemizing components, gate counts, and classic IC package equivalents (e.g., 7400 quad NAND, 7404 hex inverter) with pin allocations. *(Phase 4)*
-33. Granular project metadata / OpenGraph tag studio: title, author, description, version, license (MIT / CERN-OHL / Creative Commons), and generated OpenGraph social-card preview fields, editable at export time. *(Phase 1: metadata fields + JSON export; Phase 4: OpenGraph card generation)*
+29. HDL exporter: synthesis-formatted structural Verilog (`.v`) and VHDL (`.vhd`) with standard module headers and port declarations. *(Phase 4; delivered in 4a)*
+30. Industry-standard netlist exporter: SPICE `.cir` subcircuits, KiCad schematic netlist text, and EDIF. *(Phase 4; delivered in 4b)*
+31. Vector SVG and print-ready PDF schematic exporter with title block, border grid, reference designators, and net labels. *(Phase 1: SVG; Phase 4: PDF/title-block, designators and net labels; delivered in 4d)*
+32. Bill-of-materials exporter: CSV/JSON itemizing components, gate counts, and classic IC package equivalents (e.g., 7400 quad NAND, 7404 hex inverter) with pin allocations. *(Phase 4; delivered in 4c)*
+33. Granular project metadata / OpenGraph tag studio: title, author, description, version, license (MIT / CERN-OHL / Creative Commons), and generated OpenGraph social-card preview fields, editable at export time. *(Phase 1: metadata fields + JSON export; Phase 4: OpenGraph card generation; delivered in 4e)*
 34. Offline single-file portable `.circuit.json` project bundle (layouts, embedded subcircuits, memory contents), reloadable with zero network connectivity. *(Phase 1)*
 
 Truth-table CSV export, referenced by capability 19, ships in Phase 1 alongside the generator itself.

@@ -1,0 +1,124 @@
+.logic-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logic-shortcuts-intro {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.logic-shortcuts-recording {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.14);
+  border: 1px solid #2563eb;
+  font-weight: 600;
+}
+
+.logic-shortcuts-problem {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid #dc2626;
+}
+
+.logic-shortcuts-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.logic-shortcuts-table th,
+.logic-shortcuts-table td {
+  border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.logic-shortcuts-table tbody th {
+  font-weight: 500;
+}
+
+.logic-shortcuts-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.logic-shortcuts-keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logic-shortcuts kbd {
+  font-family: ui-monospace, monospace;
+  border: 1px solid rgba(100, 116, 139, 0.6);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 7px;
+  background: rgba(148, 163, 184, 0.15);
+  white-space: nowrap;
+}
+
+.logic-shortcuts-row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.logic-shortcuts button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: #1f2933;
+}
+
+.logic-shortcuts button[aria-pressed="true"] {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.logic-shortcuts button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.logic-shortcuts-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.logic-workspace[data-theme="dark"] .logic-shortcuts button,
+.logic-workspace[data-theme="high-contrast"] .logic-shortcuts button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-shortcuts button[aria-pressed="true"],
+.logic-workspace[data-theme="high-contrast"] .logic-shortcuts button[aria-pressed="true"] {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+}
+
+.logic-workspace[data-theme="junior-explorer"] .logic-shortcuts button {
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 2px solid #1e293b;
+  border-radius: 12px;
+  background: #fff;
+  color: #1e293b;
+  min-height: 40px;
+}
