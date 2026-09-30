@@ -7,6 +7,21 @@ function makeTriangleGlb(extra: Record<string, unknown> = {}): Uint8Array {
   const rawJson=new TextEncoder().encode(json),jsonLength=Math.ceil(rawJson.length/4)*4,totalLength=12+8+jsonLength+8+binary.length,output=new Uint8Array(totalLength),view=new DataView(output.buffer);view.setUint32(0,0x46546c67,true);view.setUint32(4,2,true);view.setUint32(8,totalLength,true);view.setUint32(12,jsonLength,true);view.setUint32(16,0x4e4f534a,true);output.fill(0x20,20,20+jsonLength);output.set(rawJson,20);const binHeader=20+jsonLength;view.setUint32(binHeader,binary.length,true);view.setUint32(binHeader+4,0x004e4942,true);output.set(binary,binHeader+8);return output;
 }
 
+/** Builds a GLB from an explicit chunk list so framing defects can be expressed exactly. */
+function makeGlb(chunks: Array<{ type: number; data: Uint8Array }>, options: { declaredLength?: number; version?: number } = {}): Uint8Array {
+  const body = chunks.reduce((sum, chunk) => sum + 8 + chunk.data.byteLength, 0);
+  const totalLength = 12 + body, output = new Uint8Array(totalLength), view = new DataView(output.buffer);
+  view.setUint32(0, 0x46546c67, true); view.setUint32(4, options.version ?? 2, true); view.setUint32(8, options.declaredLength ?? totalLength, true);
+  let offset = 12;
+  for (const chunk of chunks) { view.setUint32(offset, chunk.data.byteLength, true); view.setUint32(offset + 4, chunk.type, true); output.set(chunk.data, offset + 8); offset += 8 + chunk.data.byteLength; }
+  return output;
+}
+
+const pad = (text: string) => { const bytes = new TextEncoder().encode(text); const padded = new Uint8Array(Math.ceil(bytes.byteLength / 4) * 4).fill(0x20); padded.set(bytes); return padded; };
+const jsonChunk = (json: unknown) => pad(JSON.stringify(json));
+const BIN_CHUNK = 0x004e4942, JSON_CHUNK = 0x4e4f534a, VENDOR_CHUNK = 0x00000001;
+const MINIMAL_JSON = { asset: { version: '2.0' } };
+
 describe('glTF optimizer engine',()=>{
  it('clamps lossy controls to supported bounds',()=>{expect(clampGltfOptions({targetRatio:4,maxTextureDimension:16})).toEqual({targetRatio:1,maxTextureDimension:64});expect(clampGltfOptions({targetRatio:-1,maxTextureDimension:99999})).toEqual({targetRatio:.05,maxTextureDimension:8192});});
  it('inspects original GLB bytes without invoking a transform or rewriting them',async()=>{const input=makeTriangleGlb();const before=input.slice();const inspection=await inspectGlb(input);expect(input).toEqual(before);expect(inspection.stats.meshes).toBe(1);expect(inspection.stats.triangles).toBe(1);expect(inspection.inputBytes).toBe(input.byteLength);expect(inspection.extensionReport.policy).toBe('registered-preservation');});
@@ -15,4 +30,18 @@ describe('glTF optimizer engine',()=>{
  it('preflights Draco as unsupported rather than trying to transform undecodable geometry',async()=>{const input=makeTriangleGlb({extensionsUsed:['KHR_draco_mesh_compression'],extensionsRequired:['KHR_draco_mesh_compression']});const inspection=await inspectGlb(input);expect(inspection.transformBlockers.join(' ')).toMatch(/Draco decoder/i);await expect(optimizeGlb(input,{targetRatio:.5,maxTextureDimension:1024})).rejects.toThrow(/Draco decoder/i);});
  it('round-trips an uncompressed triangle while preserving cameras and source texture formats policy',async()=>{const input=makeTriangleGlb({cameras:[{type:'perspective',perspective:{yfov:.8,znear:.1}}]});const result=await optimizeGlb(input,{targetRatio:1,maxTextureDimension:1024});expect(new DataView(result.bytes.buffer,result.bytes.byteOffset,result.bytes.byteLength).getUint32(0,true)).toBe(0x46546c67);expect(result.before.meshes).toBe(1);expect(result.after.meshes).toBe(1);expect(result.before.triangles).toBe(1);expect(result.after.triangles).toBe(1);expect(result.report.preservedTextureFormats).toBe(true);expect(result.report.cameraCountPreserved).toBe(true);expect(result.report.animationCountPreserved).toBe(true);expect(result.report.extensionPreservation.unsupported).toEqual([]);});
  it('parses only a valid glTF 2.0 JSON chunk',()=>{expect(readGlbJson(makeTriangleGlb()).asset.version).toBe('2.0');expect(()=>readGlbJson(new Uint8Array(24))).toThrow(/GLB|glTF/i);});
+ it('rejects a header whose declared total length disagrees with the file size',()=>{const truncated=makeTriangleGlb().slice(0,-4);expect(()=>readGlbJson(truncated)).toThrow(/length|truncat/i);expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)}],{declaredLength:9999}))).toThrow(/length/i);});
+ it('rejects a document whose first chunk is not JSON',()=>{expect(()=>readGlbJson(makeGlb([{type:BIN_CHUNK,data:pad('payload')}]))).toThrow(/JSON/i);});
+ it('rejects a truncated chunk header and a chunk payload that runs past the declared length',()=>{const short=makeTriangleGlb().slice(0,19);expect(()=>readGlbJson(short)).toThrow(/small|length|truncat/i);const glb=makeTriangleGlb(),view=new DataView(glb.buffer,glb.byteOffset,glb.byteLength),binHeader=20+view.getUint32(12,true);view.setUint32(binHeader,glb.byteLength,true);expect(()=>readGlbJson(glb)).toThrow(/chunk|length|truncat/i);});
+ it('rejects a chunk length that is not four-byte aligned',()=>{const glb=makeGlb([{type:JSON_CHUNK,data:new Uint8Array(21).fill(0x20)}]);expect(()=>readGlbJson(glb)).toThrow(/align/i);});
+ it('rejects invalid JSON and any asset version other than 2.0',()=>{
+  expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:pad('{ not json')}]))).toThrow(/JSON/i);
+  expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk({asset:{version:'1.0'}})}]))).toThrow(/2\.0|version/i);
+  expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk({scenes:[]})}]))).toThrow(/asset|version/i);
+ });
+ it('rejects a second JSON chunk and a BIN chunk that appears twice or before the JSON chunk',()=>{expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)},{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)}]))).toThrow(/JSON/i);expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)},{type:BIN_CHUNK,data:pad('a')},{type:BIN_CHUNK,data:pad('b')}]))).toThrow(/BIN/i);expect(()=>readGlbJson(makeGlb([{type:BIN_CHUNK,data:pad('a')},{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)}]))).toThrow(/JSON/i);});
+ it('requires a BIN chunk when the JSON declares an embedded first buffer without a URI',()=>{const embedded={asset:{version:'2.0'},buffers:[{byteLength:4}],meshes:[{primitives:[{attributes:{POSITION:0}}]}],accessors:[{bufferView:0,componentType:5126,count:1,type:'VEC3'}]};expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk(embedded)}]))).toThrow(/BIN|buffer/i);expect(()=>readGlbJson(makeGlb([{type:JSON_CHUNK,data:jsonChunk(embedded)},{type:BIN_CHUNK,data:new Uint8Array(4)}]))).not.toThrow();});
+ it('inspects an unknown chunk but blocks rewriting because its payload cannot be guaranteed to survive',async()=>{const input=makeGlb([{type:JSON_CHUNK,data:jsonChunk(MINIMAL_JSON)},{type:VENDOR_CHUNK,data:new Uint8Array(4).fill(7)}]);const before=input.slice();const inspection=await inspectGlb(input);expect(input).toEqual(before);expect(inspection.transformBlockers.join(' ')).toMatch(/unknown chunk|unregistered chunk|preserv/i);await expect(optimizeGlb(input,{targetRatio:1,maxTextureDimension:1024})).rejects.toThrow(/unknown chunk|preserv/i);});
+ it('reports blocked geometry counts as unavailable rather than a misleading zero',async()=>{const input=makeTriangleGlb({extensionsUsed:['VENDOR_unknown_payload'],extensions:{VENDOR_unknown_payload:{importantId:'00123'}}});const inspection=await inspectGlb(input);expect(inspection.stats.vertices).toBeNull();expect(inspection.stats.triangles).toBeNull();expect(inspection.stats.meshes).toBe(1);expect(inspection.stats.primitives).toBe(1);expect(inspection.stats.textures).toBe(0);});
+ it('still reports real geometry counts for a readable model',async()=>{const inspection=await inspectGlb(makeTriangleGlb());expect(inspection.stats.vertices).toBe(3);expect(inspection.stats.triangles).toBe(1);const result=await optimizeGlb(makeTriangleGlb(),{targetRatio:1,maxTextureDimension:1024});expect(result.before.triangles).toBe(1);expect(result.after.triangles).toBe(1);});
 });

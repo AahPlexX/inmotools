@@ -4,7 +4,9 @@ import { dedup, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
 
 export type GltfOptimizeOptions = { targetRatio: number; maxTextureDimension: number };
-export type GltfStats = { meshes: number; primitives: number; vertices: number; triangles: number; textures: number; cameras: number; animations: number };
+export type GltfStats = { meshes: number; primitives: number; vertices: number | null; triangles: number | null; textures: number; cameras: number; animations: number };
+/** Statistics read from a decoded document, where geometry counts are always known. */
+export type GltfDecodedStats = Omit<GltfStats, 'vertices' | 'triangles'> & { vertices: number; triangles: number };
 export type GltfExtensionReport = {
   used: string[];
   required: string[];
@@ -31,7 +33,7 @@ export type GltfOptimizeReport = {
   extensionPreservation: GltfExtensionReport;
   stages: string[];
 };
-export type GltfOptimizeResult = { bytes: Uint8Array; inputBytes: number; outputBytes: number; before: GltfStats; after: GltfStats; options: GltfOptimizeOptions; report: GltfOptimizeReport };
+export type GltfOptimizeResult = { bytes: Uint8Array; inputBytes: number; outputBytes: number; before: GltfDecodedStats; after: GltfDecodedStats; options: GltfOptimizeOptions; report: GltfOptimizeReport };
 export type GltfRunControl = { signal?: AbortSignal; onProgress?: (progress: number, stage: string) => void };
 
 const REGISTERED_EXTENSION_NAMES = new Set<string>(ALL_EXTENSIONS
@@ -47,7 +49,7 @@ export function clampGltfOptions(options: Partial<GltfOptimizeOptions>): GltfOpt
 
 function primitiveElementCount(primitive: Primitive) { return primitive.getIndices()?.getCount() ?? primitive.getAttribute('POSITION')?.getCount() ?? 0; }
 function primitiveTriangleCount(primitive: Primitive) { const count = primitiveElementCount(primitive), mode = Number(primitive.getMode()); if (mode === 4) return Math.floor(count / 3); if (mode === 5 || mode === 6) return Math.max(0, count - 2); return 0; }
-function collectStats(document: Document): GltfStats {
+function collectStats(document: Document): GltfDecodedStats {
   const root = document.getRoot();
   let primitives = 0, vertices = 0, triangles = 0;
   for (const mesh of root.listMeshes()) for (const primitive of mesh.listPrimitives()) {
@@ -61,8 +63,9 @@ function collectRawStats(json: Record<string, any>): GltfStats {
   return {
     meshes: (json.meshes ?? []).length,
     primitives: (json.meshes ?? []).reduce((sum: number, mesh: any) => sum + (mesh.primitives?.length ?? 0), 0),
-    vertices: 0,
-    triangles: 0,
+    // Geometry is not decoded on the preflight-blocked path, so these counts are unknown, not zero.
+    vertices: null,
+    triangles: null,
     textures: (json.textures ?? []).length,
     cameras: (json.cameras ?? []).length,
     animations: (json.animations ?? []).length,
@@ -71,14 +74,45 @@ function collectRawStats(json: Record<string, any>): GltfStats {
 function createIo() { return new WebIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder }); }
 function throwIfAborted(signal?: AbortSignal) { if (signal?.aborted) throw new DOMException('Optimization canceled.', 'AbortError'); }
 
-export function readGlbJson(input: Uint8Array): Record<string, any> {
-  if (input.byteLength < 20) throw new Error('The selected file is too small to be a GLB document.');
+const GLB_MAGIC = 0x46546c67, GLB_VERSION = 2, GLB_HEADER_BYTES = 12, GLB_CHUNK_HEADER_BYTES = 8;
+const GLB_JSON_CHUNK = 0x4e4f534a, GLB_BIN_CHUNK = 0x004e4942;
+export type GltfContainer = { json: Record<string, any>; unknownChunkTypes: number[]; hasBinaryChunk: boolean };
+
+/** Validates the GLB 2 container framing described in the glTF 2.0 specification, then returns the JSON chunk. */
+export function readGlbContainer(input: Uint8Array): GltfContainer {
+  if (input.byteLength < GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES) throw new Error('The selected file is too small to be a GLB document.');
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
-  if (view.getUint32(0, true) !== 0x46546c67) throw new Error('File is not a binary GLB document.');
-  if (view.getUint32(4, true) !== 2) throw new Error('Only glTF 2.0 GLB files are supported.');
-  const jsonLength = view.getUint32(12, true), jsonType = view.getUint32(16, true);
-  if (jsonType !== 0x4e4f534a || 20 + jsonLength > input.byteLength) throw new Error('GLB JSON chunk is missing or invalid.');
-  return JSON.parse(new TextDecoder().decode(input.subarray(20, 20 + jsonLength)).trim());
+  if (view.getUint32(0, true) !== GLB_MAGIC) throw new Error('File is not a binary GLB document.');
+  if (view.getUint32(4, true) !== GLB_VERSION) throw new Error('Only glTF 2.0 GLB files are supported.');
+  const declaredLength = view.getUint32(8, true);
+  if (declaredLength !== input.byteLength) throw new Error(`GLB header length declares a ${declaredLength.toLocaleString()} byte file but this file is ${input.byteLength.toLocaleString()} bytes, so the container is truncated or padded.`);
+
+  const unknownChunkTypes: number[] = []; let json: Record<string, any> | null = null, hasBinaryChunk = false, binaryChunkAllowed = true;
+  for (let offset = GLB_HEADER_BYTES; offset < declaredLength;) {
+    if (offset + GLB_CHUNK_HEADER_BYTES > declaredLength) throw new Error('A GLB chunk header is truncated.');
+    const chunkLength = view.getUint32(offset, true), chunkType = view.getUint32(offset + 4, true);
+    if (chunkLength % 4 !== 0) throw new Error(`A GLB chunk declares a ${chunkLength} byte length that is not four-byte aligned.`);
+    if (offset + GLB_CHUNK_HEADER_BYTES + chunkLength > declaredLength) throw new Error('A GLB chunk payload extends past the declared file length.');
+    if (json === null && chunkType !== GLB_JSON_CHUNK) throw new Error('The first GLB chunk must be the JSON chunk.');
+    if (chunkType === GLB_JSON_CHUNK) {
+      if (json !== null) throw new Error('A GLB file must contain exactly one JSON chunk.');
+      json = JSON.parse(new TextDecoder().decode(input.subarray(offset + GLB_CHUNK_HEADER_BYTES, offset + GLB_CHUNK_HEADER_BYTES + chunkLength)).trim());
+    } else if (chunkType === GLB_BIN_CHUNK) {
+      if (!binaryChunkAllowed || hasBinaryChunk) throw new Error('A GLB file may contain at most one binary chunk, and it must follow the JSON chunk.');
+      hasBinaryChunk = true; binaryChunkAllowed = false;
+    } else if (!unknownChunkTypes.includes(chunkType)) unknownChunkTypes.push(chunkType);
+    offset += GLB_CHUNK_HEADER_BYTES + chunkLength;
+  }
+
+  if (!json) throw new Error('GLB JSON chunk is missing or invalid.');
+  if (String(json?.asset?.version ?? '') !== '2.0') throw new Error(`Unsupported glTF asset version ${String(json?.asset?.version ?? 'missing')}; this tool reads glTF 2.0 assets.`);
+  const embeddedFirstBuffer = (json.buffers as any[] | undefined)?.[0];
+  if (embeddedFirstBuffer && embeddedFirstBuffer.uri === undefined && !hasBinaryChunk) throw new Error('The JSON references an embedded binary buffer but this GLB has no binary chunk.');
+  return { json, unknownChunkTypes, hasBinaryChunk };
+}
+
+export function readGlbJson(input: Uint8Array): Record<string, any> {
+  return readGlbContainer(input).json;
 }
 
 export function classifyGltfExtensions(extensionsUsed: readonly string[], extensionsRequired: readonly string[]): GltfExtensionReport {
@@ -96,12 +130,17 @@ export function classifyGltfExtensions(extensionsUsed: readonly string[], extens
 }
 
 export async function inspectGlb(input: Uint8Array): Promise<GltfInspection> {
-  const json = readGlbJson(input);
+  const container = readGlbContainer(input);
+  const json = container.json;
   const extensionsUsed: string[] = Array.isArray(json.extensionsUsed) ? (json.extensionsUsed as unknown[]).map((value) => String(value)) : [];
   const extensionsRequired: string[] = Array.isArray(json.extensionsRequired) ? (json.extensionsRequired as unknown[]).map((value) => String(value)) : [];
   const extensionReport = classifyGltfExtensions(extensionsUsed, extensionsRequired);
   const transformBlockers: string[] = [], previewBlockers: string[] = [];
 
+  if (container.unknownChunkTypes.length) {
+    const types = container.unknownChunkTypes.map((type) => `0x${type.toString(16).padStart(8, '0')}`).join(', ');
+    transformBlockers.push(`Transformation is blocked because this GLB contains unknown chunk type${container.unknownChunkTypes.length === 1 ? '' : 's'} ${types}. Unknown chunk payloads cannot be guaranteed to survive a glTF Transform read/write cycle, so the original bytes are preserved instead of producing lossy output.`);
+  }
   if (extensionReport.unsupported.length) {
     transformBlockers.push(`Transformation is blocked because this GLB uses unregistered extension${extensionReport.unsupported.length === 1 ? '' : 's'} ${extensionReport.unsupported.join(', ')}. Unknown extension payloads cannot be guaranteed to survive a glTF Transform read/write cycle, so the original bytes are preserved instead of producing lossy output.`);
   }
