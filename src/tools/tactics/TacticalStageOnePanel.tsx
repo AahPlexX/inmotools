@@ -409,7 +409,7 @@ export default function TacticalStageOnePanel({
                 <input name="propRotation" type="number" step="1" defaultValue={selectedEquipment.rotationDeg} required />
               </label>
               <label>
-                Scale
+                Prop scale
                 <input name="propScale" type="number" min="0.2" max="8" step="0.1" defaultValue={selectedEquipment.scale} required />
               </label>
               <button type="submit">Apply prop transform</button>

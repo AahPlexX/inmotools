@@ -1173,7 +1173,7 @@ test('scales a squad and authors tokens, props, elevation, spotlight, ghosts, an
   await stage.getByRole('button', { name: 'Place Cone' }).click();
   await expect(page.locator('[data-equipment-kind="cone"]')).toHaveCount(1);
   await stage.getByLabel('Rotation').fill('45');
-  await stage.getByLabel('Scale').fill('1.5');
+  await stage.getByLabel('Prop scale').fill('1.5');
   await stage.getByRole('button', { name: 'Apply prop transform' }).click();
   await expect(page.locator('.status-line').last()).toContainText('Training prop transformed.');
 
