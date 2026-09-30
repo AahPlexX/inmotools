@@ -3,7 +3,7 @@
 **Status:** In progress (Slice 1 shared shell; Slice 2 crochet complete; Slice 3 counted-thread complete except provenance-blocked FC-37; Slice 4 knitting in progress; Slice 7 publishing in progress)
 **Branch:** `feature/fiber-craft-workstation` (dedicated; no premature merge to `main`)
 **Owner:** Autonomous, tool-scoped only (no repo-wide authority)
-**Function progress:** **29/65 complete**
+**Function progress:** **30/65 complete**
 
 ## Goal
 
@@ -80,8 +80,15 @@ The following design-spec functions are complete and accepted on the dedicated b
 - **FC-55** structured accessible chart description generated from the same canonical round/grid data as the visual chart.
 - **FC-56** vector multi-page crochet pattern-book PDF with cover, project/material reference, legend, vector diagram, and paginated written instructions.
 - **FC-59** high-resolution crochet PNG export at selectable 1×–4× bitmap resolution for both round and grid charts.
+- **FC-60** crochet materials/shopping list as formula-safe CSV and matching paginated printable PDF, both generated from the same project rows and included in the release ZIP.
 - **FC-63** generated 1200×630 social preview PNG with project title/details, crochet badge, and canonical chart thumbnail.
 - **FC-64** offline PWA project use verified through the generated service worker plus the same portable `.craftproj` workflow; Fiber reloads and remains usable offline without an account.
+
+FC-60 acceptance (2026-09-30): the same validated crochet materials rows now produce the existing
+formula-safe CSV and a paginated printable PDF, with both outputs in the release ZIP. Focused Fiber
+units pass **105/105**, the TypeScript/production/PWA build passes, and the complete Fiber browser spec
+passes **12/12** across desktop and mobile Chromium at this development round's source state. No new
+dependency was added; the existing exact pins for Papa Parse and pdf-lib remain current stable releases.
 
 Latest acceptance milestone: dedicated Fiber run `36503415830` at code head
 `e2b9508d5d3143447d3708b374e186ce7eee249d` passed **68/68** focused unit/selector checks,
@@ -148,8 +155,8 @@ table. Every other counted-thread function in this slice is now accepted; move o
       generation, color-stop/trim sequencing, DST/EXP/JEF/PES encoders, appliqué placement export.
 - [ ] **Slice 7 — Export, metadata & publishing.** **In progress:** FC-56 vector multi-page
       pattern-book PDF, FC-59 high-resolution PNG, FC-63 1200×630 social preview, and FC-64 offline
-      PWA project use are accepted. SVG/DXF cutter export, embroidery bundle export,
-      materials/shopping export, metadata/copyright and export-time tag review, and batch export
+      PWA project use are accepted. FC-60 CSV and printable PDF materials export is now accepted.
+      SVG/DXF cutter export, embroidery bundle export, metadata/copyright and export-time tag review, and batch export
       remain open.
 - [ ] **Slice 8 — Verification & merge readiness.** Full unit + Playwright + axe-core sweep,
       catalog/homepage link assertion, production build, deployment check. No merge to `main`

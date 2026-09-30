@@ -14,9 +14,10 @@ import {
   transformCrochetGrid,
 } from '../../src/tools/fiber-craft/crochet-document-engine';
 import Papa from 'papaparse';
+import { PDFDocument } from 'pdf-lib';
 import { unzipSync, strFromU8 } from 'fflate';
 import { buildCrochetReleaseFiles, fiberCraftReleaseZipFilename, zipCrochetRelease } from '../../src/tools/fiber-craft/pattern-export-engine';
-import { buildCrochetMaterialsCsv, buildCrochetPatternBookModel, buildCrochetPatternText, fiberCraftMaterialsFilename, fiberCraftPatternTextFilename } from '../../src/tools/fiber-craft/pattern-export-engine';
+import { buildCrochetMaterialsCsv, buildCrochetMaterialsPdf, buildCrochetPatternBookModel, buildCrochetPatternText, fiberCraftMaterialsFilename, fiberCraftMaterialsPdfFilename, fiberCraftPatternTextFilename } from '../../src/tools/fiber-craft/pattern-export-engine';
 import type { FiberCraftDocument, GridChart } from '../../src/tools/fiber-craft/fiber-craft-types';
 
 const NOW = '2026-09-29T00:00:00.000Z';
@@ -183,6 +184,18 @@ describe('materials and shopping list CSV', () => {
     expect(csv).not.toMatch(/(^|,|")@cmd/);
     expect(fiberCraftMaterialsFilename('Moss Bunny')).toBe('moss-bunny-materials.csv');
   });
+
+  test('prints the same project materials as a PDF and includes it in the release bundle', async () => {
+    const project = roundProject();
+    const pdfBytes = await buildCrochetMaterialsPdf(project, 'us');
+    const pdf = await PDFDocument.load(pdfBytes);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(1);
+    expect(pdf.getTitle()).toBe('Moss Bunny materials list');
+    expect(pdf.getAuthor()).toBe('Ana');
+    expect(fiberCraftMaterialsPdfFilename(project.metadata.title)).toBe('moss-bunny-materials.pdf');
+    const files = await buildCrochetReleaseFiles(project, 'us');
+    expect(strFromU8(files['moss-bunny-materials.pdf'].subarray(0, 5))).toBe('%PDF-');
+  });
 });
 
 describe('one-click pattern release bundle', () => {
@@ -195,6 +208,7 @@ describe('one-click pattern release bundle', () => {
     const files = await buildCrochetReleaseFiles(document(), 'us');
     expect(Object.keys(files).sort()).toEqual([
       'moss-bunny-materials.csv',
+      'moss-bunny-materials.pdf',
       'moss-bunny-pattern-book.pdf',
       'moss-bunny-pattern.txt',
       'moss-bunny.craftproj',

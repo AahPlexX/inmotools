@@ -299,11 +299,14 @@ test.describe('Fiber Craft Workstation', () => {
     const csv = await readFile((await materials.path())!, 'utf8');
     expect(csv).toContain('Section,Item,Detail,Quantity');
     expect(csv).toContain('Project,Title,Moss Bunny');
+    const [materialsPdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Print materials list (.pdf)' }).click()]);
+    expect(materialsPdf.suggestedFilename()).toBe('moss-bunny-materials.pdf');
+    await inspectPdfDownload(materialsPdf);
     const [release] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export everything (.zip)' }).click()]);
     expect(release.suggestedFilename()).toBe('moss-bunny-pattern-release.zip');
     const zipBytes = await readFile((await release.path())!);
     expect([...zipBytes.subarray(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
-    for (const name of ['moss-bunny-pattern-book.pdf', 'moss-bunny-pattern.txt', 'moss-bunny-materials.csv', 'moss-bunny.craftproj', 'moss-bunny-2x.png', 'moss-bunny-social-preview.png']) {
+    for (const name of ['moss-bunny-pattern-book.pdf', 'moss-bunny-pattern.txt', 'moss-bunny-materials.csv', 'moss-bunny-materials.pdf', 'moss-bunny.craftproj', 'moss-bunny-2x.png', 'moss-bunny-social-preview.png']) {
       expect(zipBytes.includes(Buffer.from(name))).toBe(true);
     }
     const [project] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Save .craftproj' }).click()]);

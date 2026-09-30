@@ -1,6 +1,6 @@
 # Fiber Craft — crochet completion ledger
 
-**As of:** 2026-09-29
+**As of:** 2026-09-30
 
 This is the single handoff record for the **crochet** part of the Fiber Craft Workstation
 (`src/tools/fiber-craft/`, route `#/fiber-craft-workstation`). Counted-thread and knitting work is tracked
@@ -27,10 +27,10 @@ FC-03, FC-04, FC-07, FC-50–FC-52, FC-54–FC-56, FC-59, FC-63, FC-64. Their de
 | CR-03 | Grid tools: resize the C2C/filet grid (1–80 per side), apply the gauge-recommended size, clear, mirror, flip and rotate | FC-06, FC-52 | **Done** |
 | CR-04 | Title & credit: edit title, author, license and notes; exports are disabled while edits are unsaved; the PDF cover and PDF subject carry the license and notes | FC-61, FC-62 | **Done** |
 | CR-05 | Copy or download the written pattern (rounds, C2C rows, filet rows) as plain text, built from the same model as the PDF | FC-14 | **Done** |
-| CR-06 | Materials list (CSV): project, yarn, weight class, hook, gauge, finished size, every used color and stitch with counts. Yarn amount is intentionally not estimated (no authoritative method); the file says so | FC-60 | **Done** |
+| CR-06 | Materials list as spreadsheet CSV and matching paginated printable PDF: project, yarn, weight class, hook, gauge, finished size, every used color and stitch with counts. Yarn amount is intentionally not estimated; both outputs say so | FC-60 | **Done** |
 | CR-07 | Chart zoom (60–300%, buttons or `+` `-` `0` on the chart) and pan (scroll, drag, keyboard) for round and grid charts | FC-05 | **Done** |
 | CR-08 | Metric/imperial: switching the gauge unit converts the swatch span and size fields instead of relabelling them; sizes, recommendations and the materials list follow. Hooks already show mm and US together | FC-53 | **Done** |
-| CR-09 | "Export everything (.zip)": PDF, chart PNG, share card, written pattern, materials CSV and project file in one download | FC-65 | **Done** |
+| CR-09 | "Export everything (.zip)": pattern PDF, materials PDF, chart PNG, share card, written pattern, materials CSV and project file in one download | FC-65 | **Done** |
 | CR-10 | Final UX, copy, SEO, accessibility and responsive audit, including the catalog entry wording | — | **Done**, see "CR-10 audit notes" |
 | CR-11 | Integration onto `origin/main` and closing the crochet items in `.tasks/` | Governance §4 | In progress, see Integration |
 
@@ -134,3 +134,4 @@ pull request has merged into `main` and the Fiber entry in `.tasks/` has been re
 | 2026-09-29 | CR-06, CR-07, CR-08; also fixed a hard-coded 12-column grid layout that broke resized grids | Fiber unit files 6/6, 102/102 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
 | 2026-09-29 | CR-09 | Fiber unit files 6/6, 104/104 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 10/10 across desktop and mobile Chromium |
 | 2026-09-29 | CR-10 | Full unit suite 216 files, 2218/2218 tests; `tsc --noEmit` clean; production build passes; Fiber browser spec 12/12 across desktop and mobile Chromium (adds axe in every theme, overflow, and page-title checks) |
+| 2026-09-30 | FC-60 printable materials completion | Same project rows now feed formula-safe CSV and a paginated PDF, both downloadable and included in the release ZIP. Focused Fiber units 105/105, production TypeScript/Vite/PWA build, and full Fiber browser spec 12/12 across desktop/mobile Chromium pass locally at the code state in this development round. No dependency added. |

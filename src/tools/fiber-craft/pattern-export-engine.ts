@@ -177,7 +177,7 @@ const CSV_HEADER = ['Section', 'Item', 'Detail', 'Quantity'] as const;
  * Shopping list for a crochet project. Yarn amount is deliberately not estimated: it depends on the
  * yarn, hook, and the crocheter's tension, and no published method applies to every chart.
  */
-export const buildCrochetMaterialsCsv = (document: FiberCraftDocument, dialect: CrochetDialect): string => {
+const buildCrochetMaterialsRows = (document: FiberCraftDocument, dialect: CrochetDialect): string[][] => {
   const chart = document.chart;
   if (document.metadata.discipline !== 'crochet' || (chart.kind !== 'polar' && chart.kind !== 'grid')) {
     throw new Error('The materials list requires a crochet round or grid chart.');
@@ -230,11 +230,60 @@ export const buildCrochetMaterialsCsv = (document: FiberCraftDocument, dialect: 
   for (const [symbolId, count] of symbolCounts) rows.push(['Stitches', crochetSymbolLabel(symbolId, dialect), '', plural(count)]);
   rows.push(['Note', 'Yarn amount', 'Yarn amount is not estimated. Swatch with your yarn and check the label for yardage.', '']);
 
-  return `${unparse({ fields: [...CSV_HEADER], data: rows }, { escapeFormulae: true, newline: '\r\n' })}\r\n`;
+  return rows;
 };
+
+export const buildCrochetMaterialsCsv = (document: FiberCraftDocument, dialect: CrochetDialect): string =>
+  `${unparse({ fields: [...CSV_HEADER], data: buildCrochetMaterialsRows(document, dialect) }, { escapeFormulae: true, newline: '\r\n' })}\r\n`;
 
 export const fiberCraftMaterialsFilename = (title: string): string =>
   `${fiberCraftFilenameStem(title)}-materials.csv`;
+
+export const fiberCraftMaterialsPdfFilename = (title: string): string =>
+  `${fiberCraftFilenameStem(title)}-materials.pdf`;
+
+/** Printable companion to the CSV, generated from the exact same materials rows. */
+export async function buildCrochetMaterialsPdf(document: FiberCraftDocument, dialect: CrochetDialect): Promise<Uint8Array> {
+  const rows = buildCrochetMaterialsRows(document, dialect);
+  const pdf = await PDFDocument.create();
+  const bodyFont = await pdf.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  pdf.setTitle(`${document.metadata.title || 'Untitled pattern'} materials list`);
+  if (document.metadata.author) pdf.setAuthor(document.metadata.author);
+  pdf.setSubject('Printable crochet materials and shopping list');
+  pdf.setCreator('InmoTools Fiber Craft Workstation');
+  pdf.setProducer('InmoTools Fiber Craft Workstation');
+  pdf.setLanguage('en-US');
+
+  let page = pdf.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
+  let y = 730;
+  const startPage = (continued: boolean) => {
+    if (continued) page = pdf.addPage([LETTER_WIDTH, LETTER_HEIGHT]);
+    page.drawText(continued ? 'MATERIALS LIST (CONTINUED)' : 'MATERIALS & SHOPPING LIST', {
+      x: PAGE_MARGIN, y: 742, size: 12, font: boldFont, color: MUTED,
+    });
+    y = 706;
+  };
+  startPage(false);
+  let section = '';
+  for (const [nextSection, item, detail, quantity] of rows) {
+    const headingHeight = nextSection === section ? 0 : 25;
+    const line = [item, detail, quantity].filter(Boolean).join(' — ');
+    const wrapped = wrapText(bodyFont, line, 10, LETTER_WIDTH - PAGE_MARGIN * 2);
+    const rowHeight = wrapped.length * 15 + 7;
+    if (y - headingHeight - rowHeight < PAGE_MARGIN + 18) startPage(true);
+    if (nextSection !== section) {
+      section = nextSection;
+      page.drawText(pdfSafeText(section.toUpperCase()), { x: PAGE_MARGIN, y, size: 12, font: boldFont, color: BLACK });
+      y -= 25;
+    }
+    y = drawWrappedText(page, bodyFont, line, PAGE_MARGIN, y, 10, LETTER_WIDTH - PAGE_MARGIN * 2, 15) - 7;
+  }
+  pdf.getPages().forEach((current, index) => current.drawText(`Page ${index + 1} of ${pdf.getPageCount()}`, {
+    x: PAGE_MARGIN, y: 25, size: 9, font: bodyFont, color: MUTED,
+  }));
+  return pdf.save();
+}
 
 export const fiberCraftPatternPdfFilename = (title: string): string =>
   `${fiberCraftFilenameStem(title)}-pattern-book.pdf`;
@@ -504,6 +553,7 @@ export const buildCrochetReleaseFiles = async (
   [fiberCraftPatternPdfFilename(document.metadata.title)]: await buildCrochetPatternPdf(document, dialect),
   [fiberCraftPatternTextFilename(document.metadata.title)]: strToU8(buildCrochetPatternText(document, dialect)),
   [fiberCraftMaterialsFilename(document.metadata.title)]: strToU8(buildCrochetMaterialsCsv(document, dialect)),
+  [fiberCraftMaterialsPdfFilename(document.metadata.title)]: await buildCrochetMaterialsPdf(document, dialect),
   [fiberCraftProjectFilename(document.metadata.title)]: strToU8(serializeFiberCraftProject(document)),
 });
 
