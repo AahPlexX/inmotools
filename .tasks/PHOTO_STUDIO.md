@@ -1,5 +1,9 @@
 # Photo Studio — Authoritative Completion Tracker
 
+> **SUPERSEDED — ARCHIVE ONLY (recorded 2026-09-30).** Do not resume work from this branch and do not merge it. Photo Studio was completed and integrated on `origin/main` by PR #78 (squash `4740cca7`, merged 2026-09-26) at **164/164 capabilities**, and this branch's PR #29 was closed as superseded. The authoritative tracker is `.tasks/PHOTO_STUDIO.md` on `origin/main`; completion is recorded in `.tasks/DONE.md` and `.tasks/WORK_LOG.md` there. The status lines and checkpoint below (IN PROGRESS, 120/164, Task 6.1 next) describe this abandoned branch as of its last commit and are kept only as history.
+>
+> How this happened, so it is not repeated: work continued here after the PR was superseded because the PR state was last checked on 2026-09-23 (still open) and not re-checked when work resumed on 2026-09-29. The Task 5.2–5.4 merge work on this branch duplicates what `main` already ships, and `main`'s version is a superset (cylindrical projection, gain compensation, rotation-constrained planar registration). A trial merge of `origin/main` into this branch conflicts in 40 files, including add/add conflicts on the same `merge/` files, and the trial was aborted with no change. Nothing on this branch was found worth porting.
+
 > This file is the single source of truth for Photo Studio completion state while `feat/photo-studio` is active. Update it whenever a Photo Studio commit changes a gate, remaining task, verification result, integration state, or deployment state. Do not claim completion from the implementation plan alone.
 
 ## Deterministic completion goal
@@ -23,7 +27,7 @@ If any box above is unchecked, Photo Studio is not complete.
 
 ## Current state
 
-- Status: **IN PROGRESS**
+- Status: **SUPERSEDED — this branch is archived; Photo Studio is COMPLETE 164/164 on `origin/main` (PR #78, `4740cca7`).** The figures below are this branch's last-known state, not the product's.
 - Working branch: `feat/photo-studio`
 - Pull request: `#29`
 - Current material Photo head: `d739648` (Task 5.4 — focus, average, and median stacks; prior head `39fc871` was Task 5.3)
