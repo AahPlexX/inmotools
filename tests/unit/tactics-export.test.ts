@@ -366,7 +366,7 @@ describe('Tactical video capability negotiation and frame fallback', () => {
   });
 
   it('exposes a video combination only when the container and encoder both accept it', async () => {
-    expect(MEDIABUNNY_PIN).toBe('1.55.4');
+    expect(MEDIABUNNY_PIN).toBe('1.58.0');
     const probed: string[] = [];
     const probe = {
       async canEncodeVideo(codec: VideoExportCandidate['codec']) {
