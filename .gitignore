@@ -6,3 +6,6 @@ test-results/
 *.log
 .DS_Store
 public/pyodide/
+
+# Written by the review-agent-governance plugin hook into whichever directory a tool touches
+review-receipts/
