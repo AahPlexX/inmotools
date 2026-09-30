@@ -4,30 +4,25 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated branch tip: `d0e23d4763ac2c138845862f64f09299cdb66e19`
-- Runtime source unchanged since: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
+- Last fully browser-validated runtime source: `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`
+- Test-only browser assertion after that runtime, not a runtime change: `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`
+- Earlier runtime source, unchanged by the T13 documentation gate: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **T13-01 branch-complete gate executed.** Branch-complete is not claimed. T14-01 stays BLOCKED. No queue item is READY.
-- Verified functional features: **51/60**
+- Milestone: **Branch-complete is satisfied.** T14-01 is READY and has not been started.
+- Verified functional features: **60/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
-Documentation commits after the validated branch tip do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
+Documentation commits after the validated runtime do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
 
 ## Exact next sequential action
 
-**No queue item is READY.** T13-01 recorded the branch-complete gate at `d0e23d4763ac2c138845862f64f09299cdb66e19` and the contract is not satisfied. T14-01 stays BLOCKED until branch-complete. Do not start reconciliation with `main`. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 43–48, 50, or 56–60. Newly verified rows: none.
+**T14-01 is READY.** Fetch then-current `main`, reconcile non-destructively, and rerun the branch gate on the integrated result. Do not start that reconciliation in the same stage that closed the unfinished rows. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 1, 2, 9–38, or 42–60. Newly verified rows: **3, 4, 5, 6, 7, 8, 39, 40, 41**.
 
-Named blockers, rechecked in this gate and left unchanged:
+No feature-row blocker remains. Timeline virtualization is still not implemented. The 256-track cap remains, and that residual did not block these rows. Squad size stays uncapped because row 3 requires arbitrary roster growth; growth to 24 active players is tested. Scenario comparison memoizes an unchanged project diff.
 
-- **3 — in-progress.** Dynamic Squad & Neutral-Player Scaler. `addRosterPlayer` grows a roster, and player status includes `neutral`, `substitute`, and `coach`. No workspace control authors those statuses or scales a squad through them.
-- **4 — in-progress.** Normalized `[0,1]` Tactical Coordinate System. Current spatial entities normalize and convert to metres. The broader accepted coordinate and editing surface is still incomplete, so this row is not verified.
-- **5 — in-progress.** Roster, Jersey, Role & Developmental Token Editor. Tokens can be created and jersey text can render. Interactive kit, status, avatar, and development controls are not in the workspace. Session development level belongs to row 42, not this row.
-- **6 — planned.** Authored Ball Elevation & Trajectory Layer. Ball elevation is stored and shown by the verified 3D pitch (row 35). There is no authored elevation trajectory layer.
-- **7 — in-progress.** Training Equipment & Prop Library. `addEquipment` validates scene-owned placement, and the board can draw equipment. No sourced prop catalog or transform UI is reachable.
-- **8 — in-progress.** Precision Snapping & Tactical Guides. `snapNormalizedPoint` is covered by focused units. Board guides, teammate and equal-spacing assistance, and snapping UI are not wired.
-- **39 — planned.** Presentation / Spotlight Telestration. No implementation surface. Video telestration (row 44) is a different verified feature.
-- **40 — planned.** Onion-Skin / Ghost Positions. No implementation surface.
-- **41 — planned.** Scenario Comparison View. The workspace "Scenario tools" section is mirror, flip, and restart authoring (rows 13 and 15), not a comparison view.
+## Stage 1 closure evidence
+
+Stage 1 is **DONE** at runtime source `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`. The metre-coordinate browser assertion is test-only commit `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`. Focused Tactical units pass **155/155** across 20 `tactics-*.test.ts` files and the e2e selector check passes **3/3**. TypeScript and the production build pass (`✓ built in 4.43s`). The full Tactical Playwright spec passes **70 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. The new browser scenario scales a squad, sets a neutral token, writes the ball in pitch metres, places and transforms a cone, authors an elevation trajectory, adds a board spotlight, records onion-skin ghosts, compares two scenarios, and snaps a move after snapping is enabled. Newly verified rows: **3, 4, 5, 6, 7, 8, 39, 40, 41**. The verified numerator is **60/60**. Help copy was not changed. Rows 1, 2, 9–38, and 42–60 were not reopened.
 
 ## T13-01 gate evidence
 
@@ -87,13 +82,13 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60**.
+Verified: **1–60**.
 
-In progress: **3, 4, 5, 7, 8**.
+In progress: none.
 
-Planned: **6, 39, 40, 41**.
+Planned: none.
 
-T13-01 reconciled this split and did not promote a row. The deterministic denominator remains 60.
+Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T13-01 had left those rows unfinished. The deterministic denominator remains 60.
 
 ## Core architecture that must be preserved
 

@@ -1,10 +1,11 @@
 # Tactical Matchboard Studio Execution Queue
 
-**Updated:** 2026-09-29
+**Updated:** 2026-09-30
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**T13-01 tested tip:** `d0e23d4763ac2c138845862f64f09299cdb66e19`  
-**Runtime source unchanged:** `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
+**Stage 1 runtime source:** `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`  
+**Stage 1 test-only follow-up:** `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`  
+**Earlier runtime, before Stage 1:** `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
 
 ## Purpose and source-of-truth roles
 
@@ -153,9 +154,17 @@
 - **Exit evidence:** tested tip `d0e23d4763ac2c138845862f64f09299cdb66e19`. Focused Tactical units **144/144** plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0 and production build (`✓ built in 6.06s`). Full Tactical Playwright spec **68 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop and mobile Chromium, including Axe, responsive widths, persistence/import/export, and local media. Verified numerator stays **51/60**. Named blockers: in-progress **3, 4, 5, 7, 8**; planned **6, 39, 40, 41**. No tactical defect was produced. Help copy was not changed. Rows 43–48, 50, and 56–60 were not reopened.
 - **Reverse-safe:** no.
 
+### T13-02 — Close the unfinished authoring rows
+- **Status:** DONE
+- **Depends on:** T13-01 recorded blockers 3, 4, 5, 6, 7, 8, 39, 40, 41
+- **Primary files:** tactical squad, coordinate, token, elevation, prop, guide, and presentation authoring modules, stage-1 panel, tactical tests
+- **Implementation:** runtime source `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`. Test-only metre-coordinate browser assertion `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`. Squad scaling stays uncapped. Scenario comparison memoizes an unchanged diff. Timeline virtualization was not added.
+- **Exit evidence:** focused Tactical units **155/155** plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0 and production build (`✓ built in 4.43s`). Full Tactical Playwright spec **70 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Newly verified rows: **3, 4, 5, 6, 7, 8, 39, 40, 41**. Verified numerator is **60/60**. Help copy was not changed. Rows 1, 2, 9–38, and 42–60 were not reopened.
+- **Reverse-safe:** complete.
+
 ### T14-01 — Reconcile and integrate
-- **Status:** BLOCKED
-- **Depends on:** T13-01 branch-complete, which is not satisfied. The T13-01 gate listing blockers does not unblock this item.
+- **Status:** READY
+- **Depends on:** branch-complete, satisfied by T13-02. The earlier T13-01 gate listing blockers does not keep this item blocked.
 - **Primary files:** conflict files only, existing PR #76
 - **Action:** fetch then-current `main`, non-destructively reconcile, rerun branch gate, use existing repository-supported PR integration.
 - **Exit evidence:** exact integrated `main` SHA and green required gates.
