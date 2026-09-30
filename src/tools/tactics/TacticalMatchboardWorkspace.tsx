@@ -849,7 +849,7 @@ export default function TacticalMatchboardWorkspace() {
       <div className="workspace-header tactical-workspace-header">
         <div>
           <h2>Tactical Matchboard Studio</h2>
-          <p>Open Board setup. Enter pitch length and width, choose a direction and a formation (the starting arrangement of your players), then choose "Build board". Those players, your squad, appear on the pitch, the drawn field. Choose "Place opposition" to add the opposition (the other team) as a mirrored squad (the same shape, facing the other way) in the other half, in a different kit (shirt color). Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Export SVG" to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
+          <p>Open Board setup. Enter pitch length and width (the drawn field’s size), choose a direction and a formation (the starting arrangement of your players), then choose "Build board". Those players (your squad) appear on the pitch (the drawn field). Choose "Place opposition" to add the opposition (the other team) as a mirrored squad (the same shape, facing the other way) in the other half, in a different kit (shirt color). Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Export SVG" (Scalable Vector Graphics) to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
         </div>
       </div>
       <div
@@ -1199,7 +1199,7 @@ export default function TacticalMatchboardWorkspace() {
             <input
               value={oppositionName}
               aria-label="Opposition name"
-              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the mirrored squad, the same player shape facing the other way.'}
+              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the mirrored squad (the same player shape facing the other way).'}
               onChange={(event) => setOppositionName(event.target.value)}
             />
           </label>
@@ -1209,7 +1209,7 @@ export default function TacticalMatchboardWorkspace() {
               type="color"
               value={oppositionColor}
               aria-label="Opposition color"
-              data-tactical-tip={'Choose the kit color (shirt color) for the opposition, the other team. If it matches your squad, "Place opposition" changes it so the two kits stay different colors.'}
+              data-tactical-tip={'Choose the kit color (shirt color) for the opposition (the other team). If it matches your squad, "Place opposition" changes it so the two kits stay different colors.'}
               onChange={(event) => setOppositionColor(event.target.value)}
             />
           </label>
@@ -1230,14 +1230,14 @@ export default function TacticalMatchboardWorkspace() {
           >
             Remove drawing
           </button>
-          <button className="action-button secondary" type="button" data-tactical-tip="Download the current pitch as an SVG file." onClick={exportSvg}>Export SVG</button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Download the current pitch (the drawn field) as an SVG (Scalable Vector Graphics) file." onClick={exportSvg}>Export SVG</button>
           <button className="action-button secondary" type="button" data-tactical-tip="Open the help reference. Tooltips are extra; the labels and help stay available." onClick={openHelp}>Help</button>
           <button className="action-button secondary" type="button" data-tactical-tip="Open the same player actions as a right-click." onClick={() => openActions()}>Player actions</button>
           <button
             className="action-button secondary"
             type="button"
             aria-pressed={inspectorSheet}
-            data-tactical-tip="Open player and layer controls in a bottom sheet."
+            data-tactical-tip="Open player and layer controls in a bottom sheet (a panel that slides up from the bottom)."
             onClick={() => {
               setHelpOpen(false);
               setActionsOpen(false);
@@ -1253,7 +1253,7 @@ export default function TacticalMatchboardWorkspace() {
             className="action-button secondary"
             type="button"
             aria-pressed={timelineSheet}
-            data-tactical-tip="Open timeline transport in a bottom sheet."
+            data-tactical-tip="Open play, pause, and scrub controls for the motion timeline in a bottom sheet (a panel that slides up from the bottom)."
             onClick={() => {
               setHelpOpen(false);
               setActionsOpen(false);

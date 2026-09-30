@@ -303,7 +303,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'layout',
     title: 'Narrow layout',
     paragraphs: [
-      'On a narrow window the pitch and player controls come before the setup panels. "Players sheet" and "Timeline sheet" open those same controls in a bottom sheet, a panel that slides up from the bottom of the screen.',
+      'On a narrow window the pitch and player controls come before the setup panels. "Players sheet" and "Timeline sheet" open those same controls in a bottom sheet (a panel that slides up from the bottom of the screen).',
       'Escape closes a sheet, player actions, or help and returns focus to the button that opened it.',
     ],
   },
@@ -335,7 +335,7 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     id: 'match-setup',
     title: 'Place the other team, move the ball, remove a drawing',
     paragraphs: [
-      'With your squad (your players) visible on the pitch, the drawn field, type a name in "Opposition name" and choose a kit color (shirt color) in "Opposition color". Then choose "Place opposition". Your visible squad fits into one half. A mirrored squad (the same shape, facing the other way) fits into the other half. If the kit colors match, the opposition kit changes so the two colors stay different. Choosing "Place opposition" again updates the other team to match your visible squad. It does not add another squad. Choose "Undo" and the previous board comes back. The board stays in this browser. Nothing is uploaded.',
+      'With your squad (your players) visible on the pitch (the drawn field), type a name in "Opposition name" and choose a kit color (shirt color) in "Opposition color". Then choose "Place opposition". Your visible squad fits into one half. A mirrored squad (the same shape, facing the other way) fits into the other half. If the kit colors match, the opposition kit changes so the two colors stay different. Choosing "Place opposition" again updates the other team to match your visible squad. It does not add another squad. Choose "Undo" and the previous board comes back. The board stays in this browser. Nothing is uploaded.',
       'Choose "Move". Click the ball, then click the pitch where the ball should go. The ball moves to that spot. While the ball is selected, and focus is on the pitch or the page background, the arrow keys nudge it (move it a small step). Arrow keys do not move the ball while a text field, button, or other control has focus.',
       'Click an arrow or other drawing (a mark on the pitch). Then choose "Remove drawing", or press Delete or Backspace while focus is on the pitch or the page background. The drawing disappears. Players stay on the pitch. In a text field, Backspace still deletes typed characters.',
     ],
