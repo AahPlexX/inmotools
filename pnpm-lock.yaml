@@ -297,8 +297,8 @@ importers:
         specifier: 3.10.2
         version: 3.10.2
       katex:
-        specifier: 0.18.5
-        version: 0.18.5
+        specifier: 0.18.9
+        version: 0.18.9
       lcms-wasm:
         specifier: 1.0.5
         version: 1.0.5
@@ -4496,8 +4496,8 @@ packages:
     resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
     hasBin: true
 
-  katex@0.18.5:
-    resolution: {integrity: sha512-1FU5H3RjGJVj6GT9fMjf2uMIXmPQp232aXS3UEeQzf0dxefHg/CKMvNB3DuOC46LFG/E5PNxrE8dOwB782FDGg==}
+  katex@0.18.9:
+    resolution: {integrity: sha512-8ad9RyoKsb/g8/yLFE+KAlP+DhbCTRUNi/V9XGsxn0R+trJJltNwzcDNo0q/DEkOy5fQUQTAQyCXCYSE+OakTQ==}
     hasBin: true
 
   kdbush@4.1.0:
@@ -11163,7 +11163,7 @@ snapshots:
     dependencies:
       commander: 8.3.0
 
-  katex@0.18.5:
+  katex@0.18.9:
     dependencies:
       commander: 15.0.0
 
