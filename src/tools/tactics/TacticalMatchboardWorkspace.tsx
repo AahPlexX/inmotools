@@ -334,8 +334,8 @@ export default function TacticalMatchboardWorkspace() {
 
   function rebuildBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!window.confirm('Build board replaces this board and clears undo. Continue?')) {
-      setStatus('Build board cancelled. The current board and undo history are unchanged.');
+    if (!window.confirm('Build board replaces this board and clears undo. Choose OK and the new board appears. Choose Cancel and the current board and undo stay unchanged.')) {
+      setStatus('Build board cancelled. The current board and undo are unchanged.');
       return;
     }
     try {
@@ -656,7 +656,7 @@ export default function TacticalMatchboardWorkspace() {
         primaryColor: oppositionColor,
         formation,
       }),
-      `Opposition placed from ${formation.label} in the opposite half. Undo restores the previous board.`,
+      `Opposition placed from ${formation.label} in the other half. Choose Undo and the previous board comes back.`,
     );
   }
 
@@ -923,7 +923,7 @@ export default function TacticalMatchboardWorkspace() {
       <div className="workspace-header tactical-workspace-header">
         <div>
           <h2>Tactical Matchboard Studio</h2>
-          <p>Open Board setup. Enter pitch length and width (the drawn field’s size), choose a direction and a formation (the starting arrangement of your players), then choose "Build board" and confirm. Confirming replaces the board and clears undo. Those players (your squad) appear on the pitch (the drawn field). Choose an opposition formation (the other team’s starting arrangement), then choose "Place opposition". That formation is placed in the other half in a different kit (shirt color). It does not have to match your squad. Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Freehand" to draw a stroke. Zoom and pan buttons change the pitch view. Choose "Export SVG" (Scalable Vector Graphics) to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
+          <p>Open Board setup. Type the length and width of the pitch (the drawn field) in "Pitch length (m)" and "Pitch width (m)", choose a direction in "Direction", and choose a formation (the starting arrangement of your players) in "Formation". Then choose "Build board". In the dialog, choose OK. The board is replaced, undo is cleared, and your squad (your players) appears on the pitch. In that dialog, choose Cancel and the current board and undo stay as they are. Choose a formation (the other team’s starting arrangement) in "Opposition formation". That list is separate from "Formation". Then choose "Place opposition". Your squad fits into one half. The formation you chose fits into the other half in a different kit (shirt color). It does not have to match your squad. Choose "Place opposition" again and the other team updates. A second squad does not appear. Choose "Move", click a player or the ball, then click the pitch. It moves to that spot. Choose "Arrow", click a start point, then an end point. The arrow appears. Choose "Freehand" (a stroke you draw by hand). Drag on the pitch and release, or choose "Add freehand point" and then "Save freehand". The stroke appears. Choose "Zoom in" or "Zoom out". Zoom (how close the pitch looks) changes by 0.25, from 1 to 4, and the view changes. After zoom is above 1, choose "Pan left", "Pan right", "Pan up", or "Pan down". Pan (sliding the view across the pitch) moves the view. Choose "Reset pitch view" and the whole pitch shows again. Choose "Drag to pan", then drag on the pitch. The view slides while zoom is above 1. Players stay on the same spots on the pitch. Choose "Export SVG" (Scalable Vector Graphics). A diagram file downloads. The board stays in this browser. Nothing is uploaded.</p>
         </div>
       </div>
       <div
@@ -1029,7 +1029,7 @@ export default function TacticalMatchboardWorkspace() {
               />
             </label>
             <div className="tactical-setup-action">
-              <button className="action-button" type="submit" data-tactical-tip="Asks you to confirm, then builds a new board from these settings and clears undo for the previous board. Cancelling leaves the board and undo unchanged.">Build board</button>
+              <button className="action-button" type="submit" data-tactical-tip="Choose Build board. The dialog says Build board replaces this board and clears undo. Choose OK. A new board appears from these settings, and undo for the previous board is cleared. Choose Cancel. The board and undo stay unchanged.">Build board</button>
               <small>Dimensions are editable training inputs unless a sourced rules profile explicitly states otherwise.</small>
             </div>
           </form>
@@ -1266,8 +1266,8 @@ export default function TacticalMatchboardWorkspace() {
             className={`action-button ${mode === 'freehand' ? '' : 'secondary'}`}
             type="button"
             aria-pressed={mode === 'freehand'}
-            data-tactical-tip="Drag on the pitch to draw a freehand stroke, or add points and save the stroke."
-            onClick={() => { setMode('freehand'); setArrowStart(null); setStatus('Freehand tool active. Drag on the pitch, or add points and save the stroke.'); }}
+            data-tactical-tip="Choose Freehand (a stroke you draw by hand). Drag on the pitch (the drawn field) and release. The stroke appears. Or choose Add freehand point at least twice, up to 2,000 points, then choose Save freehand. The stroke appears. That 2 to 2,000 point limit matches a freehand mark on a local match video."
+            onClick={() => { setMode('freehand'); setArrowStart(null); setStatus('Freehand (a stroke you draw by hand) is on. Drag on the pitch and release, and the stroke appears. Or choose Add freehand point, then Save freehand.'); }}
           >
             Freehand
           </button>
@@ -1289,7 +1289,7 @@ export default function TacticalMatchboardWorkspace() {
             <input
               value={oppositionName}
               aria-label="Opposition name"
-              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the formation you choose in Opposition formation.'}
+              data-tactical-tip="Type the opposition name (the other team) here. Choose Place opposition. That name appears on the formation (the starting arrangement) you chose in Opposition formation."
               onChange={(event) => setOppositionName(event.target.value)}
             />
           </label>
@@ -1309,7 +1309,7 @@ export default function TacticalMatchboardWorkspace() {
               aria-label="Opposition formation"
               value={oppositionFormationId}
               onChange={(event) => setOppositionFormationId(event.target.value)}
-              data-tactical-tip="Choose the other team's formation. It is separate from your squad's formation."
+              data-tactical-tip="Choose a formation (the other team’s starting arrangement) here. This list is separate from Formation in Board setup. Choose Place opposition and this formation appears in the other half."
             >
               {availableFormations.map((formation) => (
                 <option key={formation.id} value={formation.id}>{formation.label}</option>
@@ -1319,7 +1319,7 @@ export default function TacticalMatchboardWorkspace() {
           <button
             className="action-button secondary"
             type="button"
-            data-tactical-tip={'Click after your squad is visible on the pitch. Your squad fits into one half. The opposition formation you chose is placed in the other half. It does not have to match your squad. The kits (shirt colors) stay different. "Undo" puts the previous board back.'}
+            data-tactical-tip="Choose Place opposition after your squad (your players) is visible on the pitch (the drawn field). Your squad fits into one half. The formation you chose in Opposition formation fits into the other half. It does not have to match your squad. If the kits (shirt colors) match, the other team’s kit changes so the colors stay different. Choose Place opposition again. The other team updates. A second squad does not appear. Choose Undo. The previous board comes back."
             onClick={placeOpposition}
           >
             Place opposition

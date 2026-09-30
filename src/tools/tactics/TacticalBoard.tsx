@@ -155,9 +155,9 @@ export default function TacticalBoard({
   }
 
   const instruction = panDrag
-    ? 'Drag the pitch to pan. Zoom and pan buttons stay available.'
+    ? 'Drag on the pitch (the drawn field). Pan (sliding the view) moves the view when zoom (how close the pitch looks) is above 1. The zoom and pan buttons stay available.'
     : interactionMode === 'freehand'
-      ? 'Drag on the pitch to draw a freehand stroke, or add points and save the stroke.'
+      ? 'Drag on the pitch (the drawn field) and release. A freehand stroke (a line you draw by hand) appears. Or choose Add freehand point, then Save freehand.'
     : interactionMode === 'arrow'
       ? arrowStart
         ? 'Arrow start set. Tap or click the pitch to place the arrow end.'
