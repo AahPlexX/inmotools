@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  disposeLogStructuringWorker,
   isCancellation,
   LogStructuringCancelled,
   LogStructuringTimeout,
@@ -22,6 +23,7 @@ interface FakeWorkerInstance {
 }
 
 let latest: FakeWorkerInstance | null = null;
+let constructed = 0;
 
 const installFakeWorker = () => {
   class FakeWorker implements FakeWorkerInstance {
@@ -31,10 +33,11 @@ const installFakeWorker = () => {
     onerror: (() => void) | null = null;
     onmessageerror: (() => void) | null = null;
 
-    constructor() { latest = this; }
+    constructor() { latest = this; constructed += 1; }
     postMessage(message: unknown) { this.posted.push(message); }
     terminate() { this.terminated += 1; }
-    respond(payload: unknown) { this.onmessage?.({ data: payload }); }
+    // A terminated worker delivers nothing, as in a browser.
+    respond(payload: unknown) { if (!this.terminated) this.onmessage?.({ data: payload }); }
     fail() { this.onerror?.(); }
     failMessage() { this.onmessageerror?.(); }
   }
@@ -46,10 +49,16 @@ const currentWorker = (): FakeWorkerInstance => {
   return latest;
 };
 
-const postedId = (): string => (currentWorker().posted[0] as { id: string }).id;
+const postedId = (): string => {
+  const { posted } = currentWorker();
+  return (posted[posted.length - 1] as { id: string }).id;
+};
 
 afterEach(() => {
+  // The runner keeps one worker across runs; drop it so each test starts cold.
+  disposeLogStructuringWorker();
   vi.unstubAllGlobals();
+  constructed = 0;
   vi.useRealTimers();
   latest = null;
 });
@@ -73,12 +82,94 @@ describe('without Worker support', () => {
 describe('with a worker', () => {
   const sample: StructuredLogs = { columns: ['a'], rows: [{ a: '1' }], unmatched: [], kinds: { a: 'integer' } };
 
-  it('resolves with the worker result and terminates the worker', async () => {
+  it('resolves with the worker result and keeps the worker for the next run', async () => {
     installFakeWorker();
     const handle = runLogStructuring('input', '(?<a>\\d)', {});
     currentWorker().respond({ id: postedId(), result: sample });
     await expect(handle.promise).resolves.toEqual(sample);
+    expect(currentWorker().terminated).toBe(0);
+  });
+
+  it('reuses one worker across sequential runs instead of constructing one per run', async () => {
+    installFakeWorker();
+    for (let run = 0; run < 3; run += 1) {
+      const handle = runLogStructuring(`input ${run}`, '(?<a>\\d)', {});
+      currentWorker().respond({ id: postedId(), result: sample });
+      await expect(handle.promise).resolves.toEqual(sample);
+    }
+    expect(constructed).toBe(1);
+    expect(currentWorker().posted).toHaveLength(3);
+    expect(currentWorker().terminated).toBe(0);
+  });
+
+  it('keeps the worker after a reported pattern error, since the worker itself is healthy', async () => {
+    installFakeWorker();
+    const failing = runLogStructuring('input', '(', {});
+    currentWorker().respond({ id: postedId(), error: 'Invalid regular expression.' });
+    await expect(failing.promise).rejects.toThrow('Invalid regular expression.');
+    const next = runLogStructuring('input', '(?<a>\\d)', {});
+    currentWorker().respond({ id: postedId(), result: sample });
+    await expect(next.promise).resolves.toEqual(sample);
+    expect(constructed).toBe(1);
+  });
+
+  it('replaces the worker after a deadline miss so the next run does not queue behind a runaway pattern', async () => {
+    vi.useFakeTimers();
+    installFakeWorker();
+    const runaway = runLogStructuring('input', '^(a+)+$', {}, 'line', 50);
+    const stuck = currentWorker();
+    const assertion = expect(runaway.promise).rejects.toThrow(LogStructuringTimeout);
+    await vi.advanceTimersByTimeAsync(60);
+    await assertion;
+    expect(stuck.terminated).toBe(1);
+
+    const next = runLogStructuring('input', '(?<a>\\d)', {}, 'line', 50);
+    expect(constructed).toBe(2);
+    expect(currentWorker()).not.toBe(stuck);
+    currentWorker().respond({ id: postedId(), result: sample });
+    await expect(next.promise).resolves.toEqual(sample);
+  });
+
+  it('cancelling an already settled run leaves the idle worker in place', async () => {
+    installFakeWorker();
+    const handle = runLogStructuring('input', '(?<a>\\d)', {});
+    currentWorker().respond({ id: postedId(), result: sample });
+    await handle.promise;
+    handle.cancel();
+    expect(currentWorker().terminated).toBe(0);
+    // The next run reuses it; cancelling that one while in flight retires it.
+    const inFlight = runLogStructuring('input', '(?<a>\\d)', {});
+    expect(constructed).toBe(1);
+    inFlight.cancel();
+    await expect(inFlight.promise).rejects.toBeInstanceOf(LogStructuringCancelled);
     expect(currentWorker().terminated).toBe(1);
+  });
+
+  it('settles an uncancelled in-flight run as cancelled when a new run starts', async () => {
+    installFakeWorker();
+    const first = runLogStructuring('first', '(?<a>\\d)', {});
+    const busy = currentWorker();
+    const second = runLogStructuring('second', '(?<a>\\d)', {});
+    await expect(first.promise).rejects.toBeInstanceOf(LogStructuringCancelled);
+    expect(busy.terminated).toBe(1);
+    expect(constructed).toBe(2);
+    currentWorker().respond({ id: postedId(), result: sample });
+    await expect(second.promise).resolves.toEqual(sample);
+  });
+
+  it('dispose terminates the idle worker and cancels an in-flight run', async () => {
+    installFakeWorker();
+    const done = runLogStructuring('input', '(?<a>\\d)', {});
+    currentWorker().respond({ id: postedId(), result: sample });
+    await done.promise;
+    disposeLogStructuringWorker();
+    expect(currentWorker().terminated).toBe(1);
+
+    const pending = runLogStructuring('input', '(?<a>\\d)', {});
+    disposeLogStructuringWorker();
+    await expect(pending.promise).rejects.toBeInstanceOf(LogStructuringCancelled);
+    expect(currentWorker().terminated).toBe(1);
+    expect(constructed).toBe(2);
   });
 
   it('forwards the pattern, flags, and scan mode to the worker', async () => {
@@ -177,7 +268,7 @@ describe('with a worker', () => {
     currentWorker().respond({ id: postedId(), result: sample });
     await expect(handle.promise).resolves.toEqual(sample);
     await vi.advanceTimersByTimeAsync(200);
-    // Still one terminate: the timer must not run a second teardown.
-    expect(currentWorker().terminated).toBe(1);
+    // The timer must not tear down the idle worker after the run settled.
+    expect(currentWorker().terminated).toBe(0);
   });
 });

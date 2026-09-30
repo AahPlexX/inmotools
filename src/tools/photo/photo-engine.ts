@@ -1,41 +1,131 @@
+import { normalizeCanvasExpansion, normalizeCornerOffsets, normalizeFreeTransform } from './photo-transform';
+import { applySelectiveColor, isNeutralSelectiveColor, normalizeSelectiveColor } from './photo-selective-color';
 import type {
   ColorGrade,
   HslAdjustment,
   LocalAdjustment,
+  LocalEffect,
+  PhotoChannelMixerRow,
+  PhotoChannelMixer,
+  PhotoColorManagement,
   PhotoHistogram,
   PhotoHistory,
+  PhotoLayer,
+  PhotoLayerGroup,
+  PhotoLevels,
+  PhotoLut,
   PhotoMask,
   PhotoRecipe,
+  PhotoRgbToneCurves,
   RetouchOperation,
   TonePoint,
 } from './photo-types';
+import { normalizeRawSettings } from './photo-raw-settings';
+import { normalizePhotoLut, preparePhotoLut, samplePreparedPhotoLut } from './photo-lut';
+import { normalizePhotoColorManagement } from './color/photo-color-management';
+import { clonePhotoSelection, normalizePhotoSelection, photoSelectionWeight } from './photo-selection';
+import { clonePhotoMask, normalizePhotoMaskOverlay } from './photo-mask';
+import { blendChannels, cloneLayer, normalizeLayerFields } from './photo-layers';
+import { applyDetailFilters, isDetailFiltersNeutral, normalizeDetailFilters } from './photo-detail-filters';
+import { normalizeLiquifyStrokes, normalizeMeshWarp } from './photo-warp';
 
 const EPSILON = 1e-7;
 const HSL_SECTORS = 8;
+const EMPTY_BRUSH_MASK: PhotoMask = { type: 'brush', points: [], radius: 0.01, feather: 0, opacity: 0, invert: false, flow: 1, spacing: 0.25, smoothing: 0.3 };
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
 }
 
+const MAX_LAYER_GROUPS = 20;
+
+/** Rebuilds layer groups from untrusted input: unique ids, bounded names, clamped opacity. */
+function normalizeLayerGroups(value: unknown): PhotoLayerGroup[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const groups: PhotoLayerGroup[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const input = entry as Record<string, unknown>;
+    const id = typeof input.id === 'string' && input.id ? input.id.slice(0, 120) : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    groups.push({
+      id,
+      name: typeof input.name === 'string' && input.name.trim() ? input.name.trim().slice(0, 80) : 'Group',
+      visible: input.visible === undefined ? true : Boolean(input.visible),
+      opacity: typeof input.opacity === 'number' && Number.isFinite(input.opacity) ? Math.min(1, Math.max(0, input.opacity)) : 1,
+    });
+    if (groups.length >= MAX_LAYER_GROUPS) break;
+  }
+  return groups;
+}
+
+/** Normalizes layers and drops references to groups that no longer exist. */
+function normalizeLayersWithGroups(layers: PhotoLayer[], groups: unknown): PhotoLayer[] {
+  const known = new Set(normalizeLayerGroups(groups).map((group) => group.id));
+  return layers.slice(0, 50).map(normalizeLayer).map((layer) => (layer.groupId && !known.has(layer.groupId) ? { ...layer, groupId: null } : layer));
+}
+
 function cloneRecipe(recipe: PhotoRecipe): PhotoRecipe {
   return {
     ...recipe,
+    freeTransform: recipe.freeTransform ? { ...recipe.freeTransform } : recipe.freeTransform,
+    perspectiveCorners: recipe.perspectiveCorners ? {
+      topLeft: { ...recipe.perspectiveCorners.topLeft },
+      topRight: { ...recipe.perspectiveCorners.topRight },
+      bottomRight: { ...recipe.perspectiveCorners.bottomRight },
+      bottomLeft: { ...recipe.perspectiveCorners.bottomLeft },
+    } : recipe.perspectiveCorners,
+    canvasExpansion: recipe.canvasExpansion ? { ...recipe.canvasExpansion } : recipe.canvasExpansion,
+    selectiveColor: recipe.selectiveColor ? {
+      mode: recipe.selectiveColor.mode,
+      ranges: Object.fromEntries(Object.entries(recipe.selectiveColor.ranges).map(([key, inks]) => [key, { ...inks }])) as NonNullable<PhotoRecipe['selectiveColor']>['ranges'],
+    } : recipe.selectiveColor,
+    layerGroups: recipe.layerGroups ? recipe.layerGroups.map((group) => ({ ...group })) : recipe.layerGroups,
+    raw: recipe.raw ? { ...recipe.raw } : undefined,
     crop: { ...recipe.crop },
     toneCurve: recipe.toneCurve.map((point) => ({ ...point })),
+    rgbToneCurves: {
+      red: recipe.rgbToneCurves.red.map((point) => ({ ...point })),
+      green: recipe.rgbToneCurves.green.map((point) => ({ ...point })),
+      blue: recipe.rgbToneCurves.blue.map((point) => ({ ...point })),
+    },
+    levels: { ...recipe.levels },
+    channelMixer: {
+      red: { ...recipe.channelMixer.red },
+      green: { ...recipe.channelMixer.green },
+      blue: { ...recipe.channelMixer.blue },
+    },
+    lut: recipe.lut ? {
+      ...recipe.lut,
+      domainMin: [...recipe.lut.domainMin],
+      domainMax: [...recipe.lut.domainMax],
+    } : null,
+    colorManagement: recipe.colorManagement ? {
+      ...recipe.colorManagement,
+      assignedProfile: recipe.colorManagement.assignedProfile ? { ...recipe.colorManagement.assignedProfile } : null,
+      outputProfile: recipe.colorManagement.outputProfile ? { ...recipe.colorManagement.outputProfile } : null,
+      proofProfile: recipe.colorManagement.proofProfile ? { ...recipe.colorManagement.proofProfile } : null,
+    } : undefined,
     hsl: recipe.hsl.map((entry) => ({ ...entry })),
     shadowGrade: { ...recipe.shadowGrade },
     midtoneGrade: { ...recipe.midtoneGrade },
     highlightGrade: { ...recipe.highlightGrade },
     blackAndWhiteMix: [...recipe.blackAndWhiteMix],
+    selection: clonePhotoSelection(recipe.selection),
     localAdjustments: recipe.localAdjustments.map((adjustment) => ({
       ...adjustment,
-      mask: adjustment.mask.type === 'brush'
-        ? { ...adjustment.mask, points: adjustment.mask.points.map((point) => ({ ...point })) }
-        : { ...adjustment.mask },
+      mask: clonePhotoMask(adjustment.mask),
       effect: { ...adjustment.effect },
+      overlay: normalizePhotoMaskOverlay(adjustment.overlay),
     })),
     retouch: recipe.retouch.map((operation) => ({ ...operation })),
+    layers: (recipe.layers ?? []).map(cloneLayer),
+    meshWarp: recipe.meshWarp ? recipe.meshWarp.map((point) => ({ ...point })) : recipe.meshWarp,
+    liquifyStrokes: (recipe.liquifyStrokes ?? []).map((stroke) => ({ ...stroke, path: stroke.path.map((point) => ({ ...point })) })),
+    detailFilters: recipe.detailFilters ? { ...recipe.detailFilters, defringe: { ...recipe.detailFilters.defringe } } : recipe.detailFilters,
   };
 }
 
@@ -46,9 +136,37 @@ const neutralHsl = (): HslAdjustment[] => Array.from({ length: HSL_SECTORS }, ()
 }));
 
 const neutralGrade = (): ColorGrade => ({ hue: 0, saturation: 0, luminance: 0 });
-
+const identityToneCurve = (): TonePoint[] => [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+const neutralRgbToneCurves = (): PhotoRgbToneCurves => ({
+  red: identityToneCurve(),
+  green: identityToneCurve(),
+  blue: identityToneCurve(),
+});
+const neutralLevels = (): PhotoLevels => ({
+  inputBlack: 0,
+  gamma: 1,
+  inputWhite: 1,
+  outputBlack: 0,
+  outputWhite: 1,
+});
+const neutralChannelMixer = (): PhotoChannelMixer => ({
+  red: { red: 1, green: 0, blue: 0, constant: 0 },
+  green: { red: 0, green: 1, blue: 0, constant: 0 },
+  blue: { red: 0, green: 0, blue: 1, constant: 0 },
+});
+const neutralColorManagement = (): PhotoColorManagement => ({
+  assignedProfile: null,
+  outputProfile: null,
+  proofProfile: null,
+  renderingIntent: 'relative-colorimetric',
+  proofIntent: 'relative-colorimetric',
+  blackPointCompensation: true,
+  softProof: false,
+  gamutWarning: false,
+});
 export const DEFAULT_RECIPE: PhotoRecipe = {
   version: 1,
+  raw: normalizeRawSettings(undefined),
   crop: { x: 0, y: 0, width: 1, height: 1 },
   straighten: 0,
   rotateQuarterTurns: 0,
@@ -57,6 +175,11 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   lensDistortion: 0,
   perspectiveHorizontal: 0,
   perspectiveVertical: 0,
+  meshWarp: null,
+  liquifyStrokes: [],
+  freeTransform: null,
+  perspectiveCorners: null,
+  canvasExpansion: null,
 
   exposure: 0,
   contrast: 0,
@@ -65,7 +188,12 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   whites: 0,
   blacks: 0,
   midtone: 0,
-  toneCurve: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+  toneCurve: identityToneCurve(),
+  rgbToneCurves: neutralRgbToneCurves(),
+  levels: neutralLevels(),
+  channelMixer: neutralChannelMixer(),
+  colorManagement: neutralColorManagement(),
+  lut: null,
 
   temperature: 0,
   tint: 0,
@@ -87,6 +215,7 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   denoiseLuminance: 0,
   denoiseChroma: 0,
   chromaticAberration: 0,
+  detailFilters: { gaussianBlur: 0, medianFilter: 0, bilateralSmoothing: 0, highPass: 0, frequencySeparationDetail: 0, defringe: { hue: 300, range: 30, amount: 0 }, moireReduction: 0, hotPixelCorrection: 0 },
 
   vignette: 0,
   vignetteMidpoint: 0.5,
@@ -95,8 +224,10 @@ export const DEFAULT_RECIPE: PhotoRecipe = {
   grainSize: 1,
   grainColor: 0,
 
+  selection: null,
   localAdjustments: [],
   retouch: [],
+  layers: [],
 };
 
 function normalizeToneCurve(points: TonePoint[]): TonePoint[] {
@@ -112,6 +243,50 @@ function normalizeToneCurve(points: TonePoint[]): TonePoint[] {
   return normalized;
 }
 
+function normalizeRgbToneCurves(curves: PhotoRgbToneCurves | undefined): PhotoRgbToneCurves {
+  const source = curves ?? neutralRgbToneCurves();
+  return {
+    red: normalizeToneCurve(source.red ?? identityToneCurve()),
+    green: normalizeToneCurve(source.green ?? identityToneCurve()),
+    blue: normalizeToneCurve(source.blue ?? identityToneCurve()),
+  };
+}
+
+function normalizeLevels(levels: PhotoLevels | undefined): PhotoLevels {
+  const source = levels ?? neutralLevels();
+  const rawBlack = clamp(source.inputBlack, 0, 0.999);
+  const rawWhite = clamp(source.inputWhite, 0.001, 1);
+  const inputBlack = Math.min(rawBlack, rawWhite - 0.001);
+  const inputWhite = Math.max(rawWhite, inputBlack + 0.001);
+  const rawOutputBlack = clamp(source.outputBlack, 0, 1);
+  const rawOutputWhite = clamp(source.outputWhite, 0, 1);
+  return {
+    inputBlack,
+    gamma: clamp(source.gamma, 0.1, 10),
+    inputWhite,
+    outputBlack: Math.min(rawOutputBlack, rawOutputWhite),
+    outputWhite: Math.max(rawOutputBlack, rawOutputWhite),
+  };
+}
+
+function normalizeMixerRow(row: PhotoChannelMixerRow | undefined, fallback: PhotoChannelMixerRow): PhotoChannelMixerRow {
+  const source = row ?? fallback;
+  return {
+    red: clamp(source.red, -2, 2),
+    green: clamp(source.green, -2, 2),
+    blue: clamp(source.blue, -2, 2),
+    constant: clamp(source.constant, -2, 2),
+  };
+}
+
+function normalizeChannelMixer(mixer: PhotoChannelMixer | undefined): PhotoChannelMixer {
+  const fallback = neutralChannelMixer();
+  return {
+    red: normalizeMixerRow(mixer?.red, fallback.red),
+    green: normalizeMixerRow(mixer?.green, fallback.green),
+    blue: normalizeMixerRow(mixer?.blue, fallback.blue),
+  };
+}
 function normalizeHsl(entries: HslAdjustment[]): HslAdjustment[] {
   return Array.from({ length: HSL_SECTORS }, (_, index) => {
     const entry = entries[index] ?? DEFAULT_RECIPE.hsl[index];
@@ -131,12 +306,13 @@ function normalizeGrade(grade: ColorGrade): ColorGrade {
   };
 }
 
-function normalizeMask(mask: PhotoMask): PhotoMask {
+function normalizeMask(mask: PhotoMask, depth = 0): PhotoMask {
   const base = {
     feather: clamp(mask.feather, 0, 1),
     opacity: clamp(mask.opacity, 0, 1),
     invert: Boolean(mask.invert),
   };
+  if (depth >= 8) return EMPTY_BRUSH_MASK;
   switch (mask.type) {
     case 'brush':
       return {
@@ -145,8 +321,15 @@ function normalizeMask(mask: PhotoMask): PhotoMask {
           x: clamp(point.x, 0, 1),
           y: clamp(point.y, 0, 1),
           pressure: clamp(point.pressure, 0, 1),
+          // Points from recipes saved before flow/erase existed are treated as one
+          // pass so legacy strokes render identically to their original max-based weight.
+          strokeId: Number.isFinite(point.strokeId) ? point.strokeId : 0,
+          erase: Boolean(point.erase),
         })),
         radius: clamp(mask.radius, 0.001, 1),
+        flow: clamp(mask.flow ?? 1, 0.01, 1),
+        spacing: clamp(mask.spacing ?? 0.25, 0.01, 1),
+        smoothing: clamp(mask.smoothing ?? 0.3, 0, 1),
         ...base,
       };
     case 'radial':
@@ -179,6 +362,33 @@ function normalizeMask(mask: PhotoMask): PhotoMask {
         range: clamp(mask.range, 0, 180),
         ...base,
       };
+    case 'selection': {
+      const selection = normalizePhotoSelection(mask.selection);
+      return {
+        type: 'selection',
+        selection: selection ?? {
+          operations: [{ mode: 'replace', source: { type: 'rectangle', x: 0, y: 0, width: 0.001, height: 0.001 } }],
+          feather: 0,
+          expansion: 0,
+          inverted: false,
+        },
+        ...base,
+        feather: clamp(mask.feather, 0, 0.25),
+        opacity: selection ? base.opacity : 0,
+      };
+    }
+    case 'composite': {
+      const operations = mask.operations.slice(0, 64).map((operation, index) => ({
+        mode: index === 0
+          ? 'replace' as const
+          : operation.mode === 'add' || operation.mode === 'subtract' || operation.mode === 'intersect'
+            ? operation.mode
+            : 'replace' as const,
+        mask: normalizeMask(operation.mask, depth + 1),
+      }));
+      if (!operations.length) return EMPTY_BRUSH_MASK;
+      return { type: 'composite', operations, ...base };
+    }
   }
 }
 
@@ -194,6 +404,7 @@ function normalizeLocalAdjustment(adjustment: LocalAdjustment): LocalAdjustment 
       sharpness: clamp(adjustment.effect.sharpness, -1, 2),
       blur: clamp(adjustment.effect.blur, 0, 1),
     },
+    overlay: normalizePhotoMaskOverlay(adjustment.overlay),
   };
 }
 
@@ -206,6 +417,7 @@ function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
       y: clamp(operation.y, 0, 1),
       radius: clamp(operation.radius, 0.001, 1),
       strength: clamp(operation.strength, 0, 1),
+      enabled: operation.enabled ?? true,
     };
   }
   return {
@@ -218,6 +430,21 @@ function normalizeRetouch(operation: RetouchOperation): RetouchOperation {
     radius: clamp(operation.radius, 0.001, 1),
     feather: clamp(operation.feather, 0, 1),
     opacity: clamp(operation.opacity, 0, 1),
+    enabled: operation.enabled ?? true,
+    // Legacy operations saved before multi-stroke painting existed have no path;
+    // an empty path keeps them rendering as the single anchored stamp they always were.
+    path: (operation.path ?? []).slice(0, 2000).map((point) => ({ x: clamp(point.x, 0, 1), y: clamp(point.y, 0, 1) })),
+    // Legacy operations already have a meaningful target from source/target placement, so they
+    // count as anchored; only an operation that has genuinely never had its target placed (or
+    // was just re-sourced) should treat its next target placement as setting a fresh anchor.
+    anchored: operation.anchored ?? true,
+  };
+}
+
+function normalizeLayer(layer: PhotoLayer): PhotoLayer {
+  return {
+    ...normalizeLayerFields(layer),
+    mask: layer.mask ? normalizeMask(layer.mask) : null,
   };
 }
 
@@ -231,12 +458,18 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
   return {
     ...source,
     version: 1,
+    raw: normalizeRawSettings(source.raw),
     crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
     straighten: clamp(source.straighten, -45, 45),
     rotateQuarterTurns: Math.round(source.rotateQuarterTurns ?? 0) % 4,
     lensDistortion: clamp(source.lensDistortion, -1, 1),
     perspectiveHorizontal: clamp(source.perspectiveHorizontal, -1, 1),
     perspectiveVertical: clamp(source.perspectiveVertical, -1, 1),
+    meshWarp: normalizeMeshWarp(source.meshWarp),
+    liquifyStrokes: normalizeLiquifyStrokes(source.liquifyStrokes),
+    freeTransform: normalizeFreeTransform(source.freeTransform),
+    perspectiveCorners: normalizeCornerOffsets(source.perspectiveCorners),
+    canvasExpansion: normalizeCanvasExpansion(source.canvasExpansion),
 
     exposure: clamp(source.exposure, -5, 5),
     contrast: clamp(source.contrast, -1, 1),
@@ -246,6 +479,11 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     blacks: clamp(source.blacks, -1, 1),
     midtone: clamp(source.midtone, -1, 1),
     toneCurve: normalizeToneCurve(source.toneCurve),
+    rgbToneCurves: normalizeRgbToneCurves(source.rgbToneCurves),
+    levels: normalizeLevels(source.levels),
+    channelMixer: normalizeChannelMixer(source.channelMixer),
+    lut: normalizePhotoLut(source.lut as PhotoLut | null | undefined),
+    colorManagement: normalizePhotoColorManagement(source.colorManagement),
 
     temperature: clamp(source.temperature, -1, 1),
     tint: clamp(source.tint, -1, 1),
@@ -255,6 +493,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     shadowGrade: normalizeGrade(source.shadowGrade),
     midtoneGrade: normalizeGrade(source.midtoneGrade),
     highlightGrade: normalizeGrade(source.highlightGrade),
+    selectiveColor: normalizeSelectiveColor(source.selectiveColor),
     blackAndWhiteMix: Array.from({ length: HSL_SECTORS }, (_, index) => clamp(source.blackAndWhiteMix[index] ?? 1, 0, 2)),
 
     texture: clamp(source.texture, -1, 1),
@@ -266,6 +505,7 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     denoiseLuminance: clamp(source.denoiseLuminance, 0, 1),
     denoiseChroma: clamp(source.denoiseChroma, 0, 1),
     chromaticAberration: clamp(source.chromaticAberration, -1, 1),
+    detailFilters: normalizeDetailFilters(source.detailFilters),
 
     vignette: clamp(source.vignette, -1, 1),
     vignetteMidpoint: clamp(source.vignetteMidpoint, 0, 1),
@@ -274,12 +514,25 @@ export function normalizeRecipe(recipe: PhotoRecipe): PhotoRecipe {
     grainSize: clamp(source.grainSize, 0.5, 3),
     grainColor: clamp(source.grainColor, 0, 1),
 
+    selection: normalizePhotoSelection(source.selection),
     localAdjustments: source.localAdjustments.map(normalizeLocalAdjustment),
     retouch: source.retouch.map(normalizeRetouch),
+    layers: normalizeLayersWithGroups(source.layers ?? [], source.layerGroups),
+    layerGroups: normalizeLayerGroups(source.layerGroups),
   };
 }
 
-function srgbToLinear(value: number): number {
+/** Linear-light channel gains for the recipe's temperature and tint (both −1…1). Shared with the
+ * white-balance eyedropper so a picked neutral solves against exactly what the renderer applies. */
+export function whiteBalanceMultipliers(temperature: number, tint: number): [number, number, number] {
+  return [
+    1 + Math.max(0, temperature) * 0.28 - Math.max(0, -temperature) * 0.12 + tint * 0.04,
+    1 - tint * 0.16,
+    1 + Math.max(0, -temperature) * 0.28 - Math.max(0, temperature) * 0.12 + tint * 0.04,
+  ];
+}
+
+export function srgbToLinear(value: number): number {
   const normalized = value / 255;
   return normalized <= 0.04045
     ? normalized / 12.92
@@ -389,6 +642,42 @@ function isIdentityCurve(points: TonePoint[]): boolean {
     && Math.abs(points[1].y - 1) < EPSILON;
 }
 
+function isNeutralLevels(levels: PhotoLevels): boolean {
+  return levels.inputBlack === 0
+    && levels.gamma === 1
+    && levels.inputWhite === 1
+    && levels.outputBlack === 0
+    && levels.outputWhite === 1;
+}
+
+function isNeutralChannelMixer(mixer: PhotoChannelMixer): boolean {
+  const identity = neutralChannelMixer();
+  return (['red', 'green', 'blue'] as const).every((channel) => {
+    const row = mixer[channel];
+    const expected = identity[channel];
+    return row.red === expected.red
+      && row.green === expected.green
+      && row.blue === expected.blue
+      && row.constant === expected.constant;
+  });
+}
+
+function applyLevelsValue(value: number, levels: PhotoLevels): number {
+  const span = Math.max(EPSILON, levels.inputWhite - levels.inputBlack);
+  const normalized = clamp((value - levels.inputBlack) / span, 0, 1);
+  const gammaAdjusted = normalized ** (1 / levels.gamma);
+  return levels.outputBlack + gammaAdjusted * (levels.outputWhite - levels.outputBlack);
+}
+
+function applyChannelMixer(rgb: [number, number, number], mixer: PhotoChannelMixer): [number, number, number] {
+  const [red, green, blue] = rgb;
+  const mix = (row: PhotoChannelMixerRow) => clamp(
+    red * row.red + green * row.green + blue * row.blue + row.constant,
+    0,
+    1,
+  );
+  return [mix(mixer.red), mix(mixer.green), mix(mixer.blue)];
+}
 function isNeutralGlobal(recipe: PhotoRecipe): boolean {
   return recipe.exposure === 0
     && recipe.contrast === 0
@@ -398,11 +687,18 @@ function isNeutralGlobal(recipe: PhotoRecipe): boolean {
     && recipe.blacks === 0
     && recipe.midtone === 0
     && isIdentityCurve(recipe.toneCurve)
+    && isIdentityCurve(recipe.rgbToneCurves.red)
+    && isIdentityCurve(recipe.rgbToneCurves.green)
+    && isIdentityCurve(recipe.rgbToneCurves.blue)
+    && isNeutralLevels(recipe.levels)
+    && isNeutralChannelMixer(recipe.channelMixer)
+    && (!recipe.lut || recipe.lut.strength === 0)
     && recipe.temperature === 0
     && recipe.tint === 0
     && recipe.saturation === 0
     && recipe.vibrance === 0
     && recipe.hsl.every((entry) => entry.hue === 0 && entry.saturation === 0 && entry.luminance === 0)
+    && isNeutralSelectiveColor(recipe.selectiveColor)
     && recipe.shadowGrade.saturation === 0
     && recipe.midtoneGrade.saturation === 0
     && recipe.highlightGrade.saturation === 0
@@ -437,14 +733,14 @@ function seededNoise(x: number, y: number): number {
 
 function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
   if (isNeutralGlobal(recipe)) return;
+  const preparedLut = preparePhotoLut(recipe.lut);
   const exposureScale = 2 ** recipe.exposure;
   const temperature = recipe.temperature;
   const tint = recipe.tint;
-  const wbR = 1 + Math.max(0, temperature) * 0.28 - Math.max(0, -temperature) * 0.12 + tint * 0.04;
-  const wbG = 1 - tint * 0.16;
-  const wbB = 1 + Math.max(0, -temperature) * 0.28 - Math.max(0, temperature) * 0.12 + tint * 0.04;
+  const [wbR, wbG, wbB] = whiteBalanceMultipliers(temperature, tint);
   const contrastSlope = 1 + recipe.contrast * 1.8 + recipe.dehaze * 0.55;
   const gamma = 2 ** (-recipe.midtone * 0.8);
+  const selectiveColor = isNeutralSelectiveColor(recipe.selectiveColor) ? null : recipe.selectiveColor!;
 
   for (let offset = 0; offset < data.length; offset += 4) {
     if (data[offset + 3] === 0) continue;
@@ -483,6 +779,7 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
     sat = clamp(sat * (1 + sector.saturation), 0, 1);
     light = clamp(light + sector.luminance * 0.25, 0, 1);
     [sr, sg, sb] = hslToRgb(hue, sat, light);
+    if (selectiveColor) [sr, sg, sb] = applySelectiveColor([sr, sg, sb], selectiveColor);
 
     luminance = clamp(sr * 0.2126 + sg * 0.7152 + sb * 0.0722, 0, 1);
     [sr, sg, sb] = applyGrade([sr, sg, sb], recipe.shadowGrade, 1 - smoothstep(0.15, 0.6, luminance));
@@ -498,9 +795,14 @@ function applyGlobalAdjustments(data: Uint8ClampedArray, width: number, height: 
       sb = gray;
     }
 
-    sr = interpolateCurve(sr, recipe.toneCurve);
-    sg = interpolateCurve(sg, recipe.toneCurve);
-    sb = interpolateCurve(sb, recipe.toneCurve);
+    sr = applyLevelsValue(sr, recipe.levels);
+    sg = applyLevelsValue(sg, recipe.levels);
+    sb = applyLevelsValue(sb, recipe.levels);
+    sr = interpolateCurve(interpolateCurve(sr, recipe.toneCurve), recipe.rgbToneCurves.red);
+    sg = interpolateCurve(interpolateCurve(sg, recipe.toneCurve), recipe.rgbToneCurves.green);
+    sb = interpolateCurve(interpolateCurve(sb, recipe.toneCurve), recipe.rgbToneCurves.blue);
+    [sr, sg, sb] = applyChannelMixer([sr, sg, sb], recipe.channelMixer);
+    if (preparedLut) [sr, sg, sb] = samplePreparedPhotoLut(preparedLut, [sr, sg, sb]);
 
     const pixelIndex = offset / 4;
     const x = pixelIndex % width;
@@ -650,8 +952,14 @@ function circularHueDistance(a: number, b: number): number {
   return Math.min(raw, 360 - raw);
 }
 
+// A stroke is every point sharing one strokeId (one continuous paint gesture). Dabs
+// within a stroke union via max, matching a single physical brush pass; separate
+// strokes then accumulate with "over" compositing scaled by flow, so one pass never
+// exceeds `flow` coverage and repeated passes build toward full coverage. Erase
+// strokes accumulate the same way, then multiplicatively remove coverage at the end.
 function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: number): number {
-  let best = 0;
+  const paintStrokes = new Map<number, number>();
+  const eraseStrokes = new Map<number, number>();
   for (const point of mask.points) {
     const distance = Math.hypot(x - point.x, y - point.y);
     if (distance > mask.radius) continue;
@@ -659,14 +967,32 @@ function brushWeight(mask: Extract<PhotoMask, { type: 'brush' }>, x: number, y: 
     const edge = mask.feather <= EPSILON
       ? (distance <= mask.radius ? 1 : 0)
       : 1 - smoothstep(inner, mask.radius, distance);
-    best = Math.max(best, edge * point.pressure);
+    const contribution = edge * point.pressure;
+    const strokes = point.erase ? eraseStrokes : paintStrokes;
+    strokes.set(point.strokeId, Math.max(strokes.get(point.strokeId) ?? 0, contribution));
   }
-  return best;
+  let painted = 0;
+  for (const strokeMax of paintStrokes.values()) painted += strokeMax * mask.flow * (1 - painted);
+  let erased = 0;
+  for (const strokeMax of eraseStrokes.values()) erased += strokeMax * mask.flow * (1 - erased);
+  return painted * (1 - erased);
 }
 
-function maskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
+export function photoMaskWeight(mask: PhotoMask, x: number, y: number, red: number, green: number, blue: number): number {
   let weight = 0;
-  if (mask.type === 'radial') {
+  if (mask.type === 'composite') {
+    for (const operation of mask.operations) {
+      const incoming = photoMaskWeight(operation.mask, x, y, red, green, blue);
+      if (operation.mode === 'replace') weight = incoming;
+      else if (operation.mode === 'add') weight = Math.max(weight, incoming);
+      else if (operation.mode === 'subtract') weight *= 1 - incoming;
+      else weight = Math.min(weight, incoming);
+    }
+    if (mask.feather > EPSILON) {
+      const halfFeather = mask.feather * 0.5;
+      weight = smoothstep(0.5 - halfFeather, 0.5 + halfFeather, weight);
+    }
+  } else if (mask.type === 'radial') {
     const dx = (x - mask.cx) / Math.max(EPSILON, mask.rx);
     const dy = (y - mask.cy) / Math.max(EPSILON, mask.ry);
     const distance = Math.hypot(dx, dy);
@@ -691,8 +1017,18 @@ function maskWeight(mask: PhotoMask, x: number, y: number, red: number, green: n
     const distance = circularHueDistance(hue, mask.center);
     const featherDegrees = Math.max(1, mask.feather * 60);
     weight = 1 - smoothstep(mask.range, mask.range + featherDegrees, distance);
-  } else {
+  } else if (mask.type === 'brush') {
     weight = brushWeight(mask, x, y);
+  } else {
+    weight = photoSelectionWeight(
+      mask.selection,
+      x,
+      y,
+      red,
+      green,
+      blue,
+      mask.feather,
+    );
   }
   const resolved = mask.invert ? 1 - weight : weight;
   return clamp(resolved * mask.opacity, 0, 1);
@@ -702,18 +1038,19 @@ function applyLocalColorEffect(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  adjustment: LocalAdjustment,
+  mask: PhotoMask,
+  effect: LocalEffect,
 ): void {
-  const exposureScale = 2 ** adjustment.effect.exposure;
+  const exposureScale = 2 ** effect.exposure;
   for (let pixel = 0; pixel < width * height; pixel += 1) {
     const offset = pixel * 4;
     if (data[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = maskWeight(adjustment.mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
+    const weight = photoMaskWeight(mask, x, y, data[offset], data[offset + 1], data[offset + 2]);
     if (weight <= EPSILON) continue;
 
-    if (adjustment.effect.exposure !== 0) {
+    if (effect.exposure !== 0) {
       for (let channel = 0; channel < 3; channel += 1) {
         const linear = srgbToLinear(data[offset + channel]);
         const adjusted = linear * (1 + (exposureScale - 1) * weight);
@@ -721,9 +1058,9 @@ function applyLocalColorEffect(
       }
     }
 
-    if (adjustment.effect.saturation !== 0) {
+    if (effect.saturation !== 0) {
       const [hue, saturation, lightness] = rgbToHsl(data[offset] / 255, data[offset + 1] / 255, data[offset + 2] / 255);
-      const targetSaturation = clamp(saturation * (1 + adjustment.effect.saturation), 0, 1);
+      const targetSaturation = clamp(saturation * (1 + effect.saturation), 0, 1);
       const mixedSaturation = saturation + (targetSaturation - saturation) * weight;
       const [r, g, b] = hslToRgb(hue, mixedSaturation, lightness);
       data[offset] = Math.round(r * 255);
@@ -737,9 +1074,10 @@ function applyLocalSpatialEffect(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  adjustment: LocalAdjustment,
+  mask: PhotoMask,
+  effect: LocalEffect,
 ): void {
-  if (adjustment.effect.sharpness === 0 && adjustment.effect.blur === 0) return;
+  if (effect.sharpness === 0 && effect.blur === 0) return;
   const source = new Uint8ClampedArray(data);
   const blurred = boxBlur(source, width, height, 2);
   for (let pixel = 0; pixel < width * height; pixel += 1) {
@@ -747,13 +1085,13 @@ function applyLocalSpatialEffect(
     if (source[offset + 3] === 0) continue;
     const x = (pixel % width + 0.5) / width;
     const y = (Math.floor(pixel / width) + 0.5) / height;
-    const weight = maskWeight(adjustment.mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
+    const weight = photoMaskWeight(mask, x, y, source[offset], source[offset + 1], source[offset + 2]);
     if (weight <= EPSILON) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const difference = source[offset + channel] - blurred[offset + channel];
-      const sharpened = source[offset + channel] + difference * adjustment.effect.sharpness;
-      const softened = source[offset + channel] + (blurred[offset + channel] - source[offset + channel]) * adjustment.effect.blur;
-      const target = adjustment.effect.blur > 0 ? softened : sharpened;
+      const sharpened = source[offset + channel] + difference * effect.sharpness;
+      const softened = source[offset + channel] + (blurred[offset + channel] - source[offset + channel]) * effect.blur;
+      const target = effect.blur > 0 ? softened : sharpened;
       data[offset + channel] = clamp(Math.round(source[offset + channel] + (target - source[offset + channel]) * weight), 0, 255);
     }
   }
@@ -763,9 +1101,28 @@ function applyLocalAdjustments(data: Uint8ClampedArray, width: number, height: n
   if (!hasLocalWork(recipe)) return;
   for (const adjustment of recipe.localAdjustments) {
     if (!adjustment.enabled || adjustment.mask.opacity <= 0) continue;
-    applyLocalColorEffect(data, width, height, adjustment);
-    applyLocalSpatialEffect(data, width, height, adjustment);
+    applyLocalColorEffect(data, width, height, adjustment.mask, adjustment.effect);
+    applyLocalSpatialEffect(data, width, height, adjustment.mask, adjustment.effect);
   }
+}
+
+// A full-canvas mask (opacity 1, no feather) so an adjustment layer with no mask of its own
+// still applies everywhere, matching how an unmasked local adjustment already behaves.
+const FULL_CANVAS_LAYER_MASK: PhotoMask = { type: 'radial', cx: 0.5, cy: 0.5, rx: 4, ry: 4, feather: 0, opacity: 1, invert: false };
+
+function applyAdjustmentLayer(data: Uint8ClampedArray, width: number, height: number, layer: PhotoLayer): void {
+  if (!layer.effect || layer.opacity <= EPSILON) return;
+  // Layer opacity scales the whole effect's strength, since an adjustment layer has no pixels
+  // of its own to blend at partial opacity the way an image layer does.
+  const effect: LocalEffect = {
+    exposure: layer.effect.exposure * layer.opacity,
+    saturation: layer.effect.saturation * layer.opacity,
+    sharpness: layer.effect.sharpness * layer.opacity,
+    blur: layer.effect.blur * layer.opacity,
+  };
+  const mask = layer.mask ?? FULL_CANVAS_LAYER_MASK;
+  applyLocalColorEffect(data, width, height, mask, effect);
+  applyLocalSpatialEffect(data, width, height, mask, effect);
 }
 
 function pixelFromNormalized(value: number, size: number): number {
@@ -816,15 +1173,27 @@ function applyCloneOrHeal(
   const centerCorrection = operation.type === 'heal'
     ? [0, 1, 2].map((channel) => source[targetCenterOffset + channel] - source[sourceCenterOffset + channel])
     : [0, 0, 0];
+  // The source offset is locked to the source/target anchor for the whole operation, so every
+  // additional stroke point painted afterward samples with that same fixed offset (a real
+  // clone-stamp "aligned" behavior) rather than each dab picking its own source.
+  const deltaX = sourceCenterX - targetCenterX;
+  const deltaY = sourceCenterY - targetCenterY;
+  const stamps: Array<{ x: number; y: number }> = [{ x: operation.targetX, y: operation.targetY }, ...operation.path];
 
   for (let py = 0; py < height; py += 1) {
     for (let px = 0; px < width; px += 1) {
       const nx = (px + 0.5) / width;
       const ny = (py + 0.5) / height;
-      const weight = retouchCircleWeight(nx, ny, operation.targetX, operation.targetY, operation.radius, operation.feather) * operation.opacity;
+      let stampWeight = 0;
+      for (const stamp of stamps) {
+        const candidate = retouchCircleWeight(nx, ny, stamp.x, stamp.y, operation.radius, operation.feather);
+        if (candidate > stampWeight) stampWeight = candidate;
+        if (stampWeight >= 1) break;
+      }
+      const weight = stampWeight * operation.opacity;
       if (weight <= EPSILON) continue;
-      const sourceX = clamp(sourceCenterX + (px - targetCenterX), 0, width - 1);
-      const sourceY = clamp(sourceCenterY + (py - targetCenterY), 0, height - 1);
+      const sourceX = clamp(px + deltaX, 0, width - 1);
+      const sourceY = clamp(py + deltaY, 0, height - 1);
       const sampleOffset = (sourceY * width + sourceX) * 4;
       const targetOffset = (py * width + px) * 4;
       for (let channel = 0; channel < 3; channel += 1) {
@@ -837,8 +1206,101 @@ function applyCloneOrHeal(
 
 function applyRetouch(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe): void {
   for (const operation of recipe.retouch) {
+    if (!operation.enabled) continue;
     if (operation.type === 'red-eye') applyRedEye(data, width, height, operation);
     else applyCloneOrHeal(data, width, height, operation);
+  }
+}
+
+/** A layer's own source image, decoded to raw pixels by the caller (layer decoding is
+ * inherently async; this whole pixel pipeline is synchronous by design, so decoding stays
+ * outside it, matching how the primary source image is already decoded before this runs). */
+export interface PhotoLayerPixels {
+  layerId: string;
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+function bilinearSample(data: Uint8ClampedArray, width: number, height: number, x: number, y: number): [number, number, number, number] {
+  const x0 = Math.floor(x - 0.5);
+  const y0 = Math.floor(y - 0.5);
+  const fx = x - 0.5 - x0;
+  const fy = y - 0.5 - y0;
+  const at = (sx: number, sy: number, channel: number) => {
+    const cx = clamp(sx, 0, width - 1);
+    const cy = clamp(sy, 0, height - 1);
+    return data[(cy * width + cx) * 4 + channel];
+  };
+  const result: [number, number, number, number] = [0, 0, 0, 0];
+  for (let channel = 0; channel < 4; channel += 1) {
+    const top = at(x0, y0, channel) * (1 - fx) + at(x0 + 1, y0, channel) * fx;
+    const bottom = at(x0, y0 + 1, channel) * (1 - fx) + at(x0 + 1, y0 + 1, channel) * fx;
+    result[channel] = top * (1 - fy) + bottom * fy;
+  }
+  return result;
+}
+
+function compositeOneLayer(data: Uint8ClampedArray, width: number, height: number, layer: PhotoLayer, source: PhotoLayerPixels): void {
+  const radians = (-layer.transform.rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const centerX = layer.transform.x * width;
+  const centerY = layer.transform.y * height;
+  const halfW = (source.width * layer.transform.scale) / 2;
+  const halfH = (source.height * layer.transform.scale) / 2;
+  if (halfW <= EPSILON || halfH <= EPSILON) return;
+
+  for (let py = 0; py < height; py += 1) {
+    for (let px = 0; px < width; px += 1) {
+      const dx = px + 0.5 - centerX;
+      const dy = py + 0.5 - centerY;
+      // Inverse-rotate the output pixel into the layer's own unrotated local space.
+      const localX = dx * cos - dy * sin;
+      const localY = dx * sin + dy * cos;
+      const sourceX = (localX / (2 * halfW) + 0.5) * source.width;
+      const sourceY = (localY / (2 * halfH) + 0.5) * source.height;
+      if (sourceX < 0 || sourceY < 0 || sourceX >= source.width || sourceY >= source.height) continue;
+      const sample = bilinearSample(source.data, source.width, source.height, sourceX, sourceY);
+      const offset = (py * width + px) * 4;
+      let maskWeight = 1;
+      if (layer.mask) {
+        maskWeight = photoMaskWeight(layer.mask, (px + 0.5) / width, (py + 0.5) / height, data[offset], data[offset + 1], data[offset + 2]);
+      }
+      const alpha = clamp((sample[3] / 255) * layer.opacity * maskWeight, 0, 1);
+      if (alpha <= EPSILON) continue;
+      const base: [number, number, number] = [data[offset] / 255, data[offset + 1] / 255, data[offset + 2] / 255];
+      const top: [number, number, number] = [sample[0] / 255, sample[1] / 255, sample[2] / 255];
+      const blended = blendChannels(layer.blendMode, base, top);
+      for (let channel = 0; channel < 3; channel += 1) {
+        const blendedByte = clamp(Math.round(blended[channel] * 255), 0, 255);
+        data[offset + channel] = clamp(Math.round(data[offset + channel] + (blendedByte - data[offset + channel]) * alpha), 0, 255);
+      }
+    }
+  }
+}
+
+function compositeLayers(data: Uint8ClampedArray, width: number, height: number, recipe: PhotoRecipe, layerPixels: PhotoLayerPixels[]): void {
+  if (!recipe.layers?.length) return;
+  const pixelsById = new Map(layerPixels.map((entry) => [entry.layerId, entry]));
+  const groups = new Map((recipe.layerGroups ?? []).map((group) => [group.id, group]));
+  for (const ownLayer of recipe.layers) {
+    // A group hides all of its layers and scales their opacity; ungrouped layers are unaffected.
+    const group = ownLayer.groupId ? groups.get(ownLayer.groupId) : undefined;
+    if (group && !group.visible) continue;
+    const layer = group ? { ...ownLayer, opacity: ownLayer.opacity * group.opacity } : ownLayer;
+    if (!layer.visible || layer.opacity <= EPSILON) continue;
+    if (layer.role === 'adjustment') {
+      applyAdjustmentLayer(data, width, height, layer);
+      continue;
+    }
+    // 'image', 'text', and 'shape' all composite from a rendered bitmap: an image layer's is
+    // its decoded sourceDataUrl, while text/shape are rendered to a bitmap by the caller (the
+    // renderer, which owns canvas/text-measurement APIs this pure engine does not depend on)
+    // and handed in exactly like a decoded image, so this path never special-cases them.
+    const source = pixelsById.get(layer.id);
+    if (!source) continue; // Not yet rendered/decoded by the caller; composites once it is.
+    compositeOneLayer(data, width, height, layer, source);
   }
 }
 
@@ -847,19 +1309,24 @@ export function applyPixelAdjustments(
   width: number,
   height: number,
   inputRecipe: PhotoRecipe,
+  layerPixels: PhotoLayerPixels[] = [],
 ): void {
   const recipe = inputRecipe === DEFAULT_RECIPE ? inputRecipe : normalizeRecipe(inputRecipe);
   if (width <= 0 || height <= 0 || data.length < width * height * 4) return;
   const isFullyNeutral = isNeutralGlobal(recipe)
     && !hasSpatialDetail(recipe)
     && !hasLocalWork(recipe)
-    && recipe.retouch.length === 0;
+    && recipe.retouch.length === 0
+    && !recipe.layers?.length
+    && isDetailFiltersNeutral(recipe.detailFilters);
   if (isFullyNeutral) return;
 
   applyGlobalAdjustments(data, width, height, recipe);
   applySpatialDetail(data, width, height, recipe);
+  applyDetailFilters(data, width, height, recipe.detailFilters);
   applyLocalAdjustments(data, width, height, recipe);
   applyRetouch(data, width, height, recipe);
+  compositeLayers(data, width, height, recipe, layerPixels);
 }
 
 export function sampleHistogram(data: Uint8ClampedArray): PhotoHistogram {

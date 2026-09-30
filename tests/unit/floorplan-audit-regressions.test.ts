@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { analyzeFloorplan } from '../../src/tools/floorplan/floorplan-analysis';
 import * as exportEngine from '../../src/tools/floorplan/export-engine';
 import { createInitialProject } from '../../src/tools/floorplan/state-engine';
+import { getSymbolDefinition } from '../../src/tools/floorplan/symbol-library';
 import type { FloorplanProject } from '../../src/tools/floorplan/floorplan-types';
 
 const baseProject = (name: string): FloorplanProject => createInitialProject(name).present;
@@ -41,7 +42,7 @@ describe('PlanCraft September audit regressions', () => {
     };
 
     const analysis = analyzeFloorplan(project);
-    expect(analysis.clearanceViolations.some((violation) => violation.componentId === 'wide' && violation.rule === 'wall_clearance')).toBe(true);
+    expect(analysis.clearanceViolations.some((violation) => violation.componentId === 'wide' && violation.rule === 'wall_collision')).toBe(true);
   });
 
   it('subtracts hosted opening intervals from DXF wall centerlines', () => {
@@ -88,5 +89,83 @@ describe('PlanCraft September audit regressions', () => {
     const placement = describe(simpleWallProject(), 'arch-d', { pdfScale: 50 });
     expect(placement.placementLabel).toBe('Physical scale 1:50');
     expect(placement.pointsPerMm).toBeCloseTo(72 / 25.4 / 50, 10);
+  });
+});
+
+// Clearance model (F10/F11): footprints collide with footprints and walls; an access zone
+// sits in front of an item and is only blocked by other footprints or walls.
+const wallProject = (walls: readonly (readonly [string, number, number, number, number])[]): FloorplanProject => {
+  const vertices = walls.flatMap(([id, x1, y1, x2, y2]) => [
+    { id: `${id}-a`, position: { x: x1, y: y1 }, connectedWallIds: [id] },
+    { id: `${id}-b`, position: { x: x2, y: y2 }, connectedWallIds: [id] },
+  ]);
+  return {
+    ...baseProject('Clearance'),
+    vertices,
+    walls: walls.map(([id]) => ({ id, startVertexId: `${id}-a`, endVertexId: `${id}-b`, thickness: 150, height: 2700, state: 'existing' as const, material: 'drywall_stud' as const, isLoadBearing: false, openings: [] })),
+  };
+};
+const place = (id: string, symbolKey: string, x: number, y: number, rotation = 0) => {
+  const symbol = getSymbolDefinition(symbolKey)!;
+  return { id, category: symbol.category, symbolKey, position: { x, y }, rotation, scale: { x: 1, y: 1 }, layerId: symbol.category === 'mep' ? 'mep' : 'furniture', clearance: symbol.clearance };
+};
+const rulesFor = (project: FloorplanProject) => analyzeFloorplan(project).clearanceViolations.map((violation) => `${violation.componentId}:${violation.rule}:${violation.otherComponentId ?? 'wall'}`);
+
+describe('PlanCraft clearance model', () => {
+  it('accepts a sofa pushed against a wall and a nightstand beside the bed', () => {
+    const project: FloorplanProject = {
+      ...wallProject([['north', 0, 0, 6000, 0]]),
+      components: [
+        place('sofa', 'sofa-3-seat', 2000, 75 + 450),
+        place('bed', 'queen-bed', 4500, 75 + 1015),
+        place('stand', 'nightstand', 4500 + 762.5 + 275, 75 + 225),
+      ],
+    };
+    expect(rulesFor(project)).toEqual([]);
+  });
+
+  it('reports two items occupying the same floor', () => {
+    const project: FloorplanProject = { ...baseProject('Overlap'), components: [place('a', 'sofa-3-seat', 0, 0), place('b', 'armchair', 900, 200)] };
+    expect(rulesFor(project)).toEqual(['a:collision:b']);
+  });
+
+  it('reports an item that runs into a wall', () => {
+    const project: FloorplanProject = { ...wallProject([['north', 0, 0, 6000, 0]]), components: [place('sofa', 'sofa-3-seat', 2000, 300)] };
+    expect(rulesFor(project)).toEqual(['sofa:wall_collision:wall']);
+  });
+
+  it('reports furniture placed in the space in front of another item', () => {
+    const project: FloorplanProject = { ...baseProject('Access'), components: [place('sofa', 'sofa-3-seat', 0, 0), place('table', 'coffee-table', 0, 450 + 200 + 300)] };
+    expect(rulesFor(project)).toEqual(['sofa:access_blocked:table']);
+  });
+
+  it('lets chairs sit in a dining table clearance', () => {
+    const project: FloorplanProject = { ...baseProject('Dining'), components: [place('table', 'dining-6', 0, 0), place('chair', 'dining-chair', 0, 450 + 250)] };
+    expect(rulesFor(project)).toEqual([]);
+  });
+
+  it('checks a toilet against the ADA 60" × 56" water-closet clearance (604.3.1)', () => {
+    // Rear wall face at y = 75, side wall face at x = -455 from the toilet centerline (604.2 allows 16"–18").
+    const walls = wallProject([['rear', -3000, 0, 3000, 0], ['side', -530, 0, -530, 3000]]);
+    const toilet = place('wc', 'toilet', 0, 75 + 350);
+    expect(rulesFor({ ...walls, components: [toilet] })).toEqual([]);
+    // A vanity 900 mm to the side is outside a 30" × 48" space but inside the 60"-wide clearance.
+    expect(rulesFor({ ...walls, components: [toilet, place('vanity', 'base-cabinet', 900, 75 + 300)] })).toContain('wc:ada_fixture_clearance:vanity');
+  });
+
+  it('applies the current library clearance to toilets saved with the old 30" × 48" envelope', () => {
+    const stale = { ...place('wc', 'toilet', 0, 425), clearance: { shape: 'rectangle' as const, dimensions: { x: 760, y: 1220 }, bufferOffset: 0, adaRuleKey: 'ada_fixture_clearance' as const } };
+    const project: FloorplanProject = { ...baseProject('Stale'), components: [stale, place('vanity', 'base-cabinet', 900, 375)] };
+    expect(rulesFor(project)).toContain('wc:ada_fixture_clearance:vanity');
+  });
+
+  it('flags an obstructed ADA turning space', () => {
+    const project: FloorplanProject = { ...baseProject('Turning'), components: [place('turn', 'ada-turning-circle', 0, 0), place('chair', 'armchair', 600, 0)] };
+    expect(rulesFor(project)).toEqual(['turn:ada_turning_circle:chair']);
+  });
+
+  it('never reports wall-mounted MEP devices as collisions', () => {
+    const project: FloorplanProject = { ...wallProject([['north', 0, 0, 6000, 0]]), components: [place('outlet', 'duplex-120v', 2000, 0), place('sofa', 'sofa-3-seat', 2000, 75 + 450)] };
+    expect(rulesFor(project)).toEqual([]);
   });
 });

@@ -12,6 +12,8 @@ import {
   type CrystalMeasurement,
   type CrystalViewState,
 } from './project-engine';
+import { enumerateReflections } from './diffraction-engine';
+import { structureFactorIntensity } from './structure-factor-engine';
 import type { CrystalDocument, CrystalSite } from './crystal-types';
 
 export type CrystalExportTarget =
@@ -21,7 +23,9 @@ export type CrystalExportTarget =
   | 'xyz'
   | 'extxyz'
   | 'project'
-  | 'measurements-csv';
+  | 'measurements-csv'
+  | 'reflections-csv'
+  | 'reflections-hkl';
 
 export interface CrystalExportOptions {
   readonly filenameStem?: string;
@@ -29,6 +33,8 @@ export interface CrystalExportOptions {
   readonly view?: CrystalViewState;
   readonly preserveCifMetadata?: boolean;
   readonly cifBlockName?: string;
+  /** Minimum d-spacing for reflection-table exports; defaults to 0.8 Å. */
+  readonly minDSpacing?: number;
 }
 
 export interface CrystalExportResult {
@@ -351,6 +357,51 @@ function exportProject(document: CrystalDocument, options: CrystalExportOptions)
   };
 }
 
+function exportReflections(
+  document: CrystalDocument,
+  options: CrystalExportOptions,
+  format: 'csv' | 'hkl',
+): CrystalExportResult {
+  const reflections = enumerateReflections(document.cell, { minDSpacing: options.minDSpacing ?? 0.8 });
+
+  let factorOf: ((hkl: readonly [number, number, number]) => number) | null = null;
+  try {
+    structureFactorIntensity(document, [1, 0, 0]);
+    factorOf = (hkl) => structureFactorIntensity(document, hkl);
+  } catch {
+    factorOf = null;
+  }
+
+  if (format === 'csv') {
+    const lines: string[] = [];
+    if (!factorOf) lines.push('# structure factors unavailable for one or more sites; intensity column left empty');
+    lines.push('h,k,l,d,intensity');
+    for (const reflection of reflections) {
+      const [h, k, l] = reflection.hkl;
+      const intensity = factorOf ? formatNumber(factorOf(reflection.hkl)) : '';
+      lines.push(`${h},${k},${l},${formatNumber(reflection.d)},${intensity}`);
+    }
+    return {
+      filename: `${chooseFilenameStem(document, options)}-reflections.csv`,
+      mime: 'text/csv;charset=utf-8',
+      text: `${lines.join('\n')}\n`,
+      diff: computeMetadataDiff(document.cif, document.cif),
+    };
+  }
+
+  const lines = reflections.map((reflection) => {
+    const [h, k, l] = reflection.hkl;
+    const intensity = factorOf ? factorOf(reflection.hkl) : 0;
+    return `${h} ${k} ${l} ${intensity.toFixed(2)}`;
+  });
+  return {
+    filename: `${chooseFilenameStem(document, options)}-reflections.hkl`,
+    mime: 'text/plain;charset=utf-8',
+    text: `${lines.join('\n')}\n`,
+    diff: computeMetadataDiff(document.cif, document.cif),
+  };
+}
+
 export function exportCrystal(
   document: CrystalDocument,
   target: CrystalExportTarget,
@@ -370,6 +421,10 @@ export function exportCrystal(
       return exportProject(document, options);
     case 'measurements-csv':
       return exportMeasurements(document, options);
+    case 'reflections-csv':
+      return exportReflections(document, options, 'csv');
+    case 'reflections-hkl':
+      return exportReflections(document, options, 'hkl');
     default: {
       const unreachable: never = target;
       throw new RangeError(`Unsupported Crystal export target: ${String(unreachable)}`);

@@ -18,9 +18,10 @@ const closedRoom = (): FloorplanProject => ({
     state: 'existing' as const, material: 'drywall_stud' as const, isLoadBearing: false, openings: [],
   })),
   components: [{
-    id: 'chair', category: 'office', symbolKey: 'task-chair', position: { x: 2000, y: 1500 }, rotation: 0,
+    // Placed across the north wall so the snapshot carries a wall collision.
+    id: 'chair', category: 'office', symbolKey: 'task-chair', position: { x: 2000, y: 100 }, rotation: 0,
     scale: { x: 1, y: 1 }, layerId: 'furniture',
-    clearance: { shape: 'circle', dimensions: { x: 900, y: 900 }, bufferOffset: 0, adaRuleKey: 'ada_turning_circle' },
+    clearance: { shape: 'rectangle', dimensions: { x: 650, y: 650 }, bufferOffset: 0 },
   }],
 });
 

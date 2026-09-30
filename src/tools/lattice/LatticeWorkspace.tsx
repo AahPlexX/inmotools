@@ -16,6 +16,7 @@ import { closeLatticeSqlSession, createLatticeSqlSession, refreshJsonTreeTable, 
 import { commitHistory, createHistory, redoHistory, undoHistory } from './state-engine';
 import type { QueryResult } from '../duckdb/duckdb-client';
 import { consumeFileInput } from '../../lib/file-input';
+import { PagedTable } from '../../components/PagedTable';
 
 const DEFAULT_SOURCE = JSON.stringify({
   project: 'JSON Lattice Studio',
@@ -340,7 +341,7 @@ export default function LatticeWorkspace() {
       </section>
 
       <section className="lattice-graph-panel" aria-label="Interactive JSON graph">
-        <div className="lattice-panel-heading"><div><h2>Graph workspace</h2><p>Drag to pan · wheel to zoom · double-click primitives to edit.</p></div>{layoutError ? <span className="lattice-bad">Layout error</span> : <span className="lattice-good">ELK worker</span>}</div>
+        <div className="lattice-panel-heading"><div><h2>Graph workspace</h2><p>Drag to pan · scroll or use − / + to zoom · double-click a value to edit it.</p></div>{layoutError ? <span className="lattice-bad">Layout error</span> : <span className="lattice-good">ELK worker</span>}</div>
         <LatticeViewport graph={graph} layout={layout} collapsedPaths={collapsedPaths} searchMatches={searchMatches} activePath={activePath} onToggleCollapse={toggleCollapse} onEditPrimitive={editPrimitive} onSelect={setActivePath} />
         {layoutError ? <div className="lattice-error" role="alert">{layoutError}</div> : null}
       </section>
@@ -363,7 +364,7 @@ export default function LatticeWorkspace() {
 
       <details><summary>JSONPath & DuckDB</summary><div className="lattice-dock-grid">
         <div><h3>JSONPath slice</h3><label>JSONPath query<input aria-label="JSONPath query" value={jsonPath} onChange={(event) => setJsonPath(event.target.value)} /></label><div className="button-row"><button type="button" onClick={runJsonPath}>Run JSONPath</button><label className="lattice-check"><input type="checkbox" checked={querySlice} onChange={(event) => setQuerySlice(event.target.checked)} /> Slice graph to matches + ancestors</label></div><p data-testid="query-summary">{querySummary}</p></div>
-        <div><h3>Local SQL</h3><label>SQL query<textarea aria-label="SQL query" value={sql} onChange={(event) => setSql(event.target.value)} /></label><button type="button" disabled={sqlBusy || !sql.trim()} onClick={() => void runSql()}>{sqlBusy ? 'Running locally…' : 'Run SQL'}</button>{sqlResult ? <div className="result-table-wrap" data-testid="sql-results"><table><thead><tr>{sqlResult.columns.map((column) => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{sqlResult.rows.map((row, index) => <tr key={index}>{sqlResult.columns.map((column) => <td key={column}>{String(row[column] ?? '')}</td>)}</tr>)}</tbody></table></div> : <div data-testid="sql-results" className="lattice-empty">No SQL results yet.</div>}</div>
+        <div><h3>Local SQL</h3><label>SQL query<textarea aria-label="SQL query" value={sql} onChange={(event) => setSql(event.target.value)} /></label><button type="button" disabled={sqlBusy || !sql.trim()} onClick={() => void runSql()}>{sqlBusy ? 'Running locally…' : 'Run SQL'}</button>{sqlResult ? <PagedTable columns={sqlResult.columns.map((column) => ({ key: column, label: column }))} rows={sqlResult.rows} caption="Local SQL results" pageSize={100} testId="sql-results" renderCell={(row, column) => String(row[column] ?? '')} /> : <div data-testid="sql-results" className="lattice-empty">No SQL results yet.</div>}</div>
       </div></details>
     </div>
 

@@ -151,7 +151,7 @@ export function PacePanel({ settings, patch, disabled, onPreset, onRamp, metrono
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-ramp-heading">
-        <h2 id="sightline-ramp-heading">Velocity ramp trainer</h2>
+        <h2 id="sightline-ramp-heading">Speed trainer</h2>
         <p className="sightline-note">
           A ramp starts below your chosen rate and lifts it in steps, so the reading stays fluent while the pace climbs.
         </p>
@@ -216,7 +216,7 @@ export function PacePanel({ settings, patch, disabled, onPreset, onRamp, metrono
       </section>
 
       <section className="sightline-card" aria-labelledby="sightline-metronome-heading">
-        <h2 id="sightline-metronome-heading">Subvocalization metronome</h2>
+        <h2 id="sightline-metronome-heading">Pacing beat</h2>
         <p className="sightline-note">
           A steady click gives the inner voice something to follow. It discourages silent pronunciation rather than measuring it.
         </p>

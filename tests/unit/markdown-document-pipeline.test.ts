@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareDocument, toFilenameStem } from '../../src/tools/markdown/document-pipeline';
+import { applyPreparedCitations, prepareDocument, toFilenameStem } from '../../src/tools/markdown/document-pipeline';
 
 describe('prepareDocument', () => {
   it('evaluates table formulas', () => {
@@ -9,6 +9,13 @@ describe('prepareDocument', () => {
       '| Widgets | 4 | 2.5 | =B2*C2 |',
     ].join('\n');
     expect(prepareDocument(source)).toContain('| Widgets | 4 | 2.5 | 10 |');
+  });
+
+  it('applies citations without evaluating formula-shaped text in this stage', () => {
+    const source = '| A | B |\n| - | - |\n| 4 | =A2*3 |\n\nSee [@smith2024].';
+    const result = applyPreparedCitations(source, new Map([['smith2024', '(Smith, 2024)']]));
+    expect(result).toContain('| 4 | =A2*3 |');
+    expect(result).toContain('See (Smith, 2024).');
   });
 
   it('substitutes in-text citations when a formatted map is supplied', () => {

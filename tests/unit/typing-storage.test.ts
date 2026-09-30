@@ -2,15 +2,21 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clearAllTests,
+  clearTestsForTypist,
+  createTypist,
   dailyActivity,
   filterTests,
+  ensureDefaultTypist,
   findPersonalBest,
   listTests,
+  listTestsForTypist,
+  listTypists,
   readPreference,
   rollingWpm,
   saveTest,
   updateTestTags,
   writePreference,
+  DEFAULT_TYPIST_ID,
   type StoredTest,
 } from '../../src/tools/typing/typing-storage';
 
@@ -43,6 +49,58 @@ function makeTest(overrides: Partial<StoredTest> = {}): StoredTest {
 describe('typing storage', () => {
   beforeEach(async () => {
     await clearAllTests();
+  });
+
+
+  it('initializes the default local typist idempotently and adopts legacy tests once', async () => {
+    await saveTest(makeTest({ notes: 'legacy', typistId: undefined }));
+    const first = await ensureDefaultTypist();
+    const second = await ensureDefaultTypist();
+    expect(first.id).toBe(DEFAULT_TYPIST_ID);
+    expect(second.id).toBe(DEFAULT_TYPIST_ID);
+    expect((await listTypists()).filter((profile) => profile.id === DEFAULT_TYPIST_ID)).toHaveLength(1);
+    const rows = await listTests();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.typistId).toBe(DEFAULT_TYPIST_ID);
+  });
+
+  it('isolates history, personal bests, and destructive resets by typist id', async () => {
+    const alpha = await createTypist(`Alpha-${Date.now()}-${Math.random()}`);
+    const bravo = await createTypist(`Bravo-${Date.now()}-${Math.random()}`);
+    await saveTest(makeTest({ typistId: alpha.id, netWpm: 75 }));
+    await saveTest(makeTest({ typistId: bravo.id, netWpm: 110 }));
+
+    expect((await listTestsForTypist(alpha.id)).map((row) => row.netWpm)).toEqual([75]);
+    expect((await listTestsForTypist(bravo.id)).map((row) => row.netWpm)).toEqual([110]);
+
+    const alphaPb = await findPersonalBest({
+      typistId: alpha.id,
+      mode: 'words-1000',
+      durationMode: 'time',
+      durationValue: 30,
+      language: 'english',
+      layout: 'qwerty',
+    });
+    const bravoPb = await findPersonalBest({
+      typistId: bravo.id,
+      mode: 'words-1000',
+      durationMode: 'time',
+      durationValue: 30,
+      language: 'english',
+      layout: 'qwerty',
+    });
+    expect(alphaPb?.netWpm).toBe(75);
+    expect(bravoPb?.netWpm).toBe(110);
+
+    await clearTestsForTypist(alpha.id);
+    expect(await listTestsForTypist(alpha.id)).toHaveLength(0);
+    expect(await listTestsForTypist(bravo.id)).toHaveLength(1);
+  });
+
+  it('accepts stopped attempts for saved partial scores', async () => {
+    const id = await saveTest(makeTest({ finishReason: 'stopped', netWpm: 42 }));
+    const rows = await listTests();
+    expect(rows.find((row) => row.id === id)?.finishReason).toBe('stopped');
   });
 
   it('round-trips a stored test', async () => {

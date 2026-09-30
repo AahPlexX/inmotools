@@ -3,7 +3,7 @@ import { PagedTable } from '../../components/PagedTable';
 import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { buildPatternFlags, extractGroupNames, rowsToCsv, rowsToMarkdown, unmatchedToTsv, type LogPatternFlags, type LogScanMode, type StructuredLogs } from './log-engine';
-import { isCancellation, runLogStructuring } from './log-runner';
+import { disposeLogStructuringWorker, isCancellation, runLogStructuring } from './log-runner';
 
 const SAMPLE='2026-08-29 INFO service started\n2026-08-29 ERROR disk full\nunmatched line';
 const DEFAULT_PATTERN='^(?<date>\\d{4}-\\d{2}-\\d{2})\\s+(?<level>INFO|WARN|ERROR)\\s+(?<message>.+)$';
@@ -18,6 +18,8 @@ export default function LogWorkspace(){
  const [input,setInput]=useState(SAMPLE),[pattern,setPattern]=useState(DEFAULT_PATTERN),[flags,setFlags]=useState<LogPatternFlags>({}),[mode,setMode]=useState<LogScanMode>('line'),[result,setResult]=useState<StructuredLogs>(EMPTY),[error,setError]=useState(''),[running,setRunning]=useState(false),[sourceName,setSourceName]=useState(''),[statusNote,setStatusNote]=useState('');
  const runRef=useRef<{cancel():void}|null>(null),debounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);const flagKey=buildPatternFlags(flags);
  useEffect(()=>{const timer=setTimeout(()=>{debounceRef.current=null;runRef.current?.cancel();setRunning(true);setError('');let handle:{promise:Promise<StructuredLogs>;cancel():void};try{handle=runLogStructuring(input,pattern,flags,mode);}catch(reason){setRunning(false);setResult(EMPTY);setError(reason instanceof Error?`Could not start a background worker: ${reason.message}`:'Could not start a background worker.');return;}runRef.current=handle;const isCurrent=()=>runRef.current===handle;handle.promise.then((next)=>{if(isCurrent()){setResult(next);setError('');}}).catch((reason:unknown)=>{if(!isCurrent()||isCancellation(reason))return;setResult(EMPTY);setError(reason instanceof Error?reason.message:'The pattern could not be applied.');}).finally(()=>{if(isCurrent()){runRef.current=null;setRunning(false);}});},DEBOUNCE_MS);debounceRef.current=timer;return()=>{clearTimeout(timer);debounceRef.current=null;runRef.current?.cancel();runRef.current=null;};},[input,pattern,flagKey,mode]);
+ // The structuring worker is shared across runs; release it when the tool closes.
+ useEffect(()=>()=>disposeLogStructuringWorker(),[]);
  const cancelRun=()=>{if(debounceRef.current!==null){clearTimeout(debounceRef.current);debounceRef.current=null;}runRef.current?.cancel();runRef.current=null;setRunning(false);setResult(EMPTY);setError('Stopped. Edit the pattern or the input to run again.');};
  const {rows,columns,unmatched,kinds,rowLineNumbers=[],unmatchedLineNumbers=[]}=result;const declaredGroups=useMemo(()=>extractGroupNames(pattern),[pattern]);const stem=sourceName.replace(/\.[^.]+$/,'')||'structured-logs';const exportable=rows.length>0&&columns.length>0&&!running&&!error;
  const displayRows=useMemo(()=>rows.map((row,index)=>({row,line:rowLineNumbers[index]??null})),[rowLineNumbers,rows]);

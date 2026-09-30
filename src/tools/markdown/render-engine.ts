@@ -8,6 +8,9 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { toHtml } from 'hast-util-to-html';
 import type { Element, Root as HastRoot, RootContent as HastRootContent } from 'hast';
 import type { RenderResult, ScrollAnchor } from './markdown-types';
+import remarkGithubAlerts from './github-alerts-plugin';
+import remarkHeadingIds from './heading-id-plugin';
+import remarkEmoji from './emoji-plugin';
 
 // Renders a markdown source string to sanitized HTML.
 //
@@ -45,6 +48,9 @@ const createProcessor = () =>
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
+    .use(remarkGithubAlerts)
+    .use(remarkHeadingIds)
+    .use(remarkEmoji)
     .use(remarkRehype)
     // rehype-katex never throws for a malformed expression: it renders a
     // `.katex-error` span in place of the broken expression instead, which is

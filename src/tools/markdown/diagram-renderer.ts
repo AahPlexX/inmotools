@@ -45,6 +45,76 @@ const showDiagramError = (pre: HTMLElement, kind: 'Mermaid' | 'Graphviz', messag
   pre.insertAdjacentElement('afterend', error);
 };
 
+const BLOCKED_GRAPHVIZ_ELEMENTS = 'script, foreignObject, iframe, object, embed';
+
+const isSafeGraphvizNavigationHref = (value: string): boolean => {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('#')) return true;
+  try {
+    const url = new URL(trimmed, document.baseURI);
+    return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:' || url.protocol === 'tel:';
+  } catch {
+    return false;
+  }
+};
+
+const hasUnsafeCssUrl = (value: string): boolean => {
+  const references = [...value.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/gi)];
+  return references.some((match) => !match[2]?.trim().startsWith('#'));
+};
+
+const parseSafeGraphvizSvg = (svg: string): SVGElement => {
+  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  if (parsed.querySelector('parsererror') || parsed.documentElement.localName.toLowerCase() !== 'svg') {
+    throw new Error('Graphviz returned invalid SVG.');
+  }
+
+  const root = parsed.documentElement;
+  root.querySelectorAll(BLOCKED_GRAPHVIZ_ELEMENTS).forEach((element) => element.remove());
+
+  for (const element of [root, ...Array.from(root.querySelectorAll('*'))]) {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.localName.toLowerCase();
+      const value = attribute.value.trim();
+
+      if (name.startsWith('on')) {
+        element.removeAttributeNode(attribute);
+        continue;
+      }
+
+      // Graphviz's documented URL/href attributes are copied into SVG links.
+      // Keep deliberate navigation on <a> only for ordinary web/contact
+      // protocols; every other SVG href must be an in-document fragment.
+      if (name === 'href' || name === 'src') {
+        const isAnchorNavigation = element.localName.toLowerCase() === 'a' && name === 'href';
+        const safe = isAnchorNavigation
+          ? isSafeGraphvizNavigationHref(value)
+          : value.startsWith('#');
+        if (!safe) element.removeAttributeNode(attribute);
+        continue;
+      }
+
+      // Prevent resource-bearing CSS URLs from turning generated SVG into an
+      // automatic external fetch surface. Graphviz's normal fragment refs
+      // such as url(#clipPath) remain intact.
+      if (value.includes('url(') && hasUnsafeCssUrl(value)) {
+        element.removeAttributeNode(attribute);
+      }
+    }
+  }
+
+  return document.importNode(root, true) as unknown as SVGElement;
+};
+
+const replaceWithGraphvizDiagram = (pre: HTMLElement, svg: string): void => {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'markdown-workbench-diagram';
+  const sourceLine = pre.getAttribute('data-source-line');
+  if (sourceLine) wrapper.setAttribute('data-source-line', sourceLine);
+  wrapper.append(parseSafeGraphvizSvg(svg));
+  pre.replaceWith(wrapper);
+};
+
 const replaceWithDiagram = (
   pre: HTMLElement,
   svg: string,
@@ -95,7 +165,7 @@ export const renderDiagramBlocks = async (
       try {
         const response = await handle.promise;
         if (!isCurrent()) return;
-        if (response.svg) replaceWithDiagram(pre, response.svg);
+        if (response.svg) replaceWithGraphvizDiagram(pre, response.svg);
         else if (response.error) showDiagramError(pre, 'Graphviz', response.error);
       } catch (error) {
         if (!isCurrent()) return;

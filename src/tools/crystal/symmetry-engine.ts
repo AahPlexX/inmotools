@@ -5,7 +5,7 @@ import type { CrystalDocument, CrystalSite, Mat3, UnitCell, Vec3 } from './cryst
 import type { CrystalSymmetryOperation, CrystalSymmetryResult, SymmetryAdapterCell, SymmetryBreakInspection, SymmetrySweepPoint } from './symmetry-types';
 import type { StructureHealthFinding } from './structure-health-engine';
 
-const DEFAULT_TOLERANCE = 1e-4;
+export const DEFAULT_TOLERANCE = 1e-4;
 const VECTOR_EPSILON = 1e-10;
 const LATTICE_NOISE_EPSILON = 1e-9;
 const MAX_EQUIVALENT_SITES = 50_000;
@@ -239,23 +239,89 @@ export function applySymmetryOperation(fractional: Vec3, operation: CrystalSymme
   ];
 }
 
-export function generateEquivalentSites(document: CrystalDocument, result: CrystalSymmetryResult): CrystalDocument {
-  const sites: CrystalSite[] = [];
+/**
+ * Apply every operation to every site, deduping images that land on the same
+ * (element, wrapped-fractional) position within tolerance. Shared by detected-
+ * symmetry expansion (`generateEquivalentSites`) and source-symmetry CIF import.
+ */
+export function expandSitesBySymmetry(
+  sites: readonly CrystalSite[],
+  operations: readonly CrystalSymmetryOperation[],
+  tolerance: number,
+): CrystalSite[] {
+  const expanded: CrystalSite[] = [];
   const seen = new Set<string>();
-  for (const site of document.sites) {
-    for (const operation of result.operations) {
+  for (const site of sites) {
+    for (const operation of operations) {
       const fractional = applySymmetryOperation(site.fractional, operation);
-      const key = `${site.element}|${fractional.map((value) => Math.round(value / result.tolerance)).join('|')}`;
+      const key = `${site.element}|${fractional.map((value) => Math.round(value / tolerance)).join('|')}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      if (sites.length >= MAX_EQUIVALENT_SITES) {
+      if (expanded.length >= MAX_EQUIVALENT_SITES) {
         throw new RangeError(
-          `Equivalent-site generation would exceed the ${MAX_EQUIVALENT_SITES.toLocaleString()}-site limit.`,
+          `Symmetry expansion would exceed the ${MAX_EQUIVALENT_SITES.toLocaleString()}-site limit.`,
         );
       }
-      sites.push({ ...site, id: `${site.id}@sym-${sites.length + 1}`, fractional });
+      expanded.push({ ...site, id: `${site.id}@sym-${expanded.length + 1}`, fractional });
     }
   }
+  return expanded;
+}
+
+const SYMMETRY_TERM_RE = /^([+-]?)(\d+(?:\.\d+)?(?:\/\d+)?)?([xyz])?$/i;
+
+function evalSymmetryFraction(text: string, source: string): number {
+  const [numText, denText] = text.split('/');
+  const numerator = Number(numText);
+  const denominator = denText === undefined ? 1 : Number(denText);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
+    throw new RangeError(`Invalid numeric term "${text}" in symmetry operation "${source}".`);
+  }
+  return numerator / denominator;
+}
+
+function parseSymmetryComponent(component: string, source: string): { coeffs: Vec3; translation: number } {
+  const cleaned = component.replace(/\s+/g, '');
+  const terms = cleaned.match(/[+-]?[^+-]+/g);
+  if (!cleaned || !terms) throw new RangeError(`Could not parse symmetry-operation component "${component}" in "${source}".`);
+  let x = 0, y = 0, z = 0, translation = 0;
+  for (const term of terms) {
+    const match = SYMMETRY_TERM_RE.exec(term);
+    if (!match) throw new RangeError(`Invalid symmetry-operation term "${term}" in "${source}".`);
+    const sign = match[1] === '-' ? -1 : 1;
+    const magnitude = match[2] ? evalSymmetryFraction(match[2], source) : 1;
+    const axis = match[3]?.toLowerCase();
+    if (axis === 'x') x += sign * magnitude;
+    else if (axis === 'y') y += sign * magnitude;
+    else if (axis === 'z') z += sign * magnitude;
+    else translation += sign * magnitude;
+  }
+  return { coeffs: [x, y, z], translation };
+}
+
+/**
+ * Parse one CIF/SHELX-style symmetry-operation triplet (e.g. "-x+1/2,y,-z+1/2",
+ * per IUCr Core CIF `_space_group_symop_operation_xyz` / legacy
+ * `_symmetry_equiv_pos_as_xyz`) into a rotation matrix + translation vector.
+ */
+export function parseSymmetryOperationXyz(text: string): CrystalSymmetryOperation {
+  const components = text.split(',');
+  if (components.length !== 3) {
+    throw new RangeError(`Symmetry operation "${text}" must have exactly 3 comma-separated components.`);
+  }
+  const [row0, row1, row2] = components.map((component) => parseSymmetryComponent(component, text));
+  return {
+    rotation: [
+      row0!.coeffs[0], row0!.coeffs[1], row0!.coeffs[2],
+      row1!.coeffs[0], row1!.coeffs[1], row1!.coeffs[2],
+      row2!.coeffs[0], row2!.coeffs[1], row2!.coeffs[2],
+    ],
+    translation: [row0!.translation, row1!.translation, row2!.translation],
+  };
+}
+
+export function generateEquivalentSites(document: CrystalDocument, result: CrystalSymmetryResult): CrystalDocument {
+  const sites = expandSitesBySymmetry(document.sites, result.operations, result.tolerance);
   return {
     ...document,
     id: `${document.id}-equivalent-sites`,

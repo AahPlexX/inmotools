@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createPreloadErrorRecoveryHandler } from '../../src/lib/deployment-recovery';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createPreloadErrorRecoveryHandler, recoverLatestDeployment } from '../../src/lib/deployment-recovery';
 
 const fakeEvent = () => ({ preventDefault: vi.fn() }) as unknown as Event;
 
@@ -38,5 +38,33 @@ describe('deployment recovery', () => {
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(recover).not.toHaveBeenCalled();
+  });
+
+  describe('recoverLatestDeployment', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    const stubBrowser = (controller: object | null) => {
+      const reload = vi.fn();
+      const getRegistration = vi.fn(() => Promise.resolve(undefined));
+      vi.stubGlobal('window', { location: { reload }, setTimeout, clearTimeout });
+      vi.stubGlobal('navigator', { serviceWorker: { controller, getRegistration } });
+      return { reload, getRegistration };
+    };
+
+    it('reloads immediately when no service worker controls the page', async () => {
+      // A first visit has an installing worker but no controller; waiting on
+      // its precache delayed recovery past the point users see a blank tool.
+      const { reload, getRegistration } = stubBrowser(null);
+      await recoverLatestDeployment();
+      expect(getRegistration).not.toHaveBeenCalled();
+      expect(reload).toHaveBeenCalledOnce();
+    });
+
+    it('checks for an updated worker before reloading a controlled page', async () => {
+      const { reload, getRegistration } = stubBrowser({});
+      await recoverLatestDeployment();
+      expect(getRegistration).toHaveBeenCalledOnce();
+      expect(reload).toHaveBeenCalledOnce();
+    });
   });
 });

@@ -40,13 +40,16 @@ const downloadFile = async (page: Page, exportId: string): Promise<Download> => 
 };
 
 const openPanel = async (page: Page, panel: string) => {
-  await page.getByTestId(`sightline-panel-${panel}`).click();
-  await expect(page.getByTestId(`sightline-panel-${panel}`)).toHaveAttribute('aria-selected', 'true');
+  const advanced = page.getByTestId('sightline-settings-details');
+  if (!(await advanced.getAttribute('open'))) await advanced.evaluate((element: HTMLDetailsElement) => { element.open = true; });
+  const tab = page.getByTestId(`sightline-panel-${panel}`);
+  await tab.evaluate((element: HTMLElement) => element.click());
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
 };
 
 /** Finish a short real session without waiting through the whole sample. */
 const readBriefly = async (page: Page) => {
-  await page.getByTestId('sightline-wpm-range').fill('900');
+  await page.getByTestId('sightline-cockpit-wpm').fill('900');
   const scrub = page.getByTestId('sightline-scrub');
   const last = Number(await scrub.getAttribute('max'));
   await scrub.fill(String(Math.max(0, last - 8)));
@@ -76,6 +79,7 @@ test('the sample passage is ingested, measured, and offered as sections', async 
   await expect(status).toContainText('sentences');
 
   // The sample has headings, so the navigator lists real sections.
+  await page.getByTestId('sightline-contents-details').locator('summary').click();
   const chapters = page.locator('.sightline-chapter-list li');
   await expect(chapters.first()).toBeVisible();
   expect(await chapters.count()).toBeGreaterThan(1);
@@ -89,13 +93,26 @@ test('pasted text is read through the chosen markup dialect', async ({ page }) =
   await page.getByTestId('sightline-paste-format').selectOption('markdown');
   await page.getByTestId('sightline-ingest-paste').click();
   await expect(page.getByTestId('sightline-status')).toContainText('Pasted markdown');
+  await page.getByTestId('sightline-contents-details').locator('summary').click();
   await expect(page.locator('.sightline-chapter-list')).toContainText('Pasted heading');
   await expect(page.getByTestId('sightline-rsvp')).toBeVisible();
+});
+
+test('the first-run and loaded-document hierarchy keep reading controls reachable', async ({ page }) => {
+  await page.goto('./#/tools/sightline-velocity');
+  await expect(page.getByTestId('sightline-start-here')).toBeVisible();
+  await expect(page.getByTestId('sightline-settings-details')).not.toHaveAttribute('open', '');
+  await page.getByTestId('sightline-sample').click();
+  await expect(page.getByTestId('sightline-document-bar')).toBeVisible();
+  await expect(page.getByTestId('sightline-cockpit')).toBeVisible();
+  await expect(page.getByTestId('sightline-source-details')).not.toHaveAttribute('open', '');
+  await expect(page.getByTestId('sightline-cockpit-wpm')).toBeEnabled();
 });
 
 test('the clipboard is offered as an ingestion path', async ({ page }) => {
   await page.goto('./#/tools/sightline-velocity');
   await page.getByTestId('sightline-clipboard').click();
+  await page.getByTestId('sightline-clipboard').getByRole('button', { name: 'Read clipboard text' }).click();
   // A browser that grants clipboard access ingests the text; one that refuses
   // says so rather than failing silently.
   await expect(page.getByTestId('sightline-status')).toContainText(/clipboard|words/i);
@@ -130,7 +147,6 @@ test('the sample library offers more than one built-in reading', async ({ page }
   await page.goto('./#/tools/sightline-velocity');
   await expect(page.getByTestId('sightline-sample-select').locator('option')).toHaveCount(3);
   await page.getByTestId('sightline-sample-select').selectOption('technical');
-  await page.getByTestId('sightline-sample').click();
   await expect(page.getByTestId('sightline-status')).toContainText(/technical/i);
 });
 
@@ -158,7 +174,7 @@ test('keyboard control plays, steps, and bookmarks without a mouse', async ({ pa
 test('the clock advances the words and reports a measured rate', async ({ page }) => {
   await page.clock.install();
   await loadSample(page);
-  await page.getByTestId('sightline-wpm-range').fill('900');
+  await page.getByTestId('sightline-cockpit-wpm').fill('900');
   await page.getByTestId('sightline-play').click();
   await expect(page.getByTestId('sightline-play')).toHaveText('Pause');
   await page.clock.runFor(1_000);
@@ -293,7 +309,7 @@ test('a reading session is recorded and exported as analytics', async ({ page })
 
 test('clearing local data requires explicit confirmation and names everything it removes', async ({ page }) => {
   await page.goto('./#/tools/sightline-velocity');
-  await page.getByTestId('sightline-panel-data').click();
+  await openPanel(page, 'data');
   const clear = page.getByTestId('sightline-warehouse-clear');
   await expect(clear).toHaveText(/clear history and word bank/i);
   await clear.click();
@@ -377,6 +393,7 @@ test('reader state survives an export and import round trip', async ({ page }) =
 
 test('highlights and margin notes are kept against the word', async ({ page }) => {
   await loadSample(page);
+  await page.locator('.sightline-cockpit-more').locator('summary').click();
   await page.getByRole('button', { name: 'Highlight this sentence' }).click();
   await expect(page.locator('.sightline-list').filter({ hasText: 'words' }).first()).toBeVisible();
 

@@ -79,15 +79,15 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 - Features 3, 11, 12, 17, 18, 19, 24, 27 move from `stub-stage2` to `done` only with focused evidence.
 - Viewport / scroll chrome stays device-agnostic across `CLIENT_VIEWPORTS` (portrait + landscape CSS widths). Formula help is tap/focus, never hover-only (`data-testid=tsw-formula-tooltip`). iPhone 13 / `mobile-chromium` is not the sole P16 gate.
 - `pnpm test:unit` and `pnpm build` pass. Playwright hooks live in `tests/e2e/tabular-sheet-workstation.spec.ts`.
-- Historical Stage 2 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #71 squash-merged onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54` (https://github.com/AahPlexX/inmotools/pull/71). Do not touch PR #33 / transcode.
+- Historical Stage 2 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #73 squash-merged onto `main` at `4dcc856bc97027862342513cdea7eb769c0ffbc1` (https://github.com/AahPlexX/inmotools/pull/73). Do not touch PR #33 / transcode.
 
 ## Stage 1 done-when
 
 - Historical Stage 1 branch `feature/tabular-sheet-workstation` (closed history) had unique commits versus `origin/main`.
 - Catalog entry + lazy workspace + multi-sheet grid + formulas + persist + working import/export path.
 - `pnpm test:unit` and `pnpm build` pass, with focused formula/persist units.
-- Historical Stage 1 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #71 squash-merged onto `main` at `b582c34dea4ba97ab7080743dc290eeb45946b54` (https://github.com/AahPlexX/inmotools/pull/71). Do not touch PR #33 / transcode.
-- Stop product commits beyond Wave A. Do not invent Wave B/C/D.
+- Historical Stage 1 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #73 squash-merged onto `main` at `4dcc856bc97027862342513cdea7eb769c0ffbc1` (https://github.com/AahPlexX/inmotools/pull/73). Do not touch PR #33 / transcode.
+- Stop product commits. PR #73 is merged on `main`. Do not invent Wave B/C/D.
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
@@ -127,7 +127,7 @@ Acceptance for #16 and any responsive parity UI is the CSS-width matrix in `CLIE
 
 Not accepted as the only proof: iPhone 13, `mobile-chromium`, or any one hardcoded device name. Evidence: `tests/unit/sheets-parity.test.ts` (matrix lock) and `tests/e2e/tabular-sheet-workstation.spec.ts` (`keeps parity chrome readable at *`, skipped on `mobile-chromium` by design).
 
-### Wave A — Tabular Sheet Expansion Cut v2 (this PR)
+### Wave A — Tabular Sheet Expansion Cut v2 (merged PR #73)
 
 Approved Wave A set only. Do not invent Wave B/C/D (pivots upgrade, drawing/sparklines pack, Sheet Actions).
 

@@ -1,7 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 
 const FIXTURE_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAGElEQVR4nGNkYGiwYWCAIBYGGwY4wM0BAEqkAfYnNZPCAAAAAElFTkSuQmCC',
+  'iVBORw0KGgoAAAANSUhEUgAAAUAAAADwCAIAAAD+Tyo8AAACqElEQVR42u3VQQ0AMQwDwbVU/pj7OBQ9zTyWQeJVqzVVfa6nBTzqtO+CVfW9WmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpgsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGCywqlpgwAKrqgUGC6yqFhiwwKoW2AKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwwWWFUtMGCBVdUCgwVWVQsMWGBVtcBggVXVAgMWWNUCAxZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGBVtcCABVZVCwwWWFUtMGCBVS0wYIFV1QIDFljVAgMWWFUtMGCBVS0wYIFV1QKDBVZVCwxYYFW1wGCBVdUCAxZYVS0wWGBVtcCABVa1wIAFVlULDFhgVQsMWGBVtcCABVa1wIAFVlULDBZYVS0wYIFV1QKDBVZVCwxYYFULDFhgVbXAgAVWtcCABVZVCwxYYFULDFhgVbXAYIFV1QIDFlhVLTBYYFW1wIAFVlULDBZYVS0wYIFVLTBggVXVAgMWWNUCAxZYVS0wWGALrGqBAQusqhYYLLCqWmDAAquqBQYLrKoWGLDAqhYYsMCqaoEBC6xqgQELrKoWGLDAqhYYsMCqaoHBAquqBQYssKpaYLDAqmqBAQusqhYYLLCqWmDAAqtaYMACq6oFBiywqgUGLLCqWmCwwD6ZqgUGLLCqWmCwwKpqgQELrKoWGCywqlpgwAKrWmDAAquqBQYssKoFBiywqlpgwAKrWmDAAquqBQYLrKoWGLDAqmqBwQKrqgUGLLCqWmCwwKpqgQELrGqBAQusqhYYsMCqFhiwwKpqgcEC+2SqFhiwwKpqgcECq6oFBiywqlpg+I0LLVVQ6zZs79UAAAAASUVORK5CYII=',
   'base64',
 );
 
@@ -19,8 +19,36 @@ async function openFixture(page: Page) {
     mimeType: 'image/png',
     buffer: FIXTURE_PNG,
   });
-  await expect(page.getByTestId('photo-source-dimensions')).toContainText('4 × 4');
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText('320 × 240');
   await expect(page.getByTestId('photo-preview')).toBeVisible();
+}
+
+async function photoBox(page: Page) {
+  const preview = page.getByTestId('photo-preview');
+  await preview.scrollIntoViewIfNeeded();
+  const box = await preview.boundingBox();
+  if (!box) throw new Error('Rendered photo has no bounding box.');
+  return box;
+}
+
+async function dragOnPhoto(page: Page, startX: number, startY: number, endX: number, endY: number) {
+  const box = await photoBox(page);
+  await page.mouse.move(box.x + box.width * startX, box.y + box.height * startY);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * endX, box.y + box.height * endY, { steps: 5 });
+  await page.mouse.up();
+}
+
+async function clickPhoto(page: Page, x: number, y: number) {
+  const box = await photoBox(page);
+  await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
+}
+
+async function downloadBytes(download: Download): Promise<Buffer> {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
 test('loads a local photo, edits, compares, undoes, and opens export', async ({ page }) => {
@@ -36,19 +64,466 @@ test('loads a local photo, edits, compares, undoes, and opens export', async ({ 
   await page.getByRole('button', { name: 'Export' }).click();
   await expect(page.getByRole('dialog', { name: 'Export photo' })).toBeVisible();
   await expect(page.getByLabel('File format')).toBeVisible();
+  await expect(page.getByLabel('File name')).toHaveValue('fixture-edited.jpg');
+  await expect(page.getByLabel('Output sharpening')).toBeVisible();
 });
 
-test('geometry and local tools produce reversible recipe state', async ({ page }) => {
+test('individual adjustment reset restores only that control to its neutral value', async ({ page }) => {
   await openFixture(page);
+  const exposure = page.getByLabel('Exposure value');
+  const contrast = page.getByLabel('Contrast value');
+  await exposure.fill('1.4');
+  await exposure.press('Enter');
+  await contrast.fill('0.36');
+  await contrast.press('Enter');
+  await page.getByRole('button', { name: 'Reset Exposure' }).click();
+  await expect(exposure).toHaveValue('0');
+  await expect(contrast).toHaveValue('0.36');
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+});
+
+test('named snapshots save and restore a user-labelled recipe state', async ({ page }) => {
+  await openFixture(page);
+  const exposure = page.getByLabel('Exposure value');
+  await exposure.fill('1.2');
+  await exposure.press('Enter');
+  await page.getByRole('button', { name: 'Inspect & workflow' }).click();
+  const snapshotName = page.getByRole('textbox', { name: 'Snapshot name' });
+  await snapshotName.fill('Warm proof');
+  await page.getByRole('button', { name: 'Save snapshot' }).click();
+  await expect(page.getByRole('button', { name: /Warm proof/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await exposure.fill('-0.8');
+  await exposure.press('Enter');
+  await page.getByRole('button', { name: 'Inspect & workflow' }).click();
+  await page.getByRole('button', { name: /Warm proof/ }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(exposure).toHaveValue('1.2');
+});
+
+test('RGB histogram, clipping warnings, and color sampler inspect the rendered preview', async ({ page }) => {
+  await openFixture(page);
+  const histogram = page.getByRole('img', { name: 'Live RGB and luminance histogram' });
+  await expect(histogram).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel]')).toHaveCount(4);
+  await expect(histogram.locator('[data-histogram-channel="red"]')).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel="green"]')).toBeVisible();
+  await expect(histogram.locator('[data-histogram-channel="blue"]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Clipping warnings' }).click();
+  await expect(page.getByRole('button', { name: 'Clipping warnings' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('photo-clipping-overlay')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Color sampler' }).click();
+  await expect(page.getByRole('button', { name: 'Color sampler' })).toHaveAttribute('aria-pressed', 'true');
+  await clickPhoto(page, 0.5, 0.5);
+  const readout = page.getByRole('status', { name: 'Sampled color readout' });
+  await expect(readout).toContainText(/#[0-9A-F]{6}/);
+  await expect(readout).toContainText(/RGB \d+, \d+, \d+/);
+  await expect(readout).toContainText(/HSL \d+°, \d+%, \d+%/);
+});
+
+test('geometry, detail, and local tools produce reversible recipe state', async ({ page }) => {
+  await openFixture(page);
+  await page.getByText('Detail & noise', { exact: true }).click();
+  await page.getByLabel('Texture value').fill('0.4');
+  await page.getByLabel('Luminance denoise value').fill('0.3');
+
   await page.getByRole('button', { name: 'Crop & geometry' }).click();
   const cropWidth = page.getByRole('spinbutton', { name: 'Crop width percent value', exact: true });
   await cropWidth.fill('75');
   await cropWidth.press('Enter');
+  await page.getByLabel('Lens distortion value').fill('0.25');
+  await page.getByLabel('Horizontal perspective value').fill('-0.2');
   await page.getByRole('button', { name: 'Rotate right' }).click();
+
   await page.getByRole('button', { name: 'Local adjustments' }).click();
   await page.getByRole('button', { name: 'Add radial mask' }).click();
   await expect(page.getByText('Radial adjustment 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+});
+
+test('selection geometry, combinations, refinement, clear, and mask conversion share one reversible workflow', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+
+  // Keyboard-operable defaults cover non-canvas access to geometry selection.
+  await page.getByRole('button', { name: 'Add centered rectangle' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('photo-active-selection')).toContainText('1 combined region');
+  await expect(page.getByTestId('photo-selection-overlay')).toBeVisible();
+  await page.getByLabel('Selection combine mode').selectOption('add');
+  await page.getByRole('button', { name: 'Add centered ellipse' }).click();
+  await expect(page.getByTestId('photo-active-selection')).toContainText('2 combined regions');
+
+  await page.getByLabel('Selection feather value').fill('0.04');
+  await page.getByLabel('Selection feather value').press('Enter');
+  await page.getByLabel('Selection grow or shrink value').fill('-0.03');
+  await page.getByLabel('Selection grow or shrink value').press('Enter');
+  await page.getByRole('button', { name: 'Invert selection' }).click();
+  await expect(page.getByRole('button', { name: 'Use normal selection' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Clear selection' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+
+  // Direct manipulation replaces the restored selection, then lasso/color/luminance add to it.
+  await page.getByLabel('Selection combine mode').selectOption('replace');
+  await page.getByRole('button', { name: 'Draw rectangle' }).click();
+  await dragOnPhoto(page, 0.15, 0.2, 0.65, 0.7);
+  await expect(page.getByTestId('photo-active-selection')).toContainText('1 combined region');
+  await page.getByLabel('Selection combine mode').selectOption('add');
+  await page.getByRole('button', { name: 'Trace lasso' }).click();
+  const box = await photoBox(page);
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.25);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.3, { steps: 3 });
+  await page.mouse.move(box.x + box.width * 0.48, box.y + box.height * 0.7, { steps: 3 });
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.25, { steps: 3 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Sample color' }).click();
+  await clickPhoto(page, 0.5, 0.5);
+  await page.getByRole('button', { name: 'Apply luminance selection' }).click();
+  await expect(page.getByTestId('photo-active-selection')).toContainText('4 combined regions');
+
+  await page.getByRole('button', { name: 'Convert selection to mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await expect(page.getByText('Selection mask 1', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(0);
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+});
+
+test('local masks rename, duplicate, bypass, visualize, and compose with an active selection', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+  await page.getByRole('button', { name: 'Add radial mask' }).click();
+  const firstMask = page.getByTestId('photo-local-adjustment').first();
+  const rename = firstMask.getByLabel('Rename Radial adjustment 1');
+  await rename.fill('Portrait mask');
+  await rename.press('Enter');
+  await expect(firstMask.locator('strong')).toHaveText('Portrait mask');
+
+  await firstMask.getByLabel('Show mask overlay').check();
+  await expect(page.getByTestId('photo-mask-overlay')).toBeVisible();
+  await firstMask.getByLabel('Portrait mask overlay color').fill('#ff0000');
+  await firstMask.getByLabel('Portrait mask overlay opacity value').fill('0.6');
+  await firstMask.getByLabel('Portrait mask overlay opacity value').press('Enter');
+  await firstMask.getByLabel('Enabled').uncheck();
+  await expect(firstMask.getByLabel('Enabled')).not.toBeChecked();
+
+  await firstMask.getByRole('button', { name: 'Duplicate mask' }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(2);
+  await expect(page.getByTestId('photo-local-adjustment').nth(1).locator('strong')).toHaveText('Portrait mask copy');
+
+  await page.getByRole('button', { name: 'Add centered rectangle' }).click();
+  await firstMask.getByRole('button', { name: 'Add selection to mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByTestId('photo-active-selection')).toBeVisible();
+  await firstMask.getByRole('button', { name: 'Subtract selection from mask' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await firstMask.getByRole('button', { name: 'Intersect mask with selection' }).click();
+  await expect(page.getByText('No active selection.')).toBeVisible();
+
+  await page.getByTestId('photo-local-adjustment').nth(1).getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByTestId('photo-local-adjustment')).toHaveCount(1);
+});
+
+test('brush masks expose flow, spacing, and smoothing controls and record erase strokes separately', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+  await page.getByRole('button', { name: 'Add brush mask' }).click();
+  const brushMask = page.getByTestId('photo-local-adjustment').first();
+
+  const flow = brushMask.getByLabel('Brush adjustment 1 flow value');
+  const spacing = brushMask.getByLabel('Brush adjustment 1 spacing value');
+  const smoothing = brushMask.getByLabel('Brush adjustment 1 smoothing value');
+  await expect(flow).toHaveValue('1');
+  await expect(spacing).toHaveValue('0.25');
+  await expect(smoothing).toHaveValue('0.3');
+  await flow.fill('0.4');
+  await flow.press('Enter');
+  await expect(flow).toHaveValue('0.4');
+
+  await brushMask.getByRole('button', { name: 'Paint on photo' }).click();
+  await dragOnPhoto(page, 0.3, 0.3, 0.5, 0.3);
+  const paintDabs = page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="paint"]');
+  await expect(paintDabs.first()).toBeVisible();
+  const paintedCount = await paintDabs.count();
+  expect(paintedCount).toBeGreaterThan(0);
+  await expect(page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]')).toHaveCount(0);
+
+  await brushMask.getByLabel('Brush adjustment 1 erase mode').check();
+  await brushMask.getByRole('button', { name: 'Paint on photo' }).click();
+  await dragOnPhoto(page, 0.3, 0.5, 0.5, 0.5);
+  const eraseDabs = page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]');
+  await expect(eraseDabs.first()).toBeVisible();
+  await expect(paintDabs).toHaveCount(paintedCount);
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('[data-photo-mask="brush"] circle[data-photo-brush-dab="erase"]')).toHaveCount(0);
+  await expect(paintDabs).toHaveCount(paintedCount);
+});
+
+test('tone curve points are user-editable and reversible through normal history', async ({ page }) => {
+  await openFixture(page);
+  await page.locator('summary').filter({ hasText: 'Tone curve' }).click();
+  await page.getByRole('button', { name: 'Add point' }).click();
+  const output = page.getByLabel('Tone point 2 output percent');
+  await expect(output).toHaveValue('50');
+  await output.fill('70');
+  await expect(output).toHaveValue('70');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(output).toHaveValue('50');
+});
+
+test('radial masks stay spatially accurate above 100% zoom and undo as one gesture', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText('125%');
+
+  await page.getByRole('button', { name: 'Local adjustments' }).click();
+  await page.getByRole('button', { name: 'Add radial mask' }).click();
+  await expect(page.getByText(/Place Radial adjustment 1/)).toBeVisible();
+
+  await dragOnPhoto(page, 0.25, 0.3, 0.65, 0.7);
+  const mask = page.locator('[data-photo-mask="radial"]').first();
+  await expect(mask).toBeVisible();
+  const placed = await mask.evaluate((element) => ({
+    cx: Number(element.getAttribute('cx')),
+    cy: Number(element.getAttribute('cy')),
+    rx: Number(element.getAttribute('rx')),
+    ry: Number(element.getAttribute('ry')),
+  }));
+  expect(placed.cx).toBeGreaterThan(20);
+  expect(placed.cx).toBeLessThan(30);
+  expect(placed.cy).toBeGreaterThan(25);
+  expect(placed.cy).toBeLessThan(35);
+  expect(placed.rx).toBeGreaterThan(30);
+  expect(placed.ry).toBeGreaterThan(30);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const restoredCx = Number(await mask.getAttribute('cx'));
+  expect(restoredCx).toBeCloseTo(50, 0);
+});
+
+test('clone retouch supports explicit source then target placement on the photo', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Retouch' }).click();
+  await page.getByRole('button', { name: 'Add clone spot' }).click();
+  await expect(page.getByText(/Set source for clone spot/)).toBeVisible();
+
+  await clickPhoto(page, 0.22, 0.35);
+  await expect(page.getByText(/Set target for clone spot/)).toBeVisible();
+  await clickPhoto(page, 0.72, 0.62);
+
+  const overlay = page.locator('[data-photo-retouch="clone"]').first();
+  await expect(overlay).toBeVisible();
+  const circles = overlay.locator('circle');
+  const sourceCx = Number(await circles.nth(0).getAttribute('cx'));
+  const targetCx = Number(await circles.nth(1).getAttribute('cx'));
+  expect(sourceCx).toBeGreaterThan(15);
+  expect(sourceCx).toBeLessThan(30);
+  expect(targetCx).toBeGreaterThan(65);
+  expect(targetCx).toBeLessThan(80);
+});
+
+test('retouch operations paint multi-stroke coverage, bypass, reorder, and clear independently', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Retouch' }).click();
+  await page.getByRole('button', { name: 'Add clone spot' }).click();
+  await clickPhoto(page, 0.22, 0.35);
+  await clickPhoto(page, 0.72, 0.62);
+
+  const overlay = page.locator('[data-photo-retouch="clone"]').first();
+  // A plain click still carries a same-position [start, end] gesture path, so the very first
+  // target click can already record one redundant (harmless, same-spot) stroke point; the real
+  // signal is the count rising further once a real drag adds distinct stroke points.
+  const baselineCircles = await overlay.locator('circle').count();
+  expect(baselineCircles).toBeGreaterThanOrEqual(2);
+
+  const cloneCard = page.getByTestId('photo-retouch-operation').filter({ hasText: 'Clone operation' });
+  await cloneCard.getByRole('button', { name: 'Paint target on photo' }).click();
+  await dragOnPhoto(page, 0.5, 0.5, 0.55, 0.5);
+  await expect.poll(() => overlay.locator('circle').count()).toBeGreaterThan(baselineCircles);
+  await expect(cloneCard.getByText(/more stroke point/)).toBeVisible();
+
+  await cloneCard.getByLabel('Enabled').uncheck();
+  await expect(page.locator('[data-photo-retouch="clone"]')).toHaveCount(0);
+  await cloneCard.getByLabel('Enabled').check();
+  await expect(page.locator('[data-photo-retouch="clone"]')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Add healing spot' }).click();
+  await expect(page.getByTestId('photo-retouch-operation')).toHaveCount(2);
+  const healCard = page.getByTestId('photo-retouch-operation').filter({ hasText: 'Healing operation' });
+  await expect(healCard.locator('strong')).toHaveText('Healing operation 2');
+  await healCard.getByRole('button', { name: 'Move up' }).click();
+  await expect(healCard.locator('strong')).toHaveText('Healing operation 1');
+  await expect(cloneCard.locator('strong')).toHaveText('Clone operation 2');
+
+  await cloneCard.getByRole('button', { name: 'Clear stroke' }).click();
+  await expect(overlay.locator('circle')).toHaveCount(2);
+});
+
+test('layers import, blend, transform, mask, duplicate, reorder, and remove independently', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Layers' }).click();
+  await expect(page.getByText('Add an image layer to composite extra local content over this photo.')).toBeVisible();
+
+  await page.getByTestId('photo-layer-file-input').setInputFiles({ name: 'overlay.png', mimeType: 'image/png', buffer: FIXTURE_PNG });
+  const layerCard = page.getByTestId('photo-layer');
+  await expect(layerCard).toHaveCount(1);
+  await expect(layerCard.locator('strong')).toHaveText('overlay');
+
+  const rename = layerCard.getByLabel('Rename overlay');
+  await rename.fill('Sky overlay');
+  await rename.press('Enter');
+  await expect(layerCard.locator('strong')).toHaveText('Sky overlay');
+
+  await layerCard.getByLabel('Sky overlay blend mode').selectOption('multiply');
+  await expect(layerCard.getByLabel('Sky overlay blend mode')).toHaveValue('multiply');
+  await layerCard.getByLabel('Sky overlay opacity value').fill('0.6');
+  await layerCard.getByLabel('Sky overlay opacity value').press('Enter');
+  await expect(layerCard.getByLabel('Sky overlay opacity value')).toHaveValue('0.6');
+  await layerCard.getByLabel('Sky overlay scale value').fill('1.4');
+  await layerCard.getByLabel('Sky overlay scale value').press('Enter');
+  await expect(layerCard.getByLabel('Sky overlay scale value')).toHaveValue('1.4');
+
+  await layerCard.getByRole('button', { name: 'Add radial mask' }).click();
+  const maskOverlay = page.locator('[data-photo-mask="radial"]');
+  await expect(maskOverlay).toBeVisible();
+  await dragOnPhoto(page, 0.3, 0.3, 0.6, 0.6);
+  await expect(layerCard.getByText('Mask: radial')).toBeVisible();
+
+  await layerCard.getByLabel('Visible').uncheck();
+  await expect(maskOverlay).toHaveCount(0);
+  await layerCard.getByLabel('Visible').check();
+  await expect(maskOverlay).toBeVisible();
+
+  await layerCard.getByRole('button', { name: 'Remove mask' }).click();
+  await expect(maskOverlay).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add radial mask' })).toBeVisible();
+
+  await layerCard.getByRole('button', { name: 'Duplicate layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(2);
+  const duplicateCard = page.getByTestId('photo-layer').filter({ hasText: 'Sky overlay copy' });
+  await expect(duplicateCard.locator('strong')).toHaveText('Sky overlay copy');
+
+  await expect(duplicateCard.getByRole('button', { name: 'Move up' })).toBeEnabled();
+  await duplicateCard.getByRole('button', { name: 'Move up' }).click();
+  await expect(page.getByTestId('photo-layer').first().locator('strong')).toHaveText('Sky overlay copy');
+
+  await duplicateCard.getByRole('button', { name: 'Remove layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(1);
+  await layerCard.getByRole('button', { name: 'Remove layer' }).click();
+  await expect(page.getByTestId('photo-layer')).toHaveCount(0);
+});
+
+test('adjustment, text, shape, and watermark layers can each be added and configured', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Layers' }).click();
+
+  await page.getByRole('button', { name: 'Add adjustment layer' }).click();
+  const adjustmentCard = page.getByTestId('photo-layer').filter({ hasText: 'Adjustment 1' });
+  await expect(adjustmentCard).toHaveCount(1);
+  const exposureControl = adjustmentCard.getByLabel('Adjustment 1 exposure value');
+  await exposureControl.fill('0.9');
+  await exposureControl.press('Enter');
+  await expect(exposureControl).toHaveValue('0.9');
+
+  await page.getByRole('button', { name: 'Add text layer' }).click();
+  const textCard = page.getByTestId('photo-layer').filter({ hasText: 'Text 1' });
+  await expect(textCard).toHaveCount(1);
+  const textInput = textCard.getByLabel('Text 1 text content');
+  await textInput.fill('Sample caption');
+  await textInput.blur();
+  await expect(textInput).toHaveValue('Sample caption');
+  const fontSizeControl = textCard.getByLabel('Text 1 font size value');
+  await fontSizeControl.fill('72');
+  await fontSizeControl.press('Enter');
+  await expect(fontSizeControl).toHaveValue('72');
+
+  await page.getByRole('button', { name: 'Add rectangle' }).click();
+  const shapeCard = page.getByTestId('photo-layer').filter({ hasText: 'Rectangle 1' });
+  await expect(shapeCard).toHaveCount(1);
+  await shapeCard.getByLabel('Rectangle 1 shape kind').selectOption('ellipse');
+  await expect(shapeCard.getByLabel('Rectangle 1 shape kind')).toHaveValue('ellipse');
+  await shapeCard.getByLabel('Filled').uncheck();
+  await expect(shapeCard.getByLabel('Filled')).not.toBeChecked();
+
+  await page.getByTestId('photo-watermark-file-input').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: FIXTURE_PNG });
+  const watermarkCard = page.getByTestId('photo-layer').filter({ hasText: 'logo' });
+  await expect(watermarkCard).toHaveCount(1);
+  await expect(watermarkCard.getByRole('button', { name: 'top left' })).toBeVisible();
+  await watermarkCard.getByRole('button', { name: 'top left' }).click();
+  await expect(watermarkCard.getByLabel('logo horizontal position value')).toHaveValue('0.12');
+  await expect(watermarkCard.getByLabel('logo vertical position value')).toHaveValue('0.12');
+
+  await expect(page.getByTestId('photo-layer')).toHaveCount(4);
+});
+
+test('mesh warp, liquify, and deterministic detail filters are reachable and reversible', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Warp & detail' }).click();
+
+  const warpButton = page.getByRole('button', { name: 'Warp mesh on photo' });
+  const resetMeshButton = page.getByRole('button', { name: 'Reset mesh warp' });
+  await expect(resetMeshButton).toBeDisabled();
+  await warpButton.click();
+  await expect(warpButton).toHaveAttribute('aria-pressed', 'true');
+  await dragOnPhoto(page, 0.3, 0.3, 0.4, 0.35);
+  await expect(resetMeshButton).toBeEnabled();
+  await resetMeshButton.click();
+  await expect(resetMeshButton).toBeDisabled();
+  await warpButton.click();
+  await expect(warpButton).toHaveAttribute('aria-pressed', 'false');
+
+  await page.getByLabel('Liquify mode').selectOption('pull');
+  await expect(page.getByLabel('Liquify mode')).toHaveValue('pull');
+  await page.getByLabel('Liquify brush radius value').fill('0.15');
+  await page.getByLabel('Liquify brush radius value').press('Enter');
+  await expect(page.getByLabel('Liquify brush radius value')).toHaveValue('0.15');
+
+  const clearLiquifyButton = page.getByRole('button', { name: 'Clear liquify strokes' });
+  await expect(clearLiquifyButton).toBeDisabled();
+  await page.getByRole('button', { name: 'Paint liquify on photo' }).click();
+  await dragOnPhoto(page, 0.5, 0.5, 0.55, 0.5);
+  await expect(page.getByText(/stroke.* recorded/)).toContainText('1 stroke');
+  await expect(clearLiquifyButton).toBeEnabled();
+  await clearLiquifyButton.click();
+  await expect(page.getByText(/stroke.* recorded/)).toContainText('0 strokes');
+
+  const gaussianBlur = page.getByLabel('Gaussian blur value');
+  await gaussianBlur.fill('0.4');
+  await gaussianBlur.press('Enter');
+  await expect(gaussianBlur).toHaveValue('0.4');
+
+  const defringeAmount = page.getByLabel('Defringe amount value');
+  await defringeAmount.fill('0.5');
+  await defringeAmount.press('Enter');
+  await expect(defringeAmount).toHaveValue('0.5');
+
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Warp & detail' }).click();
+  await expect(gaussianBlur).toHaveValue('0.4');
+});
+
+test('dust visualization renders a preview-only overlay distinct from clipping/focus overlays', async ({ page }) => {
+  await openFixture(page);
+  const dustButton = page.getByRole('button', { name: 'Dust visualization' });
+  await dustButton.click();
+  await expect(dustButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('photo-dust-overlay')).toBeVisible();
+  await dustButton.click();
+  await expect(dustButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('photo-dust-overlay')).toHaveCount(0);
 });
 
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
@@ -65,6 +540,67 @@ test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   expect(download.suggestedFilename()).toBe('fixture-edited.xmp');
 });
 
+test('PNG export embeds reviewed XMP and honors safe custom filename plus output sharpening', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  await dialog.getByLabel('File format').selectOption('image/png');
+  await dialog.getByLabel('File name').fill('reviewed portrait');
+  await dialog.getByLabel('Output sharpening').selectOption('standard');
+  await dialog.getByLabel('Metadata policy').selectOption('custom');
+  await dialog.getByLabel('Title').fill('A&B portrait');
+
+  const downloadPromise = page.waitForEvent('download');
+  await dialog.getByRole('button', { name: 'Download photo' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('reviewed portrait.png');
+  const bytes = await downloadBytes(download);
+  expect(bytes.includes(Buffer.from('XML:com.adobe.xmp'))).toBe(true);
+  expect(bytes.includes(Buffer.from('A&amp;B portrait'))).toBe(true);
+});
+
+test('long and short edge sizing expose planned output and require an explicit safe choice for oversized export', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  const resize = dialog.getByLabel('Resize', { exact: true });
+  const value = dialog.getByLabel('Resize value', { exact: true });
+
+  await resize.selectOption('long-edge');
+  await value.fill('200');
+  await expect(dialog.getByText('Planned output · 200 × 150')).toBeVisible();
+
+  await resize.selectOption('short-edge');
+  await value.fill('120');
+  await expect(dialog.getByText('Planned output · 160 × 120')).toBeVisible();
+
+  await resize.selectOption('long-edge');
+  await value.fill('10000');
+  await expect(dialog.getByRole('alert')).toContainText('Planned output · 10000 × 7500');
+  await expect(dialog.getByRole('button', { name: 'Choose safe size to export' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: /Use verified safe size/ })).toBeVisible();
+  await dialog.getByRole('button', { name: /Use verified safe size/ }).click();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(dialog.getByText('Planned output · 4096 × 3072')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Download photo' })).toBeEnabled();
+});
+
+test('batch export queues multiple local files and reports per-file completion', async ({ page }) => {
+  await openFixture(page);
+  await page.getByRole('button', { name: 'Export' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Export photo' });
+  await dialog.locator('summary').filter({ hasText: 'Batch export current recipe' }).click();
+  await dialog.locator('input[type="file"][multiple]').setInputFiles([
+    { name: 'batch-a.png', mimeType: 'image/png', buffer: FIXTURE_PNG },
+    { name: 'batch-b.png', mimeType: 'image/png', buffer: FIXTURE_PNG },
+  ]);
+  await expect(dialog.getByText('2 queued')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Export 2 photos' }).click();
+  await expect(dialog.locator('.photo-batch-status li[data-status="completed"]')).toHaveCount(2, { timeout: 15_000 });
+  await expect(dialog.getByText('batch-a.png', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('batch-b.png', { exact: true })).toBeVisible();
+});
+
 test('keyboard undo and redo work without pointer-only interaction', async ({ page }) => {
   await openFixture(page);
   const contrast = page.getByLabel('Contrast value');
@@ -76,10 +612,13 @@ test('keyboard undo and redo work without pointer-only interaction', async ({ pa
   await expect(contrast).toHaveValue('0.4');
 });
 
-test('reflows without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
+test('reflows editor and export dialog without page-level horizontal overflow at 320 CSS pixels', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto('/inmotools/#/tools/photo-studio');
-  await expectWorkspace(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  await openFixture(page);
+  let overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(overflow).toBe(false);
+  await page.getByRole('button', { name: 'Export' }).click();
+  await expect(page.getByRole('dialog', { name: 'Export photo' })).toBeVisible();
+  overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
 });

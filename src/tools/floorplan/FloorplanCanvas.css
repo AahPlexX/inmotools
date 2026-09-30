@@ -1,3 +1,42 @@
+/*
+ * PlanCraft layout and tool-scoped additions. Base PlanCraft colors and panels live in
+ * src/styles.css; the rules here are prefixed with .plancraft so they win without
+ * editing the shared stylesheet.
+ */
+
+/* Desktop: tools and library stacked on the left, drawing in the middle, properties on the right. */
+.plancraft .plancraft-shell {
+  grid-template-columns: clamp(220px, 18vw, 320px) minmax(0, 1fr) clamp(240px, 20vw, 340px);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "tools stage inspector"
+    "library stage inspector";
+}
+.plancraft .plancraft-toolbox { grid-area: tools; max-height: none; overflow: visible; }
+.plancraft .plancraft-library { grid-area: library; min-width: 0; min-height: 0; overflow: auto; background: var(--pc-panel); border-right: 1px solid var(--pc-border); border-top: 1px solid var(--pc-border); }
+.plancraft .plancraft-stage { grid-area: stage; }
+.plancraft .plancraft-inspector { grid-area: inspector; }
+
+.plancraft-overlay[data-mode="select"] { cursor: default; }
+.plancraft-overlay[data-mode="select"]:active { cursor: grabbing; }
+
+.plancraft-pdf-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 8px; border-left: 1px solid #64748b; border-right: 1px solid #64748b; }
+.plancraft-pdf-group label { display: inline-flex; align-items: center; gap: 6px; color: #e2e8f0; font-size: 12px; white-space: nowrap; }
+
+.plancraft-button-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 8px; }
+.plancraft-form-stack small { color: #94a3b8; font-size: 11px; font-weight: 400; }
+.plancraft-help { margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.5; }
+.plancraft-room-list input[type="text"] { width: 100%; min-height: 34px; background: #0f172a; border: 1px solid var(--pc-border); border-radius: 7px; padding: 5px 8px; color: #f8fafc; font-weight: 700; }
+.plancraft-finding { text-align: left; padding: 8px; border: 1px solid #9f3349; border-radius: 7px; background: #2a1320; color: #fecdd3; font-size: 12px; line-height: 1.4; cursor: pointer; }
+.plancraft-finding:hover, .plancraft-finding:focus-visible { border-color: #fb7185; background: #3a1628; }
+
+/* Pointer hints by default; touch hints on touch-first devices. */
+.plancraft-hint-touch { display: none; }
+@media (pointer: coarse) {
+  .plancraft-hint-pointer { display: none; }
+  .plancraft-hint-touch { display: inline; color: #94a3b8; }
+}
+
 .plancraft-canvas-shell {
   position: relative;
   width: 100%;
@@ -11,13 +50,15 @@
   bottom: 10px;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(3, minmax(44px, 1fr));
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
   gap: 6px;
   padding: 6px;
   border: 1px solid var(--pc-border);
   border-radius: 10px;
   background: rgba(15, 23, 42, 0.92);
 }
+
+.plancraft-view-controls .plancraft-fit { grid-column: span 2; font-size: 13px; }
 
 .plancraft-view-controls button {
   min-width: 44px;
@@ -103,11 +144,39 @@
     position: static;
     width: 100%;
     max-width: none;
-    grid-template-columns: repeat(3, minmax(44px, 1fr));
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
     border-radius: 0;
+  }
+
+  /* Phones: tools sit directly above the drawing so picking a tool never scrolls it away. */
+  .plancraft .plancraft-shell { display: flex; flex-direction: column; }
+  .plancraft .plancraft-toolbox { order: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--pc-border); }
+  .plancraft .plancraft-stage { order: 1; }
+  .plancraft .plancraft-library { order: 2; max-height: none; border-right: 0; }
+  .plancraft .plancraft-inspector { order: 3; }
+  .plancraft .plancraft-toolbox .plancraft-panel-heading { display: none; }
+  /* Two controls per row keep the drawing close to the top of the screen. */
+  .plancraft .plancraft-exportbar,
+  .plancraft .plancraft-toolbar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .plancraft .plancraft-exportbar > *,
+  .plancraft .plancraft-toolbar-actions > * { min-width: 0; max-width: 100%; }
+  .plancraft .plancraft-exportbar .plancraft-pdf-group { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; border: 0; padding: 0; }
+  .plancraft .plancraft-exportbar .plancraft-pdf-group label { display: grid; gap: 4px; white-space: normal; }
+  .plancraft .plancraft-exportbar .plancraft-pdf-group select { min-width: 0; width: 100%; }
+  .plancraft .plancraft-exportbar .plancraft-pdf-group .plancraft-button { grid-column: 1 / -1; }
+  .plancraft .plancraft-exportbar .plancraft-coffee { grid-column: 1 / -1; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .plancraft .plancraft-shell {
+    grid-template-columns: minmax(190px, 260px) minmax(0, 1fr);
+    grid-template-areas:
+      "tools stage"
+      "library stage"
+      "inspector inspector";
   }
 }
 

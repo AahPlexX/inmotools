@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 test('compiles collision-safe symbols, isolates bad files, previews safely, and reports viewBox uncertainty', async ({ page }) => {
@@ -251,4 +252,56 @@ test('Vector Studio exposes non-destructive clip, difference, and symmetry dupli
   await released.nth(0).locator(':scope > rect:not(.vector-selection-outline)').click();
   await page.getByRole('button', { name: 'Symmetry duplicate horizontal' }).click();
   await expect(page.getByTestId('vector-layer')).toHaveCount(3);
+});
+
+
+test('Vector Studio keeps scrollable regions keyboard reachable and free of serious axe violations', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+
+  const canvasViewport = page.locator('.vector-canvas-scroll');
+  const inspector = page.locator('.vector-inspector');
+  await expect(canvasViewport).toHaveAttribute('tabindex', '0');
+  await expect(canvasViewport).toHaveAttribute('role', 'region');
+  await expect(inspector).toHaveAttribute('tabindex', '0');
+
+  await canvasViewport.focus();
+  await expect(canvasViewport).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+
+  const results = await new AxeBuilder({ page }).analyze();
+  const blocking = results.violations.filter((violation) =>
+    violation.impact === 'serious' || violation.impact === 'critical');
+  expect(blocking, blocking.map((item) => `${item.id}: ${item.help}`).join('\n')).toEqual([]);
+});
+
+test('pages the compiled symbol table for a large icon set', async ({ page }) => {
+  await page.goto('./#/tools/svg-sprite-compiler');
+  const files = Array.from({ length: 120 }, (_, index) => ({
+    name: `icon-${String(index).padStart(3, '0')}.svg`,
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from(`<svg viewBox="0 0 10 10"><path d="M0 0h${(index % 9) + 1}v10z"/></svg>`),
+  }));
+  await page.locator('#svg-files').setInputFiles(files);
+  await page.getByRole('button', { name: 'Compile sprite' }).click();
+
+  const table = page.getByTestId('svg-symbols');
+  await expect(page.getByTestId('svg-symbols-range')).toContainText('Rows 1–100 of 120');
+  await expect(table.locator('tbody tr')).toHaveCount(100);
+  await table.getByRole('button', { name: 'Last' }).click();
+  await expect(table.locator('tbody tr')).toHaveCount(20);
+  await expect(table.locator('tbody tr').last()).toContainText('icon-119.svg');
+
+  // Previews mount two images per symbol, so they arrive in batches of 48.
+  const previews = page.getByLabel('Compiled symbol previews').locator('article');
+  await expect(previews).toHaveCount(48);
+  await expect(page.getByTestId('svg-preview-count')).toHaveText('Showing 48 of 120 previews');
+  await page.getByRole('button', { name: 'Show 48 more previews' }).click();
+  await expect(previews).toHaveCount(96);
+  await page.getByRole('button', { name: 'Show 24 more previews' }).click();
+  await expect(previews).toHaveCount(120);
+  await expect(page.getByTestId('svg-preview-count')).toHaveCount(0);
+
+  // A search narrows the previews and starts a fresh batch.
+  await page.getByLabel('Search compiled symbols').fill('icon-11');
+  await expect(previews).toHaveCount(10);
 });
