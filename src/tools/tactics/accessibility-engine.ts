@@ -15,6 +15,7 @@ export type TacticalShortcutId =
   | 'next-frame'
   | 'previous-keyframe'
   | 'next-keyframe'
+  | 'delete-drawing'
   | 'player-actions';
 
 export type TacticalFocusKind = 'editable' | 'activation' | 'board' | 'neutral';
@@ -268,6 +269,17 @@ export const TACTICAL_SHORTCUTS: readonly TacticalShortcut[] = [
     allowRepeat: false,
     focus: ['activation', 'board', 'neutral'],
   },
+  {
+    id: 'delete-drawing',
+    label: 'Remove selected drawing',
+    chords: ['delete', 'backspace'],
+    display: 'Delete or Backspace',
+    summary: 'Removes the selected arrow or drawing. It does not remove a player. Text fields keep Backspace.',
+    allowInEditable: false,
+    allowWhenOverlay: false,
+    allowRepeat: false,
+    focus: QUIET_FOCUS,
+  },
 ];
 
 export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
@@ -317,6 +329,15 @@ export const TACTICAL_HELP_SECTIONS: readonly TacticalHelpSection[] = [
     paragraphs: [
       'The project vault — projects, snapshots (saved copies of the project at a moment), and autosaves stored in this browser — keeps that data on this device. Nothing is uploaded.',
       'If a previous autosave is waiting, autosave stays paused until you restore it or keep the current board.',
+    ],
+  },
+  {
+    id: 'match-setup',
+    title: 'Other team, ball, and drawings',
+    paragraphs: [
+      'Place opposition fits the visible squad into one half and a mirrored squad into the other half. The two kits stay different colors. Undo puts the previous board back.',
+      'Click the ball, then click the pitch to move it. Arrow keys nudge the ball while it is selected.',
+      'Click an arrow or other drawing, then choose Remove drawing, Delete, or Backspace. That removes the drawing and leaves the players in place.',
     ],
   },
 ];

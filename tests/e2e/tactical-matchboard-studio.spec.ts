@@ -97,6 +97,41 @@ test('authors an arrow and supports undo and redo', async ({ page }) => {
   await expect(page.locator('#arrow-1')).toHaveCount(1);
 });
 
+test('places an opposition, moves the ball, and removes a selected drawing', async ({ page }) => {
+  await setupPanel(page).getByRole('combobox', { name: /Formation/ }).selectOption('ussf-4v4-1-2-1');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(page.locator('#training-left-penalty-area')).toHaveCount(1);
+  await expect(page.locator('#training-centre-circle')).toHaveCount(1);
+  await page.locator('.tactical-player-list button').first().click();
+  await expect(page.locator('.tactical-board-svg g[data-selected="true"]')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Place opposition' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(8);
+  await expect(page.locator('.status-line').last()).toContainText('Opposition placed');
+
+  await page.locator('#tactical-ball').click();
+  await expect(page.locator('.status-line').last()).toContainText('Ball selected');
+  await clickBoard(page, 0.3, 0.35);
+  await expect(page.locator('.status-line').last()).toContainText('Ball moved');
+
+  await page.getByRole('button', { name: 'Arrow', exact: true }).click();
+  await clickBoard(page, 0.2, 0.25);
+  await clickBoard(page, 0.4, 0.45);
+  await page.locator('#arrow-1').evaluate((node) => {
+    node.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      isPrimary: true,
+      pointerId: 7,
+      pointerType: 'mouse',
+    }));
+  });
+  await page.getByRole('button', { name: 'Remove drawing' }).click();
+  await expect(page.locator('#arrow-1')).toHaveCount(0);
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(8);
+});
+
 test('downloads the current board as SVG', async ({ page }) => {
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export SVG' }).click();

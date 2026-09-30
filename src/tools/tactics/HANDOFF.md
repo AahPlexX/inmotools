@@ -2,26 +2,54 @@
 
 ## Workstream identity
 
-- Branch: `feature/tactical-matchboard-studio`
-- Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Reconciled `origin/main`: `637a56960954eea2a6b8045a14c703c9a662b254`
-- Reconcile merge: `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`
-- Last fully browser-validated runtime source: `fae25d868ec1fb56d3594872a53fa77ca73f8da7`
-- Stage 1 authoring runtime, unchanged except the Mediabunny pin string: `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`
-- Test-only browser assertion after that authoring runtime, not a runtime change: `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`
-- Earlier runtime source, unchanged by the T13 documentation gate: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
-- Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **T14-01 is DONE.** Branch-complete remains satisfied. T15-01 is READY and has not been started.
-- Verified functional features: **60/60**
-- Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
+- Branch: `cursor/tactical-matchboard-production-audit-8765`
+- Base: `origin/main` `b51a51600fb9516378ab48f95cb0d057c72a1103` (`feat(tactics): Tactical Matchboard Studio (#76)`)
+- Do not push to `feature/tactical-matchboard-studio` or PR #76. That PR was squash-merged into the base above.
+- Do not undraft or merge the new draft PR from this workstream.
+- Milestone: **T16-01 production audit is DONE.**
+- Verified functional features: **63/63**. Rows 1–60 stayed verified. Rows 61–63 are the audit additions.
+- Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader. The catalog entry now names both teams and the real export set. The unit registration check still requires SVG in `outputs`.
+- Dependencies: exact pins were not changed. `mediabunny` remains `1.58.0`. `jszip` remains `3.10.2`.
 
-Documentation commits after the validated runtime do not change Tactical runtime behavior. The live branch ref is authoritative after documentation updates.
+Historical SHAs below describe the pre-squash branch. They are not the branch to resume.
+
+- Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
+- Reconciled `origin/main` before the squash: `637a56960954eea2a6b8045a14c703c9a662b254`
+- Reconcile merge: `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`
+- Last pre-squash browser-validated runtime: `fae25d868ec1fb56d3594872a53fa77ca73f8da7`
+- Stage 1 authoring runtime: `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`
+- Test-only metre assertion: `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`
+- Earlier runtime before the T13 documentation gate: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
 
 ## Exact next sequential action
 
-**T15-01 is READY.** Validate the exact integrated revision, including Pages artifact, deployment, and live route where feasible, then reconcile task state. Do not undraft or merge PR #76 from this workstream. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 1–60. The T14 pin alignment on row 57 is already recorded.
+**Stop.** T16-01 is done. Do not start another feature row, do not reopen rows 1–63, and do not undraft or merge. A later model should resume only if the user asks for another audit pass or for the residual backlog below.
 
-No feature-row blocker remains. Timeline virtualization is still not implemented. The 256-track cap remains, and that residual did not block these rows. Squad size stays uncapped because row 3 requires arbitrary roster growth; growth to 24 active players is tested. Scenario comparison memoizes an unchanged project diff.
+Help copy changed. The workspace header sentence, help section `match-setup`, command-bar tooltips, and the catalog summary/outputs/steps were rewritten in plain language. Stage 2 instructional writing is not a separate queued task.
+
+## T16-01 production audit
+
+T16-01 is **DONE**. The audit started from main at the PR #76 squash. Findings that were fixed:
+
+- The default board was a rectangle, a halfway line, and a centre spot. Fitted training markings now draw penalty areas, goal areas, penalty marks, goals, a centre circle, and corner arcs. A 105 m by 68 m pitch keeps 16.5 m boxes and a 9.15 m centre circle. Smaller pitches scale the boxes so they stay on the pitch. IFAB and futsal overlay lists are not rewritten. Markings are derived when the SVG or PDF is drawn and are labeled as training geometry, not a governing-body ruling.
+- The board could place only one team. Place opposition fits the visible active squad into one half and a mirrored squad into the other, keeps the kits distinct, refits without duplicating players, and moves authored keyframes and phase positions with the squad. A locked layer is refused.
+- Selection was not drawn on the pitch. The selected player, ball, or drawing now has a ring. Clicking the ball, then the pitch, moves the ball. Clicking a drawing and choosing Remove drawing, Delete, or Backspace removes that drawing and leaves the players. Backspace in a text field is unchanged.
+- The header and catalog described the tool as an SVG exporter. They now name both teams and the local export set.
+
+Evidence: focused Tactical units **162/162** across 21 `tactics-*.test.ts` files and the e2e selector check **3/3**. `tsc --noEmit -p tsconfig.app.json` exits 0. Production build succeeds (`✓ built in 6.46s`). Full Tactical Playwright spec **72 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. The new browser scenario places an opposition, moves the ball, and removes a drawing. Rows 1–60 were not reopened. Newly verified rows: **61, 62, 63**.
+
+## Residual backlog, in priority order
+
+1. Timeline virtualization is still not implemented. The 256-track cap remains. It did not block rows 1–63.
+2. Squad size stays uncapped because row 3 requires arbitrary roster growth. Growth to 24 active players is already tested.
+3. There is no pitch zoom or pan.
+4. Opposition mirrors the current visible squad. It is not a separately chosen formation.
+5. Training markings are derived at SVG/PDF render. They are not stored in the project overlay list, so a raw project JSON does not list them. This app redraws them on open.
+6. Build board still replaces the board and clears undo without a confirm. Existing authoring flows rebuild after other edits, so a confirm was not added.
+7. Video export remains capped at 12 frames. PDF page text remains WinAnsi. Non-ASCII notes become `?` on the PDF page while the sidecar keeps the original text.
+8. The tactical board has no freehand stroke. Video telestration already has freehand. Pointer movement remains click-to-place, not drag.
+
+Scenario comparison still memoizes an unchanged project diff. No dependency was added or upgraded.
 
 ## T14-01 closure evidence
 
@@ -89,13 +117,13 @@ Task 5 is **DONE** at runtime source `c6550af2a0b32f970983e2aed2c70fed68817346`.
 
 ## Current verified feature rows
 
-Verified: **1–60**.
+Verified: **1–63**.
 
 In progress: none.
 
 Planned: none.
 
-Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T13-01 had left those rows unfinished. The deterministic denominator remains 60.
+Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T16-01 added **61, 62, and 63**. The deterministic denominator is 63. Rows 1–60 were not reopened.
 
 ## Core architecture that must be preserved
 
@@ -111,14 +139,14 @@ Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T13-01 had left thos
 
 ## Multi-agent / branch rules
 
-- Stay on `feature/tactical-matchboard-studio`.
-- Use existing PR #76 only.
+- Stay on `cursor/tactical-matchboard-production-audit-8765`.
+- Do not push to `feature/tactical-matchboard-studio` or PR #76.
+- Do not undraft or merge the draft PR for this audit.
 - Before every mutation, compare the last known branch tip with the live remote ref. If another agent advanced it, refresh and reconcile before writing.
 - An ACTIVE queue item's Primary files are reserved.
-- Forward agent takes the lowest-numbered READY item.
-- Reverse agent takes the highest-numbered READY item whose dependencies are DONE and whose Primary files do not overlap ACTIVE work.
+- Forward agent takes the lowest-numbered READY item. None are READY after T16-01.
 - Never force-push, destructively rebase, delete the branch, or merge partial work.
-- T14 reconciliation with then-current `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254` is done. T15 is the next READY item.
+- T14 history is recorded below. T15 is superseded because PR #76 was squash-merged to main as `b51a516`. T16-01 is DONE.
 
 ## Known non-Tactical repository context
 
@@ -131,4 +159,4 @@ Whenever material Tactical state changes, update together:
 - `src/tools/tactics/TODO_SEQUENCE.md`
 - `src/tools/tactics/HANDOFF.md`
 - `.tasks/IN_PROGRESS.md`
-- existing PR #76 summary when its milestone/count/evidence becomes stale.
+- the draft PR for `cursor/tactical-matchboard-production-audit-8765` when its milestone, count, or evidence becomes stale. Do not edit PR #76.
