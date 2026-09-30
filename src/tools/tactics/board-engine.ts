@@ -1,4 +1,5 @@
 import { sampleBallElevationTrajectory } from './elevation-engine';
+import { displayPitchOverlays } from './pitch-engine';
 import type {
   NormalizedPoint,
   TacticalAnnotation,
@@ -11,6 +12,9 @@ export interface TacticalBoardRenderOptions {
   ghosts?: Array<{ tokenId: string; position: NormalizedPoint; relation: 'previous' | 'next' }>;
   guides?: Array<{ axis: 'x' | 'y'; value: number; label: string }>;
   scenarioGhosts?: Array<{ tokenId: string; position: NormalizedPoint }>;
+  selectedTokenId?: string;
+  selectedAnnotationId?: string;
+  ballSelected?: boolean;
 }
 
 const BOARD_WIDTH = 1000;
@@ -75,7 +79,7 @@ function serializePitch(project: TacticalProject, height: number): string[] {
     `<circle cx="${number(BOARD_WIDTH / 2)}" cy="${number(height / 2)}" r="4" fill="#ffffff"/>`,
   ];
 
-  for (const overlay of project.pitch.overlays) {
+  for (const overlay of displayPitchOverlays(project.pitch)) {
     if (!overlay.points.length) continue;
     const points = overlay.points
       .map((point) => {
@@ -85,13 +89,14 @@ function serializePitch(project: TacticalProject, height: number): string[] {
       .join(' ');
     const id = escapeAttribute(safeId(overlay.id));
     const label = escapeText(overlay.label);
+    const training = overlay.id.startsWith('training-') ? ' data-training-marking="true" pointer-events="none"' : '';
     if (overlay.kind === 'zone') {
       parts.push(
-        `<polygon id="${id}" data-tactical-kind="pitch-zone" points="${points}" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.65" stroke-width="2"><title>${label}</title></polygon>`,
+        `<polygon id="${id}" data-tactical-kind="pitch-zone"${training} points="${points}" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.65" stroke-width="2"><title>${label}</title></polygon>`,
       );
     } else {
       parts.push(
-        `<polyline id="${id}" data-tactical-kind="pitch-line" points="${points}" fill="none" stroke="#ffffff" stroke-opacity="0.8" stroke-width="2"><title>${label}</title></polyline>`,
+        `<polyline id="${id}" data-tactical-kind="pitch-line"${training} points="${points}" fill="none" stroke="#ffffff" stroke-opacity="0.8" stroke-width="2"><title>${label}</title></polyline>`,
       );
     }
   }
@@ -135,6 +140,7 @@ function serializeAnnotation(
   annotation: TacticalAnnotation,
   height: number,
   markerId: string,
+  selected: boolean,
 ): string {
   if (!annotation.points.length) return '';
   if (annotation.kind === 'spotlight') {
@@ -142,13 +148,15 @@ function serializeAnnotation(
     const id = escapeAttribute(safeId(annotation.id));
     const label = annotation.label?.trim();
     const title = label ? `<title>${escapeText(label)}</title>` : '<title>Spotlight</title>';
-    return `<g id="${id}" data-tactical-kind="annotation" data-annotation-kind="spotlight"><circle cx="${number(center.x)}" cy="${number(center.y)}" r="72" fill="#111827" fill-opacity="0.16" stroke="#fef08a" stroke-width="4"/>${title}</g>`;
+    const selectedAttr = selected ? ' data-selected="true"' : '';
+    return `<g id="${id}" data-tactical-kind="annotation" data-annotation-kind="spotlight"${selectedAttr}><circle cx="${number(center.x)}" cy="${number(center.y)}" r="72" fill="#111827" fill-opacity="0.16" stroke="#fef08a" stroke-width="4"/>${title}</g>`;
   }
   if (annotation.kind === 'presentation-label') {
     const center = toBoardPoint(annotation.points[0]!, height);
     const id = escapeAttribute(safeId(annotation.id));
     const label = annotation.label?.trim() || 'Note';
-    return `<text id="${id}" data-tactical-kind="annotation" data-annotation-kind="presentation-label" x="${number(center.x)}" y="${number(center.y)}" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#ffffff">${escapeText(label)}</text>`;
+    const selectedAttr = selected ? ' data-selected="true"' : '';
+    return `<text id="${id}" data-tactical-kind="annotation" data-annotation-kind="presentation-label"${selectedAttr} x="${number(center.x)}" y="${number(center.y)}" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#ffffff">${escapeText(label)}</text>`;
   }
   const points = annotation.points
     .map((point) => {
@@ -161,7 +169,8 @@ function serializeAnnotation(
   const marker = isArrow ? ` marker-end="url(#${escapeAttribute(markerId)})"` : '';
   const label = annotation.label?.trim();
   const title = label ? `<title>${escapeText(label)}</title>` : '';
-  const line = `<polyline id="${id}" data-tactical-kind="annotation" data-annotation-kind="${escapeAttribute(annotation.kind)}" points="${points}" fill="none" stroke="#fef08a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"${marker}>${title}</polyline>`;
+  const selectedAttr = selected ? ' data-selected="true"' : '';
+  const line = `<polyline id="${id}" data-tactical-kind="annotation" data-annotation-kind="${escapeAttribute(annotation.kind)}"${selectedAttr} points="${points}" fill="none" stroke="#fef08a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"${marker}>${title}</polyline>`;
 
   if (!label) return line;
   const last = toBoardPoint(annotation.points[annotation.points.length - 1]!, height);
@@ -255,7 +264,7 @@ export function serializeTacticalBoardSvg(
       || annotation.visible === false
       || !layerIsVisible(scene, annotation.layerId)
     ) continue;
-    parts.push(serializeAnnotation(annotation, height, markerId));
+    parts.push(serializeAnnotation(annotation, height, markerId, options?.selectedAnnotationId === annotation.id));
   }
 
   for (const token of project.playerTokens) {
@@ -273,12 +282,13 @@ export function serializeTacticalBoardSvg(
     const textFill = safeColor(team?.secondaryColor ?? '', '#ffffff');
     const displayName = player?.displayName?.trim() || player?.jerseyNumber?.trim() || 'Player';
     const jersey = player?.jerseyNumber?.trim();
+    const selectedAttr = options?.selectedTokenId === token.id ? ' data-selected="true"' : '';
 
     parts.push(
-      `<g id="${id}" data-tactical-kind="player" transform="translate(${number(point.x)} ${number(point.y)}) rotate(${number(token.rotationDeg)})"><circle cx="0" cy="0" r="24" fill="${escapeAttribute(fill)}" stroke="#ffffff" stroke-width="3"/><title>${escapeText(displayName)}</title>${jersey ? `<text x="0" y="7" text-anchor="middle" font-family="system-ui, sans-serif" font-size="20" font-weight="800" fill="${escapeAttribute(textFill)}">${escapeText(jersey)}</text>` : ''}</g>`,
+      `<g id="${id}" data-tactical-kind="player"${selectedAttr} transform="translate(${number(point.x)} ${number(point.y)}) rotate(${number(token.rotationDeg)})"><circle cx="0" cy="0" r="24" fill="${escapeAttribute(fill)}" stroke="#ffffff" stroke-width="3"/><title>${escapeText(displayName)}</title>${jersey ? `<text x="0" y="7" text-anchor="middle" font-family="system-ui, sans-serif" font-size="20" font-weight="800" fill="${escapeAttribute(textFill)}">${escapeText(jersey)}</text>` : ''}</g>`,
     );
     parts.push(
-      `<text x="${number(point.x)}" y="${number(point.y + 42)}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">${escapeText(displayName)}</text>`,
+      `<text data-tactical-kind="player-label" data-token-id="${id}" x="${number(point.x)}" y="${number(point.y + 42)}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">${escapeText(displayName)}</text>`,
     );
   }
 
@@ -290,8 +300,9 @@ export function serializeTacticalBoardSvg(
   const elevationLabel = project.ball.elevationMeters > 0
     ? `<text x="16" y="-14" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#ffffff">${escapeText(`${project.ball.elevationMeters.toFixed(1)} m`)}</text>`
     : '';
+  const ballSelected = options?.ballSelected ? ' data-selected="true"' : '';
   parts.push(
-    `<g id="tactical-ball" data-tactical-kind="ball" transform="translate(${number(ballPoint.x)} ${number(ballPoint.y)})"><circle cx="0" cy="0" r="11" fill="#ffffff" stroke="#111827" stroke-width="2"/><title>Ball${project.ball.elevationMeters > 0 ? `, elevation ${project.ball.elevationMeters.toFixed(2)} m` : ''}</title>${elevationLabel}</g>`,
+    `<g id="tactical-ball" data-tactical-kind="ball"${ballSelected} transform="translate(${number(ballPoint.x)} ${number(ballPoint.y)})"><circle cx="0" cy="0" r="11" fill="#ffffff" stroke="#111827" stroke-width="2"/><title>Ball${project.ball.elevationMeters > 0 ? `, elevation ${project.ball.elevationMeters.toFixed(2)} m` : ''}</title>${elevationLabel}</g>`,
   );
 
   parts.push('</svg>');

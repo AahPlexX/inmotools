@@ -1,14 +1,10 @@
 # Tactical Matchboard Studio Execution Queue
 
 **Updated:** 2026-09-30
-**Branch:** `feature/tactical-matchboard-studio`  
-**Existing PR:** #76 only — do not create a replacement/parallel PR.  
-**T14 reconciled `origin/main`:** `637a56960954eea2a6b8045a14c703c9a662b254`  
-**T14 merge:** `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`  
-**T14 runtime source:** `fae25d868ec1fb56d3594872a53fa77ca73f8da7`  
-**Stage 1 runtime source:** `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`  
-**Stage 1 test-only follow-up:** `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`  
-**Earlier runtime, before Stage 1:** `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
+**Branch:** `cursor/tactical-matchboard-production-audit-8765`
+**Base:** `origin/main` `b51a51600fb9516378ab48f95cb0d057c72a1103` (`feat(tactics): Tactical Matchboard Studio (#76)`)
+**PR:** new draft only. Do not push to `feature/tactical-matchboard-studio` or PR #76. Do not undraft or merge from this workstream.
+**Prior history, now on main via the squash:** T14 reconciled `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254`; T14 merge `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`; T14 runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7`; stage 1 runtime `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`; stage 1 test-only `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`; earlier runtime `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`.
 
 ## Purpose and source-of-truth roles
 
@@ -20,7 +16,7 @@
 
 ## Agent coordination protocol
 
-1. Stay on the single branch above. Never create another Tactical Matchboard branch or PR unless the user explicitly changes this rule.
+1. Stay on `cursor/tactical-matchboard-production-audit-8765`. Do not push to `feature/tactical-matchboard-studio` or PR #76. The user required a new branch and a new draft PR for this audit.
 2. Before every write, compare the last known branch tip to the live branch. If another agent advanced it, refresh the affected files and re-evaluate before writing.
 3. An agent must treat the **Primary files** on an `ACTIVE` item as reserved. Do not concurrently edit those files from another queue item.
 4. A forward-working agent takes the lowest-numbered `READY` item.
@@ -174,9 +170,18 @@
 - **Reverse-safe:** never before T13.
 
 ### T15-01 — Exact-main deployment and closure
-- **Status:** READY
+- **Status:** SUPERSEDED for this workstream
 - **Depends on:** T14-01 DONE
 - **Primary files:** deployment/task ledgers only as required
-- **Action:** exact-main validation, Pages artifact/deployment/live route verification where feasible, task reconciliation.
-- **Exit evidence:** exact deployed revision and closure records.
+- **Action:** was exact-main validation of draft PR #76. That PR was squash-merged to `origin/main` as `b51a51600fb9516378ab48f95cb0d057c72a1103` before this audit. Do not reopen or push to PR #76.
+- **Exit evidence:** the squash is the main tip this audit branched from. This item does not authorize another merge.
 - **Reverse-safe:** never before T14.
+
+### T16-01 — Production audit fixes
+- **Status:** DONE
+- **Depends on:** `origin/main` containing `b51a51600fb9516378ab48f95cb0d057c72a1103`
+- **Primary files:** tactical pitch/board/workspace/accessibility modules, tactical tests, this tool's SSOT, and the Matchboard catalog entry
+- **Implementation:** fitted training markings for pitches that do not already have sourced penalty geometry; a mirrored opposition that fits both squads into opposite halves; a visible selection ring; direct ball movement; removal of a selected drawing; plain header, help, tooltip, and catalog copy.
+- **Exit evidence:** focused Tactical units **162/162** across 21 `tactics-*.test.ts` files plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0. Production build `✓ built in 6.46s`. Full Tactical Playwright spec **72 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Verified numerator is **63/63**. Newly verified rows: **61, 62, 63**. Rows 1–60 were not reopened. Help copy changed. No dependency pin changed.
+- **Residual:** timeline virtualization and the 256-track cap; uncapped squad size; no pitch zoom/pan; opposition is a mirror rather than a second formation picker; training markings are derived at render/export; Build board still replaces the board without a confirm; 12-frame video cap; WinAnsi PDF page text.
+- **Reverse-safe:** complete for this audit. Do not undraft or merge the draft PR from this workstream.

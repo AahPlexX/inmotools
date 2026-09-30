@@ -39,6 +39,7 @@ import {
   morphFormationPhases,
   reviewFormationLegality,
 } from './formation-engine';
+import { authorEntityCoordinate } from './coordinate-engine';
 import { tacticalPitchGuides, snapWithTacticalAssist } from './guide-engine';
 import { applyPresentationVisibility, onionSkinGhosts } from './presentation-authoring-engine';
 import { transformTacticalProject } from './pitch-engine';
@@ -68,6 +69,8 @@ import {
   addTacticalArrow,
   buildBeginnerTacticalProject,
   nudgeNormalizedPoint,
+  placeMirroredOpposition,
+  removeTacticalAnnotation,
 } from './workspace-engine';
 import './tactical-matchboard.css';
 
@@ -175,6 +178,10 @@ export default function TacticalMatchboardWorkspace() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [snapAssist, setSnapAssist] = useState(DEFAULT_TACTICAL_SNAP);
   const [onionSkin, setOnionSkin] = useState(false);
+  const [boardTarget, setBoardTarget] = useState<'player' | 'ball'>('player');
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [oppositionName, setOppositionName] = useState('Opposition');
+  const [oppositionColor, setOppositionColor] = useState('#9f1239');
   const [scenarioOverlayId, setScenarioOverlayId] = useState('');
   const [tip, setTip] = useState<{ text: string; top: number; left: number; width: number; height: number } | null>(null);
   const tipHostRef = useRef<HTMLElement | null>(null);
@@ -207,8 +214,22 @@ export default function TacticalMatchboardWorkspace() {
       scenarioGhosts: overlay
         ? Object.entries(overlay.tokenPositions).map(([tokenId, position]) => ({ tokenId, position }))
         : undefined,
+      selectedTokenId: boardTarget === 'player' ? selectedTokenId : undefined,
+      selectedAnnotationId: selectedAnnotationId ?? undefined,
+      ballSelected: boardTarget === 'ball',
     };
-  }, [onionSkin, previewTimeMs, project, scenarioOverlayId, sceneId, snapAssist.enabled, snapAssist.pitchGuides]);
+  }, [
+    boardTarget,
+    onionSkin,
+    previewTimeMs,
+    project,
+    scenarioOverlayId,
+    sceneId,
+    selectedAnnotationId,
+    selectedTokenId,
+    snapAssist.enabled,
+    snapAssist.pitchGuides,
+  ]);
   const sceneTokens = project.playerTokens.filter((token) => token.sceneId === sceneId);
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId);
   const availableFormations = useMemo(
@@ -287,6 +308,8 @@ export default function TacticalMatchboardWorkspace() {
     setPreviewTimeMs(0);
     setCameraDraft(null);
     setSelectedTokenId(firstTokenId);
+    setBoardTarget('player');
+    setSelectedAnnotationId(null);
     setMode('move');
     setArrowStart(null);
     setSetup((current) => ({
@@ -314,6 +337,8 @@ export default function TacticalMatchboardWorkspace() {
       setActiveSceneId(nextProject.scenes[0]?.id ?? '');
       setPreviewTimeMs(0);
       setSelectedTokenId(nextProject.playerTokens[0]?.id);
+      setBoardTarget('player');
+      setSelectedAnnotationId(null);
       setMode('move');
       setArrowStart(null);
       setStatus(`Built ${nextProject.ruleset.teamSize}v${nextProject.ruleset.teamSize} board with ${nextProject.playerTokens.length} placed players.`);
@@ -521,6 +546,17 @@ export default function TacticalMatchboardWorkspace() {
       return;
     }
 
+    if (boardTarget === 'ball') {
+      const assisted = assistPoint(point);
+      applyEdit(
+        'Move ball',
+        (current) => authorEntityCoordinate(current, { kind: 'ball' }, assisted.point),
+        assisted.snapped ? 'Ball snapped to a tactical guide.' : 'Ball moved.',
+      );
+      setSelectedAnnotationId(null);
+      return;
+    }
+
     if (!selectedToken) {
       setStatus('Select a player before choosing a destination.');
       return;
@@ -531,9 +567,19 @@ export default function TacticalMatchboardWorkspace() {
       (current) => movePlayerToken(current, selectedToken.id, assisted.point),
       assisted.snapped ? 'Player snapped to a tactical guide.' : 'Player moved.',
     );
+    setSelectedAnnotationId(null);
   }
 
-  function nudge(dx: number, dy: number) {
+  function nudge(dx: number, dy: number, subject: 'player' | 'ball' = boardTarget) {
+    if (subject === 'ball') {
+      const assisted = assistPoint(nudgeNormalizedPoint(project.ball.position, dx, dy));
+      applyEdit(
+        'Nudge ball',
+        (current) => authorEntityCoordinate(current, { kind: 'ball' }, assisted.point),
+        assisted.snapped ? 'Ball snapped to a tactical guide.' : 'Ball position adjusted.',
+      );
+      return;
+    }
     if (!selectedToken) {
       setStatus('Select a player before using precision movement.');
       return;
@@ -562,6 +608,55 @@ export default function TacticalMatchboardWorkspace() {
     );
   }
 
+  function selectPlayer(tokenId: string) {
+    setSelectedTokenId(tokenId);
+    setBoardTarget('player');
+    setSelectedAnnotationId(null);
+    setStatus(`Selected ${tokenId}.`);
+  }
+
+  function selectBall() {
+    setBoardTarget('ball');
+    setSelectedAnnotationId(null);
+    setMode('move');
+    setArrowStart(null);
+    setStatus('Ball selected. Click the pitch or use the arrow keys to move it.');
+  }
+
+  function selectAnnotation(annotationId: string) {
+    setSelectedAnnotationId(annotationId);
+    setStatus('Drawing selected. Remove drawing deletes it and leaves the players in place.');
+  }
+
+  function placeOpposition() {
+    if (!sceneId || !layerId) {
+      setStatus('The current scene does not have an editable layer.');
+      return;
+    }
+    applyEdit(
+      'Place opposition',
+      (current) => placeMirroredOpposition(current, sceneId, layerId, {
+        teamName: oppositionName,
+        primaryColor: oppositionColor,
+      }),
+      'Opposition placed in the opposite half. Undo restores the previous board.',
+    );
+  }
+
+  function removeSelectedDrawing() {
+    if (!selectedAnnotationId) {
+      setStatus('Select a drawing on the pitch before removing it.');
+      return;
+    }
+    const annotationId = selectedAnnotationId;
+    const removed = applyEdit(
+      'Remove drawing',
+      (current) => removeTacticalAnnotation(current, annotationId),
+      'Drawing removed.',
+    );
+    if (removed) setSelectedAnnotationId(null);
+  }
+
   function exportSvg() {
     try {
       const svg = serializeTacticalBoardSvg(project, sceneId);
@@ -576,6 +671,9 @@ export default function TacticalMatchboardWorkspace() {
     const next = undoTacticalProject(history);
     setHistory(next);
     setArrowStart(null);
+    setSelectedAnnotationId((current) => (
+      current && next.present.annotations.some((annotation) => annotation.id === current) ? current : null
+    ));
     setStatus(next === history ? 'Nothing to undo.' : 'Undid the last board edit.');
   }
 
@@ -583,6 +681,9 @@ export default function TacticalMatchboardWorkspace() {
     const next = redoTacticalProject(history);
     setHistory(next);
     setArrowStart(null);
+    setSelectedAnnotationId((current) => (
+      current && next.present.annotations.some((annotation) => annotation.id === current) ? current : null
+    ));
     setStatus(next === history ? 'Nothing to redo.' : 'Redid the next board edit.');
   }
 
@@ -727,6 +828,7 @@ export default function TacticalMatchboardWorkspace() {
       else if (action === 'nudge-left') nudge(-0.02, 0);
       else if (action === 'nudge-right') nudge(0.02, 0);
       else if (action === 'player-actions') openActions();
+      else if (action === 'delete-drawing') removeSelectedDrawing();
       else if (
         action === 'toggle-playback'
         || action === 'stop-playback'
@@ -747,7 +849,7 @@ export default function TacticalMatchboardWorkspace() {
       <div className="workspace-header tactical-workspace-header">
         <div>
           <h2>Tactical Matchboard Studio</h2>
-          <p>Build a local tactical board, place a formation, move players precisely, add arrows, and export SVG.</p>
+          <p>Open Board setup. Enter pitch length and width (the drawn field’s size), choose a direction and a formation (the starting arrangement of your players), then choose "Build board". Those players (your squad) appear on the pitch (the drawn field). Choose "Place opposition" to add the opposition (the other team) as a mirrored squad (the same shape, facing the other way) in the other half, in a different kit (shirt color). Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Export SVG" (Scalable Vector Graphics) to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
         </div>
       </div>
       <div
@@ -853,7 +955,7 @@ export default function TacticalMatchboardWorkspace() {
               />
             </label>
             <div className="tactical-setup-action">
-              <button className="action-button" type="submit">Build board</button>
+              <button className="action-button" type="submit" data-tactical-tip="Builds a new board from these settings and clears undo for the previous board.">Build board</button>
               <small>Dimensions are editable training inputs unless a sourced rules profile explicitly states otherwise.</small>
             </div>
           </form>
@@ -1057,7 +1159,10 @@ export default function TacticalMatchboardWorkspace() {
               onChange={(event) => {
                 const nextSceneId = event.target.value;
                 setActiveSceneId(nextSceneId);
-                setSelectedTokenId(project.playerTokens.find((token) => token.sceneId === nextSceneId)?.id);
+                const nextTokenId = project.playerTokens.find((token) => token.sceneId === nextSceneId)?.id;
+                setSelectedTokenId(nextTokenId);
+                setBoardTarget('player');
+                setSelectedAnnotationId(null);
                 setArrowStart(null);
                 setStatus('Scene view changed.');
               }}
@@ -1089,14 +1194,50 @@ export default function TacticalMatchboardWorkspace() {
           </label>
           <button className="action-button secondary" type="button" data-tactical-tip="Undo the last board edit." disabled={!history.past.length} onClick={undo}>Undo</button>
           <button className="action-button secondary" type="button" data-tactical-tip="Redo the next board edit." disabled={!history.future.length} onClick={redo}>Redo</button>
-          <button className="action-button secondary" type="button" onClick={exportSvg}>Export SVG</button>
+          <label className="tactical-arrow-label">
+            Opposition name
+            <input
+              value={oppositionName}
+              aria-label="Opposition name"
+              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the mirrored squad (the same player shape facing the other way).'}
+              onChange={(event) => setOppositionName(event.target.value)}
+            />
+          </label>
+          <label className="tactical-arrow-label">
+            Opposition color
+            <input
+              type="color"
+              value={oppositionColor}
+              aria-label="Opposition color"
+              data-tactical-tip={'Choose the kit color (shirt color) for the opposition (the other team). If it matches your squad, "Place opposition" changes it so the two kits stay different colors.'}
+              onChange={(event) => setOppositionColor(event.target.value)}
+            />
+          </label>
+          <button
+            className="action-button secondary"
+            type="button"
+            data-tactical-tip={'Click after your squad is visible on the pitch. Your squad fits into one half and a mirrored squad (the same shape, facing the other way) fits into the other half. The kits (shirt colors) stay different. "Undo" puts the previous board back.'}
+            onClick={placeOpposition}
+          >
+            Place opposition
+          </button>
+          <button
+            className="action-button secondary"
+            type="button"
+            data-tactical-tip={'Click an arrow or other drawing on the pitch, then click "Remove drawing". That drawing disappears. Players stay on the pitch.'}
+            disabled={!selectedAnnotationId}
+            onClick={removeSelectedDrawing}
+          >
+            Remove drawing
+          </button>
+          <button className="action-button secondary" type="button" data-tactical-tip="Download the current pitch (the drawn field) as an SVG (Scalable Vector Graphics) file." onClick={exportSvg}>Export SVG</button>
           <button className="action-button secondary" type="button" data-tactical-tip="Open the help reference. Tooltips are extra; the labels and help stay available." onClick={openHelp}>Help</button>
           <button className="action-button secondary" type="button" data-tactical-tip="Open the same player actions as a right-click." onClick={() => openActions()}>Player actions</button>
           <button
             className="action-button secondary"
             type="button"
             aria-pressed={inspectorSheet}
-            data-tactical-tip="Open player and layer controls in a bottom sheet."
+            data-tactical-tip="Open player and layer controls in a bottom sheet (a panel that slides up from the bottom)."
             onClick={() => {
               setHelpOpen(false);
               setActionsOpen(false);
@@ -1112,7 +1253,7 @@ export default function TacticalMatchboardWorkspace() {
             className="action-button secondary"
             type="button"
             aria-pressed={timelineSheet}
-            data-tactical-tip="Open timeline transport in a bottom sheet."
+            data-tactical-tip="Open play, pause, and scrub controls for the motion timeline in a bottom sheet (a panel that slides up from the bottom)."
             onClick={() => {
               setHelpOpen(false);
               setActionsOpen(false);
@@ -1128,6 +1269,7 @@ export default function TacticalMatchboardWorkspace() {
             type="button"
             aria-expanded={show3D}
             aria-controls="tactical-3d-panel"
+            data-tactical-tip="Show or hide the local 3D pitch. Nothing is uploaded."
             onClick={() => setShow3D((value) => !value)}
           >
             {show3D ? 'Hide 3D view' : 'Show 3D view'}
@@ -1158,7 +1300,7 @@ export default function TacticalMatchboardWorkspace() {
                 selectedTokenId={selectedTokenId}
                 cameraState={activeCamera}
                 onSelectToken={(tokenId) => {
-                  setSelectedTokenId(tokenId);
+                  selectPlayer(tokenId);
                   setStatus(`Selected ${tokenId} in the 3D view.`);
                 }}
                 onCameraChange={setCameraDraft}
@@ -1177,10 +1319,9 @@ export default function TacticalMatchboardWorkspace() {
             arrowStart={arrowStart}
             analysisSettings={analysisSettings}
             renderOptions={boardRenderOptions}
-            onSelectToken={(tokenId) => {
-              setSelectedTokenId(tokenId);
-              setStatus(`Selected ${tokenId}.`);
-            }}
+            onSelectToken={selectPlayer}
+            onSelectBall={selectBall}
+            onSelectAnnotation={selectAnnotation}
             onPitchPoint={handlePitchPoint}
             onOpenActions={openActions}
           />
@@ -1194,7 +1335,7 @@ export default function TacticalMatchboardWorkspace() {
             tab={inspectorTab}
             sheetOpen={inspectorSheet}
             onTabChange={setInspectorTab}
-            onSelectToken={setSelectedTokenId}
+            onSelectToken={selectPlayer}
             onToggleGrouped={(tokenId) => {
               setGroupedTokenIds((current) => (
                 current.includes(tokenId) ? current.filter((id) => id !== tokenId) : [...current, tokenId]
@@ -1320,10 +1461,10 @@ export default function TacticalMatchboardWorkspace() {
             </button>
             <button type="button" className="action-button secondary" onClick={() => { setMode('move'); setArrowStart(null); setStatus('Move tool active.'); }}>Move tool</button>
             <button type="button" className="action-button secondary" onClick={() => { setMode('arrow'); setArrowStart(null); setStatus('Arrow tool active. Choose a start point.'); }}>Arrow tool</button>
-            <button type="button" onClick={() => nudge(0, -0.02)} aria-label="Move player up from actions">Move up</button>
-            <button type="button" onClick={() => nudge(-0.02, 0)} aria-label="Move player left from actions">Move left</button>
-            <button type="button" onClick={() => nudge(0.02, 0)} aria-label="Move player right from actions">Move right</button>
-            <button type="button" onClick={() => nudge(0, 0.02)} aria-label="Move player down from actions">Move down</button>
+            <button type="button" onClick={() => nudge(0, -0.02, 'player')} aria-label="Move player up from actions">Move up</button>
+            <button type="button" onClick={() => nudge(-0.02, 0, 'player')} aria-label="Move player left from actions">Move left</button>
+            <button type="button" onClick={() => nudge(0.02, 0, 'player')} aria-label="Move player right from actions">Move right</button>
+            <button type="button" onClick={() => nudge(0, 0.02, 'player')} aria-label="Move player down from actions">Move down</button>
           </div>
         </TacticalDialog>
       ) : null}

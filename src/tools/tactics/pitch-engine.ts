@@ -2,6 +2,8 @@ import type {
   NormalizedPoint,
   PitchDimensions,
   PitchRuleProfile,
+  SourceProvenance,
+  TacticalPitch,
   TacticalProject,
 } from './tactics-types';
 
@@ -152,6 +154,131 @@ export function createTrainingFormatProfile(teamSize: number): PitchRuleProfile 
 }
 
 export const trainingFormatProfiles: PitchRuleProfile[] = [1, 2, 3, 4, 5, 7, 9, 11].map(createTrainingFormatProfile);
+
+const TRAINING_MARKING_PROVENANCE: SourceProvenance = {
+  kind: 'tool-default',
+  authoritative: false,
+  sourceTitle: 'InMo Tools fitted training markings',
+  sourceDate: '2026-09-30',
+  note: 'Geometric pitch lines fitted to this pitch. Full-size distances are used only when they fit. Not a governing-body ruling.',
+};
+
+function clampUnitInterval(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function fittedTrainingMarkings(dimensions: PitchDimensions): TacticalPitch['overlays'] {
+  assertFinitePositive(dimensions.lengthMeters, 'Pitch length');
+  assertFinitePositive(dimensions.widthMeters, 'Pitch width');
+  const length = dimensions.lengthMeters;
+  const width = dimensions.widthMeters;
+  const penaltyDepthRef = 16.5;
+  const penaltyWidthRef = 40.32;
+  const scale = Math.min(
+    1,
+    ((length / 2) * 0.72) / penaltyDepthRef,
+    (width * 0.72) / penaltyWidthRef,
+  );
+  const provenance = { ...TRAINING_MARKING_PROVENANCE };
+
+  const at = (xMeters: number, yMeters: number): NormalizedPoint => createNormalizedPoint(
+    clampUnitInterval(xMeters / length),
+    clampUnitInterval(yMeters / width),
+  );
+  const line = (
+    id: string,
+    label: string,
+    meters: Array<[number, number]>,
+  ): TacticalPitch['overlays'][number] => ({
+    id,
+    kind: 'line',
+    label,
+    points: meters.map(([xMeters, yMeters]) => at(xMeters, yMeters)),
+    provenance: { ...provenance },
+  });
+  const box = (
+    id: string,
+    label: string,
+    x0: number,
+    x1: number,
+    y0: number,
+    y1: number,
+  ) => line(id, label, [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]);
+
+  const penaltyDepth = penaltyDepthRef * scale;
+  const penaltyHalf = (penaltyWidthRef * scale) / 2;
+  const goalAreaDepth = 5.5 * scale;
+  const goalAreaHalf = ((7.32 / 2) + 5.5) * scale;
+  const goalHalf = (7.32 * scale) / 2;
+  const spot = 11 * scale;
+  const midY = width / 2;
+  const goalDepth = Math.min(length * 0.03, 2 * scale);
+  const circleRadius = Math.min(9.15 * scale, width * 0.22, length * 0.12);
+  const markings: TacticalPitch['overlays'] = [
+    box('training-left-penalty-area', 'Training penalty area', 0, penaltyDepth, midY - penaltyHalf, midY + penaltyHalf),
+    box('training-right-penalty-area', 'Training penalty area', length, length - penaltyDepth, midY - penaltyHalf, midY + penaltyHalf),
+    box('training-left-goal-area', 'Training goal area', 0, goalAreaDepth, midY - goalAreaHalf, midY + goalAreaHalf),
+    box('training-right-goal-area', 'Training goal area', length, length - goalAreaDepth, midY - goalAreaHalf, midY + goalAreaHalf),
+    line('training-left-penalty-mark', 'Training penalty mark', [[spot, midY - 0.15 * scale], [spot, midY + 0.15 * scale]]),
+    line('training-right-penalty-mark', 'Training penalty mark', [[length - spot, midY - 0.15 * scale], [length - spot, midY + 0.15 * scale]]),
+    line('training-left-goal', 'Training goal', [[0, midY - goalHalf], [goalDepth, midY - goalHalf], [goalDepth, midY + goalHalf], [0, midY + goalHalf]]),
+    line('training-right-goal', 'Training goal', [[length, midY - goalHalf], [length - goalDepth, midY - goalHalf], [length - goalDepth, midY + goalHalf], [length, midY + goalHalf]]),
+  ];
+
+  const circle: Array<[number, number]> = [];
+  const segments = 24;
+  for (let index = 0; index <= segments; index += 1) {
+    const angle = (index / segments) * Math.PI * 2;
+    circle.push([
+      length / 2 + Math.cos(angle) * circleRadius,
+      width / 2 + Math.sin(angle) * circleRadius,
+    ]);
+  }
+  markings.push(line('training-centre-circle', 'Training centre circle', circle));
+
+  const cornerRadius = Math.min(scale, length * 0.04, width * 0.04);
+  if (cornerRadius >= 0.3) {
+    const arc = (
+      id: string,
+      label: string,
+      centerX: number,
+      centerY: number,
+      startAngle: number,
+      endAngle: number,
+    ) => {
+      const points: Array<[number, number]> = [];
+      const steps = 6;
+      for (let index = 0; index <= steps; index += 1) {
+        const angle = startAngle + ((endAngle - startAngle) * index) / steps;
+        points.push([
+          centerX + Math.cos(angle) * cornerRadius,
+          centerY + Math.sin(angle) * cornerRadius,
+        ]);
+      }
+      return line(id, label, points);
+    };
+    markings.push(
+      arc('training-corner-top-left', 'Training corner arc', 0, 0, 0, Math.PI / 2),
+      arc('training-corner-bottom-left', 'Training corner arc', 0, width, 0, -Math.PI / 2),
+      arc('training-corner-top-right', 'Training corner arc', length, 0, Math.PI, Math.PI / 2),
+      arc('training-corner-bottom-right', 'Training corner arc', length, width, Math.PI, (Math.PI * 3) / 2),
+    );
+  }
+
+  return markings;
+}
+
+function pitchHasSourcedAreas(pitch: TacticalPitch): boolean {
+  return pitch.overlays.some((overlay) => (
+    /penalty|goal-area|goal area|six-metre|six metre/i.test(`${overlay.id} ${overlay.label}`)
+  ));
+}
+
+export function displayPitchOverlays(pitch: TacticalPitch): TacticalPitch['overlays'] {
+  if (pitch.overlays.some((overlay) => overlay.id.startsWith('training-'))) return pitch.overlays;
+  if (pitchHasSourcedAreas(pitch)) return pitch.overlays;
+  return [...pitch.overlays, ...fittedTrainingMarkings(pitch.dimensions)];
+}
 
 export type TacticalProjectTransform = 'horizontal' | 'vertical';
 

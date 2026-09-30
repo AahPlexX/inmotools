@@ -18,12 +18,27 @@ export interface TacticalBoardProps {
   onSelectToken: (tokenId: string) => void;
   onPitchPoint: (point: NormalizedPoint) => void;
   onOpenActions: (tokenId?: string) => void;
+  onSelectBall?: () => void;
+  onSelectAnnotation?: (annotationId: string) => void;
 }
 
-function tokenIdFromTarget(target: EventTarget | null): string | undefined {
-  if (!(target instanceof Element)) return undefined;
-  const token = target.closest<SVGGElement>('g[data-tactical-kind="player"]');
-  return token?.id || undefined;
+function entityFromTarget(target: EventTarget | null):
+  | { kind: 'player'; id: string }
+  | { kind: 'ball' }
+  | { kind: 'annotation'; id: string }
+  | null {
+  if (!(target instanceof Element)) return null;
+  const label = target.closest('[data-token-id]');
+  if (label?.getAttribute('data-tactical-kind') === 'player-label') {
+    const labelId = label.getAttribute('data-token-id');
+    if (labelId) return { kind: 'player', id: labelId };
+  }
+  const player = target.closest<SVGGElement>('g[data-tactical-kind="player"]');
+  if (player?.id) return { kind: 'player', id: player.id };
+  if (target.closest('[data-tactical-kind="ball"]')) return { kind: 'ball' };
+  const annotation = target.closest<SVGElement>('[data-tactical-kind="annotation"]');
+  if (annotation?.id) return { kind: 'annotation', id: annotation.id };
+  return null;
 }
 
 export default function TacticalBoard({
@@ -37,6 +52,8 @@ export default function TacticalBoard({
   onSelectToken,
   onPitchPoint,
   onOpenActions,
+  onSelectBall,
+  onSelectAnnotation,
 }: TacticalBoardProps) {
   const svg = useMemo(
     () => serializeTacticalBoardSvg(project, sceneId, renderOptions),
@@ -45,9 +62,17 @@ export default function TacticalBoard({
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (!event.isPrimary || event.button !== 0) return;
-    const tokenId = tokenIdFromTarget(event.target);
-    if (interactionMode === 'move' && tokenId) {
-      onSelectToken(tokenId);
+    const entity = entityFromTarget(event.target);
+    if (entity?.kind === 'annotation') {
+      onSelectAnnotation?.(entity.id);
+      return;
+    }
+    if (interactionMode === 'move' && entity?.kind === 'player') {
+      onSelectToken(entity.id);
+      return;
+    }
+    if (interactionMode === 'move' && entity?.kind === 'ball') {
+      onSelectBall?.();
       return;
     }
 
@@ -57,7 +82,8 @@ export default function TacticalBoard({
 
   function handleContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault();
-    onOpenActions(tokenIdFromTarget(event.target));
+    const entity = entityFromTarget(event.target);
+    onOpenActions(entity?.kind === 'player' ? entity.id : undefined);
   }
 
   const instruction = interactionMode === 'arrow'

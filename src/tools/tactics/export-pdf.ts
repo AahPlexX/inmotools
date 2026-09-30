@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { readExportMetadata, sampleExportTimes } from './export-engine';
+import { displayPitchOverlays } from './pitch-engine';
 import type { ExportMetadata } from './export-types';
 import { sampleTacticalProjectAtTime } from './timeline-engine';
 import type { NormalizedPoint, TacticalProject } from './tactics-types';
@@ -98,7 +99,7 @@ function drawDiagram(page: PDFPage, font: PDFFont, project: TacticalProject, sce
     thickness: 1,
   });
 
-  for (const overlay of project.pitch.overlays) {
+  for (const overlay of displayPitchOverlays(project.pitch)) {
     if (overlay.points.length < 2) continue;
     for (let index = 1; index < overlay.points.length; index += 1) {
       const start = mapPoint(overlay.points[index - 1]!, box);

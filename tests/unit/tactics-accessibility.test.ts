@@ -77,6 +77,7 @@ describe('tactical accessibility contracts', () => {
       'previous-keyframe',
       'next-keyframe',
       'player-actions',
+      'delete-drawing',
     ]);
     expect(TACTICAL_HELP_SECTIONS.map((section) => section.id)).toEqual([
       'move',
@@ -85,6 +86,7 @@ describe('tactical accessibility contracts', () => {
       'layers',
       'motion',
       'recovery',
+      'match-setup',
     ]);
   });
 
