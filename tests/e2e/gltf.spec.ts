@@ -209,18 +209,57 @@ test('leaves textures in their original format by default and discloses the WebP
 
 test('cancels a running optimization without producing a downloadable result', async ({ page }) => {
   test.setTimeout(120_000);
+
+  // Hold the worker's first request so the run is provably still in flight. Racing a heavy model
+  // instead is flaky: on a fast host the optimization can finish before the click lands, which
+  // detaches the Cancel button. This gates delivery while keeping a real Worker and a real UI.
+  await page.addInitScript(() => {
+    const RealWorker = window.Worker;
+    const instances: GatedWorker[] = [];
+    class GatedWorker {
+      private worker: Worker;
+      private queued: unknown[] | null = null;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+      onmessageerror: ((event: MessageEvent) => void) | null = null;
+      terminated = false;
+      constructor(url: string | URL, options?: WorkerOptions) {
+        this.worker = new RealWorker(url, options);
+        this.worker.addEventListener('message', (event) => this.onmessage?.(event));
+        this.worker.addEventListener('error', (event) => this.onerror?.(event));
+        this.worker.addEventListener('messageerror', (event) => this.onmessageerror?.(event));
+        instances.push(this);
+      }
+      postMessage(message: unknown) { this.queued = [message]; }
+      terminate() { this.terminated = true; this.worker.terminate(); }
+      release() { if (this.queued) { this.worker.postMessage(this.queued[0]); this.queued = null; } }
+    }
+    const gate = {
+      release: () => instances.forEach((instance) => instance.release()),
+      terminated: () => instances.some((instance) => instance.terminated),
+    };
+    window.Worker = GatedWorker as unknown as typeof Worker;
+    (window as unknown as { __gltfGate: typeof gate }).__gltfGate = gate;
+  });
+
+  // A small model is enough now that the gate, not model size, guarantees the run is still in flight.
   await page.goto('./#/tools/gltf-optimizer');
-  await loadModel(page, 'grid.glb', makeGridGlb(160));
+  await loadModel(page, 'grid.glb', makeGridGlb(24));
   await page.getByRole('button', { name: 'Optimize GLB' }).click();
 
+  // The run is in flight because the worker has not received the bytes yet.
   const cancel = page.getByRole('button', { name: 'Cancel optimization' });
   await expect(cancel).toBeVisible();
+  await expect(page.getByRole('progressbar')).toBeVisible();
   await cancel.click();
+
   await expect(page.locator('.status-line')).toContainText(/canceled/i, { timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Optimize GLB' })).toBeEnabled();
 
-  // Cancelling mid-run must not resurrect output when the terminated worker had already posted.
+  // The worker must actually be terminated, so a late reply can never be accepted.
+  expect(await page.evaluate(() => (window as unknown as { __gltfGate: { terminated: () => boolean } }).__gltfGate.terminated())).toBe(true);
+  await page.evaluate(() => (window as unknown as { __gltfGate: { release: () => void } }).__gltfGate.release());
   await page.waitForTimeout(1500);
   await expect(page.getByRole('button', { name: 'Download optimized GLB' })).toBeDisabled();
 });
