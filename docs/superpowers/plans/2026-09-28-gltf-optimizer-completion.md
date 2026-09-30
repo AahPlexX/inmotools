@@ -54,12 +54,12 @@
 
 **Interfaces:** Adds `TASK-024: glTF / GLB Optimizer completion` without changing other active workstream entries. Product changes remain unauthorized until this plan and execution method are approved.
 
-- [ ] Reconfirm branch `feat/gltf-optimizer-completion`, base commit ancestry, worktree status, and the exact `origin/main` ref; preserve the other worktree lock metadata and the untracked `.probe-opencv/` in the Photo Studio checkout.
-- [ ] Insert a concise TASK-024 entry into `.tasks/IN_PROGRESS.md` describing the approved spec and completion gate, and advance `.tasks/config.json` `nextId` from 24 to 25.
-- [ ] Install the lockfile-exact dependencies in the isolated worktree with `pnpm install --frozen-lockfile`; confirm it completes without modifying `package.json` or `pnpm-lock.yaml`.
-- [ ] Run `pnpm exec vitest run tests/unit/gltf.test.ts` and `pnpm test:unit`; record baseline pass/fail counts and any unrelated failure signature in the active task entry before attributing later failures.
-- [ ] Run `pnpm build` and record its baseline result. Do not run Playwright before a fresh build.
-- [ ] Commit only the task-state start record as `docs(tasks): track gltf optimizer completion`.
+- [x] Reconfirm branch `feat/gltf-optimizer-completion`, base commit ancestry, worktree status, and the exact `origin/main` ref; preserve the other worktree lock metadata and the untracked `.probe-opencv/` in the Photo Studio checkout.
+- [x] Insert a concise TASK-024 entry into `.tasks/IN_PROGRESS.md` describing the approved spec and completion gate, and advance `.tasks/config.json` `nextId` from 24 to 25.
+- [x] Install the lockfile-exact dependencies in the isolated worktree with `pnpm install --frozen-lockfile`; confirm it completes without modifying `package.json` or `pnpm-lock.yaml`.
+- [x] Run `pnpm exec vitest run tests/unit/gltf.test.ts` and `pnpm test:unit`; record baseline pass/fail counts and any unrelated failure signature in the active task entry before attributing later failures.
+- [x] Run `pnpm build` and record its baseline result. Do not run Playwright before a fresh build.
+- [x] Commit only the task-state start record as `docs(tasks): track gltf optimizer completion`.
 
 ## Task 2: Validate GLB framing and report known statistics
 
@@ -67,12 +67,12 @@
 
 **Interfaces:** Preserve `readGlbJson(input: Uint8Array): Record<string, any>` as the JSON accessor. Add an internal framing scanner returning the JSON plus encountered chunk metadata/blockers. Change `GltfStats.vertices` and `triangles` to `number | null` when unavailable; known JSON counts remain numbers. Extend inspection blockers without weakening existing unknown-extension / Draco policy.
 
-- [ ] Add generated-GLB tests named for header total-length mismatch, first/missing JSON chunk, truncated chunk header/payload, unaligned chunk length, invalid JSON/`asset.version`, invalid chunk ordering/duplicate BIN, missing BIN when the JSON buffer has no URI, and unknown trailing chunk blocking rewrite while inspection remains possible.
-- [ ] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm every new case fails for the specific missing validation, not because the fixture is malformed.
-- [ ] Implement strict GLB 2 container framing: header length equals input bytes; JSON is first and unique; each chunk header/payload is complete and four-byte aligned; optional BIN is in the valid next position and occurs at most once; if JSON declares an embedded first buffer without a URI, require the BIN chunk; unknown chunk types may be inspected but block serialization unless preservation is proven; JSON parses and declares `asset.version: "2.0"`.
-- [ ] Make preflight-blocked geometry counts explicitly unavailable (not zero) while retaining safe known mesh/primitive/texture/camera/animation counts. Render unavailable values clearly in every relevant metric/status location.
-- [ ] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm malformed inputs reject with specific actionable messages and existing fixtures/policies pass.
-- [ ] Commit as `fix(gltf): validate GLB container framing`.
+- [x] Add generated-GLB tests named for header total-length mismatch, first/missing JSON chunk, truncated chunk header/payload, unaligned chunk length, invalid JSON/`asset.version`, invalid chunk ordering/duplicate BIN, missing BIN when the JSON buffer has no URI, and unknown trailing chunk blocking rewrite while inspection remains possible.
+- [x] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm every new case fails for the specific missing validation, not because the fixture is malformed.
+- [x] Implement strict GLB 2 container framing: header length equals input bytes; JSON is first and unique; each chunk header/payload is complete and four-byte aligned; optional BIN is in the valid next position and occurs at most once; if JSON declares an embedded first buffer without a URI, require the BIN chunk; unknown chunk types may be inspected but block serialization unless preservation is proven; JSON parses and declares `asset.version: "2.0"`.
+- [x] Make preflight-blocked geometry counts explicitly unavailable (not zero) while retaining safe known mesh/primitive/texture/camera/animation counts. Render unavailable values clearly in every relevant metric/status location.
+- [x] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm malformed inputs reject with specific actionable messages and existing fixtures/policies pass.
+- [x] Commit as `fix(gltf): validate GLB container framing`.
 
 ## Task 3: Prove optimization, scene preservation, and texture policies
 
@@ -80,14 +80,14 @@
 
 **Interfaces:** Extend `GltfOptimizeOptions` with `textureFormat: 'preserve' | 'webp'`; default missing/invalid option to `'preserve'`. Add report fields for converted texture count, measured geometry outcome/target shortfall, and preservation status. Keep `optimizeGlb(input, options, control)` and add no separate optimizer implementation.
 
-- [ ] Add a deterministic multi-triangle fixture and failing tests for measured reduction, original input immutability, valid output re-inspection, and best-effort behavior when the simplifier cannot meet the requested ratio.
-- [ ] Add a non-empty animation fixture targeting a node property and a camera fixture; assert names, channel targets/sampler semantics/accessor values, and camera preservation survive the output read/write cycle.
-- [ ] Add image fixtures with controlled codec behavior: same-format resizing keeps MIME; decode/encode failures retain original bytes and report a skip; unsupported browser APIs report a skip. Add WebP opt-in tests that assert actual encoded MIME before mutation, only count successful conversions, serialize `EXT_texture_webp` in both `extensionsUsed` and `extensionsRequired` only if at least one texture converted, and make WebP preview work in the bundled Three.js loader.
-- [ ] Run the new engine cases and confirm RED. Use injected/mocked codec functions only at the narrow codec seam; do not depend on platform-specific lossy image bytes.
-- [ ] Implement minimal measured before/after and preservation checks. Reject output on invariant mismatch. Compare non-empty animation names and channel/sampler targets against the input document while allowing buffer/accessor indices to be rewritten. Keep geometry shortfall informational and never fabricate the requested ratio.
-- [ ] Add an explicit opt-in checkbox/control, off by default, with visible pre-run help that converted output requires `EXT_texture_webp` and has no PNG/JPEG fallback; preserve same-format resize by default and disclose per-image skips.
-- [ ] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm reduction, animation, MIME, extension and re-inspection assertions pass.
-- [ ] Commit as `feat(gltf): verify optimization and texture outcomes`.
+- [x] Add a deterministic multi-triangle fixture and failing tests for measured reduction, original input immutability, valid output re-inspection, and best-effort behavior when the simplifier cannot meet the requested ratio.
+- [x] Add a non-empty animation fixture targeting a node property and a camera fixture; assert names, channel targets/sampler semantics/accessor values, and camera preservation survive the output read/write cycle.
+- [x] Add image fixtures with controlled codec behavior: same-format resizing keeps MIME; decode/encode failures retain original bytes and report a skip; unsupported browser APIs report a skip. Add WebP opt-in tests that assert actual encoded MIME before mutation, only count successful conversions, serialize `EXT_texture_webp` in both `extensionsUsed` and `extensionsRequired` only if at least one texture converted, and make WebP preview work in the bundled Three.js loader.
+- [x] Run the new engine cases and confirm RED. Use injected/mocked codec functions only at the narrow codec seam; do not depend on platform-specific lossy image bytes.
+- [x] Implement minimal measured before/after and preservation checks. Reject output on invariant mismatch. Compare non-empty animation names and channel/sampler targets against the input document while allowing buffer/accessor indices to be rewritten. Keep geometry shortfall informational and never fabricate the requested ratio.
+- [x] Add an explicit opt-in checkbox/control, off by default, with visible pre-run help that converted output requires `EXT_texture_webp` and has no PNG/JPEG fallback; preserve same-format resize by default and disclose per-image skips.
+- [x] Run `pnpm exec vitest run tests/unit/gltf.test.ts`; confirm reduction, animation, MIME, extension and re-inspection assertions pass.
+- [x] Commit as `feat(gltf): verify optimization and texture outcomes`.
 
 ## Task 4: Move optimization into a cancellable local worker
 
@@ -95,12 +95,12 @@
 
 **Interfaces:** Define discriminated worker messages with a numeric `requestId`: request `{ type: 'optimize', requestId, bytes, options }`; response `progress { requestId, value, stage }`, `completed { requestId, result }`, or `error { requestId, message }`. Export `GltfWorkerClient.run(bytes, options, onProgress): { promise: Promise<GltfOptimizeResult>; cancel(): void }` and `dispose(): void`. Cancellation terminates the active worker and rejects the pending promise with an `AbortError`; completion/error/cancel/dispose all settle the request at most once. The client creates the Vite module worker using the repository's `new Worker(new URL(..., import.meta.url), { type: 'module' })` pattern. Keep a copy of source bytes in the workspace; transfer only a separate copy if transferables are used.
 
-- [ ] Add fake-worker tests for successful result/progress correlation, mismatched request IDs, `onerror`/`messageerror`, post failure, cancellation/termination with `AbortError`, cancel-after-completion no-op, and late response after cancel ignored; confirm RED.
-- [ ] Implement the worker protocol and one-run client. Terminate the worker on completion, error, cancellation or disposal; settle pending requests on unexpected worker exits and posting failures; never accept a late or mismatched reply.
-- [ ] Route Optimize, settings invalidation, explicit cancel, and workspace unmount through the client. Invalidate result immediately on cancel and disable download. If `Worker` is unavailable, leave inspection/preview enabled, disable optimization, and explain that processing is unavailable rather than falling back to main-thread work.
-- [ ] Ensure progress/status remains announced and controls stay keyboard reachable. Keep preview and WebGL renderer on the UI thread; do not broaden worker ownership into preview.
-- [ ] Run `pnpm exec vitest run tests/unit/gltf-worker-client.test.ts tests/unit/gltf.test.ts`; confirm all protocol and engine cases pass.
-- [ ] Commit as `feat(gltf): run optimization in cancellable worker`.
+- [x] Add fake-worker tests for successful result/progress correlation, mismatched request IDs, `onerror`/`messageerror`, post failure, cancellation/termination with `AbortError`, cancel-after-completion no-op, and late response after cancel ignored; confirm RED.
+- [x] Implement the worker protocol and one-run client. Terminate the worker on completion, error, cancellation or disposal; settle pending requests on unexpected worker exits and posting failures; never accept a late or mismatched reply.
+- [x] Route Optimize, settings invalidation, explicit cancel, and workspace unmount through the client. Invalidate result immediately on cancel and disable download. If `Worker` is unavailable, leave inspection/preview enabled, disable optimization, and explain that processing is unavailable rather than falling back to main-thread work.
+- [x] Ensure progress/status remains announced and controls stay keyboard reachable. Keep preview and WebGL renderer on the UI thread; do not broaden worker ownership into preview.
+- [x] Run `pnpm exec vitest run tests/unit/gltf-worker-client.test.ts tests/unit/gltf.test.ts`; confirm all protocol and engine cases pass.
+- [x] Commit as `feat(gltf): run optimization in cancellable worker`.
 
 ## Task 5: Verify visible workflows and reconcile documentation
 
@@ -108,12 +108,12 @@
 
 **Interfaces:** Keep route `#/tools/gltf-optimizer`, existing E2E selector behavior, and `downloadBytes` output type/name contract. Docs must distinguish historical initial implementation from current completion work and link this approved spec/plan.
 
-- [ ] Add the E2E-selector assertion that a `src/tools/gltf/` change selects `tests/e2e/gltf.spec.ts`; update the selector only if the assertion exposes a missing mapping.
-- [ ] Add browser cases for invalid/non-GLB upload feedback; valid model optimization with actual before/after metrics; settings invalidation; explicit WebP warning/default-off behavior; cancel leaves no download; and download event suggested filename, MIME type, and downloaded GLB magic/length/JSON parseability. Capture the Blob passed to `URL.createObjectURL` in the browser test to assert its MIME without adding a component-test dependency. Use a controlled worker test seam for cancellation rather than a timing-dependent heavy model.
-- [ ] Exercise populated workspace at phone portrait, landscape and tablet widths; assert no horizontal document overflow, keyboard access to optimizer and preview controls, and no serious/critical Axe violations.
-- [ ] Correct catalog privacy text to say parsing, same-format resizing/optional extension-aware conversion, preview and export remain local. Correct Tool 13 stale WebP wording and Task 9 stale implementation checklist without changing historical commit claims; link the completion plan.
-- [ ] Run focused selector, worker-client, and engine tests. Run `pnpm build` immediately before `pnpm exec playwright test tests/e2e/gltf.spec.ts`; both desktop and mobile Chromium projects must pass. If preview appears stale, inspect port 4173 before rerunning.
-- [ ] Commit as `test(gltf): verify output and local workflows` and `docs(gltf): reconcile optimizer behavior` (keep commits separated by concern).
+- [x] Add the E2E-selector assertion that a `src/tools/gltf/` change selects `tests/e2e/gltf.spec.ts`; update the selector only if the assertion exposes a missing mapping.
+- [x] Add browser cases for invalid/non-GLB upload feedback; valid model optimization with actual before/after metrics; settings invalidation; explicit WebP warning/default-off behavior; cancel leaves no download; and download event suggested filename, MIME type, and downloaded GLB magic/length/JSON parseability. Capture the Blob passed to `URL.createObjectURL` in the browser test to assert its MIME without adding a component-test dependency. Use a controlled worker test seam for cancellation rather than a timing-dependent heavy model.
+- [x] Exercise populated workspace at phone portrait, landscape and tablet widths; assert no horizontal document overflow, keyboard access to optimizer and preview controls, and no serious/critical Axe violations.
+- [x] Correct catalog privacy text to say parsing, same-format resizing/optional extension-aware conversion, preview and export remain local. Correct Tool 13 stale WebP wording and Task 9 stale implementation checklist without changing historical commit claims; link the completion plan.
+- [x] Run focused selector, worker-client, and engine tests. Run `pnpm build` immediately before `pnpm exec playwright test tests/e2e/gltf.spec.ts`; both desktop and mobile Chromium projects must pass. If preview appears stale, inspect port 4173 before rerunning.
+- [x] Commit as `test(gltf): verify output and local workflows` and `docs(gltf): reconcile optimizer behavior` (keep commits separated by concern).
 
 ## Task 6: Final evidence and integration handoff
 
