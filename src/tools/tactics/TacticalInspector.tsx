@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { readCanonicalCoordinate } from './coordinate-engine';
 import { layerPlayerTokenIds } from './editor-engine';
 import { useFocusTrap } from './TacticalOverlay';
 import type { PlayerToken, TacticalProject } from './tactics-types';
@@ -171,6 +172,12 @@ export default function TacticalInspector({
               />
             </label>
             <button type="submit">Set position</button>
+            <p className="tactical-coordinate-readout">
+              {(() => {
+                const reading = readCanonicalCoordinate(selectedToken.position, project.pitch.dimensions);
+                return `Normalized ${reading.x.toFixed(3)}, ${reading.y.toFixed(3)}. Pitch metres ${reading.xMeters.toFixed(2)} m by ${reading.yMeters.toFixed(2)} m.`;
+              })()}
+            </p>
           </form>
         ) : <p>Select a player to enable exact coordinates.</p>}
       </div>

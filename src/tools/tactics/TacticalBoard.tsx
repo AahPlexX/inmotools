@@ -1,5 +1,5 @@
 import { useMemo, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { serializeTacticalBoardSvg } from './board-engine';
+import { serializeTacticalBoardSvg, type TacticalBoardRenderOptions } from './board-engine';
 import {
   TacticalAnalysisOverlay,
   type AnalysisDisplaySettings,
@@ -14,6 +14,7 @@ export interface TacticalBoardProps {
   interactionMode: 'move' | 'arrow';
   arrowStart?: NormalizedPoint | null;
   analysisSettings?: AnalysisDisplaySettings;
+  renderOptions?: TacticalBoardRenderOptions;
   onSelectToken: (tokenId: string) => void;
   onPitchPoint: (point: NormalizedPoint) => void;
   onOpenActions: (tokenId?: string) => void;
@@ -32,13 +33,14 @@ export default function TacticalBoard({
   interactionMode,
   arrowStart,
   analysisSettings,
+  renderOptions,
   onSelectToken,
   onPitchPoint,
   onOpenActions,
 }: TacticalBoardProps) {
   const svg = useMemo(
-    () => serializeTacticalBoardSvg(project, sceneId),
-    [project, sceneId],
+    () => serializeTacticalBoardSvg(project, sceneId, renderOptions),
+    [project, sceneId, renderOptions],
   );
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {

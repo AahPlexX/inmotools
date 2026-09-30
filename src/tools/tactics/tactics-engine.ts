@@ -78,6 +78,7 @@ export function createStarterTacticalProject(): TacticalProject {
       },
     ],
     formationStates: [],
+    scenarios: [],
     ball: {
       position: { x: 0.5, y: 0.5 },
       elevationMeters: 0,
@@ -200,6 +201,41 @@ export function validateTacticalProject(project: TacticalProject): string[] {
         errors.push(`Object ${object.id} references missing layer ${object.layerId}.`);
       }
       validatePosition(errors, object.id, object.position);
+    }
+  }
+
+  const rosterStatuses = new Set(['active', 'substitute', 'neutral', 'coach']);
+  for (const team of project.teams) {
+    for (const player of team.roster) {
+      if (!rosterStatuses.has(player.status)) {
+        errors.push(`Roster player ${player.id} status must be active, substitute, neutral, or coach.`);
+      }
+    }
+  }
+
+  if (!Array.isArray(project.scenarios)) {
+    errors.push('Scenarios must be an array.');
+  } else {
+    const scenarioIds = new Set<string>();
+    for (const scenario of project.scenarios) {
+      if (!scenario.id?.trim()) errors.push('Scenario id is required.');
+      else if (scenarioIds.has(scenario.id)) errors.push(`Scenario id ${scenario.id} is duplicated.`);
+      scenarioIds.add(scenario.id);
+      if (!scenario.label?.trim()) errors.push(`Scenario ${scenario.id || 'record'} label is required.`);
+      if (!sceneLayers.has(scenario.sceneId)) {
+        errors.push(`Scenario ${scenario.id || 'record'} references missing scene ${scenario.sceneId}.`);
+      }
+      if (!Number.isInteger(scenario.capturedAtMs) || scenario.capturedAtMs < 0) {
+        errors.push(`Scenario ${scenario.id || 'record'} time must be a non-negative integer millisecond value.`);
+      }
+      if (!Number.isFinite(scenario.ballElevationMeters) || scenario.ballElevationMeters < 0) {
+        errors.push(`Scenario ${scenario.id || 'record'} ball elevation must be a non-negative finite metre value.`);
+      }
+      if (scenario.ballPosition) validatePosition(errors, scenario.id || 'scenario', scenario.ballPosition);
+      else errors.push(`Scenario ${scenario.id || 'record'} is missing a ball position.`);
+      for (const [tokenId, position] of Object.entries(scenario.tokenPositions ?? {})) {
+        validatePosition(errors, `${scenario.id}:${tokenId}`, position);
+      }
     }
   }
 

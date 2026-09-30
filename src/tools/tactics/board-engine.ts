@@ -1,3 +1,4 @@
+import { sampleBallElevationTrajectory } from './elevation-engine';
 import type {
   NormalizedPoint,
   TacticalAnnotation,
@@ -5,6 +6,12 @@ import type {
   TacticalProject,
   TacticalScene,
 } from './tactics-types';
+
+export interface TacticalBoardRenderOptions {
+  ghosts?: Array<{ tokenId: string; position: NormalizedPoint; relation: 'previous' | 'next' }>;
+  guides?: Array<{ axis: 'x' | 'y'; value: number; label: string }>;
+  scenarioGhosts?: Array<{ tokenId: string; position: NormalizedPoint }>;
+}
 
 const BOARD_WIDTH = 1000;
 
@@ -109,6 +116,18 @@ function serializeEquipment(item: TacticalEquipment, height: number): string {
     return `<polygon id="${id}" data-tactical-kind="equipment" data-equipment-kind="cone" points="${number(point.x)},${number(topY)} ${number(leftX)},${number(bottomY)} ${number(rightX)},${number(bottomY)}" fill="#f59e0b" stroke="#78350f" stroke-width="1.5" transform="rotate(${rotation} ${x} ${y})"/>`;
   }
 
+  if (item.kind === 'pole') {
+    return `<line id="${id}" data-tactical-kind="equipment" data-equipment-kind="pole" x1="${x}" y1="${number(point.y - 16 * scale)}" x2="${x}" y2="${number(point.y + 16 * scale)}" stroke="#e2e8f0" stroke-width="${number(3 * scale)}" stroke-linecap="round" transform="rotate(${rotation} ${x} ${y})"/>`;
+  }
+
+  if (item.kind === 'mannequin') {
+    return `<g id="${id}" data-tactical-kind="equipment" data-equipment-kind="mannequin" transform="translate(${x} ${y}) rotate(${rotation})"><circle cx="0" cy="${number(-8 * scale)}" r="${number(5 * scale)}" fill="#cbd5e1" stroke="#334155" stroke-width="1.5"/><rect x="${number(-6 * scale)}" y="${number(-2 * scale)}" width="${number(12 * scale)}" height="${number(16 * scale)}" rx="3" fill="#94a3b8" stroke="#334155" stroke-width="1.5"/></g>`;
+  }
+
+  if (item.kind === 'mini-goal') {
+    return `<rect id="${id}" data-tactical-kind="equipment" data-equipment-kind="mini-goal" x="${number(point.x - 16 * scale)}" y="${number(point.y - 8 * scale)}" width="${number(32 * scale)}" height="${number(16 * scale)}" fill="none" stroke="#f8fafc" stroke-width="2" transform="rotate(${rotation} ${x} ${y})"/>`;
+  }
+
   return `<rect id="${id}" data-tactical-kind="equipment" data-equipment-kind="${escapeAttribute(item.kind)}" x="${number(point.x - 7 * scale)}" y="${number(point.y - 7 * scale)}" width="${number(14 * scale)}" height="${number(14 * scale)}" rx="2" fill="#f8fafc" stroke="#334155" stroke-width="1.5" transform="rotate(${rotation} ${x} ${y})"/>`;
 }
 
@@ -118,6 +137,19 @@ function serializeAnnotation(
   markerId: string,
 ): string {
   if (!annotation.points.length) return '';
+  if (annotation.kind === 'spotlight') {
+    const center = toBoardPoint(annotation.points[0]!, height);
+    const id = escapeAttribute(safeId(annotation.id));
+    const label = annotation.label?.trim();
+    const title = label ? `<title>${escapeText(label)}</title>` : '<title>Spotlight</title>';
+    return `<g id="${id}" data-tactical-kind="annotation" data-annotation-kind="spotlight"><circle cx="${number(center.x)}" cy="${number(center.y)}" r="72" fill="#111827" fill-opacity="0.16" stroke="#fef08a" stroke-width="4"/>${title}</g>`;
+  }
+  if (annotation.kind === 'presentation-label') {
+    const center = toBoardPoint(annotation.points[0]!, height);
+    const id = escapeAttribute(safeId(annotation.id));
+    const label = annotation.label?.trim() || 'Note';
+    return `<text id="${id}" data-tactical-kind="annotation" data-annotation-kind="presentation-label" x="${number(center.x)}" y="${number(center.y)}" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#ffffff">${escapeText(label)}</text>`;
+  }
   const points = annotation.points
     .map((point) => {
       const board = toBoardPoint(point, height);
@@ -125,7 +157,7 @@ function serializeAnnotation(
     })
     .join(' ');
   const id = escapeAttribute(safeId(annotation.id));
-  const isArrow = annotation.kind === 'arrow';
+  const isArrow = annotation.kind === 'arrow' || annotation.kind === 'presentation-arrow';
   const marker = isArrow ? ` marker-end="url(#${escapeAttribute(markerId)})"` : '';
   const label = annotation.label?.trim();
   const title = label ? `<title>${escapeText(label)}</title>` : '';
@@ -136,7 +168,59 @@ function serializeAnnotation(
   return `${line}<text x="${number(last.x + 10)}" y="${number(last.y - 10)}" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">${escapeText(label)}</text>`;
 }
 
-export function serializeTacticalBoardSvg(project: TacticalProject, sceneId: string): string {
+function serializeGuides(guides: TacticalBoardRenderOptions['guides'], height: number): string[] {
+  if (!guides?.length) return [];
+  return guides.map((guide) => {
+    const label = escapeText(guide.label);
+    if (guide.axis === 'x') {
+      const x = number(guide.value * BOARD_WIDTH);
+      return `<line data-tactical-kind="guide" x1="${x}" y1="10" x2="${x}" y2="${number(height - 10)}" stroke="#bae6fd" stroke-opacity="0.85" stroke-width="2" stroke-dasharray="6 6"><title>${label}</title></line>`;
+    }
+    const y = number(guide.value * height);
+    return `<line data-tactical-kind="guide" x1="10" y1="${y}" x2="${number(BOARD_WIDTH - 10)}" y2="${y}" stroke="#bae6fd" stroke-opacity="0.85" stroke-width="2" stroke-dasharray="6 6"><title>${label}</title></line>`;
+  });
+}
+
+function serializeGhosts(
+  ghosts: Array<{ tokenId: string; position: NormalizedPoint; relation?: 'previous' | 'next' }> | undefined,
+  height: number,
+  kind: 'ghost' | 'scenario-ghost',
+): string[] {
+  if (!ghosts?.length) return [];
+  return ghosts.map((ghost) => {
+    const point = toBoardPoint(ghost.position, height);
+    const relation = ghost.relation ?? 'scenario';
+    const id = escapeAttribute(safeId(`${kind}-${ghost.tokenId}-${relation}`));
+    return `<circle id="${id}" data-tactical-kind="${kind}" data-ghost-token="${escapeAttribute(ghost.tokenId)}" data-ghost-relation="${escapeAttribute(relation)}" cx="${number(point.x)}" cy="${number(point.y)}" r="18" fill="none" stroke="#e2e8f0" stroke-opacity="0.8" stroke-width="3" stroke-dasharray="4 4"><title>${escapeText(relation)} position</title></circle>`;
+  });
+}
+
+function serializeElevationTrajectory(project: TacticalProject, height: number): string {
+  const track = project.timeline.tracks.find((item) => item.targetId === 'ball');
+  const elevationKeys = (track?.keyframes ?? []).filter((keyframe) => keyframe.elevationMeters !== undefined);
+  if (elevationKeys.length < 2) return '';
+  const span = elevationKeys.reduce((max, keyframe) => Math.max(max, keyframe.timeMs), 0);
+  const step = Math.max(50, Math.ceil(span / 80));
+  let samples;
+  try {
+    samples = sampleBallElevationTrajectory(project, step);
+  } catch {
+    return '';
+  }
+  if (samples.length < 2) return '';
+  const pixelsPerMeter = BOARD_WIDTH / project.pitch.dimensions.lengthMeters;
+  const points = samples.map((sample) => {
+    const board = toBoardPoint(sample.position, height);
+    return `${number(board.x)},${number(board.y - sample.elevationMeters * pixelsPerMeter * 0.35)}`;
+  }).join(' ');
+  return `<polyline data-tactical-kind="elevation-trajectory" points="${points}" fill="none" stroke="#fb923c" stroke-width="4" stroke-dasharray="8 6"><title>Authored ball elevation trajectory</title></polyline>`;
+}
+
+export function serializeTacticalBoardSvg(
+  project: TacticalProject,
+  sceneId: string,
+  options?: TacticalBoardRenderOptions,
+): string {
   const scene = requireScene(project, sceneId);
   const height = boardHeight(project);
   const markerId = `tactical-arrowhead-${safeId(project.id)}-${safeId(scene.id)}`;
@@ -153,6 +237,7 @@ export function serializeTacticalBoardSvg(project: TacticalProject, sceneId: str
     `<marker id="${escapeAttribute(markerId)}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#fef08a"/></marker>`,
     '</defs>',
     ...serializePitch(project, height),
+    ...serializeGuides(options?.guides, height),
   ];
 
   for (const item of project.equipment) {
@@ -197,9 +282,16 @@ export function serializeTacticalBoardSvg(project: TacticalProject, sceneId: str
     );
   }
 
+  parts.push(...serializeGhosts(options?.ghosts, height, 'ghost'));
+  parts.push(...serializeGhosts(options?.scenarioGhosts, height, 'scenario-ghost'));
+  parts.push(serializeElevationTrajectory(project, height));
+
   const ballPoint = toBoardPoint(project.ball.position, height);
+  const elevationLabel = project.ball.elevationMeters > 0
+    ? `<text x="16" y="-14" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#ffffff">${escapeText(`${project.ball.elevationMeters.toFixed(1)} m`)}</text>`
+    : '';
   parts.push(
-    `<g id="tactical-ball" data-tactical-kind="ball" transform="translate(${number(ballPoint.x)} ${number(ballPoint.y)})"><circle cx="0" cy="0" r="11" fill="#ffffff" stroke="#111827" stroke-width="2"/><title>Ball</title></g>`,
+    `<g id="tactical-ball" data-tactical-kind="ball" transform="translate(${number(ballPoint.x)} ${number(ballPoint.y)})"><circle cx="0" cy="0" r="11" fill="#ffffff" stroke="#111827" stroke-width="2"/><title>Ball${project.ball.elevationMeters > 0 ? `, elevation ${project.ball.elevationMeters.toFixed(2)} m` : ''}</title>${elevationLabel}</g>`,
   );
 
   parts.push('</svg>');

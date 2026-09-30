@@ -245,6 +245,16 @@ export interface FormationState {
   playerPositions: Record<string, NormalizedPoint>;
 }
 
+export interface TacticalScenario {
+  id: string;
+  label: string;
+  sceneId: string;
+  capturedAtMs: number;
+  tokenPositions: Record<string, NormalizedPoint>;
+  ballPosition: NormalizedPoint;
+  ballElevationMeters: number;
+}
+
 export interface BallState {
   position: NormalizedPoint;
   elevationMeters: number;
@@ -410,6 +420,7 @@ export interface TacticalProject {
   equipment: TacticalEquipment[];
   scenes: TacticalScene[];
   formationStates: FormationState[];
+  scenarios: TacticalScenario[];
   ball: BallState;
   annotations: TacticalAnnotation[];
   timeline: TacticalTimeline;

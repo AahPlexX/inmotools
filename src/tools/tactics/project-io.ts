@@ -181,7 +181,7 @@ function assertRequiredProjectShape(value: Record<string, unknown>): void {
   }
   for (const key of ([
     'teams', 'playerTokens', 'officials', 'equipment', 'scenes', 'formationStates',
-    'annotations', 'cameraStates', 'media', 'importProvenance',
+    'scenarios', 'annotations', 'cameraStates', 'media', 'importProvenance',
   ] as const)) {
     if (!Array.isArray(value[key])) throw new Error(`Invalid tactical project: ${key} must be an array.`);
   }
@@ -249,6 +249,7 @@ export function migrateTacticalProject(raw: unknown): TacticalProject {
   }
 
   if (source.videoReview == null) source.videoReview = createEmptyVideoReview();
+  if (!Array.isArray(source.scenarios)) source.scenarios = [];
 
   if (source.schemaVersion !== TACTICS_SCHEMA_VERSION) {
     throw new Error(`Unsupported tactical project schema version: ${String(source.schemaVersion)}.`);

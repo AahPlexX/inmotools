@@ -1152,3 +1152,63 @@ test('reduced motion steps playback instead of animating it', async ({ page }) =
   await expect(page.locator('.status-line').last()).toContainText('Reduced motion stepped to the next keyframe.');
   await expect(page.getByRole('button', { name: 'Play timeline' })).toBeEnabled();
 });
+
+test('scales a squad and authors tokens, props, elevation, spotlight, ghosts, and scenario comparison', async ({ page }) => {
+  const stage = page.locator('.tactical-stage-panel');
+  await stage.locator('summary').click();
+  await expect(page.getByTestId('squad-summary')).toContainText('7 active');
+
+  await stage.getByLabel('Active players').fill('9');
+  await stage.getByRole('button', { name: 'Scale squad' }).click();
+  await expect(page.getByTestId('squad-summary')).toContainText('9 active');
+  await expect(page.locator('.tactical-player-list button')).toHaveCount(9);
+
+  await stage.getByLabel('Role').fill('Pivot');
+  await stage.getByLabel('Developmental token').fill('first-year');
+  await stage.getByLabel('Status').selectOption('neutral');
+  await stage.getByRole('button', { name: 'Save token' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Roster token updated.');
+  await expect(page.getByTestId('squad-summary')).toContainText('1 neutral');
+
+  await stage.getByRole('button', { name: 'Place Cone' }).click();
+  await expect(page.locator('[data-equipment-kind="cone"]')).toHaveCount(1);
+  await stage.getByLabel('Rotation').fill('45');
+  await stage.getByLabel('Scale').fill('1.5');
+  await stage.getByRole('button', { name: 'Apply prop transform' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Training prop transformed.');
+
+  await stage.getByLabel('Elevation time (ms)').fill('0');
+  await stage.getByLabel('Elevation (m)').fill('0');
+  await stage.getByRole('button', { name: 'Author elevation' }).click();
+  await stage.getByLabel('Elevation time (ms)').fill('1000');
+  await stage.getByLabel('Elevation (m)').fill('8');
+  await stage.getByRole('button', { name: 'Author elevation' }).click();
+  await expect(page.locator('[data-tactical-kind="elevation-trajectory"]')).toHaveCount(1);
+
+  await stage.getByRole('button', { name: 'Add spotlight' }).click();
+  await expect(page.locator('[data-annotation-kind="spotlight"]')).toHaveCount(1);
+
+  await stage.getByRole('button', { name: 'Record onion-skin positions' }).click();
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  await stage.getByRole('button', { name: 'Capture scenario' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Base shape captured');
+  await stage.getByLabel('Scenario label').fill('Press');
+  await page.getByRole('button', { name: 'Move player right' }).click();
+  await stage.getByRole('button', { name: 'Capture scenario' }).click();
+  await expect(page.getByTestId('scenario-comparison')).toContainText(/moved/i);
+  await expect(page.getByTestId('scenario-comparison')).toContainText('m');
+
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await page.getByLabel('Playhead (ms)').fill('1000');
+  await page.getByRole('button', { name: 'Set playhead' }).click();
+  await stage.getByRole('button', { name: 'Record onion-skin positions' }).click();
+  await page.getByLabel('Playhead (ms)').fill('500');
+  await page.getByRole('button', { name: 'Set playhead' }).click();
+  await stage.getByLabel('Show onion skin').check();
+  await expect(page.locator('[data-tactical-kind="ghost"]').first()).toBeAttached();
+
+  await stage.getByLabel('Snap movement').check();
+  await page.locator('.tactical-player-list button').nth(1).click();
+  await clickBoard(page, 0.51, 0.05);
+  await expect(page.locator('.status-line').last()).toContainText('Player snapped to a tactical guide.');
+});

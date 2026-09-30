@@ -199,6 +199,13 @@ export function transformTacticalProject(
         Object.entries(state.playerPositions).map(([id, position]) => [id, point(position)]),
       ),
     })),
+    scenarios: (project.scenarios ?? []).map((scenario) => ({
+      ...scenario,
+      tokenPositions: Object.fromEntries(
+        Object.entries(scenario.tokenPositions).map(([id, position]) => [id, point(position)]),
+      ),
+      ballPosition: point(scenario.ballPosition),
+    })),
     ball: { ...project.ball, position: point(project.ball.position) },
     annotations: project.annotations.map((annotation) => ({
       ...annotation,

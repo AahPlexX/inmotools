@@ -6,6 +6,7 @@ import TacticalExportPanel from './TacticalExportPanel';
 import TacticalInspector from './TacticalInspector';
 import { TacticalDialog } from './TacticalOverlay';
 import TacticalPersistencePanel from './TacticalPersistencePanel';
+import TacticalStageOnePanel, { DEFAULT_TACTICAL_SNAP } from './TacticalStageOnePanel';
 import TacticalTimelinePanel from './TacticalTimelinePanel';
 import TacticalVideoPanel from './TacticalVideoPanel';
 import {
@@ -38,6 +39,8 @@ import {
   morphFormationPhases,
   reviewFormationLegality,
 } from './formation-engine';
+import { tacticalPitchGuides, snapWithTacticalAssist } from './guide-engine';
+import { applyPresentationVisibility, onionSkinGhosts } from './presentation-authoring-engine';
 import { transformTacticalProject } from './pitch-engine';
 import { sampleTacticalProjectAtTime } from './timeline-engine';
 import {
@@ -170,6 +173,9 @@ export default function TacticalMatchboardWorkspace() {
   const [groupedTokenIds, setGroupedTokenIds] = useState<string[]>([]);
   const [transportRequest, setTransportRequest] = useState<TacticalTransportRequest | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [snapAssist, setSnapAssist] = useState(DEFAULT_TACTICAL_SNAP);
+  const [onionSkin, setOnionSkin] = useState(false);
+  const [scenarioOverlayId, setScenarioOverlayId] = useState('');
   const [tip, setTip] = useState<{ text: string; top: number; left: number; width: number; height: number } | null>(null);
   const tipHostRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -178,7 +184,10 @@ export default function TacticalMatchboardWorkspace() {
 
   const project = history.present;
   const presentationProject = useMemo(
-    () => sampleTacticalProjectAtTime(project, Math.min(previewTimeMs, project.timeline.durationMs)),
+    () => {
+      const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
+      return applyPresentationVisibility(sampleTacticalProjectAtTime(project, timeMs), timeMs);
+    },
     [previewTimeMs, project],
   );
   const sampledCamera = useMemo(
@@ -189,6 +198,17 @@ export default function TacticalMatchboardWorkspace() {
   const activeScene = project.scenes.find((scene) => scene.id === activeSceneId) ?? project.scenes[0];
   const sceneId = activeScene?.id ?? '';
   const layerId = activeScene?.layers[0]?.id ?? '';
+  const boardRenderOptions = useMemo(() => {
+    const timeMs = Math.min(previewTimeMs, project.timeline.durationMs);
+    const overlay = project.scenarios.find((scenario) => scenario.id === scenarioOverlayId);
+    return {
+      ghosts: onionSkin ? onionSkinGhosts(project, timeMs, sceneId) : undefined,
+      guides: snapAssist.enabled && snapAssist.pitchGuides ? tacticalPitchGuides(project) : undefined,
+      scenarioGhosts: overlay
+        ? Object.entries(overlay.tokenPositions).map(([tokenId, position]) => ({ tokenId, position }))
+        : undefined,
+    };
+  }, [onionSkin, previewTimeMs, project, scenarioOverlayId, sceneId, snapAssist.enabled, snapAssist.pitchGuides]);
   const sceneTokens = project.playerTokens.filter((token) => token.sceneId === sceneId);
   const selectedToken = sceneTokens.find((token) => token.id === selectedTokenId);
   const availableFormations = useMemo(
@@ -468,6 +488,19 @@ export default function TacticalMatchboardWorkspace() {
     );
   }
 
+  function assistPoint(point: NormalizedPoint): { point: NormalizedPoint; snapped: boolean } {
+    if (!snapAssist.enabled || !sceneId) return { point, snapped: false };
+    const result = snapWithTacticalAssist(project, sceneId, point, {
+      threshold: 0.025,
+      gridStep: snapAssist.grid ? 0.05 : undefined,
+      pitchGuides: snapAssist.pitchGuides,
+      teammateSnap: snapAssist.teammates,
+      equalSpacing: snapAssist.equalSpacing,
+      excludeTokenId: selectedTokenId,
+    });
+    return { point: result.point, snapped: result.snappedX || result.snappedY };
+  }
+
   function handlePitchPoint(point: NormalizedPoint) {
     if (mode === 'arrow') {
       if (!arrowStart) {
@@ -492,10 +525,11 @@ export default function TacticalMatchboardWorkspace() {
       setStatus('Select a player before choosing a destination.');
       return;
     }
+    const assisted = assistPoint(point);
     applyEdit(
       `Move ${selectedToken.id}`,
-      (current) => movePlayerToken(current, selectedToken.id, point),
-      'Player moved.',
+      (current) => movePlayerToken(current, selectedToken.id, assisted.point),
+      assisted.snapped ? 'Player snapped to a tactical guide.' : 'Player moved.',
     );
   }
 
@@ -504,11 +538,11 @@ export default function TacticalMatchboardWorkspace() {
       setStatus('Select a player before using precision movement.');
       return;
     }
-    const next = nudgeNormalizedPoint(selectedToken.position, dx, dy);
+    const assisted = assistPoint(nudgeNormalizedPoint(selectedToken.position, dx, dy));
     applyEdit(
       `Nudge ${selectedToken.id}`,
-      (current) => movePlayerToken(current, selectedToken.id, next),
-      'Player position adjusted.',
+      (current) => movePlayerToken(current, selectedToken.id, assisted.point),
+      assisted.snapped ? 'Player snapped to a tactical guide.' : 'Player position adjusted.',
     );
   }
 
@@ -948,6 +982,21 @@ export default function TacticalMatchboardWorkspace() {
           </div>
         </details>
 
+        <TacticalStageOnePanel
+          project={project}
+          sceneId={sceneId}
+          layerId={layerId}
+          selectedTokenId={selectedTokenId}
+          previewTimeMs={Math.min(previewTimeMs, project.timeline.durationMs)}
+          snap={snapAssist}
+          onionSkin={onionSkin}
+          scenarioOverlayId={scenarioOverlayId}
+          guides={tacticalPitchGuides(project)}
+          onEdit={applyEdit}
+          onSnapChange={setSnapAssist}
+          onOnionSkinChange={setOnionSkin}
+          onScenarioOverlayChange={setScenarioOverlayId}
+        />
 
         <TacticalTimelinePanel
           project={project}
@@ -1127,6 +1176,7 @@ export default function TacticalMatchboardWorkspace() {
             interactionMode={mode}
             arrowStart={arrowStart}
             analysisSettings={analysisSettings}
+            renderOptions={boardRenderOptions}
             onSelectToken={(tokenId) => {
               setSelectedTokenId(tokenId);
               setStatus(`Selected ${tokenId}.`);
