@@ -85,7 +85,11 @@ export type PhotoMergeRequest =
   | RequestBase & { type: 'align' }
   | RequestBase & { type: 'fuse'; align: boolean }
   | RequestBase & { type: 'hdr'; align: boolean; exposureSeconds: number[]; tonemap: PhotoTonemapSettings }
-  | RequestBase & { type: 'panorama'; cropMode: PhotoPanoramaCrop };
+  | RequestBase & { type: 'panorama'; cropMode: PhotoPanoramaCrop }
+  | RequestBase & { type: 'stack'; method: PhotoStackMethod; align: boolean };
+
+/** Focus picks the locally sharpest frame, average lowers noise, median rejects transients. */
+export type PhotoStackMethod = 'focus' | 'average' | 'median';
 
 /** 'full' keeps the whole stitched canvas, transparent where no photo reaches; 'inscribed'
  * trims to a rectangle every pixel of which is covered. */
@@ -94,5 +98,5 @@ export type PhotoPanoramaCrop = 'full' | 'inscribed';
 export type PhotoMergeResponse =
   | { id: number; ok: true; type: 'register'; registrations: PhotoFrameRegistration[] }
   | { id: number; ok: true; type: 'align'; registrations: PhotoFrameRegistration[]; aligned: PhotoMergeRaster[] }
-  | { id: number; ok: true; type: 'fuse' | 'hdr' | 'panorama'; registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop }
+  | { id: number; ok: true; type: 'fuse' | 'hdr' | 'panorama' | 'stack'; registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop }
   | { id: number; ok: false; diagnostic: PhotoMergeDiagnostic };

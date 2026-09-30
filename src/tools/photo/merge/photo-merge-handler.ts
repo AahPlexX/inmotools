@@ -10,6 +10,7 @@ import type {
 import { PhotoRegistrationError, registerFramePair, warpFrameToReference, type PhotoCv } from './photo-registration';
 import { commonCoverageRect, fuseExposures, mergeHdr } from './photo-exposure-merge';
 import { cropPanorama, layoutPanorama, PhotoPanoramaError, renderPanorama } from './photo-panorama';
+import { stackFrames } from './photo-stack';
 
 const MODELS: PhotoRegistrationModel[] = ['translation', 'euclidean', 'homography'];
 
@@ -31,7 +32,7 @@ export function validatePhotoMergeRequest(message: unknown): { ok: true; request
   const invalid = (text: string) => ({ ok: false as const, diagnostic: { code: 'invalid-request' as const, message: text } });
   if (!isRecord(message) || !Number.isInteger(message.id)) return invalid('Merge request is missing its id.');
   const type = message.type;
-  if (type !== 'register' && type !== 'align' && type !== 'fuse' && type !== 'hdr' && type !== 'panorama') return invalid('Unknown merge request type.');
+  if (type !== 'register' && type !== 'align' && type !== 'fuse' && type !== 'hdr' && type !== 'panorama' && type !== 'stack') return invalid('Unknown merge request type.');
   if (!MODELS.includes(message.model as PhotoRegistrationModel)) return invalid('Unknown alignment model.');
   if (!Array.isArray(message.sources)) return invalid('Merge request has no source list.');
   const badSource = message.sources.findIndex((source) => !isRaster(source));
@@ -40,7 +41,7 @@ export function validatePhotoMergeRequest(message: unknown): { ok: true; request
   }
   const sources = message.sources as PhotoMergeRaster[];
   // Fusion and HDR blend pixel-for-pixel, so every frame must share one grid.
-  const sizeProblem = checkMergeSources(sources, type === 'fuse' || type === 'hdr');
+  const sizeProblem = checkMergeSources(sources, type === 'fuse' || type === 'hdr' || type === 'stack');
   if (sizeProblem) return { ok: false, diagnostic: sizeProblem };
   const referenceIndex = message.referenceIndex;
   if (!Number.isInteger(referenceIndex) || (referenceIndex as number) < 0 || (referenceIndex as number) >= sources.length) {
@@ -54,6 +55,11 @@ export function validatePhotoMergeRequest(message: unknown): { ok: true; request
   }
   const align = message.align !== false;
   if (type === 'fuse') return { ok: true, request: { ...base, type, align } };
+  if (type === 'stack') {
+    const method = message.method;
+    if (method !== 'focus' && method !== 'average' && method !== 'median') return invalid('Unknown stack method.');
+    return { ok: true, request: { ...base, type, method, align } };
+  }
 
   const times = message.exposureSeconds;
   if (!Array.isArray(times) || times.length !== sources.length) return invalid('HDR needs one exposure time per photo.');
@@ -131,9 +137,11 @@ export async function handlePhotoMergeRequest(message: unknown, loadEngine: () =
     if (!crop) {
       return { id, ok: false, diagnostic: { code: 'no-common-coverage', message: 'After alignment the photos share no common area to merge. Check that they show the same scene.' } };
     }
-    const result = request.type === 'fuse'
-      ? fuseExposures(cv, aligned, crop)
-      : mergeHdr(cv, aligned, crop, request.exposureSeconds, request.tonemap);
+    const result = request.type === 'stack'
+      ? stackFrames(request.method, aligned, crop)
+      : request.type === 'fuse'
+        ? fuseExposures(cv, aligned, crop)
+        : mergeHdr(cv, aligned, crop, request.exposureSeconds, request.tonemap);
     return { id, ok: true, type: request.type, registrations, result, crop };
   } catch (error) {
     if (error instanceof PhotoRegistrationError) {

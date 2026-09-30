@@ -661,6 +661,30 @@ test('panorama stitching orders photos by name, stitches them wider, and refuses
   await expect(report).toContainText('overlap');
 });
 
+test('focus, average, and median stacks align shifted frames into a smaller aligned photo', async ({ page }) => {
+  test.setTimeout(150_000);
+  await openFixture(page);
+  // The same scene shifted a few pixels between shots, as a handheld burst would be.
+  const shots = await stripPngs(page, 66, [0, 3, 6]);
+  const input = page.getByTestId('photo-merge-file-input');
+  const mergeButton = page.getByRole('button', { name: 'Merge selected photos' });
+  const report = page.getByTestId('photo-merge-report');
+
+  for (const [value, label] of [['average', 'Average stack'], ['median', 'Median stack'], ['focus', 'Focus stack']] as const) {
+    await page.getByRole('button', { name: 'Merge photos' }).click();
+    await page.getByLabel('Merge method').selectOption(value);
+    await expect(page.getByLabel('Alignment')).toBeVisible();
+    await input.setInputFiles(shots.map((buffer, index) => ({ name: `burst-${index + 1}.png`, mimeType: 'image/png', buffer })));
+    await expect(page.getByTestId('photo-merge-plan')).toContainText('3 photos · 240 × 180');
+    await mergeButton.click();
+    await expect(report).toContainText(`${label} of 3 photos`, { timeout: 90_000 });
+    const [, width, height] = (await report.textContent())!.match(/(\d+) × (\d+), after cropping/)!;
+    expect(Number(width)).toBeLessThan(240);
+    expect(Number(width)).toBeGreaterThan(220);
+    await expect(page.getByTestId('photo-source-dimensions')).toContainText(`${width} × ${height}`);
+  }
+});
+
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {
   await openFixture(page);
   await page.getByRole('button', { name: 'Export' }).click();

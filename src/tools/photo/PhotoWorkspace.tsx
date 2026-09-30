@@ -28,7 +28,9 @@ import { NEUTRAL_DETAIL_FILTERS } from './photo-detail-filters';
 import { createPhotoMergeClient, PhotoMergeFailure } from './merge/photo-merge-client';
 import { planPhotoMerge } from './merge/photo-merge-plan';
 import { decodeMergeFrame, mergeResultToFile, readMergeFrame, type PhotoMergeFrame } from './merge/photo-merge-sources';
-import { DEFAULT_TONEMAP, type PhotoPanoramaCrop, type PhotoRegistrationModel, type PhotoTonemapSettings } from './merge/photo-merge-types';
+import { DEFAULT_TONEMAP, type PhotoPanoramaCrop, type PhotoRegistrationModel, type PhotoStackMethod, type PhotoTonemapSettings } from './merge/photo-merge-types';
+
+const STACK_LABELS: Record<PhotoStackMethod, string> = { focus: 'Focus stack', average: 'Average stack', median: 'Median stack' };
 import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
@@ -384,7 +386,7 @@ export default function PhotoWorkspace() {
   const mergeClientRef = useRef<ReturnType<typeof createPhotoMergeClient> | null>(null);
   const mergeFileInputRef = useRef<HTMLInputElement | null>(null);
   const [mergeFrames, setMergeFrames] = useState<PhotoMergeFrame[]>([]);
-  const [mergeMode, setMergeMode] = useState<'fuse' | 'hdr' | 'panorama'>('fuse');
+  const [mergeMode, setMergeMode] = useState<'fuse' | 'hdr' | 'panorama' | PhotoStackMethod>('fuse');
   const [mergeReference, setMergeReference] = useState<number | null>(null);
   const [mergePanoramaCrop, setMergePanoramaCrop] = useState<PhotoPanoramaCrop>('inscribed');
   const [mergeAlignment, setMergeAlignment] = useState<PhotoRegistrationModel | 'none'>('translation');
@@ -2440,14 +2442,17 @@ export default function PhotoWorkspace() {
       const client = (mergeClientRef.current ??= createPhotoMergeClient());
       const align = mergeAlignment !== 'none';
       const model = mergeAlignment === 'none' ? 'translation' : mergeAlignment;
+      const stackMethod = mergeMode === 'fuse' || mergeMode === 'hdr' || mergeMode === 'panorama' ? null : mergeMode;
       const merged = mergeMode === 'panorama'
         ? await client.panorama(rasters, panoramaReferenceIndex(frames.length), mergePanoramaCrop)
-        : mergeMode === 'fuse'
-          ? await client.fuse(model, align, rasters)
-          : await client.hdr(model, align, rasters, frames.map((frame) => frame.exposureSeconds ?? 0), mergeTonemap);
+        : stackMethod
+          ? await client.stack(stackMethod, model, align, rasters)
+          : mergeMode === 'fuse'
+            ? await client.fuse(model, align, rasters)
+            : await client.hdr(model, align, rasters, frames.map((frame) => frame.exposureSeconds ?? 0), mergeTonemap);
       const shaky = merged.registrations.filter((item) => item.lowConfidence).map((item) => item.sourceIndex + 1);
-      const label = mergeMode === 'panorama' ? 'Panorama' : mergeMode === 'fuse' ? 'Exposure fusion' : 'HDR merge';
-      const stem = mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr-merge';
+      const label = stackMethod ? STACK_LABELS[stackMethod] : mergeMode === 'panorama' ? 'Panorama' : mergeMode === 'fuse' ? 'Exposure fusion' : 'HDR merge';
+      const stem = stackMethod ? `${stackMethod}-stack` : mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr-merge';
       const file = await mergeResultToFile(merged.result, `${stem}-${frames.length}-photos.png`);
       const trimmed = mergeMode === 'panorama'
         ? (mergePanoramaCrop === 'inscribed' ? 'trimmed to the fully covered area' : 'full canvas, transparent where no photo reaches')
@@ -2463,7 +2468,8 @@ export default function PhotoWorkspace() {
   }
 
   function renderMergePanel() {
-    const plan = mergeFrames.length ? planPhotoMerge(mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr', mergeFrames) : null;
+    const operation = mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : mergeMode === 'hdr' ? 'hdr' : (`${mergeMode}-stack` as const);
+    const plan = mergeFrames.length ? planPhotoMerge(operation, mergeFrames) : null;
     const panorama = mergeMode === 'panorama';
     const referenceIndex = panoramaReferenceIndex(Math.max(1, mergeFrames.length));
     const missingTime = mergeMode === 'hdr' && mergeFrames.some((frame) => !frame.exposureSeconds);
@@ -2494,10 +2500,13 @@ export default function PhotoWorkspace() {
         </div>
         <label>
           Merge method
-          <select value={mergeMode} disabled={mergeBusy} onChange={(event) => setMergeMode(event.target.value as 'fuse' | 'hdr' | 'panorama')}>
+          <select value={mergeMode} disabled={mergeBusy} onChange={(event) => setMergeMode(event.target.value as typeof mergeMode)}>
             <option value="fuse">Exposure fusion</option>
             <option value="hdr">HDR merge with tone mapping</option>
             <option value="panorama">Panorama stitch</option>
+            <option value="focus">Focus stack (sharpest detail)</option>
+            <option value="average">Average stack (less noise)</option>
+            <option value="median">Median stack (removes passing objects)</option>
           </select>
         </label>
         {panorama ? (

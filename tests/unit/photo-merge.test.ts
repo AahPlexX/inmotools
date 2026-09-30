@@ -7,6 +7,7 @@ import { checkMergeSources, planPhotoMerge } from '../../src/tools/photo/merge/p
 import { DEFAULT_TONEMAP, type PhotoMergeRaster, type PhotoMergeResponse } from '../../src/tools/photo/merge/photo-merge-types';
 import { commonCoverageRect } from '../../src/tools/photo/merge/photo-exposure-merge';
 import { exposureSecondsFromTags } from '../../src/tools/photo/merge/photo-merge-sources';
+import { averageStack, focusStack, medianStack } from '../../src/tools/photo/merge/photo-stack';
 import { createCvScope, registerFramePair, warpFrameToReference, type PhotoCv } from '../../src/tools/photo/merge/photo-registration';
 
 /** Deterministic textured fixture: overlapping soft-edged rectangles of varied size and color,
@@ -405,6 +406,151 @@ describe('panorama stitching against the real OpenCV engine', () => {
   test('photos of different sizes are accepted for a panorama, and a bad crop mode is refused', () => {
     expect(validatePhotoMergeRequest({ id: 7, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 12, 5)] })).toMatchObject({ ok: true });
     expect(validatePhotoMergeRequest({ id: 8, type: 'panorama', model: 'homography', cropMode: 'round', referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 12, 5)] })).toMatchObject({ ok: false, diagnostic: { code: 'invalid-request' } });
+  });
+});
+
+describe('average, median, and focus stacks', () => {
+  const solidFrame = (width: number, height: number, value: number) => flatRaster(width, height, value);
+  const wholeCrop = (raster: PhotoMergeRaster) => ({ x: 0, y: 0, width: raster.width, height: raster.height });
+  const firstChannel = (raster: PhotoMergeRaster) => new Uint8Array(raster.buffer)[0];
+
+  test('average takes the per-channel mean and returns an opaque raster', () => {
+    const frames = [10, 20, 60].map((value) => solidFrame(4, 3, value));
+    const result = averageStack(frames, wholeCrop(frames[0]));
+    expect(firstChannel(result)).toBe(30);
+    expect(new Uint8Array(result.buffer)[3]).toBe(255);
+  });
+
+  test('median ignores an outlier frame, and an even count averages the two middle values', () => {
+    const odd = [10, 20, 200].map((value) => solidFrame(2, 2, value));
+    expect(firstChannel(medianStack(odd, wholeCrop(odd[0])))).toBe(20);
+    const even = [10, 20, 30, 100].map((value) => solidFrame(2, 2, value));
+    expect(firstChannel(medianStack(even, wholeCrop(even[0])))).toBe(25);
+  });
+
+  test('stacks read only the requested crop and return a raster of that size', () => {
+    const wide = (values: number[]) => {
+      const bytes = new Uint8Array(4 * 2 * 4);
+      for (let i = 0; i < 8; i += 1) { const v = values[i % 4]; bytes[i * 4] = v; bytes[i * 4 + 1] = v; bytes[i * 4 + 2] = v; bytes[i * 4 + 3] = 255; }
+      return { width: 4, height: 2, buffer: bytes.buffer } as PhotoMergeRaster;
+    };
+    const result = averageStack([wide([1, 10, 20, 3]), wide([3, 30, 40, 5])], { x: 1, y: 0, width: 2, height: 2 });
+    expect([result.width, result.height]).toEqual([2, 2]);
+    expect(Array.from(new Uint8Array(result.buffer)).filter((_, i) => i % 4 === 0)).toEqual([20, 30, 20, 30]);
+  });
+
+  test('focus stack keeps each frame\'s sharp half and discards the blurred half', () => {
+    const width = 120;
+    const height = 90;
+    const truth = texturedRaster(width, height, 81);
+    const blur = (raster: PhotoMergeRaster) => {
+      const from = new Uint8Array(raster.buffer);
+      const out = new Uint8Array(from.length);
+      for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+        for (let c = 0; c < 4; c += 1) {
+          let sum = 0;
+          let count = 0;
+          for (let dy = -3; dy <= 3; dy += 1) for (let dx = -3; dx <= 3; dx += 1) {
+            const sx = Math.min(width - 1, Math.max(0, x + dx));
+            const sy = Math.min(height - 1, Math.max(0, y + dy));
+            sum += from[(sy * width + sx) * 4 + c];
+            count += 1;
+          }
+          out[(y * width + x) * 4 + c] = Math.round(sum / count);
+        }
+      }
+      return { width, height, buffer: out.buffer } as PhotoMergeRaster;
+    };
+    const soft = blur(truth);
+    const mix = (leftSharp: boolean) => {
+      const sharpBytes = new Uint8Array(truth.buffer);
+      const softBytes = new Uint8Array(soft.buffer);
+      const out = new Uint8Array(sharpBytes.length);
+      for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+        const source = (x < width / 2) === leftSharp ? sharpBytes : softBytes;
+        for (let c = 0; c < 4; c += 1) out[(y * width + x) * 4 + c] = source[(y * width + x) * 4 + c];
+      }
+      return { width, height, buffer: out.buffer } as PhotoMergeRaster;
+    };
+    const frames = [mix(true), mix(false)];
+    const result = focusStack(frames, wholeCrop(frames[0]));
+    const bandError = (raster: PhotoMergeRaster, x0: number, x1: number) => {
+      const a = new Uint8Array(raster.buffer);
+      const b = new Uint8Array(truth.buffer);
+      let sum = 0;
+      let n = 0;
+      for (let y = 6; y < height - 6; y += 1) for (let x = x0; x < x1; x += 1) for (let c = 0; c < 3; c += 1) { sum += Math.abs(a[(y * width + x) * 4 + c] - b[(y * width + x) * 4 + c]); n += 1; }
+      return sum / n;
+    };
+    // Well away from the seam at x=60, on each side.
+    expect(bandError(result, 8, 42)).toBeLessThan(bandError(frames[1], 8, 42) * 0.35);
+    expect(bandError(result, 78, 112)).toBeLessThan(bandError(frames[0], 78, 112) * 0.35);
+  });
+
+  test('flat frames with no detail blend evenly rather than picking one', () => {
+    const frames = [40, 80].map((value) => solidFrame(16, 16, value));
+    expect(firstChannel(focusStack(frames, wholeCrop(frames[0])))).toBe(60);
+  });
+});
+
+describe('stacking through the worker against the real OpenCV engine', () => {
+  /** Deterministic per-frame pixel noise of about +/-25 levels. */
+  function noisy(raster: PhotoMergeRaster, seed: number): PhotoMergeRaster {
+    const bytes = new Uint8ClampedArray(raster.buffer.slice(0));
+    let state = seed;
+    for (let i = 0; i < bytes.length; i += 4) {
+      state = (state * 16807) % 2147483647;
+      const offset = (state / 2147483647 - 0.5) * 50;
+      for (let c = 0; c < 3; c += 1) bytes[i + c] += offset;
+    }
+    return { width: raster.width, height: raster.height, buffer: bytes.buffer };
+  }
+  const meanError = (a: PhotoMergeRaster, b: PhotoMergeRaster) => {
+    const pa = new Uint8Array(a.buffer);
+    const pb = new Uint8Array(b.buffer);
+    let sum = 0;
+    for (let i = 0; i < pa.length; i += 4) for (let c = 0; c < 3; c += 1) sum += Math.abs(pa[i + c] - pb[i + c]);
+    return sum / ((pa.length / 4) * 3);
+  };
+
+  test('an aligned average of shifted noisy frames is much cleaner than one frame', async () => {
+    const shifts: Array<[number, number]> = [[0, 0], [3, -2], [-4, 3], [2, 4], [-3, -3]];
+    const pairs = shifts.map(([dx, dy]) => cameraPair(240, 180, dx, dy, 55));
+    const clean = pairs[0].reference;
+    const frames = pairs.map((pair, index) => noisy(index === 0 ? pair.reference : pair.target, 101 + index));
+    const single = copyRaster(frames[0]);
+    const response = await handlePhotoMergeRequest({ id: 1, type: 'stack', method: 'average', model: 'translation', align: true, referenceIndex: 0, sources: frames }, loadPhotoMergeEngine);
+    expect(response.ok).toBe(true);
+    if (!response.ok || response.type !== 'stack') return;
+    const truth = cropRaster(clean, response.crop.x, response.crop.y, response.crop.width, response.crop.height);
+    const singleCrop = cropRaster(single, response.crop.x, response.crop.y, response.crop.width, response.crop.height);
+    expect(response.crop.width).toBeLessThan(240);
+    expect(meanError(response.result, truth)).toBeLessThan(meanError(singleCrop, truth) * 0.6);
+  }, 60_000);
+
+  test('a median stack removes an object that appears in only one frame; an average keeps a ghost of it', async () => {
+    const base = cameraPair(160, 120, 0, 0, 33).reference;
+    const withBlock = (raster: PhotoMergeRaster) => {
+      const bytes = new Uint8Array(raster.buffer.slice(0));
+      for (let y = 50; y < 80; y += 1) for (let x = 60; x < 100; x += 1) { const o = (y * 160 + x) * 4; bytes[o] = 255; bytes[o + 1] = 255; bytes[o + 2] = 255; }
+      return { width: 160, height: 120, buffer: bytes.buffer } as PhotoMergeRaster;
+    };
+    const frames = () => [copyRaster(base), withBlock(base), copyRaster(base)];
+    const request = (id: number, method: 'median' | 'average') => ({ id, type: 'stack', method, model: 'translation', align: false, referenceIndex: 0, sources: frames() });
+    const median = await handlePhotoMergeRequest(request(2, 'median'), loadPhotoMergeEngine);
+    const average = await handlePhotoMergeRequest(request(3, 'average'), loadPhotoMergeEngine);
+    expect(median.ok && average.ok).toBe(true);
+    if (!median.ok || !average.ok || median.type !== 'stack' || average.type !== 'stack') return;
+    const probe = (raster: PhotoMergeRaster) => new Uint8Array(raster.buffer)[(65 * 160 + 80) * 4];
+    const original = new Uint8Array(base.buffer)[(65 * 160 + 80) * 4];
+    expect(probe(median.result)).toBe(original);
+    expect(Math.abs(probe(average.result) - original)).toBeGreaterThan(20);
+  }, 60_000);
+
+  test('a bad stack method and mismatched frame sizes are refused before any work', () => {
+    const sources = [flatRaster(20, 10, 5), flatRaster(20, 10, 5)];
+    expect(validatePhotoMergeRequest({ id: 4, type: 'stack', method: 'sharpen', model: 'translation', align: true, referenceIndex: 0, sources })).toMatchObject({ ok: false, diagnostic: { code: 'invalid-request' } });
+    expect(validatePhotoMergeRequest({ id: 5, type: 'stack', method: 'median', model: 'translation', align: true, referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 10, 5)] })).toMatchObject({ ok: false, diagnostic: { code: 'dimension-mismatch', sourceIndex: 1 } });
   });
 });
 
