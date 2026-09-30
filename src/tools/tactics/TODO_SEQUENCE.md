@@ -3,6 +3,9 @@
 **Updated:** 2026-09-30
 **Branch:** `feature/tactical-matchboard-studio`  
 **Existing PR:** #76 only — do not create a replacement/parallel PR.  
+**T14 reconciled `origin/main`:** `637a56960954eea2a6b8045a14c703c9a662b254`  
+**T14 merge:** `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`  
+**T14 runtime source:** `fae25d868ec1fb56d3594872a53fa77ca73f8da7`  
 **Stage 1 runtime source:** `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`  
 **Stage 1 test-only follow-up:** `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`  
 **Earlier runtime, before Stage 1:** `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
@@ -163,16 +166,16 @@
 - **Reverse-safe:** complete.
 
 ### T14-01 — Reconcile and integrate
-- **Status:** READY
+- **Status:** DONE
 - **Depends on:** branch-complete, satisfied by T13-02. The earlier T13-01 gate listing blockers does not keep this item blocked.
 - **Primary files:** conflict files only, existing PR #76
 - **Action:** fetch then-current `main`, non-destructively reconcile, rerun branch gate, use existing repository-supported PR integration.
-- **Exit evidence:** exact integrated `main` SHA and green required gates.
+- **Exit evidence:** merged then-current `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254` as `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`. The only content conflict was `.tasks/IN_PROGRESS.md`; Matchboard stayed, and main's Wave A DONE record replaced the stale Wave A in-progress line. `package.json` auto-merged: `jszip` stayed `3.10.2`, and `mediabunny` took main's exact pin `1.58.0`. `canEncodeVideo(codec, { width, height, bitrate })` still matches that package, so runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7` sets `MEDIABUNNY_PIN` to `1.58.0`. Frozen `pnpm install` succeeded. Focused Tactical units **155/155** plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0 and production build (`✓ built in 6.75s`). Full Tactical Playwright spec **70 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Verified numerator stays **60/60**. Help copy was not changed. Rows 1–56 and 58–60 were not reopened. Row 57's pin sentence was updated to the installed version. PR #76 stays draft.
 - **Reverse-safe:** never before T13.
 
 ### T15-01 — Exact-main deployment and closure
-- **Status:** BLOCKED
-- **Depends on:** T14-01
+- **Status:** READY
+- **Depends on:** T14-01 DONE
 - **Primary files:** deployment/task ledgers only as required
 - **Action:** exact-main validation, Pages artifact/deployment/live route verification where feasible, task reconciliation.
 - **Exit evidence:** exact deployed revision and closure records.

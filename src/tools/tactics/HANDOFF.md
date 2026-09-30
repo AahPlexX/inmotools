@@ -4,11 +4,14 @@
 
 - Branch: `feature/tactical-matchboard-studio`
 - Original branch base: `4dcc856bc97027862342513cdea7eb769c0ffbc1`
-- Last fully browser-validated runtime source: `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`
-- Test-only browser assertion after that runtime, not a runtime change: `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`
+- Reconciled `origin/main`: `637a56960954eea2a6b8045a14c703c9a662b254`
+- Reconcile merge: `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`
+- Last fully browser-validated runtime source: `fae25d868ec1fb56d3594872a53fa77ca73f8da7`
+- Stage 1 authoring runtime, unchanged except the Mediabunny pin string: `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`
+- Test-only browser assertion after that authoring runtime, not a runtime change: `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`
 - Earlier runtime source, unchanged by the T13 documentation gate: `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`
 - Existing PR: **#76 only**; keep it draft/open/unmerged. Do not create a parallel Tactical Matchboard PR.
-- Milestone: **Branch-complete is satisfied.** T14-01 is READY and has not been started.
+- Milestone: **T14-01 is DONE.** Branch-complete remains satisfied. T15-01 is READY and has not been started.
 - Verified functional features: **60/60**
 - Registration: Tactical Matchboard Studio is registered in the catalog and lazy workspace loader.
 
@@ -16,9 +19,13 @@ Documentation commits after the validated runtime do not change Tactical runtime
 
 ## Exact next sequential action
 
-**T14-01 is READY.** Fetch then-current `main`, reconcile non-destructively, and rerun the branch gate on the integrated result. Do not start that reconciliation in the same stage that closed the unfinished rows. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 1, 2, 9–38, or 42–60. Newly verified rows: **3, 4, 5, 6, 7, 8, 39, 40, 41**.
+**T15-01 is READY.** Validate the exact integrated revision, including Pages artifact, deployment, and live route where feasible, then reconcile task state. Do not undraft or merge PR #76 from this workstream. Help copy was not changed, so Stage 2 instructional writing is not required. The workspace header instructional sentence was not rewritten. Do not reopen rows 1–60. The T14 pin alignment on row 57 is already recorded.
 
 No feature-row blocker remains. Timeline virtualization is still not implemented. The 256-track cap remains, and that residual did not block these rows. Squad size stays uncapped because row 3 requires arbitrary roster growth; growth to 24 active players is tested. Scenario comparison memoizes an unchanged project diff.
+
+## T14-01 closure evidence
+
+T14-01 is **DONE**. Then-current `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254` was merged as `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`. The only content conflict was `.tasks/IN_PROGRESS.md`. The Matchboard entry stayed. Main's GeoJSON, Markdown, Audio Mastering, and Site Intelligence entries stayed. The stale Wave A in-progress line yielded to main's Wave A DONE record. Catalog registration, the lazy workspace loader, and the tactics e2e selector route stayed. `package.json` auto-merged without a pin conflict: `jszip` stayed `3.10.2`, and `mediabunny` took main's exact `1.58.0`. Frozen `pnpm install --frozen-lockfile` succeeded. `canEncodeVideo` in `1.58.0` still accepts `width`, `height`, and `bitrate`, so runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7` sets `MEDIABUNNY_PIN` to `1.58.0`. That is the only tactics runtime change after stage 1. Focused Tactical units pass **155/155** across 20 `tactics-*.test.ts` files and the e2e selector check passes **3/3**. `tsc --noEmit -p tsconfig.app.json` exits 0 and the production build succeeds (`✓ built in 6.75s`). The full Tactical Playwright spec passes **70 / 2 intentional duplicate mobile Axe/reflow skips / 0 failures** on desktop Chromium and mobile Chromium. The verified numerator stays **60/60**. Help copy was not changed. Rows 1–56 and 58–60 were not reopened. Row 57 stays verified; its pin sentence now names the installed `1.58.0`. PR #76 stays the only vehicle and stays draft.
 
 ## Stage 1 closure evidence
 
@@ -111,7 +118,7 @@ Stage 1 verified rows **3, 4, 5, 6, 7, 8, 39, 40, and 41**. T13-01 had left thos
 - Forward agent takes the lowest-numbered READY item.
 - Reverse agent takes the highest-numbered READY item whose dependencies are DONE and whose Primary files do not overlap ACTIVE work.
 - Never force-push, destructively rebase, delete the branch, or merge partial work.
-- Reconciliation with then-current `main` remains T14 after the branch-complete gate.
+- T14 reconciliation with then-current `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254` is done. T15 is the next READY item.
 
 ## Known non-Tactical repository context
 
