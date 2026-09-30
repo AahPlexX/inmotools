@@ -12,6 +12,8 @@ export const PHOTO_MERGE_LIMITS = {
   maxSourcePixels: 16 * 1024 * 1024,
   /** Estimated peak working memory for one job, including per-frame float intermediates. */
   maxWorkingBytes: 768 * 1024 * 1024,
+  /** A stitched canvas keeps 16 bytes per pixel of float accumulators plus one warped frame. */
+  maxPanoramaPixels: 12 * 1024 * 1024,
   /** Registration runs on a copy downscaled to this long edge, then is scaled back. */
   registrationMaxEdge: 1024,
   jobSeconds: 90,
@@ -82,10 +84,15 @@ export type PhotoMergeRequest =
   | RequestBase & { type: 'register' }
   | RequestBase & { type: 'align' }
   | RequestBase & { type: 'fuse'; align: boolean }
-  | RequestBase & { type: 'hdr'; align: boolean; exposureSeconds: number[]; tonemap: PhotoTonemapSettings };
+  | RequestBase & { type: 'hdr'; align: boolean; exposureSeconds: number[]; tonemap: PhotoTonemapSettings }
+  | RequestBase & { type: 'panorama'; cropMode: PhotoPanoramaCrop };
+
+/** 'full' keeps the whole stitched canvas, transparent where no photo reaches; 'inscribed'
+ * trims to a rectangle every pixel of which is covered. */
+export type PhotoPanoramaCrop = 'full' | 'inscribed';
 
 export type PhotoMergeResponse =
   | { id: number; ok: true; type: 'register'; registrations: PhotoFrameRegistration[] }
   | { id: number; ok: true; type: 'align'; registrations: PhotoFrameRegistration[]; aligned: PhotoMergeRaster[] }
-  | { id: number; ok: true; type: 'fuse' | 'hdr'; registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop }
+  | { id: number; ok: true; type: 'fuse' | 'hdr' | 'panorama'; registrations: PhotoFrameRegistration[]; result: PhotoMergeRaster; crop: PhotoMergeCrop }
   | { id: number; ok: false; diagnostic: PhotoMergeDiagnostic };

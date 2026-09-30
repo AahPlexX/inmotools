@@ -581,7 +581,7 @@ test('exposure fusion and HDR merge a bracket into a new photo and refuse mismat
   await mergeButton.click();
   const report = page.getByTestId('photo-merge-report');
   await expect(report).toContainText('Exposure fusion of 3 photos', { timeout: 90_000 });
-  const [, width, height] = (await report.textContent())!.match(/(\d+) × (\d+) after cropping/)!;
+  const [, width, height] = (await report.textContent())!.match(/(\d+) × (\d+), after cropping/)!;
   expect(Number(width)).toBeLessThan(240);
   await expect(page.getByTestId('photo-source-dimensions')).toContainText(`${width} × ${height}`);
 
@@ -596,6 +596,69 @@ test('exposure fusion and HDR merge a bracket into a new photo and refuse mismat
   await expect(mergeButton).toBeEnabled();
   await mergeButton.click();
   await expect(report).toContainText('HDR merge of 3 photos', { timeout: 90_000 });
+});
+
+/** Overlapping 240x180 frames cut from one wide textured scene at the given left edges. */
+async function stripPngs(page: Page, seed: number, lefts: number[]): Promise<Buffer[]> {
+  const frames = await page.evaluate(([sceneSeed, edges]) => {
+    const width = 240;
+    const height = 180;
+    const scene = document.createElement('canvas');
+    scene.width = Math.max(...edges) + width;
+    scene.height = height;
+    const sceneContext = scene.getContext('2d')!;
+    sceneContext.fillStyle = 'rgb(90, 100, 110)';
+    sceneContext.fillRect(0, 0, scene.width, scene.height);
+    let state = sceneSeed;
+    const next = () => { state = (state * 16807) % 2147483647; return state / 2147483647; };
+    for (let i = 0; i < 260; i += 1) {
+      sceneContext.fillStyle = `rgb(${Math.floor(next() * 255)}, ${Math.floor(next() * 255)}, ${Math.floor(next() * 255)})`;
+      sceneContext.fillRect(Math.floor(next() * scene.width), Math.floor(next() * scene.height), 6 + Math.floor(next() * 40), 6 + Math.floor(next() * 30));
+    }
+    return edges.map((left) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(scene, left, 0, width, height, 0, 0, width, height);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+  }, [seed, lefts] as const);
+  return frames.map((base64) => Buffer.from(base64, 'base64'));
+}
+
+test('panorama stitching orders photos by name, stitches them wider, and refuses unrelated photos', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openFixture(page);
+  const strip = await stripPngs(page, 62, [0, 100, 200]);
+  const unrelated = await stripPngs(page, 71, [0]);
+  await page.getByRole('button', { name: 'Merge photos' }).click();
+  await page.getByLabel('Merge method').selectOption('panorama');
+  const input = page.getByTestId('photo-merge-file-input');
+  const mergeButton = page.getByRole('button', { name: 'Merge selected photos' });
+  const report = page.getByTestId('photo-merge-report');
+
+  // Chosen out of order; the list must come back in name (shooting) order with the middle photo as reference.
+  const named = (name: string, index: number) => ({ name, mimeType: 'image/png', buffer: strip[index] });
+  await input.setInputFiles([named('pano-3.png', 2), named('pano-1.png', 0), named('pano-2.png', 1)]);
+  await expect(page.getByTestId('photo-merge-frame')).toHaveCount(3);
+  await expect(page.getByTestId('photo-merge-frame').first()).toContainText('pano-1.png');
+  await expect(page.getByLabel('Reference photo (kept undistorted)')).toHaveValue('1');
+  await expect(page.getByRole('button', { name: 'Move pano-1.png left' })).toBeDisabled();
+  await expect(page.getByLabel('Alignment')).toHaveCount(0);
+
+  await mergeButton.click();
+  await expect(report).toContainText('Panorama of 3 photos', { timeout: 90_000 });
+  const [, width, height] = (await report.textContent())!.match(/(\d+) × (\d+), trimmed/)!;
+  expect(Number(width)).toBeGreaterThan(400);
+  expect(Number(width)).toBeLessThanOrEqual(443);
+  await expect(page.getByTestId('photo-source-dimensions')).toContainText(`${width} × ${height}`);
+
+  await page.getByRole('button', { name: 'Merge photos' }).click();
+  await page.getByLabel('Merge method').selectOption('panorama');
+  await input.setInputFiles([named('a.png', 0), { name: 'b.png', mimeType: 'image/png', buffer: unrelated[0] }]);
+  await mergeButton.click();
+  await expect(report).toContainText('could not be joined to its neighbour', { timeout: 90_000 });
+  await expect(report).toContainText('overlap');
 });
 
 test('metadata editor creates a reviewed XMP sidecar', async ({ page }) => {

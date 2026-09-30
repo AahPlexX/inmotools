@@ -9,6 +9,7 @@ import type {
 } from './photo-merge-types';
 import { PhotoRegistrationError, registerFramePair, warpFrameToReference, type PhotoCv } from './photo-registration';
 import { commonCoverageRect, fuseExposures, mergeHdr } from './photo-exposure-merge';
+import { cropPanorama, layoutPanorama, PhotoPanoramaError, renderPanorama } from './photo-panorama';
 
 const MODELS: PhotoRegistrationModel[] = ['translation', 'euclidean', 'homography'];
 
@@ -30,7 +31,7 @@ export function validatePhotoMergeRequest(message: unknown): { ok: true; request
   const invalid = (text: string) => ({ ok: false as const, diagnostic: { code: 'invalid-request' as const, message: text } });
   if (!isRecord(message) || !Number.isInteger(message.id)) return invalid('Merge request is missing its id.');
   const type = message.type;
-  if (type !== 'register' && type !== 'align' && type !== 'fuse' && type !== 'hdr') return invalid('Unknown merge request type.');
+  if (type !== 'register' && type !== 'align' && type !== 'fuse' && type !== 'hdr' && type !== 'panorama') return invalid('Unknown merge request type.');
   if (!MODELS.includes(message.model as PhotoRegistrationModel)) return invalid('Unknown alignment model.');
   if (!Array.isArray(message.sources)) return invalid('Merge request has no source list.');
   const badSource = message.sources.findIndex((source) => !isRaster(source));
@@ -47,6 +48,10 @@ export function validatePhotoMergeRequest(message: unknown): { ok: true; request
   }
   const base = { id: message.id as number, model: message.model as PhotoRegistrationModel, referenceIndex: referenceIndex as number, sources };
   if (type === 'register' || type === 'align') return { ok: true, request: { ...base, type } };
+  if (type === 'panorama') {
+    if (message.cropMode !== 'full' && message.cropMode !== 'inscribed') return invalid('Unknown panorama crop mode.');
+    return { ok: true, request: { ...base, type, cropMode: message.cropMode } };
+  }
   const align = message.align !== false;
   if (type === 'fuse') return { ok: true, request: { ...base, type, align } };
 
@@ -90,7 +95,7 @@ export async function handlePhotoMergeRequest(message: unknown, loadEngine: () =
   if (!validated.ok) return { id, ok: false, diagnostic: validated.diagnostic };
   const request = validated.request;
   const { type, model, referenceIndex, sources } = request;
-  const shouldAlign = request.type === 'register' || request.type === 'align' || request.align;
+  const shouldAlign = request.type === 'register' || request.type === 'align' || (request.type !== 'panorama' && request.align);
 
   let cv: PhotoCv;
   try {
@@ -107,6 +112,11 @@ export async function handlePhotoMergeRequest(message: unknown, loadEngine: () =
   }
 
   try {
+    if (request.type === 'panorama') {
+      const layout = layoutPanorama(cv, sources, referenceIndex);
+      const { result, crop } = cropPanorama(renderPanorama(cv, sources, layout), request.cropMode);
+      return { id, ok: true, type: 'panorama', registrations: layout.registrations, result, crop };
+    }
     const reference = sources[referenceIndex];
     const registrations = sources.map((source, index) => (
       index === referenceIndex || !shouldAlign ? referenceRegistration(index, model) : registerFramePair(cv, reference, source, model, index)
@@ -129,6 +139,7 @@ export async function handlePhotoMergeRequest(message: unknown, loadEngine: () =
     if (error instanceof PhotoRegistrationError) {
       return { id, ok: false, diagnostic: { code: 'registration-failed', message: error.message, sourceIndex: error.sourceIndex } };
     }
+    if (error instanceof PhotoPanoramaError) return { id, ok: false, diagnostic: error.diagnostic };
     return {
       id,
       ok: false,

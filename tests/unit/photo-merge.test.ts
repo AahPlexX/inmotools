@@ -314,6 +314,100 @@ describe('exposure fusion and HDR against the real OpenCV engine', () => {
   });
 });
 
+describe('panorama stitching against the real OpenCV engine', () => {
+  /** One wide scene photographed as overlapping frames at the given left edges. */
+  const strip = (lefts: number[], width = 240, height = 180, seed = 61) => {
+    const scene = texturedRaster(Math.max(...lefts) + width, height, seed);
+    return { scene, frames: lefts.map((left) => cropRaster(scene, left, 0, width, height)) };
+  };
+
+  function meanAbsDifference(a: PhotoMergeRaster, b: PhotoMergeRaster): number {
+    const pa = new Uint8Array(a.buffer);
+    const pb = new Uint8Array(b.buffer);
+    let sum = 0;
+    for (let i = 0; i < pa.length; i += 4) for (let c = 0; c < 3; c += 1) sum += Math.abs(pa[i + c] - pb[i + c]);
+    return sum / ((pa.length / 4) * 3);
+  }
+
+  test('three overlapping frames stitch back into the original wide scene', async () => {
+    const { scene, frames } = strip([0, 100, 200]);
+    const response = await handlePhotoMergeRequest({ id: 1, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 1, sources: frames }, loadPhotoMergeEngine);
+    expect(response.ok).toBe(true);
+    if (!response.ok || response.type !== 'panorama') return;
+    expect(Math.abs(response.result.width - 440)).toBeLessThanOrEqual(3);
+    expect(Math.abs(response.result.height - 180)).toBeLessThanOrEqual(3);
+    // Compare the stitched interior with the true scene at the offset the reference photo implies.
+    const inner = cropRaster(response.result, 20, 20, 400, 140);
+    const truth = cropRaster(scene, 20, 20, 400, 140);
+    expect(meanAbsDifference(inner, truth)).toBeLessThan(6);
+    expect(response.registrations.map((item) => item.sourceIndex)).toEqual([0, 1, 2]);
+    expect(response.registrations[1].matrix).toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  }, 60_000);
+
+  test('the reference choice changes the origin but not the stitched content size', async () => {
+    const { frames } = strip([0, 100, 200], 240, 180, 62);
+    const left = await handlePhotoMergeRequest({ id: 2, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 0, sources: frames.map(copyRaster) }, loadPhotoMergeEngine);
+    const middle = await handlePhotoMergeRequest({ id: 3, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 1, sources: frames.map(copyRaster) }, loadPhotoMergeEngine);
+    expect(left.ok && middle.ok).toBe(true);
+    if (left.ok && middle.ok && left.type === 'panorama' && middle.type === 'panorama') {
+      expect(Math.abs(left.result.width - middle.result.width)).toBeLessThanOrEqual(3);
+    }
+  }, 60_000);
+
+  test('a vertical offset leaves transparent edges that inscribed cropping removes but full cropping keeps', async () => {
+    const scene = texturedRaster(380, 200, 63);
+    const frames = [cropRaster(scene, 0, 10, 240, 180), cropRaster(scene, 70, 0, 240, 180), cropRaster(scene, 140, 20, 240, 180)];
+    const transparentPixels = (raster: PhotoMergeRaster) => {
+      const bytes = new Uint8Array(raster.buffer);
+      let count = 0;
+      for (let i = 3; i < bytes.length; i += 4) if (bytes[i] !== 255) count += 1;
+      return count;
+    };
+    const full = await handlePhotoMergeRequest({ id: 4, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 1, sources: frames.map(copyRaster) }, loadPhotoMergeEngine);
+    const inscribed = await handlePhotoMergeRequest({ id: 5, type: 'panorama', model: 'homography', cropMode: 'inscribed', referenceIndex: 1, sources: frames.map(copyRaster) }, loadPhotoMergeEngine);
+    expect([full, inscribed].map((item) => (item.ok ? 'ok' : item.diagnostic.message))).toEqual(['ok', 'ok']);
+    if (!full.ok || !inscribed.ok || full.type !== 'panorama' || inscribed.type !== 'panorama') return;
+    expect(transparentPixels(full.result)).toBeGreaterThan(0);
+    expect(transparentPixels(inscribed.result)).toBe(0);
+    expect(inscribed.result.height).toBeLessThan(full.result.height);
+    expect(inscribed.crop).toMatchObject({ width: inscribed.result.width, height: inscribed.result.height });
+  }, 60_000);
+
+  test('a neighbour that genuinely rotates keeps its rotation instead of being flattened to a shift', async () => {
+    const cv = await loadPhotoMergeEngine();
+    const scene = texturedRaster(380, 180, 62);
+    const angle = (4 * Math.PI) / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    // Rotate the second frame 4 degrees about its centre (frame coordinates <- rotated coordinates).
+    const centre = { x: 120, y: 90 };
+    const rotation = [cos, -sin, centre.x - cos * centre.x + sin * centre.y, sin, cos, centre.y - sin * centre.x - cos * centre.y, 0, 0, 1];
+    const rotated = warpFrameToReference(cv, cropRaster(scene, 90, 0, 240, 180), rotation, 240, 180);
+    const response = await handlePhotoMergeRequest(
+      { id: 9, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 0, sources: [cropRaster(scene, 0, 0, 240, 180), rotated] },
+      loadPhotoMergeEngine,
+    );
+    expect(response.ok).toBe(true);
+    if (!response.ok || response.type !== 'panorama') return;
+    const matrix = response.registrations[1].matrix;
+    expect(Math.abs(matrix[1])).toBeGreaterThan(0.03); // sin(4°) is about 0.07; a pure shift would be 0.
+    expect(Math.abs(matrix[3])).toBeGreaterThan(0.03);
+  }, 60_000);
+
+  test('unrelated photos are refused as a registration failure naming the unmatched photo', async () => {
+    const one = strip([0], 240, 180, 71).frames[0];
+    const other = strip([0], 240, 180, 72).frames[0];
+    const response = await handlePhotoMergeRequest({ id: 6, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 0, sources: [one, other] }, loadPhotoMergeEngine);
+    expect(response).toMatchObject({ id: 6, ok: false, diagnostic: { code: 'registration-failed', sourceIndex: 1 } });
+    expect(response.ok === false && response.diagnostic.message).toContain('overlap');
+  }, 60_000);
+
+  test('photos of different sizes are accepted for a panorama, and a bad crop mode is refused', () => {
+    expect(validatePhotoMergeRequest({ id: 7, type: 'panorama', model: 'homography', cropMode: 'full', referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 12, 5)] })).toMatchObject({ ok: true });
+    expect(validatePhotoMergeRequest({ id: 8, type: 'panorama', model: 'homography', cropMode: 'round', referenceIndex: 0, sources: [flatRaster(20, 10, 5), flatRaster(22, 12, 5)] })).toMatchObject({ ok: false, diagnostic: { code: 'invalid-request' } });
+  });
+});
+
 describe('engine runtime resolution', () => {
   const ready = { Mat: function Mat() {} };
 

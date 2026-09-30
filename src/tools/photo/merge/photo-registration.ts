@@ -8,6 +8,7 @@ export interface CvMat extends CvReleasable {
   rows: number;
   cols: number;
   data: Uint8Array;
+  data32F: Float32Array;
   empty(): boolean;
   doubleAt(row: number, col: number): number;
   floatAt(row: number, col: number): number;
@@ -77,16 +78,17 @@ const ORB_FEATURES = 1000;
 const MAX_MATCH_DISTANCE = 64;
 const MIN_FEATURE_MATCHES = 8;
 const RANSAC_THRESHOLD = 3;
+const TRANSLATION_PREFERENCE = 0.8;
 const ECC_ITERATIONS = 100;
 const ECC_EPSILON = 1e-6;
 const ECC_GAUSSIAN_SIZE = 5;
 const LOW_CONFIDENCE_CORRELATION = 0.6;
 
-type Matrix3 = [number, number, number, number, number, number, number, number, number];
+export type Matrix3 = [number, number, number, number, number, number, number, number, number];
 
 const IDENTITY: Matrix3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-function multiply(a: Matrix3, b: Matrix3): Matrix3 {
+export function multiply(a: Matrix3, b: Matrix3): Matrix3 {
   const out = new Array<number>(9).fill(0) as Matrix3;
   for (let row = 0; row < 3; row += 1) {
     for (let col = 0; col < 3; col += 1) {
@@ -102,7 +104,7 @@ function normalizeHomogeneous(matrix: Matrix3): Matrix3 {
   return matrix.map((value) => value / w) as Matrix3;
 }
 
-function applyToPoint(matrix: Matrix3, x: number, y: number): { x: number; y: number } {
+export function applyToPoint(matrix: Matrix3, x: number, y: number): { x: number; y: number } {
   const w = matrix[6] * x + matrix[7] * y + matrix[8];
   return { x: (matrix[0] * x + matrix[1] * y + matrix[2]) / w, y: (matrix[3] * x + matrix[4] * y + matrix[5]) / w };
 }
@@ -171,7 +173,7 @@ interface CoarseEstimate {
 
 /** ORB features + cross-checked Hamming matching + RANSAC homography. OpenCV's RANSAC seeds its
  * own RNG per call, so the estimate is deterministic for identical inputs. */
-function coarseFeatureEstimate(cv: PhotoCv, scope: CvScope, reference: CvMat, target: CvMat): CoarseEstimate | null {
+function coarseFeatureEstimate(cv: PhotoCv, scope: CvScope, reference: CvMat, target: CvMat, preferTranslation = false): CoarseEstimate | null {
   const detector = scope.track(new cv.ORB(ORB_FEATURES));
   const emptyMask = scope.track(new cv.Mat());
   const referenceKeys = scope.track(new cv.KeyPointVector());
@@ -210,6 +212,25 @@ function coarseFeatureEstimate(cv: PhotoCv, scope: CvScope, reference: CvMat, ta
   for (let row = 0; row < 3; row += 1) for (let col = 0; col < 3; col += 1) values.push(homography.doubleAt(row, col));
   const inliers = cv.countNonZero(inlierMask);
   if (inliers < MIN_FEATURE_MATCHES || values.some((value) => !Number.isFinite(value))) return null;
+  if (preferTranslation) {
+    // An 8-parameter homography fitted to a few dozen matches can absorb noise as scale, shear and
+    // perspective. When a plain shift explains nearly as many matches, the simpler model is the
+    // better estimate; a pair that truly rotates or changes perspective fails this test and keeps
+    // the homography.
+    const shifts = { x: [] as number[], y: [] as number[] };
+    for (let k = 0; k < count; k += 1) {
+      shifts.x.push(toPoints[k * 2] - fromPoints[k * 2]);
+      shifts.y.push(toPoints[k * 2 + 1] - fromPoints[k * 2 + 1]);
+    }
+    const median = (list: number[]) => [...list].sort((a, b) => a - b)[list.length >> 1];
+    const tx = median(shifts.x);
+    const ty = median(shifts.y);
+    let shiftInliers = 0;
+    for (let k = 0; k < count; k += 1) if (Math.hypot(shifts.x[k] - tx, shifts.y[k] - ty) <= RANSAC_THRESHOLD) shiftInliers += 1;
+    if (shiftInliers >= MIN_FEATURE_MATCHES && shiftInliers >= inliers * TRANSLATION_PREFERENCE) {
+      return { homography: [1, 0, tx, 0, 1, ty, 0, 0, 1], matches: count, inliers: shiftInliers };
+    }
+  }
   return { homography: normalizeHomogeneous(values as Matrix3), matches: count, inliers };
 }
 
@@ -298,6 +319,34 @@ export function registerFramePair(
       correlation: Number.isFinite(correlation) ? correlation : 0,
       lowConfidence: !(correlation >= LOW_CONFIDENCE_CORRELATION),
     };
+  } finally {
+    scope.release();
+  }
+}
+
+const MIN_PANORAMA_INLIERS = 15;
+
+/** Feature-only homography between two overlapping frames of a panorama, mapping `reference`
+ * pixel coordinates to `target` pixel coordinates. Panorama neighbours can be hundreds of pixels
+ * apart, far outside ECC's basin of convergence, so no intensity refinement is attempted; a pair
+ * with too few consistent matches is refused instead of being stitched wrongly. */
+export function estimatePairHomography(cv: PhotoCv, reference: PhotoMergeRaster, target: PhotoMergeRaster, targetIndex: number): { matrix: Matrix3; inliers: number } {
+  const scope = createCvScope();
+  try {
+    const longEdge = Math.max(reference.width, reference.height, target.width, target.height);
+    const scale = Math.min(1, PHOTO_MERGE_LIMITS.registrationMaxEdge / longEdge);
+    const referenceGray = workingGray(cv, scope, rasterToMat(cv, scope, reference), scale);
+    const targetGray = workingGray(cv, scope, rasterToMat(cv, scope, target), scale);
+    let estimate: CoarseEstimate | null = null;
+    try { estimate = coarseFeatureEstimate(cv, scope, referenceGray, targetGray, true); } catch { estimate = null; }
+    if (!estimate || estimate.inliers < MIN_PANORAMA_INLIERS) {
+      throw new PhotoRegistrationError(
+        `Photo ${targetIndex + 1} could not be joined to its neighbour: ${estimate ? `only ${estimate.inliers} consistent matches were found` : 'no reliable matches were found'}. Photos need to overlap by roughly a third and show the same scene, in left-to-right order.`,
+        targetIndex,
+      );
+    }
+    const full = normalizeHomogeneous(multiply(inverseWorkingScaleMatrix(scale), multiply(estimate.homography, workingScaleMatrix(scale))));
+    return { matrix: full, inliers: estimate.inliers };
   } finally {
     scope.release();
   }

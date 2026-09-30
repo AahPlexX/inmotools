@@ -3,6 +3,7 @@ import {
   type PhotoFrameRegistration,
   type PhotoMergeCrop,
   type PhotoMergeDiagnostic,
+  type PhotoPanoramaCrop,
   type PhotoTonemapSettings,
   type PhotoMergeRaster,
   type PhotoMergeRequest,
@@ -114,6 +115,11 @@ export function createPhotoMergeClient(options: PhotoMergeClientOptions = {}) {
     async fuse(model: PhotoRegistrationModel, align: boolean, sources: PhotoMergeRaster[]): Promise<MergeResult> {
       const response = await run({ type: 'fuse', model, align, referenceIndex: 0, sources });
       if (response.type !== 'fuse') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
+      return { registrations: response.registrations, result: response.result, crop: response.crop };
+    },
+    async panorama(sources: PhotoMergeRaster[], referenceIndex: number, cropMode: PhotoPanoramaCrop): Promise<MergeResult> {
+      const response = await run({ type: 'panorama', model: 'homography', referenceIndex, cropMode, sources });
+      if (response.type !== 'panorama') throw new PhotoMergeFailure({ code: 'worker-failed', message: 'The merge worker returned the wrong result type.' });
       return { registrations: response.registrations, result: response.result, crop: response.crop };
     },
     async hdr(model: PhotoRegistrationModel, align: boolean, sources: PhotoMergeRaster[], exposureSeconds: number[], tonemap: PhotoTonemapSettings): Promise<MergeResult> {

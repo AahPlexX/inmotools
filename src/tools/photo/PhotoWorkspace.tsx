@@ -28,7 +28,7 @@ import { NEUTRAL_DETAIL_FILTERS } from './photo-detail-filters';
 import { createPhotoMergeClient, PhotoMergeFailure } from './merge/photo-merge-client';
 import { planPhotoMerge } from './merge/photo-merge-plan';
 import { decodeMergeFrame, mergeResultToFile, readMergeFrame, type PhotoMergeFrame } from './merge/photo-merge-sources';
-import { DEFAULT_TONEMAP, type PhotoRegistrationModel, type PhotoTonemapSettings } from './merge/photo-merge-types';
+import { DEFAULT_TONEMAP, type PhotoPanoramaCrop, type PhotoRegistrationModel, type PhotoTonemapSettings } from './merge/photo-merge-types';
 import { cloneLayer, createAdjustmentLayer, createImageLayer, createShapeLayer, createTextLayer, PHOTO_BLEND_MODES } from './photo-layers';
 import {
   MAX_CUBE_FILE_BYTES,
@@ -384,7 +384,9 @@ export default function PhotoWorkspace() {
   const mergeClientRef = useRef<ReturnType<typeof createPhotoMergeClient> | null>(null);
   const mergeFileInputRef = useRef<HTMLInputElement | null>(null);
   const [mergeFrames, setMergeFrames] = useState<PhotoMergeFrame[]>([]);
-  const [mergeMode, setMergeMode] = useState<'fuse' | 'hdr'>('fuse');
+  const [mergeMode, setMergeMode] = useState<'fuse' | 'hdr' | 'panorama'>('fuse');
+  const [mergeReference, setMergeReference] = useState<number | null>(null);
+  const [mergePanoramaCrop, setMergePanoramaCrop] = useState<PhotoPanoramaCrop>('inscribed');
   const [mergeAlignment, setMergeAlignment] = useState<PhotoRegistrationModel | 'none'>('translation');
   const [mergeTonemap, setMergeTonemap] = useState<PhotoTonemapSettings>(DEFAULT_TONEMAP);
   const [mergeBusy, setMergeBusy] = useState(false);
@@ -2395,12 +2397,30 @@ export default function PhotoWorkspace() {
     setMergeReport('');
     try {
       const frames = await Promise.all(files.filter(isPhotoImportFile).map(readMergeFrame));
+      // Camera file names count up in shooting order, the natural left-to-right order for a panorama.
+      frames.sort((a, b) => a.file.name.localeCompare(b.file.name, undefined, { numeric: true }));
+      setMergeReference(null);
       setMergeFrames(frames);
       if (!frames.length) setMergeReport('None of those files is a browser-readable image.');
     } catch (error) {
       setMergeFrames([]);
       setMergeReport(photoImportErrorMessage(error));
     }
+  }
+
+  /** The photo left undistorted; the middle one keeps stretching at both ends to a minimum. */
+  function panoramaReferenceIndex(count: number) {
+    return Math.min(mergeReference ?? Math.floor((count - 1) / 2), count - 1);
+  }
+
+  function moveMergeFrame(index: number, direction: -1 | 1) {
+    setMergeFrames((frames) => {
+      const target = index + direction;
+      if (target < 0 || target >= frames.length) return frames;
+      const next = [...frames];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   function setMergeExposure(index: number, text: string) {
@@ -2420,14 +2440,20 @@ export default function PhotoWorkspace() {
       const client = (mergeClientRef.current ??= createPhotoMergeClient());
       const align = mergeAlignment !== 'none';
       const model = mergeAlignment === 'none' ? 'translation' : mergeAlignment;
-      const merged = mergeMode === 'fuse'
-        ? await client.fuse(model, align, rasters)
-        : await client.hdr(model, align, rasters, frames.map((frame) => frame.exposureSeconds ?? 0), mergeTonemap);
+      const merged = mergeMode === 'panorama'
+        ? await client.panorama(rasters, panoramaReferenceIndex(frames.length), mergePanoramaCrop)
+        : mergeMode === 'fuse'
+          ? await client.fuse(model, align, rasters)
+          : await client.hdr(model, align, rasters, frames.map((frame) => frame.exposureSeconds ?? 0), mergeTonemap);
       const shaky = merged.registrations.filter((item) => item.lowConfidence).map((item) => item.sourceIndex + 1);
-      const label = mergeMode === 'fuse' ? 'Exposure fusion' : 'HDR merge';
-      const file = await mergeResultToFile(merged.result, `${mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr-merge'}-${frames.length}-photos.png`);
-      setMergeReport(`${label} of ${frames.length} photos: ${merged.crop.width} × ${merged.crop.height} after cropping to the area every photo covers.${
-        shaky.length ? ` Alignment confidence was low for photo ${shaky.join(', ')}; check the result for ghosting.` : ''} Opened as a new photo; the originals are unchanged.`);
+      const label = mergeMode === 'panorama' ? 'Panorama' : mergeMode === 'fuse' ? 'Exposure fusion' : 'HDR merge';
+      const stem = mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr-merge';
+      const file = await mergeResultToFile(merged.result, `${stem}-${frames.length}-photos.png`);
+      const trimmed = mergeMode === 'panorama'
+        ? (mergePanoramaCrop === 'inscribed' ? 'trimmed to the fully covered area' : 'full canvas, transparent where no photo reaches')
+        : 'after cropping to the area every photo covers';
+      setMergeReport(`${label} of ${frames.length} photos: ${merged.crop.width} × ${merged.crop.height}, ${trimmed}.${
+        shaky.length ? ` Alignment confidence was low for photo ${shaky.join(', ')}; check the result for ${mergeMode === 'panorama' ? 'seams and warping' : 'ghosting'}.` : ''} Opened as a new photo; the originals are unchanged.`);
       await importPhotoFiles([file], 'file-input');
     } catch (error) {
       setMergeReport(error instanceof PhotoMergeFailure ? error.diagnostic.message : `Merging failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -2437,7 +2463,9 @@ export default function PhotoWorkspace() {
   }
 
   function renderMergePanel() {
-    const plan = mergeFrames.length ? planPhotoMerge(mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr', mergeFrames) : null;
+    const plan = mergeFrames.length ? planPhotoMerge(mergeMode === 'panorama' ? 'panorama' : mergeMode === 'fuse' ? 'exposure-fusion' : 'hdr', mergeFrames) : null;
+    const panorama = mergeMode === 'panorama';
+    const referenceIndex = panoramaReferenceIndex(Math.max(1, mergeFrames.length));
     const missingTime = mergeMode === 'hdr' && mergeFrames.some((frame) => !frame.exposureSeconds);
     const tonemapControl = (key: keyof PhotoTonemapSettings, label: string, min: number, max: number, step: number) => (
       <SimpleControl label={label} value={mergeTonemap[key]} min={min} max={max} step={step} neutral={DEFAULT_TONEMAP[key]} onChange={(value) => setMergeTonemap((current) => ({ ...current, [key]: value }))} />
@@ -2446,7 +2474,7 @@ export default function PhotoWorkspace() {
       <>
         <div className="photo-inspector-header">
           <h2>Merge photos</h2>
-          <p>Combine a bracketed series of the same scene into one photo. The result opens as a new local photo; the originals are unchanged.</p>
+          <p>Combine a bracketed series into one balanced photo, or stitch overlapping photos into a panorama. The result opens as a new local photo; the originals are unchanged.</p>
         </div>
         <div className="photo-inline-actions">
           <button type="button" disabled={mergeBusy} onClick={() => mergeFileInputRef.current?.click()}>Choose photos to merge</button>
@@ -2466,25 +2494,55 @@ export default function PhotoWorkspace() {
         </div>
         <label>
           Merge method
-          <select value={mergeMode} disabled={mergeBusy} onChange={(event) => setMergeMode(event.target.value as 'fuse' | 'hdr')}>
+          <select value={mergeMode} disabled={mergeBusy} onChange={(event) => setMergeMode(event.target.value as 'fuse' | 'hdr' | 'panorama')}>
             <option value="fuse">Exposure fusion</option>
             <option value="hdr">HDR merge with tone mapping</option>
+            <option value="panorama">Panorama stitch</option>
           </select>
         </label>
-        <label>
-          Alignment
-          <select value={mergeAlignment} disabled={mergeBusy} onChange={(event) => setMergeAlignment(event.target.value as PhotoRegistrationModel | 'none')}>
-            <option value="translation">Shift only (handheld)</option>
-            <option value="euclidean">Shift and rotation</option>
-            <option value="homography">Perspective</option>
-            <option value="none">None (tripod)</option>
-          </select>
-        </label>
+        {panorama ? (
+          <>
+            <label>
+              Reference photo (kept undistorted)
+              <select
+                value={referenceIndex}
+                disabled={mergeBusy || !mergeFrames.length}
+                onChange={(event) => setMergeReference(Number(event.target.value))}
+              >
+                {mergeFrames.map((frame, index) => <option key={`${frame.file.name}-${index}`} value={index}>{index + 1}. {frame.file.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Crop
+              <select value={mergePanoramaCrop} disabled={mergeBusy} onChange={(event) => setMergePanoramaCrop(event.target.value as PhotoPanoramaCrop)}>
+                <option value="inscribed">Trim to the fully covered area</option>
+                <option value="full">Keep the full canvas (transparent edges)</option>
+              </select>
+            </label>
+            <p className="photo-export-note">Photos are stitched in the order listed, left to right, with a flat (perspective) projection. Reorder them below if needed.</p>
+          </>
+        ) : (
+          <label>
+            Alignment
+            <select value={mergeAlignment} disabled={mergeBusy} onChange={(event) => setMergeAlignment(event.target.value as PhotoRegistrationModel | 'none')}>
+              <option value="translation">Shift only (handheld)</option>
+              <option value="euclidean">Shift and rotation</option>
+              <option value="homography">Perspective</option>
+              <option value="none">None (tripod)</option>
+            </select>
+          </label>
+        )}
         {mergeFrames.length ? (
           <ol className="photo-merge-frames" aria-label="Photos to merge">
             {mergeFrames.map((frame, index) => (
               <li key={`${frame.file.name}-${index}`} data-testid="photo-merge-frame">
                 <strong>{frame.file.name}</strong> <span>{frame.width} × {frame.height}</span>
+                {panorama ? (
+                  <span className="photo-inline-actions">
+                    <button type="button" disabled={mergeBusy || index === 0} aria-label={`Move ${frame.file.name} left`} onClick={() => moveMergeFrame(index, -1)}>Move left</button>
+                    <button type="button" disabled={mergeBusy || index === mergeFrames.length - 1} aria-label={`Move ${frame.file.name} right`} onClick={() => moveMergeFrame(index, 1)}>Move right</button>
+                  </span>
+                ) : null}
                 {mergeMode === 'hdr' ? (
                   <label>
                     Exposure time (seconds)
@@ -2501,7 +2559,7 @@ export default function PhotoWorkspace() {
               </li>
             ))}
           </ol>
-        ) : <p className="photo-export-note">Choose 2 to 9 photos of the same scene taken at different exposures.</p>}
+        ) : <p className="photo-export-note">{panorama ? 'Choose 2 to 9 photos that overlap by roughly a third.' : 'Choose 2 to 9 photos of the same scene taken at different exposures.'}</p>}
         {mergeMode === 'hdr' ? (
           <>
             {tonemapControl('gamma', 'Tone mapping gamma', 0.1, 3, 0.05)}
@@ -2512,7 +2570,7 @@ export default function PhotoWorkspace() {
         ) : null}
         {plan ? (
           <p className="photo-export-note" role={plan.ok ? 'status' : 'alert'} data-testid="photo-merge-plan">
-            {plan.ok ? `${plan.sourceCount} photos · ${plan.width} × ${plan.height} · about ${Math.ceil(plan.estimatedBytes / (1024 * 1024))} MiB working memory` : plan.diagnostic.message}
+            {plan.ok ? `${plan.sourceCount} photos · ${panorama ? 'stitched size known after alignment' : `${plan.width} × ${plan.height}`} · about ${Math.ceil(plan.estimatedBytes / (1024 * 1024))} MiB working memory` : plan.diagnostic.message}
           </p>
         ) : null}
         {missingTime ? <p className="photo-export-note" role="alert">Enter an exposure time for every photo to merge as HDR.</p> : null}
