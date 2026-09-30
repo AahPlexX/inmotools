@@ -1170,6 +1170,13 @@ test('scales a squad and authors tokens, props, elevation, spotlight, ghosts, an
   await expect(page.locator('.status-line').last()).toContainText('Roster token updated.');
   await expect(page.getByTestId('squad-summary')).toContainText('1 neutral');
 
+  await stage.getByLabel('Coordinate target').selectOption('ball');
+  await stage.getByLabel('Entry').selectOption('meters');
+  await stage.getByLabel('Coordinate X').fill('30');
+  await stage.getByLabel('Coordinate Y').fill('20');
+  await stage.getByRole('button', { name: 'Apply coordinates' }).click();
+  await expect(page.locator('.status-line').last()).toContainText('Canonical coordinates applied.');
+
   await stage.getByRole('button', { name: 'Place Cone' }).click();
   await expect(page.locator('[data-equipment-kind="cone"]')).toHaveCount(1);
   await stage.getByLabel('Rotation').fill('45');
