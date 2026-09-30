@@ -849,7 +849,7 @@ export default function TacticalMatchboardWorkspace() {
       <div className="workspace-header tactical-workspace-header">
         <div>
           <h2>Tactical Matchboard Studio</h2>
-          <p>Set the pitch and formation, place the other team, move players and the ball, draw arrows, and export from this browser.</p>
+          <p>Open Board setup. Enter pitch length and width, choose a direction and a formation (the starting arrangement of your players), then choose "Build board". Those players, your squad, appear on the pitch, the drawn field. Choose "Place opposition" to add the opposition (the other team) as a mirrored squad (the same shape, facing the other way) in the other half, in a different kit (shirt color). Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Export SVG" to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
         </div>
       </div>
       <div
@@ -1199,7 +1199,7 @@ export default function TacticalMatchboardWorkspace() {
             <input
               value={oppositionName}
               aria-label="Opposition name"
-              data-tactical-tip="Name used for the mirrored squad."
+              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the mirrored squad, the same player shape facing the other way.'}
               onChange={(event) => setOppositionName(event.target.value)}
             />
           </label>
@@ -1209,14 +1209,14 @@ export default function TacticalMatchboardWorkspace() {
               type="color"
               value={oppositionColor}
               aria-label="Opposition color"
-              data-tactical-tip="Kit color for the mirrored squad. A matching kit is changed so the teams stay distinct."
+              data-tactical-tip={'Choose the kit color (shirt color) for the opposition, the other team. If it matches your squad, "Place opposition" changes it so the two kits stay different colors.'}
               onChange={(event) => setOppositionColor(event.target.value)}
             />
           </label>
           <button
             className="action-button secondary"
             type="button"
-            data-tactical-tip="Fit your squad and a mirrored opposition into opposite halves. Undo puts the previous board back."
+            data-tactical-tip={'Click after your squad is visible on the pitch. Your squad fits into one half and a mirrored squad (the same shape, facing the other way) fits into the other half. The kits (shirt colors) stay different. "Undo" puts the previous board back.'}
             onClick={placeOpposition}
           >
             Place opposition
@@ -1224,7 +1224,7 @@ export default function TacticalMatchboardWorkspace() {
           <button
             className="action-button secondary"
             type="button"
-            data-tactical-tip="Remove the selected arrow or drawing. Click it on the pitch first. Players stay in place."
+            data-tactical-tip={'Click an arrow or other drawing on the pitch, then click "Remove drawing". That drawing disappears. Players stay on the pitch.'}
             disabled={!selectedAnnotationId}
             onClick={removeSelectedDrawing}
           >
