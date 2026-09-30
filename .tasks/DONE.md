@@ -1,5 +1,59 @@
 # Done
 
+## Geo Intelligence Hub (TASK-024) — shipped and audited
+
+Added `geo-intelligence-hub` as a new catalog entry: a keyless, provenance-tracked location
+workstation. Every value shown (country, admin hierarchy, time zone, sun/moon times, elevation,
+holidays, World Bank/Eurostat figures, nearby places) carries its source, record ID, reference
+year, retrieval time, license, and confidence class. All 44 planned features (F01–F44, ledger in
+`src/tools/geo-intel/TODO.md`) are implemented: universal search across place names, postal codes,
+DD/DMS/DDM, UTM, MGRS, Plus Codes, geohash, Maidenhead locators, `geo:` URIs, map links, and
+shareable deep links; consented device location; map click lookup; batch CSV postal lookup;
+side-by-side comparison of up to 6 locations; a provenance inspector; a country choropleth; and
+exports to JSON, GeoJSON, KML, flat CSV, PDF, iCalendar, PNG, SVG, a 1200×630 social card, and a
+ZIP bundle, each with an editable title/author/tags/license/notes and a JSON re-import path.
+
+Every network source is free, keyless, and CORS-verified live from the deployed origin before use
+(Zippopotam.us, Postcodes.io, World Bank v2, Eurostat, Eurostat GISCO ID, geoBoundaries, BigDataCloud
+client reverse-geocode, Photon, Nominatim, Nager.Date, Sunrise-Sunset.org, SunriseSunset.io, AWS
+Terrain Tiles, Open-Elevation); country/timezone/populated-place/admin-1 data is bundled from Natural
+Earth, GeoNames, Wikidata, and timezone-boundary-builder for full offline operation. Nominatim is
+off by default (opt-in switch) per its usage policy; BigDataCloud's free endpoint is used only for
+the device's own location per its fair-use terms; Open Topo Data was dropped after live testing
+showed it sends no CORS header, replaced by AWS Terrain Tiles with an Open-Elevation fallback.
+
+A follow-up production audit (2026-09-29) found and fixed 17 issues before merge: a bare postal
+number with no country failed instead of falling back to search; the holiday panel went blank once
+every date in the year had passed instead of rolling to next year; sun/moon times had no date
+picker; moon phase/illumination/rise/set from both providers were computed but discarded; search
+had no way to pick a different match; there was no shareable link; geohash/Maidenhead/antipode and
+GeoJSON/KML export were missing versus GIS/radio-tool competitors; saved locations could not move
+between devices (JSON import added); the search box had no recent-query recall; errors could not be
+dismissed; every field label and card heading was an extra keyboard tab stop; the tab strip ignored
+the ARIA arrow-key pattern; status copy read as mechanical; the catalog title wrapped to five lines
+and one control used a glyph (`ⓘ`) the site font renders as an empty box; and the sun-date input
+kept a stale value across locations. Full findings/resolutions/evaluated-and-rejected list:
+`src/tools/geo-intel/TODO.md` → "Production audit — 2026-09-29".
+
+Scope stayed exactly within the declared boundary: every change lives in `src/tools/geo-intel/**`
+and new test files under `tests/{unit,e2e,fixtures}/geo-intel*`, except two required, minimal, and
+pre-declared exceptions — one new `TOOLS` entry in `src/catalog.ts` and one loader line in
+`src/tools/workspaces.tsx` (both required by the existing `Record<ToolSlug, …>` typing; no other
+tool's files were touched). No dependency was added; UTM/MGRS/Plus Codes/geohash/Maidenhead/PNG
+decoding/TopoJSON decoding are implemented in-house against official test vectors (Open Location
+Code's own `test_data`, proj4js/mgrs reference vectors, the published geohash example, ARRL W1AW's
+published Maidenhead locator) rather than adding a package.
+
+Fresh evidence on the merge-ready tree (merge commit `399b78c`, `feature/geo-intelligence-hub`
+onto current `main` tip `637a569`, clean/conflict-free): `tsc --noEmit -p tsconfig.app.json` exit 0;
+`pnpm test:unit` **247 files / 2,883 tests passed** (2 files / 14 tests skipped, pre-existing and
+unrelated); `pnpm build` exit 0; `tests/e2e/geo-intel.spec.ts` **26 passed / 10 skipped / 0 failed**
+(skips are per-project, e.g. desktop-only interactions skipped on the mobile project and vice
+versa); the catalog-driven `accessibility.spec.ts` + `app.spec.ts` (covers every tool) **94/94
+passed**. Pushed to `origin/feature/geo-intelligence-hub`; CI on `399b78c` — "Validate and deploy
+Pages" success, "Sightline Velocity validation" success. PR #89 reported `mergeable_state: "clean"`
+immediately before merge.
+
 ## Digital Logic Workstation — 34/34 complete
 
 Local-first digital logic circuit simulator, schematic capture and prototyping workstation (`#/tools/digital-logic-workstation`). All 34 ledger items are implemented and merged; the per-item ledger is in the design document, the phased delivery in the plan. Handoff detail, evidence and known limits follow.

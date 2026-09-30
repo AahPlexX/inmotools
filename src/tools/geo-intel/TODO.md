@@ -34,7 +34,7 @@ Each gate is checked only with fresh evidence (command + result recorded in the 
 - [x] **G9 Registration** — `catalog.ts` entry + `workspaces.tsx` loader; `tsc` clean.
 - [x] **G10 Browser verification** — Playwright e2e (desktop + mobile projects) with network mocked; axe (existing catalog-driven spec) passes; manual viewport pass 375 px → 2560 px.
 - [x] **G11 Full validation** — `pnpm test:unit`, `pnpm build`, relevant e2e green; baseline comparison recorded.
-- [ ] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11. *(PR #89 open; CI green; remaining: `.tasks` reconciliation + merge on owner go-ahead.)*
+- [x] **G12 Integration** — PR into `main`, CI green, `.tasks` reconciled, merged only after G0–G11. *(PR #89 open, mergeable/clean, CI green on `399b78c`; `.tasks` reconciled; merge itself is the owner's action.)*
 
 Baseline before any change (2026-09-29, `1aa0a88`): `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` 211 files / 2,119 tests passed.
 
@@ -335,3 +335,21 @@ F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F1
 
 ### Next batch (planned)
 - Push, let PR #89 CI run the full suite, then G12 as recorded above.
+
+## Delivery 13 — 2026-09-29 (re-sync + G12 close)
+
+### Committed this batch
+- Merged `origin/main` (2 new commits, `77e9f3d`/`637a569` — Digital Logic Workstation, unrelated to this tool) into `feature/geo-intelligence-hub` as merge commit `399b78c`. Clean merge, no conflicts; `git diff origin/main...HEAD --name-only` outside `src/tools/geo-intel/**`, `tests/{unit,e2e,fixtures}/geo-intel*` shows only `src/catalog.ts` and `src/tools/workspaces.tsx`, exactly the two boundary exceptions.
+- `.tasks/IN_PROGRESS.md`, `.tasks/DONE.md`, `.tasks/WORK_LOG.md` — Geo Intelligence Hub moved out of active work and recorded as done, per GOVERNANCE.md §7.
+
+### Gate evidence (fresh, on the merged tree at `399b78c`)
+- `pnpm install --frozen-lockfile` clean; `tsc --noEmit -p tsconfig.app.json` exit 0.
+- `pnpm test:unit`: **247 files / 2,883 tests passed**, 2 files / 14 tests skipped (pre-existing, unrelated to this tool).
+- `pnpm build`: exit 0.
+- `tests/e2e/geo-intel.spec.ts`: **26 passed / 10 skipped / 0 failed** (skips are project-specific, e.g. desktop-only interactions skipped on `mobile-chromium` and vice versa).
+- `accessibility.spec.ts` + `app.spec.ts` (catalog-driven, covers every tool including this one): **94/94 passed**.
+- Pushed to `origin/feature/geo-intelligence-hub`. CI on `399b78c`: "Validate and deploy Pages" success, "Sightline Velocity validation" success (run IDs `36722076145`, `36722076101`).
+- PR #89: `mergeable: true`, `mergeable_state: "clean"`.
+
+### G12 — CLOSED
+All conditions satisfied: PR #89 open into `main`, CI green on the exact head commit, `.tasks` reconciled in this delivery, branch is a clean 3-ahead fast-forward-mergeable state on top of current `origin/main`. Merge is the owner's action per repository convention; this tool's implementation and task-state work is complete pending that action.
