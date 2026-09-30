@@ -87,8 +87,10 @@ The following design-spec functions are complete and accepted on the dedicated b
 FC-60 acceptance (2026-09-30): the same validated crochet materials rows now produce the existing
 formula-safe CSV and a paginated printable PDF, with both outputs in the release ZIP. Focused Fiber
 units pass **105/105**, the TypeScript/production/PWA build passes, and the complete Fiber browser spec
-passes **12/12** across desktop and mobile Chromium at this development round's source state. No new
-dependency was added; the existing exact pins for Papa Parse and pdf-lib remain current stable releases.
+passes **12/12** across desktop and mobile Chromium. Dedicated Fiber workflow
+[`36722583886`](https://github.com/AahPlexX/inmotools/actions/runs/36722583886) passes on exact source
+`a161df70d25be207f4f7639408510a3099ff03d9`. No new dependency was added; the existing exact
+pins for Papa Parse and pdf-lib remain current stable releases.
 
 Latest acceptance milestone: dedicated Fiber run `36503415830` at code head
 `e2b9508d5d3143447d3708b374e186ce7eee249d` passed **68/68** focused unit/selector checks,
