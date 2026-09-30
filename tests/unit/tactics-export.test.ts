@@ -7,6 +7,7 @@ import { addPlayerToken, addRosterPlayer, addTeam, addAnnotation } from '../../s
 import {
   ANALYTICS_CLAIM_BOUNDARY,
   MAX_FRAME_SEQUENCE_FRAMES,
+  MAX_VIDEO_EXPORT_FRAMES,
   MEDIABUNNY_CONTAINER_CODECS,
   MEDIABUNNY_PIN,
   RASTER_STILL_FORMATS,
@@ -363,6 +364,11 @@ describe('Tactical video capability negotiation and frame fallback', () => {
     expect(times.length).toBeLessThanOrEqual(4);
     expect(times.every((time) => Number.isInteger(time))).toBe(true);
     expect(MAX_FRAME_SEQUENCE_FRAMES).toBeGreaterThan(4);
+    expect(MAX_VIDEO_EXPORT_FRAMES).toBe(60);
+    expect(MAX_VIDEO_EXPORT_FRAMES).toBeGreaterThan(12);
+    const capped = sampleExportTimes(60_000, 30, MAX_VIDEO_EXPORT_FRAMES);
+    expect(capped.length).toBe(MAX_VIDEO_EXPORT_FRAMES);
+    expect(capped.length).toBeGreaterThan(12);
   });
 
   it('exposes a video combination only when the container and encoder both accept it', async () => {

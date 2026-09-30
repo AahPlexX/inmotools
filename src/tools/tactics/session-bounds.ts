@@ -1,5 +1,6 @@
 export const MAX_TIMELINE_DURATION_MS = 6 * 60 * 60 * 1000;
-export const MAX_TIMELINE_TRACKS = 256;
+export const MAX_TIMELINE_TRACKS = 2048;
+export const TIMELINE_TRACK_WINDOW = 40;
 export const MAX_KEYFRAMES_PER_TRACK = 100_000;
 export const MAX_TIMELINE_MARKERS = 8_000;
 export const MAX_GENERATED_TIME_SAMPLES = 120_000;

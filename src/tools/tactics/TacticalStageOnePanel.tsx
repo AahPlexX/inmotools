@@ -9,7 +9,7 @@ import {
   recordOnionSkinKeyframe,
 } from './presentation-authoring-engine';
 import { TRAINING_PROP_LIBRARY, placeTrainingProp, transformEquipment } from './prop-library';
-import { addSquadParticipant, scaleActiveSquad, squadCounts } from './squad-engine';
+import { MAX_ROSTER_PLAYERS_PER_TEAM, addSquadParticipant, scaleActiveSquad, squadCounts } from './squad-engine';
 import { editRosterToken } from './token-editor-engine';
 import type { RosterPlayerStatus } from './squad-engine';
 import type { TacticalProject } from './tactics-types';
@@ -267,7 +267,7 @@ export default function TacticalStageOnePanel({
           <form onSubmit={scaleSquad}>
             <label>
               Active players
-              <input name="activeCount" type="number" min="0" step="1" defaultValue={counts?.active ?? 0} required />
+              <input name="activeCount" type="number" min="0" max={MAX_ROSTER_PLAYERS_PER_TEAM} step="1" defaultValue={counts?.active ?? 0} required />
             </label>
             <button type="submit">Scale squad</button>
           </form>
@@ -275,7 +275,7 @@ export default function TacticalStageOnePanel({
             <button type="button" onClick={() => addParticipant('neutral')}>Add neutral player</button>
             <button type="button" onClick={() => addParticipant('coach')}>Add coach</button>
           </div>
-          <small>Roster growth stays uncapped. Neutral players and coaches stay out of the active count.</small>
+          <small>Roster growth is not limited to the formation size. A team stops at {MAX_ROSTER_PLAYERS_PER_TEAM} players so the board stays workable. Neutral players and coaches stay out of the active count.</small>
         </section>
 
         <section aria-labelledby="token-editor-heading">

@@ -7,6 +7,7 @@ import TacticalCoordinationControls from './TacticalCoordinationControls';
 import TacticalTimingControls from './TacticalTimingControls';
 import { createMotionPath, setKeyframeMotionPath } from './motion-engine';
 import { createNormalizedPoint } from './pitch-engine';
+import { MAX_TIMELINE_TRACKS, TIMELINE_TRACK_WINDOW } from './session-bounds';
 import {
   addTimelineKeyframe,
   addTimelineMarker,
@@ -15,6 +16,7 @@ import {
   setTimelinePlayhead,
   stepTimelineFrame,
   timelineKeyframeTimes,
+  timelineTrackWindow,
 } from './timeline-engine';
 import { TIMELINE_MARKER_KINDS } from './tactics-types';
 import type {
@@ -158,12 +160,17 @@ export default function TacticalTimelinePanel({
   const [frameRate, setFrameRate] = useState(30);
   const [playing, setPlaying] = useState(false);
   const [sheetReady, setSheetReady] = useState(false);
+  const [trackWindowStart, setTrackWindowStart] = useState(0);
   const previewTimeRef = useRef(previewTimeMs);
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const transportSerialRef = useRef(0);
   useFocusTrap(sheetReady, sheetRef, () => onSheetDismiss?.());
   const keyframeTimes = useMemo(() => timelineKeyframeTimes(project.timeline), [project.timeline]);
+  const trackWindow = useMemo(
+    () => timelineTrackWindow(project.timeline.tracks, trackWindowStart, TIMELINE_TRACK_WINDOW),
+    [project.timeline.tracks, trackWindowStart],
+  );
 
   useEffect(() => {
     previewTimeRef.current = previewTimeMs;
@@ -547,9 +554,18 @@ export default function TacticalTimelinePanel({
 
         <section aria-labelledby="timeline-tracks-heading">
           <h3 id="timeline-tracks-heading">Tracks</h3>
-          {project.timeline.tracks.length ? (
+          <p data-testid="timeline-track-window">
+            Showing {trackWindow.tracks.length} of {project.timeline.tracks.length} tracks. Session limit {MAX_TIMELINE_TRACKS}.
+          </p>
+          {project.timeline.tracks.length > TIMELINE_TRACK_WINDOW ? (
+            <div role="group" aria-label="Timeline track window">
+              <button type="button" disabled={trackWindow.startIndex === 0} onClick={() => setTrackWindowStart(trackWindow.startIndex - TIMELINE_TRACK_WINDOW)}>Previous tracks</button>
+              <button type="button" disabled={trackWindow.endIndex >= project.timeline.tracks.length} onClick={() => setTrackWindowStart(trackWindow.endIndex)}>Next tracks</button>
+            </div>
+          ) : null}
+          {trackWindow.tracks.length ? (
             <ul>
-              {project.timeline.tracks.map((track) => (
+              {trackWindow.tracks.map((track) => (
                 <li key={track.id}>{track.targetId}: {trackTimingLabel(track)}</li>
               ))}
             </ul>

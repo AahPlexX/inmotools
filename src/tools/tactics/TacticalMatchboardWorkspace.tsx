@@ -65,8 +65,10 @@ import {
   upsertCameraState,
   type CameraPresetId,
 } from './presentation3d-engine';
+import { MAX_TELESTRATION_POINTS } from './video-review-engine';
 import {
   addTacticalArrow,
+  addTacticalFreehand,
   buildBeginnerTacticalProject,
   nudgeNormalizedPoint,
   placeMirroredOpposition,
@@ -76,7 +78,7 @@ import './tactical-matchboard.css';
 
 const Tactical3DView = lazy(() => import('./Tactical3DView'));
 
-type InteractionMode = 'move' | 'arrow';
+type InteractionMode = 'move' | 'arrow' | 'freehand';
 
 interface SetupState {
   title: string;
@@ -147,6 +149,8 @@ export default function TacticalMatchboardWorkspace() {
   const [mode, setMode] = useState<InteractionMode>('move');
   const [arrowStart, setArrowStart] = useState<NormalizedPoint | null>(null);
   const [arrowLabel, setArrowLabel] = useState('');
+  const [freehandPoints, setFreehandPoints] = useState<NormalizedPoint[]>([]);
+  const freehandStrokeRef = useRef<{ points: NormalizedPoint[]; moved: boolean } | null>(null);
   const [customFormations, setCustomFormations] = useState<FormationTemplate[]>([]);
   const [customProfiles, setCustomProfiles] = useState<PitchRuleProfile[]>([]);
   const [customRestarts, setCustomRestarts] = useState<RestartTemplate[]>([]);
@@ -182,6 +186,7 @@ export default function TacticalMatchboardWorkspace() {
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [oppositionName, setOppositionName] = useState('Opposition');
   const [oppositionColor, setOppositionColor] = useState('#9f1239');
+  const [oppositionFormationId, setOppositionFormationId] = useState(INITIAL_SETUP.formationId);
   const [scenarioOverlayId, setScenarioOverlayId] = useState('');
   const [tip, setTip] = useState<{ text: string; top: number; left: number; width: number; height: number } | null>(null);
   const tipHostRef = useRef<HTMLElement | null>(null);
@@ -329,6 +334,10 @@ export default function TacticalMatchboardWorkspace() {
 
   function rebuildBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!window.confirm('Build board replaces this board and clears undo. Continue?')) {
+      setStatus('Build board cancelled. The current board and undo history are unchanged.');
+      return;
+    }
     try {
       if (!selectedFormation) throw new Error('Select a valid formation before building the board.');
       const nextProject = projectFromSetup(setup, selectedFormation);
@@ -341,6 +350,8 @@ export default function TacticalMatchboardWorkspace() {
       setSelectedAnnotationId(null);
       setMode('move');
       setArrowStart(null);
+      freehandStrokeRef.current = null;
+      setFreehandPoints([]);
       setStatus(`Built ${nextProject.ruleset.teamSize}v${nextProject.ruleset.teamSize} board with ${nextProject.playerTokens.length} placed players.`);
     } catch (error) {
       setStatus(errorMessage(error));
@@ -633,14 +644,77 @@ export default function TacticalMatchboardWorkspace() {
       setStatus('The current scene does not have an editable layer.');
       return;
     }
+    const formation = availableFormations.find((item) => item.id === oppositionFormationId);
+    if (!formation) {
+      setStatus('Select an opposition formation before placing the other team.');
+      return;
+    }
     applyEdit(
       'Place opposition',
       (current) => placeMirroredOpposition(current, sceneId, layerId, {
         teamName: oppositionName,
         primaryColor: oppositionColor,
+        formation,
       }),
-      'Opposition placed in the opposite half. Undo restores the previous board.',
+      `Opposition placed from ${formation.label} in the opposite half. Undo restores the previous board.`,
     );
+  }
+
+  function commitFreehand(points: readonly NormalizedPoint[]) {
+    if (!sceneId || !layerId) {
+      setStatus('The current scene does not have an editable layer.');
+      return;
+    }
+    const saved = applyEdit(
+      'Add freehand stroke',
+      (current) => addTacticalFreehand(current, sceneId, layerId, points),
+      'Freehand stroke added.',
+    );
+    if (saved) {
+      freehandStrokeRef.current = null;
+      setFreehandPoints([]);
+    }
+  }
+
+  function handleFreehandGesture(phase: 'start' | 'extend' | 'end', point: NormalizedPoint) {
+    if (phase === 'start') {
+      freehandStrokeRef.current = { points: [point], moved: false };
+      setFreehandPoints([point]);
+      return;
+    }
+    if (phase === 'extend') {
+      const stroke = freehandStrokeRef.current;
+      if (!stroke || stroke.points.length >= MAX_TELESTRATION_POINTS) return;
+      const last = stroke.points[stroke.points.length - 1];
+      if (!last) return;
+      const dx = point.x - last.x;
+      const dy = point.y - last.y;
+      if (dx * dx + dy * dy < 0.000016) return;
+      stroke.moved = true;
+      stroke.points = [...stroke.points, point];
+      setFreehandPoints(stroke.points);
+      return;
+    }
+    const stroke = freehandStrokeRef.current;
+    freehandStrokeRef.current = null;
+    if (!stroke) return;
+    if (stroke.moved && stroke.points.length >= 2) {
+      commitFreehand(stroke.points);
+      return;
+    }
+    setFreehandPoints(stroke.points);
+  }
+
+  function addFreehandPoint() {
+    setFreehandPoints((current) => {
+      if (current.length >= MAX_TELESTRATION_POINTS) return current;
+      const index = current.length;
+      const point = {
+        x: Math.min(0.92, 0.18 + (index % 12) * 0.06),
+        y: Math.min(0.88, 0.22 + Math.floor(index / 12) * 0.08),
+      };
+      return [...current, point];
+    });
   }
 
   function removeSelectedDrawing() {
@@ -849,7 +923,7 @@ export default function TacticalMatchboardWorkspace() {
       <div className="workspace-header tactical-workspace-header">
         <div>
           <h2>Tactical Matchboard Studio</h2>
-          <p>Open Board setup. Enter pitch length and width (the drawn field’s size), choose a direction and a formation (the starting arrangement of your players), then choose "Build board". Those players (your squad) appear on the pitch (the drawn field). Choose "Place opposition" to add the opposition (the other team) as a mirrored squad (the same shape, facing the other way) in the other half, in a different kit (shirt color). Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Export SVG" (Scalable Vector Graphics) to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
+          <p>Open Board setup. Enter pitch length and width (the drawn field’s size), choose a direction and a formation (the starting arrangement of your players), then choose "Build board" and confirm. Confirming replaces the board and clears undo. Those players (your squad) appear on the pitch (the drawn field). Choose an opposition formation (the other team’s starting arrangement), then choose "Place opposition". That formation is placed in the other half in a different kit (shirt color). It does not have to match your squad. Choose "Move", click a player or the ball, then click the pitch to move it. Choose "Arrow", click a start point and an end point, and the arrow appears. Choose "Freehand" to draw a stroke. Zoom and pan buttons change the pitch view. Choose "Export SVG" (Scalable Vector Graphics) to download the diagram. The board stays in this browser. Nothing is uploaded.</p>
         </div>
       </div>
       <div
@@ -955,7 +1029,7 @@ export default function TacticalMatchboardWorkspace() {
               />
             </label>
             <div className="tactical-setup-action">
-              <button className="action-button" type="submit" data-tactical-tip="Builds a new board from these settings and clears undo for the previous board.">Build board</button>
+              <button className="action-button" type="submit" data-tactical-tip="Asks you to confirm, then builds a new board from these settings and clears undo for the previous board. Cancelling leaves the board and undo unchanged.">Build board</button>
               <small>Dimensions are editable training inputs unless a sourced rules profile explicitly states otherwise.</small>
             </div>
           </form>
@@ -1188,6 +1262,22 @@ export default function TacticalMatchboardWorkspace() {
           >
             Arrow
           </button>
+          <button
+            className={`action-button ${mode === 'freehand' ? '' : 'secondary'}`}
+            type="button"
+            aria-pressed={mode === 'freehand'}
+            data-tactical-tip="Drag on the pitch to draw a freehand stroke, or add points and save the stroke."
+            onClick={() => { setMode('freehand'); setArrowStart(null); setStatus('Freehand tool active. Drag on the pitch, or add points and save the stroke.'); }}
+          >
+            Freehand
+          </button>
+          {mode === 'freehand' ? (
+            <>
+              <button type="button" className="action-button secondary" onClick={addFreehandPoint}>Add freehand point</button>
+              <p data-testid="tactical-board-freehand-count">{freehandPoints.length} freehand points</p>
+              <button type="button" className="action-button" onClick={() => commitFreehand(freehandPoints)} disabled={freehandPoints.length < 2}>Save freehand</button>
+            </>
+          ) : null}
           <label className="tactical-arrow-label">
             Arrow label
             <input value={arrowLabel} onChange={(event) => setArrowLabel(event.target.value)} />
@@ -1199,7 +1289,7 @@ export default function TacticalMatchboardWorkspace() {
             <input
               value={oppositionName}
               aria-label="Opposition name"
-              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the mirrored squad (the same player shape facing the other way).'}
+              data-tactical-tip={'Type the opposition name (the other team) here. "Place opposition" uses it on the formation you choose in Opposition formation.'}
               onChange={(event) => setOppositionName(event.target.value)}
             />
           </label>
@@ -1213,10 +1303,23 @@ export default function TacticalMatchboardWorkspace() {
               onChange={(event) => setOppositionColor(event.target.value)}
             />
           </label>
+          <label className="tactical-arrow-label">
+            Opposition formation
+            <select
+              aria-label="Opposition formation"
+              value={oppositionFormationId}
+              onChange={(event) => setOppositionFormationId(event.target.value)}
+              data-tactical-tip="Choose the other team's formation. It is separate from your squad's formation."
+            >
+              {availableFormations.map((formation) => (
+                <option key={formation.id} value={formation.id}>{formation.label}</option>
+              ))}
+            </select>
+          </label>
           <button
             className="action-button secondary"
             type="button"
-            data-tactical-tip={'Click after your squad is visible on the pitch. Your squad fits into one half and a mirrored squad (the same shape, facing the other way) fits into the other half. The kits (shirt colors) stay different. "Undo" puts the previous board back.'}
+            data-tactical-tip={'Click after your squad is visible on the pitch. Your squad fits into one half. The opposition formation you chose is placed in the other half. It does not have to match your squad. The kits (shirt colors) stay different. "Undo" puts the previous board back.'}
             onClick={placeOpposition}
           >
             Place opposition
@@ -1317,6 +1420,8 @@ export default function TacticalMatchboardWorkspace() {
             selectedTokenId={selectedTokenId}
             interactionMode={mode}
             arrowStart={arrowStart}
+            freehandPoints={freehandPoints}
+            onFreehandGesture={handleFreehandGesture}
             analysisSettings={analysisSettings}
             renderOptions={boardRenderOptions}
             onSelectToken={selectPlayer}
