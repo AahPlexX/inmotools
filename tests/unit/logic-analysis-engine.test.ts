@@ -114,6 +114,33 @@ describe('analysis-engine electrical rule check', () => {
     expect(findings.some((finding) => finding.type === 'floating_input')).toBe(true);
   });
 
+  it('reports one finding per unwired pin and names the component and pin', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'AND', 0, 0);
+    const label = doc.components[0]!.label;
+    const floating = runElectricalRuleCheck(doc).filter((finding) => finding.type === 'floating_input');
+    expect(floating).toHaveLength(2);
+    expect(floating.map((finding) => finding.message)).toEqual([
+      expect.stringContaining(`${label}.A`),
+      expect.stringContaining(`${label}.B`),
+    ]);
+    expect(floating.every((finding) => /floating/i.test(finding.message))).toBe(true);
+  });
+
+  it('groups wired-together undriven pins into one finding that lists them all', () => {
+    let doc = createInitialDocument();
+    doc = addComponent(doc, 'LED', 0, 0);
+    doc = addComponent(doc, 'LED', 4, 0);
+    const [first, second] = doc.components;
+    // addWire refuses input-to-input wires, so build the net the way a hand-edited import could.
+    doc = { ...doc, wires: [{ id: 'wire-manual', from: { componentId: first!.id, portId: 'A' }, to: { componentId: second!.id, portId: 'A' }, waypoints: [] }] };
+    const floating = runElectricalRuleCheck(doc).filter((finding) => finding.type === 'floating_input');
+    expect(floating).toHaveLength(1);
+    expect(floating[0]!.message).toContain(`${first!.label}.A`);
+    expect(floating[0]!.message).toContain(`${second!.label}.A`);
+    expect(floating[0]!.componentIds).toEqual(expect.arrayContaining([first!.id, second!.id]));
+  });
+
   it('flags two outputs wired to the same net as contention', () => {
     let doc = createInitialDocument();
     doc = addComponent(doc, 'SWITCH', 0, 0);

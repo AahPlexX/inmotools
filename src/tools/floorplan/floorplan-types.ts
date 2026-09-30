@@ -1,3 +1,5 @@
+import type { DisplayUnits } from './units';
+
 export type WallState = 'existing' | 'new_construction' | 'demolition';
 export type WallMaterial = 'drywall_stud' | 'concrete_masonry' | 'glass_partition' | 'brick';
 export type OpeningType =
@@ -103,6 +105,10 @@ export interface FloorplanProject {
   readonly name: string;
   readonly author: string;
   readonly scaleNotation: string;
+  /** Display units for readouts, inputs, and export labels. Geometry stays in millimeters. Absent = metric. */
+  readonly units?: DisplayUnits;
+  /** User room names keyed by `roomKey` (sorted boundary vertex ids). Absent = auto "Room N". */
+  readonly roomNames?: Readonly<Record<string, string>>;
   readonly vertices: readonly WallVertex[];
   readonly walls: readonly WallSegment[];
   readonly components: readonly PlanComponent[];

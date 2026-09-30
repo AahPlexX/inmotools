@@ -9,7 +9,7 @@ import {
   periodicDistance,
   wrapFractional,
 } from '../../src/tools/crystal/periodic-engine';
-import { measureAngle, measureDihedral } from '../../src/tools/crystal/measurement-engine';
+import { measureAngle, measureDihedral, measureDirectionAngle, measurePlaneAngle } from '../../src/tools/crystal/measurement-engine';
 import type { UnitCell } from '../../src/tools/crystal/crystal-types';
 
 const cubic: UnitCell = { a: 5, b: 5, c: 5, alpha: 90, beta: 90, gamma: 90 };
@@ -64,5 +64,16 @@ describe('periodic crystal geometry', () => {
     const bcc = createStarterStructure('bcc');
     expect(() => expandSupercell(bcc, [0, 2, 2])).toThrow(/repeat|positive|integer/i);
     expect(() => generatePeriodicImages(bcc, -1)).toThrow(/shell|nonnegative|integer/i);
+  });
+
+  it('measures plane-plane and direction-direction angles from the cell metric', () => {
+    expect(measurePlaneAngle(cubic, [1, 0, 0], [0, 1, 0])).toBeCloseTo(90, 10);
+    expect(measurePlaneAngle(cubic, [1, 1, 1], [1, 1, -1])).toBeCloseTo(70.5287794, 6);
+    expect(measureDirectionAngle(cubic, [1, 0, 0], [1, 1, 0])).toBeCloseTo(45, 10);
+    // hexagonal a and b axes sit at gamma = 120 degrees
+    const hex: UnitCell = { a: 3, b: 3, c: 5, alpha: 90, beta: 90, gamma: 120 };
+    expect(measureDirectionAngle(hex, [1, 0, 0], [0, 1, 0])).toBeCloseTo(120, 10);
+    expect(() => measureDirectionAngle(cubic, [0, 0, 0], [1, 0, 0])).toThrow(RangeError);
+    expect(() => measurePlaneAngle(cubic, [0, 0, 0], [1, 0, 0])).toThrow(RangeError);
   });
 });
