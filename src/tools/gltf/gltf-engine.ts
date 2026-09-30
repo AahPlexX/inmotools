@@ -1,9 +1,12 @@
 import { WebIO, type Document, type Primitive } from '@gltf-transform/core';
-import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptSimplifier } from 'meshoptimizer';
 
-export type GltfOptimizeOptions = { targetRatio: number; maxTextureDimension: number };
+export type GltfTextureFormat = 'preserve' | 'webp';
+export type GltfOptimizeOptions = { targetRatio: number; maxTextureDimension: number; textureFormat: GltfTextureFormat };
+/** What the run actually achieved. Simplification is lossy and best-effort, so the requested ratio is never reported as the outcome. */
+export type GltfGeometryOutcome = { targetRatio: number; measuredRatio: number | null; targetReached: boolean; reductionApplied: boolean; note: string };
 export type GltfStats = { meshes: number; primitives: number; vertices: number | null; triangles: number | null; textures: number; cameras: number; animations: number };
 /** Statistics read from a decoded document, where geometry counts are always known. */
 export type GltfDecodedStats = Omit<GltfStats, 'vertices' | 'triangles'> & { vertices: number; triangles: number };
@@ -26,10 +29,13 @@ export type GltfInspection = {
 };
 export type GltfOptimizeReport = {
   resizedTextures: number;
+  convertedTextures: number;
   skippedTextures: string[];
-  preservedTextureFormats: true;
+  preservedTextureFormats: boolean;
   cameraCountPreserved: boolean;
   animationCountPreserved: boolean;
+  animationsPreserved: boolean;
+  geometry: GltfGeometryOutcome;
   extensionPreservation: GltfExtensionReport;
   stages: string[];
 };
@@ -44,6 +50,8 @@ export function clampGltfOptions(options: Partial<GltfOptimizeOptions>): GltfOpt
   return {
     targetRatio: Number.isFinite(options.targetRatio) ? Math.max(.05, Math.min(1, Number(options.targetRatio))) : .6,
     maxTextureDimension: Number.isFinite(options.maxTextureDimension) ? Math.max(64, Math.min(8192, Math.round(Number(options.maxTextureDimension)))) : 2048,
+    // Converting formats is opt-in: it changes what viewers must support, so the default preserves the source.
+    textureFormat: options.textureFormat === 'webp' ? 'webp' : 'preserve',
   };
 }
 
@@ -159,7 +167,7 @@ export async function inspectGlb(input: Uint8Array): Promise<GltfInspection> {
   return { stats: collectStats(document), inputBytes: input.byteLength, extensionsUsed, extensionsRequired, extensionReport, transformBlockers, previewBlockers, textureFormats };
 }
 
-async function resizeBrowserTextures(document: Document, maximumDimension: number, control: GltfRunControl, report: GltfOptimizeReport) {
+async function resizeBrowserTextures(document: Document, maximumDimension: number, textureFormat: GltfTextureFormat, control: GltfRunControl, report: GltfOptimizeReport) {
   if (typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') {
     report.skippedTextures.push('Texture resize unavailable: browser image/canvas APIs are missing.');
     return;
@@ -182,16 +190,35 @@ async function resizeBrowserTextures(document: Document, maximumDimension: numbe
       const canvas = new OffscreenCanvas(width, height), context = canvas.getContext('2d');
       if (!context) { report.skippedTextures.push(`${texture.getName() || `Texture ${index + 1}`}: 2D canvas unavailable.`); continue; }
       context.drawImage(bitmap, 0, 0, width, height);
-      const quality = mimeType === 'image/jpeg' || mimeType === 'image/webp' ? .9 : undefined;
-      const encoded = await canvas.convertToBlob(quality === undefined ? { type: mimeType } : { type: mimeType, quality });
-      if (encoded.type !== mimeType || !encoded.size) { report.skippedTextures.push(`${texture.getName() || `Texture ${index + 1}`}: browser could not re-encode ${mimeType} without changing format.`); continue; }
+      // Preserve mode re-encodes in place. Opt-in WebP asks for a different format and is verified before use.
+      const targetMimeType = textureFormat === 'webp' ? 'image/webp' : mimeType;
+      const quality = targetMimeType === 'image/jpeg' || targetMimeType === 'image/webp' ? .9 : undefined;
+      const encoded = await canvas.convertToBlob(quality === undefined ? { type: targetMimeType } : { type: targetMimeType, quality });
+      if (encoded.type !== targetMimeType || !encoded.size) {
+        const reason = textureFormat === 'webp' ? 'the browser could not encode WebP' : `the browser could not re-encode ${mimeType} without changing format`;
+        report.skippedTextures.push(`${texture.getName() || `Texture ${index + 1}`}: ${reason}; the original texture and format were preserved.`);
+        continue;
+      }
       texture.setImage(new Uint8Array(await encoded.arrayBuffer()));
-      texture.setMimeType(mimeType);
+      texture.setMimeType(targetMimeType);
       report.resizedTextures += 1;
+      if (targetMimeType !== mimeType) report.convertedTextures += 1;
     } catch {
       report.skippedTextures.push(`${texture.getName() || `Texture ${index + 1}`}: decode/resize failed; original preserved.`);
     } finally { bitmap?.close(); }
   }
+}
+
+/** Animation identity that geometry and texture work must not alter: names, targets, and sampler shape. */
+function animationSignatures(document: Document) {
+  return document.getRoot().listAnimations().map((animation) => JSON.stringify({
+    name: animation.getName(),
+    channels: animation.listChannels().map((channel) => {
+      const targetNode = channel.getTargetNode();
+      return { path: channel.getTargetPath(), node: targetNode ? document.getRoot().listNodes().indexOf(targetNode) : -1, interpolation: channel.getSampler()?.getInterpolation() ?? 'LINEAR' };
+    }),
+    samplerCount: animation.listSamplers().length,
+  }));
 }
 
 export async function optimizeGlb(input: Uint8Array, requestedOptions: GltfOptimizeOptions, control: GltfRunControl = {}): Promise<GltfOptimizeResult> {
@@ -202,12 +229,16 @@ export async function optimizeGlb(input: Uint8Array, requestedOptions: GltfOptim
   control.onProgress?.(.08, 'Reading GLB without modifying source');
   await MeshoptDecoder.ready;
   const io = createIo(), document = await io.readBinary(input), before = collectStats(document);
+  const animationsBefore = animationSignatures(document);
   const report: GltfOptimizeReport = {
     resizedTextures: 0,
+    convertedTextures: 0,
     skippedTextures: [],
     preservedTextureFormats: true,
     cameraCountPreserved: true,
     animationCountPreserved: true,
+    animationsPreserved: true,
+    geometry: { targetRatio: options.targetRatio, measuredRatio: null, targetReached: true, reductionApplied: false, note: '' },
     extensionPreservation: inspection.extensionReport,
     stages: [],
   };
@@ -221,17 +252,34 @@ export async function optimizeGlb(input: Uint8Array, requestedOptions: GltfOptim
   } else report.stages.push('Geometry unchanged (100% target)');
 
   throwIfAborted(control.signal);
-  await resizeBrowserTextures(document, options.maxTextureDimension, control, report);
-  report.stages.push('Texture resize with original MIME formats preserved');
+  await resizeBrowserTextures(document, options.maxTextureDimension, options.textureFormat, control, report);
+  report.preservedTextureFormats = report.convertedTextures === 0;
+  report.stages.push(report.convertedTextures ? 'Texture resize with opt-in WebP conversion' : 'Texture resize with original MIME formats preserved');
   const after = collectStats(document);
   report.cameraCountPreserved = after.cameras === before.cameras;
   report.animationCountPreserved = after.animations === before.animations;
+  report.animationsPreserved = JSON.stringify(animationSignatures(document)) === JSON.stringify(animationsBefore);
+  report.geometry = describeGeometryOutcome(before.triangles, after.triangles, options.targetRatio);
   if (!report.cameraCountPreserved) throw new Error('Optimization unexpectedly changed the camera count; output was not written.');
   if (!report.animationCountPreserved) throw new Error('Optimization unexpectedly changed the animation count; output was not written.');
+  if (!report.animationsPreserved) throw new Error('Optimization unexpectedly changed animation targets or samplers; output was not written.');
   throwIfAborted(control.signal);
+  // The bundled writer cannot emit a PNG/JPEG fallback beside a WebP image, so the extension is required.
+  if (report.convertedTextures > 0) document.createExtension(EXTTextureWebP).setRequired(true);
   control.onProgress?.(.88, 'Writing optimized GLB');
   const bytes = await io.writeBinary(document);
   throwIfAborted(control.signal);
   control.onProgress?.(1, 'Optimization complete');
   return { bytes, inputBytes: input.byteLength, outputBytes: bytes.byteLength, before, after, options, report };
+}
+
+/** Reports what simplification actually achieved, which may be short of the requested target. */
+function describeGeometryOutcome(beforeTriangles: number, afterTriangles: number, targetRatio: number): GltfGeometryOutcome {
+  const measuredRatio = beforeTriangles > 0 ? afterTriangles / beforeTriangles : null;
+  const reductionApplied = afterTriangles < beforeTriangles;
+  const targetReached = beforeTriangles === 0 || afterTriangles <= Math.ceil(beforeTriangles * targetRatio);
+  const note = targetReached
+    ? `Simplification is lossy and best-effort; the measured result reached the ${Math.round(targetRatio * 100)}% target.`
+    : `Simplification is lossy and best-effort, and mesh topology or error limits left the result above the ${Math.round(targetRatio * 100)}% target.`;
+  return { targetRatio, measuredRatio, targetReached, reductionApplied, note };
 }
