@@ -3,11 +3,7 @@
   "taskplannerVersion": "2.1.1",
   "readmeAttribution": true,
   "idPrefix": "TASK",
-<<<<<<< HEAD
-  "nextId": 26,
-=======
-  "nextId": 25,
->>>>>>> e33c2a52 (fix(typing): stop the workspace stretching to ~21,000px (TASK-024 P0))
+  "nextId": 27,
   "states": {
     "backlog": "BACKLOG.md",
     "next": "NEXT.md",
