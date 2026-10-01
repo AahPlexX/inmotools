@@ -94,7 +94,7 @@ test('syntax guide fits narrow landscape and keeps its close control reachable',
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('manual save does not report success when IndexedDB fails', async ({page}) => {
+test('manual save reports IndexedDB failure but a clean document can still start New', async ({page}) => {
   await page.addInitScript(() => {
     IDBDatabase.prototype.transaction = function() { throw new DOMException('Test storage failure','QuotaExceededError'); };
   });
@@ -102,8 +102,158 @@ test('manual save does not report success when IndexedDB fails', async ({page}) 
   await page.getByRole('button',{name:'Save draft',exact:true}).click();
   await expect(page.getByTestId('markdown-status')).toContainText('Local autosave failed');
   await page.getByRole('button',{name:'New',exact:true}).click();
-  await expect(page.getByTestId('markdown-status')).toContainText('Could not save the current document');
+  await expect(page.getByTestId('markdown-status')).toContainText('Started a new document');
   await expect(editorLocator(page)).toContainText('Untitled document');
+});
+
+
+test('untouched default content does not create a local draft on the autosave timer', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await page.waitForTimeout(1_500);
+  const drafts = await openPanel(page, /^Local drafts and storage/);
+  await expect(drafts).toContainText('No local drafts saved yet.');
+  await expect(drafts.locator('[data-testid="markdown-draft-list"]')).toHaveCount(0);
+});
+
+test('manual source scrolling keeps the split preview aligned without moving the caret', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const source = Array.from({ length: 80 }, (_, index) =>
+    `## Section ${index + 1}\n\nParagraph ${index + 1} with enough text to create vertical space.`
+  ).join('\n\n');
+  await setSource(page, source);
+  const editor = editorLocator(page);
+  await editor.press('ControlOrMeta+Home');
+  const preview = page.locator('.markdown-workbench-preview');
+  await expect.poll(() => preview.evaluate((node) => (node as HTMLElement).scrollTop)).toBeLessThan(80);
+
+  await page.locator('.cm-scroller').evaluate((node) => {
+    const scroller = node as HTMLElement;
+    scroller.scrollTop = scroller.scrollHeight;
+    scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  await expect.poll(() => preview.evaluate((node) => (node as HTMLElement).scrollTop), { timeout: 5_000 }).toBeGreaterThan(500);
+});
+
+test('invalid bibliography input explains the parse problem instead of failing silently', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'See [@missing].');
+  const citations = await openPanel(page, /^Citations/);
+  await page.getByLabel('Bibliography format').selectOption('json');
+  await page.getByLabel('Bibliography source').fill('{not valid json');
+  await expect(citations.locator('.markdown-workbench-citation-warning')).toContainText(/couldn.t read|json syntax/i);
+
+  await page.getByLabel('Bibliography format').selectOption('bib');
+  await page.getByLabel('Bibliography source').fill('this is not a BibTeX entry');
+  await expect(citations.locator('.markdown-workbench-citation-warning')).toContainText(/no bibtex entries|@article/i);
+});
+
+test('outline supports filtering and marks the current source section', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Start\n\nIntro\n\n## Installation\n\nSteps\n\n## API reference\n\nDetails');
+  const panel = await openPanel(page, /^Outline/);
+  const filter = panel.getByRole('searchbox', { name: 'Filter outline headings' });
+  await expect(filter).toBeVisible();
+  await filter.fill('api');
+  await expect(panel.getByRole('button', { name: 'API reference' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Installation' })).toHaveCount(0);
+  await filter.fill('');
+
+  const editor = editorLocator(page);
+  await editor.click();
+  await editor.press('ControlOrMeta+End');
+  await expect(panel.getByRole('button', { name: 'API reference' })).toHaveAttribute('aria-current', 'location');
+});
+
+test('local HTML files import as Markdown without upload', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await page.setInputFiles('input[type="file"][accept*=".html"]', {
+    name: 'article.html',
+    mimeType: 'text/html',
+    buffer: Buffer.from('<article><h1>Imported HTML</h1><p>A <strong>bold</strong> paragraph.</p><ul><li>One</li><li>Two</li></ul></article>'),
+  });
+  await expect(editorLocator(page)).toContainText('# Imported HTML');
+  await expect(editorLocator(page)).toContainText('**bold**');
+  await expect(page.locator('.markdown-workbench-preview h1')).toHaveText('Imported HTML');
+  await expect(page.getByTestId('markdown-status')).toContainText(/Imported article\.html.*Markdown/i);
+});
+
+test('formatting controls expose keyboard-accessible explanatory tooltips', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const heading = page.getByRole('button', { name: 'Heading', exact: true });
+  await heading.focus();
+  const headingTip = page.getByRole('tooltip').filter({ hasText: /heading/i });
+  await expect(headingTip).toBeVisible();
+  await expect(heading).toHaveAttribute('aria-describedby', /markdown-format-tip-/);
+
+  const toc = page.getByRole('button', { name: 'Table of contents', exact: true });
+  await toc.focus();
+  await expect(page.getByRole('tooltip').filter({ hasText: /links to the headings/i })).toBeVisible();
+});
+
+test('editor settings expose usable touch targets and visible font-size feedback', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('./#/tools/markdown-workbench');
+  for (const label of ['Wrap lines', 'Vim keys', 'Spellcheck', 'Syntax suggestions']) {
+    const box = await page.getByText(label, { exact: true }).boundingBox();
+    expect(box, label).not.toBeNull();
+    expect(box!.height, `${label} touch target height`).toBeGreaterThanOrEqual(24);
+  }
+  await expect(page.getByTestId('markdown-font-size-value')).toHaveText(/13\s*px/i);
+  await page.getByLabel('Font size').press('ArrowRight');
+  await expect(page.getByTestId('markdown-font-size-value')).toHaveText(/14\s*px/i);
+});
+
+test('dark workspace is readable and reversible without changing document content', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '# Dark check\n\n~~~javascript\nconst answer = 42;\n~~~');
+  const workspace = page.getByTestId('markdown-workbench');
+  await page.getByLabel('Dark workspace').check();
+  await expect(workspace).toHaveClass(/markdown-workbench-theme-dark/);
+  const contrast = await workspace.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  expect(contrast.background).not.toBe(contrast.color);
+  await expect(editorLocator(page)).toContainText('const answer = 42;');
+  await page.getByLabel('Dark workspace').uncheck();
+  await expect(workspace).not.toHaveClass(/markdown-workbench-theme-dark/);
+});
+
+test('focus writing hides secondary chrome but keeps an obvious exit control', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByRole('button', { name: 'Focus writing', exact: true }).click();
+  await expect(page.getByTestId('markdown-workbench')).toHaveClass(/markdown-workbench-focus/);
+  await expect(page.getByRole('button', { name: 'Exit focus', exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Export as' })).toBeHidden();
+  await expect(page.locator('.markdown-workbench-panel').first()).toBeHidden();
+  await expect(editorLocator(page)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Exit focus', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Export as' })).toBeVisible();
+});
+
+test('GitHub-style quote and list shortcuts use the same Markdown actions as the toolbar', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'alpha');
+  const editor = editorLocator(page);
+  await editor.press('ControlOrMeta+Shift+.');
+  await expect(editor).toContainText('> alpha');
+  await editor.press('ControlOrMeta+Shift+8');
+  await expect(editor).toContainText('- > alpha');
+
+  await setSource(page, 'beta');
+  await editor.press('ControlOrMeta+Shift+7');
+  await expect(editor).toContainText('1. beta');
+});
+
+test('document metrics show characters and lines alongside words and sentences', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, 'One line.\nSecond line.');
+  const metrics = await openPanel(page, /^Document metrics/);
+  await expect(metrics).toContainText('Characters');
+  await expect(metrics).toContainText('Lines');
+  await expect(metrics).toContainText('19');
+  await expect(metrics).toContainText('2');
 });
 
 test('ATX heading levels are visibly distinct in the rendered preview', async ({ page }) => {
@@ -232,7 +382,7 @@ test('a delayed file read that loses a race with a newer edit is cancelled inste
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, 'Original content before opening a file.');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'delayed.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Content from the delayed file'),
@@ -457,7 +607,7 @@ test('opening a file saves dirty work first and gives the imported file a separa
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Working draft\n\nKeep this before opening another file.');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'Imported document.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Imported document\n\nNew file body.'),
@@ -466,6 +616,9 @@ test('opening a file saves dirty work first and gives the imported file a separa
   await expect(page.getByTestId('markdown-status')).toContainText('Opened Imported document.md locally');
   await expect(page.locator('.markdown-workbench-preview h1')).toHaveText('Imported document');
 
+  // A just-opened file is untouched, so it is not persisted until edited (clean-draft rule); once
+  // edited it gets its own draft identity instead of overwriting the one it replaced.
+  await setSource(page, '# Imported document\n\nNew file body, edited.');
   await page.waitForTimeout(1400);
   const panel = await openPanel(page, /^Local drafts and storage/);
   await expect(panel.getByRole('button', { name: /Working draft —/ })).toHaveCount(1);
@@ -503,13 +656,13 @@ test('file selection validates Markdown or plain text instead of trusting accept
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Keep this document');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'wrong.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-not-really-a-markdown-document'),
   });
 
-  await expect(page.getByTestId('markdown-status')).toContainText('is not a Markdown or plain-text document');
+  await expect(page.getByTestId('markdown-status')).toContainText('is not a supported document');
   await expect(editorLocator(page)).toContainText('# Keep this document');
 });
 

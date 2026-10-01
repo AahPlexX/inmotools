@@ -1,5 +1,13 @@
 # Done
 
+## Markdown Workbench production audit remediation (F11-F21) — shipped and verified
+
+Eleven evidence-backed functions extend the completed F01-F10 ledger: source-scroll sync (F11), bibliography diagnostics (F12), clean-draft persistence (F13), outline filter and current section (F14), local HTML import (F15), formatting tooltips (F16), >=24 px editor-setting targets with font-size feedback (F17), dark workspace (F18), focus writing (F19), Ctrl/Cmd+Shift+7/8/. block shortcuts (F20), and character and line counts (F21). Each has its own e2e test in tests/e2e/markdown-workbench-ux.spec.ts.
+
+- Correction made at integration: the branch's own commits did not deliver F11. The split panes were unbounded (the grid grew to the document, so nothing in the editor scrolled), no scroll listener existed, preview anchors used element.offsetTop (relative to a positioned ancestor, not the preview scroller, so line 1 mapped to ~1,248 px), and a sync request landing mid-render was dropped. Fixed with a scroller listener, a bounded split view (scoped to the Markdown stylesheet), anchors measured in the scroller's own coordinates, and re-application of the latest request once anchors are measured.
+- Stale tests corrected to match intended behavior: the file input's accessible name is now "Open a local Markdown, text, or HTML file" (it accepts HTML); the unsupported-file message says "not a supported document"; a clean untouched document is not persisted as a draft (F13), so an imported file gets its own draft once edited.
+- Verification: tsc clean; tests/unit/markdown*.test.ts 216/216 (run with --testTimeout=60000; the citation tests exceed the 5 s default on this host); tests/e2e/markdown-workbench.spec.ts, markdown-workbench-ux.spec.ts and markdown-mermaid.spec.ts 152/152 on desktop and mobile Chromium with --workers=1.
+
 ## glTF / GLB Optimizer completion (TASK-024) — 10/10 acceptance areas complete
 
 The glTF / GLB optimizer (`#/tools/gltf-optimizer`) now rejects malformed containers, reports measured results, preserves scene content, keeps texture formats by default, and optimizes in a cancellable worker.

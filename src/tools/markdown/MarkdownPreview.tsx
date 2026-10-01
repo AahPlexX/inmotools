@@ -19,9 +19,13 @@ const measureAnchors = (
   anchors: readonly ScrollAnchor[],
   onAnchorsMeasured: MarkdownPreviewProps['onAnchorsMeasured'],
 ): void => {
-  const offsets = anchors.map((anchor) => {
+  // Offsets are in the scroller's own content coordinates. element.offsetTop is relative to whichever
+  // ancestor is positioned, which is not this scroller, so it cannot be used as a scrollTop target.
+  const hostTop = host.getBoundingClientRect().top;
+  const offsets = anchors.flatMap((anchor) => {
     const element = host.querySelector<HTMLElement>(`[data-source-line="${anchor.sourceLine}"]`);
-    return { sourceLine: anchor.sourceLine, offsetTop: element?.offsetTop ?? 0 };
+    if (!element) return [];
+    return [{ sourceLine: anchor.sourceLine, offsetTop: element.getBoundingClientRect().top - hostTop + host.scrollTop }];
   });
   onAnchorsMeasured(offsets);
 };
