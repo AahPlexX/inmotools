@@ -134,6 +134,9 @@ export default function MarkdownWorkspace() {
   const draftStoreRef = useRef<DraftStore | null>(null);
   const draftIdRef = useRef<string | null>(null);
   const editorViewScrollRef = useRef<{ offsetTop: number; sourceLine: number }[]>([]);
+  // The latest line the preview was asked to follow. A request that lands while the preview is
+  // re-rendering (no anchors yet) is re-applied once the anchors are measured, so it is not lost.
+  const lastScrollSyncRef = useRef<{ line: number; at: number } | null>(null);
   const previewHostRef = useRef<HTMLDivElement | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -369,10 +372,6 @@ export default function MarkdownWorkspace() {
     [formulaPreparedSource, citationResult],
   );
 
-  const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
-    editorViewScrollRef.current = offsets;
-  }, []);
-
   const handlePreviewRenderStateChange = useCallback((pending: boolean) => {
     previewPendingRef.current = pending;
     if (!pending) {
@@ -387,12 +386,19 @@ export default function MarkdownWorkspace() {
   }, []);
 
   const scrollPreviewToLine = useCallback((line: number) => {
+    lastScrollSyncRef.current = { line, at: Date.now() };
     const anchors = editorViewScrollRef.current;
     if (anchors.length === 0) return;
     const targetOffset = computeScrollOffset(anchors, line);
     const scroller = previewHostRef.current?.querySelector<HTMLElement>('.markdown-workbench-preview');
     scroller?.scrollTo({ top: targetOffset, behavior: 'smooth' });
   }, []);
+
+  const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
+    editorViewScrollRef.current = offsets;
+    const last = lastScrollSyncRef.current;
+    if (last && Date.now() - last.at < 1500) scrollPreviewToLine(last.line);
+  }, [scrollPreviewToLine]);
 
   const handleSourceLineChange = useCallback((line: number) => {
     setActiveSourceLine(line);

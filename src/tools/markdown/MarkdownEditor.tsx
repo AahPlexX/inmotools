@@ -360,7 +360,14 @@ export default function MarkdownEditor({
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
+    // Manual scrolling moves the split preview too. CodeMirror only reports viewport changes when its
+    // rendered window shifts, which is far coarser than the user's scrolling, so listen to the scroller.
+    const onScroll = () => {
+      const topBlock = view.lineBlockAtHeight(view.scrollDOM.scrollTop);
+      onViewportLineChangeRef.current?.(view.state.doc.lineAt(topBlock.from).number);
+    };
+    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true });
+    return () => { view.scrollDOM.removeEventListener('scroll', onScroll); view.destroy(); viewRef.current = null; };
   }, [vimCompartment, wrapCompartment, attributesCompartment, suggestionsCompartment, themeCompartment, highlightCompartment]);
 
   useEffect(() => {

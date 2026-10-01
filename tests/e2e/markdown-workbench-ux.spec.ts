@@ -187,7 +187,7 @@ test('formatting controls expose keyboard-accessible explanatory tooltips', asyn
 
   const toc = page.getByRole('button', { name: 'Table of contents', exact: true });
   await toc.focus();
-  await expect(page.getByRole('tooltip').filter({ hasText: /heading links|table of contents/i })).toBeVisible();
+  await expect(page.getByRole('tooltip').filter({ hasText: /links to the headings/i })).toBeVisible();
 });
 
 test('editor settings expose usable touch targets and visible font-size feedback', async ({ page }) => {
@@ -382,7 +382,7 @@ test('a delayed file read that loses a race with a newer edit is cancelled inste
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, 'Original content before opening a file.');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'delayed.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Content from the delayed file'),
@@ -607,7 +607,7 @@ test('opening a file saves dirty work first and gives the imported file a separa
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Working draft\n\nKeep this before opening another file.');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'Imported document.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Imported document\n\nNew file body.'),
@@ -616,6 +616,9 @@ test('opening a file saves dirty work first and gives the imported file a separa
   await expect(page.getByTestId('markdown-status')).toContainText('Opened Imported document.md locally');
   await expect(page.locator('.markdown-workbench-preview h1')).toHaveText('Imported document');
 
+  // A just-opened file is untouched, so it is not persisted until edited (clean-draft rule); once
+  // edited it gets its own draft identity instead of overwriting the one it replaced.
+  await setSource(page, '# Imported document\n\nNew file body, edited.');
   await page.waitForTimeout(1400);
   const panel = await openPanel(page, /^Local drafts and storage/);
   await expect(panel.getByRole('button', { name: /Working draft —/ })).toHaveCount(1);
@@ -653,13 +656,13 @@ test('file selection validates Markdown or plain text instead of trusting accept
   await page.goto('./#/tools/markdown-workbench');
   await setSource(page, '# Keep this document');
 
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'wrong.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-not-really-a-markdown-document'),
   });
 
-  await expect(page.getByTestId('markdown-status')).toContainText('is not a Markdown or plain-text document');
+  await expect(page.getByTestId('markdown-status')).toContainText('is not a supported document');
   await expect(editorLocator(page)).toContainText('# Keep this document');
 });
 

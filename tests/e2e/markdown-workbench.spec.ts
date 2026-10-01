@@ -344,7 +344,7 @@ test('routes the Print / PDF export through the browser print dialog rather than
 
 test('opens a local Markdown file without uploading it', async ({ page }) => {
   await page.goto('./#/tools/markdown-workbench');
-  await page.setInputFiles('input[aria-label="Open a local Markdown file"]', {
+  await page.setInputFiles('input[aria-label="Open a local Markdown, text, or HTML file"]', {
     name: 'imported-notes.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Imported heading\n\nImported body text.'),
@@ -431,13 +431,12 @@ test('saves, lists, reloads and deletes a local draft', async ({ page }) => {
   await draftList.locator('li > button').first().click();
   await expect(page.locator('.markdown-workbench-preview h1')).toContainText('Draft under test');
 
-  // Switching also preserves the document we leave, so target the requested draft.
-  await expect(draftList.locator('li')).toHaveCount(2);
+  // The untouched "Untitled document" we left is clean, so switching does not persist it (F13).
+  await expect(draftList.locator('li')).toHaveCount(1);
   await draftList.locator('li').filter({ hasText: 'Draft under test' })
     .getByRole('button', { name: /^Delete draft saved/ }).click();
   await expect(page.getByTestId('markdown-status')).toContainText(/Deleted/, { timeout: 15_000 });
-  await expect(draftList.locator('li')).toHaveCount(1);
-  await expect(draftList).toContainText('Untitled document');
+  await expect(draftList.locator('li')).toHaveCount(0);
 });
 
 test('changing the font size keeps the caret and document intact', async ({ page }) => {

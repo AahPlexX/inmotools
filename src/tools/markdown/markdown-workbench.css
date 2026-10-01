@@ -347,3 +347,15 @@
 @media (max-width: 520px) {
   .markdown-workbench-format-tooltip { position: fixed; inset: auto 12px 12px; width: auto; max-width: none; transform: none; }
 }
+
+/* Split view: bound the body so the source and the preview each scroll on their own and the preview
+   follows manual source scrolling (F11). Without a bound the grid grows to the document and the page scrolls. */
+.markdown-workbench-view-split { height: min(80vh, 800px); }
+.markdown-workbench-view-split .markdown-workbench-editor-pane,
+.markdown-workbench-view-split .markdown-workbench-preview-pane,
+.markdown-workbench-view-split .markdown-workbench-editor,
+.markdown-workbench-view-split .markdown-workbench-preview { min-height: 0; }
+.markdown-workbench-view-split .markdown-workbench-editor .cm-editor { height: 100%; }
+@media (max-width: 860px) {
+  .markdown-workbench-view-split { height: auto; grid-template-rows: min(60vh, 520px) min(60vh, 520px); }
+}
