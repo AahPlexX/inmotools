@@ -1,4 +1,4 @@
-# Typing Workstation UX/UI elevation — plan (TASK-024)
+# Typing Workstation UX/UI elevation — plan (TASK-026)
 
 Source of findings: `docs/typing-ux-audit-2026-09-30.md` (UX-01 … UX-14). This plan changes presentation and interaction only. The engine, corpora, storage schema, export formats, shortcuts (Esc, F2, Tab) and every existing accessible name stay as they are; the `tw-stat`, `tw-char`, `tw-caret`, `tw-summary` and `tw-root` hooks the e2e spec depends on are preserved.
 

@@ -1,6 +1,6 @@
 # Typing Workstation — UX/UI audit (2026-09-30)
 
-Scope: `src/tools/typing/` as shipped on `origin/main` at `dd12e943`, inspected in a real browser (Chromium via Playwright) at 1440×900, 768×1024 and 390×844, through three states — resting, mid-test, and the result dialog — plus a full read of `TypingWorkspace.tsx` (1,804 lines) and `typing-styles.css` (734 lines). Every finding below was measured or read, not assumed. Work is tracked as TASK-024; the implementation plan is `docs/superpowers/plans/2026-09-30-typing-ux-elevation.md`.
+Scope: `src/tools/typing/` as shipped on `origin/main` at `dd12e943`, inspected in a real browser (Chromium via Playwright) at 1440×900, 768×1024 and 390×844, through three states — resting, mid-test, and the result dialog — plus a full read of `TypingWorkspace.tsx` (1,804 lines) and `typing-styles.css` (734 lines). Every finding below was measured or read, not assumed. Work is tracked as TASK-026; the implementation plan is `docs/superpowers/plans/2026-09-30-typing-ux-elevation.md`.
 
 Not yet audited (listed so the gap is explicit rather than silent): the export-history, add-typist and custom-text dialogs beyond their shared shell; the ten non-light themes beyond spot checks; real screen-reader output; 320 px reflow after the redesign. These are verification gates in the plan, not claims.
 

@@ -352,6 +352,7 @@ export default function TypingWorkspace() {
   const canvasRef = useRef<HTMLTextAreaElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
   const [windowOffsetPx, setWindowOffsetPx] = useState(0);
+  const [canvasFocused, setCanvasFocused] = useState(false);
   const compositionActiveRef = useRef(false);
   const compositionCommitRef = useRef<string | null>(null);
   const pendingPhysicalInputRef = useRef<{ code: string; t: number } | null>(null);
@@ -1207,7 +1208,7 @@ export default function TypingWorkspace() {
         {config.mode === 'custom' && (
           <button type="button" className="subtle" disabled={sessionActive} onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
         )}
-        <button type="button" aria-disabled={sessionActive} onClick={restart}>New text</button>
+        <button type="button" className="subtle" aria-disabled={sessionActive} onClick={restart}>New text</button>
         <button type="button" className="subtle" title="Discard this attempt without saving a result" onClick={abort} disabled={!sessionActive}>Abort &amp; discard</button>
         <button type="button" className="subtle" disabled={sessionActive} onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
@@ -1216,10 +1217,10 @@ export default function TypingWorkspace() {
       {/* Live stats */}
       {!(config.hideStatsDuringTest && running && !engine.finished) && (
         <div className="tw-stats-strip" aria-label="Live typing metrics">
-          <div className="tw-stat"><h3>Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm}</small></div>
+          <div className="tw-stat"><h3 title="Words per minute with errors subtracted (one word = five characters)">Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm} (before errors)</small></div>
           <div className="tw-stat"><h3>Accuracy</h3><p>{metrics.accuracy}%</p><small>{metrics.incorrectChars} errors</small></div>
-          <div className="tw-stat"><h3>Consistency</h3><p>{metrics.consistency}%</p><small>Higher is smoother</small></div>
-          <div className="tw-stat"><h3>Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
+          <div className="tw-stat"><h3 title="How steady your keystroke rhythm is">Consistency</h3><p>{metrics.consistency}%</p><small>Higher = steadier pace</small></div>
+          <div className="tw-stat"><h3 title="Characters per minute counting every key, errors included">Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
           <div className="tw-stat"><h3>Timer</h3><p>{formatMs(totalDurationMs ? durationRemainingMs : metrics.elapsedMs)}</p><small>{totalDurationMs ? 'Remaining' : 'Elapsed'}</small></div>
         </div>
       )}
@@ -1270,8 +1271,12 @@ export default function TypingWorkspace() {
             event.preventDefault();
             setStatusText('Drop input is disabled during a typing test.');
           }}
-          onFocus={() => setPauseUntilFocus(false)}
+          onFocus={() => { setCanvasFocused(true); setPauseUntilFocus(false); }}
+          onBlur={() => setCanvasFocused(false)}
         />
+        {!canvasFocused && !engine.finished && (
+          <div className="tw-focus-cue" aria-hidden="true"><span>{running ? 'Click to resume typing' : 'Click here and start typing'}</span></div>
+        )}
         {pauseUntilFocus && <span className="tw-visually-hidden">Focus the canvas to begin.</span>}
       </div>
 
@@ -1301,19 +1306,19 @@ export default function TypingWorkspace() {
           <h3>Per-key summary</h3>
           <KeyStatsTable rows={keyStats} />
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Personal best / pacer</h3>
-          <p style={{ margin: 0 }}>
+          <p className="tw-personal-best">
             {personalBest ? (
               <>Best {personalBest.netWpm} WPM · {personalBest.accuracy}% acc · {new Date(personalBest.savedAt).toLocaleDateString()}</>
             ) : (
               <>No comparable personal best yet.</>
             )}
           </p>
-          <label style={{ display: 'block', marginTop: '0.4rem' }}>
+          <label>
             <input type="checkbox" checked={config.ghostEnabled} onChange={(e) => setConfig((c) => ({ ...c, ghostEnabled: e.target.checked }))} /> Show ghost pacer
           </label>
-          <label style={{ display: 'block' }}>
+          <label>
             <input type="checkbox" checked={config.pacerEnabled} onChange={(e) => setConfig((c) => ({ ...c, pacerEnabled: e.target.checked }))} /> Target-WPM pacer
           </label>
           {config.pacerEnabled && (
@@ -1327,7 +1332,7 @@ export default function TypingWorkspace() {
             </label>
           )}
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Comfort &amp; accessibility</h3>
           <label>
             Theme
@@ -1368,7 +1373,7 @@ export default function TypingWorkspace() {
             <input type="checkbox" disabled={sessionActive} checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
           </label>
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Sensory feedback</h3>
           <label>
             Switch

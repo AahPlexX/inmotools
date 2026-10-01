@@ -571,6 +571,46 @@
   cursor: not-allowed;
 }
 
+/* Settings panels: one row per setting, label left and control right; checkboxes are their own rows. */
+.tw-settings { display: grid; gap: 0.55rem; align-content: start; }
+.tw-settings h3 { margin-bottom: 0; }
+.tw-settings label {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 8rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.tw-settings label:has(> input[type='checkbox']) { display: flex; gap: 0.5rem; }
+.tw-settings label > select,
+.tw-settings label > input:not([type='checkbox']) { min-width: 0; width: 100%; box-sizing: border-box; }
+.tw-settings label > input[type='range'] { padding: 0; }
+.tw-settings label > span { font-variant-numeric: tabular-nums; min-width: 3.2rem; text-align: right; }
+.tw-personal-best { margin: 0; }
+
+/* Idle cue over the passage so a visitor knows typing begins here. */
+.tw-focus-cue {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border-radius: inherit;
+}
+.tw-focus-cue span {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(11, 18, 32, 0.9);
+  color: #ffffff;
+}
+
 /* Secondary text inherits the theme's colour (dark themes included) and is dimmed, not hard-coded grey. */
 .tw-muted { margin: 0.35rem 0 0; font-size: 0.8rem; color: inherit; opacity: 0.78; }
 .tw-empty {

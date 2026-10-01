@@ -600,6 +600,29 @@ test('history and analytics explain themselves before any test is saved', async 
   await expect(zone).toContainText('Other typists are not affected');
 });
 
+test('cues where to type, has one primary action, and lays settings out as rows', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  const cue = workspace.locator('.tw-focus-cue');
+  await expect(cue).toContainText('Click here and start typing');
+  await workspace.getByRole('textbox', { name: /Typing test canvas/i }).focus();
+  await expect(cue).toHaveCount(0);
+
+  // Start is the only filled button in the control area; New text is secondary.
+  const background = (name: string) => workspace.getByRole('button', { name, exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await background('New text')).not.toBe(await background('Start'));
+
+  // A setting's label and its control share a row (they used to run together).
+  const row = await workspace.locator('.tw-settings label', { hasText: 'Theme' }).evaluate((label) => {
+    const select = label.querySelector('select')!.getBoundingClientRect();
+    const box = label.getBoundingClientRect();
+    return { selectTop: select.top, labelTop: box.top, labelHeight: box.height, selectHeight: select.height };
+  });
+  expect(row.labelHeight).toBeLessThan(row.selectHeight + 12);
+  expect(Math.abs(row.selectTop - row.labelTop)).toBeLessThan(10);
+});
+
 test('every theme keeps text at WCAG AA contrast', async ({ page }) => {
   test.setTimeout(90_000);
   await clearTypingDatabase(page);
