@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
 import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { buildBeginnerTacticalProject } from '../../src/tools/tactics/workspace-engine';
@@ -107,8 +107,12 @@ describe('Tactical project interchange', () => {
       blob: new Blob(['hello'], { type: 'text/plain' }),
     }];
 
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
     const first = await exportTacticalProjectZip(project);
+    vi.setSystemTime(new Date('2026-01-01T00:00:10Z'));
     const second = await exportTacticalProjectZip(project);
+    vi.useRealTimers();
     expect([...first]).toEqual([...second]);
 
     const imported = await importTacticalProjectZip(first, 'board.zip');

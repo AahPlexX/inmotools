@@ -27,6 +27,13 @@ Historical SHAs below describe the pre-squash branch. They are not the branch to
 
 Help copy changed: YES. The workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note were rewritten. The catalog entry was not changed in this wave. Stage 2 instructional writing applies because help copy changed.
 
+## 2026-10-01 fix on `main`: deterministic project ZIP (row 60)
+
+- Found: `main` CI failed once in `tests/unit/tactics-persistence.test.ts` ("round-trips deterministic ZIP bundles…"); two exports of the same project differed in one header byte.
+- Cause: `zip.file(path, …, { createFolders: true })` made JSZip create the `assets/` folder entry with the current time, so exports made in different seconds differed.
+- Fix: `src/tools/tactics/project-io.ts` writes `assets/` itself with the fixed ZIP date. The test now sets the clock to two different times between the exports, so it fails without the fix.
+- Evidence: Tactical units 165/165; full `pnpm test:unit` 344 files / 3,702 tests passed; `tsc` clean; build passed; Tactical e2e "round-trips a project ZIP…" passed on desktop and mobile.
+
 ## T17-01 residuals wave
 
 T17-01 is **DONE** except the PDF encoding half of residual 7. The wave started from main `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`.

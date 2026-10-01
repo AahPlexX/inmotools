@@ -328,6 +328,8 @@ export async function exportTacticalProjectZip(project: TacticalProject): Promis
 
   for (const media of [...current.media].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!media.blob) continue;
+    // JSZip stamps auto-created folders with the current time; a fixed date keeps exports byte-identical.
+    if (!assets.length) zip.file('assets/', null, { dir: true, date: ZIP_DATE });
     if (media.blob.size > MAX_ASSET_BYTES) throw new Error(`Local asset ${media.name} exceeds the ZIP asset size limit.`);
     const path = assetPath(media.id, media.name);
     assets.push({

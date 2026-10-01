@@ -2,6 +2,7 @@
 
 Completed tasks and material task-state reconciliations are summarized here with newest entries first.
 
+- 2026-10-01 — Tactical Matchboard Studio: project ZIP export made byte-identical again when it contains media (the auto-created `assets/` folder carried the current time); the unit test now moves the clock between exports. Detail: `src/tools/tactics/HANDOFF.md`. Evidence: Tactical units 165/165, full units 3,702 passed, build passed, Tactical ZIP e2e passed on desktop and mobile.
 - 2026-10-01 — Fixed red `main` (CAD Studio): restored the CAD ledger `.tasks/CAD_STUDIO.md` from `origin/feature/cad-studio` @ `c01f02cf` (lost in the branch cleanup), pointed its implementation commit at `main`, and re-added the pinned dev dependency `fast-check` 4.10.0 used by the CAD property tests. CAD added to IN_PROGRESS. Evidence: tsc clean, 344 unit files / 3,702 tests passed / 0 failed, build passed.
 - 2026-10-01 — Kept ahead work from older branches without reverting main: Fiber Craft Workstation, Site Intelligence Analyzer, and CAD Studio added from their branches; PDF workstation search/forms/overlays and audio mastering audit fixes applied onto the current tools. Shared catalog, routing, and task notes keep current main and only gain the new entries.
 - 2026-10-01 — Markdown Workbench parity pass: preview-to-source scroll, preview task toggle, bounded narrow split, focus-mode save state, live word/line/reading counts, control tooltips, local editor prefs. Audit notes appended; earlier audit sections kept.
