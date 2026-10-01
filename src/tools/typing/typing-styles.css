@@ -679,6 +679,37 @@
   }
 }
 
+/* Phone: the typing area comes first (session bar, passage, live metrics) and the settings follow.
+   Visual order only; tab order still follows the DOM. */
+@media (max-width: 768px) {
+  .tw-root > * { order: 10; }
+  .tw-root > .tw-session-bar { order: 0; }
+  .tw-root > .tw-canvas { order: 1; }
+  .tw-root > .tw-stats-strip { order: 2; }
+  .tw-root > .tw-toolbar { order: 3; }
+
+  /* Keyboard-shortcut hint is irrelevant on touch; keep it for aria-describedby. */
+  .tw-input-hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: normal;
+  }
+
+  .tw-session-bar { gap: 0.5rem; }
+  .tw-session-state { grid-auto-flow: column; justify-content: start; align-items: center; gap: 0.5rem; }
+  .tw-session-controls { flex-wrap: nowrap; }
+  .tw-session-controls button { flex: 1 1 auto; min-width: 0; padding-inline: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
+
+  .tw-stats-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.4rem; }
+  .tw-stat { padding: 0.5rem 0.25rem; text-align: center; min-width: 0; }
+  .tw-stat h3 { letter-spacing: 0; text-transform: none; font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; }
+  .tw-stat p { font-size: 1.05rem; }
+  .tw-stat small { display: none; }
+}
+
 @media (max-width: 480px) {
   .tw-session-bar {
     padding: 0.75rem;
@@ -695,10 +726,6 @@
   .tw-profile-picker select {
     flex: 1 1 180px;
     min-width: 0;
-  }
-
-  .tw-session-controls button {
-    flex-basis: calc(50% - 0.25rem);
   }
 
   .tw-canvas {

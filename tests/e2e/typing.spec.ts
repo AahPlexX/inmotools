@@ -518,7 +518,7 @@ test('keeps every workspace element inside its own bounds and wraps the passage 
       const overhanging = [...root.querySelectorAll('*')].filter((element) => {
         const rect = element.getBoundingClientRect();
         return rect.width > 0 && rect.right > bounds.right + 1 && !insideFittingScrollRegion(element);
-      }).length;
+      }).map((element) => `${element.tagName.toLowerCase()}.${String(element.className).trim().replace(/[ 	]+/g, ".")}`);
       const live = document.querySelector('[aria-label="Live typing metrics"]');
       const statsInside = [...(live?.querySelectorAll('.tw-stat') ?? [])].every((stat) => stat.getBoundingClientRect().right <= bounds.right + 1);
       const text = document.querySelector('.tw-canvas-text') as HTMLElement;
@@ -533,11 +533,23 @@ test('keeps every workspace element inside its own bounds and wraps the passage 
       };
     });
     expect(report.toolbarWidth, `toolbar wider than workspace at ${width}px`).toBeLessThanOrEqual(report.rootWidth + 1);
-    expect(report.overhanging, `elements overhanging the workspace at ${width}px`).toBe(0);
+    expect(report.overhanging, `elements overhanging the workspace at ${width}px`).toEqual([]);
     expect(report.statCount).toBe(5);
     expect(report.statsInside, `a live stat is clipped at ${width}px`).toBe(true);
     expect(report.passageLines, `passage did not wrap at ${width}px`).toBeGreaterThanOrEqual(2);
   }
+});
+
+test('puts Start and the first line of the passage in the first viewport', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  const viewportHeight = page.viewportSize()!.height;
+
+  const start = await workspace.getByRole('button', { name: 'Start', exact: true }).boundingBox();
+  expect(start!.y + start!.height).toBeLessThanOrEqual(viewportHeight);
+
+  const firstChar = await workspace.locator('.tw-canvas-text .tw-char').first().boundingBox();
+  expect(firstChar!.y + firstChar!.height).toBeLessThanOrEqual(viewportHeight);
 });
 
 test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {

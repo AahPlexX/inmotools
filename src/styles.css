@@ -123,11 +123,13 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .suite-page--workspace-first .local-note p { margin-top: 4px; font-size: 13px; }
 .suite-page--workspace-first .suite-guide { padding-top: 40px; }
 @media (max-width: 860px) {
-  .suite-page--workspace-first .suite-intro { grid-template-columns: 1fr; gap: 6px; padding-bottom: 12px; }
+  .suite-page--workspace-first .suite-intro { grid-template-columns: minmax(0, 1fr); gap: 6px; padding-bottom: 12px; }
   /* Clamped, not hidden: the full text stays in the DOM for assistive technology. */
   .suite-page--workspace-first .audience { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .suite-page--workspace-first .suite-summary,
-  .suite-page--workspace-first .local-note p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .suite-page--workspace-first .local-note p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; }
+  .suite-page--workspace-first .suite-intro h1 { font-size: 20px; }
+  .suite-page--workspace-first .suite-topline { margin-bottom: 8px; }
 }
 .workspace-header { padding: 18px 22px; border-bottom: 1px solid var(--line); background: #fbfcfd; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .workspace-header h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
