@@ -17,6 +17,7 @@ import { commitHistory, createHistory, redoHistory, undoHistory } from './state-
 import type { QueryResult } from '../duckdb/duckdb-client';
 import { consumeFileInput } from '../../lib/file-input';
 import { PagedTable } from '../../components/PagedTable';
+import './lattice-workspace.css';
 
 const DEFAULT_SOURCE = JSON.stringify({
   project: 'JSON Lattice Studio',
@@ -75,7 +76,7 @@ export default function LatticeWorkspace() {
   const [layoutError, setLayoutError] = useState('');
   const [parseError, setParseError] = useState('');
   const [revisionState, setRevisionState] = useState<RevisionState>('current');
-  const [status, setStatus] = useState('Edit, inspect, query, and export locally.');
+  const [status, setStatus] = useState('Edit, inspect, query, and export. Nothing leaves this browser.');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const [activePath, setActivePath] = useState('');
@@ -91,6 +92,8 @@ export default function LatticeWorkspace() {
   const [sql, setSql] = useState("SELECT path, key, type, value_text FROM json_tree LIMIT 50");
   const [sqlResult, setSqlResult] = useState<QueryResult | null>(null);
   const [sqlBusy, setSqlBusy] = useState(false);
+  const [sqlError, setSqlError] = useState('');
+  const [focusNonce, setFocusNonce] = useState(0);
   const [renameKey, setRenameKey] = useState('');
   const [addKey, setAddKey] = useState('newField');
   const [addValue, setAddValue] = useState('null');
@@ -122,10 +125,10 @@ export default function LatticeWorkspace() {
   const selectedValue = useMemo(() => { try { return selectedNode ? getPointerValue(history.present, selectedNode.path) : null; } catch { return null; } }, [history.present, selectedNode]);
   const normalizedExportReady = revisionState === 'current';
   const revisionLabel = revisionState === 'current'
-    ? 'Revision current · normalized exports ready'
+    ? 'In sync · current'
     : revisionState === 'pending'
-      ? 'Revision pending · normalized exports paused'
-      : 'Revision invalid · normalized exports paused';
+      ? 'Waiting to parse · pending'
+      : 'Cannot parse · invalid';
 
   const comparisonResult = useMemo(() => {
     if (!diffMode) return { result: null, error: '' };
@@ -236,9 +239,9 @@ export default function LatticeWorkspace() {
   };
   const toggleCollapse = (path: string) => setCollapsedPaths((current) => { const next = new Set(current); if (next.has(path)) next.delete(path); else next.add(path); return next; });
   const editPrimitive = (path: string, value: JsonPrimitive) => {
-    if (privacyEnabled) { setStatus('Turn off Privacy Shield before editing canonical values.'); return; }
+    if (privacyEnabled) { setStatus('Turn Privacy Shield off before editing. The source itself is unchanged.'); return; }
     const { document } = applyJsonPatch(history.present, [{ op: 'replace', path, value }]);
-    commitValue(document, `${path || '/'} updated with an RFC 6902 replace operation.`);
+    commitValue(document, `Updated ${path || '/'}.`);
   };
   const undo = () => { const next = undoHistory(history); if (next === history) return; setHistory(next); syncSourceFromValue(next.present); setStatus('Undo applied.'); };
   const redo = () => { const next = redoHistory(history); if (next === history) return; setHistory(next); syncSourceFromValue(next.present); setStatus('Redo applied.'); };
@@ -271,13 +274,13 @@ export default function LatticeWorkspace() {
     catch (error) { setJsonPathPointers([]); setQuerySummary(error instanceof Error ? error.message : 'JSONPath failed.'); }
   };
   const runSql = async () => {
-    setSqlBusy(true); setSqlResult(null);
+    setSqlBusy(true); setSqlResult(null); setSqlError('');
     try {
       if (!sqlSessionRef.current) sqlSessionRef.current = await createLatticeSqlSession();
       await refreshJsonTreeTable(sqlSessionRef.current, history.present);
       const result = await runLatticeSql(sqlSessionRef.current, sql);
-      setSqlResult(result); setStatus(`DuckDB returned ${plural(result.rows.length, 'row')}.`);
-    } catch (error) { setStatus(`SQL failed: ${error instanceof Error ? error.message : 'unknown error'}`); }
+      setSqlResult(result); setSqlError(''); setStatus(`SQL returned ${plural(result.rows.length, 'row')}.`);
+    } catch (error) { const message = error instanceof Error ? error.message : 'unknown error'; setSqlError(message); setStatus(`SQL failed: ${message}`); }
     finally { setSqlBusy(false); }
   };
 
@@ -295,10 +298,34 @@ export default function LatticeWorkspace() {
     try { downloadText(serializeStructuredData(history.present, target), `json-lattice.${target === 'yaml' ? 'yaml' : target}`, target === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'); }
     catch (error) { setStatus(error instanceof Error ? error.message : 'Export failed.'); }
   };
+  const exportXml = () => {
+    if (!normalizedExportReady) return;
+    try { downloadText(serializeStructuredData(history.present, 'xml'), 'json-lattice.xml', 'application/xml;charset=utf-8'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'XML export failed.'); }
+  };
+  const copyText = async (value: string, note: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setStatus(note);
+    } catch { setStatus('Clipboard is blocked in this browser. Select the text and copy it manually.'); }
+  };
+  const containerPaths = baseGraph.nodes.filter((node) => node.childCount > 0).map((node) => node.path);
+  const collapseAll = () => setCollapsedPaths(new Set(containerPaths));
+  const expandAll = () => setCollapsedPaths(new Set());
+  const matchList = useMemo(() => [...searchMatches].sort(), [searchMatches]);
+  const focusMatch = (offset: number) => {
+    if (!matchList.length) { setStatus('No search matches yet.'); return; }
+    const current = Math.max(0, matchList.indexOf(activePath));
+    const next = (current + offset + matchList.length) % matchList.length;
+    const path = matchList[next];
+    setActivePath(path);
+    setFocusNonce((value) => value + 1);
+    setStatus(`Match ${next + 1} of ${matchList.length}.`);
+  };
   const exportRawSource = () => {
     const { extension, mime } = rawExportDetails(format);
     downloadText(source, `json-lattice-source.${extension}`, mime);
-    setStatus(`Raw ${format.toUpperCase()} source exported exactly as shown in the editor.`);
+    setStatus(`Saved the ${format.toUpperCase()} text exactly as it appears in the editor.`);
   };
   const exportProtectedJson = () => {
     if (!normalizedExportReady) return;
@@ -317,10 +344,12 @@ export default function LatticeWorkspace() {
   return <div className="lattice-studio" data-testid="json-lattice-studio">
     <div className="lattice-topbar">
       <div className="lattice-actions">
-        <button type="button" onClick={undo} disabled={!history.past.length}>Undo</button>
-        <button type="button" onClick={redo} disabled={!history.future.length}>Redo</button>
-        <button type="button" aria-pressed={privacyEnabled} onClick={() => setPrivacyEnabled((value) => !value)}>Privacy Shield</button>
-        <button type="button" aria-pressed={diffMode} onClick={() => setDiffMode((value) => !value)}>Diff Mode</button>
+        <button type="button" title="Step back through edits" onClick={undo} disabled={!history.past.length}>Undo</button>
+        <button type="button" title="Reapply an undone edit" onClick={redo} disabled={!history.future.length}>Redo</button>
+        <button type="button" title="Hide emails, tokens, cards, and secret-like fields in the graph. The source stays unchanged." aria-pressed={privacyEnabled} onClick={() => setPrivacyEnabled((value) => !value)}>Privacy Shield</button>
+        <button type="button" title="Compare this document with another JSON payload" aria-pressed={diffMode} onClick={() => setDiffMode((value) => !value)}>Diff Mode</button>
+        <button type="button" title="Fold every object and array" onClick={collapseAll}>Collapse all</button>
+        <button type="button" title="Show every nested node" onClick={expandAll}>Expand all</button>
       </div>
       <div className="lattice-statline" aria-label="Graph statistics"><span>Loaded <strong>{baseGraph.nodes.length}</strong></span><span>Visible <strong data-testid="visible-node-count">{graph.nodes.length}</strong></span><span>Rendered <strong>{layout?.nodes.size ?? 0}</strong></span></div>
     </div>
@@ -328,27 +357,35 @@ export default function LatticeWorkspace() {
     <div className="lattice-inputbar">
       <label>Input format<select aria-label="Input format" value={format} onChange={(event) => changeFormat(event.target.value as StructuredFormat)}>{FORMATS.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}</select></label>
       <label className="lattice-file">Open local file<input type="file" accept=".json,.yaml,.yml,.toml,.xml,.csv,application/json,text/csv" onChange={(event) => consumeFileInput(event.target, () => loadFile(event.target.files?.[0]))} /></label>
-      <label className="lattice-search">Search graph<input aria-label="Search graph" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="key, value, type, or path" /></label>
+      <label className="lattice-search">Search graph<input aria-label="Search graph" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="key, value, type, or path" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); focusMatch(event.shiftKey ? -1 : 1); } }} /></label>
+      <span className="lattice-search-nav" role="group" aria-label="Search matches">
+        <button type="button" title="Previous match" aria-label="Previous match" onClick={() => focusMatch(-1)}>↑</button>
+        <button type="button" title="Next match" aria-label="Next match" onClick={() => focusMatch(1)}>↓</button>
+      </span>
       <span className="lattice-search-count"><strong data-testid="search-match-count">{searchMatches.size}</strong> matches</span>
-      <label>Layout<select value={direction} onChange={(event) => setDirection(event.target.value as LatticeLayoutDirection)}><option value="LR">Left → right</option><option value="TB">Top → bottom</option><option value="RL">Right → left</option><option value="BT">Bottom → top</option></select></label>
+      <label title="Direction the graph grows">Layout<select aria-label="Layout direction" value={direction} onChange={(event) => setDirection(event.target.value as LatticeLayoutDirection)}><option value="LR">Left → right</option><option value="TB">Top → bottom</option><option value="RL">Right → left</option><option value="BT">Bottom → top</option></select></label>
     </div>
 
     <div className="lattice-main">
       <section className="lattice-source-panel" aria-label="Canonical source editor">
-        <div className="lattice-panel-heading"><div><h2>Canonical source</h2><p>{format.toUpperCase()} input normalizes to a JSON-compatible model.</p></div><span className={revisionState === 'current' ? 'lattice-good' : 'lattice-bad'} data-testid="revision-status">{revisionLabel}</span></div>
+        <div className="lattice-panel-heading"><div><h2>Source</h2><p>Paste or open JSON, YAML, TOML, XML, or CSV. A short pause applies the parse.</p></div><span className={revisionState === 'current' ? 'lattice-good' : 'lattice-bad'} data-testid="revision-status" title={revisionState === 'current' ? 'Exports use this parsed document' : 'Exports wait until the source parses'}>{revisionLabel}</span></div>
         <LatticeEditor value={source} format={format} onChange={editSource} />
         {parseError ? <div className="lattice-error" role="alert">{parseError}</div> : null}
       </section>
 
       <section className="lattice-graph-panel" aria-label="Interactive JSON graph">
-        <div className="lattice-panel-heading"><div><h2>Graph workspace</h2><p>Drag to pan · scroll or use − / + to zoom · double-click a value to edit it.</p></div>{layoutError ? <span className="lattice-bad">Layout error</span> : <span className="lattice-good">ELK worker</span>}</div>
-        <LatticeViewport graph={graph} layout={layout} collapsedPaths={collapsedPaths} searchMatches={searchMatches} activePath={activePath} onToggleCollapse={toggleCollapse} onEditPrimitive={editPrimitive} onSelect={setActivePath} />
+        <div className="lattice-panel-heading"><div><h2>Graph</h2><p>Drag to pan. Scroll, pinch, or use − / + to zoom. Double-click a value, or tap Edit, to change it.</p></div>{layoutError ? <span className="lattice-bad">Layout failed</span> : <span className="lattice-good" title="Layout runs in a local worker so typing stays responsive">Layout ready</span>}</div>
+        <LatticeViewport graph={graph} layout={layout} collapsedPaths={collapsedPaths} searchMatches={searchMatches} activeMatch={matchList.includes(activePath) ? activePath : undefined} focusNonce={focusNonce} activePath={activePath} onToggleCollapse={toggleCollapse} onEditPrimitive={editPrimitive} onSelect={setActivePath} />
         {layoutError ? <div className="lattice-error" role="alert">{layoutError}</div> : null}
       </section>
 
       <aside className="lattice-inspector" aria-label="Node inspector">
         <div className="lattice-panel-heading"><div><h2>Inspector</h2><p>{selectedNode?.path || '/'}</p></div><span>{selectedNode?.type ?? '—'}</span></div>
-        <dl className="lattice-inspector-list"><div><dt>Key</dt><dd>{selectedNode?.key ?? '—'}</dd></div><div><dt>Depth</dt><dd>{selectedNode?.depth ?? 0}</dd></div><div><dt>Children</dt><dd>{selectedNode?.childCount ?? 0}</dd></div><div><dt>Value</dt><dd>{selectedValue === null ? 'null' : typeof selectedValue === 'object' ? selectedNode?.type : String(selectedValue)}</dd></div></dl>
+        <dl className="lattice-inspector-list"><div><dt>Key</dt><dd title={selectedNode?.key}>{selectedNode?.key ?? '—'}</dd></div><div><dt>Depth</dt><dd>{selectedNode?.depth ?? 0}</dd></div><div><dt>Children</dt><dd>{selectedNode?.childCount ?? 0}</dd></div><div><dt>Value</dt><dd title={selectedValue === null ? 'null' : typeof selectedValue === 'object' ? selectedNode?.type : String(selectedValue)}>{selectedValue === null ? 'null' : typeof selectedValue === 'object' ? selectedNode?.type : String(selectedValue)}</dd></div></dl>
+        <div className="lattice-copy-row">
+          <button type="button" title="Copy the JSON Pointer for this node" onClick={() => void copyText(selectedNode?.path || '/', 'Copied the path.')}>Copy path</button>
+          <button type="button" title="Copy the value as JSON" onClick={() => void copyText(JSON.stringify(selectedValue), 'Copied the value.')}>Copy value</button>
+        </div>
         {selectedNode?.path ? <div className="field"><label htmlFor="lattice-rename">Rename property</label><input id="lattice-rename" value={renameKey} onChange={(event) => setRenameKey(event.target.value)} /><div className="button-row"><button type="button" className="action-button secondary" onClick={renameSelected}>Rename</button><button type="button" className="action-button secondary" onClick={removeSelected}>Remove node</button></div></div> : null}
         {selectedNode && ['object', 'array'].includes(selectedNode.type) ? <div className="lattice-add-child"><h3>Add child</h3>{selectedNode.type === 'object' ? <label>Property key<input value={addKey} onChange={(event) => setAddKey(event.target.value)} /></label> : null}<label>JSON value<input value={addValue} onChange={(event) => setAddValue(event.target.value)} /></label><button type="button" onClick={addChild}>Add child</button></div> : null}
       </aside>
@@ -356,15 +393,15 @@ export default function LatticeWorkspace() {
 
     <div className="lattice-dock">
       <details open><summary>Privacy & diff</summary><div className="lattice-dock-grid">
-        <div><h3>Privacy Shield</h3><label>Protection mode<select value={privacyMode} onChange={(event) => setPrivacyMode(event.target.value as 'mask' | 'mock')}><option value="mask">Mask detected values</option><option value="mock">Deterministic mock values</option></select></label><p data-testid="privacy-summary">{privacyEnabled ? `${privacy.findings.length} protected values` : 'Shield off · source unchanged'}</p><button type="button" disabled={!normalizedExportReady} onClick={exportProtectedJson}>Export protected JSON</button><small>Heuristic detector: review before sharing.</small></div>
+        <div><h3>Privacy Shield</h3><label>Protection mode<select aria-label="Protection mode" title="Mask replaces hits with a label. Mock replaces them with stable fake values." value={privacyMode} onChange={(event) => setPrivacyMode(event.target.value as 'mask' | 'mock')}><option value="mask">Mask detected values</option><option value="mock">Stable stand-in values</option></select></label><p data-testid="privacy-summary">{privacyEnabled ? `${privacy.findings.length} protected values` : 'Shield off · source unchanged'}</p><button type="button" title="Download a JSON copy with protected values substituted" disabled={!normalizedExportReady} onClick={exportProtectedJson}>Export protected JSON</button><small>This is a guess, not a guarantee. Read the file before you share it.</small></div>
         <div><h3>Structural diff</h3><label>Comparison JSON<textarea aria-label="Comparison JSON" value={comparison} onChange={(event) => setComparison(event.target.value)} /></label><p data-testid="diff-summary">{diffSummary}</p></div>
       </div></details>
 
-      <details><summary>Schema generator</summary><div className="lattice-dock-grid single"><label>Schema target<select aria-label="Schema target" value={schemaTarget} onChange={(event) => setSchemaTarget(event.target.value as SchemaTarget)}><option value="typescript">TypeScript</option><option value="zod">Zod</option><option value="go">Go</option><option value="rust">Rust Serde</option><option value="jsonSchemaDraft07">JSON Schema Draft-07</option><option value="jsonSchema202012">JSON Schema 2020-12</option></select></label><pre data-testid="schema-output" tabIndex={0}>{schemaOutputs[schemaTarget]}</pre></div></details>
+      <details><summary>Schema generator</summary><div className="lattice-dock-grid single"><label>Schema target<select aria-label="Schema target" value={schemaTarget} onChange={(event) => setSchemaTarget(event.target.value as SchemaTarget)}><option value="typescript">TypeScript</option><option value="zod">Zod</option><option value="go">Go</option><option value="rust">Rust Serde</option><option value="jsonSchemaDraft07">JSON Schema Draft-07</option><option value="jsonSchema202012">JSON Schema 2020-12</option></select></label><button type="button" title="Copy the generated schema" onClick={() => void copyText(schemaOutputs[schemaTarget], 'Copied the schema.')}>Copy schema</button><pre data-testid="schema-output" tabIndex={0}>{schemaOutputs[schemaTarget]}</pre></div></details>
 
       <details><summary>JSONPath & DuckDB</summary><div className="lattice-dock-grid">
         <div><h3>JSONPath slice</h3><label>JSONPath query<input aria-label="JSONPath query" value={jsonPath} onChange={(event) => setJsonPath(event.target.value)} /></label><div className="button-row"><button type="button" onClick={runJsonPath}>Run JSONPath</button><label className="lattice-check"><input type="checkbox" checked={querySlice} onChange={(event) => setQuerySlice(event.target.checked)} /> Slice graph to matches + ancestors</label></div><p data-testid="query-summary">{querySummary}</p></div>
-        <div><h3>Local SQL</h3><label>SQL query<textarea aria-label="SQL query" value={sql} onChange={(event) => setSql(event.target.value)} /></label><button type="button" disabled={sqlBusy || !sql.trim()} onClick={() => void runSql()}>{sqlBusy ? 'Running locally…' : 'Run SQL'}</button>{sqlResult ? <PagedTable columns={sqlResult.columns.map((column) => ({ key: column, label: column }))} rows={sqlResult.rows} caption="Local SQL results" pageSize={100} testId="sql-results" renderCell={(row, column) => String(row[column] ?? '')} /> : <div data-testid="sql-results" className="lattice-empty">No SQL results yet.</div>}</div>
+        <div><h3>Local SQL</h3><label>SQL query<textarea aria-label="SQL query" value={sql} onChange={(event) => setSql(event.target.value)} /></label><button type="button" title="Run this query against the current document in local DuckDB" disabled={sqlBusy || !sql.trim()} onClick={() => void runSql()}>{sqlBusy ? 'Running…' : 'Run SQL'}</button>{sqlError ? <p className="lattice-sql-error" role="alert">{sqlError}</p> : null}{sqlResult ? <PagedTable columns={sqlResult.columns.map((column) => ({ key: column, label: column }))} rows={sqlResult.rows} caption="Local SQL results" pageSize={100} testId="sql-results" renderCell={(row, column) => String(row[column] ?? '')} /> : <div data-testid="sql-results" className="lattice-empty">No SQL results yet.</div>}</div>
       </div></details>
     </div>
 
@@ -372,14 +409,15 @@ export default function LatticeWorkspace() {
       <button type="button" disabled={!layout || !normalizedExportReady} onClick={exportSvg}>Export SVG</button>
       <button type="button" disabled={!layout || !normalizedExportReady} onClick={() => void exportRaster('png')}>Export PNG</button>
       <button type="button" disabled={!layout || !normalizedExportReady} onClick={() => void exportRaster('jpeg')}>Export JPEG</button>
-      <button type="button" disabled={!normalizedExportReady} onClick={() => downloadText(buildFlatCsv(history.present), 'json-lattice.csv', 'text/csv;charset=utf-8')}>Export CSV</button>
+      <button type="button" title="Download the flattened table" disabled={!normalizedExportReady} onClick={() => downloadText(buildFlatCsv(history.present), 'json-lattice.csv', 'text/csv;charset=utf-8')}>Export CSV</button>
+      <button type="button" title="Download the parsed document as XML" disabled={!normalizedExportReady} onClick={exportXml}>Export XML</button>
       <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('json')}>Export JSON</button>
       <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('yaml')}>Export YAML</button>
       <button type="button" disabled={!normalizedExportReady} onClick={() => exportFormat('toml')}>Export TOML</button>
       <button type="button" onClick={exportRawSource}>Export raw source</button>
-      <button type="button" onClick={() => { window.localStorage.removeItem(STORAGE_KEY); setStatus('Saved JSON Lattice session cleared from this browser.'); }}>Clear saved session</button>
+      <button type="button" title="Forget the autosaved session in this browser" onClick={() => { window.localStorage.removeItem(STORAGE_KEY); setStatus('Cleared the saved session in this browser.'); }}>Clear saved session</button>
     </div>
     <div className="lattice-status" role="status">{status}</div>
-    <p className="lattice-disclaimer">Normalized/vector/raster exports are bound to the current parsed revision. Raw source export preserves editor text exactly. Privacy Shield is heuristic, foreign-key links are convention-based suggestions, and browser/Wasm memory is finite. Processing stays local to this browser.</p>
+    <p className="lattice-disclaimer">Parsed exports wait until the source is valid. Raw export saves the editor text as-is. Privacy Shield and the dashed id links are guesses — read them before you share. Huge files can run out of browser memory. Nothing is uploaded.</p>
   </div>;
 }

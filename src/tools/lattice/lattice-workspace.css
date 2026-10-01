@@ -1,0 +1,33 @@
+.lattice-studio button:focus-visible,
+.lattice-studio input:focus-visible,
+.lattice-studio select:focus-visible,
+.lattice-studio textarea:focus-visible {
+  outline: 2px solid var(--lt-accent, #38bdf8);
+  outline-offset: 2px;
+}
+.lattice-search-nav { display: flex; gap: 4px; }
+.lattice-search-nav button { min-width: 36px; padding-inline: 8px; }
+.lattice-node.is-current-match { border-color: #f59e0b; box-shadow: 0 0 0 3px #f59e0b66, 0 8px 24px #0005; }
+.lattice-node-value { white-space: nowrap; }
+.lattice-edit {
+  position: absolute;
+  left: 8px;
+  bottom: -11px;
+  min-height: 26px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-size: 11px;
+}
+.lattice-minimap { cursor: crosshair; touch-action: none; }
+.lattice-minimap-window { fill: #38bdf822; stroke: #e2e8f0; stroke-width: 18; }
+.lattice-inspector-list dd { user-select: text; }
+.lattice-copy-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
+.lattice-sql-error { color: #fda4af; font-size: 12px; margin: 6px 0 0; }
+@media (max-width: 760px) {
+  .lattice-viewport-actions button,
+  .lattice-search-nav button,
+  .lattice-edit,
+  .lattice-collapse { min-height: 44px !important; }
+  .lattice-node-head strong { max-width: 58%; }
+  .lattice-disclaimer { font-size: 12px; line-height: 1.45; }
+}

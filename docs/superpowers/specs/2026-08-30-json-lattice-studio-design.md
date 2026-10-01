@@ -71,3 +71,17 @@ Schema inference recursively merges object shapes across array members so proper
 - Privacy Shield is a heuristic detector, not a guarantee that all sensitive information is found.
 - FK cross-links are convention-based suggestions and remain visually distinct from structural parent/child edges.
 - DuckDB memory remains subject to browser/Wasm memory limits.
+
+## Audit addendum — 2026-10-01
+
+This addendum records production-audit resolutions. It does not replace the sections above.
+
+- Search jumps to the previous or next match and centers that node. Enter / Shift+Enter do the same.
+- The minimap shows the current view rectangle and pans on click or drag.
+- Wheel zoom uses a non-passive listener, normalizes line/page/pixel deltas, and treats ctrl/meta+wheel as pinch. Two-finger pinch zooms on touch.
+- Fit runs when the layout changes, not on every resize, so a pan is not thrown away when mobile browser chrome shows or hides.
+- Node values keep their full text in a tooltip instead of a silent 88-character cut.
+- Inspector can copy the JSON Pointer and the JSON value. Schema output can be copied. XML export sits beside the existing JSON/YAML/TOML/CSV exports.
+- Collapse all / Expand all, an on-node Edit control for touch, and title tooltips on primary controls are part of the workspace.
+- Status, revision, and disclaimer copy names what the user can do. Revision text still contains `current`, `pending`, and `invalid` for the existing checks.
+- Direct competitors for this surface are JSON Crack (graph, fold, search, image export), JSON Hero (path copy, inferred types), and JSON Editor Online (tree edit, format convert). Lattice already covers multi-format parse, privacy substitution, structural diff, schema targets, and local SQL. The items above close the graph-navigation and path-copy gaps those tools have, without a server or an account.
