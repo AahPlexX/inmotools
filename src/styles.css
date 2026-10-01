@@ -113,6 +113,22 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .suite-facts dt { color: var(--muted); font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: .07em; }
 .suite-facts dd { margin: 0; line-height: 1.5; font-size: 14px; }
 .suite-workspace { border: 1px solid var(--line-strong); background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+/* Opt-in compact intro for tools whose workspace should be usable in the first viewport. */
+.suite-page--workspace-first .suite-topline { margin-bottom: 16px; }
+.suite-page--workspace-first .suite-intro { grid-template-columns: minmax(0, 1fr) minmax(220px, 360px); gap: 8px 32px; align-items: start; padding-bottom: 18px; border-bottom: 0; }
+.suite-page--workspace-first .audience { margin-bottom: 6px; }
+.suite-page--workspace-first .suite-intro h1 { max-width: none; font-size: clamp(22px, 2.4vw, 32px); line-height: 1.15; letter-spacing: -.03em; }
+.suite-page--workspace-first .suite-summary { margin-top: 8px; font-size: 15px; line-height: 1.5; }
+.suite-page--workspace-first .local-note { padding: 2px 0 2px 14px; }
+.suite-page--workspace-first .local-note p { margin-top: 4px; font-size: 13px; }
+.suite-page--workspace-first .suite-guide { padding-top: 40px; }
+@media (max-width: 860px) {
+  .suite-page--workspace-first .suite-intro { grid-template-columns: 1fr; gap: 6px; padding-bottom: 12px; }
+  /* Clamped, not hidden: the full text stays in the DOM for assistive technology. */
+  .suite-page--workspace-first .audience { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .suite-page--workspace-first .suite-summary,
+  .suite-page--workspace-first .local-note p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+}
 .workspace-header { padding: 18px 22px; border-bottom: 1px solid var(--line); background: #fbfcfd; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .workspace-header h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .workspace-header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
