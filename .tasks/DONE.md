@@ -44,8 +44,9 @@ decoding/TopoJSON decoding are implemented in-house against official test vector
 Code's own `test_data`, proj4js/mgrs reference vectors, the published geohash example, ARRL W1AW's
 published Maidenhead locator) rather than adding a package.
 
-Fresh evidence on the merge-ready tree (merge commit `399b78c`, `feature/geo-intelligence-hub`
-onto current `main` tip `637a569`, clean/conflict-free): `tsc --noEmit -p tsconfig.app.json` exit 0;
+Fresh evidence on the merge-ready tree (merge commit `882360e` onto `main` tip `dd12e94`; the only
+conflict was both tools appending to the catalog and loader, resolved by keeping both). Earlier
+evidence at `399b78c` onto `637a569`: `tsc --noEmit -p tsconfig.app.json` exit 0;
 `pnpm test:unit` **247 files / 2,883 tests passed** (2 files / 14 tests skipped, pre-existing and
 unrelated); `pnpm build` exit 0; `tests/e2e/geo-intel.spec.ts` **26 passed / 10 skipped / 0 failed**
 (skips are per-project, e.g. desktop-only interactions skipped on the mobile project and vice

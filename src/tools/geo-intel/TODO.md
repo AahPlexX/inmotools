@@ -353,3 +353,12 @@ F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F1
 
 ### G12 — CLOSED
 All conditions satisfied: PR #89 open into `main`, CI green on the exact head commit, `.tasks` reconciled in this delivery, branch is a clean 3-ahead fast-forward-mergeable state on top of current `origin/main`. Merge is the owner's action per repository convention; this tool's implementation and task-state work is complete pending that action.
+
+## Delivery 14 — 2026-09-30 (second re-sync)
+### Committed this batch
+- Merged `origin/main` @ `dd12e94` (Tactical Matchboard Studio, PRs #76/#92) as `882360e`. Both branches had appended a slug to `ToolSlug`, a `TOOLS` entry and a loader line at the same spot; resolved by keeping both, in that order. No other conflicts.
+### Gate evidence (on `882360e`)
+- `tsc` exit 0; `pnpm test:unit` 268 files / 3,046 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0.
+- `geo-intel.spec.ts` + `accessibility.spec.ts` + `app.spec.ts`: 122 passed / 10 skipped / 0 failed.
+### Next batch (planned)
+- CI on the pushed head, then merge PR #89.
