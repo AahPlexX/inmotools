@@ -1,10 +1,10 @@
 # Tabular Sheet Workstation — agent handoff
 
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
-Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-sheet-wave-b` → `main` only. Do not merge. Do not open a second PR. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`. Do not touch unrelated tools.
+Status: **Wave B is integrated into `main`** (squash-merged from `feature/tabular-sheet-wave-b`); the branch is deleted. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`.
 
-**Tip SHA:** `34d8b5f`  
-**Last focused-gate code:** `34d8b5f`  
+**Tip:** the Wave B squash on `main` (see `git log -- src/tools/sheets`).  
+**Last focused gate:** sheets units 56/56, `pnpm build`, Tabular e2e 43 passed / 0 failed / 13 intentional skips.  
 **Workstream:** **Wave B** (local PivotTable UX + GETPIVOTDATA subset) on top of merged PR #73 Wave A / docs stamp PR #74 / #71 P1–P16 / docs PR #72.
 
 ## Merge status (PR #73 + #74)
@@ -12,7 +12,7 @@ Draft PR: https://github.com/AahPlexX/inmotools/pull/75 — `feature/tabular-she
 - CoS squash-merged PR #73 onto `main` at `4dcc856bc97027862342513cdea7eb769c0ffbc1` (`feat(sheets): Wave A Formula.js, spill, and export comments (#73)`). Product tip is that squash. Do not push to `feature/tabular-sheet-wave-a`.
 - Docs PR #74 stamped HANDOFF to that squash (`e6cddbe`). Parent of the Wave A squash is `6776107f946b16bfe4edddc275ea5a1af234d7fb`. Product code from `feature/tabular-sheet-wave-a` is on `main`.
 - Prior: CoS squash-merged PR #71 at `b582c34dea4ba97ab7080743dc290eeb45946b54`; docs PR #72 stamped HANDOFF to that squash (`6776107f946b16bfe4edddc275ea5a1af234d7fb`).
-- This Wave B branch rebases onto `origin/main` after that docs stamp.
+- Wave B was merged into `origin/main` after that docs stamp.
 - Repository-wide validate remaining reds are **out-of-suite** e2e (same class as PR #70 / #71). That is not a sheets regression and is **not** a claim that the full Pages suite is green.
 
 ## What works
@@ -93,8 +93,8 @@ Catalog / lockfile edits select `__FULL_SUITE__` via `scripts/select-e2e-specs.m
 
 ## Next sequential steps
 
-1. Keep this draft PR. Push only `feature/tabular-sheet-wave-b`. Never merge. Never open a second PR.
-2. After any later commit, put that tip SHA in this file and `.tasks/IN_PROGRESS.md` TASK-022 in the same cycle.
+1. Wave B is merged and its branch is gone. Any later sheets work starts from `origin/main` on a new branch and must first enter `.tasks/` (NEXT or IN_PROGRESS) before implementation.
+2. Record the new tip and focused-gate evidence in this file in the same cycle as the change.
 3. Do not chase out-of-suite Pages reds listed above.
 4. Do not invent Wave C/D.
 5. Reject reviews that treat iPhone 13 / `mobile-chromium` as the only #16 proof.
