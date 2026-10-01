@@ -120,6 +120,8 @@
 
 .tw-root {
   display: grid;
+  /* minmax(0, …) stops any child's max-content width from widening the only grid track. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   color: var(--text-1, #0b1220);
 }
@@ -199,25 +201,25 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #4b5468;
+  color: inherit;
 }
 
 .tw-stat p {
   margin: 0;
   font-size: 1.8rem;
   font-weight: 700;
-  color: #0b1220;
+  color: inherit;
   font-variant-numeric: tabular-nums;
 }
 
 .tw-stat small {
-  color: #4b5468;
+  color: inherit;
+  opacity: 0.8;
   font-size: 0.75rem;
 }
 
 .tw-canvas {
   padding: 1.5rem 1.75rem;
-  min-height: 260px;
   background: #ffffff;
   border: 1px solid #dde3ee;
   border-radius: 14px;
@@ -237,10 +239,22 @@
   box-shadow: 0 0 0 3px rgba(42, 61, 99, 0.25);
 }
 
+/* The passage shows a fixed number of lines; TypingWorkspace slides .tw-canvas-text so the active
+   line stays on the middle row. Height is in em so it follows the user's font size. */
+.tw-canvas-window {
+  height: calc(var(--tw-window-lines, 3) * 1.7em);
+  overflow: hidden;
+}
+
 .tw-canvas-text {
   position: relative;
   z-index: 1;
   pointer-events: none;
+  transition: transform 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-canvas-text { transition: none; }
 }
 
 .tw-input-capture {
@@ -291,7 +305,7 @@
 }
 
 .tw-char { position: relative; }
-.tw-char.pending { color: #8892a6; }
+.tw-char.pending { color: #5b6578; }
 .tw-char.correct { color: #0b1220; }
 .tw-char.incorrect { color: #b91c1c; background: rgba(220, 38, 38, 0.12); border-radius: 3px; }
 .tw-char.extra { color: #b91c1c; text-decoration: underline wavy; }
@@ -338,7 +352,13 @@
   font-size: 0.85rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #4b5468;
+  color: inherit;
+}
+
+/* A wide table scrolls inside its own focusable region instead of widening the panel. */
+.tw-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .tw-panel table {
@@ -362,6 +382,8 @@
   padding: 0.75rem;
   background: #eef1f6;
   border-radius: 10px;
+  /* Lets the keys below size against this box, not the page, so the keyboard fits its panel. */
+  container-type: inline-size;
 }
 
 .tw-keyboard-row {
@@ -371,9 +393,12 @@
 }
 
 .tw-key {
-  min-width: 34px;
+  /* Ideal 2.6rem key that shrinks (never grows past it) when its row would overflow the panel. */
+  flex: 0 1 2.6rem;
+  min-width: 0;
   min-height: 34px;
-  padding: 0.25rem 0.35rem;
+  padding: 0.25rem 0.1rem;
+  overflow: hidden;
   border-radius: 6px;
   background: white;
   border: 1px solid #c5cddb;
@@ -384,7 +409,11 @@
   font-size: 0.75rem;
   color: #0b1220;
 }
-.tw-key.space { min-width: 240px; }
+.tw-key.space { flex: 0 1 14rem; }
+@container (max-width: 30rem) {
+  .tw-key { min-height: 28px; font-size: 0.65rem; }
+  .tw-key .finger { display: none; }
+}
 .tw-key.heat-1 { background: #dfeafe; }
 .tw-key.heat-2 { background: #b4d0fb; }
 .tw-key.heat-3 { background: #79aef8; }
@@ -468,7 +497,7 @@
 
 /* Theme presets — the workspace flips these on .tw-root via data-theme. */
 .tw-root[data-theme='nord'] .tw-canvas { background: #2e3440; color: #d8dee9; }
-.tw-root[data-theme='nord'] .tw-char.pending { color: #616e88; }
+.tw-root[data-theme='nord'] .tw-char.pending { color: #98a4be; }
 .tw-root[data-theme='nord'] .tw-char.correct { color: #eceff4; }
 .tw-root[data-theme='nord'] .tw-panel,
 .tw-root[data-theme='nord'] .tw-stat { background: #3b4252; color: #eceff4; border-color: #434c5e; }
@@ -479,7 +508,7 @@
 .tw-root[data-theme='nord'] .tw-toolbar input { background: #2e3440; color: #eceff4; border-color: #4c566a; }
 
 .tw-root[data-theme='dracula'] .tw-canvas { background: #282a36; color: #f8f8f2; }
-.tw-root[data-theme='dracula'] .tw-char.pending { color: #6272a4; }
+.tw-root[data-theme='dracula'] .tw-char.pending { color: #8c9bd0; }
 .tw-root[data-theme='dracula'] .tw-char.correct { color: #f8f8f2; }
 .tw-root[data-theme='dracula'] .tw-panel,
 .tw-root[data-theme='dracula'] .tw-stat { background: #313342; color: #f8f8f2; border-color: #44475a; }
@@ -488,18 +517,18 @@
 .tw-root[data-theme='dracula'] .tw-toolbar { background: #313342; border-color: #44475a; color: #f8f8f2; }
 
 .tw-root[data-theme='matrix'] .tw-canvas { background: #050b05; color: #b6ffb6; }
-.tw-root[data-theme='matrix'] .tw-char.pending { color: #3a6a3a; }
+.tw-root[data-theme='matrix'] .tw-char.pending { color: #4c944c; }
 .tw-root[data-theme='matrix'] .tw-char.correct { color: #d8ffd8; }
 .tw-root[data-theme='matrix'] .tw-panel,
 .tw-root[data-theme='matrix'] .tw-stat { background: #08120a; color: #b6ffb6; border-color: #1a3d1a; }
 .tw-root[data-theme='matrix'] .tw-toolbar { background: #08120a; border-color: #1a3d1a; color: #d8ffd8; }
 
 .tw-root[data-theme='paper'] .tw-canvas { background: #fdfaf3; color: #212527; }
-.tw-root[data-theme='paper'] .tw-char.pending { color: #a99f8b; }
+.tw-root[data-theme='paper'] .tw-char.pending { color: #756c5a; }
 .tw-root[data-theme='paper'] .tw-panel { background: #fffdf7; border-color: #e5dcc7; }
 
 .tw-root[data-theme='cyberpunk'] .tw-canvas { background: #0a0a23; color: #f5d6ff; }
-.tw-root[data-theme='cyberpunk'] .tw-char.pending { color: #6a3aa0; }
+.tw-root[data-theme='cyberpunk'] .tw-char.pending { color: #a67ad8; }
 .tw-root[data-theme='cyberpunk'] .tw-char.correct { color: #f5f6ff; }
 .tw-root[data-theme='cyberpunk'] .tw-char.incorrect { color: #ff4dd6; background: rgba(255, 77, 214, 0.15); }
 .tw-root[data-theme='cyberpunk'] .tw-panel,
@@ -507,25 +536,25 @@
 .tw-root[data-theme='cyberpunk'] .tw-toolbar { background: #14143a; border-color: #3a2f7a; color: #f5d6ff; }
 
 .tw-root[data-theme='gruvbox'] .tw-canvas { background: #282828; color: #ebdbb2; }
-.tw-root[data-theme='gruvbox'] .tw-char.pending { color: #928374; }
+.tw-root[data-theme='gruvbox'] .tw-char.pending { color: #a89984; }
 .tw-root[data-theme='gruvbox'] .tw-panel,
 .tw-root[data-theme='gruvbox'] .tw-stat { background: #32302f; color: #ebdbb2; border-color: #504945; }
 .tw-root[data-theme='gruvbox'] .tw-toolbar { background: #32302f; border-color: #504945; color: #ebdbb2; }
 
 .tw-root[data-theme='monokai'] .tw-canvas { background: #272822; color: #f8f8f2; }
-.tw-root[data-theme='monokai'] .tw-char.pending { color: #75715e; }
+.tw-root[data-theme='monokai'] .tw-char.pending { color: #9a967f; }
 .tw-root[data-theme='monokai'] .tw-panel,
 .tw-root[data-theme='monokai'] .tw-stat { background: #32332c; color: #f8f8f2; border-color: #44453a; }
 
 .tw-root[data-theme='oled'] .tw-canvas { background: #000000; color: #e0e0e0; }
-.tw-root[data-theme='oled'] .tw-char.pending { color: #4a4a4a; }
+.tw-root[data-theme='oled'] .tw-char.pending { color: #8a8a8a; }
 .tw-root[data-theme='oled'] .tw-panel,
 .tw-root[data-theme='oled'] .tw-stat { background: #050505; color: #e0e0e0; border-color: #1c1c1c; }
 .tw-root[data-theme='oled'] .tw-toolbar { background: #050505; border-color: #1c1c1c; color: #e0e0e0; }
 
 .tw-root[data-theme='high-contrast'] .tw-canvas { background: #ffffff; color: #000000; }
 .tw-root[data-theme='high-contrast'] .tw-char.correct { color: #000000; }
-.tw-root[data-theme='high-contrast'] .tw-char.pending { color: #555555; }
+.tw-root[data-theme='high-contrast'] .tw-char.pending { color: #444444; }
 .tw-root[data-theme='high-contrast'] .tw-char.incorrect { color: #ffffff; background: #000000; }
 .tw-root[data-theme='high-contrast'] .tw-panel,
 .tw-root[data-theme='high-contrast'] .tw-stat { background: #ffffff; border-color: #000; }
@@ -541,6 +570,72 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Settings panels: one row per setting, label left and control right; checkboxes are their own rows. */
+.tw-settings { display: grid; gap: 0.55rem; align-content: start; }
+.tw-settings h3 { margin-bottom: 0; }
+.tw-settings label {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 8rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.tw-settings label:has(> input[type='checkbox']) { display: flex; gap: 0.5rem; }
+.tw-settings label > select,
+.tw-settings label > input:not([type='checkbox']) { min-width: 0; width: 100%; box-sizing: border-box; }
+.tw-settings label > input[type='range'] { padding: 0; }
+.tw-settings label > span { font-variant-numeric: tabular-nums; min-width: 3.2rem; text-align: right; }
+.tw-personal-best { margin: 0; }
+
+/* Idle cue over the passage so a visitor knows typing begins here. */
+.tw-focus-cue {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border-radius: inherit;
+}
+.tw-focus-cue span {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(11, 18, 32, 0.9);
+  color: #ffffff;
+}
+
+/* Secondary text inherits the theme's colour (dark themes included) and is dimmed, not hard-coded grey. */
+.tw-muted { margin: 0.35rem 0 0; font-size: 0.8rem; color: inherit; opacity: 0.78; }
+.tw-empty {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: inherit;
+  border: 1px dashed currentColor;
+  border-radius: 10px;
+  opacity: 0.85;
+}
+.tw-file-button { padding: 0.35rem 0.6rem; border: 1px solid #b6bfce; border-radius: 8px; cursor: pointer; }
+.tw-file-input { display: none; }
+.tw-chart-history { margin-top: 0.5rem; }
+.tw-chart[hidden] { display: none; }
+.tw-danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(127, 127, 127, 0.35);
+}
+.tw-danger-zone .tw-muted { margin: 0; }
 
 .tw-root[data-theme='nord'] .tw-session-bar {
   background: #2e3440;
@@ -624,6 +719,24 @@
 .tw-modal .row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 .tw-modal .row button { padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid #1f2a44; background: #1f2a44; color: white; font-weight: 600; }
 .tw-modal .row button.subtle { background: white; color: #1f2a44; }
+.tw-modal:focus { outline: none; }
+
+/* Result dialog: stats read as one row, fields pair up, exports sit apart from Discard / Save. */
+.tw-result-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0.5rem 0 0.75rem; }
+.tw-result-summary > div { display: grid; gap: 0.1rem; padding: 0.6rem 0.75rem; background: #f3f6fb; border-radius: 10px; }
+.tw-result-summary strong { font-size: 1.35rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tw-result-summary small { color: #4b5468; }
+.tw-modal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 0.75rem; }
+.tw-modal-fields > div:first-child { grid-column: 1 / -1; }
+.tw-modal label.tw-check { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+.tw-modal label.tw-check input { width: auto; margin: 0; }
+.tw-export-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #dde3ee; }
+.tw-export-row button { padding: 0.3rem 0.7rem; border-radius: 8px; border: 1px solid #b6bfce; background: white; color: #1f2a44; font-size: 0.85rem; }
+@media (max-width: 480px) {
+  .tw-result-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tw-modal-fields { grid-template-columns: minmax(0, 1fr); }
+  .tw-modal .row button { flex: 1 1 0; }
+}
 
 .tw-ergo-hint {
   display: flex; gap: 0.75rem; align-items: center;
@@ -651,6 +764,37 @@
   }
 }
 
+/* Phone: the typing area comes first (session bar, passage, live metrics) and the settings follow.
+   Visual order only; tab order still follows the DOM. */
+@media (max-width: 768px) {
+  .tw-root > * { order: 10; }
+  .tw-root > .tw-session-bar { order: 0; }
+  .tw-root > .tw-canvas { order: 1; }
+  .tw-root > .tw-stats-strip { order: 2; }
+  .tw-root > .tw-toolbar { order: 3; }
+
+  /* Keyboard-shortcut hint is irrelevant on touch; keep it for aria-describedby. */
+  .tw-input-hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: normal;
+  }
+
+  .tw-session-bar { gap: 0.5rem; }
+  .tw-session-state { grid-auto-flow: column; justify-content: start; align-items: center; gap: 0.5rem; }
+  .tw-session-controls { flex-wrap: nowrap; }
+  .tw-session-controls button { flex: 1 1 auto; min-width: 0; padding-inline: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
+
+  .tw-stats-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.4rem; }
+  .tw-stat { padding: 0.5rem 0.25rem; text-align: center; min-width: 0; }
+  .tw-stat h3 { letter-spacing: 0; text-transform: none; font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; }
+  .tw-stat p { font-size: 1.05rem; }
+  .tw-stat small { display: none; }
+}
+
 @media (max-width: 480px) {
   .tw-session-bar {
     padding: 0.75rem;
@@ -669,12 +813,7 @@
     min-width: 0;
   }
 
-  .tw-session-controls button {
-    flex-basis: calc(50% - 0.25rem);
-  }
-
   .tw-canvas {
-    min-height: 220px;
     padding: 1rem;
   }
 

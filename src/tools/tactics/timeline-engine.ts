@@ -1,0 +1,631 @@
+import { MAX_KEYFRAMES_PER_TRACK, MAX_TIMELINE_DURATION_MS, MAX_TIMELINE_MARKERS, MAX_TIMELINE_TRACKS } from './session-bounds';
+import { TIMELINE_MARKER_KINDS } from './tactics-types';
+import type {
+  InterpolationKind,
+  NormalizedPoint,
+  TacticalKeyframe,
+  TacticalProject,
+  TacticalTimeline,
+  TacticalScene,
+  TimelineMarker,
+  TimelineTrack,
+} from './tactics-types';
+import { createMotionPath, sampleMotionPath } from './motion-engine';
+import { getPossessionHolderAtTime } from './possession-engine';
+
+export interface SampledTimelineState {
+  position?: NormalizedPoint;
+  rotationDeg?: number;
+  elevationMeters?: number;
+  visible?: boolean;
+  attachmentTargetId?: string | null;
+}
+
+export interface TimelineVisibilitySpan {
+  startMs: number;
+  endMs: number;
+  visible: boolean;
+}
+
+function requireIntegerTime(value: number, label: string): number {
+  if (!Number.isInteger(value)) throw new RangeError(`${label} must be an integer millisecond value.`);
+  if (value < 0) throw new RangeError(`${label} cannot be negative.`);
+  return value;
+}
+function clampUnit(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function validatePoint(point: NormalizedPoint, label: string): NormalizedPoint {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new RangeError(`${label} must use finite coordinates.`);
+  if (point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) throw new RangeError(`${label} must stay inside normalized pitch bounds.`);
+  return { x: point.x, y: point.y };
+}
+
+function cloneKeyframe(keyframe: TacticalKeyframe): TacticalKeyframe {
+  return {
+    ...keyframe,
+    position: keyframe.position ? { ...keyframe.position } : undefined,
+    bezier: keyframe.bezier ? [...keyframe.bezier] as [number, number, number, number] : undefined,
+    motionPath: keyframe.motionPath
+      ? { kind: keyframe.motionPath.kind, controlPoints: keyframe.motionPath.controlPoints.map((point) => ({ ...point })) }
+      : undefined,
+  };
+}
+
+function sortedKeyframes(track: TimelineTrack): TacticalKeyframe[] {
+  return track.keyframes.map(cloneKeyframe).sort((left, right) => left.timeMs - right.timeMs || left.id.localeCompare(right.id));
+}
+function validateKeyframe(keyframe: TacticalKeyframe): TacticalKeyframe {
+  requireIntegerTime(keyframe.timeMs, 'Keyframe time');
+  if (keyframe.position) validatePoint(keyframe.position, 'Keyframe position');
+  if (keyframe.rotationDeg !== undefined && !Number.isFinite(keyframe.rotationDeg)) throw new RangeError('Keyframe rotation must be finite.');
+  if (keyframe.interpolation === 'cubic-bezier') {
+    if (!keyframe.bezier) throw new Error('Cubic-bezier keyframes require four control values.');
+    const [x1, y1, x2, y2] = keyframe.bezier;
+    if (![x1, y1, x2, y2].every(Number.isFinite)) throw new RangeError('Cubic-bezier controls must be finite.');
+    if (x1 < 0 || x1 > 1 || x2 < 0 || x2 > 1) throw new RangeError('Cubic-bezier x controls must stay between 0 and 1.');
+  }
+  if (keyframe.motionPath) createMotionPath(keyframe.motionPath.kind, keyframe.motionPath.controlPoints);
+  return cloneKeyframe(keyframe);
+}
+
+export function addTimelineKeyframe(track: TimelineTrack, keyframe: TacticalKeyframe): TimelineTrack {
+  const next = validateKeyframe(keyframe);
+  if (track.keyframes.some((item) => item.id === next.id)) throw new Error(`Keyframe id ${next.id} already exists.`);
+  if (track.keyframes.some((item) => item.timeMs === next.timeMs)) throw new Error(`A keyframe already exists at time ${next.timeMs}.`);
+  return { ...track, keyframes: [...track.keyframes.map(cloneKeyframe), next].sort((a, b) => a.timeMs - b.timeMs) };
+}
+
+export interface SetTimelineVisibilityInput {
+  id: string;
+  timeMs: number;
+  visible: boolean;
+}
+
+export function setTimelineVisibility(
+  track: TimelineTrack,
+  input: SetTimelineVisibilityInput,
+): TimelineTrack {
+  requireIntegerTime(input.timeMs, 'Visibility time');
+  const id = input.id.trim();
+  if (!id) throw new Error('Visibility keyframe id is required.');
+
+  const existingIndex = track.keyframes.findIndex((keyframe) => keyframe.timeMs === input.timeMs);
+  if (existingIndex >= 0) {
+    return {
+      ...track,
+      keyframes: track.keyframes
+        .map((keyframe, index) => index === existingIndex
+          ? validateKeyframe({ ...cloneKeyframe(keyframe), visible: input.visible })
+          : cloneKeyframe(keyframe))
+        .sort((left, right) => left.timeMs - right.timeMs || left.id.localeCompare(right.id)),
+    };
+  }
+
+  return addTimelineKeyframe(track, {
+    id,
+    timeMs: input.timeMs,
+    visible: input.visible,
+    interpolation: 'hold',
+  });
+}
+
+function cubicCoordinate(t: number, first: number, second: number): number {
+  const inverse = 1 - t;
+  return 3 * inverse * inverse * t * first + 3 * inverse * t * t * second + t * t * t;
+}
+
+function cubicBezierProgress(progress: number, values: [number, number, number, number]): number {
+  const [x1, y1, x2, y2] = values;
+  let low = 0;
+  let high = 1;
+  let parameter = progress;
+  for (let index = 0; index < 30; index += 1) {
+    parameter = (low + high) / 2;
+    const x = cubicCoordinate(parameter, x1, x2);
+    if (x < progress) low = parameter;
+    else high = parameter;
+  }
+  return clampUnit(cubicCoordinate(parameter, y1, y2));
+}
+function easedProgress(kind: InterpolationKind, progress: number, bezier?: [number, number, number, number]): number {
+  const t = clampUnit(progress);
+  if (kind === 'hold') return 0;
+  if (kind === 'linear') return t;
+  if (kind === 'smooth') return t * t * (3 - 2 * t);
+  if (kind === 'ease-in') return t * t;
+  if (kind === 'ease-out') return 1 - (1 - t) * (1 - t);
+  if (kind === 'ease-in-out') return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+  if (kind === 'cubic-bezier') {
+    if (!bezier) throw new Error('Cubic-bezier interpolation requires control values.');
+    return cubicBezierProgress(t, bezier);
+  }
+  return t;
+}
+
+function applyKeyframe(state: SampledTimelineState, keyframe: TacticalKeyframe): SampledTimelineState {
+  return {
+    position: keyframe.position ? { ...keyframe.position } : state.position ? { ...state.position } : undefined,
+    rotationDeg: keyframe.rotationDeg !== undefined ? keyframe.rotationDeg : state.rotationDeg,
+    elevationMeters: keyframe.elevationMeters !== undefined ? keyframe.elevationMeters : state.elevationMeters,
+    visible: keyframe.visible !== undefined ? keyframe.visible : state.visible,
+  };
+}
+
+function cloneSampledState(state: SampledTimelineState): SampledTimelineState {
+  return {
+    ...state,
+    position: state.position ? { ...state.position } : undefined,
+  };
+}
+
+function interpolateKeyframeSpan(
+  leftKeyframe: TacticalKeyframe,
+  leftState: SampledTimelineState,
+  rightKeyframe: TacticalKeyframe,
+  rightState: SampledTimelineState,
+  timeMs: number,
+): SampledTimelineState {
+  const rawProgress = (timeMs - leftKeyframe.timeMs) / (rightKeyframe.timeMs - leftKeyframe.timeMs);
+  const progress = easedProgress(leftKeyframe.interpolation, rawProgress, leftKeyframe.bezier);
+  let position: NormalizedPoint | undefined;
+  if (leftState.position && rightState.position) {
+    position = leftKeyframe.motionPath
+      ? sampleMotionPath(leftState.position, rightState.position, leftKeyframe.motionPath, progress)
+      : {
+          x: clampUnit(interpolateNumber(leftState.position.x, rightState.position.x, progress)!),
+          y: clampUnit(interpolateNumber(leftState.position.y, rightState.position.y, progress)!),
+        };
+  }
+  return {
+    position,
+    rotationDeg: interpolateNumber(leftState.rotationDeg, rightState.rotationDeg, progress),
+    elevationMeters: interpolateNumber(leftState.elevationMeters, rightState.elevationMeters, progress),
+    visible: leftState.visible,
+  };
+}
+
+function interpolateNumber(left: number | undefined, right: number | undefined, progress: number): number | undefined {
+  if (left === undefined) return undefined;
+  if (right === undefined) return left;
+  return left + (right - left) * progress;
+}
+
+
+export function layerTimelineTarget(sceneIdValue: string, layerIdValue: string): string {
+  const sceneId = sceneIdValue.trim();
+  const layerId = layerIdValue.trim();
+  if (!sceneId || !layerId) throw new Error('Scene and layer ids are required for timeline visibility.');
+  return layerId;
+}
+
+export function addTimelineVisibilityChange(
+  timeline: TacticalTimeline,
+  targetIdValue: string,
+  timeMs: number,
+  visible: boolean,
+  _defaultVisible = true,
+): TacticalTimeline {
+  const targetId = targetIdValue.trim();
+  if (!targetId) throw new Error('Visibility target is required.');
+  requireIntegerTime(timeMs, 'Visibility time');
+  if (timeMs > timeline.durationMs) throw new RangeError('Visibility time cannot exceed timeline duration.');
+
+  const keyframeId = `visibility-${targetId}-${timeMs}-${visible ? 'show' : 'hide'}`;
+  const existing = timeline.tracks.find((track) => track.targetId === targetId);
+  if (!existing) {
+    return addTimelineTrack(timeline, {
+      id: `visibility-track-${targetId}`,
+      targetId,
+      keyframes: [{
+        id: keyframeId,
+        timeMs,
+        visible,
+        interpolation: 'hold',
+      }],
+    });
+  }
+
+  const updated = setTimelineVisibility(existing, {
+    id: keyframeId,
+    timeMs,
+    visible,
+  });
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => track.id === existing.id ? updated : track),
+    markers: timeline.markers.map(cloneMarker),
+    possessionEvents: timeline.possessionEvents?.map((event) => ({ ...event })),
+  };
+}
+
+export function sampleTrackAtTimes(track: TimelineTrack, times: readonly number[]): SampledTimelineState[] {
+  for (const timeMs of times) requireIntegerTime(timeMs, 'Sample time');
+  const keyframes = sortedKeyframes(track);
+  if (!keyframes.length) return times.map(() => ({}));
+
+  const results: SampledTimelineState[] = [];
+  let cursor = 0;
+  let inherited: SampledTimelineState = {};
+  let previousTime = -1;
+  for (const timeMs of times) {
+    if (timeMs < previousTime) {
+      cursor = 0;
+      inherited = {};
+    }
+    previousTime = timeMs;
+    if (timeMs < keyframes[0]!.timeMs) {
+      const future = applyKeyframe({}, keyframes[0]!);
+      results.push({ ...cloneSampledState(future), visible: undefined });
+      continue;
+    }
+    while (cursor < keyframes.length && keyframes[cursor]!.timeMs <= timeMs) {
+      inherited = applyKeyframe(inherited, keyframes[cursor]!);
+      cursor += 1;
+    }
+    const leftKeyframe = keyframes[cursor - 1]!;
+    const rightKeyframe = keyframes[cursor];
+    if (!rightKeyframe || timeMs === leftKeyframe.timeMs) {
+      results.push(cloneSampledState(inherited));
+      continue;
+    }
+    results.push(interpolateKeyframeSpan(
+      leftKeyframe,
+      inherited,
+      rightKeyframe,
+      applyKeyframe(inherited, rightKeyframe),
+      timeMs,
+    ));
+  }
+  return results;
+}
+
+export function sampleTimelineTrack(track: TimelineTrack, timeMs: number): SampledTimelineState {
+  return sampleTrackAtTimes(track, [timeMs])[0] ?? {};
+}
+
+export function offsetTimelineTrack(track: TimelineTrack, deltaMs: number): TimelineTrack {
+  if (!Number.isInteger(deltaMs)) throw new RangeError('Timeline offset must be an integer millisecond value.');
+  const keyframes = track.keyframes.map((keyframe) => {
+    const timeMs = keyframe.timeMs + deltaMs;
+    if (timeMs < 0) throw new RangeError('Timeline offset cannot create negative project time.');
+    return { ...cloneKeyframe(keyframe), timeMs };
+  });
+  return { ...track, keyframes };
+}
+export function offsetTimelineGroup(
+  timeline: TacticalTimeline,
+  targetIds: string[],
+  baseOffsetMs: number,
+  staggerStepMs = 0,
+): TacticalTimeline {
+  if (!Number.isInteger(baseOffsetMs) || !Number.isInteger(staggerStepMs)) {
+    throw new RangeError('Group timing offsets must use integer millisecond values.');
+  }
+  const targets = targetIds.map((targetId) => targetId.trim()).filter(Boolean);
+  if (!targets.length) throw new Error('Select at least one timeline target for grouped timing.');
+  if (new Set(targets).size !== targets.length) {
+    throw new Error('Grouped timing cannot contain duplicate targets.');
+  }
+
+  const byTarget = new Map(timeline.tracks.map((track) => [track.targetId, track] as const));
+  const shiftedById = new Map<string, TimelineTrack>();
+  targets.forEach((targetId, index) => {
+    const track = byTarget.get(targetId);
+    if (!track) throw new Error(`Timeline target ${targetId} does not exist.`);
+    const shifted = offsetTimelineTrack(track, baseOffsetMs + staggerStepMs * index);
+    if (shifted.keyframes.some((keyframe) => keyframe.timeMs > timeline.durationMs)) {
+      throw new RangeError(`Grouped timing for ${targetId} exceeds timeline duration.`);
+    }
+    shiftedById.set(track.id, shifted);
+  });
+
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => shiftedById.get(track.id) ?? {
+      ...track,
+      keyframes: track.keyframes.map(cloneKeyframe),
+    }),
+    markers: timeline.markers.map(cloneMarker),
+    possessionEvents: timeline.possessionEvents?.map((event) => ({ ...event })),
+  };
+}
+export function getVisibilitySpans(
+  track: TimelineTrack,
+  durationMs: number,
+  defaultVisible = true,
+): TimelineVisibilitySpan[] {
+  requireIntegerTime(durationMs, 'Timeline duration');
+  if (durationMs === 0) return [];
+  const changes = sortedKeyframes(track)
+    .filter((keyframe) => keyframe.visible !== undefined && keyframe.timeMs <= durationMs)
+    .map((keyframe) => ({ timeMs: keyframe.timeMs, visible: keyframe.visible! }));
+  let visible = defaultVisible;
+  let startMs = 0;
+  const spans: TimelineVisibilitySpan[] = [];
+  for (const change of changes) {
+    if (change.timeMs === 0) {
+      visible = change.visible;
+      continue;
+    }
+    if (change.visible === visible) continue;
+    spans.push({ startMs, endMs: change.timeMs, visible });
+    startMs = change.timeMs;
+    visible = change.visible;
+  }
+  if (startMs < durationMs) spans.push({ startMs, endMs: durationMs, visible });
+  return spans;
+}
+
+function cloneMarker(marker: TimelineMarker): TimelineMarker {
+  return { ...marker };
+}
+
+export function addTimelineMarker(timeline: TacticalTimeline, marker: TimelineMarker): TacticalTimeline {
+  requireIntegerTime(marker.timeMs, 'Marker time');
+  if (!TIMELINE_MARKER_KINDS.includes(marker.kind)) {
+    throw new Error(`Unsupported timeline marker kind ${String(marker.kind)}.`);
+  }
+  if (marker.timeMs > timeline.durationMs) throw new RangeError('Marker time cannot exceed timeline duration.');
+  if (timeline.markers.some((item) => item.id === marker.id)) throw new Error(`Marker id ${marker.id} already exists.`);
+  const next = cloneMarker(marker);
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => ({ ...track, keyframes: track.keyframes.map(cloneKeyframe) })),
+    markers: [...timeline.markers.map(cloneMarker), next].sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id)),
+  };
+}
+
+function validateTrack(track: TimelineTrack): TimelineTrack {
+  const id = track.id.trim();
+  const targetId = track.targetId.trim();
+  if (!id) throw new Error('Timeline track id is required.');
+  if (!targetId) throw new Error('Timeline track target id is required.');
+  const ids = new Set<string>();
+  const times = new Set<number>();
+  const keyframes = sortedKeyframes(track).map((keyframe) => {
+    const next = validateKeyframe(keyframe);
+    if (ids.has(next.id)) throw new Error(`Keyframe id ${next.id} already exists in track ${id}.`);
+    if (times.has(next.timeMs)) throw new Error(`Track ${id} has more than one keyframe at time ${next.timeMs}.`);
+    ids.add(next.id);
+    times.add(next.timeMs);
+    return next;
+  });
+  return { ...track, id, targetId, keyframes };
+}
+
+export function addTimelineTrack(timeline: TacticalTimeline, track: TimelineTrack): TacticalTimeline {
+  const next = validateTrack(track);
+  if (timeline.tracks.some((item) => item.id === next.id)) throw new Error(`Timeline track id ${next.id} already exists.`);
+  if (timeline.tracks.some((item) => item.targetId === next.targetId)) throw new Error(`Timeline target ${next.targetId} already has a track.`);
+  return {
+    ...timeline,
+    tracks: [...timeline.tracks.map(validateTrack), next],
+    markers: timeline.markers.map(cloneMarker),
+  };
+}
+
+export function sampleTacticalTimeline(
+  timeline: TacticalTimeline,
+  timeMs: number,
+): Record<string, SampledTimelineState> {
+  requireIntegerTime(timeMs, 'Sample time');
+  const result: Record<string, SampledTimelineState> = {};
+  for (const track of timeline.tracks) {
+    const valid = validateTrack(track);
+    if (result[valid.targetId]) throw new Error(`Timeline target ${valid.targetId} has multiple tracks.`);
+    result[valid.targetId] = sampleTimelineTrack(valid, timeMs);
+  }
+  if ((timeline.possessionEvents?.length ?? 0) > 0) {
+    const holderTargetId = getPossessionHolderAtTime(timeline, timeMs);
+    const ballState = result.ball ?? {};
+    ballState.attachmentTargetId = holderTargetId;
+    if (holderTargetId) {
+      const holder = result[holderTargetId];
+      if (!holder?.position) throw new Error(`Possession holder target ${holderTargetId} has no sampled position.`);
+      ballState.position = { ...holder.position };
+    }
+    result.ball = ballState;
+  }
+  return result;
+}
+
+export function sampleTacticalProjectAtTime(
+  project: TacticalProject,
+  timeMs: number,
+): TacticalProject {
+  const timeline = setTimelinePlayhead(project.timeline, timeMs);
+  const sampled = sampleTacticalTimeline(timeline, timeline.playheadMs);
+  const applyState = <T extends { id: string; position: NormalizedPoint }>(
+    item: T,
+  ): T => {
+    const state = sampled[item.id];
+    if (!state) return { ...item, position: { ...item.position } };
+    return {
+      ...item,
+      position: state.position ? { ...state.position } : { ...item.position },
+      ...('rotationDeg' in item && state.rotationDeg !== undefined ? { rotationDeg: state.rotationDeg } : {}),
+      ...('visible' in item && state.visible !== undefined ? { visible: state.visible } : {}),
+    } as T;
+  };
+
+  const ballState = sampled.ball;
+  return {
+    ...project,
+    timeline,
+    playerTokens: project.playerTokens.map(applyState),
+    officials: project.officials.map(applyState),
+    equipment: project.equipment.map(applyState),
+    scenes: project.scenes.map((scene) => ({
+      ...scene,
+      layers: scene.layers.map((layer) => ({
+        ...layer,
+        visible: sampled[layer.id]?.visible ?? layer.visible,
+      })),
+      objects: scene.objects.map(applyState),
+    })),
+    annotations: project.annotations.map((annotation) => ({
+      ...annotation,
+      visible: sampled[annotation.id]?.visible ?? annotation.visible,
+      points: annotation.points.map((point) => ({ ...point })),
+      provenance: annotation.provenance ? { ...annotation.provenance } : undefined,
+    })),
+    ball: {
+      ...project.ball,
+      position: ballState?.position ? { ...ballState.position } : { ...project.ball.position },
+      elevationMeters: ballState?.elevationMeters ?? project.ball.elevationMeters,
+      attachedToPlayerId: ballState?.attachmentTargetId ?? project.ball.attachedToPlayerId,
+    },
+  };
+}
+
+export function stepTimelineFrame(
+  timeMs: number,
+  durationMs: number,
+  frameRate: number,
+  direction: -1 | 1,
+): number {
+  requireIntegerTime(timeMs, 'Frame-step time');
+  requireIntegerTime(durationMs, 'Timeline duration');
+  if (!Number.isFinite(frameRate) || frameRate <= 0) {
+    throw new RangeError('Frame rate must be a positive finite number.');
+  }
+  const stepMs = Math.max(1, Math.round(1000 / frameRate));
+  const next = direction > 0
+    ? (Math.floor(timeMs / stepMs) + 1) * stepMs
+    : (Math.ceil(timeMs / stepMs) - 1) * stepMs;
+  return Math.min(durationMs, Math.max(0, next));
+}
+
+export function timelineKeyframeTimes(timeline: TacticalTimeline): number[] {
+  return [...new Set(timeline.tracks.flatMap((track) => track.keyframes.map((keyframe) => keyframe.timeMs)))]
+    .sort((left, right) => left - right);
+}
+
+export function setTimelinePlayhead(timeline: TacticalTimeline, timeMs: number): TacticalTimeline {
+  requireIntegerTime(timeMs, 'Playhead time');
+  requireIntegerTime(timeline.durationMs, 'Timeline duration');
+  let playheadMs = Math.min(timeMs, timeline.durationMs);
+  if (timeline.loop) playheadMs = timeline.durationMs === 0 ? 0 : timeMs % timeline.durationMs;
+  return { ...timeline, playheadMs };
+}
+
+export function addTimelineScene(
+  scenes: TacticalScene[],
+  rawScene: TacticalScene,
+): TacticalScene[] {
+  const id = rawScene.id.trim();
+  const name = rawScene.name.trim();
+  if (!id) throw new Error('Scene id is required.');
+  if (!name) throw new Error('Scene name is required.');
+  requireIntegerTime(rawScene.startMs, `Scene ${id} start`);
+  requireIntegerTime(rawScene.durationMs, `Scene ${id} duration`);
+  if (scenes.some((scene) => scene.id === id)) {
+    throw new Error(`Scene id ${id} already exists.`);
+  }
+  const clone = (scene: TacticalScene): TacticalScene => ({
+    ...scene,
+    layers: scene.layers.map((layer) => ({ ...layer })),
+    objects: scene.objects.map((object) => ({
+      ...object,
+      position: { ...object.position },
+    })),
+  });
+  const next = clone({ ...rawScene, id, name });
+  return [...scenes.map(clone), next]
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
+}
+export function activeScenesAtTime(scenes: TacticalScene[], timeMs: number): TacticalScene[] {
+  requireIntegerTime(timeMs, 'Scene sample time');
+  return scenes
+    .map((scene) => {
+      requireIntegerTime(scene.startMs, `Scene ${scene.id} start`);
+      requireIntegerTime(scene.durationMs, `Scene ${scene.id} duration`);
+      return scene;
+    })
+    .filter((scene) => scene.durationMs === 0
+      ? timeMs === scene.startMs
+      : timeMs >= scene.startMs && timeMs < scene.startMs + scene.durationMs)
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
+}
+
+export function validateTacticalTimeline(timeline: TacticalTimeline): string[] {
+  const errors: string[] = [];
+  if (!Number.isInteger(timeline.durationMs) || timeline.durationMs < 0) {
+    errors.push('Timeline duration must be a non-negative integer number of milliseconds.');
+  } else if (timeline.durationMs > MAX_TIMELINE_DURATION_MS) {
+    errors.push(`Timeline duration exceeds the ${MAX_TIMELINE_DURATION_MS} millisecond session limit.`);
+  }
+  if (timeline.tracks.length > MAX_TIMELINE_TRACKS) {
+    errors.push(`Timeline track count exceeds the ${MAX_TIMELINE_TRACKS} track session limit.`);
+  }
+  if (timeline.markers.length > MAX_TIMELINE_MARKERS) {
+    errors.push(`Timeline marker count exceeds the ${MAX_TIMELINE_MARKERS} marker session limit.`);
+  }
+  if (!Number.isInteger(timeline.playheadMs) || timeline.playheadMs < 0) {
+    errors.push('Timeline playhead must be a non-negative integer number of milliseconds.');
+  } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && timeline.playheadMs > timeline.durationMs) {
+    errors.push(`Timeline playhead ${timeline.playheadMs} exceeds duration ${timeline.durationMs}.`);
+  }
+  if (!Number.isFinite(timeline.playbackRate) || timeline.playbackRate <= 0) {
+    errors.push('Timeline playback rate must be a positive finite number.');
+  }
+
+  const trackIds = new Set<string>();
+  const targetIds = new Set<string>();
+  for (const track of timeline.tracks) {
+    if (trackIds.has(track.id)) errors.push(`Timeline track id ${track.id} is duplicated.`);
+    if (targetIds.has(track.targetId)) errors.push(`Timeline target ${track.targetId} has multiple tracks.`);
+    trackIds.add(track.id);
+    targetIds.add(track.targetId);
+    if (track.keyframes.length > MAX_KEYFRAMES_PER_TRACK) {
+      errors.push(`Timeline track ${track.id} exceeds the ${MAX_KEYFRAMES_PER_TRACK} keyframe session limit.`);
+      continue;
+    }
+    try {
+      const valid = validateTrack(track);
+      if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0) {
+        for (const keyframe of valid.keyframes) {
+          if (keyframe.timeMs > timeline.durationMs) {
+            errors.push(`Keyframe ${keyframe.id} time ${keyframe.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+          }
+        }
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'Invalid timeline track.');
+    }
+  }
+
+  const markerIds = new Set<string>();
+  for (const marker of timeline.markers) {
+    if (markerIds.has(marker.id)) errors.push(`Timeline marker id ${marker.id} is duplicated.`);
+    markerIds.add(marker.id);
+    if (!TIMELINE_MARKER_KINDS.includes(marker.kind)) {
+      errors.push(`Timeline marker ${marker.id} has unsupported marker kind ${String(marker.kind)}.`);
+    }
+    if (!Number.isInteger(marker.timeMs) || marker.timeMs < 0) {
+      errors.push(`Timeline marker ${marker.id} time must be a non-negative integer millisecond value.`);
+    } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && marker.timeMs > timeline.durationMs) {
+      errors.push(`Timeline marker ${marker.id} time ${marker.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+    }
+  }
+  const possessionIds = new Set<string>();
+  const possessionTimes = new Set<number>();
+  for (const event of timeline.possessionEvents ?? []) {
+    if (!event.id.trim()) errors.push('Possession event id is required.');
+    if (possessionIds.has(event.id)) errors.push(`Possession event id ${event.id} is duplicated.`);
+    if (possessionTimes.has(event.timeMs)) errors.push(`Possession event time ${event.timeMs} is duplicated.`);
+    possessionIds.add(event.id);
+    possessionTimes.add(event.timeMs);
+    if (!Number.isInteger(event.timeMs) || event.timeMs < 0) {
+      errors.push(`Possession event ${event.id} time must be a non-negative integer millisecond value.`);
+    } else if (Number.isInteger(timeline.durationMs) && timeline.durationMs >= 0 && event.timeMs > timeline.durationMs) {
+      errors.push(`Possession event ${event.id} time ${event.timeMs} exceeds timeline duration ${timeline.durationMs}.`);
+    }
+    if (event.holderTargetId && !targetIds.has(event.holderTargetId)) {
+      errors.push(`Possession holder target ${event.holderTargetId} does not exist in the timeline.`);
+    }
+  }
+  return errors;
+}

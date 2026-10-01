@@ -54,7 +54,10 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Powder simulation failed.' } as const;
     }
-  }, [document.cell, radiation, minD]);
+    // Depends on the whole document, not just document.cell: |F|²-weighted
+    // intensities also read document.sites (element/position/occupancy), so a
+    // site edit with an unchanged cell must still recompute the pattern.
+  }, [document, radiation, minD]);
 
   return (
     <section className="crystal-structure-panel" data-testid="crystal-diffraction-panel" aria-labelledby="crystal-diffraction-heading">

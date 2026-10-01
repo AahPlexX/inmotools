@@ -15,6 +15,13 @@ describe('focused E2E spec selection', () => {
     ]);
   });
 
+  it('routes glTF source changes, including the worker, to the glTF browser spec', () => {
+    // The worker and client live outside the workspace file, so a mapping keyed only to the workspace would miss them.
+    for (const changed of ['src/tools/gltf/GltfWorkspace.tsx', 'src/tools/gltf/gltf-engine.ts', 'src/tools/gltf/gltf.worker.ts', 'src/tools/gltf/gltf-worker-client.ts', 'src/tools/gltf/GltfViewport.tsx']) {
+      expect(selectE2eSpecs([changed]), changed).toEqual(['tests/e2e/gltf.spec.ts']);
+    }
+  });
+
   it('keeps direct E2E files and established tool mappings focused', () => {
     expect(selectE2eSpecs(['tests/e2e/crystal-lattice-studio.spec.ts'])).toEqual([
       'tests/e2e/crystal-lattice-studio.spec.ts',
@@ -38,6 +45,12 @@ describe('focused E2E spec selection', () => {
     expect(selectE2eSpecs(['src/tools/svg/VectorCanvas.tsx'])).toEqual([
       'tests/e2e/svg.spec.ts',
       'tests/e2e/vector-nested-composition.spec.ts',
+    ]);
+  });
+
+  it('routes Tactical Matchboard source changes to its focused browser contract', () => {
+    expect(selectE2eSpecs(['src/tools/tactics/TacticalBoard.tsx'])).toEqual([
+      'tests/e2e/tactical-matchboard-studio.spec.ts',
     ]);
   });
 });
