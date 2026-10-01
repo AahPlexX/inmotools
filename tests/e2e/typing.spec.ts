@@ -540,6 +540,44 @@ test('keeps every workspace element inside its own bounds and wraps the passage 
   }
 });
 
+test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  const lines = Array.from({ length: 10 }, (_, i) => `line ${i + 1} alpha beta`);
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill(lines.join('\n'));
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  const windowBox = workspace.locator('.tw-canvas-window');
+  const lineHeight = await workspace.locator('.tw-canvas-text').evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  const box = await windowBox.boundingBox();
+  expect(box!.height).toBeLessThanOrEqual(lineHeight * 3 + 1);
+
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  await canvas.focus();
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.type(lines[i], { delay: 5 });
+    await page.keyboard.press('Enter');
+    // The caret must stay inside the visible window, never scrolled out of sight.
+    const inside = await workspace.evaluate(() => {
+      const win = document.querySelector('.tw-canvas-window')!.getBoundingClientRect();
+      const caret = document.querySelector('.tw-caret')!.getBoundingClientRect();
+      return caret.top >= win.top - 1 && caret.bottom <= win.bottom + 1;
+    });
+    expect(inside, `caret visible after line ${i + 1}`).toBe(true);
+  }
+  // The window has scrolled: the first line is no longer visible.
+  const firstLineVisible = await workspace.evaluate(() => {
+    const win = document.querySelector('.tw-canvas-window')!.getBoundingClientRect();
+    const first = document.querySelector('.tw-canvas-text .tw-char')!.getBoundingClientRect();
+    return first.bottom > win.top + 1 && first.top < win.bottom - 1;
+  });
+  expect(firstLineVisible).toBe(false);
+});
+
 test('offers explicit lifecycle controls with pause-safe timing and active-session guardrails', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/fira-code/400.css';
 import '@fontsource/roboto-mono/400.css';
@@ -73,6 +73,7 @@ import {
   type ExportMetadata,
 } from './typing-export';
 import { classifyKeystrokeSound, createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
+import { PASSAGE_WINDOW_LINES, passageWindowStartLine } from './typing-window';
 import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
 import {
   createSessionClock,
@@ -349,6 +350,8 @@ export default function TypingWorkspace() {
 
   const audioRef = useRef<AudioController | null>(null);
   const canvasRef = useRef<HTMLTextAreaElement | null>(null);
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const [windowOffsetPx, setWindowOffsetPx] = useState(0);
   const compositionActiveRef = useRef(false);
   const compositionCommitRef = useRef<string | null>(null);
   const pendingPhysicalInputRef = useRef<{ code: string; t: number } | null>(null);
@@ -362,6 +365,24 @@ export default function TypingWorkspace() {
   const running = sessionClock.status === 'running';
   const paused = sessionClock.status === 'paused';
   const sessionActive = isSessionActive(sessionClock);
+
+  // Keep the line being typed on the middle row of the 3-line passage window.
+  useLayoutEffect(() => {
+    const text = textRef.current;
+    if (!text) return;
+    const place = () => {
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      if (!lineHeight) return;
+      const marker = text.querySelector<HTMLElement>('.tw-caret') ?? (text.lastElementChild as HTMLElement | null);
+      const activeLine = marker ? Math.floor((marker.offsetTop + marker.offsetHeight / 2) / lineHeight) : 0;
+      const totalLines = Math.round(text.scrollHeight / lineHeight);
+      setWindowOffsetPx(passageWindowStartLine(activeLine, totalLines) * lineHeight);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(text);
+    return () => observer.disconnect();
+  }, [engine.cursor, engine.targetText, engine.finished, config.fontSize, config.font]);
   const sessionNow = effectiveSessionNow(sessionClock, now);
   const activeTypist = typists.find((profile) => profile.id === activeTypistId)
     ?? { id: DEFAULT_TYPIST_ID, name: 'Local typist', createdAt: 0, updatedAt: 0 };
@@ -1211,8 +1232,16 @@ export default function TypingWorkspace() {
         className={`tw-canvas ${config.blurUntilFocus && pauseUntilFocus ? 'blur-mode' : ''}`}
         style={{ fontSize: `${config.fontSize}px` }}
       >
-        <div className="tw-canvas-text" data-testid="typing-target" aria-label="Typing target text">
-          {renderCells(engine, config.caret)}
+        <div className="tw-canvas-window" style={{ '--tw-window-lines': PASSAGE_WINDOW_LINES } as CSSProperties}>
+          <div
+            ref={textRef}
+            className="tw-canvas-text"
+            data-testid="typing-target"
+            aria-label="Typing target text"
+            style={{ transform: `translateY(-${windowOffsetPx}px)` }}
+          >
+            {renderCells(engine, config.caret)}
+          </div>
         </div>
         <textarea
           ref={canvasRef}

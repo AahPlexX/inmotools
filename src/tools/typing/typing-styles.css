@@ -219,7 +219,6 @@
 
 .tw-canvas {
   padding: 1.5rem 1.75rem;
-  min-height: 260px;
   background: #ffffff;
   border: 1px solid #dde3ee;
   border-radius: 14px;
@@ -239,10 +238,22 @@
   box-shadow: 0 0 0 3px rgba(42, 61, 99, 0.25);
 }
 
+/* The passage shows a fixed number of lines; TypingWorkspace slides .tw-canvas-text so the active
+   line stays on the middle row. Height is in em so it follows the user's font size. */
+.tw-canvas-window {
+  height: calc(var(--tw-window-lines, 3) * 1.7em);
+  overflow: hidden;
+}
+
 .tw-canvas-text {
   position: relative;
   z-index: 1;
   pointer-events: none;
+  transition: transform 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tw-canvas-text { transition: none; }
 }
 
 .tw-input-capture {
@@ -691,7 +702,6 @@
   }
 
   .tw-canvas {
-    min-height: 220px;
     padding: 1rem;
   }
 
