@@ -18,6 +18,7 @@ Use these verified repository locations as the authoritative directory for their
 - `.tasks/PROJECT_COMPLETION.md` — deterministic repository/workstream completion gates and progress-freshness contract.
 - `docs/superpowers/specs/` — project design/specification records.
 - `docs/superpowers/plans/` — project implementation-plan records.
+- `docs/DOCUMENTATION_STANDARD.md` — required per-tool documents (spec, tracker, task state, index row), their format and writing rules; `docs/TOOL_INDEX.md` is the per-tool index and `AGENTS.md` the entry point for agents.
 
 Do not invent a referenced path, file, section, command, branch, or policy. Verify that every reference resolves before relying on it and re-check references after governance changes.
 
@@ -147,5 +148,6 @@ Keep the execution report outside the repository. It must include, as applicable
 
 ## Change history
 
+- **2026-10-01:** Added the documentation standard, tool index and agent entry point to the SSOT directory.
 - **2026-09-11:** Added the deterministic project-completion contract to the SSOT directory and made task-state freshness a binding lifecycle invariant.
 - **2026-08-31:** Created the repository-wide governance SSOT, consolidated governing CRUD rules into one neutral root document, and retired redundant instruction surfaces.
