@@ -56,7 +56,7 @@ This file is the handoff ledger; `.tasks/IN_PROGRESS.md` TASK-022 and the in-too
 | 19 | Conditional formatting | Rule editor + local-grid paint. Hook: `data-testid=tsw-cf-editor`. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 20 | Status-bar aggregates | Count / sum / average / min / max of selection | done |
 | 21 | Charts via `chart.js@4.5.1` from selection | OSS replacement: reuse existing Chart.js on main. Not a Pro evidence-cut. | done |
-| 22 | In-house pivot / group-by aggregation | OSS replacement: in-house group-by. Not a Pro evidence-cut. | done |
+| 22 | In-house pivot / group-by aggregation | OSS replacement: local PivotTable from a contiguous range (row/column/value/filter fields, SUM/COUNT/AVERAGE/MIN/MAX) plus GETPIVOTDATA subset. Default write: new sheet at A1. Alternative: destination cell on a chosen sheet. Not a Pro evidence-cut. Evidence: `tests/unit/sheets-wave-b.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 23 | Keyboard shortcuts | Univer + workspace accelerators | done |
 | 24 | Context menu + long-press | Reserved hooks open a real menu (`data-testid=tsw-context-menu`). Long-press 500ms + right-click. Univer `contextMenu` stays false. Evidence: `tests/unit/sheets-stage2.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | 25 | Virtualized grid | Univer canvas grid; accessible fallback window | done |
@@ -87,7 +87,7 @@ No `1–36` row uses a fourth status. Features 21 and 22 are `done` OSS replacem
 - Catalog entry + lazy workspace + multi-sheet grid + formulas + persist + working import/export path.
 - `pnpm test:unit` and `pnpm build` pass, with focused formula/persist units.
 - Historical Stage 1 vehicle: draft PR on `feature/tabular-sheet-workstation` (closed history). Current workstream: PR #73 squash-merged onto `main` at `4dcc856bc97027862342513cdea7eb769c0ffbc1` (https://github.com/AahPlexX/inmotools/pull/73). Do not touch PR #33 / transcode.
-- Stop product commits. PR #73 is merged on `main`. Do not invent Wave B/C/D.
+- Stop product commits beyond Wave B. Do not invent Wave C/D.
 
 ## Gap ledger (Excel / Sheets parity beyond 1–36)
 
@@ -129,13 +129,22 @@ Not accepted as the only proof: iPhone 13, `mobile-chromium`, or any one hardcod
 
 ### Wave A — Tabular Sheet Expansion Cut v2 (merged PR #73)
 
-Approved Wave A set only. Do not invent Wave B/C/D (pivots upgrade, drawing/sparklines pack, Sheet Actions).
+Approved Wave A set. Wave B is the next sequential cut (local PivotTable + GETPIVOTDATA subset). Do not invent Wave C/D (drawing/sparklines pack, Sheet Actions).
 
 | ID | Feature | Notes | Status |
 | --- | --- | --- | --- |
 | WA1 | Broad Excel-class formulas | Exact pin `@formulajs/formulajs@4.6.1`. Portable DAG remains SSOT; Formula.js supplies implementations for names the local catalog does not own. Insert Function lists locked P2 names plus FILTER/SORT/UNIQUE and Formula.js names (`tsw-insert-function-search`). Evidence: `tests/unit/sheets-wave-a.test.ts`, `tests/unit/sheets-parity.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | WA2 | FILTER / SORT / UNIQUE spill | Engine-owned spill into empty neighboring cells. Blocked spill writes `#SPILL!`. Formula.js has no FILTER and its UNIQUE is not Excel UNIQUE, so these three are local. Evidence: `tests/unit/sheets-wave-a.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 | WA3 | Export-surviving comments | Cell notes/comments round-trip through exceljs XLSX and the portable JSON/zip bundle. No auth, no DB, no realtime threads. Evidence: `tests/unit/sheets-wave-a.test.ts` | done |
+
+### Wave B — Tabular Sheet Expansion Cut v2 (this PR)
+
+Approved Wave B set only. Do not invent Wave C/D (drawing/sparklines pack, Sheet Actions). Portable DAG + Formula.js remains formula SSOT. Pivot engine is in-house MIT-compatible local code.
+
+| ID | Feature | Notes | Status |
+| --- | --- | --- | --- |
+| WB1 | Local PivotTable UX | Create from a contiguous header+data range. Assign row, column, value, and filter fields. Aggregations: SUM, COUNT, AVERAGE, MIN, MAX. Auto-refresh on workbook commit plus explicit Refresh. **Default placement: new sheet at A1.** Alternative: destination cell on the current sheet; the engine overwrites that rectangle and does not shift other cells. No slicers, no Excel pivot cache, no OLAP, no date grouping, no calculated fields, no Univer Pro. Hook: `data-testid=tsw-pivot-chrome`. Evidence: `tests/unit/sheets-wave-b.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
+| WB2 | GETPIVOTDATA subset | `GETPIVOTDATA(data_field, pivot_cell, [field, item]...)` against in-house pivot defs. Covers grand total, one field/item, and row+column pairs. Data field may be `Amount` or `Sum of Amount`. Missing pivot cell or item writes `#REF!`. No Excel-imported caches, no OLAP, no slicers. Evidence: `tests/unit/sheets-wave-b.test.ts`, `tests/e2e/tabular-sheet-workstation.spec.ts` | done |
 
 ### Not in the approved cut (do not expand)
 
@@ -155,7 +164,7 @@ CoS-named exclusions: realtime collab, VBA/Apps Script, cloud Power Query, Unive
 | X4 | Remote / cloud Power Query / cloud connectors | Would leave the browser. CSV/XLSX/bundle import is the local substitute. |
 | X5 | SEQUENCE / SORTBY / RANDARRAY / array constants / dotted names | FILTER / SORT / UNIQUE spill is Wave A. Remaining dynamic-array surface stays out: `{1,2;3,4}` literals, SEQUENCE, SORTBY, RANDARRAY, implicit intersection beyond top-left, and dotted Excel names (`BETA.DIST`) that the portable tokenizer cannot parse. |
 | X6 | Excel workbook encryption / IRM / password-to-open | Not in the approved cut. A leftover hashed PIN is a local edit lock, not file crypto. |
-| X7 | PivotTables as Excel caches / slicers / GETPIVOTDATA | In-house group-by remains the OSS substitute (feature 22). Not Univer Pro pivots. |
+| X7 | Excel pivot caches / slicers / OLAP / Power Pivot | Wave B is a local PivotTable plus GETPIVOTDATA subset (WB1/WB2). Excel caches, slicers, OLAP cubes, and Power Pivot stay out. Not Univer Pro pivots. |
 | X8 | Drawing / images / sparklines / Pro charts | Chart.js column/line/pie from the selection only. |
 | X9 | Real-time multiplayer + comments threads | Portable notes only. No Pro thread-comment. |
 | X10 | Solver / Goal Seek / Data Tables / Power Pivot | Heavy analysis add-ins; not in the local OSS stack. |

@@ -21,8 +21,8 @@ describe('tabular sheet workstation wiring', () => {
     expect(tool?.accepts).toMatch(/XLSX/i);
     expect(tool?.outputs).toMatch(/CSV/i);
     const catalogCopy = `${tool?.summary} ${tool?.hint} ${tool?.steps.join(' ')}`;
-    expect(tool?.summary).toBe('Edit multi-sheet workbooks in this browser: formula bar, AutoSum, paste special, named ranges, FILTER/SORT/UNIQUE spill, column/line/pie charts, and an in-house pivot. Import and export stay on this device.');
-    expect(tool?.hint).toBe('Paste special, text to columns, and remove duplicates run on the local grid. FILTER, SORT, and UNIQUE spill into empty neighboring cells; a blocked spill writes #SPILL!. Cell comments survive XLSX and portable bundle export. Univer Pro and HyperFormula are not used. Browser memory still bounds very large workbooks.');
+    expect(tool?.summary).toBe('Edit multi-sheet workbooks in this browser: formula bar, AutoSum, paste special, named ranges, FILTER/SORT/UNIQUE spill, column/line/pie charts, and a local PivotTable. Import and export stay on this device.');
+    expect(tool?.hint).toBe('Paste special, text to columns, and remove duplicates run on the local grid. FILTER, SORT, and UNIQUE spill into empty neighboring cells; a blocked spill writes #SPILL!. Create a PivotTable from a contiguous range and refresh it from the source. GETPIVOTDATA reads those local pivot values. Cell comments survive XLSX and portable bundle export. Univer Pro and HyperFormula are not used. Browser memory still bounds very large workbooks.');
     expect(catalogCopy).not.toMatch(/seamless|robust|empower|unlock|delve/i);
     expect(tool?.summary).not.toMatch(/sheets-core|engine-formula|Univer/i);
     expect(read('src/tools/sheets/sheets.css')).toMatch(/@media print/);

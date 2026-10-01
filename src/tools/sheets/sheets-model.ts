@@ -86,6 +86,7 @@ export function removeSheet(book: PortableWorkbook, sheetId: string): PortableWo
   next.validations = next.validations.filter((rule) => rule.sheetId !== sheetId);
   next.conditionalFormats = next.conditionalFormats.filter((rule) => rule.sheetId !== sheetId);
   next.comments = next.comments.filter((comment) => comment.sheetId !== sheetId);
+  next.pivots = (next.pivots ?? []).filter((pivot) => pivot.sourceSheetId !== sheetId && pivot.destSheetId !== sheetId);
   return next;
 }
 

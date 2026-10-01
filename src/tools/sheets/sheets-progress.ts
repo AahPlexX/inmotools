@@ -22,7 +22,7 @@ export const FEATURE_PROGRESS: FeatureStatus[] = [
   { id: 19, title: 'Conditional formatting', status: 'done', note: 'Rule editor + local-grid paint. Hook: data-testid=tsw-cf-editor. Evidence: sheets-stage2 unit + tabular-sheet-workstation.spec.ts' },
   { id: 20, title: 'Status-bar aggregates', status: 'done', note: 'Count/sum/avg/min/max' },
   { id: 21, title: 'Charts via chart.js@4.5.1', status: 'done', note: 'OSS replacement: reuse chart.js@4.5.1 already on main. Not a Pro evidence-cut.' },
-  { id: 22, title: 'In-house pivot / group-by', status: 'done', note: 'OSS replacement: in-house group-by aggregation. Not a Pro evidence-cut.' },
+  { id: 22, title: 'In-house pivot / group-by', status: 'done', note: 'OSS replacement: local PivotTable from a contiguous range (rows/cols/values/filters, SUM/COUNT/AVERAGE/MIN/MAX) plus GETPIVOTDATA subset. Writes to a new sheet at A1 by default or a chosen destination cell. Not a Pro evidence-cut.' },
   { id: 23, title: 'Keyboard shortcuts', status: 'done', note: 'Arrows, Enter, Delete, Ctrl+Z/Y/F/C/X/V/S' },
   { id: 24, title: 'Context menu + long-press', status: 'done', note: 'Reserved hooks now open a real menu (data-testid=tsw-context-menu). Long-press 500ms + right-click. Univer contextMenu stays false. Evidence: sheets-stage2 unit + tabular-sheet-workstation.spec.ts' },
   { id: 25, title: 'Virtualized grid', status: 'done', note: 'Windowed fallback; Univer canvas when mounted' },
