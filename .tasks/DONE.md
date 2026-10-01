@@ -1,5 +1,15 @@
 # Done
 
+## Audio Mastering Workstation production audit and remediation — shipped and verified
+
+The original 81-function workstation was already on main through PR #81. This audit fixed verified production defects and recorded, without implementing, the next competitive-parity scope. Durable record: docs/superpowers/plans/2026-09-27-audio-mastering-production-parity-audit.md; the historical 81/81 plan keeps an additive post-merge notice.
+
+- Fixed: realtime AudioWorklet failure handling; fatal DSP-worker fail-closed recovery with a backup-rescue banner; import, restore and reference race cleanup (staged-id rollback); normalized project-id validation; exact codec configuration probes; MediaBunny 1.58.0 to 1.60.0 (mediabunny and the aac, flac and mp3 encoders) with resampling and encoder refresh; correct button and radio semantics; 44 px authored targets including sliders; touch-safe spectral painting; keyboard-scrollable, narrow-screen report tables; draft-safe signed numeric entry across free-form fields; 12 px minimum informational text; factual recovery, export and reference guidance.
+- Dependency note: the MediaBunny bump also affects Transcode (audio engine), Video (video engine) and Tactical video export; those were verified too (below).
+- Integration: reconciled by hand with main's radio-role and tooltip changes; PR #82 and PR #85 were closed unmerged, so this lands as a new PR. At integration, two of the branch's own e2e tests were found failing here and were fixed: the processor-crash test fired its error 75 ms after listener attach, before this host's AudioContext clock had left zero (it now waits for the playhead to move), and the DSP-crash test assumed one Save project backup button although the recovery banner and the Project tab each offer one. Tests that looked up Reference, Paint regions, Select time and the Listen controls as buttons now use the radio role main introduced.
+- Verification (fresh, on the branch merged with current origin/main): tsc --noEmit -p tsconfig.app.json clean; the full repository unit suite 3,125 tests across 280 files (--testTimeout=60000, 0 failed); the mastering, transcode, video and tactics-export unit files 28 files / 301 tests; tests/e2e/mastering.spec.ts, music.spec.ts, transcode.spec.ts and video.spec.ts 60 passed, 0 failed on desktop and mobile Chromium with --workers=1 (includes the per-tab Axe scan).
+- Deferred, not approved: the competitive-parity candidates listed in BACKLOG.md.
+
 ## Tabular Sheet Workstation Wave B (TASK-022) — shipped and verified
 
 Wave B adds a local PivotTable and a GETPIVOTDATA subset to the Tabular Sheet Workstation, on top of Wave A (merged earlier via PR #73) and the P1-P16 parity slice.

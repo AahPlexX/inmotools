@@ -3,7 +3,7 @@
 **Audit date:** 2026-09-27  
 **Route:** `#/tools/audio-mastering`  
 **Audit branch:** `audit/audio-mastering-20260927-reconciled`  
-**Integration PR:** #85 (supersedes documentation-conflicted PR #82)  
+**Integration:** squash-merged into `origin/main` from `feature/audio-mastering-production-audit` on 2026-10-01. PR #82 and PR #85 carried earlier versions of this work and were closed unmerged, so neither is the integration record.  
 **Historical feature ledger:** `docs/superpowers/plans/2026-09-27-audio-mastering-completion.md` — remains the authoritative record for the original 81/81 feature build. This file does not replace or rewrite that history.
 
 ## Purpose
