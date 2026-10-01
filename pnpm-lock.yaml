@@ -174,14 +174,14 @@ importers:
         specifier: 4.6.1
         version: 4.6.1
       '@gltf-transform/core':
-        specifier: 4.5.0
-        version: 4.5.0
+        specifier: 4.5.1
+        version: 4.5.1
       '@gltf-transform/extensions':
-        specifier: 4.4.2
-        version: 4.4.2
+        specifier: 4.5.1
+        version: 4.5.1
       '@gltf-transform/functions':
-        specifier: 4.5.0
-        version: 4.5.0(@types/node@26.4.1)
+        specifier: 4.5.1
+        version: 4.5.1(@types/node@26.4.1)
       '@hpcc-js/wasm-graphviz':
         specifier: 1.28.0
         version: 1.28.0
@@ -1150,20 +1150,14 @@ packages:
     resolution: {integrity: sha512-QkHPCaHljG4SRT5TNOIBx4ClgQYyLlblwthF4tJP5GsWEJ7uD8eu+yN9RyCl3NCQdpWIEdtJb+pnQpuceywrLA==}
     hasBin: true
 
-  '@gltf-transform/core@4.5.0':
-    resolution: {integrity: sha512-JlvShvnB4AtfGZqjnESS/wfPJbpVnyHhTwJBbWN4qXqkB3C5HIoxxpu/orwGBge6Pc0zObeWj70lVf+4gbuu0A==}
-
   '@gltf-transform/core@4.5.1':
     resolution: {integrity: sha512-OWgBYssKHKoXMIrMb2N20jXqWRnMP9HdtcTFQBEAJtz4P+OOxx5fozl5eAeK7nktIs5uDE/lu4NbkE5VCZaR9g==}
-
-  '@gltf-transform/extensions@4.4.2':
-    resolution: {integrity: sha512-HJH1FM+edC5eNvl6xO0SOXJ/j/3oDoIpSu150OTdJaLBoM3TgCCGIfh4wyhgWAqZrkvgHKVGiZKxcKV5LkgPCQ==}
 
   '@gltf-transform/extensions@4.5.1':
     resolution: {integrity: sha512-3jTe+GWRy4fj1TU790LPsO+rpO/4byUWPTpNkjy6M6h8RvrUivRf12Mptc0770K4ZczibpJDNHXZFkFsFMRDLA==}
 
-  '@gltf-transform/functions@4.5.0':
-    resolution: {integrity: sha512-7sMOuEfksMyF+/NTwUnEOgh7djohJ5XfeYg8rzXDG+9JIdbGVUpvJUY3XVBJCUJJ04dusDvcTHloOi1wfM8lnw==}
+  '@gltf-transform/functions@4.5.1':
+    resolution: {integrity: sha512-rfm4nQY2DJ+ip1e15xp7YfQwhRno3kPLcGw4EZiRk1dVwMV3cdFMcF08glYcO/+oLyYkUEs3xXMJYXa0cPgcTg==}
 
   '@grpc/grpc-js@1.14.5':
     resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
@@ -6998,27 +6992,18 @@ snapshots:
       bessel: 1.0.2
       jstat: 1.9.6
 
-  '@gltf-transform/core@4.5.0':
-    dependencies:
-      property-graph: 4.1.0
-
   '@gltf-transform/core@4.5.1':
     dependencies:
       property-graph: 4.1.0
-
-  '@gltf-transform/extensions@4.4.2':
-    dependencies:
-      '@gltf-transform/core': 4.5.0
-      ktx-parse: 1.1.0
 
   '@gltf-transform/extensions@4.5.1':
     dependencies:
       '@gltf-transform/core': 4.5.1
       ktx-parse: 1.1.0
 
-  '@gltf-transform/functions@4.5.0(@types/node@26.4.1)':
+  '@gltf-transform/functions@4.5.1(@types/node@26.4.1)':
     dependencies:
-      '@gltf-transform/core': 4.5.0
+      '@gltf-transform/core': 4.5.1
       '@gltf-transform/extensions': 4.5.1
       ktx-parse: 1.1.0
       ndarray: 1.1.1
