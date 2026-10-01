@@ -53,11 +53,11 @@ The timeline provides duration, current time, selected range, and keyframe marke
 
 **Slug:** `gltf-optimizer`
 
-**Files:** `src/tools/gltf/gltf-engine.ts`, `src/tools/gltf/GltfWorkspace.tsx`, `src/tools/gltf/GltfViewport.tsx`.
+**Files:** `src/tools/gltf/gltf-engine.ts`, `src/tools/gltf/GltfWorkspace.tsx`, `src/tools/gltf/GltfViewport.tsx`, plus `src/tools/gltf/gltf.worker.ts`, `src/tools/gltf/gltf-worker-client.ts`, and `src/tools/gltf/gltf-worker-protocol.ts` (see the [2026-09-28 completion design](2026-09-28-gltf-optimizer-completion-design.md)).
 
-`@gltf-transform/core` WebIO reads/writes local GLB data. `@gltf-transform/functions` plus `meshoptimizer` performs mesh simplification and geometry optimization. Browser-side texture resize/WebP conversion is used where the source texture and browser codec support permit it. Three.js provides the orbit viewport and before/after render statistics.
+`@gltf-transform/core` WebIO reads/writes local GLB data. `@gltf-transform/functions` plus `meshoptimizer` performs mesh simplification and geometry optimization. Browser-side texture resize is used where the source texture and browser codec support permit it, keeping each texture in its original format. WebP conversion is an explicit opt-in rather than a default: the installed `@gltf-transform/extensions` `EXTTextureWebP` writer cannot emit a PNG/JPEG fallback and its documentation says the extension "should always be required", so a converted model is disclosed as requiring `EXT_texture_webp`. Three.js provides the orbit viewport and before/after render statistics. The transform runs in a Web Worker so the orbit viewport and controls stay responsive, and the UI has no main-thread fallback.
 
-The user selects target polygon ratio and maximum texture dimension. The engine reports input/output bytes, vertices/triangles, textures, and meshes. Optimization never modifies the original file; export creates a new GLB.
+The user selects target polygon ratio and maximum texture dimension. The engine reports input/output bytes, vertices/triangles, textures, and meshes, and reports the **measured** post-optimization triangle ratio rather than echoing the requested target. Optimization never modifies the original file; export creates a new GLB.
 
 ## Tool 14 — GeoJSON/Topology Simplifier
 

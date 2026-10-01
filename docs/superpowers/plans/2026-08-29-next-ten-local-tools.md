@@ -332,6 +332,8 @@ Commit message: `feat: add lossless keyframe video slicer`.
 
 ### Task 9: glTF/GLB optimizer
 
+> **Status (2026-09-30):** shipped and subsequently completed. The steps below are the historical initial implementation record and are kept verbatim; they are not a checklist of remaining work. The completion work — GLB container validation, extension preflight, honest statistics, measured geometry reporting, opt-in WebP, worker execution with cancellation, and browser verification — is specified in the [2026-09-28 design](../specs/2026-09-28-gltf-optimizer-completion-design.md) and [plan](2026-09-28-gltf-optimizer-completion.md) and is tracked as TASK-024. Later files and interfaces added to `src/tools/gltf/`: `gltf.worker.ts`, `gltf-worker-client.ts`, `gltf-worker-protocol.ts`.
+
 **Files:**
 - Create: `src/tools/gltf/gltf-engine.ts`
 - Create: `src/tools/gltf/GltfViewport.tsx`
