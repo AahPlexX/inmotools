@@ -73,8 +73,8 @@ export function BatchPanel({ client, defaultCountry }: { client: HttpClient; def
       {error ? <p className="gi-error" role="alert">{error}</p> : null}
       {input ? <p>Detected <strong>{input.rows.length}</strong> row{input.rows.length === 1 ? '' : 's'} · postal column <code>{input.postalColumn}</code> · country column <code>{input.countryColumn ?? '(none — using default)'}</code> · about {minutes} min at 1 request/s (repeat codes are looked up once).</p> : null}
       <div className="gi-actions">
-        <button type="button" className="gi-btn primary" disabled={!input || running} onClick={run}>Run batch lookup</button>
-        <button type="button" className="gi-btn" disabled={!running} onClick={() => controller.current?.abort()}>Cancel</button>
+        <button type="button" className="gi-btn primary" disabled={!input || running} onClick={run} data-tip="Look up every row, one per second; repeated codes are looked up once">Run batch lookup</button>
+        <button type="button" className="gi-btn" disabled={!running} onClick={() => controller.current?.abort()} data-tip="Stop after the current row; finished rows stay downloadable">Cancel</button>
         <button type="button" className="gi-btn" disabled={!rows?.length || !input} onClick={() => input && rows && downloadText(batchToCsv(input, rows), 'geo-intel-batch.csv', 'text/csv;charset=utf-8')} data-tip="Your columns plus gi_* result columns with source, license and retrieval time">Download results CSV</button>
       </div>
       {progress ? (
@@ -136,7 +136,7 @@ export function SourcesPanel({ client, settings, onSettings, health, onStatus }:
                   <tr key={id}>
                     <th scope="row"><a href={SOURCES[id].homepage} target="_blank" rel="noreferrer">{SOURCES[id].name}</a></th>
                     <td><span className={`gi-state state-${state}`} data-tip={h?.lastError ?? (state === 'open' ? 'Paused after repeated failures' : 'Ready')}>{state === 'open' ? 'paused' : state}</span>
-                      {h && h.state !== 'closed' ? <button type="button" className="gi-btn small" onClick={() => client.resetBreaker(id)}>Retry now</button> : null}</td>
+                      {h && h.state !== 'closed' ? <button type="button" className="gi-btn small" onClick={() => client.resetBreaker(id)} data-tip="Try this source again now instead of waiting for the one-minute pause">Retry now</button> : null}</td>
                     <td>{h?.requests ?? 0}</td><td>{h?.cacheHits ?? 0}</td><td>{stats?.bySource[id] ?? 0}</td>
                     <td className="gi-small">{SOURCES[id].policy}</td><td className="gi-small">{SOURCES[id].license}</td>
                   </tr>

@@ -2,6 +2,7 @@ import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import { SOURCES } from '../core/sources';
 import { abbreviation, formatOffset, offsetMinutes } from '../core/timezone';
+import { sunPositionAt } from '../core/solar';
 import { FIELD_GROUP_LABELS, type FieldGroup, type LocationProfile, type ProfileField } from '../core/types';
 import type { BoundaryLayer } from '../adapters/boundaries';
 import { boundaryAttribution } from '../adapters/boundaries';
@@ -15,13 +16,16 @@ export function fieldHelp(item: ProfileField): string {
   return `${item.label} — ${source}${item.reference_year ? `, ${item.reference_year}` : ''}. ${item.note ?? CONFIDENCE_HELP[item.confidence_class] ?? ''}`.trim();
 }
 
-export function FieldRow({ item, zone, units, onInspect }: { item: ProfileField; zone: string | null; units: Units; onInspect: (key: string) => void }) {
+/** Year badges only where the year changes the meaning (published statistics), not on sun or clock times. */
+const YEAR_GROUPS = new Set<FieldGroup>(['population', 'indicators', 'eu', 'admin']);
+
+export function FieldRow({ item, zone, units, onInspect, onMenu }: { item: ProfileField; zone: string | null; units: Units; onInspect: (key: string) => void; onMenu?: (item: ProfileField, x: number, y: number) => void }) {
   return (
-    <div className="gi-row" data-field={item.key}>
+    <div className="gi-row" data-field={item.key} onContextMenu={onMenu ? (event) => { event.preventDefault(); event.stopPropagation(); onMenu(item, event.clientX, event.clientY); } : undefined}>
       <dt data-tip={fieldHelp(item)}>{item.label}</dt>
       <dd>
         <span className="gi-value">{displayValue(item, zone, units)}</span>
-        {item.reference_year ? <span className="gi-year">{item.reference_year}</span> : null}
+        {item.reference_year && YEAR_GROUPS.has(item.group) ? <span className="gi-year" data-tip={`Reference year of this figure (${item.reference_year})`}>{item.reference_year}</span> : null}
         <button type="button" className="gi-prov" aria-label={`Provenance for ${item.label}`} data-tip={`${fieldHelp(item)} Press for the full record.`} onClick={() => onInspect(item.key)}><Icon name="info" /></button>
       </dd>
     </div>
@@ -63,7 +67,7 @@ export function LiveClock({ zone }: { zone: string }) {
   return (
     <div className="gi-clock" data-tip="Current local time at this location, updated every second from your device clock (works offline)." tabIndex={0}>
       <span className="gi-clock-time" aria-live="off">{time}</span>
-      <span className="gi-clock-meta">{date} · {abbreviation(zone, now)} · {offset}</span>
+      <span className="gi-clock-meta">{[date, /^(GMT|UTC)/.test(abbreviation(zone, now)) ? '' : abbreviation(zone, now), offset].filter(Boolean).join(' · ')}</span>
     </div>
   );
 }
@@ -96,6 +100,41 @@ function DaylightBar({ profile }: { profile: LocationProfile }) {
       </div>
       <div className="gi-daylight-scale" aria-hidden="true"><span>−12 h</span><span>Solar noon</span><span>+12 h</span></div>
     </div>
+  );
+}
+
+/** Sun height over the local solar day (−12 h … +12 h around solar noon), with the horizon and "now". */
+export function sunCurve(lat: number, lon: number, noonIso: string, steps = 96): Array<{ t: number; altitude: number }> {
+  const noon = new Date(noonIso).getTime();
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = noon - 12 * 3_600_000 + (i / steps) * 24 * 3_600_000;
+    return { t, altitude: sunPositionAt(t, lat, lon).altitude };
+  });
+}
+
+function SunChart({ profile }: { profile: LocationProfile }) {
+  const noonIso = profile.solar?.solarNoon;
+  const now = useNow(60_000).getTime();
+  if (!noonIso) return null;
+  const points = sunCurve(profile.lat, profile.lon, noonIso);
+  const W = 300; const H = 90; const top = 90; const bottom = -90;
+  const y = (alt: number) => ((top - alt) / (top - bottom)) * H;
+  const x = (i: number) => (i / (points.length - 1)) * W;
+  const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.altitude).toFixed(1)}`).join('');
+  const peak = points.reduce((a, b) => (b.altitude > a.altitude ? b : a));
+  const start = points[0].t; const end = points[points.length - 1].t;
+  const nowX = now >= start && now <= end ? ((now - start) / (end - start)) * W : null;
+  const nowAlt = nowX !== null ? sunPositionAt(now, profile.lat, profile.lon) : null;
+  return (
+    <figure className="gi-sunchart">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Sun height over the day: highest ${peak.altitude.toFixed(1)}° at ${formatTime(new Date(peak.t).toISOString(), profile.timezone)}${nowAlt ? `; now ${nowAlt.altitude.toFixed(1)}°` : ''}.`}>
+        <rect x="0" y={y(0)} width={W} height={H - y(0)} className="gi-sun-night" />
+        <line x1="0" x2={W} y1={y(0)} y2={y(0)} className="gi-sun-horizon" />
+        <path d={d} className="gi-sun-path" />
+        {nowX !== null && nowAlt ? <circle cx={nowX} cy={y(nowAlt.altitude)} r="4" className="gi-sun-now" /> : null}
+      </svg>
+      <figcaption className="gi-muted">Sun height · peak {peak.altitude.toFixed(1)}°{nowAlt ? ` · now ${nowAlt.altitude.toFixed(1)}° (azimuth ${nowAlt.azimuth.toFixed(0)}°)` : ''}</figcaption>
+    </figure>
   );
 }
 
@@ -159,6 +198,7 @@ export interface ProfilePanelProps {
   onExportHolidayCsv: () => void;
   onMenu: (x: number, y: number) => void;
   onShare: () => void;
+  onRowMenu: (item: ProfileField, x: number, y: number) => void;
   onPickAlternative: (alt: { label: string; lat: number; lon: number }) => void;
   onCopySummary: () => void;
   onSolarDate: (date: string) => void;
@@ -177,7 +217,10 @@ export function ProfilePanel(props: ProfilePanelProps) {
   const longPress = useLongPress((x, y) => props.onMenu(x, y));
   const onContextMenu = (event: MouseEvent) => { event.preventDefault(); props.onMenu(event.clientX, event.clientY); };
   const coordText = `${profile.lat.toFixed(6)}, ${profile.lon.toFixed(6)}`;
-  const rows = (group: FieldGroup, skip: string[] = []) => (grouped.get(group) ?? []).filter((item) => !skip.includes(item.key)).map((item) => <FieldRow key={item.key} item={item} zone={profile.timezone} units={units} onInspect={props.onInspect} />);
+  const [filter, setFilter] = useState('');
+  const needle = filter.trim().toLowerCase();
+  const matches = (item: ProfileField) => !needle || `${item.label} ${displayValue(item, profile.timezone, units)} ${item.key}`.toLowerCase().includes(needle);
+  const rows = (group: FieldGroup, skip: string[] = []) => (grouped.get(group) ?? []).filter((item) => !skip.includes(item.key) && !(item.key === 'elevation.feet' && units !== 'imperial') && matches(item)).map((item) => <FieldRow key={item.key} item={item} zone={profile.timezone} units={units} onInspect={props.onInspect} onMenu={props.onRowMenu} />);
   const sections: Array<[FieldGroup, string[]]> = [['address', []], ['country', []], ['population', []], ['indicators', []], ['eu', []], ['timezone', []], ['solar', []], ['elevation', []], ['codes', []]];
 
   return (
@@ -217,8 +260,14 @@ export function ProfilePanel(props: ProfilePanelProps) {
         ) : null}
       </section>
 
+      <div className="gi-filter">
+        <label className="gi-field grow"><span>Find a value</span>
+          <input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="e.g. sunrise, currency, NUTS, MGRS" data-tip="Show only the rows whose name or value contains this text. Right-click (or long-press) any row to copy it." data-testid="gi-profile-filter" />
+        </label>
+        {needle ? <span className="gi-muted" role="status">{profile.fields.filter(matches).length} matching value{profile.fields.filter(matches).length === 1 ? '' : 's'}</span> : null}
+      </div>
       <div className="gi-cards">
-        {profile.adminChain.length ? (
+        {!needle && profile.adminChain.length ? (
           <Card id="admin" title="Administrative hierarchy" tip={GROUP_TIPS.admin}>
             <ol className="gi-admin">
               {profile.adminChain.map((level) => (
@@ -244,6 +293,7 @@ export function ProfilePanel(props: ProfilePanelProps) {
                     <input key={profile.id} type="date" defaultValue={profile.solar?.solarNoon?.slice(0, 10) ?? ''} min="1900-01-01" max="2100-12-31" onChange={(event) => { if (event.target.value) props.onSolarDate(event.target.value); }} data-tip="Show sun, twilight and moon times for another day at this place" />
                   </label>
                   <DaylightBar profile={profile} />
+                  <SunChart profile={profile} />
                 </>
               ) : null}
               <dl className="gi-rows">{content}</dl>
@@ -251,8 +301,10 @@ export function ProfilePanel(props: ProfilePanelProps) {
             </Card>
           );
         })}
-        <HolidaysCard profile={profile} onExportIcs={props.onExportIcs} onExportCsv={props.onExportHolidayCsv} onYear={props.onHolidayYear} />
+        {!needle ? <HolidaysCard profile={profile} onExportIcs={props.onExportIcs} onExportCsv={props.onExportHolidayCsv} onYear={props.onHolidayYear} /> : null}
 
+        {!needle ? (
+          <>
         <Card id="nearby" title="Nearby places" tip="Populated places from the bundled Natural Earth table within the chosen radius (works offline).">
           <label className="gi-range">
             <span>Radius <output>{props.radiusKm} km</output></span>
@@ -289,6 +341,8 @@ export function ProfilePanel(props: ProfilePanelProps) {
             </>
           ) : null}
         </Card>
+          </>
+        ) : null}
       </div>
 
       <footer className="gi-attribution" aria-label="Sources used for this location">

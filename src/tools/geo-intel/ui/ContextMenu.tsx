@@ -32,6 +32,9 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState | null; onClose
   useEffect(() => {
     if (!menu) return undefined;
     const close = (event: Event) => { if (!(event.target instanceof Node) || !ref.current?.contains(event.target)) onClose(); };
+    // A right-click near an edge scrolls its target into view as the menu opens; ignore that scroll.
+    const openedAt = performance.now();
+    const onScroll = () => { if (performance.now() - openedAt > 250) onClose(); };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
@@ -43,12 +46,12 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState | null; onClose
       buttons[next].focus();
     };
     window.addEventListener('pointerdown', close, true);
-    window.addEventListener('scroll', onClose, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onClose);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('pointerdown', close, true);
-      window.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onClose);
       window.removeEventListener('keydown', onKey);
     };
