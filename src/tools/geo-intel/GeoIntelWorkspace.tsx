@@ -143,6 +143,11 @@ export default function GeoIntelWorkspace() {
     return () => { alive = false; };
   }, [profile, radiusKm]);
 
+  // Late responses must not land on a location or indicator the user has already left.
+  const profileIdRef = useRef<string | null>(null);
+  profileIdRef.current = profile?.id ?? null;
+  const choroToken = useRef(0);
+
   const stored = profile ? history.find((item) => item.id === profile.id) ?? null : null;
 
   const show = useCallback((next: LocationProfile, fit = true) => {
@@ -316,6 +321,7 @@ export default function GeoIntelWorkspace() {
     setBoundary({ level, loading: true, layer: null, error: null, hit: null });
     try {
       const layer = await boundaryLayer(client, iso3, level);
+      if (profileIdRef.current !== profile.id) return;
       const hit = featureAt(layer, profile.lon, profile.lat);
       setBoundary({ level, loading: false, layer, error: null, hit: hit?.properties.shapeName ?? null });
       if (hit?.properties.shapeName) {
@@ -328,21 +334,23 @@ export default function GeoIntelWorkspace() {
         recordProfile(updated).then(refreshHistory).catch(() => undefined);
       }
     } catch (caught) {
-      setBoundary({ level, loading: false, layer: null, error: `geoBoundaries: ${(caught as Error).message}`, hit: null });
+      if (profileIdRef.current === profile.id) setBoundary({ level, loading: false, layer: null, error: `geoBoundaries: ${(caught as Error).message}`, hit: null });
     }
   }, [client, profile, refreshHistory]);
 
   const toggleChoropleth = useCallback(async (indicator: string, active: boolean) => {
     if (indicator !== settings.choroplethIndicator) updateSettings({ choroplethIndicator: indicator });
-    if (!active) { setChoro((c) => ({ ...c, indicator, active: false })); return; }
+    const token = ++choroToken.current;
+    if (!active) { setChoro((c) => ({ ...c, indicator, active: false, loading: false })); return; }
     setChoro((c) => ({ ...c, indicator, loading: true, error: null }));
     try {
       const data = await worldBankAllCountries(client, indicator);
+      if (token !== choroToken.current) return;
       const def = WB_INDICATORS.find((item) => item.id === indicator);
       const { fills, legend } = choropleth(data.values, def?.label.replace(' (country)', '') ?? indicator, def?.unit ?? '');
       setChoro({ indicator, active: true, loading: false, fills, legend, error: null });
     } catch (caught) {
-      setChoro((c) => ({ ...c, loading: false, active: false, error: `World Bank: ${(caught as Error).message}` }));
+      if (token === choroToken.current) setChoro((c) => ({ ...c, loading: false, active: false, error: `World Bank: ${(caught as Error).message}` }));
     }
   }, [client, settings.choroplethIndicator, updateSettings]);
 
@@ -411,8 +419,7 @@ export default function GeoIntelWorkspace() {
         <HistoryPanel items={history} onImport={importFile} handlers={{
           onOpen: (item) => { show(item.profile); setTab('profile'); },
           onStar: (item) => toggleStar(item.id),
-          onRename: (item, name) => updateProfileMeta(item.id, { name }).then(refreshHistory),
-          onTags: (item, tags) => updateProfileMeta(item.id, { tags }).then(refreshHistory),
+          onSave: (item, name, tags) => updateProfileMeta(item.id, { name, tags }).then(refreshHistory),
           onDelete: (item) => removeFromHistory(item.id),
           onCompare: (item) => togglePin(item.profile),
           onExport: (item) => setExportFor([item.profile]),
@@ -453,7 +460,7 @@ export default function GeoIntelWorkspace() {
 
       <div className="gi-layout">
         <div className="gi-map-col">
-          <MapCanvas ref={map} scene={scene} mode={mode} onPick={(point) => run({ kind: 'map', lat: point.lat, lon: point.lon })} onMeasure={onMeasurePoint} onBox={(next) => { setBox(next); setMode('select'); setTab('tools'); }} onPinMenu={pinMenu} onMapMenu={mapMenu} />
+          <MapCanvas ref={map} scene={scene} mode={mode} onPick={(point, metresPerPx) => run({ kind: 'map', lat: point.lat, lon: point.lon, precisionMetres: metresPerPx })} onMeasure={onMeasurePoint} onBox={(next) => { setBox(next); setMode('select'); setTab('tools'); }} onPinMenu={pinMenu} onMapMenu={mapMenu} />
           {mode !== 'select' ? <p className="gi-mode-note" role="status">{mode === 'measure' ? 'Measure mode: click point A, then point B.' : 'Box mode: drag on the map.'} <button type="button" className="gi-link" onClick={() => setMode('select')}>Done</button></p> : null}
           {scene.legend ? (
             <div className="gi-legend compact" aria-label="Map legend">

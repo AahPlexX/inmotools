@@ -161,11 +161,14 @@ export class HttpClient {
       this.emit();
       return { data: cached.value as T, fromCache: true, stale: false, retrievedAt: new Date(cached.storedAt).toISOString() };
     }
-    const existing = this.inflight.get(key);
-    if (existing) return existing as Promise<FetchResult<T>>;
-    const task = this.fetchWithFallback<T>(url, key, options, cached).finally(() => { this.inflight.delete(key); });
-    this.inflight.set(key, task as Promise<FetchResult<unknown>>);
-    return task;
+    // The shared request runs without any caller's signal, so cancelling one caller never cancels
+    // another caller's identical request; each caller only stops waiting.
+    let task = this.inflight.get(key) as Promise<FetchResult<T>> | undefined;
+    if (!task) {
+      task = this.fetchWithFallback<T>(url, key, { ...options, signal: undefined }, cached).finally(() => { this.inflight.delete(key); });
+      this.inflight.set(key, task as Promise<FetchResult<unknown>>);
+    }
+    return withAbort(task, options.signal);
   }
 
   private staleResult<T>(cached: CachedEntry): FetchResult<T> {
@@ -260,6 +263,16 @@ export class HttpClient {
       }
     }
   }
+}
+
+function withAbort<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return task;
+  if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    task.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
 }
 
 export const TTL = {

@@ -32,12 +32,17 @@ export function formatOffset(minutes: number): string {
 }
 
 /** Standard offset = smaller of the January/July offsets of that year. */
+/** Offsets sampled twice a month, so changes outside January/July (e.g. Morocco's Ramadan shift) are seen. */
+function yearOffsets(zone: string, year: number): number[] {
+  return Array.from({ length: 24 }, (_, i) => offsetMinutes(zone, new Date(Date.UTC(year, Math.floor(i / 2), i % 2 ? 16 : 1))));
+}
+
 export function standardOffsetMinutes(zone: string, year: number): number {
-  return Math.min(offsetMinutes(zone, new Date(Date.UTC(year, 0, 1))), offsetMinutes(zone, new Date(Date.UTC(year, 6, 1))));
+  return Math.min(...yearOffsets(zone, year));
 }
 
 export function observesDst(zone: string, year: number): boolean {
-  return offsetMinutes(zone, new Date(Date.UTC(year, 0, 1))) !== offsetMinutes(zone, new Date(Date.UTC(year, 6, 1)));
+  return new Set(yearOffsets(zone, year)).size > 1;
 }
 
 export function isDst(zone: string, instant: Date): boolean {

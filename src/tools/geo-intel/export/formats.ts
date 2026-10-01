@@ -80,8 +80,15 @@ export function buildCsv(profiles: LocationProfile[], meta: ResolvedMetadata, op
     }), meta.title, meta.author, meta.tags.join('; '), meta.date, meta.licenseText, meta.notes];
   });
   // Neutralise spreadsheet formula injection in text cells (OWASP CSV injection guidance).
-  const safe = (value: unknown) => (typeof value === 'string' && /^[=+\-@\t\r]/.test(value) && !/^-?\d/.test(value) ? `'${value}` : value);
-  return `${Papa.unparse({ fields: header, data: rows.map((row) => row.map(safe)) })}\r\n`;
+  return `${Papa.unparse({ fields: header, data: rows.map((row) => row.map(neutralizeFormula)) })}\r\n`;
+}
+
+/**
+ * Spreadsheet formula-injection guard (OWASP CSV injection): text starting with = + - @ tab or CR
+ * is prefixed with an apostrophe. Plain signed numbers stay numeric.
+ */
+export function neutralizeFormula<T>(value: T): T | string {
+  return typeof value === 'string' && /^[=+\-@\t\r]/.test(value) && !/^[+-]?\d+(?:\.\d+)?$/.test(value) ? `'${value}` : value;
 }
 
 export const GROUP_OPTIONS = (Object.keys(FIELD_GROUP_LABELS) as FieldGroup[]).map((group) => ({ group, label: FIELD_GROUP_LABELS[group] }));
@@ -89,7 +96,7 @@ export const GROUP_OPTIONS = (Object.keys(FIELD_GROUP_LABELS) as FieldGroup[]).m
 // ---------------- iCalendar (RFC 5545) ----------------
 
 export function icsEscape(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /** Folds content lines to ≤75 octets (RFC 5545 §3.1), never splitting a UTF-8 sequence. */
@@ -144,7 +151,7 @@ export function buildIcs(profile: LocationProfile, meta: ResolvedMetadata, calen
 export function buildHolidayCsv(profile: LocationProfile): string {
   const calendar = profile.holidays;
   if (!calendar) return '';
-  return `${Papa.unparse({ fields: ['date', 'name', 'local_name', 'nationwide', 'regions', 'types'], data: calendar.items.map((h) => [h.date, h.name, h.localName, h.global ? 'yes' : 'no', (h.counties ?? []).join('; '), h.types.join('; ')]) })}\r\n`;
+  return `${Papa.unparse({ fields: ['date', 'name', 'local_name', 'nationwide', 'regions', 'types'], data: calendar.items.map((h) => [h.date, h.name, h.localName, h.global ? 'yes' : 'no', (h.counties ?? []).join('; '), h.types.join('; ')].map(neutralizeFormula)) })}\r\n`;
 }
 
 // ---------------- GeoJSON (RFC 7946) and KML 2.2 ----------------
@@ -209,7 +216,8 @@ export function parseProfileImport(text: string): { profiles: LocationProfile[];
   try { data = JSON.parse(text); } catch { throw new Error('This file is not valid JSON.'); }
   const root = data as { schema?: string; profiles?: unknown[]; metadata?: Partial<ExportMetadata> };
   const list = Array.isArray(data) ? data : root?.schema === 'geo-intel-export/1' && Array.isArray(root.profiles) ? root.profiles : [data];
-  const profiles = list.filter(isProfile).map((p) => ({ ...p, adminChain: Array.isArray(p.adminChain) ? p.adminChain : [], warnings: Array.isArray(p.warnings) ? p.warnings : [], sourcesUsed: Array.isArray(p.sourcesUsed) ? p.sourcesUsed : [] }));
+  const known = (id: unknown): id is SourceId => typeof id === 'string' && Object.hasOwn(SOURCES, id);
+  const profiles = list.filter(isProfile).filter((p) => p.fields.every((item) => known(item.source))).map((p) => ({ ...p, adminChain: Array.isArray(p.adminChain) ? p.adminChain : [], warnings: Array.isArray(p.warnings) ? p.warnings : [], sourcesUsed: Array.isArray(p.sourcesUsed) ? p.sourcesUsed.filter(known) : [] }));
   if (!profiles.length) throw new Error('No Geo Intelligence Hub locations were found in this file.');
   const metadata = root?.schema === 'geo-intel-export/1' && root.metadata ? { ...root.metadata, tags: Array.isArray(root.metadata.tags) ? root.metadata.tags : [] } : null;
   return { profiles, rejected: list.length - profiles.length, metadata };

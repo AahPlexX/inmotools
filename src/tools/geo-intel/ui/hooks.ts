@@ -89,8 +89,10 @@ export function useLongPress(onLongPress: (x: number, y: number, target: EventTa
     },
     onPointerUp: clear,
     onPointerCancel: clear,
-    /** True if the last press became a long-press (use to swallow the following click). */
-    consumed: () => fired.current,
+    /** A long-press opens the menu; swallow the click that follows on release. */
+    onClickCapture: (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+      if (fired.current) { fired.current = false; event.preventDefault(); event.stopPropagation(); }
+    },
   };
 }
 

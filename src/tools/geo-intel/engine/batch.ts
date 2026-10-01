@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import { postcodesLookup, zippopotamLookup } from '../adapters/postal';
 import type { AdapterResult } from '../adapters/common';
 import { normalizePostal } from '../core/postal';
+import { neutralizeFormula } from '../export/formats';
 import { formatOffset, offsetMinutes } from '../core/timezone';
 import { NotFoundError, type HttpClient } from '../net/http';
 import { countryAt, timezoneAt } from '../offline/static-data';
@@ -25,6 +26,8 @@ const COUNTRY_HEADERS = /^(country([\s_-]?code)?|iso2?|cc|nation)$/i;
 export function parseBatchCsv(text: string): BatchInput {
   const parsed = Papa.parse<Record<string, string>>(text.replace(/^\uFEFF/, ''), { header: true, skipEmptyLines: 'greedy', transformHeader: (header) => header.trim() });
   const headers = (parsed.meta.fields ?? []).filter(Boolean);
+  const quoteError = parsed.errors.find((error) => error.type === 'Quotes');
+  if (quoteError) throw new Error(`The CSV has an unclosed quote near row ${(quoteError.row ?? 0) + 2}; fix it and try again.`);
   if (!headers.length) throw new Error('The CSV needs a header row, e.g. “postcode,country”.');
   const postalColumn = headers.find((header) => POSTAL_HEADERS.test(header)) ?? headers[0];
   const countryColumn = headers.find((header) => COUNTRY_HEADERS.test(header)) ?? null;
@@ -57,7 +60,7 @@ export async function runBatch(input: BatchInput, options: BatchOptions): Promis
   for (const row of rows) {
     if (options.signal?.aborted) return { rows: out, cancelled: true, truncated: input.rows.length > BATCH_ROW_LIMIT };
     const code = (row[input.postalColumn] ?? '').trim();
-    const country = ((input.countryColumn ? row[input.countryColumn] : '') || options.defaultCountry).trim().toUpperCase();
+    const country = ((input.countryColumn ? row[input.countryColumn] ?? '' : '').trim() || options.defaultCountry).trim().toUpperCase();
     progress.current = `${country} ${code}`;
     options.onProgress?.({ ...progress });
     const key = `${country}|${code.toUpperCase()}`;
@@ -97,5 +100,5 @@ export async function runBatch(input: BatchInput, options: BatchOptions): Promis
 }
 
 export function batchToCsv(input: BatchInput, rows: OutputRow[]): string {
-  return Papa.unparse({ fields: [...input.headers, ...OUTPUT_COLUMNS], data: rows.map((row) => [...input.headers, ...OUTPUT_COLUMNS].map((column) => row[column] ?? '')) });
+  return Papa.unparse({ fields: [...input.headers, ...OUTPUT_COLUMNS], data: rows.map((row) => [...input.headers, ...OUTPUT_COLUMNS].map((column) => neutralizeFormula(row[column] ?? ''))) });
 }

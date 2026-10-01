@@ -54,7 +54,8 @@ export class DexieResponseCache implements ResponseCache {
   async set(entry: CachedEntry) {
     await db().responses.put(entry);
     this.writes += 1;
-    if (this.writes % 50 === 0) await pruneResponses();
+    // Prune on the first write of each session too, so short sessions cannot grow the store unbounded.
+    if (this.writes === 1 || this.writes % 50 === 0) await pruneResponses();
   }
 }
 
@@ -80,11 +81,14 @@ export async function responseCacheStats(): Promise<{ entries: number; bySource:
 
 /** Adds or refreshes a profile, then trims unstarred history to HISTORY_LIMIT. */
 export async function recordProfile(profile: LocationProfile, now = Date.now()): Promise<StoredProfile> {
-  const existing = await db().profiles.get(profile.id);
-  const record: StoredProfile = existing
-    ? { ...existing, profile, updatedAt: now }
-    : { id: profile.id, name: profile.label, starred: false, tags: [], createdAt: now, updatedAt: now, profile, metadata: { ...EMPTY_METADATA } };
-  await db().profiles.put(record);
+  const record = await db().transaction('rw', db().profiles, async () => {
+    const existing = await db().profiles.get(profile.id);
+    const value: StoredProfile = existing
+      ? { ...existing, profile, updatedAt: now }
+      : { id: profile.id, name: profile.label, starred: false, tags: [], createdAt: now, updatedAt: now, profile, metadata: { ...EMPTY_METADATA } };
+    await db().profiles.put(value);
+    return value;
+  });
   await trimHistory();
   return record;
 }
@@ -107,11 +111,16 @@ export async function getProfile(id: string): Promise<StoredProfile | undefined>
 }
 
 export async function updateProfileMeta(id: string, patch: Partial<Pick<StoredProfile, 'name' | 'starred' | 'tags' | 'metadata'>>): Promise<StoredProfile | undefined> {
-  const existing = await db().profiles.get(id);
-  if (!existing) return undefined;
-  const tags = patch.tags ? normalizeTags(patch.tags) : existing.tags;
-  const next: StoredProfile = { ...existing, ...patch, tags, name: (patch.name ?? existing.name).trim() || existing.profile.label, updatedAt: Date.now() };
-  await db().profiles.put(next);
+  // Read-modify-write inside one transaction so concurrent edits cannot overwrite each other.
+  const next = await db().transaction('rw', db().profiles, async () => {
+    const existing = await db().profiles.get(id);
+    if (!existing) return undefined;
+    const tags = patch.tags ? normalizeTags(patch.tags) : existing.tags;
+    const updated: StoredProfile = { ...existing, ...patch, tags, name: (patch.name ?? existing.name).trim() || existing.profile.label, updatedAt: Date.now() };
+    await db().profiles.put(updated);
+    return updated;
+  });
+  if (!next) return undefined;
   if (patch.starred === false) await trimHistory();
   return next;
 }

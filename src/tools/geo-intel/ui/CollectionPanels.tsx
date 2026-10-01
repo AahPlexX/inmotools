@@ -56,8 +56,8 @@ export function ComparePanel({ profiles, units, onRemove, onOpen, onExport, onCl
   );
 }
 
-function HistoryItem({ item, onOpen, onStar, onRename, onTags, onDelete, onCompare, onExport, onMenu }: {
-  item: StoredProfile; onOpen: () => void; onStar: () => void; onRename: (name: string) => void; onTags: (tags: string[]) => void; onDelete: () => void; onCompare: () => void; onExport: () => void; onMenu: (x: number, y: number) => void;
+function HistoryItem({ item, onOpen, onStar, onSave, onDelete, onCompare, onExport, onMenu }: {
+  item: StoredProfile; onOpen: () => void; onStar: () => void; onSave: (name: string, tags: string[]) => void; onDelete: () => void; onCompare: () => void; onExport: () => void; onMenu: (x: number, y: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
@@ -68,7 +68,7 @@ function HistoryItem({ item, onOpen, onStar, onRename, onTags, onDelete, onCompa
       <button type="button" className="gi-star" aria-pressed={item.starred} aria-label={item.starred ? `Unstar ${item.name}` : `Star ${item.name}`} data-tip={item.starred ? 'Unstar (may then be trimmed from history)' : 'Star to keep permanently'} onClick={onStar}><Icon name={item.starred ? 'star' : 'starOutline'} size={22} /></button>
       <div className="gi-history-main">
         {editing ? (
-          <form className="gi-edit" onSubmit={(event) => { event.preventDefault(); onRename(name); onTags(parseTagInput(tags)); setEditing(false); }}>
+          <form className="gi-edit" onSubmit={(event) => { event.preventDefault(); onSave(name, parseTagInput(tags)); setEditing(false); }}>
             <label className="gi-field compact"><span>Name</span><input value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label>
             <label className="gi-field compact"><span>Tags (comma-separated)</span><input value={tags} onChange={(event) => setTags(event.target.value)} /></label>
             <div className="gi-actions"><button type="submit" className="gi-btn primary">Save</button><button type="button" className="gi-btn" onClick={() => { setEditing(false); setName(item.name); setTags(item.tags.join(', ')); }}>Cancel</button></div>
@@ -83,7 +83,7 @@ function HistoryItem({ item, onOpen, onStar, onRename, onTags, onDelete, onCompa
       </div>
       {!editing ? (
         <div className="gi-history-actions">
-          <button type="button" className="gi-btn small" onClick={() => setEditing(true)} data-tip="Rename and tag">Edit</button>
+          <button type="button" className="gi-btn small" onClick={() => { setName(item.name); setTags(item.tags.join(', ')); setEditing(true); }} data-tip="Rename and tag">Edit</button>
           <button type="button" className="gi-btn small" onClick={onCompare} data-tip="Add to comparison">Compare</button>
           <button type="button" className="gi-btn small" onClick={onExport} data-tip="Export this saved location">Export</button>
           <button type="button" className="gi-btn small danger" onClick={onDelete} data-tip="Delete from this device">Delete</button>
@@ -96,8 +96,8 @@ function HistoryItem({ item, onOpen, onStar, onRename, onTags, onDelete, onCompa
 export interface HistoryHandlers {
   onOpen: (item: StoredProfile) => void;
   onStar: (item: StoredProfile) => void;
-  onRename: (item: StoredProfile, name: string) => void;
-  onTags: (item: StoredProfile, tags: string[]) => void;
+  /** Name and tags are saved together in one write. */
+  onSave: (item: StoredProfile, name: string, tags: string[]) => void;
   onDelete: (item: StoredProfile) => void;
   onCompare: (item: StoredProfile) => void;
   onExport: (item: StoredProfile) => void;
@@ -120,7 +120,7 @@ export function HistoryPanel({ items, handlers, onImport }: { items: StoredProfi
       </div>
       <p className="gi-muted">The last 50 lookups are kept on this device; starred ones are kept until you delete them. Nothing is uploaded.</p>
       {visible.length ? <ul className="gi-history">{visible.map((item) => (
-        <HistoryItem key={item.id} item={item} onOpen={() => handlers.onOpen(item)} onStar={() => handlers.onStar(item)} onRename={(name) => handlers.onRename(item, name)} onTags={(tags) => handlers.onTags(item, tags)} onDelete={() => handlers.onDelete(item)} onCompare={() => handlers.onCompare(item)} onExport={() => handlers.onExport(item)} onMenu={(x, y) => handlers.onMenu(item, x, y)} />
+        <HistoryItem key={item.id} item={item} onOpen={() => handlers.onOpen(item)} onStar={() => handlers.onStar(item)} onSave={(name, tags) => handlers.onSave(item, name, tags)} onDelete={() => handlers.onDelete(item)} onCompare={() => handlers.onCompare(item)} onExport={() => handlers.onExport(item)} onMenu={(x, y) => handlers.onMenu(item, x, y)} />
       ))}</ul> : <p className="gi-empty">{items.length ? 'No saved location matches.' : 'No lookups yet.'}</p>}
       {items.some((item) => !item.starred) ? <div className="gi-actions"><button type="button" className="gi-btn danger" onClick={handlers.onClear} data-tip="Remove all unstarred history from this device">Clear unstarred history</button></div> : null}
     </div>

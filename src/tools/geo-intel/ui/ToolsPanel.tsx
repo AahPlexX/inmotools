@@ -95,6 +95,7 @@ export function ToolsPanel(props: ToolsProps) {
 
   const [boxInput, setBoxInput] = useState({ south: '', west: '', north: '', east: '' });
   const applyBox = () => {
+    if (Object.values(boxInput).some((v) => v.trim() === '')) return;
     const values = Object.fromEntries(Object.entries(boxInput).map(([k, v]) => [k, Number(v)])) as unknown as BBox;
     if ([values.south, values.north].some((v) => !Number.isFinite(v) || Math.abs(v) > 90) || [values.west, values.east].some((v) => !Number.isFinite(v) || Math.abs(v) > 180) || values.south >= values.north) return;
     props.onBox(values);
@@ -109,7 +110,7 @@ export function ToolsPanel(props: ToolsProps) {
         </label>
         {!convertText && current ? <p className="gi-muted">Showing the current location.</p> : null}
         {converted && 'error' in converted ? <p className="gi-error" role="alert">{converted.error}</p> : null}
-        {(converted && 'point' in converted ? converted.point : current?.point) ? (() => {
+        {(converted ? 'point' in converted : !!current) ? (() => {
           const point = (converted && 'point' in converted ? converted.point : current?.point) as LatLon;
           return (
             <>

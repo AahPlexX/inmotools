@@ -17,7 +17,8 @@ export interface MapCanvasHandle {
 interface Props {
   scene: MapScene;
   mode: MapMode;
-  onPick: (point: LatLon) => void;
+  /** metresPerPx: ground size of one screen pixel at the click. */
+  onPick: (point: LatLon, metresPerPx: number) => void;
   onMeasure: (point: LatLon) => void;
   onBox: (box: BBox) => void;
   onPinMenu: (pinId: string, x: number, y: number) => void;
@@ -74,6 +75,13 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
     const [x, y] = toSvg(clientX, clientY);
     return invert(x, y);
   }, [toSvg]);
+
+  // Equal Earth is equal-area, not conformal; this uses the local east-west scale, good enough to grade precision.
+  const metresPerPx = (point: LatLon) => {
+    const [x1] = project(point.lon, point.lat); const [x2] = project(Math.min(180, point.lon + 0.01), point.lat);
+    const unitsPerDegree = Math.abs(x2 - x1) / 0.01 || 1;
+    return (unitsPerPx / unitsPerDegree) * 111_320 * Math.cos((point.lat * Math.PI) / 180);
+  };
 
   const zoomAt = useCallback((factor: number, clientX?: number, clientY?: number) => {
     setView((current) => {
@@ -188,7 +196,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
     if (g.moved) return;
     const point = toLatLon(event.clientX, event.clientY);
     if (!point) return;
-    if (mode === 'measure') onMeasure(point); else onPick(point);
+    if (mode === 'measure') onMeasure(point); else onPick(point, metresPerPx(point));
   };
 
   const onKeyDown = (event: KeyboardEvent<SVGSVGElement>) => {
@@ -204,7 +212,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
       case '0': setView(HOME); break;
       case 'Enter': case ' ': {
         const center = invert(fitted[0] + fitted[2] / 2, fitted[1] + fitted[3] / 2);
-        if (center) (mode === 'measure' ? onMeasure : onPick)(center);
+        if (center) { if (mode === 'measure') onMeasure(center); else onPick(center, metresPerPx(center)); }
         break;
       }
       default: return;

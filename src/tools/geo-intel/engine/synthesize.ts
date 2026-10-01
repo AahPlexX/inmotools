@@ -24,7 +24,8 @@ export const NUTS_COUNTRIES = new Set(['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK',
 export type ResolveInput =
   | { kind: 'text'; text: string }
   | { kind: 'device'; lat: number; lon: number; accuracy: number | null }
-  | { kind: 'map'; lat: number; lon: number };
+  /** precisionMetres: ground size of one screen pixel where the user clicked, if known. */
+  | { kind: 'map'; lat: number; lon: number; precisionMetres?: number };
 
 export interface ResolveOptions {
   client: HttpClient;
@@ -94,7 +95,7 @@ async function anchorFor(parsed: ParsedQuery, input: ResolveInput, options: Reso
     return { point: { lat: input.lat, lon: input.lon }, kind: 'device', query: 'Device location', confidence: confidenceForPrecision(precision), source: 'device', geography: 'point', recordId: null, note: input.accuracy ? `Reported accuracy ±${Math.round(input.accuracy)} m.` : 'Accuracy not reported by the device.', primary };
   }
   if (input.kind === 'map') {
-    return { point: { lat: input.lat, lon: input.lon }, kind: 'map', query: `Map point ${profileId(input)}`, confidence: 'rooftop', source: 'user', geography: 'point', recordId: null, note: 'Point chosen on the map; precision depends on the zoom level you clicked at.', primary: null };
+    return { point: { lat: input.lat, lon: input.lon }, kind: 'map', query: `Map point ${profileId(input)}`, confidence: input.precisionMetres === undefined ? 'street' : confidenceForPrecision(input.precisionMetres), source: 'user', geography: 'point', recordId: null, note: input.precisionMetres === undefined ? 'Point chosen on the map or from a list.' : `Point clicked on the map; one screen pixel there is about ${Math.max(1, Math.round(input.precisionMetres)).toLocaleString('en-US')} m.`, primary: null };
   }
   switch (parsed.kind) {
     case 'empty': throw new ResolveError('Type a place, postal code, coordinates, or Plus Code.');

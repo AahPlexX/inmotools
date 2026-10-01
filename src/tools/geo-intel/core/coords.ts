@@ -149,6 +149,7 @@ export function parseUtm(input: string): LatLon {
   const easting = Number(match[3]);
   const northing = Number(match[4]);
   if (easting < 100_000 || easting > 900_000) throw new Error('UTM easting must be between 100,000 and 900,000 m');
+  if (northing < 0 || northing > 10_000_000) throw new Error('UTM northing must be between 0 and 10,000,000 m');
   if (designator === 'NORTH' || designator === 'SOUTH') return fromUtm(zone, designator === 'NORTH' ? 'N' : 'S', easting, northing);
   // A single letter is a latitude band (C–M south, N–X north). Because "S" is
   // also written for the southern hemisphere, accept whichever reading lands

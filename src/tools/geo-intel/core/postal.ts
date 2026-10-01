@@ -45,7 +45,7 @@ export function normalizePostal(countryInput: string, codeInput: string): Postal
       return { country, code: match[1].toUpperCase(), display, resolves: 'forward_sortation_area' };
     }
     case 'NL': {
-      const match = /^(\d{4})\s?[A-Z]{0,2}$/.exec(display);
+      const match = /^(\d{4})(?:\s?[A-Z]{2})?$/.exec(display);
       if (!match) throw new Error(`"${display}" is not a Dutch postal code`);
       return { country, code: match[1], display, resolves: display.length > 4 ? 'numeric_district' : 'full_code' };
     }

@@ -362,3 +362,39 @@ All conditions satisfied: PR #89 open into `main`, CI green on the exact head co
 - `geo-intel.spec.ts` + `accessibility.spec.ts` + `app.spec.ts`: 122 passed / 10 skipped / 0 failed.
 ### Next batch (planned)
 - CI on the pushed head, then merge PR #89.
+
+## Delivery 15 — 2026-09-30 (PR #89 review findings)
+
+29 automated review comments (CodeAnt, Copilot). Regressions for the fixes: `tests/unit/geo-intel-review.test.ts` (12 tests).
+
+### Fixed
+| Finding | Fix |
+| --- | --- |
+| Dutch codes like `1234 A` accepted | Only 4 digits, optionally followed by exactly 2 letters (`core/postal.ts`) |
+| Malformed CSV quotes silently parsed | Unclosed quote stops the batch with the row number (`engine/batch.ts`) |
+| Whitespace-only country cell blocked the default country | Trimmed before falling back |
+| Batch CSV and holiday CSV not formula-safe; `-1+HYPERLINK(…)` slipped past the main CSV guard | One shared `neutralizeFormula` for all three CSV writers; only plain signed numbers are exempt |
+| `icsEscape` left lone `\r` | `\r\n`, `\r`, `\n` all become `\n` |
+| JSON import accepted unknown source IDs (crash in attribution) | Profiles citing unknown sources are rejected; unknown `sourcesUsed` entries dropped |
+| `1 h 60 min` possible | Total minutes rounded first |
+| UTM northing unchecked | 0–10,000,000 m enforced |
+| Antipodal great-circle arc divided by zero | Routed via the pole |
+| Ring area across the antimeridian inflated | Longitude step taken the short way round |
+| DST detection sampled only Jan/Jul (missed Morocco) | 24 samples a year |
+| Shared in-flight request bound to the first caller's abort signal | Shared request runs unsignalled; each caller races its own signal (`net/http.ts`) |
+| Profile read-modify-write races; rename and tags were two writes | Dexie `rw` transactions; name + tags saved in one write |
+| Cache pruning only every 50 writes per session | Also prunes on the first write of each session |
+| Map clicks always labelled rooftop | Confidence from the ground size of one screen pixel at the click |
+| Long-press then release also clicked the button underneath; the `consumed` function was spread onto the DOM | `onClickCapture` swallows the click after a long-press |
+| History editor kept stale name/tags | Re-read when Edit opens |
+| Empty bounding-box fields became 0 | All four edges required |
+| Converter showed the current location next to an error | Falls back to the current location only when the input is empty |
+| Late boundary / choropleth responses overwrote newer state | Profile-id and request-token guards |
+
+### Not changed (with reason)
+- **Plus Codes longer than 15 digits:** the official `validityTests.csv` marks 16–17-digit codes valid, and the spec truncates extra digits; behaviour matches the reference.
+- **Antimeridian drag box, ring drawing and boundary ray-cast:** the Equal Earth view has its seam at ±180°, so a drag cannot cross it; Natural Earth geometry is pre-split there. geoBoundaries layers that cross it (e.g. Fiji ADM1) can draw a stray line or misassign points within the seam; recorded as a known limitation.
+
+### Evidence
+- `tsc` exit 0; `pnpm test:unit` 269 files / 3,058 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0.
+- `geo-intel.spec.ts` + `accessibility.spec.ts` + `app.spec.ts`: 122 passed / 10 skipped / 0 failed.

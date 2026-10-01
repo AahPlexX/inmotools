@@ -66,6 +66,8 @@ export function greatCirclePoints(a: LatLon, b: LatLon, segments = 64): LatLon[]
   const φ1 = toRad(a.lat); const λ1 = toRad(a.lon); const φ2 = toRad(b.lat); const λ2 = toRad(b.lon);
   const d = distanceKm(a, b) / EARTH_RADIUS_KM;
   if (d === 0) return [a, b];
+  // Antipodal points have no unique great circle; go via the pole (any meridian is a shortest path).
+  if (Math.abs(Math.sin(d)) < 1e-9) return Array.from({ length: segments + 1 }, (_, i) => destination(a, a.lat >= 0 ? 0 : 180, (i / segments) * d * EARTH_RADIUS_KM));
   const points: LatLon[] = [];
   for (let i = 0; i <= segments; i += 1) {
     const f = i / segments;
@@ -116,7 +118,8 @@ export function ringAreaKm2(ring: LatLon[]): number {
   let total = 0;
   for (let i = 0; i < ring.length; i += 1) {
     const p1 = ring[i]; const p2 = ring[(i + 1) % ring.length];
-    total += toRad(p2.lon - p1.lon) * (2 + Math.sin(toRad(p1.lat)) + Math.sin(toRad(p2.lat)));
+    const dLon = ((((p2.lon - p1.lon) % 360) + 540) % 360) - 180; // shortest way round, so antimeridian crossings stay small
+    total += toRad(dLon) * (2 + Math.sin(toRad(p1.lat)) + Math.sin(toRad(p2.lat)));
   }
   return Math.abs((total * EARTH_RADIUS_KM ** 2) / 2);
 }

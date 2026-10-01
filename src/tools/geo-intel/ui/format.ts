@@ -45,8 +45,9 @@ export function formatElevation(m: number, units: Units): string {
 }
 
 export function formatDurationSeconds(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
+  const total = Math.round(seconds / 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return `${h} h ${String(m).padStart(2, '0')} min`;
 }
 
