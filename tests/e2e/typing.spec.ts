@@ -495,6 +495,51 @@ test('reflows without page-level horizontal overflow across compact viewports', 
   }
 });
 
+// The page clips an over-wide workspace, so document.scrollWidth stays small even when the
+// workspace itself is thousands of pixels wide (the pre-fix toolbar measured 20,953 px). This test
+// measures the workspace's own geometry instead.
+test('keeps every workspace element inside its own bounds and wraps the passage at every width', async ({ page }) => {
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const workspace = await openWorkspace(page);
+    await expect(workspace.locator('.tw-canvas')).toBeVisible();
+    const report = await page.evaluate(() => {
+      const root = document.querySelector('.tw-root') as HTMLElement;
+      const bounds = root.getBoundingClientRect();
+      // An element that overhangs is acceptable only inside a deliberate horizontal scroll region
+      // that itself fits the workspace (e.g. the history table); anything else is a layout bug.
+      const insideFittingScrollRegion = (element: Element) => {
+        for (let parent = element.parentElement; parent && parent !== root; parent = parent.parentElement) {
+          const overflowX = getComputedStyle(parent).overflowX;
+          if ((overflowX === 'auto' || overflowX === 'scroll') && parent.getBoundingClientRect().right <= bounds.right + 1) return true;
+        }
+        return false;
+      };
+      const overhanging = [...root.querySelectorAll('*')].filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.right > bounds.right + 1 && !insideFittingScrollRegion(element);
+      }).length;
+      const live = document.querySelector('[aria-label="Live typing metrics"]');
+      const statsInside = [...(live?.querySelectorAll('.tw-stat') ?? [])].every((stat) => stat.getBoundingClientRect().right <= bounds.right + 1);
+      const text = document.querySelector('.tw-canvas-text') as HTMLElement;
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      return {
+        rootWidth: Math.round(bounds.width),
+        toolbarWidth: Math.round(document.querySelector('.tw-toolbar')!.getBoundingClientRect().width),
+        overhanging,
+        statsInside,
+        statCount: live?.querySelectorAll('.tw-stat').length ?? 0,
+        passageLines: Math.round(text.scrollHeight / lineHeight),
+      };
+    });
+    expect(report.toolbarWidth, `toolbar wider than workspace at ${width}px`).toBeLessThanOrEqual(report.rootWidth + 1);
+    expect(report.overhanging, `elements overhanging the workspace at ${width}px`).toBe(0);
+    expect(report.statCount).toBe(5);
+    expect(report.statsInside, `a live stat is clipped at ${width}px`).toBe(true);
+    expect(report.passageLines, `passage did not wrap at ${width}px`).toBeGreaterThanOrEqual(2);
+  }
+});
+
 test('offers explicit lifecycle controls with pause-safe timing and active-session guardrails', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);

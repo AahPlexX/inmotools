@@ -1399,6 +1399,7 @@ export default function TypingWorkspace() {
           <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
         </div>
         <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        <div className="tw-table-scroll" role="region" aria-label="Saved typing tests table" tabIndex={0}>
         <PagedTable
           columns={[
             { key: 'saved', label: 'Saved' },
@@ -1439,6 +1440,7 @@ export default function TypingWorkspace() {
             return null;
           }}
         />
+        </div>
         <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
       </section>
 
@@ -1512,7 +1514,9 @@ function renderCells(state: EngineState, caret: CaretStyle): ReactNode[] {
     if (idx === state.cursor && !state.finished) {
       out.push(<span key={`caret-${idx}`} className={`tw-caret style-${caret}`} aria-hidden="true" />);
     }
-    const rendered = cell.expected === ' ' ? '\u00A0' : cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
+    // A real space (not U+00A0) is the only line-break opportunity in the passage; the canvas is
+    // pre-wrap, so a non-breaking space here would make the whole text one unwrappable line.
+    const rendered = cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
     const displayed = cell.state === 'incorrect' && cell.typed ? (cell.typed === ' ' ? '_' : cell.typed) : rendered;
     out.push(
       <span key={idx} className={`tw-char ${cell.state}`}>{displayed}</span>

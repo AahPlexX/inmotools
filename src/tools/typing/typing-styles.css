@@ -120,6 +120,8 @@
 
 .tw-root {
   display: grid;
+  /* minmax(0, …) stops any child's max-content width from widening the only grid track. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   color: var(--text-1, #0b1220);
 }
@@ -341,6 +343,12 @@
   color: #4b5468;
 }
 
+/* A wide table scrolls inside its own focusable region instead of widening the panel. */
+.tw-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .tw-panel table {
   width: 100%;
   border-collapse: collapse;
@@ -362,6 +370,8 @@
   padding: 0.75rem;
   background: #eef1f6;
   border-radius: 10px;
+  /* Lets the keys below size against this box, not the page, so the keyboard fits its panel. */
+  container-type: inline-size;
 }
 
 .tw-keyboard-row {
@@ -371,9 +381,12 @@
 }
 
 .tw-key {
-  min-width: 34px;
+  /* Ideal 2.6rem key that shrinks (never grows past it) when its row would overflow the panel. */
+  flex: 0 1 2.6rem;
+  min-width: 0;
   min-height: 34px;
-  padding: 0.25rem 0.35rem;
+  padding: 0.25rem 0.1rem;
+  overflow: hidden;
   border-radius: 6px;
   background: white;
   border: 1px solid #c5cddb;
@@ -384,7 +397,11 @@
   font-size: 0.75rem;
   color: #0b1220;
 }
-.tw-key.space { min-width: 240px; }
+.tw-key.space { flex: 0 1 14rem; }
+@container (max-width: 30rem) {
+  .tw-key { min-height: 28px; font-size: 0.65rem; }
+  .tw-key .finger { display: none; }
+}
 .tw-key.heat-1 { background: #dfeafe; }
 .tw-key.heat-2 { background: #b4d0fb; }
 .tw-key.heat-3 { background: #79aef8; }
