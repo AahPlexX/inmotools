@@ -1411,23 +1411,27 @@ export default function TypingWorkspace() {
             <input type="text" placeholder="e.g. morning,code" value={filterTagText} onChange={(e) => setFilterTagText(e.target.value)} />
           </label>
           <button className="subtle" type="button" onClick={async () => setHistory(await listTests())}>Refresh</button>
-          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Import JSON
-            <input type="file" disabled={sessionActive} accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept="application/json" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
           </label>
-          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Load CSV dictionary
-            <input type="file" disabled={sessionActive} accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept=".csv,text/csv" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
-          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
         </div>
         <div className="tw-stats-strip">
           <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
-          <div className="tw-stat"><h3>10-test avg</h3><p>{round(rolling.last10)}</p></div>
-          <div className="tw-stat"><h3>50-test avg</h3><p>{round(rolling.last50)}</p></div>
-          <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
+          <div className="tw-stat"><h3>10-test avg</h3><p>{visibleHistory.length ? round(rolling.last10) : '—'}</p></div>
+          <div className="tw-stat"><h3>50-test avg</h3><p>{visibleHistory.length ? round(rolling.last50) : '—'}</p></div>
+          <div className="tw-stat"><h3>All-time avg</h3><p>{visibleHistory.length ? round(rolling.allTime) : '—'}</p></div>
         </div>
-        <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        {visibleHistory.length === 0 && (
+          <p className="tw-empty" role="status">
+            {filterTags.length > 0 ? 'No saved tests match these tags.' : 'No saved tests yet. Finish a test and choose Save to start your history and trend chart.'}
+          </p>
+        )}
+        <div className="tw-chart tw-chart-history" hidden={visibleHistory.length === 0}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
         <div className="tw-table-scroll" role="region" aria-label="Saved typing tests table" tabIndex={0}>
         <PagedTable
           columns={[
@@ -1470,7 +1474,11 @@ export default function TypingWorkspace() {
           }}
         />
         </div>
-        <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
+        <p className="tw-muted">Daily activity (last 30 active days): {daily.length}</p>
+        <div className="tw-danger-zone">
+          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
+          <span className="tw-muted">Deletes this typist’s saved tests from this browser. Other typists are not affected.</span>
+        </div>
       </section>
 
       {/* Save modal */}
@@ -1600,7 +1608,7 @@ function VirtualKeyboard({ layout, heat, errors }: { layout: ReturnType<typeof f
 }
 
 function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>Finish a test to see analytics.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test and your per-key analytics appear here.</p>;
   return (
     <PagedTable
       columns={[
@@ -1627,7 +1635,7 @@ function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
 }
 
 function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>No data yet.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test to see this breakdown.</p>;
   return (
     <PagedTable
       columns={[
@@ -1837,7 +1845,7 @@ function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything stays in this browser. Longer passages can be used for extended practice.</p>
         <label htmlFor="tw-custom-text-input">Custom text</label>
         <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
-        {!usableText ? <p role="status" style={{ fontSize: '0.8rem', color: '#6b7280' }}>Enter at least one non-whitespace character.</p> : null}
+        {!usableText ? <p role="status" className="tw-muted">Enter at least one non-whitespace character.</p> : null}
         <div className="row">
           <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
           <button type="button" disabled={!usableText} onClick={() => onApply(text)}>Use this text</button>

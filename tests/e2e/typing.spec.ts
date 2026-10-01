@@ -584,6 +584,22 @@ test('result dialog keeps stray keystrokes out of its fields and lays out stats,
   await expect(resultDialog.getByRole('button', { name: 'Discard' })).toBeVisible();
 });
 
+test('history and analytics explain themselves before any test is saved', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  const history = workspace.getByRole('region', { name: 'Session history' });
+
+  await expect(history.getByText(/No saved tests yet/)).toBeVisible();
+  // Averages are not-yet-known, not zero.
+  await expect(history.locator('.tw-stat', { hasText: '10-test avg' }).locator('p')).toHaveText('—');
+  await expect(history.locator('.tw-chart-history')).toBeHidden();
+  await expect(workspace.getByText('Finish a test and your per-key analytics appear here.').first()).toBeVisible();
+  // Destructive reset lives in its own zone with a plain-language scope note.
+  const zone = history.locator('.tw-danger-zone');
+  await expect(zone.getByRole('button', { name: /Reset .* scores/ })).toBeVisible();
+  await expect(zone).toContainText('Other typists are not affected');
+});
+
 test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);

@@ -570,6 +570,32 @@
   cursor: not-allowed;
 }
 
+/* Secondary text inherits the theme's colour (dark themes included) and is dimmed, not hard-coded grey. */
+.tw-muted { margin: 0.35rem 0 0; font-size: 0.8rem; color: inherit; opacity: 0.78; }
+.tw-empty {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: inherit;
+  border: 1px dashed currentColor;
+  border-radius: 10px;
+  opacity: 0.85;
+}
+.tw-file-button { padding: 0.35rem 0.6rem; border: 1px solid #b6bfce; border-radius: 8px; cursor: pointer; }
+.tw-file-input { display: none; }
+.tw-chart-history { margin-top: 0.5rem; }
+.tw-chart[hidden] { display: none; }
+.tw-danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(127, 127, 127, 0.35);
+}
+.tw-danger-zone .tw-muted { margin: 0; }
+
 .tw-root[data-theme='nord'] .tw-session-bar {
   background: #2e3440;
   color: #eceff4;
