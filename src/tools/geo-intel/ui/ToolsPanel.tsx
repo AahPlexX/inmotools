@@ -153,7 +153,7 @@ export function ToolsPanel(props: ToolsProps) {
               <CopyRow label="North-east" value={formatDD({ lat: plusDecoded.area.latitudeHi, lon: plusDecoded.area.longitudeHi })} tip="Upper-right corner of the cell" onCopy={props.onCopy} />
               <div className="gi-row"><dt>Cell size</dt><dd>{describeArea(plusDecoded.area)}</dd></div>
             </dl>
-            <div className="gi-actions"><button type="button" className="gi-btn primary" onClick={() => props.onLookup({ lat: plusDecoded.area.latitudeCenter, lon: plusDecoded.area.longitudeCenter })}>Look up this cell</button></div>
+            <div className="gi-actions"><button type="button" className="gi-btn primary" onClick={() => props.onLookup({ lat: plusDecoded.area.latitudeCenter, lon: plusDecoded.area.longitudeCenter })} data-tip="Build a full profile for the centre of this cell">Look up this cell</button></div>
           </>
         ) : null}
       </section>
@@ -173,14 +173,14 @@ export function ToolsPanel(props: ToolsProps) {
         </div>
         <div className="gi-actions">
           <button type="button" className="gi-btn" aria-pressed={props.mode === 'measure'} onClick={() => props.onMode(props.mode === 'measure' ? 'select' : 'measure')} data-tip="While on, map clicks set point A then point B instead of looking up places">{props.mode === 'measure' ? 'Measuring… (click map)' : 'Measure on map'}</button>
-          <button type="button" className="gi-btn" onClick={() => { props.onMeasure('a', null); props.onMeasure('b', null); }} disabled={!props.measure.a && !props.measure.b}>Clear points</button>
+          <button type="button" className="gi-btn" onClick={() => { props.onMeasure('a', null); props.onMeasure('b', null); }} disabled={!props.measure.a && !props.measure.b} data-tip="Forget the two points clicked on the map">Clear points</button>
         </div>
         {distance ? (
           <dl className="gi-rows" data-testid="gi-distance">
             <div className="gi-row"><dt data-tip="Shortest path over the Earth's surface">Distance</dt><dd><strong>{formatDistance(distance.km, units)}</strong></dd></div>
             <div className="gi-row"><dt data-tip="Direction to set off in, clockwise from true north">Initial bearing</dt><dd>{distance.initial.toFixed(1)}° ({compassPoint(distance.initial)})</dd></div>
             <div className="gi-row"><dt data-tip="Direction of travel on arrival">Final bearing</dt><dd>{distance.final.toFixed(1)}° ({compassPoint(distance.final)})</dd></div>
-            <div className="gi-row"><dt data-tip="Halfway point along the great circle">Midpoint</dt><dd><button type="button" className="gi-link" onClick={() => props.onLookup(distance.mid)}>{formatDD(distance.mid, 4)}</button></dd></div>
+            <div className="gi-row"><dt data-tip="Halfway point along the great circle">Midpoint</dt><dd><button type="button" className="gi-link" onClick={() => props.onLookup(distance.mid)} data-tip="Look up the halfway point">{formatDD(distance.mid, 4)}</button></dd></div>
           </dl>
         ) : <p className="gi-muted">Pick two points{props.mode === 'measure' ? ' — click the map' : ''}.</p>}
       </section>
@@ -189,7 +189,7 @@ export function ToolsPanel(props: ToolsProps) {
         <h3 id="gi-box-title" data-tip="Exact spherical area of a latitude/longitude rectangle" tabIndex={0}>Bounding box & area</h3>
         <div className="gi-actions">
           <button type="button" className="gi-btn" aria-pressed={props.mode === 'box'} onClick={() => props.onMode(props.mode === 'box' ? 'select' : 'box')} data-tip="While on, drag on the map to draw a box">{props.mode === 'box' ? 'Drawing… (drag on map)' : 'Draw on map'}</button>
-          <button type="button" className="gi-btn" onClick={() => props.onBox(null)} disabled={!props.box}>Clear box</button>
+          <button type="button" className="gi-btn" onClick={() => props.onBox(null)} disabled={!props.box} data-tip="Remove the box from the map">Clear box</button>
         </div>
         <div className="gi-grid4">
           {(['north', 'west', 'east', 'south'] as const).map((edge) => (
@@ -216,7 +216,7 @@ export function ToolsPanel(props: ToolsProps) {
               {WB_INDICATORS.map((item) => <option key={item.id} value={item.id}>{item.label.replace(' (country)', '')}</option>)}
             </select>
           </label>
-          <button type="button" className="gi-btn" aria-pressed={props.choropleth.active} disabled={props.choropleth.loading} onClick={() => props.onChoropleth(props.choropleth.indicator, !props.choropleth.active)}>{props.choropleth.loading ? 'Loading…' : props.choropleth.active ? 'Hide' : 'Show on map'}</button>
+          <button type="button" className="gi-btn" aria-pressed={props.choropleth.active} disabled={props.choropleth.loading} onClick={() => props.onChoropleth(props.choropleth.indicator, !props.choropleth.active)} data-tip="Colour every country by this indicator; one request, cached for a week">{props.choropleth.loading ? 'Loading…' : props.choropleth.active ? 'Hide' : 'Show on map'}</button>
         </div>
         {props.choropleth.error ? <p className="gi-error" role="alert">{props.choropleth.error}</p> : null}
         {props.choropleth.active && props.choropleth.legend ? (

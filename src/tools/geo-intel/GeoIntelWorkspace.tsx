@@ -6,7 +6,7 @@ import { worldBankAllCountries, WB_INDICATORS } from './adapters/statistics';
 import { nagerHolidays, solarTimes } from './adapters/environment';
 import { formatDD } from './core/coords';
 import { field, SOURCES, upsertFields } from './core/sources';
-import { EMPTY_METADATA, type BBox, type ExportMetadata, type LatLon, type LocationProfile } from './core/types';
+import { EMPTY_METADATA, type ProfileField, type BBox, type ExportMetadata, type LatLon, type LocationProfile } from './core/types';
 import { holidayFields, resolveLocation, solarFields, type ResolveInput } from './engine/synthesize';
 import { attributionLines, buildHolidayCsv, buildIcs, fileSlug, parseProfileImport, resolveMetadata, type ResolvedMetadata } from './export/formats';
 import { localDate } from './core/timezone';
@@ -16,6 +16,7 @@ import { boundaryPaths, choropleth, countryPaths, emptyScene, exportSvg, type Ar
 import { ComparePanel, COMPARE_LIMIT, HistoryPanel } from './ui/CollectionPanels';
 import { ContextMenu, type MenuItem, type MenuState } from './ui/ContextMenu';
 import { ExportDialog } from './ui/ExportDialog';
+import { displayValue } from './ui/format';
 import { copyText, getClient, useMediaQuery, useSettings, useSourceHealth } from './ui/hooks';
 import { MapCanvas, type MapCanvasHandle, type MapMode } from './ui/MapCanvas';
 import { BatchPanel, PostalCountrySelect, SourcesPanel } from './ui/OpsPanels';
@@ -112,6 +113,7 @@ export default function GeoIntelWorkspace() {
   const [exportFor, setExportFor] = useState<LocationProfile[] | null>(null);
   const [inspect, setInspect] = useState<{ key: string | null } | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [showKeys, setShowKeys] = useState(false);
 
   const announce = useCallback((message: string) => { setStatus(message); }, []);
   const refreshHistory = useCallback(() => listProfiles().then(setHistory).catch(() => undefined), []);
@@ -130,6 +132,7 @@ export default function GeoIntelWorkspace() {
       const target = event.target as HTMLElement | null;
       const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
       if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey) { event.preventDefault(); searchInput.current?.focus(); }
+      if (event.key === '?' && !typing) { event.preventDefault(); setShowKeys(true); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -292,6 +295,20 @@ export default function GeoIntelWorkspace() {
     setMenu({ x, y, title: target.label, items });
   }, [history, compare, copy, share, toggleStar, togglePin, removeFromHistory]);
 
+  const rowMenu = useCallback((item: ProfileField, x: number, y: number) => {
+    const text = displayValue(item, profile?.timezone ?? null, settings.units);
+    const source = SOURCES[item.source];
+    setMenu({
+      x, y, title: item.label,
+      items: [
+        { id: 'value', label: 'Copy value', run: () => copy(text, item.label) },
+        { id: 'raw', label: 'Copy raw value', disabled: String(item.value) === text, run: () => copy(String(item.value), item.label) },
+        { id: 'cite', label: 'Copy value with source', run: () => copy(`${item.label}: ${text}${item.unit && !text.includes(item.unit) ? ` ${item.unit}` : ''} (${source.name}${item.reference_year ? `, ${item.reference_year}` : ''}; ${item.license}; retrieved ${item.retrieved_at.slice(0, 10)})`, `${item.label} with source`) },
+        { id: 'prov', label: 'Show provenance', run: () => setInspect({ key: item.key }) },
+      ],
+    });
+  }, [copy, profile?.timezone, settings.units]);
+
   const pinMenu = useCallback((pinId: string, x: number, y: number) => {
     const target = pinId === 'current' ? profile : compare.find((item) => item.id === pinId) ?? null;
     if (target) profileMenu(target, x, y);
@@ -398,6 +415,7 @@ export default function GeoIntelWorkspace() {
           onRadius={setRadiusKm} onLookupPlace={(place) => run({ kind: 'map', lat: place.lat, lon: place.lon })} onBoundary={loadBoundary}
           onExportIcs={() => downloadHolidays('ics')} onExportHolidayCsv={() => downloadHolidays('csv')} onMenu={(x, y) => profileMenu(profile, x, y)}
           onPickAlternative={(alt) => run({ kind: 'map', lat: alt.lat, lon: alt.lon })}
+          onRowMenu={rowMenu}
           onShare={() => share(profile)} onCopySummary={() => copy(summaryText(profile), 'Summary')} onSolarDate={changeSolarDate} onHolidayYear={changeHolidayYear}
         />
       ) : (
@@ -447,13 +465,14 @@ export default function GeoIntelWorkspace() {
         <datalist id="gi-recent">{[...new Set(history.map((item) => item.profile.query))].filter((q) => !q.startsWith('Map point') && q !== 'Device location').slice(0, 12).map((q) => <option key={q} value={q} />)}</datalist>
         <button type="submit" className="gi-btn primary" disabled={!query.trim() || !!busy} data-testid="gi-search" data-tip="Look it up (Enter). Searches run only when you ask — there is no search-as-you-type.">Look up</button>
         <button type="button" className="gi-btn" onClick={() => setConsent(true)} disabled={!!busy} data-tip="Use this device's location — you will be asked first">Use my location</button>
+        <button type="button" className="gi-btn" onClick={() => setShowKeys(true)} aria-label="Keyboard shortcuts" data-tip="Keyboard shortcuts (press ?)">?</button>
         <PostalCountrySelect value={settings.defaultPostalCountry} onChange={(code) => updateSettings({ defaultPostalCountry: code })} label="Postal country" tip="Country assumed for postal codes typed without one (e.g. “10115”)" />
       </form>
 
       <div className="gi-statusbar">
         {!online ? <span className="gi-badge warn" data-tip="Bundled data and anything you looked up before still work">Offline — using cached and bundled data</span> : null}
         {busy ? <span className="gi-busy" role="status">{busy}</span> : null}
-        {error ? <p className="gi-error" role="alert">{error} <button type="button" className="gi-link" onClick={() => setError(null)}>Dismiss</button></p> : null}
+        {error ? <p className="gi-error" role="alert">{error} <button type="button" className="gi-link" onClick={() => setError(null)} data-tip="Hide this message">Dismiss</button></p> : null}
         <span className="gi-visually-hidden" role="status" aria-live="polite">{status}</span>
         {status && !busy ? <span className="gi-muted" aria-hidden="true">{status}</span> : null}
       </div>
@@ -461,7 +480,7 @@ export default function GeoIntelWorkspace() {
       <div className="gi-layout">
         <div className="gi-map-col">
           <MapCanvas ref={map} scene={scene} mode={mode} onPick={(point, metresPerPx) => run({ kind: 'map', lat: point.lat, lon: point.lon, precisionMetres: metresPerPx })} onMeasure={onMeasurePoint} onBox={(next) => { setBox(next); setMode('select'); setTab('tools'); }} onPinMenu={pinMenu} onMapMenu={mapMenu} />
-          {mode !== 'select' ? <p className="gi-mode-note" role="status">{mode === 'measure' ? 'Measure mode: click point A, then point B.' : 'Box mode: drag on the map.'} <button type="button" className="gi-link" onClick={() => setMode('select')}>Done</button></p> : null}
+          {mode !== 'select' ? <p className="gi-mode-note" role="status">{mode === 'measure' ? 'Measure mode: click point A, then point B.' : 'Box mode: drag on the map.'} <button type="button" className="gi-link" onClick={() => setMode('select')} data-tip="Back to normal map clicks (look up a place)">Done</button></p> : null}
           {scene.legend ? (
             <div className="gi-legend compact" aria-label="Map legend">
               <p><strong>{scene.legend.title}</strong></p>
@@ -524,6 +543,24 @@ export default function GeoIntelWorkspace() {
 
       {exportFor ? <ExportDialog profiles={exportFor} metadata={history.find((item) => item.id === exportFor[0].id)?.metadata ?? EMPTY_METADATA} onMetadata={onMetadata} mapSvg={mapSvg} onClose={() => setExportFor(null)} onStatus={announce} /> : null}
       {inspect && profile ? <ProvenanceDialog profile={profile} focusKey={inspect.key} onClose={() => setInspect(null)} units={units} /> : null}
+      {showKeys ? (
+        <div className="gi-dialog-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setShowKeys(false); }}>
+          <div className="gi-dialog" role="dialog" aria-modal="true" aria-labelledby="gi-keys-title" onKeyDown={(event) => { if (event.key === 'Escape') setShowKeys(false); }} data-testid="gi-keys">
+            <header className="gi-dialog-head"><h2 id="gi-keys-title">Keyboard shortcuts</h2><button type="button" className="gi-icon" aria-label="Close shortcuts" onClick={() => setShowKeys(false)} autoFocus><Icon name="close" size={20} /></button></header>
+            <dl className="gi-keys">
+              <dt><kbd>/</kbd></dt><dd>Jump to the search box</dd>
+              <dt><kbd>Enter</kbd></dt><dd>Look up what you typed</dd>
+              <dt><kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd> <kbd>End</kbd></dt><dd>Move between the Profile, Compare, Tools… tabs</dd>
+              <dt><kbd>Arrow keys</kbd></dt><dd>Pan the map (when it has focus)</dd>
+              <dt><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></dt><dd>Zoom the map in, out, or back to the whole world</dd>
+              <dt><kbd>Enter</kbd> on the map</dt><dd>Look up the point at the centre of the map</dd>
+              <dt><kbd>Shift</kbd> + <kbd>F10</kbd></dt><dd>Open the menu for the focused location or value</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Close any dialog, menu or tooltip</dd>
+              <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+            </dl>
+          </div>
+        </div>
+      ) : null}
       <ContextMenu menu={menu} onClose={() => setMenu(null)} />
       <TooltipLayer root={root} />
     </div>

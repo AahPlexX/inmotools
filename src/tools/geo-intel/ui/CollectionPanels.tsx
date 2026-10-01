@@ -9,6 +9,16 @@ import { useLongPress, useNow } from './hooks';
 
 export const COMPARE_LIMIT = 6;
 
+/** True between 09:00 and 17:00 on a Monday–Friday in `zone`. */
+export function workHours(instant: Date, zone: string): boolean {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', hourCycle: 'h23', weekday: 'short' }).formatToParts(instant);
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+    const day = parts.find((p) => p.type === 'weekday')?.value ?? '';
+    return hour >= 9 && hour < 17 && !['Sat', 'Sun'].includes(day);
+  } catch { return false; }
+}
+
 const value = (profile: LocationProfile, key: string) => profile.fields.find((item) => item.key === key)?.value ?? null;
 
 function CompareCard({ profile, index, base, units, now, onRemove, onOpen, onMenu }: { profile: LocationProfile; index: number; base: LocationProfile; units: Units; now: Date; onRemove: () => void; onOpen: () => void; onMenu: (x: number, y: number) => void }) {
@@ -18,7 +28,7 @@ function CompareCard({ profile, index, base, units, now, onRemove, onOpen, onMen
   const elevation = value(profile, 'elevation.metres');
   const rows: Array<[string, string, string]> = [
     ['Country', String(value(profile, 'country.name') ?? '—'), 'Country containing the point'],
-    ['Local time', zone ? formatTime(now.toISOString(), zone) : '—', 'Current local time there'],
+    ['Local time', zone ? `${formatTime(now.toISOString(), zone)}${workHours(now, zone) ? ' · working hours' : ''}` : '—', 'Local time there at the planner time (09:00–17:00 on a weekday counts as working hours)'],
     ['UTC offset', zone ? formatOffset(offsetMinutes(zone, now)) : '—', 'Offset right now, including daylight saving'],
     ['Time zone', zone ?? '—', 'IANA time-zone name'],
     ['Population (country)', typeof population === 'number' ? population.toLocaleString() : '—', 'World Bank total population of the country'],
@@ -40,14 +50,23 @@ function CompareCard({ profile, index, base, units, now, onRemove, onOpen, onMen
 }
 
 export function ComparePanel({ profiles, units, onRemove, onOpen, onExport, onClear, onMenu }: { profiles: LocationProfile[]; units: Units; onRemove: (id: string) => void; onOpen: (profile: LocationProfile) => void; onExport: () => void; onClear: () => void; onMenu: (profile: LocationProfile, x: number, y: number) => void }) {
-  const now = useNow(30_000);
+  const live = useNow(30_000);
+  const [shift, setShift] = useState(0);
+  const now = new Date(live.getTime() + shift * 1_800_000);
   if (!profiles.length) return <p className="gi-empty" data-testid="gi-compare">Pin up to {COMPARE_LIMIT} locations with “Compare” (or the right-click / long-press menu) to see them side by side.</p>;
   return (
     <div data-testid="gi-compare">
       <div className="gi-actions">
         <button type="button" className="gi-btn primary" onClick={onExport} data-tip="Export all compared locations together">Export comparison…</button>
-        <button type="button" className="gi-btn" onClick={onClear}>Clear all</button>
+        <button type="button" className="gi-btn" onClick={onClear} data-tip="Remove every location from the comparison">Clear all</button>
         <span className="gi-muted">{profiles.length} of {COMPARE_LIMIT}</span>
+      </div>
+      <div className="gi-planner">
+        <label className="gi-range">
+          <span>Meeting planner: <output>{shift === 0 ? 'now' : `${shift > 0 ? '+' : '−'}${Math.abs(shift / 2)} h from now`}</output></span>
+          <input type="range" min={-48} max={48} step={1} value={shift} onChange={(event) => setShift(Number(event.target.value))} aria-label="Shift the compared local times by half-hour steps" data-tip="Slide to see the local time at every compared place for a future or past moment; 09:00–17:00 is marked as working hours" data-testid="gi-planner" />
+        </label>
+        {shift !== 0 ? <button type="button" className="gi-btn small" onClick={() => setShift(0)} data-tip="Back to the current time">Now</button> : null}
       </div>
       <div className="gi-compare-grid">
         {profiles.map((profile, index) => <CompareCard key={profile.id} profile={profile} index={index} base={profiles[0]} units={units} now={now} onRemove={() => onRemove(profile.id)} onOpen={() => onOpen(profile)} onMenu={(x, y) => onMenu(profile, x, y)} />)}

@@ -199,9 +199,9 @@ function countryFields(country: CountryRecord, retrievedAt: string, match: 'insi
     field('country.languages', 'Languages', 'country', languageNames(country.languages).join(', ') || null, meta),
     field('country.drivingSide', 'Drives on the', 'country', country.drivingSide, { ...meta, source: 'wikidata', recordId: country.wikidata, note: 'Wikidata P1622 (current statement).' }),
     field('country.areaKm2', 'Area', 'country', country.areaKm2, { ...meta, unit: 'km²' }),
-    field('country.neighbours', 'Land neighbours (ISO)', 'country', country.neighbours.join(', ') || null, meta),
+    field('country.neighbours', 'Bordering countries (ISO codes)', 'country', country.neighbours.join(', ') || null, meta),
     field('country.postalFormat', 'Postal code format', 'country', country.postalFormat, { ...meta, note: '# = digit, @ = letter (GeoNames notation).' }),
-    field('population.geonames', 'Population (GeoNames country record)', 'population', country.geonamesPopulation, { ...meta, unit: 'people', note: 'GeoNames country total; GeoNames does not publish its reference year. Prefer the World Bank figure where shown.' }),
+    field('population.geonames', 'Population (GeoNames estimate)', 'population', country.geonamesPopulation, { ...meta, unit: 'people', note: 'GeoNames country total; GeoNames does not publish its reference year. Prefer the World Bank figure where shown.' }),
   ];
 }
 
@@ -214,8 +214,8 @@ function timezoneFields(zone: string, match: 'polygon' | 'nautical', instant: Da
     field('tz.name', 'IANA time zone', 'timezone', zone, { ...meta, note: match === 'nautical' ? 'No zone polygon covers this point; nautical zone from longitude.' : 'Point-in-polygon on bundled timezone-boundary-builder 2026d (simplified; 99.93% agreement on land).' }),
     field('tz.abbreviation', 'Abbreviation', 'timezone', abbreviation(zone, instant) || null, computed),
     field('tz.offset', 'Current UTC offset', 'timezone', formatOffset(offset), computed),
-    field('tz.dst', 'Daylight saving time now', 'timezone', observesDst(zone, instant.getUTCFullYear()) ? isDst(zone, instant) : false, computed),
-    field('tz.observesDst', 'Observes DST this year', 'timezone', observesDst(zone, instant.getUTCFullYear()), computed),
+    field('tz.dst', 'Daylight saving in effect', 'timezone', observesDst(zone, instant.getUTCFullYear()) ? isDst(zone, instant) : false, computed),
+    field('tz.observesDst', 'Uses daylight saving this year', 'timezone', observesDst(zone, instant.getUTCFullYear()), computed),
     field('tz.nextTransition', 'Next offset change', 'timezone', transition ? `${transition.at.toISOString()} (${formatOffset(transition.fromMinutes)} → ${formatOffset(transition.toMinutes)})` : null, computed),
   ];
 }
@@ -316,6 +316,7 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
   else warnings.push('No country at this point (open ocean or Antarctica outside the bundled boundaries).');
   fields = upsertFields(fields, timezoneFields(zone, tzHit.match, now));
   if (wb) fields = upsertFields(fields, wb);
+  if (wb?.some((item) => item.key === 'wb.SP.POP.TOTL')) fields = fields.filter((item) => item.key !== 'population.geonames');
   if (eu) fields = upsertFields(fields, eu);
 
   const state = fields.find((item) => item.key === 'admin.state');
@@ -335,7 +336,7 @@ export async function resolveLocation(input: ResolveInput, options: ResolveOptio
   else if (countryCode) warnings.push(`Nager.Date publishes no holiday calendar for ${countryCode}.`);
 
   const place = nearest[0];
-  if (place) fields = upsertFields(fields, [field('population.nearestPlace', 'Nearest populated place (bundled)', 'population', `${place.name} · ${place.distanceKm.toFixed(1)} km · pop. ≈${place.popMax.toLocaleString('en-US')}`, { source: 'natural-earth', geography: 'populated_place', confidence: 'locality_centroid', retrievedAt, unit: null, note: 'Natural Earth pop_max is an urban-agglomeration estimate for the named place, not the population of this point or postal code.' })]);
+  if (place) fields = upsertFields(fields, [field('population.nearestPlace', 'Nearest town or city', 'population', `${place.name} · ${place.distanceKm.toFixed(1)} km · pop. ≈${place.popMax.toLocaleString('en-US')}`, { source: 'natural-earth', geography: 'populated_place', confidence: 'locality_centroid', retrievedAt, unit: null, note: 'Natural Earth pop_max is an urban-agglomeration estimate for the named place, not the population of this point or postal code.' })]);
 
   if (anchor.kind === 'postal') warnings.push('Population is not reported for postal codes: postal areas are delivery routes, not census geographies. Figures shown belong to the named country, NUTS region, or populated place.');
 
