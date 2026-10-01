@@ -15,7 +15,7 @@ import {
   type ChapterNode,
   type DiagnosticLevel,
   type DocumentMetadata,
-  DocumentPageGeometry,
+  type DocumentPageGeometry,
   type DocumentModel,
   type IngestDiagnostic,
   type ParagraphKind,
@@ -151,7 +151,7 @@ export const normalizeParagraphText = (value: string): string =>
   value
     .replace(/\r\n?/g, '\n')
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/[\u200b\ufeff]/g, '')
     .replace(/[ \t\f\v]+/g, ' ')
     .replace(/\s*\n\s*/g, ' ')
     .trim();
@@ -184,13 +184,26 @@ export const buildDocumentModel = (input: BuildModelInput): DocumentModel => {
 
   const includeNotes = input.includeNotes ?? false;
   const paragraphs: RawParagraph[] = [];
-  for (const paragraph of input.paragraphs) {
+  const paragraphIndexMap = new Map<number, number>();
+  for (const [originalIndex, paragraph] of input.paragraphs.entries()) {
     if (input.proseOnly && (paragraph.kind === 'code' || paragraph.kind === 'table')) continue;
     if (!includeNotes && (paragraph.kind === 'footnote' || paragraph.kind === 'endnote')) continue;
     const text = normalizeParagraphText(paragraph.text);
     if (text.length === 0) continue;
+    paragraphIndexMap.set(originalIndex, paragraphs.length);
     paragraphs.push({ ...paragraph, text });
   }
+
+  const sourceChapters = [...(input.chapters ?? [])].sort((left, right) => left.paragraphIndex - right.paragraphIndex);
+  const originalIndices = [...paragraphIndexMap.keys()];
+  const remappedChapters: RawChapter[] = [];
+  sourceChapters.forEach((chapter, index) => {
+    const nextStart = sourceChapters[index + 1]?.paragraphIndex ?? input.paragraphs.length;
+    const retainedIndex = originalIndices.find((originalIndex) =>
+      originalIndex >= chapter.paragraphIndex && originalIndex < nextStart);
+    if (retainedIndex === undefined) return;
+    remappedChapters.push({ ...chapter, paragraphIndex: paragraphIndexMap.get(retainedIndex)! });
+  });
 
   const tokenLimit = input.tokenLimit ?? 400_000;
   const pieces: string[] = [];
@@ -269,7 +282,7 @@ export const buildDocumentModel = (input: BuildModelInput): DocumentModel => {
         sentences.push({
           index: sentenceIndex,
           text: span.text,
-          start,
+          start: start + span.start,
           end: start + span.end,
           tokenStart: sentenceTokenStart,
           tokenEnd: tokens.length,
@@ -324,7 +337,7 @@ export const buildDocumentModel = (input: BuildModelInput): DocumentModel => {
     pushDiagnostic('error', 'no-text', 'No readable text was extracted from this document.');
   }
 
-  const chapters = buildChapters(input, paragraphModel, pushDiagnostic);
+  const chapters = buildChapters({ ...input, chapters: remappedChapters }, paragraphModel, pushDiagnostic);
   // Chapter-final tokens pause slightly longer than paragraph-final tokens.
   for (const chapter of chapters) {
     const lastParagraph = paragraphModel.find((paragraph) => paragraph.index === chapter.paragraphEnd);
@@ -403,7 +416,7 @@ const buildChapters = (
     const endParagraph = next ? next.paragraphIndex - 1 : paragraphs[paragraphs.length - 1]!.index;
     const included = paragraphs.filter((paragraph) => paragraph.index >= startParagraph && paragraph.index <= endParagraph);
     if (included.length === 0) return;
-    const wordCount = included.reduce((total, paragraph) => total + paragraph.wordCount, 0);
+    const wordCount = included.reduce((total, paragraph) => paragraph.wordCount + total, 0);
     const first = included[0]!;
     const last = included[included.length - 1]!;
     chapters.push({
