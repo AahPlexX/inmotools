@@ -14,6 +14,22 @@ The glTF / GLB optimizer (`#/tools/gltf-optimizer`) now rejects malformed contai
 - Known limits: converted WebP output requires viewers and engines that implement `EXT_texture_webp`; conversions the browser cannot encode are skipped and reported; very large models are bounded by browser memory. Follow-up recorded in `BACKLOG.md`: evaluate the open `@gltf-transform` 4.5.0 dependency updates.
 - Scope: `src/tools/gltf/`, `tests/unit/gltf*.test.ts`, `tests/e2e/gltf.spec.ts`, `tests/fixtures/gltf-binary.ts`, the glTF catalog entry, one added case in `tests/unit/e2e-spec-selection.test.mjs`, and status notes in the 2026-08-29 Tool 13 design and Task 9 plan. Other workstreams and branches are preserved.
 
+## Typing Workstation UX/UI elevation (TASK-026) — shipped and verified
+
+A real-browser audit (`docs/typing-ux-audit-2026-09-30.md`) found 14 UX defects in the shipped Typing
+Workstation, led by a rendering decision that stretched the workspace to ~21,000 px and clipped it; a
+15th (dark-theme text contrast of 1.0-3.1:1) was found during verification. All 15 are fixed, and the
+audit carries a Resolution table naming the test that guards each. Delivered via PR #97 (plan:
+`docs/superpowers/plans/2026-09-30-typing-ux-elevation.md`).
+
+- Layout: spaces render as real spaces and `.tw-root` uses a `minmax(0, 1fr)` track (page ~21,000 px to ~2,900 px); keyboard heatmap flexes inside a container query; the history table scrolls in its own focusable region.
+- Test first: opt-in `workspaceFirst` flag (catalog + `ToolLayout` + scoped `src/styles.css`) puts the workspace before the guide; on phones the session bar, passage and one-row metrics precede the settings.
+- Passage: bounded 3-line window (`src/tools/typing/typing-window.ts`, 8 unit tests) that follows the typist, plus an idle "Click here and start typing" cue.
+- Result dialog: focuses the panel, not a field (trailing keystrokes were being typed into "Typist name"); tabular stats, paired fields, exports grouped apart from Discard / Save.
+- Polish: one primary action, row-based settings, history/analytics empty states, reset in its own zone, plain-language stat hints, inline styles and hard-coded greys replaced by theme-aware classes, all ten themes at WCAG AA contrast.
+- Not changed: metrics engine, corpora, storage schema, export formats, shortcuts. Deliberately not done: collapsing the thirteen sections into tabs; real screen-reader (NVDA/VoiceOver) testing.
+- Verification: `tsc`, `pnpm build`, and `tests/e2e/typing.spec.ts` on desktop and mobile Chromium (run `--workers=1` on this host), with new geometry, first-viewport, windowing, dialog-focus, empty-state, cue/primary/settings and per-theme Axe tests.
+
 ## Geo Intelligence Hub (TASK-025) — shipped and audited
 
 Added `geo-intelligence-hub` as a new catalog entry: a keyless, provenance-tracked location
