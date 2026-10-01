@@ -442,3 +442,8 @@ Method: static scan of `src/tools/geo-intel/**` (typing escapes, TODO/console le
 - `tests/unit/geo-intel-audit2.test.ts` (7 tests): Fiji-style straddling polygon inside/outside, seam path splitting, scale-bar choices, sun-curve peak vs the SunriseSunset.io fixture altitude (50.76°), working-hours detection, label copy.
 - `tests/e2e/geo-intel.spec.ts` +2 tests: profile filter, row menu items, sun chart, shortcuts dialog, scale bar; meeting planner.
 - `tsc` exit 0; `pnpm test:unit` 271 files / 3,096 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app specs 125 passed / 11 skipped / 0 failed.
+
+## Delivery 17 — 2026-10-01 (after the repository cleanup)
+- Verified the cleanup kept this tool intact: Production audit 2 (`fa27aad0`) is an ancestor of `origin/main` @ `b878e995`; catalog entry, loader, `.tasks` records (TASK-025, between glTF 024 and Typing 026) all present; `nextId` 27.
+- Adopted the new optional `workspaceFirst` catalog flag (added in PR #97 / `ToolLayout`): the short title, then the workspace, then the "How to use" guide. Before, the map started below one full screen of intro at every width. Wiring test now asserts the flag.
+- Evidence on `b878e995` + this change: `tsc` exit 0; `pnpm test:unit` 273 files / 3,105 tests passed (2 / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app specs 125 passed / 11 skipped / 0 failed (after reinstalling the Playwright 1.63 browser, which the environment reset had removed); screenshots at 375 and 1440 px show the search box and map in the first viewport.
