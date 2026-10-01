@@ -145,6 +145,7 @@
     "@types/three": "0.185.4",
     "@types/turndown": "5.0.6",
     "@vitejs/plugin-react": "6.1.1",
+    "fast-check": "4.10.0",
     "fake-indexeddb": "6.2.5",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
