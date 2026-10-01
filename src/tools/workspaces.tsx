@@ -38,6 +38,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
+  'geo-intelligence-hub': () => import('./geo-intel/GeoIntelWorkspace'),
   'tactical-matchboard-studio': () => import('./tactics/TacticalMatchboardWorkspace'),
 };
 
