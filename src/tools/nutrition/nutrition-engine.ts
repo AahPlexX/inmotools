@@ -4,6 +4,8 @@ export type GoalType = 'maintenance' | 'mild_deficit' | 'moderate_deficit' | 'mi
 export type SplitPreference = 'balanced' | 'high_protein' | 'low_carb' | 'custom';
 export type MacronutrientKey = 'protein' | 'fat' | 'carbohydrate';
 export type BmrEquation = 'mifflin_st_jeor' | 'revised_harris_benedict' | 'katch_mcardle';
+export type GoalMode = 'tier' | 'timeline' | 'fixed_target';
+export type MacroMode = 'percent' | 'protein_anchor';
 
 export interface MacronutrientSplit {
   readonly protein: number;
@@ -22,6 +24,14 @@ export interface EnergyPlanInput {
   readonly macronutrientSplitPreference?: SplitPreference;
   readonly customSplit?: MacronutrientSplit;
   readonly primaryEquation?: BmrEquation;
+  readonly mealsPerDay?: number;
+  readonly goalMode?: GoalMode;
+  readonly targetWeightKg?: number;
+  readonly timelineWeeks?: number;
+  readonly fixedTargetKcal?: number;
+  readonly macroMode?: MacroMode;
+  readonly proteinGramsPerKgTarget?: number;
+  readonly fatPercent?: number;
 }
 
 export interface NormalizedEnergyPlanInput {
@@ -36,6 +46,14 @@ export interface NormalizedEnergyPlanInput {
   readonly customSplit?: MacronutrientSplit;
   readonly primaryEquation: BmrEquation;
   readonly canonicalUnits: 'kg-cm-years';
+  readonly mealsPerDay: number;
+  readonly goalMode: GoalMode;
+  readonly macroMode: MacroMode;
+  readonly targetWeightKg?: number;
+  readonly timelineWeeks?: number;
+  readonly fixedTargetKcal?: number;
+  readonly proteinGramsPerKgTarget?: number;
+  readonly fatPercent?: number;
 }
 
 /** Atwater general factors, in kilocalories per gram. */
@@ -77,6 +95,14 @@ export const SPLIT_PRESETS: Readonly<Record<Exclude<SplitPreference, 'custom'>, 
 export const PROTEIN_ADEQUACY_G_PER_KG = 0.8;
 export const PLANNING_FLOOR_KCAL: Readonly<Record<BiologicalSex, number>> = { female: 1200, male: 1500 };
 export const KCAL_PER_KG_BODY_MASS = 7700;
+/** Institute of Medicine adequate-intake basis: 14 g fiber per 1,000 kcal. */
+export const FIBER_G_PER_1000_KCAL = 14;
+/** Thermochemical kilocalorie to kilojoule factor. */
+export const KJ_PER_KCAL = 4.184;
+/** EFSA 2010 total-water adequate intakes, food plus drinks, millilitres per day. */
+export const WATER_AI_ML: Readonly<Record<BiologicalSex, number>> = { female: 2000, male: 2500 };
+export const GOAL_MODES: readonly GoalMode[] = ['tier', 'timeline', 'fixed_target'];
+export const MACRO_MODES: readonly MacroMode[] = ['percent', 'protein_anchor'];
 
 /** The original Mifflin-St Jeor derivation sample was 19–78 years old. */
 export const MIFFLIN_DERIVATION_AGE_RANGE = [19, 78] as const;
@@ -114,10 +140,10 @@ export interface MacronutrientTarget {
   readonly distributionRange: readonly [number, number];
 }
 
-export type AdvisoryScope = 'energy_target' | 'macronutrient_distribution' | 'protein_adequacy';
+export type AdvisoryScope = 'energy_target' | 'macronutrient_distribution' | 'protein_adequacy' | 'rate_of_change';
 
 export interface Advisory {
-  readonly code: 'below_basal_rate' | 'below_planning_floor' | 'outside_distribution_range' | 'below_protein_adequacy';
+  readonly code: 'below_basal_rate' | 'below_planning_floor' | 'outside_distribution_range' | 'below_protein_adequacy' | 'aggressive_weekly_change' | 'protein_anchor_exceeds_target';
   readonly severity: 'info' | 'caution';
   readonly scope: AdvisoryScope;
   readonly message: string;
@@ -138,6 +164,16 @@ export interface EnergyPlan {
   readonly proteinGramsPerKg: number;
   readonly reconciledKcal: number;
   readonly estimatedWeeklyMassChangeKg: number;
+  readonly weeklyMassChangePercent: number;
+  readonly mealsPerDay: number;
+  readonly perMealKcal: number;
+  readonly fiberGrams: number;
+  readonly waterAiMl: number;
+  readonly bmi: number;
+  readonly bmiCategory: 'underweight' | 'normal' | 'overweight' | 'obese';
+  readonly goalMode: GoalMode;
+  readonly macroMode: MacroMode;
+  readonly workedEquation: string;
   readonly advisories: readonly Advisory[];
 }
 
@@ -248,6 +284,41 @@ export const validateEnergyPlanInput = (input: EnergyPlanInput): readonly InputI
     }
   }
 
+  const mealsPerDay = input.mealsPerDay ?? 1;
+  if (!Number.isInteger(mealsPerDay) || mealsPerDay < 1 || mealsPerDay > 12) {
+    issues.push({ field: 'mealsPerDay', message: 'Meals per day must be a whole number from 1 to 12.' });
+  }
+
+  const goalMode = input.goalMode ?? 'tier';
+  if (!GOAL_MODES.includes(goalMode)) {
+    issues.push({ field: 'goalMode', message: 'Goal mode must be tier, timeline, or fixed_target.' });
+  } else if (goalMode === 'timeline') {
+    if (!isPositiveFinite(input.targetWeightKg) || (input.targetWeightKg ?? 0) > MAX_WEIGHT_KG) {
+      issues.push({ field: 'targetWeightKg', message: `Target body mass must be a positive number up to ${MAX_WEIGHT_KG} kg.` });
+    }
+    if (!Number.isInteger(input.timelineWeeks) || (input.timelineWeeks ?? 0) < 1 || (input.timelineWeeks ?? 0) > 104) {
+      issues.push({ field: 'timelineWeeks', message: 'Timeline must be a whole number of weeks from 1 to 104.' });
+    }
+  } else if (goalMode === 'fixed_target') {
+    if (!isPositiveFinite(input.fixedTargetKcal) || (input.fixedTargetKcal ?? 0) > 20000) {
+      issues.push({ field: 'fixedTargetKcal', message: 'A fixed target must be a positive number up to 20,000 kcal.' });
+    }
+  }
+
+  const macroMode = input.macroMode ?? 'percent';
+  if (!MACRO_MODES.includes(macroMode)) {
+    issues.push({ field: 'macroMode', message: 'Macro mode must be percent or protein_anchor.' });
+  } else if (macroMode === 'protein_anchor') {
+    const proteinTarget = input.proteinGramsPerKgTarget;
+    if (typeof proteinTarget !== 'number' || !Number.isFinite(proteinTarget) || proteinTarget < 0.4 || proteinTarget > 4) {
+      issues.push({ field: 'proteinGramsPerKgTarget', message: 'Protein anchor must be between 0.4 and 4 grams per kilogram.' });
+    }
+    const fatPercent = input.fatPercent;
+    if (typeof fatPercent !== 'number' || !Number.isFinite(fatPercent) || fatPercent < 10 || fatPercent > 70) {
+      issues.push({ field: 'fatPercent', message: 'Fat share in protein-anchor mode must be between 10 and 70 percent of energy.' });
+    }
+  }
+
   // Positive form fields are not enough: extreme combinations can make a displayed
   // resting-energy equation non-positive. Never return a calorie plan from that state.
   if (!hasBaseMeasurementIssue(issues)) {
@@ -292,6 +363,9 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
   const goalType = input.goalType ?? 'maintenance';
   const splitPreference = input.macronutrientSplitPreference ?? 'balanced';
   const primaryEquation = input.primaryEquation ?? 'mifflin_st_jeor';
+  const goalMode = input.goalMode ?? 'tier';
+  const macroMode = input.macroMode ?? 'percent';
+  const mealsPerDay = input.mealsPerDay ?? 1;
 
   const mifflin = mifflinStJeorBmr(weightKg, heightCm, ageYears, biologicalSex);
   const harrisBenedict = revisedHarrisBenedictBmr(weightKg, heightCm, ageYears, biologicalSex);
@@ -302,14 +376,40 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
   const activityMultiplier = ACTIVITY_MULTIPLIERS[activityLevel];
   const tdeeKcal = primaryKcal * activityMultiplier;
   const goalDelta = GOAL_ENERGY_DELTA[goalType];
-  const targetKcal = tdeeKcal * (1 + goalDelta);
+  const timelineWeeklyKg = goalMode === 'timeline' && input.targetWeightKg !== undefined && input.timelineWeeks
+    ? (input.targetWeightKg - weightKg) / input.timelineWeeks
+    : undefined;
+  const targetKcal = goalMode === 'fixed_target' && input.fixedTargetKcal !== undefined
+    ? input.fixedTargetKcal
+    : goalMode === 'timeline' && timelineWeeklyKg !== undefined
+      ? tdeeKcal + (timelineWeeklyKg * KCAL_PER_KG_BODY_MASS) / 7
+      : tdeeKcal * (1 + goalDelta);
   if (![primaryKcal, tdeeKcal, targetKcal].every(isPositiveFinite)) {
     throw new Error('Calculated energy must remain positive and finite. No plan was produced.');
   }
 
-  const split = resolveSplit(splitPreference, input.customSplit);
+  const percentSplit = resolveSplit(splitPreference, input.customSplit);
+  const proteinAnchorGrams = macroMode === 'protein_anchor'
+    ? weightKg * (input.proteinGramsPerKgTarget ?? PROTEIN_ADEQUACY_G_PER_KG)
+    : undefined;
+  const anchoredFatPercent = macroMode === 'protein_anchor' ? input.fatPercent ?? 30 : undefined;
+  const split: MacronutrientSplit = proteinAnchorGrams === undefined || anchoredFatPercent === undefined
+    ? percentSplit
+    : {
+      protein: (proteinAnchorGrams * ENERGY_DENSITY_KCAL_PER_GRAM.protein / targetKcal) * 100,
+      fat: anchoredFatPercent,
+      carbohydrate: 100 - ((proteinAnchorGrams * ENERGY_DENSITY_KCAL_PER_GRAM.protein / targetKcal) * 100) - anchoredFatPercent,
+    };
+  const anchorExceedsTarget = split.carbohydrate < -0.05;
+  const safeSplit: MacronutrientSplit = anchorExceedsTarget
+    ? {
+      protein: Math.min(100, split.protein),
+      fat: Math.max(0, 100 - Math.min(100, split.protein)),
+      carbohydrate: 0,
+    }
+    : split;
   const macronutrients: MacronutrientTarget[] = (['protein', 'fat', 'carbohydrate'] as MacronutrientKey[]).map((key) => {
-    const percentOfEnergy = split[key];
+    const percentOfEnergy = Math.max(0, safeSplit[key]);
     const kcal = targetKcal * (percentOfEnergy / 100);
     const range = DISTRIBUTION_RANGE[key];
     return {
@@ -355,6 +455,22 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
       message: `Protein at ${proteinGramsPerKg} g/kg is below the ${PROTEIN_ADEQUACY_G_PER_KG} g/kg adequacy reference.`,
     });
   }
+  const weeklyMassChangeKg = goalMode === 'timeline' && timelineWeeklyKg !== undefined
+    ? timelineWeeklyKg
+    : ((targetKcal - tdeeKcal) * 7) / KCAL_PER_KG_BODY_MASS;
+  const weeklyMassChangePercent = (weeklyMassChangeKg / weightKg) * 100;
+  if (anchorExceedsTarget) {
+    advisories.push({
+      code: 'protein_anchor_exceeds_target', severity: 'caution', scope: 'macronutrient_distribution',
+      message: 'Protein grams plus the fat share exceed the energy target, so carbohydrate was held at 0 and fat was reduced to make the split fit.',
+    });
+  }
+  if (Math.abs(weeklyMassChangePercent) > 1) {
+    advisories.push({
+      code: 'aggressive_weekly_change', severity: 'caution', scope: 'rate_of_change',
+      message: `Estimated change of ${round(weeklyMassChangeKg, 2)} kg/week is ${round(Math.abs(weeklyMassChangePercent), 2)}% of body mass. Above 1% per week is an aggressive planning rate, not a target to chase.`,
+    });
+  }
 
   const normalizedInput: NormalizedEnergyPlanInput = {
     weightKg: round(weightKg, 4),
@@ -368,6 +484,18 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
     ...(splitPreference === 'custom' ? { customSplit: { ...split } } : {}),
     primaryEquation,
     canonicalUnits: 'kg-cm-years',
+    mealsPerDay,
+    goalMode,
+    macroMode,
+    ...(goalMode === 'timeline' && input.targetWeightKg !== undefined && input.timelineWeeks !== undefined
+      ? { targetWeightKg: round(input.targetWeightKg, 4), timelineWeeks: input.timelineWeeks }
+      : {}),
+    ...(goalMode === 'fixed_target' && input.fixedTargetKcal !== undefined
+      ? { fixedTargetKcal: round(input.fixedTargetKcal, 1) }
+      : {}),
+    ...(macroMode === 'protein_anchor' && input.proteinGramsPerKgTarget !== undefined && input.fatPercent !== undefined
+      ? { proteinGramsPerKgTarget: round(input.proteinGramsPerKgTarget, 2), fatPercent: round(input.fatPercent, 1) }
+      : {}),
   };
 
   const assumptions = [
@@ -377,6 +505,9 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
     `Goal adjustment: ${round(goalDelta * 100, 1)}% of estimated expenditure.`,
     'Macronutrient energy uses general Atwater factors: protein 4 kcal/g, carbohydrate 4 kcal/g, fat 9 kcal/g.',
     'Weekly mass-change output uses a 7,700 kcal/kg planning heuristic and is not a physiological prediction.',
+    'Fiber uses the Institute of Medicine basis of 14 g per 1,000 kcal of the planned target.',
+    `Total water adequate intake is the EFSA reference of ${WATER_AI_ML[biologicalSex]} ml/day for the ${biologicalSex} formula, from food and drinks together.`,
+    'Body mass index is a screening index from mass and stature. It is not a body-composition measure.',
   ];
 
   return {
@@ -400,13 +531,50 @@ export const calculateEnergyPlan = (input: EnergyPlanInput): EnergyPlan => {
     macronutrients,
     proteinGramsPerKg,
     reconciledKcal: round(reconciledKcal),
-    estimatedWeeklyMassChangeKg: round(((targetKcal - tdeeKcal) * 7) / KCAL_PER_KG_BODY_MASS, 2),
+    estimatedWeeklyMassChangeKg: round(weeklyMassChangeKg, 2),
+    weeklyMassChangePercent: round(weeklyMassChangePercent, 2),
+    mealsPerDay,
+    perMealKcal: round(targetKcal / mealsPerDay),
+    fiberGrams: round(targetKcal * FIBER_G_PER_1000_KCAL / 1000, 1),
+    waterAiMl: WATER_AI_ML[biologicalSex],
+    bmi: round(weightKg / ((heightCm / 100) ** 2), 1),
+    bmiCategory: bmiCategory(weightKg / ((heightCm / 100) ** 2)),
+    goalMode,
+    macroMode,
+    workedEquation: workedEquation(primaryEquation, weightKg, heightCm, ageYears, biologicalSex, leanMass),
     advisories,
   };
 };
 
+const bmiCategory = (bmi: number): EnergyPlan['bmiCategory'] => {
+  if (bmi < 18.5) return 'underweight';
+  if (bmi < 25) return 'normal';
+  if (bmi < 30) return 'overweight';
+  return 'obese';
+};
+
+export const workedEquation = (
+  equation: BmrEquation,
+  weightKg: number,
+  heightCm: number,
+  ageYears: number,
+  biologicalSex: BiologicalSex,
+  leanMassKg?: number,
+): string => {
+  if (equation === 'mifflin_st_jeor') {
+    const sex = biologicalSex === 'male' ? 5 : -161;
+    return `Mifflin-St Jeor: 10×${round(weightKg, 2)} + 6.25×${round(heightCm, 2)} − 5×${ageYears} ${sex >= 0 ? '+' : '−'} ${Math.abs(sex)}`;
+  }
+  if (equation === 'revised_harris_benedict') {
+    return biologicalSex === 'male'
+      ? `Revised Harris-Benedict: 88.362 + 13.397×${round(weightKg, 2)} + 4.799×${round(heightCm, 2)} − 5.677×${ageYears}`
+      : `Revised Harris-Benedict: 447.593 + 9.247×${round(weightKg, 2)} + 3.098×${round(heightCm, 2)} − 4.330×${ageYears}`;
+  }
+  return `Katch-McArdle: 370 + 21.6×${round(leanMassKg ?? 0, 1)} kg lean mass`;
+};
+
 export const compareGoals = (input: EnergyPlanInput): readonly EnergyPlan[] =>
-  GOAL_TYPES.map((goalType) => calculateEnergyPlan({ ...input, goalType }));
+  GOAL_TYPES.map((goalType) => calculateEnergyPlan({ ...input, goalType, goalMode: 'tier' }));
 
 export const KG_PER_POUND = 0.45359237;
 export const CM_PER_INCH = 2.54;
@@ -439,8 +607,16 @@ export const planToMarkdown = (plan: EnergyPlan): string => {
     `- Primary equation: ${plan.bmr.primaryEquation}`,
     `- Activity: ${formatActivityLabel(plan.activityLevel)} (×${plan.activityMultiplier})`,
     ...(plan.input.bodyFatPercentage === undefined ? [] : [`- Body fat: ${plan.input.bodyFatPercentage}%`]),
+    `- Goal mode: ${plan.goalMode}`,
     `- Goal: ${formatGoalLabel(plan.goalType)} (${plan.goalDeltaPercent > 0 ? '+' : ''}${plan.goalDeltaPercent}%)`,
+    `- Macro mode: ${plan.macroMode}`,
     `- Macronutrient split: ${plan.splitPreference}`,
+    `- Meals per day: ${plan.mealsPerDay}`,
+    `- Per meal: ${plan.perMealKcal} kcal`,
+    `- Body mass index: ${plan.bmi} (${plan.bmiCategory})`,
+    `- Fiber planning target: ${plan.fiberGrams} g`,
+    `- Total water adequate intake: ${plan.waterAiMl} ml`,
+    `- Worked equation: ${plan.workedEquation}`,
     '- Canonical calculation units: kilograms, centimetres, years', '',
     '## Energy estimates',
     `- Basal/resting energy (${plan.bmr.primaryEquation}): ${plan.bmr.primaryKcal} kcal/day`,
@@ -479,7 +655,15 @@ export const planToCsv = (plan: EnergyPlan): string => {
     ['primary_equation', plan.bmr.primaryEquation, ''],
     ['input_activity_level', plan.activityLevel, ''],
     ['activity_multiplier', plan.activityMultiplier, ''],
+    ['input_goal_mode', plan.goalMode, ''],
     ['input_goal', plan.goalType, ''],
+    ['input_macro_mode', plan.macroMode, ''],
+    ['meals_per_day', plan.mealsPerDay, 'count'],
+    ['per_meal_kcal', plan.perMealKcal, 'kcal'],
+    ['body_mass_index', plan.bmi, 'kg/m2'],
+    ['bmi_category', plan.bmiCategory, ''],
+    ['fiber_planning_target', plan.fiberGrams, 'g/day'],
+    ['water_adequate_intake', plan.waterAiMl, 'ml/day'],
     ['goal_adjustment', plan.goalDeltaPercent, '%'],
     ['input_macro_split', plan.splitPreference, ''],
     ...(plan.input.bodyFatPercentage === undefined ? [] : [['input_body_fat', plan.input.bodyFatPercentage, '%'] as [string, string | number, string]]),

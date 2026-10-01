@@ -234,3 +234,37 @@ describe('exports', () => {
     }
   });
 });
+
+describe('2026-10-01 planner audit', () => {
+  it('solves a timeline target from the 7700 kcal/kg heuristic', () => {
+    const plan = calculateEnergyPlan({ ...base, goalMode: 'timeline', targetWeightKg: 76, timelineWeeks: 10 });
+    const tdee = 1780 * ACTIVITY_MULTIPLIERS.moderately_active;
+    const weekly = (76 - 80) / 10;
+    expect(plan.goalMode).toBe('timeline');
+    expect(plan.targetKcal).toBe(Math.round(tdee + (weekly * 7700) / 7));
+    expect(plan.estimatedWeeklyMassChangeKg).toBeCloseTo(weekly, 2);
+    expect(planToMarkdown(plan)).toContain('Meals per day: 1');
+    expect(planToCsv(plan)).toContain('input_goal_mode,timeline');
+  });
+
+  it('keeps the goal comparison on percent tiers even when the active plan is a timeline', () => {
+    const plans = compareGoals({ ...base, goalMode: 'timeline', targetWeightKg: 70, timelineWeeks: 8 });
+    expect(plans.every((plan) => plan.goalMode === 'tier')).toBe(true);
+  });
+
+  it('anchors protein in grams per kilogram and leaves carbohydrate the remainder', () => {
+    const plan = calculateEnergyPlan({ ...base, macroMode: 'protein_anchor', proteinGramsPerKgTarget: 1.6, fatPercent: 25 });
+    const protein = plan.macronutrients.find((macro) => macro.key === 'protein');
+    expect(protein?.grams).toBe(Math.round(80 * 1.6));
+    expect(plan.macroMode).toBe('protein_anchor');
+    expect(plan.fiberGrams).toBeCloseTo(plan.targetKcal * 14 / 1000, 1);
+    expect(plan.bmi).toBeCloseTo(80 / (1.8 ** 2), 1);
+    expect(plan.waterAiMl).toBe(2500);
+    expect(plan.workedEquation).toContain('10×80');
+  });
+
+  it('flags a weekly change above 1 percent of body mass', () => {
+    const plan = calculateEnergyPlan({ ...base, goalMode: 'timeline', targetWeightKg: 70, timelineWeeks: 4 });
+    expect(plan.advisories.some((advisory) => advisory.code === 'aggressive_weekly_change')).toBe(true);
+  });
+});
