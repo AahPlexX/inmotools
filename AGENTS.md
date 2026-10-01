@@ -2,6 +2,14 @@
 
 Instructions for any coding agent or person working in this repository. Binding rules are in [GOVERNANCE.md](GOVERNANCE.md); this file only tells you where things are.
 
+## Platform rules (never change)
+
+- No user accounts or authentication.
+- No server, backend or server-side database; the site is static files on GitHub Pages.
+- Everything runs in the user's browser; tool data stays in that browser (IndexedDB, localStorage).
+
+Details: [docs/DOCUMENTATION_STANDARD.md](docs/DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec).
+
 ## Find a tool's documents
 
 1. Look the tool up in [docs/TOOL_INDEX.md](docs/TOOL_INDEX.md) by its catalog slug (`slug` in `src/catalog.ts`): `grep "<slug>" docs/TOOL_INDEX.md`.
@@ -10,6 +18,10 @@ Instructions for any coding agent or person working in this repository. Binding 
 4. Check its task state in [.tasks/](.tasks/).
 
 Every standard document starts with a header block, so `grep -rl "^tool: <slug>$" docs src .tasks` lists everything for one tool. The format, statuses and writing rules are in [docs/DOCUMENTATION_STANDARD.md](docs/DOCUMENTATION_STANDARD.md).
+
+## Adding a tool or a feature
+
+Turn the request into ID'd requirements in a spec before writing code, work on a `feature/<slug>` branch in its own worktree, and merge back into `origin/main` once verified. Steps: [docs/DOCUMENTATION_STANDARD.md](docs/DOCUMENTATION_STANDARD.md#adding-a-new-tool).
 
 ## Before you stop
 
