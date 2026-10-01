@@ -398,3 +398,9 @@ All conditions satisfied: PR #89 open into `main`, CI green on the exact head co
 ### Evidence
 - `tsc` exit 0; `pnpm test:unit` 269 files / 3,058 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0.
 - `geo-intel.spec.ts` + `accessibility.spec.ts` + `app.spec.ts`: 122 passed / 10 skipped / 0 failed.
+
+## Delivery 16 — 2026-09-30 (third re-sync)
+- Merged `origin/main` @ `61a9ed5` (glTF optimizer, #94); no conflicts.
+- Task-ID collision found: glTF claimed TASK-024 in `.tasks/config.json`; this tool's `.tasks` entries renumbered to **TASK-025** and `nextId` bumped to 26.
+- Evidence on the merged tree: `tsc` exit 0; `pnpm test:unit` 270 files / 3,090 tests passed (2 / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + gltf + accessibility + app specs 142 passed / 10 skipped / 0 failed.
+- Next: CI on the pushed head, merge PR #89, verify `main` CI and Pages deploy.

@@ -1,6 +1,6 @@
 # Done
 
-## Geo Intelligence Hub (TASK-024) — shipped and audited
+## Geo Intelligence Hub (TASK-025) — shipped and audited
 
 Added `geo-intelligence-hub` as a new catalog entry: a keyless, provenance-tracked location
 workstation. Every value shown (country, admin hierarchy, time zone, sun/moon times, elevation,
@@ -44,16 +44,14 @@ decoding/TopoJSON decoding are implemented in-house against official test vector
 Code's own `test_data`, proj4js/mgrs reference vectors, the published geohash example, ARRL W1AW's
 published Maidenhead locator) rather than adding a package.
 
-Fresh evidence on the merge-ready tree (merge commit `882360e` onto `main` tip `dd12e94`; the only
-conflict was both tools appending to the catalog and loader, resolved by keeping both). Earlier
-evidence at `399b78c` onto `637a569`: `tsc --noEmit -p tsconfig.app.json` exit 0;
-`pnpm test:unit` **247 files / 2,883 tests passed** (2 files / 14 tests skipped, pre-existing and
-unrelated); `pnpm build` exit 0; `tests/e2e/geo-intel.spec.ts` **26 passed / 10 skipped / 0 failed**
-(skips are per-project, e.g. desktop-only interactions skipped on the mobile project and vice
-versa); the catalog-driven `accessibility.spec.ts` + `app.spec.ts` (covers every tool) **94/94
-passed**. Pushed to `origin/feature/geo-intelligence-hub`; CI on `399b78c` — "Validate and deploy
-Pages" success, "Sightline Velocity validation" success. PR #89 reported `mergeable_state: "clean"`
-immediately before merge.
+Fresh evidence on the final merge-ready tree (synced onto `main` tip `61a9ed5`, no conflicts; an
+earlier sync resolved a catalog/loader conflict with Tactical Matchboard Studio by keeping both
+entries): `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` **270 files / 3,090 tests
+passed** (2 files / 14 skipped, pre-existing and unrelated); `pnpm build` exit 0; the geo-intel,
+glTF, and catalog-wide `accessibility.spec.ts` + `app.spec.ts` browser specs **142 passed / 10
+skipped / 0 failed**. 26 of 29 automated PR review findings were fixed with regression tests
+(`tests/unit/geo-intel-review.test.ts`); 3 were declined with reasons (`src/tools/geo-intel/TODO.md`,
+Delivery 15). Task ID is TASK-025 (TASK-024 belongs to the glTF optimizer).
 
 ## Digital Logic Workstation — 34/34 complete
 
