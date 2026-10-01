@@ -167,6 +167,33 @@
   font-weight: 700;
 }
 
+.tactical-pitch-view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 1vw, 10px);
+}
+
+.tactical-pitch-view-controls button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: clamp(8px, 1vw, 12px) clamp(10px, 1.4vw, 14px);
+}
+
+.tactical-board-stage {
+  position: relative;
+  width: 100%;
+  transform-origin: 0 0;
+}
+
+.tactical-freehand-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
 .tactical-board {
   position: relative;
   min-width: 0;
@@ -370,6 +397,15 @@
 
   .tactical-board-heading-row {
     display: grid;
+  }
+
+  .tactical-pitch-view-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tactical-pitch-view-controls button {
+    width: 100%;
   }
 
   .tactical-board-mode {

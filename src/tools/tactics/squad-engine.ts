@@ -3,6 +3,7 @@ import { createNormalizedPoint } from './pitch-engine';
 import type { NormalizedPoint, RosterPlayer, TacticalProject, TacticalTeam } from './tactics-types';
 
 export const ROSTER_PLAYER_STATUSES = ['active', 'substitute', 'neutral', 'coach'] as const;
+export const MAX_ROSTER_PLAYERS_PER_TEAM = 64;
 export type RosterPlayerStatus = (typeof ROSTER_PLAYER_STATUSES)[number];
 
 export interface SquadCounts {
@@ -58,6 +59,14 @@ function nextId(project: TacticalProject, prefix: string): string {
   let index = 1;
   while (occupied.has(`${prefix}-${index}`)) index += 1;
   return `${prefix}-${index}`;
+}
+
+function assertRosterRoom(team: TacticalTeam, adding: number): void {
+  if (team.roster.length + adding > MAX_ROSTER_PLAYERS_PER_TEAM) {
+    throw new RangeError(
+      `A team roster cannot grow past ${MAX_ROSTER_PLAYERS_PER_TEAM} players. Growth is not limited to the formation size. ${MAX_ROSTER_PLAYERS_PER_TEAM} is the Pages-safe roster ceiling.`,
+    );
+  }
 }
 
 function nextJersey(team: TacticalTeam): string {
@@ -138,6 +147,8 @@ export function addSquadParticipant(
   placement?: SquadPlacement,
 ): TacticalProject {
   const status = requireStatus(player.status);
+  const team = requireTeam(project, teamId);
+  if (!team.roster.some((item) => item.id === player.id)) assertRosterRoom(team, 1);
   let next = addRosterPlayer(project, teamId, { ...player, status });
   if (!placement) return next;
   const position = placement.position
@@ -190,6 +201,11 @@ export function scaleActiveSquad(
 ): TacticalProject {
   if (!Number.isInteger(activeCount) || activeCount < 0) {
     throw new RangeError('Active squad size must be a non-negative integer.');
+  }
+  if (activeCount > MAX_ROSTER_PLAYERS_PER_TEAM) {
+    throw new RangeError(
+      `Active squad size cannot exceed ${MAX_ROSTER_PLAYERS_PER_TEAM} players on one team. Growth is not limited to the formation size. ${MAX_ROSTER_PLAYERS_PER_TEAM} is the Pages-safe roster ceiling.`,
+    );
   }
   requireTeam(project, teamId);
   if (squadCounts(project, teamId).active === activeCount) return project;

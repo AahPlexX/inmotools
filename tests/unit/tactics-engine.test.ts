@@ -307,10 +307,11 @@ describe('Tactical Matchboard foundation contracts', () => {
         sourceVersion: '2017 PDI',
       },
     });
-    expect(grassroots.pitch.overlays.map((overlay) => overlay.id)).toEqual([
+    expect(grassroots.pitch.overlays.map((overlay) => overlay.id).slice(0, 2)).toEqual([
       'ussf-left-build-out-line',
       'ussf-right-build-out-line',
     ]);
+    expect(grassroots.pitch.overlays.some((overlay) => overlay.id === 'training-left-penalty-area')).toBe(true);
     expect(grassroots.pitch.overlays[0]?.points[0]?.x).toBeCloseTo(12.8016 / 105, 12);
   });
 

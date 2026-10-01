@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import Papa from 'papaparse';
-import { createNormalizedPoint, metersToNormalized } from './pitch-engine';
+import { createNormalizedPoint, ensureStoredTrainingMarkings, metersToNormalized } from './pitch-engine';
 import { MAX_TIMELINE_DURATION_MS, MAX_ZIP_ENTRIES } from './session-bounds';
 import { TACTICS_SCHEMA_VERSION, validateTacticalProject } from './tactics-engine';
 import { createEmptyVideoReview } from './video-review-engine';
@@ -257,14 +257,18 @@ export function migrateTacticalProject(raw: unknown): TacticalProject {
 
   assertRequiredProjectShape(source);
   const candidate = source as unknown as TacticalProject;
+  const stored: TacticalProject = {
+    ...candidate,
+    pitch: ensureStoredTrainingMarkings(candidate.pitch),
+  };
   let errors: string[];
   try {
-    errors = validateTacticalProject(candidate);
+    errors = validateTacticalProject(stored);
   } catch (error) {
     throw new Error(`Invalid tactical project structure: ${error instanceof Error ? error.message : 'validation failed'}`);
   }
   if (errors.length) throw new Error(`Invalid tactical project: ${errors.join(' ')}`);
-  return candidate;
+  return stored;
 }
 
 function parseProjectText(

@@ -280,6 +280,20 @@ export function displayPitchOverlays(pitch: TacticalPitch): TacticalPitch['overl
   return [...pitch.overlays, ...fittedTrainingMarkings(pitch.dimensions)];
 }
 
+export function refreshStoredTrainingMarkings(pitch: TacticalPitch): TacticalPitch {
+  const kept = pitch.overlays.filter((overlay) => !overlay.id.startsWith('training-'));
+  const displayed = displayPitchOverlays({ ...pitch, overlays: kept });
+  if (displayed === kept && kept.length === pitch.overlays.length) return pitch;
+  return { ...pitch, overlays: displayed };
+}
+
+export function ensureStoredTrainingMarkings(pitch: TacticalPitch): TacticalPitch {
+  if (pitch.overlays.some((overlay) => overlay.id.startsWith('training-'))) return pitch;
+  const displayed = displayPitchOverlays(pitch);
+  if (displayed === pitch.overlays) return pitch;
+  return { ...pitch, overlays: displayed };
+}
+
 export type TacticalProjectTransform = 'horizontal' | 'vertical';
 
 export function transformTacticalProject(

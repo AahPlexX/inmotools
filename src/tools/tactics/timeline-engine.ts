@@ -1,4 +1,4 @@
-import { MAX_KEYFRAMES_PER_TRACK, MAX_TIMELINE_DURATION_MS, MAX_TIMELINE_MARKERS, MAX_TIMELINE_TRACKS } from './session-bounds';
+import { MAX_KEYFRAMES_PER_TRACK, MAX_TIMELINE_DURATION_MS, MAX_TIMELINE_MARKERS, MAX_TIMELINE_TRACKS, TIMELINE_TRACK_WINDOW } from './session-bounds';
 import { TIMELINE_MARKER_KINDS } from './tactics-types';
 import type {
   InterpolationKind,
@@ -395,8 +395,25 @@ function validateTrack(track: TimelineTrack): TimelineTrack {
   return { ...track, id, targetId, keyframes };
 }
 
+export function timelineTrackWindow<T>(
+  tracks: readonly T[],
+  startIndex: number,
+  windowSize = TIMELINE_TRACK_WINDOW,
+): { startIndex: number; endIndex: number; tracks: T[] } {
+  const size = Number.isInteger(windowSize) && windowSize > 0 ? windowSize : TIMELINE_TRACK_WINDOW;
+  const total = tracks.length;
+  const maxStart = Math.max(0, total - size);
+  const requested = Number.isFinite(startIndex) ? Math.floor(startIndex) : 0;
+  const start = Math.min(maxStart, Math.max(0, requested));
+  const end = Math.min(total, start + size);
+  return { startIndex: start, endIndex: end, tracks: tracks.slice(start, end) };
+}
+
 export function addTimelineTrack(timeline: TacticalTimeline, track: TimelineTrack): TacticalTimeline {
   const next = validateTrack(track);
+  if (timeline.tracks.length >= MAX_TIMELINE_TRACKS) {
+    throw new Error(`Timeline track count exceeds the ${MAX_TIMELINE_TRACKS} track session limit.`);
+  }
   if (timeline.tracks.some((item) => item.id === next.id)) throw new Error(`Timeline track id ${next.id} already exists.`);
   if (timeline.tracks.some((item) => item.targetId === next.targetId)) throw new Error(`Timeline target ${next.targetId} already has a track.`);
   return {

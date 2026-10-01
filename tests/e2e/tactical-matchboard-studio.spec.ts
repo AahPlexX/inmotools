@@ -40,6 +40,9 @@ async function dispatchTouchPoint(page: Page, target: 'player' | 'board', xRatio
 }
 
 test.beforeEach(async ({ page }) => {
+  page.on('dialog', (dialog) => {
+    void dialog.accept();
+  });
   await page.goto('./#/tools/tactical-matchboard-studio');
   await expect(page.getByTestId('suite-workspace').getByRole('heading', { name: 'Tactical Matchboard Studio', exact: true })).toBeVisible();
 });
@@ -105,6 +108,7 @@ test('places an opposition, moves the ball, and removes a selected drawing', asy
   await page.locator('.tactical-player-list button').first().click();
   await expect(page.locator('.tactical-board-svg g[data-selected="true"]')).toHaveCount(1);
 
+  await page.getByRole('combobox', { name: 'Opposition formation' }).selectOption('ussf-4v4-1-2-1');
   await page.getByRole('button', { name: 'Place opposition' }).click();
   await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(8);
   await expect(page.locator('.status-line').last()).toContainText('Opposition placed');
@@ -130,6 +134,56 @@ test('places an opposition, moves the ball, and removes a selected drawing', asy
   await page.getByRole('button', { name: 'Remove drawing' }).click();
   await expect(page.locator('#arrow-1')).toHaveCount(0);
   await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(8);
+});
+
+test('asks before build board replaces the board', async ({ page }) => {
+  page.removeAllListeners('dialog');
+  const players = page.locator('.tactical-board-svg g[data-tactical-kind="player"]');
+  const before = await players.count();
+  const message = new Promise<string>((resolve) => {
+    page.once('dialog', (dialog) => {
+      resolve(dialog.message());
+      void dialog.dismiss();
+    });
+  });
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await expect(message).resolves.toMatch(/replaces this board and clears undo/i);
+  await expect(page.locator('.status-line').last()).toContainText('Build board cancelled');
+  await expect(players).toHaveCount(before);
+});
+
+test('places a different opposition formation and draws a freehand stroke', async ({ page }) => {
+  await setupPanel(page).getByRole('combobox', { name: /Formation/ }).selectOption('ussf-4v4-1-2-1');
+  await page.getByRole('button', { name: 'Build board' }).click();
+  await page.getByRole('combobox', { name: 'Opposition formation' }).selectOption('ussf-7v7-1-3-2-1');
+  await page.getByRole('button', { name: 'Place opposition' }).click();
+  await expect(page.locator('.tactical-board-svg g[data-tactical-kind="player"]')).toHaveCount(11);
+
+  await page.getByRole('button', { name: 'Freehand', exact: true }).click();
+  await page.getByRole('button', { name: 'Add freehand point' }).click();
+  await page.getByRole('button', { name: 'Add freehand point' }).click();
+  await expect(page.getByTestId('tactical-board-freehand-count')).toHaveText('2 freehand points');
+  await page.getByRole('button', { name: 'Save freehand' }).click();
+  await expect(page.locator('[data-annotation-kind="freehand"]')).toHaveCount(1);
+  await expect(page.locator('.status-line').last()).toContainText('Freehand stroke added');
+});
+
+test('zooms and pans the tactical pitch', async ({ page }) => {
+  const surface = board(page);
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(surface).toHaveAttribute('data-pitch-zoom', '1.25');
+  const afterZoom = await surface.getAttribute('data-pitch-pan-x');
+  await page.getByRole('button', { name: 'Pan right' }).click();
+  await expect(surface).not.toHaveAttribute('data-pitch-pan-x', afterZoom ?? '0');
+  await page.getByRole('button', { name: 'Reset pitch view' }).click();
+  await expect(surface).toHaveAttribute('data-pitch-zoom', '1');
+  await expect(surface).toHaveAttribute('data-pitch-pan-x', '0');
+});
+
+test('shows a virtualized timeline track window and the session limit', async ({ page }) => {
+  await page.getByText('Timeline & motion', { exact: true }).click();
+  await expect(page.getByTestId('timeline-track-window')).toContainText('Showing 0 of 0 tracks');
+  await expect(page.getByTestId('timeline-track-window')).toContainText('Session limit 2048');
 });
 
 test('downloads the current board as SVG', async ({ page }) => {
