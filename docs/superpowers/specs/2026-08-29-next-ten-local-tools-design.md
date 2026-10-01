@@ -39,6 +39,9 @@ The engine parses HAR JSON without destructive schema rewriting, inventories hea
 
 Waterfall rows normalize HAR timing fields into blocked, DNS, connect, SSL, send, wait/TTFB, and receive durations. Rendering uses Canvas with CSS-pixel coordinates backed by device-pixel-ratio scaling. The sanitized download remains a valid HAR JSON object and preserves unrelated fields.
 
+**Addendum (2026-10-01, production audit):** the paragraphs above stay in force. This pass adds, without removing them: typed HAR entry/message/body shapes; on-screen URL display that hides userinfo and sensitive query values while export still follows the selected mode; optional email and IP categories (off unless selected) covering `serverIPAddress`, forwarding headers, and IP URL hosts rewritten to `redacted.invalid`; extra sensitive field names; a findings CSV of locations only; drag-and-drop, sample capture, and clear; request search; finding-to-request jump; and a windowed waterfall whose scrollport uses `clamp(220px, 52vh, 520px)` so large captures do not paint every row at once. HAR `-1` timings still draw as zero, and TLS stays split out of connect. Tool-local notes live in `src/tools/har/README.md`.
+
+
 ## Tool 12 — Lossless Video Keyframe Slicer
 
 **Slug:** `video-keyframe-slicer`

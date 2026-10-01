@@ -130,3 +130,26 @@ it('uses protected decimal timings for the waterfall while preserving their exac
   expect(row.phases.wait).toBeCloseTo(123.45678901234568);
   expect(harEngine.stringifyHarJson(parsed)).toContain('123.456789012345678901');
 });
+
+it('hides credentials in the on-screen URL without changing the export policy', () => {
+  const shown = harEngine.displayUrl('https://ada:request-pass@api.example.test/orders?token=query-secret&safe=visible');
+  expect(shown).not.toContain('request-pass');
+  expect(shown).not.toContain('query-secret');
+  expect(shown).toContain('safe=visible');
+  expect(shown).toContain('api.example.test');
+});
+
+it('finds and redacts emails, server IPs, and extra field names only when those controls are on', async () => {
+  const har = { log: { entries: [{ serverIPAddress: '203.0.113.10', request: { url: 'https://api.example.test/?note=ada@example.test', headers: [{ name: 'X-Internal-Key', value: 'desk-secret' }, { name: 'X-Forwarded-For', value: '198.51.100.8' }], cookies: [], queryString: [{ name: 'note', value: 'ada@example.test' }] }, response: { headers: [], cookies: [], content: { mimeType: 'text/plain', text: 'ping ada@example.test from 203.0.113.10' } } }] } };
+  const findings = harEngine.analyzeHar(har, ['x-internal-key']).findings;
+  expect(findings.map((finding) => finding.field)).toEqual(expect.arrayContaining(['request.header:X-Internal-Key', 'entry.serverIPAddress', 'request.query:note:email']));
+  const off = await harEngine.sanitizeHar(har, { mode: 'redact', categories: { headers: false, cookies: false, query: false, bodies: false }, extraNames: ['x-internal-key'] });
+  expect(JSON.stringify(off.har)).toContain('desk-secret');
+  expect(JSON.stringify(off.har)).toContain('ada@example.test');
+  const on = await harEngine.sanitizeHar(har, { mode: 'redact', categories: { headers: true, emails: true, addresses: true }, extraNames: ['x-internal-key'] });
+  const text = JSON.stringify(on.har);
+  expect(text).not.toContain('desk-secret');
+  expect(text).not.toContain('ada@example.test');
+  expect(text).not.toContain('203.0.113.10');
+  expect(text).not.toContain('198.51.100.8');
+});

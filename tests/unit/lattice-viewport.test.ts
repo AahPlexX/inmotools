@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LatticeLayoutModel } from '../../src/tools/lattice/layout-engine';
-import { fitViewport, screenToWorld, visibleLayoutNodes, worldToScreen } from '../../src/tools/lattice/viewport-engine';
+import { centerViewportOnNode, fitViewport, screenToWorld, viewportWorldRect, visibleLayoutNodes, wheelZoomFactor, worldToScreen } from '../../src/tools/lattice/viewport-engine';
 
 const layout: LatticeLayoutModel = {
   bounds: { width: 1200, height: 800 },
@@ -45,5 +45,29 @@ describe('JSON Lattice viewport engine', () => {
       overscan: 20,
     });
     expect(withoutActive.map((node) => node.id)).toEqual(['/left', '/middle']);
+  });
+
+  it('centers a node without changing the current zoom', () => {
+    const centered = centerViewportOnNode({ x: 500, y: 300, width: 180, height: 80 }, { width: 800, height: 600 }, 2);
+    expect(centered.scale).toBe(2);
+    expect(centered.x).toBe(800 / 2 - (500 + 90) * 2);
+    expect(centered.y).toBe(600 / 2 - (300 + 40) * 2);
+  });
+
+  it('normalizes mouse-wheel and trackpad deltas, and pinches faster', () => {
+    expect(wheelZoomFactor(0)).toBe(1);
+    expect(wheelZoomFactor(100, 0)).toBeLessThan(1);
+    expect(wheelZoomFactor(-100, 0)).toBeGreaterThan(1);
+    expect(wheelZoomFactor(3, 1)).toBeLessThan(wheelZoomFactor(3, 0));
+    expect(wheelZoomFactor(40, 0, true)).toBeLessThan(wheelZoomFactor(40, 0, false));
+  });
+
+  it('reports the world rectangle currently on screen', () => {
+    const rect = viewportWorldRect({ x: 40, y: 20, scale: 2 }, { width: 400, height: 200 });
+    expect(rect).toEqual({ x: -20, y: -10, width: 200, height: 100 });
+  });
+
+  it('does not fit past the interactive zoom cap', () => {
+    expect(fitViewport({ width: 40, height: 40 }, { width: 800, height: 600 }, 16, 3).scale).toBe(3);
   });
 });

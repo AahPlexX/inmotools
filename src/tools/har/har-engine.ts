@@ -1,12 +1,81 @@
-export type HarFindingCategory = 'headers' | 'cookies' | 'query' | 'bodies';
-export type HarSanitizePolicy = { mode: 'redact' | 'hash' | 'mask'; mask?: string; categories: Partial<Record<HarFindingCategory, boolean>> };
+export type HarFindingCategory = 'headers' | 'cookies' | 'query' | 'bodies' | 'emails' | 'addresses';
+export type HarSanitizePolicy = {
+  mode: 'redact' | 'hash' | 'mask';
+  mask?: string;
+  categories: Partial<Record<HarFindingCategory, boolean>>;
+  /** Extra header, cookie, query, or body field names treated as sensitive for this run. */
+  extraNames?: readonly string[];
+};
 export type HarFinding = { category: HarFindingCategory; entryIndex: number; field: string };
-type HarLike = { log?: { entries?: any[] } };
+export type HarNameValue = { name?: unknown; value?: unknown };
+export type HarBody = { mimeType?: unknown; encoding?: unknown; text?: unknown; params?: HarNameValue[] };
+export type HarMessage = {
+  method?: unknown;
+  url?: unknown;
+  headers?: HarNameValue[];
+  cookies?: HarNameValue[];
+  queryString?: HarNameValue[];
+  postData?: HarBody;
+  status?: unknown;
+  redirectURL?: unknown;
+  content?: HarBody;
+};
+export type HarEntry = {
+  startedDateTime?: unknown;
+  time?: unknown;
+  request?: HarMessage;
+  response?: HarMessage;
+  timings?: Record<string, unknown>;
+  serverIPAddress?: unknown;
+  connection?: unknown;
+  pageref?: unknown;
+};
+export type HarLike = { log?: { entries?: HarEntry[]; pages?: unknown[] } };
+export type HarWaterfallRow = {
+  index: number;
+  method: string;
+  url: string;
+  displayUrl: string;
+  status: number;
+  mime: string;
+  bytes: number;
+  startOffsetMs: number;
+  totalMs: number;
+  phases: { blocked: number; dns: number; connect: number; ssl: number; send: number; wait: number; receive: number };
+};
 
 const REDACTED = '[REDACTED]';
 const SENSITIVE_NAMES = ['authorization','proxyauthorization','cookie','setcookie','apikey','xapikey','xauthtoken','token','accesstoken','refreshtoken','password','passwd','secret','session','sessionid','credential','clientsecret','bearer'];
 const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-const isSensitiveName = (value: string) => { const normalized = normalizeName(value); return SENSITIVE_NAMES.some((candidate) => normalized === candidate || normalized.endsWith(candidate)); };
+const isSensitiveName = (value: string, extraNames: readonly string[] = []) => {
+  const normalized = normalizeName(value);
+  if (!normalized) return false;
+  if (SENSITIVE_NAMES.some((candidate) => normalized === candidate || normalized.endsWith(candidate))) return true;
+  return extraNames.some((candidate) => { const extra = normalizeName(candidate); return extra.length > 0 && (normalized === extra || normalized.endsWith(extra)); });
+};
+
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const IPV4_PATTERN = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g;
+const IPV6_PATTERN = /\b(?:[0-9A-F]{1,4}:){2,7}[0-9A-F]{1,4}\b/gi;
+const FORWARD_HEADERS = ['xforwardedfor', 'xrealip', 'forwarded', 'cfconnectingip', 'trueclientip', 'xclientip'];
+
+export function displayUrl(value: string, extraNames: readonly string[] = []): string {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (url.username) url.username = 'redacted';
+    if (url.password) url.password = 'redacted';
+    const pairs = Array.from(url.searchParams.entries());
+    url.search = '';
+    for (const [name, item] of pairs) url.searchParams.append(name, isSensitiveName(name, extraNames) ? '[REDACTED]' : item);
+    return url.toString();
+  } catch {
+    return value.replace(/\/\/[^/\s@]*:[^/\s@]*@/g, '//redacted:redacted@');
+  }
+}
+
+function containsEmail(value: string): boolean { EMAIL_PATTERN.lastIndex = 0; return EMAIL_PATTERN.test(value); }
+function containsIp(value: string): boolean { IPV4_PATTERN.lastIndex = 0; if (IPV4_PATTERN.test(value)) return true; IPV6_PATTERN.lastIndex = 0; return IPV6_PATTERN.test(value); }
 
 const RAW_JSON_NUMBER = Symbol('inmotools.har.raw-json-number');
 type RawJsonNumber = { readonly [RAW_JSON_NUMBER]: string };
@@ -169,13 +238,13 @@ function cloneValue<T>(value: T): T {
   return output as T;
 }
 
-function scanObject(value: unknown, path: string, found: string[]): void {
+function scanObject(value: unknown, path: string, found: string[], extraNames: readonly string[] = []): void {
   if (isRawJsonNumber(value)) return;
-  if (Array.isArray(value)) { value.forEach((item, index) => scanObject(item, `${path}[${index}]`, found)); return; }
+  if (Array.isArray(value)) { value.forEach((item, index) => scanObject(item, `${path}[${index}]`, found, extraNames)); return; }
   if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const nextPath = path ? `${path}.${key}` : key;
-    if (isSensitiveName(key)) found.push(nextPath); else scanObject(child, nextPath, found);
+    if (isSensitiveName(key, extraNames)) found.push(nextPath); else scanObject(child, nextPath, found, extraNames);
   }
 }
 
@@ -196,25 +265,25 @@ export function readBody(body: { text?: unknown; encoding?: unknown } | undefine
   return { text: typeof body.text === 'string' ? body.text : undefined, wasBase64: false };
 }
 
-function scanBody(body: any, side: 'request' | 'response', entryIndex: number, add: (finding: HarFinding) => void): void {
-  for (const parameter of body?.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''))) add({ category: 'bodies', entryIndex, field: `${side}.body:${String(parameter.name)}` });
+function scanBody(body: HarBody | undefined, side: 'request' | 'response', entryIndex: number, extraNames: readonly string[], add: (finding: HarFinding) => void): void {
+  for (const parameter of body?.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''), extraNames)) add({ category: 'bodies', entryIndex, field: `${side}.body:${String(parameter.name)}` });
   const { text } = readBody(body);
   const parsed = parseJsonBody(text);
   if (parsed !== undefined) {
-    const fields: string[] = []; scanObject(parsed, '', fields); fields.forEach((field) => add({ category: 'bodies', entryIndex, field: `${side}.body:${field}` })); return;
+    const fields: string[] = []; scanObject(parsed, '', fields, extraNames); fields.forEach((field) => add({ category: 'bodies', entryIndex, field: `${side}.body:${field}` })); return;
   }
   if (typeof text === 'string' && String(body?.mimeType ?? '').toLowerCase().includes('application/x-www-form-urlencoded')) {
-    for (const [name] of new URLSearchParams(text)) if (isSensitiveName(name)) add({ category: 'bodies', entryIndex, field: `${side}.body:${name}` });
+    for (const [name] of new URLSearchParams(text)) if (isSensitiveName(name, extraNames)) add({ category: 'bodies', entryIndex, field: `${side}.body:${name}` });
   }
 }
 
-function scanUrl(value: unknown, credentialPrefix: string, queryPrefix: string, entryIndex: number, add: (finding: HarFinding) => void): void {
+function scanUrl(value: unknown, credentialPrefix: string, queryPrefix: string, entryIndex: number, extraNames: readonly string[], add: (finding: HarFinding) => void): void {
   if (typeof value !== 'string' || !value) return;
   try {
     const url = new URL(value);
     if (url.username) add({ category: 'query', entryIndex, field: `${credentialPrefix}:username` });
     if (url.password) add({ category: 'query', entryIndex, field: `${credentialPrefix}:password` });
-    for (const [name] of url.searchParams) if (isSensitiveName(name)) add({ category: 'query', entryIndex, field: `${queryPrefix}:${name}` });
+    for (const [name] of url.searchParams) if (isSensitiveName(name, extraNames)) add({ category: 'query', entryIndex, field: `${queryPrefix}:${name}` });
     return;
   } catch {
     // A redirect target can legally be represented in relative form by some
@@ -224,10 +293,16 @@ function scanUrl(value: unknown, credentialPrefix: string, queryPrefix: string, 
   if (question < 0) return;
   const hash = value.indexOf('#', question);
   const queryText = value.slice(question + 1, hash >= 0 ? hash : undefined);
-  for (const [name] of new URLSearchParams(queryText)) if (isSensitiveName(name)) add({ category: 'query', entryIndex, field: `${queryPrefix}:${name}` });
+  for (const [name] of new URLSearchParams(queryText)) if (isSensitiveName(name, extraNames)) add({ category: 'query', entryIndex, field: `${queryPrefix}:${name}` });
 }
 
-export function analyzeHar(har: HarLike) {
+function notePersonalData(value: unknown, entryIndex: number, field: string, add: (finding: HarFinding) => void): void {
+  if (typeof value !== 'string' || !value) return;
+  if (containsEmail(value)) add({ category: 'emails', entryIndex, field: `${field}:email` });
+  if (containsIp(value)) add({ category: 'addresses', entryIndex, field: `${field}:ip` });
+}
+
+export function analyzeHar(har: HarLike, extraNames: readonly string[] = []) {
   const findings: HarFinding[] = [];
   const seen = new Set<string>();
   const add = (finding: HarFinding) => { const key = `${finding.category}|${finding.entryIndex}|${finding.field}`; if (!seen.has(key)) { seen.add(key); findings.push(finding); } };
@@ -235,30 +310,73 @@ export function analyzeHar(har: HarLike) {
   entries.forEach((entry, entryIndex) => {
     for (const side of ['request', 'response'] as const) {
       const message = entry?.[side]; if (!message) continue;
-      for (const header of message.headers ?? []) if (isSensitiveName(String(header?.name ?? ''))) add({ category: 'headers', entryIndex, field: `${side}.header:${String(header.name)}` });
-      for (const cookie of message.cookies ?? []) add({ category: 'cookies', entryIndex, field: `${side}.cookie:${String(cookie?.name ?? '')}` });
+      for (const header of message.headers ?? []) {
+        if (isSensitiveName(String(header?.name ?? ''), extraNames)) add({ category: 'headers', entryIndex, field: `${side}.header:${String(header.name)}` });
+        notePersonalData(header?.value, entryIndex, `${side}.header:${String(header?.name ?? 'header')}`, add);
+      }
+      for (const cookie of message.cookies ?? []) {
+        add({ category: 'cookies', entryIndex, field: `${side}.cookie:${String(cookie?.name ?? '')}` });
+        notePersonalData(cookie?.value, entryIndex, `${side}.cookie:${String(cookie?.name ?? 'cookie')}`, add);
+      }
     }
-    for (const query of entry?.request?.queryString ?? []) if (isSensitiveName(String(query?.name ?? ''))) add({ category: 'query', entryIndex, field: `request.query:${String(query.name)}` });
-    scanUrl(entry?.request?.url, 'request.url', 'request.query', entryIndex, add);
-    scanUrl(entry?.response?.redirectURL, 'response.redirectURL', 'response.redirectURL.query', entryIndex, add);
-    scanBody(entry?.request?.postData, 'request', entryIndex, add);
-    scanBody(entry?.response?.content, 'response', entryIndex, add);
+    for (const query of entry?.request?.queryString ?? []) {
+      if (isSensitiveName(String(query?.name ?? ''), extraNames)) add({ category: 'query', entryIndex, field: `request.query:${String(query.name)}` });
+      notePersonalData(query?.value, entryIndex, `request.query:${String(query?.name ?? 'query')}`, add);
+    }
+    scanUrl(entry?.request?.url, 'request.url', 'request.query', entryIndex, extraNames, add);
+    scanUrl(entry?.response?.redirectURL, 'response.redirectURL', 'response.redirectURL.query', entryIndex, extraNames, add);
+    notePersonalData(entry?.request?.url, entryIndex, 'request.url', add);
+    notePersonalData(entry?.response?.redirectURL, entryIndex, 'response.redirectURL', add);
+    scanBody(entry?.request?.postData, 'request', entryIndex, extraNames, add);
+    scanBody(entry?.response?.content, 'response', entryIndex, extraNames, add);
+    notePersonalData(readBody(entry?.request?.postData).text, entryIndex, 'request.body', add);
+    notePersonalData(readBody(entry?.response?.content).text, entryIndex, 'response.body', add);
+    if (typeof entry?.serverIPAddress === 'string' && entry.serverIPAddress) add({ category: 'addresses', entryIndex, field: 'entry.serverIPAddress' });
   });
   return { requestCount: entries.length, findings };
 }
 
 async function sha256(value: string): Promise<string> { const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)); return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''); }
 async function replacement(value: unknown, policy: HarSanitizePolicy): Promise<string> { if (policy.mode === 'redact') return REDACTED; if (policy.mode === 'mask') return policy.mask?.trim() || REDACTED; return sha256(String(value ?? '')); }
+async function replacePattern(value: string, pattern: RegExp, policy: HarSanitizePolicy): Promise<string> {
+  const matches = value.match(pattern);
+  if (!matches) return value;
+  let output = value;
+  for (const match of new Set(matches)) output = output.split(match).join(await replacement(match, policy));
+  return output;
+}
+async function scrubPersonalString(value: string, policy: HarSanitizePolicy): Promise<string> {
+  let output = value;
+  if (policy.categories.emails) output = await replacePattern(output, EMAIL_PATTERN, policy);
+  if (policy.categories.addresses) {
+    output = await replacePattern(output, IPV4_PATTERN, policy);
+    output = await replacePattern(output, IPV6_PATTERN, policy);
+  }
+  return output;
+}
 async function sanitizeStructured(value: unknown, policy: HarSanitizePolicy): Promise<unknown> {
   if (isRawJsonNumber(value)) return rawJsonNumber(value[RAW_JSON_NUMBER]);
+  if (typeof value === 'string') return scrubPersonalString(value, policy);
   if (Array.isArray(value)) return Promise.all(value.map((item) => sanitizeStructured(item, policy)));
   if (!value || typeof value !== 'object') return value;
   const output = Object.create(null) as Record<string, unknown>;
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = isSensitiveName(key) ? await replacement(child, policy) : await sanitizeStructured(child, policy);
+  const extras = policy.extraNames ?? [];
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) output[key] = policy.categories.bodies && isSensitiveName(key, extras) ? await replacement(child, policy) : await sanitizeStructured(child, policy);
   return output;
 }
-async function sanitizeHeaders(headers: any[], policy: HarSanitizePolicy) { for (const header of headers ?? []) if (isSensitiveName(String(header?.name ?? ''))) header.value = await replacement(header.value, policy); }
-async function sanitizeCookies(cookies: any[], policy: HarSanitizePolicy) { for (const cookie of cookies ?? []) cookie.value = await replacement(cookie.value, policy); }
+async function sanitizeHeaders(headers: HarNameValue[] | undefined, policy: HarSanitizePolicy) {
+  const extras = policy.extraNames ?? [];
+  for (const header of headers ?? []) {
+    const name = String(header?.name ?? '');
+    const hideName = policy.categories.headers && isSensitiveName(name, extras);
+    const hideForward = policy.categories.addresses && FORWARD_HEADERS.includes(normalizeName(name));
+    if (hideName || hideForward) header.value = await replacement(header.value, policy);
+    else if (typeof header.value === 'string') header.value = await scrubPersonalString(header.value, policy);
+  }
+}
+async function sanitizeCookies(cookies: HarNameValue[] | undefined, policy: HarSanitizePolicy) {
+  for (const cookie of cookies ?? []) cookie.value = await replacement(cookie.value, policy);
+}
 
 async function sanitizeRelativeUrlQuery(value: string, policy: HarSanitizePolicy): Promise<string> {
   const question = value.indexOf('?');
@@ -269,7 +387,7 @@ async function sanitizeRelativeUrlQuery(value: string, policy: HarSanitizePolicy
   const queryText = value.slice(question + 1, hashIndex >= 0 ? hashIndex : undefined);
   const params = new URLSearchParams(queryText);
   const rebuilt = new URLSearchParams();
-  for (const [name, item] of params) rebuilt.append(name, isSensitiveName(name) ? await replacement(item, policy) : item);
+  for (const [name, item] of params) rebuilt.append(name, policy.categories.query && isSensitiveName(name, policy.extraNames ?? []) ? await replacement(item, policy) : await scrubPersonalString(item, policy));
   return `${prefix}?${rebuilt.toString()}${suffix}`;
 }
 
@@ -281,8 +399,10 @@ async function sanitizeUrl(value: unknown, policy: HarSanitizePolicy): Promise<u
     if (url.password) url.password = await replacement(url.password, policy);
     const pairs = Array.from(url.searchParams.entries());
     url.search = '';
-    for (const [name, item] of pairs) url.searchParams.append(name, isSensitiveName(name) ? await replacement(item, policy) : item);
-    return url.toString();
+    if (policy.categories.addresses && containsIp(url.hostname)) url.hostname = 'redacted.invalid';
+    for (const [name, item] of pairs) url.searchParams.append(name, policy.categories.query && isSensitiveName(name, policy.extraNames ?? []) ? await replacement(item, policy) : await scrubPersonalString(item, policy));
+    const rebuilt = url.toString();
+    return policy.categories.emails || policy.categories.addresses ? scrubPersonalString(rebuilt, policy) : rebuilt;
   } catch {
     return sanitizeRelativeUrlQuery(value, policy);
   }
@@ -291,7 +411,10 @@ async function sanitizeUrl(value: unknown, policy: HarSanitizePolicy): Promise<u
 async function sanitizeQuery(entry: any, policy: HarSanitizePolicy) {
   const request = entry?.request;
   if (request) {
-    for (const query of request.queryString ?? []) if (isSensitiveName(String(query?.name ?? ''))) query.value = await replacement(query.value, policy);
+    for (const query of request.queryString ?? []) {
+      if (policy.categories.query && isSensitiveName(String(query?.name ?? ''), policy.extraNames ?? [])) query.value = await replacement(query.value, policy);
+      else if (typeof query.value === 'string') query.value = await scrubPersonalString(query.value, policy);
+    }
     request.url = await sanitizeUrl(request.url, policy);
   }
   if (entry?.response && typeof entry.response.redirectURL === 'string') entry.response.redirectURL = await sanitizeUrl(entry.response.redirectURL, policy);
@@ -299,31 +422,38 @@ async function sanitizeQuery(entry: any, policy: HarSanitizePolicy) {
 
 async function sanitizeBodyContainer(body: any, policy: HarSanitizePolicy) {
   if (!body) return;
-  for (const parameter of body.params ?? []) if (isSensitiveName(String(parameter?.name ?? ''))) parameter.value = await replacement(parameter.value, policy);
+  for (const parameter of body.params ?? []) {
+    if (policy.categories.bodies && isSensitiveName(String(parameter?.name ?? ''), policy.extraNames ?? [])) parameter.value = await replacement(parameter.value, policy);
+    else if (typeof parameter.value === 'string') parameter.value = await scrubPersonalString(parameter.value, policy);
+  }
   const { text, wasBase64 } = readBody(body); if (text === undefined) return;
   let sanitized: string | undefined;
   const parsed = parseJsonBody(text);
   if (parsed !== undefined) sanitized = stringifyHarJson(await sanitizeStructured(parsed, policy));
   else if (String(body?.mimeType ?? '').toLowerCase().includes('application/x-www-form-urlencoded')) {
     const params = new URLSearchParams(text); const rebuilt = new URLSearchParams();
-    for (const [name, value] of params) rebuilt.append(name, isSensitiveName(name) ? await replacement(value, policy) : value);
+    for (const [name, value] of params) rebuilt.append(name, isSensitiveName(name, policy.extraNames ?? []) ? await replacement(value, policy) : await scrubPersonalString(value, policy));
     sanitized = rebuilt.toString();
   }
+  if (sanitized === undefined && typeof text === 'string' && (policy.categories.emails || policy.categories.addresses)) sanitized = await scrubPersonalString(text, policy);
   if (sanitized !== undefined) body.text = wasBase64 ? encodeBase64Body(sanitized) : sanitized;
 }
 
 export async function sanitizeHar<T extends HarLike>(har: T, policy: HarSanitizePolicy) {
   const output = cloneValue(har);
-  const originalFindings = analyzeHar(har).findings;
+  const extras = policy.extraNames ?? [];
+  const originalFindings = analyzeHar(har, extras).findings;
   for (const entry of output.log?.entries ?? []) {
-    if (policy.categories.headers) { await sanitizeHeaders(entry?.request?.headers, policy); await sanitizeHeaders(entry?.response?.headers, policy); }
+    if (policy.categories.headers || policy.categories.emails || policy.categories.addresses) { await sanitizeHeaders(entry?.request?.headers, policy); await sanitizeHeaders(entry?.response?.headers, policy); }
     if (policy.categories.cookies) { await sanitizeCookies(entry?.request?.cookies, policy); await sanitizeCookies(entry?.response?.cookies, policy); }
-    if (policy.categories.query) await sanitizeQuery(entry, policy);
-    if (policy.categories.bodies) { await sanitizeBodyContainer(entry?.request?.postData, policy); await sanitizeBodyContainer(entry?.response?.content, policy); }
+    if (policy.categories.query || policy.categories.emails || policy.categories.addresses) await sanitizeQuery(entry, policy);
+    if (policy.categories.bodies || policy.categories.emails || policy.categories.addresses) { await sanitizeBodyContainer(entry?.request?.postData, policy); await sanitizeBodyContainer(entry?.response?.content, policy); }
+    if (policy.categories.addresses && typeof entry?.serverIPAddress === 'string' && entry.serverIPAddress) entry.serverIPAddress = await replacement(entry.serverIPAddress, policy);
   }
-  const outputFindings = analyzeHar(output).findings;
+  const outputFindings = analyzeHar(output, extras).findings;
   const changedFindings = originalFindings.filter((finding) => policy.categories[finding.category]);
-  const remainingFindings = originalFindings.filter((finding) => !policy.categories[finding.category]);
+  // Unmentioned categories are not "left on purpose". Only an explicit false counts as remaining risk.
+  const remainingFindings = originalFindings.filter((finding) => policy.categories[finding.category] === false);
   return { har: output, findings: originalFindings, originalFindings, outputFindings, changedFindings, remainingFindings };
 }
 
@@ -331,16 +461,25 @@ const phaseValue = (value: unknown) => {
   const numeric = typeof value === 'number' ? value : isRawJsonNumber(value) ? Number(value[RAW_JSON_NUMBER]) : 0;
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
 };
-export function buildWaterfallRows(har: HarLike) {
+export function buildWaterfallRows(har: HarLike, extraNames: readonly string[] = []): HarWaterfallRow[] {
   const entries = har.log?.entries ?? [];
-  const times = entries.map((entry) => Date.parse(entry.startedDateTime)).filter(Number.isFinite);
+  const times = entries.map((entry) => Date.parse(String(entry.startedDateTime))).filter(Number.isFinite);
   const base = times.length ? Math.min(...times) : 0;
   return entries.map((entry, index) => {
     const ssl = phaseValue(entry?.timings?.ssl);
     const connectTotal = phaseValue(entry?.timings?.connect);
+    const url = String(entry?.request?.url ?? '');
+    const size = entry?.response?.content && typeof (entry.response.content as { size?: unknown }).size === 'number' ? (entry.response.content as { size: number }).size : 0;
     return {
-      index, method: entry?.request?.method ?? '', url: entry?.request?.url ?? '', status: entry?.response?.status ?? 0,
-      startOffsetMs: Math.max(0, Date.parse(entry.startedDateTime) - base), totalMs: phaseValue(entry?.time),
+      index,
+      method: String(entry?.request?.method ?? ''),
+      url,
+      displayUrl: displayUrl(url, extraNames),
+      status: Number(entry?.response?.status ?? 0) || 0,
+      mime: String(entry?.response?.content?.mimeType ?? ''),
+      bytes: Number.isFinite(size) ? size : 0,
+      startOffsetMs: Math.max(0, Date.parse(String(entry.startedDateTime)) - base),
+      totalMs: phaseValue(entry?.time),
       phases: { blocked: phaseValue(entry?.timings?.blocked), dns: phaseValue(entry?.timings?.dns), connect: Math.max(0, connectTotal - ssl), ssl, send: phaseValue(entry?.timings?.send), wait: phaseValue(entry?.timings?.wait), receive: phaseValue(entry?.timings?.receive) },
     };
   });
