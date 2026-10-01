@@ -2,6 +2,8 @@
 
 Slug: `geo-intelligence-hub` · Directory: `src/tools/geo-intel/` · Branch: `feature/geo-intelligence-hub` (cut from `origin/main` @ `1aa0a88`).
 
+Since 2026-10-01 the live status and requirement IDs are in [TRACKER.md](TRACKER.md); everything below is the build history.
+
 This file is the single live progress record for this tool while it is developed on its branch. Any agent picking this up continues from the first unchecked gate and the latest **Delivery Record** "Next batch (planned)" list.
 
 ## Scope boundary
