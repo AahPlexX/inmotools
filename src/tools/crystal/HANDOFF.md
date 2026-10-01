@@ -2,14 +2,13 @@
 
 **Route:** `#/tools/crystal-lattice-studio`  
 **Master design:** `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md`  
-**Active integration branch:** `feature/crystal-lattice-completion-20260927`  
-**Integration target:** `origin/main` through draft PR #83.
+**Status (2026-10-01):** the Phase 4 analysis workflows are integrated into `origin/main`. The tool is still **in progress**: see the capability ledger for the per-capability tally (90 done, 48 partial, 25 missing of 163 after Phase 4). Start new work on a fresh branch from `origin/main`.
 
 This file is the live resume point for the Crystal Lattice Studio completion workstream. The numbered 1–163 capability list in the master design is the product contract; phase-completion documents are evidence records and do not supersede that numbered contract.
 
 ## Current verified baseline
 
-Latest fully green branch baseline before the active UI-red cycle: `120324781327bc2e1681e5089359475c317219ee`.
+Latest verified evidence for the Phase 4 integration (2026-10-01, branch merged with current `origin/main`): `tsc --noEmit -p tsconfig.app.json` clean; 31 Crystal unit files / 154 tests pass; production build clean; the four Crystal browser specs pass 74 with 5 intentional skips on desktop and mobile Chromium, with one load-induced failure in the phase-4 scalar-field test that passed 12/12 on rerun (it clicks and asserts straight away, so it can race on a loaded host).
 
 GitHub Actions run `36366177069` on that revision passed:
 
@@ -19,7 +18,7 @@ GitHub Actions run `36366177069` on that revision passed:
 - Chromium installation;
 - focused Crystal browser lane: 67 passed across desktop/mobile Chromium.
 
-The active TDD browser-red commit is `e9df29e7698233a57c03b75d23d22524de52f6dd`, which defines the Phase 4 end-user workflows. Do not treat that commit as green until its browser failure is observed for the intended missing UI behavior and the implementation is revalidated.
+The Phase 4 browser acceptance (`tests/e2e/crystal-lattice-studio-phase4.spec.ts`) is green; it was driven test-first from commit `e9df29e7`.
 
 ## Integrated scientific engines
 
@@ -38,7 +37,7 @@ These engines are not counted as full master-capability completion where the mas
 
 ## Active completion sequence
 
-1. **Phase 4 user workflows** — wire reflection/Fourier, volumetric fields, voids, morphology, and bounded refinement into reachable responsive UI; add focused browser acceptance and selector routing.
+1. **Phase 4 user workflows (done for reflections, fields, voids and morphology)** — reachable and browser-tested. Still engine-only with no UI: bounded least-squares refinement (rows 109-111, 116), arbitrary plane slice (123), grid resampling (124), twin/domain overlay (132). Not implemented: charge flipping (117), morphology export (133).
 2. **Deferred earlier capabilities** — close remaining Phase 1–3 UI/import/state gaps such as empty-crystal creation, periodic-image controls, asymmetric-unit/symmetry-operation workflows, selection/appearance controls, source-vs-detected symmetry policy, and remaining reciprocal/diffraction controls.
 3. **Phase 5 metadata/export** — searchable loop-aware metadata editor with bundled dictionary guidance; P1/mmCIF/PDB and remaining diffraction/table/report/scene exports with loss previews.
 4. **Learnability/accessibility** — in-tool glossary, contextual help, beginner workflows, textual/chart alternatives, reflow/focus/keyboard/reduced-motion checks.
