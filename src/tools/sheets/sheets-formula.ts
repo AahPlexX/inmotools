@@ -1,4 +1,5 @@
 import { callFormulaJs, hasFormulaJsFunction, isoDate, jsErrorCode, storedPrimitive, toJsPrimitive } from './sheets-formula-js';
+import { findPivotContaining, lookupGetPivotData, pivotSourceCoords } from './sheets-pivot';
 import { applySpill, isSpillMatrix, type SpillMatrix } from './sheets-spill';
 import { cellKey, type CellPrimitive, type NamedRange, type PortableSheet, type PortableWorkbook, type SheetCell } from './sheets-types';
 
@@ -173,6 +174,9 @@ export function buildFormulaDag(book: PortableWorkbook): DagResult {
         const namedRef = parseA1Ref(named.a1);
         if (!namedRef) continue;
         dependsOn.push(nodeId(named.sheetId, namedRef.row, namedRef.col));
+      }
+      for (const coord of getPivotDataSourceDeps(cell.f, book, sheet.id)) {
+        dependsOn.push(nodeId(coord.sheetId, coord.row, coord.col));
       }
       nodes.push({ sheetId: sheet.id, row, col, formula: cell.f, dependsOn });
       edges.set(id, new Set(dependsOn));
@@ -605,6 +609,72 @@ function evalExpr(expr: Expr, book: PortableWorkbook, sheetId: string, named: Na
   }
 }
 
+function walkExpr(expr: Expr, visit: (item: Expr) => void): void {
+  visit(expr);
+  if (expr.kind === 'call') {
+    for (const arg of expr.args) walkExpr(arg, visit);
+    return;
+  }
+  if (expr.kind === 'unary') {
+    walkExpr(expr.value, visit);
+    return;
+  }
+  if (expr.kind === 'bin') {
+    walkExpr(expr.left, visit);
+    walkExpr(expr.right, visit);
+  }
+}
+
+function getPivotDataSourceDeps(formula: string, book: PortableWorkbook, sheetId: string): Array<{ sheetId: string; row: number; col: number }> {
+  if (!/\bGETPIVOTDATA\s*\(/i.test(formula)) return [];
+  try {
+    const body = formula.startsWith('=') ? formula.slice(1) : formula;
+    const expr = new Parser(tokenize(body)).parse();
+    const coords: Array<{ sheetId: string; row: number; col: number }> = [];
+    walkExpr(expr, (item) => {
+      if (item.kind !== 'call' || item.name !== 'GETPIVOTDATA') return;
+      const pivotArg = item.args[1];
+      if (!pivotArg || (pivotArg.kind !== 'ref' && pivotArg.kind !== 'range')) return;
+      const from = pivotArg.kind === 'ref' ? pivotArg.value : pivotArg.from;
+      const sheet = sheetByName(book, from.sheetName, sheetId);
+      if (!sheet) return;
+      const pivot = findPivotContaining(book, sheet.id, from.row, from.col);
+      if (!pivot) return;
+      coords.push(...pivotSourceCoords(book, pivot));
+    });
+    return coords;
+  } catch {
+    return [];
+  }
+}
+
+function evalGetPivotData(args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): FormulaResult {
+  if (!args[0] || !args[1]) return { kind: 'error', code: '#N/A', message: 'GETPIVOTDATA needs a value field and a pivot cell.' };
+  const dataField = firstScalar(evalExpr(args[0], book, sheetId, named));
+  if (isError(dataField)) return dataField;
+  const pivotArg = args[1];
+  if (pivotArg.kind !== 'ref' && pivotArg.kind !== 'range') {
+    return { kind: 'error', code: '#REF!', message: 'GETPIVOTDATA needs a cell inside a local PivotTable.' };
+  }
+  const from = pivotArg.kind === 'ref' ? pivotArg.value : pivotArg.from;
+  const sheet = sheetByName(book, from.sheetName, sheetId);
+  if (!sheet) return { kind: 'error', code: '#REF!', message: 'GETPIVOTDATA pivot cell sheet is missing.' };
+  const pivot = findPivotContaining(book, sheet.id, from.row, from.col);
+  if (!pivot) return { kind: 'error', code: '#REF!', message: 'GETPIVOTDATA needs a cell inside a local PivotTable.' };
+  if ((args.length - 2) % 2 !== 0) {
+    return { kind: 'error', code: '#REF!', message: 'GETPIVOTDATA field/item arguments must come in pairs.' };
+  }
+  const pairs: Array<[string, string]> = [];
+  for (let index = 2; index < args.length; index += 2) {
+    const field = firstScalar(evalExpr(args[index]!, book, sheetId, named));
+    const item = firstScalar(evalExpr(args[index + 1]!, book, sheetId, named));
+    if (isError(field)) return field;
+    if (isError(item)) return item;
+    pairs.push([displayText(field), displayText(item)]);
+  }
+  return lookupGetPivotData(book, pivot, displayText(dataField), pairs);
+}
+
 function numbers(args: Expr[], book: PortableWorkbook, sheetId: string, named: NamedRange[]): number[] | FormulaError {
   const out: number[] = [];
   for (const arg of args) {
@@ -865,6 +935,8 @@ function evalCall(name: string, args: Expr[], book: PortableWorkbook, sheetId: s
       return evalSort(args, book, sheetId, named);
     case 'UNIQUE':
       return evalUnique(args, book, sheetId, named);
+    case 'GETPIVOTDATA':
+      return evalGetPivotData(args, book, sheetId, named);
     default: {
       if (!hasFormulaJsFunction(name)) {
         return { kind: 'error', code: '#NAME?', message: `Unknown function ${name}` };
@@ -1120,6 +1192,7 @@ export function evaluateWorkbook(book: PortableWorkbook): PortableWorkbook {
     validations: [...book.validations],
     conditionalFormats: [...book.conditionalFormats],
     comments: [...book.comments],
+    pivots: [...(book.pivots ?? [])],
   };
   if (dag.cycles.length > 0) {
     for (const id of dag.cycles.flat()) {

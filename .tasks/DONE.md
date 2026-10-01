@@ -1,5 +1,15 @@
 # Done
 
+## Tabular Sheet Workstation Wave B (TASK-022) — shipped and verified
+
+Wave B adds a local PivotTable and a GETPIVOTDATA subset to the Tabular Sheet Workstation, on top of Wave A (merged earlier via PR #73) and the P1-P16 parity slice.
+
+- WB1 Local PivotTable UX: create from a contiguous header+data range; row, column, value and filter fields; SUM, COUNT, AVERAGE, MIN, MAX; auto-refresh on commit plus explicit Refresh; default placement is a new PivotN sheet at A1, or a destination cell on the current sheet (that rectangle is overwritten, other cells are not shifted). Headers are rebuilt from the current aggregation.
+- WB2 GETPIVOTDATA subset: GETPIVOTDATA(data_field, pivot_cell, [field, item]...) against the in-house pivot definitions; grand total, one field/item, and row+column pairs; the data field may be Amount or Sum of Amount.
+- Responsive: PivotTable chrome stacks at 320 CSS px and its action buttons no longer stretch; the P16 CSS-width matrix (320/360/390/412/430/768 portrait, 740/800/844/915/932/1024 landscape) stays the mobile gate; no hover-only controls.
+- Boundaries kept: no realtime collaboration, VBA/Apps Script, cloud Power Query, Univer Pro pivots or drawing, HyperFormula, auth or database, SEQUENCE/SORTBY/RANDARRAY/array constants, Excel pivot caches, slicers, OLAP or Power Pivot. Insert Function is not reduced to XLOOKUP-only. Pins unchanged (@univerjs/presets 0.25.1, exceljs 4.4.0, SheetJS CE 0.20.3, chart.js 4.5.1, @formulajs/formulajs 4.6.1).
+- Verification (fresh, on the branch merged with current origin/main): tsc --noEmit -p tsconfig.app.json clean; tests/unit/sheets-*.test.ts 56/56 across 7 files; production build clean; tests/e2e/tabular-sheet-workstation.spec.ts 43 passed, 0 failed, 13 intentional skips (12 CSS-width matrix tests run on desktop-chromium only, one shared Axe pass), --workers=1. No claim is made that the full Pages suite is green; the known out-of-suite reds are unchanged.
+
 ## Tactical Matchboard Studio residuals wave (T17-01) — shipped and verified
 
 Closed the Tactical Matchboard residual backlog, growing the verified feature ledger from 63 to **67/67**: pitch zoom and pan (row 64), board freehand (65), build-board confirmation (66), and a virtualized timeline with a 2,048-track cap and 40-row window (67); rows 3, 57, 58, 61 and 62 were updated in place. Help copy was rewritten as action, input, result (header sentence, help section match-setup, command-bar tooltips, the Build board tip, and the squad-growth note). The catalog entry was not changed.

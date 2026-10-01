@@ -44,6 +44,7 @@ export function parseBundle(value: unknown): WorkbookBundle | null {
   const workbook = record.workbook as PortableWorkbook;
   if (!Array.isArray(workbook.sheets) || workbook.sheets.length === 0) return null;
   if (!Array.isArray(workbook.comments)) workbook.comments = [];
+  if (!Array.isArray(workbook.pivots)) workbook.pivots = [];
   return {
     tool: TOOL_ID,
     schemaVersion: SCHEMA_VERSION,
