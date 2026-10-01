@@ -39,6 +39,7 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'typing-workstation': () => import('./typing/TypingWorkspace'),
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
   'geo-intelligence-hub': () => import('./geo-intel/GeoIntelWorkspace'),
+  'tactical-matchboard-studio': () => import('./tactics/TacticalMatchboardWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
