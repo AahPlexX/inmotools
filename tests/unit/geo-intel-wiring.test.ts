@@ -10,8 +10,10 @@ describe('geo intelligence hub wiring', () => {
   it('registers exactly one catalog entry with the ToolDefinition shape', () => {
     expect(TOOLS.filter((tool) => tool.slug === SLUG)).toHaveLength(1);
     const tool = TOOL_BY_SLUG.get(SLUG);
-    expect(Object.keys(tool ?? {}).sort()).toEqual(['accepts', 'audience', 'hint', 'outputs', 'privacy', 'shortTitle', 'slug', 'steps', 'summary', 'title'].sort());
+    expect(Object.keys(tool ?? {}).sort()).toEqual(['accepts', 'audience', 'hint', 'outputs', 'privacy', 'shortTitle', 'slug', 'steps', 'summary', 'title', 'workspaceFirst'].sort());
     expect(tool?.shortTitle).toBe('Geo Intelligence Hub');
+    // Interactive map tool: open on the workspace, not below the intro.
+    expect(tool?.workspaceFirst).toBe(true);
     expect(tool?.steps.length).toBeGreaterThanOrEqual(3);
     expect(tool?.privacy).toMatch(/IndexedDB/);
     expect(tool?.privacy).toMatch(/keyless/);
