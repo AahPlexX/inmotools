@@ -302,7 +302,7 @@ export default function ExifWorkspace() {
           const stripped = stripEmbeddedMetadata(new Uint8Array(await item.file.arrayBuffer()), item.file.type, operationKeepColor);
           if (!isCurrent()) return;
           encoded = {
-            blob: new Blob([stripped.buffer.slice(stripped.byteOffset, stripped.byteOffset + stripped.byteLength)], { type: item.file.type }),
+            blob: new Blob([(() => { const copy = new ArrayBuffer(stripped.byteLength); new Uint8Array(copy).set(stripped); return copy; })()], { type: item.file.type }),
             width: item.width,
             height: item.height,
             method: 'Stripped embedded metadata',
