@@ -30,7 +30,10 @@ test('stops safely when the realtime master processor crashes', async ({ page })
     EventTarget.prototype.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
       original.call(this, type, listener, options);
       if (type === 'processorerror' && listener && typeof AudioWorkletNode !== 'undefined' && this instanceof AudioWorkletNode) {
-        window.setTimeout(() => this.dispatchEvent(new Event('processorerror')), 75);
+        // The test fires the error itself once playback has really started: the audio clock can sit at
+        // zero for a while on hosts with a slow audio device, so a fixed delay is not reliable.
+        const nodes = ((window as unknown as { __masterNodes?: EventTarget[] }).__masterNodes ??= []);
+        nodes.push(this);
       }
     };
   });
@@ -47,6 +50,10 @@ test('stops safely when the realtime master processor crashes', async ({ page })
   await expect(page.getByText('Reference: load one on the Meters tab.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000', { timeout: 20_000 });
+  await page.evaluate(() => {
+    for (const node of (window as unknown as { __masterNodes?: EventTarget[] }).__masterNodes ?? []) node.dispatchEvent(new Event('processorerror'));
+  });
   await expect(page.locator('.status-line')).toContainText(/Realtime audio processor stopped unexpectedly/i);
   await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
   await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000');
@@ -77,7 +84,10 @@ test('locks destructive processing safely when the DSP worker crashes', async ({
   await expect(page.getByRole('button', { name: 'Normalize peak' })).toBeDisabled();
 
   await page.getByRole('tab', { name: 'Project' }).click();
-  await expect(page.getByRole('button', { name: 'Save project backup' })).toBeEnabled();
+  // The recovery banner and the Project tab each offer the backup; both must be usable.
+  const backupButtons = page.getByRole('button', { name: 'Save project backup' });
+  await expect(backupButtons).toHaveCount(2);
+  for (const button of await backupButtons.all()) await expect(button).toBeEnabled();
 });
 
 test('fails gracefully when the DSP worker cannot start', async ({ page }) => {
@@ -449,22 +459,22 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
 
   await page.getByRole('tab', { name: 'Meters' }).click();
   const transport = page.locator('.mastering-transport');
-  await expect(transport.getByRole('button', { name: 'Reference', exact: true })).toBeDisabled();
+  await expect(transport.getByRole('radio', { name: 'Reference', exact: true })).toBeDisabled();
   await page.getByRole('tabpanel', { name: 'Meters' }).locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
   await expect(status).toContainText(/Loaded reference\.wav as the reference/);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
   await expect(status).not.toContainText(/without the master chain/);
-  await transport.getByRole('button', { name: 'Reference', exact: true }).click();
+  await transport.getByRole('radio', { name: 'Reference', exact: true }).click();
   await expect(status).toContainText(/reference track, loudness-matched/);
   await expect(page.getByLabel('Integrated loudness', { exact: true })).not.toHaveText('— LUFS', { timeout: 10_000 });
-  await transport.getByRole('button', { name: 'Original', exact: true }).click();
+  await transport.getByRole('radio', { name: 'Original', exact: true }).click();
   await expect(status).toContainText(/original mix, loudness-matched/);
-  await transport.getByRole('button', { name: 'Difference', exact: true }).click();
+  await transport.getByRole('radio', { name: 'Difference', exact: true }).click();
   await page.getByLabel('Mono check (sum to mono)').check();
   await page.getByRole('radio', { name: 'Side only', exact: true }).check();
-  await transport.getByRole('button', { name: 'Processed', exact: true }).click();
-  await expect(transport.getByRole('button', { name: 'Processed', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await transport.getByRole('radio', { name: 'Processed', exact: true }).click();
+  await expect(transport.getByRole('radio', { name: 'Processed', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('meter', { name: 'Phase correlation' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(status).toContainText(/Paused at/);
@@ -480,7 +490,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(overlay).toHaveAttribute('aria-label', /Spectrogram from 0:00\.000 to 0:03\.000/);
   await expect(page.locator('.mastering-spectrogram .mastering-busy')).toHaveCount(0, { timeout: 15_000 });
 
-  await page.getByRole('button', { name: 'Paint regions' }).click();
+  await page.getByRole('radio', { name: 'Paint regions' }).click();
   await expect(overlay).toHaveCSS('touch-action', 'none');
   await overlay.scrollIntoViewIfNeeded();
   const box = await overlay.boundingBox();
@@ -496,7 +506,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByLabel('Clip edits')).toHaveText('0');
 
-  await page.getByRole('button', { name: 'Select time' }).click();
+  await page.getByRole('radio', { name: 'Select time' }).click();
   await expect(overlay).toHaveCSS('touch-action', 'pan-y');
   await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
   await page.mouse.down();
