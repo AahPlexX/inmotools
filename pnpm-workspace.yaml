@@ -1,6 +1,6 @@
 allowBuilds:
   core-js: false
-  exifreader@4.44.0: true
+  exifreader@4.45.2: true
   protobufjs: false
 
 minimumReleaseAgeExclude:

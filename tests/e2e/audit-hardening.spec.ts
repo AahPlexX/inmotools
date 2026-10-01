@@ -405,7 +405,7 @@ test('GeoJSON Simplifier runs simplification off the main thread', async ({ page
   await expect(page.locator('.status-line')).toContainText('Simplified locally to', { timeout: 30_000 });
 
   // The page stayed responsive throughout, and the output is smaller.
-  const outputVertices = await page.locator('.metric', { hasText: 'Output vertices' }).locator('strong').textContent();
+  const outputVertices = await page.locator('.metric', { hasText: 'Output positions' }).locator('strong').textContent();
   expect(Number(outputVertices)).toBeGreaterThan(0);
   expect(Number(outputVertices)).toBeLessThan(4001);
 

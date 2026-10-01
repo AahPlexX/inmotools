@@ -191,9 +191,11 @@ export default function MasteringSamplePen({ ctx }: { ctx: MasteringPanelContext
         <div className="field"><span className="field-label">At time</span><output className="mastering-readout">{formatTime(clipStart + editIndex / rate)}</output></div>
       </div>
       <div className="button-row">
-        <button type="button" disabled={disabled || editIndex < 0 || editIndex >= clipFrames || !Number.isFinite(editValue)}
+        <button type="button" title="Write this one value at the given sample number, on the current channel"
+          disabled={disabled || editIndex < 0 || editIndex >= clipFrames || !Number.isFinite(editValue)}
           onClick={() => ctx.applyEdit({ type: 'samplePatch', startFrame: editIndex, values: Array.from({ length: channelCount }, (_, index) => index === activeChannel ? [Math.max(-1, Math.min(1, editValue))] : []) }, `Set sample ${editIndex} on channel ${activeChannel + 1} to ${editValue}. Undo is available.`)}>Set sample</button>
-        <button type="button" disabled={!canEdit || !clip} onClick={() => void interpolateSelection()}>Interpolate selected samples</button>
+        <button type="button" title="Rebuild the selected samples on every channel from a smooth curve through the audio just outside the selection"
+          disabled={!canEdit || !clip} onClick={() => void interpolateSelection()}>Interpolate selected samples</button>
       </div>
     </fieldset>
   </section>;

@@ -112,6 +112,9 @@
 .mastering-recovery { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid var(--signal); border-radius:var(--radius-sm); background:var(--signal-soft); }
 .mastering-recovery h3 { margin:0 0 4px; font-size:16px; }
 .mastering-recovery p { margin:0; }
+.mastering-session-list { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.mastering-session-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); }
+.mastering-session-row .help-text { margin:2px 0 0; }
 .mastering-presets { display:grid; gap:10px; }
 .mastering-preset-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; }
 .mastering-preset-row .field { flex:1 1 220px; margin:0; }
@@ -197,6 +200,9 @@
   .mastering-panel { padding:14px; }
   .mastering-marker-list > div, .mastering-region-list > div { grid-template-columns:1fr; }
   .mastering-marker-list > div button, .mastering-region-list > div button { width:100%; }
+  .mastering-session-row { flex-direction:column; align-items:stretch; }
+  .mastering-session-row .button-row { width:100%; }
+  .mastering-session-row .button-row button { flex:1 1 0; }
   .mastering-fade-row { grid-template-columns:1fr; }
   .mastering-workspace .workspace-grid, .mastering-workspace .workspace-grid.three { grid-template-columns:1fr; gap:12px; }
   .mastering-zoom-bar button { flex:1 1 40%; min-height:44px; }

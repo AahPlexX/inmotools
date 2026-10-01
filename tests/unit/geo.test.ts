@@ -31,6 +31,13 @@ describe('GeoJSON simplifier',()=>{
    expect(result.rootShape).toBe('LineString → LineString');
  });
 
+ it('preserves altitude in TopoJSON when all detail is retained',()=>{
+   const source={type:'LineString' as const,coordinates:[[0,0,10],[1,1,20],[2,0,30]]};
+   const result=simplifyTopology(source,{decimals:6,retain:1,output:'topojson'});
+   expect(result.geojson.coordinates).toEqual(source.coordinates);
+   expect(positions(result.topojson?.arcs)).toEqual(source.coordinates);
+ });
+
  it('refuses lossy 3D simplification when one horizontal position has conflicting extra dimensions',()=>{
    const source={type:'MultiLineString',coordinates:[[[0,0,10],[1,0,20]],[[0,0,99],[0,1,30]]]};
    expect(()=>simplifyTopology(source,{decimals:6,retain:.5,output:'geojson'})).toThrow(/additional dimensions|altitude|3D/i);
@@ -41,6 +48,7 @@ describe('RFC 7946 structural inspection',()=>{
  it('reports feature count, coordinate count, and finite bounds without spread operations',()=>{const report=validateGeoJson(geometry);expect(report.valid).toBe(true);expect(report.featureCount).toBe(1);expect(report.coordinateCount).toBe(4);expect(report.bounds).toEqual({minX:0.123456789,minY:0.987654321,maxX:2.123456789,maxY:2.987654321});expect(computeGeoBounds(geometry)).toEqual(report.bounds);});
  it('rejects unknown types and non-finite positions',()=>{expect(validateGeoJson({type:'Thing',coordinates:[0,0]}).valid).toBe(false);const invalid=validateGeoJson({type:'Point',coordinates:[0,Number.NaN]});expect(invalid.valid).toBe(false);expect(invalid.errors.join(' ')).toMatch(/non-finite/i);});
  it('warns about positions beyond three elements and out-of-range WGS84 latitude',()=>{const report=validateGeoJson({type:'Point',coordinates:[10,95,3,4]});expect(report.valid).toBe(true);expect(report.warnings.join(' ')).toMatch(/no more than three/i);expect(report.warnings.join(' ')).toMatch(/latitude/i);});
+ it('flags projected-looking longitudes and legacy CRS metadata before export',()=>{const report=validateGeoJson({type:'Point',crs:{type:'name',properties:{name:'EPSG:3857'}},coordinates:[1000000,30]});expect(report.valid).toBe(true);expect(report.warnings.join(' ')).toMatch(/longitude/i);expect(report.warnings.join(' ')).toMatch(/crs|WGS84/i);});
  it('requires FeatureCollection members to be Features and Feature properties to be object or null',()=>{expect(validateGeoJson({type:'FeatureCollection',features:[{type:'Point',coordinates:[0,0]}]}).valid).toBe(false);expect(validateGeoJson({type:'Feature',properties:'bad',geometry:{type:'Point',coordinates:[0,0]}}).valid).toBe(false);});
 
  it('rejects short or unclosed polygon rings instead of letting topology silently repair them',()=>{
@@ -56,5 +64,16 @@ describe('RFC 7946 structural inspection',()=>{
    const report=validateGeoJson({type:'LineString',coordinates:[[0,0]]});
    expect(report.valid).toBe(false);
    expect(report.errors.join(' ')).toMatch(/two|2|LineString/i);
+ });
+
+ it('rejects null children inside a GeometryCollection',()=>{
+   const report=validateGeoJson({type:'GeometryCollection',geometries:[null]});
+   expect(report.valid).toBe(false);
+   expect(report.errors.join(' ')).toMatch(/geometries\[0\]/);
+ });
+ it('checks Feature IDs and bounding-box member shapes',()=>{
+   expect(validateGeoJson({type:'Feature',id:{key:1},properties:null,geometry:null}).valid).toBe(false);
+   expect(validateGeoJson({type:'Point',coordinates:[0,0],bbox:[0,0,1]}).valid).toBe(false);
+   expect(validateGeoJson({type:'Point',coordinates:[0,0],bbox:[0,0,1,1]}).valid).toBe(true);
  });
 });

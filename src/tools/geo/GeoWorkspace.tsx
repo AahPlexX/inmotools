@@ -29,6 +29,7 @@ function featureLabel(feature: any, index: number): string {
 
 export default function GeoWorkspace() {
   const [source, setSource] = useState<any | null>(null);
+  const [inputBytes, setInputBytes] = useState(0);
   const [fileName, setFileName] = useState('map.geojson');
   const [decimals, setDecimals] = useState(5);
   const [retain, setRetain] = useState(.65);
@@ -42,7 +43,7 @@ export default function GeoWorkspace() {
   const [running, setRunning] = useState(false);
 
   const validation = useMemo(() => source ? validateGeoJson(source) : null, [source]);
-  const sourceMetrics = useMemo(() => source ? { coordinates: countCoordinates(source), bytes: bytes(source), bounds: computeGeoBounds(source) } : null, [source]);
+  const sourceMetrics = useMemo(() => source ? { coordinates: countCoordinates(source), bytes: inputBytes, bounds: computeGeoBounds(source) } : null, [source, inputBytes]);
   const sharedBounds = result?.preview ? sourceMetrics?.bounds ?? computeGeoBounds(result.preview) : sourceMetrics?.bounds ?? null;
   const warningRows = useMemo<WarningRow[]>(() => (validation?.warnings ?? []).map((message, index) => ({ id: `warning-${index}`, message })), [validation]);
   const features = useMemo<any[]>(() => source?.type === 'FeatureCollection' && Array.isArray(source.features) ? source.features : source?.type === 'Feature' ? [source] : [], [source]);
@@ -68,6 +69,9 @@ export default function GeoWorkspace() {
     setRunning(false);
     sourceTokenRef.current += 1;
     const token = sourceTokenRef.current;
+    setSource(null);
+    setResult(null);
+    setStatus(`Loading ${file.name}…`);
     try {
       const text = await file.text();
       if (token !== sourceTokenRef.current) return;
@@ -76,6 +80,7 @@ export default function GeoWorkspace() {
       if (!check.valid) throw new Error(check.errors[0]);
       if (token !== sourceTokenRef.current) return;
       setSource(parsed);
+      setInputBytes(file.size);
       setFileName(file.name);
       setResult(null);
       setView(DEFAULT_VIEW);
@@ -186,7 +191,7 @@ export default function GeoWorkspace() {
       return;
     }
     const extension = result.settings.output === 'geojson' ? 'geojson' : 'topojson';
-    downloadText(JSON.stringify(result.exported, null, 2), `${baseName()}.simplified.${extension}`, 'application/json');
+    downloadText(JSON.stringify(result.exported), `${baseName()}.simplified.${extension}`, extension === 'geojson' ? 'application/geo+json' : 'application/json');
     setStatus(`Downloaded the ${extension.toUpperCase()} generated with the displayed settings.`);
   }
 
@@ -220,7 +225,7 @@ export default function GeoWorkspace() {
       {source && validation ? <>
         <div className={`notice ${validation.valid ? '' : 'error'}`}>
           <strong>RFC 7946 structural check: {validation.valid ? 'passes' : 'fails'}</strong>
-          <div className="help-text">{validation.featureCount.toLocaleString()} features · {validation.coordinateCount.toLocaleString()} positions{validation.bounds ? ` · bounds ${validation.bounds.minX.toFixed(4)}, ${validation.bounds.minY.toFixed(4)} → ${validation.bounds.maxX.toFixed(4)}, ${validation.bounds.maxY.toFixed(4)}` : ''}</div>
+          <div className="help-text" style={{ overflowWrap: 'anywhere' }}>Loaded: {fileName} · {validation.featureCount.toLocaleString()} features · {validation.coordinateCount.toLocaleString()} positions{validation.bounds ? ` · bounds ${validation.bounds.minX.toFixed(4)}, ${validation.bounds.minY.toFixed(4)} → ${validation.bounds.maxX.toFixed(4)}, ${validation.bounds.maxY.toFixed(4)}` : ''}</div>
         </div>
 
         {warningRows.length ? <div style={{ marginTop: 16 }}>
@@ -236,7 +241,7 @@ export default function GeoWorkspace() {
         </div> : null}
 
         {features.length ? <div className="workspace-grid" style={{ marginTop: 18 }}>
-          <div className="field">
+          <div className="field" style={{ alignSelf: 'start' }}>
             <label htmlFor="geo-feature-select">Inspect feature</label>
             <select id="geo-feature-select" value={Math.min(selectedFeatureIndex, features.length - 1)} onChange={(event) => setSelectedFeatureIndex(Number(event.target.value))}>
               {features.map((item, index) => <option key={item?.id ?? index} value={index}>{featureLabel(item, index)}</option>)}
@@ -250,7 +255,7 @@ export default function GeoWorkspace() {
 
         <div className="workspace-grid three" style={{ marginTop: 18 }}>
           <div className="field"><label htmlFor="geo-decimals">Coordinate decimals</label><input id="geo-decimals" type="number" min="0" max="12" value={decimals} onChange={(event) => setDecimalsSafe(Number(event.target.value))} /></div>
-          <div className="field"><label htmlFor="geo-retain">Geometry detail retained</label><input id="geo-retain" type="number" min="0.05" max="1" step="0.05" value={retain} onChange={(event) => setRetainSafe(Number(event.target.value))} /></div>
+          <div className="field"><label htmlFor="geo-retain">Geometry detail target</label><input id="geo-retain" type="number" min="0.05" max="1" step="0.05" value={retain} onChange={(event) => setRetainSafe(Number(event.target.value))} /><small>Fraction of removable line detail to keep. Point geometry is unchanged.</small></div>
           <div className="field"><label htmlFor="geo-output">Export format</label><select id="geo-output" value={output} onChange={(event) => setOutputSafe(event.target.value as 'geojson' | 'topojson')}><option value="geojson">GeoJSON</option><option value="topojson">TopoJSON</option></select></div>
         </div>
 
@@ -259,12 +264,11 @@ export default function GeoWorkspace() {
           {running ? <button className="action-button secondary" type="button" onClick={cancel}>Stop</button> : null}
           <button className="action-button secondary" type="button" disabled={!result || running} onClick={save}>Download generated {result?.settings.output === 'topojson' ? 'TopoJSON' : 'GeoJSON'}</button>
           <button className="action-button secondary" type="button" disabled={!result || running} onClick={saveStats}>Download processing stats</button>
-          <button className="action-button secondary" type="button" onClick={() => setView(DEFAULT_VIEW)}>Reset linked view</button>
         </div>
 
         <div className="metric-row">
-          <div className="metric"><span>Input vertices</span><strong>{sourceMetrics?.coordinates ?? 0}</strong></div>
-          <div className="metric"><span>Output vertices</span><strong>{result?.outputCoordinates ?? '—'}</strong></div>
+          <div className="metric"><span>Input positions</span><strong>{sourceMetrics?.coordinates ?? 0}</strong></div>
+          <div className="metric"><span>Output positions</span><strong>{result?.outputCoordinates ?? '—'}</strong></div>
           <div className="metric"><span>Input bytes</span><strong>{sourceMetrics?.bytes.toLocaleString() ?? 0}</strong></div>
           <div className="metric"><span>Output bytes</span><strong>{result ? result.bytes.toLocaleString() : '—'}</strong></div>
         </div>
@@ -272,7 +276,7 @@ export default function GeoWorkspace() {
         {result ? <>
           <div className="notice">
             <strong>Generated settings</strong>
-            <div className="help-text">{result.settings.decimals} decimals · {(result.settings.retain * 100).toFixed(0)}% detail · {result.settings.output === 'geojson' ? 'GeoJSON' : 'TopoJSON'}. Changing any setting invalidates this result.</div>
+            <div className="help-text">{result.settings.decimals} decimals · {(result.settings.retain * 100).toFixed(0)}% detail target · {result.settings.output === 'geojson' ? 'GeoJSON' : 'TopoJSON'}. Changing any setting invalidates this result.</div>
           </div>
           <div className={`notice ${result.outputValidation.valid ? '' : 'error'}`} style={{ marginTop: 12 }}>
             <strong>Post-simplification check: {result.outputValidation.valid ? 'passes' : 'fails'}</strong>
@@ -284,9 +288,18 @@ export default function GeoWorkspace() {
           <div><h3>Original</h3><GeoPreview data={source} label="Original GeoJSON geometry preview" bounds={sharedBounds} view={view} onViewChange={setView} /></div>
           <div><h3>Simplified</h3>{result?.preview ? <GeoPreview data={result.preview} label="Simplified GeoJSON geometry preview" bounds={sharedBounds} view={view} onViewChange={setView} /> : <div className="notice">Run the simplifier to compare geometry.</div>}</div>
         </div>
-        <p className="help-text">Both previews share the same geographic bounds and pan/zoom state. Drag either preview or use the mouse wheel; rendering is sampled for very large geometry while export always uses all coordinates. Bare geometry inputs remain bare geometry outputs; topology processing never silently wraps them in a Feature.</p>
+        <div className="button-row" role="group" aria-label="Linked preview view controls">
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.min(20, current.zoom * 1.25) }))}>Zoom in</button>
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, zoom: Math.max(.5, current.zoom / 1.25) }))}>Zoom out</button>
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, panX: current.panX + 30 }))}>Pan right</button>
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, panX: current.panX - 30 }))}>Pan left</button>
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, panY: current.panY - 30 }))}>Pan up</button>
+          <button className="action-button secondary" type="button" onClick={() => setView((current) => ({ ...current, panY: current.panY + 30 }))}>Pan down</button>
+          <button className="action-button secondary" type="button" onClick={() => setView(DEFAULT_VIEW)}>Reset linked view</button>
+        </div>
+        <p className="help-text">Both previews share the same bounds and view. Use the buttons on touch screens or with a keyboard; mouse users can also drag a preview or scroll over it to zoom. Large geometry is sampled in the preview; exports use every coordinate. Bare geometry stays bare geometry in GeoJSON output.</p>
       </> : null}
-      <div className={`status-line ${source ? 'good' : ''}`} role="status">{status}</div>
+      <div className="status-line" role="status" style={{ overflowWrap: 'anywhere' }}>{status}</div>
     </div>
   </>;
 }

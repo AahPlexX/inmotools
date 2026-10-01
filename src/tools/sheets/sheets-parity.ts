@@ -52,6 +52,7 @@ export const FEATURED_INSERT_FUNCTIONS: FormulaCatalogItem[] = [
   { name: 'FILTER', template: '=FILTER(', summary: 'Keep rows that match a test and spill into empty cells.' },
   { name: 'SORT', template: '=SORT(', summary: 'Sort a range and spill into empty cells.' },
   { name: 'UNIQUE', template: '=UNIQUE(', summary: 'Return distinct rows and spill into empty cells.' },
+  { name: 'GETPIVOTDATA', template: '=GETPIVOTDATA(', summary: 'Return a value from a local PivotTable. Name the value field, then a cell inside the pivot, then optional field/item pairs.' },
   { name: 'LEFT', template: '=LEFT(', summary: 'Return characters from the start of a text value.' },
   { name: 'RIGHT', template: '=RIGHT(', summary: 'Return characters from the end of a text value.' },
   { name: 'MID', template: '=MID(', summary: 'Return characters from the middle of a text value.' },

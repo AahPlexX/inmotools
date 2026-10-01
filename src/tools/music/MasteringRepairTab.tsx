@@ -81,7 +81,7 @@ export default function MasteringRepairTab({ ctx }: { ctx: MasteringPanelContext
 
       <Tool title="Noise reduction" summary="Broadband hiss, fan, and room noise" open>
         <ol className="mastering-steps">
-          <li>Select half a second or more where only the noise plays, and capture it as the noise fingerprint.</li>
+          <li>Select where only the noise plays, and capture it as the noise fingerprint. A short capture works, but half a second or more usually gives a more accurate fingerprint.</li>
           <li>Choose how far to lower the noise, then reduce it.</li>
         </ol>
         <div className="field"><span className="field-label">Noise fingerprint</span><output className="mastering-readout">{valid(noise) && noise ? `${formatTime(noise.startSeconds)}–${formatTime(noise.endSeconds)}` : 'Not captured for this clip'}</output></div>
@@ -182,7 +182,7 @@ export default function MasteringRepairTab({ ctx }: { ctx: MasteringPanelContext
     <section className="mastering-panel" aria-labelledby="roomtone-heading">
       <div className="mastering-panel-heading"><div><h3 id="roomtone-heading">Room tone fill</h3><p>Cover a cough, bump, or edit gap with the natural background sound from a quiet part of the same clip.</p></div></div>
       <ol className="mastering-steps">
-        <li>Select at least 0.5 seconds of clean background noise in the selected clip, then capture it.</li>
+        <li>Select some clean background noise in the selected clip, then capture it. At least 20 ms is accepted, but half a second or more usually loops more naturally.</li>
         <li>Select the part to cover and fill it. The edges blend over 10 ms so the patch doesn't click.</li>
       </ol>
       <div className="field"><span className="field-label">Captured room tone</span><output className="mastering-readout" aria-live="polite">{valid(roomTone) && roomTone ? `${formatTime(roomTone.startSeconds)}–${formatTime(roomTone.endSeconds)} (${(roomTone.endSeconds - roomTone.startSeconds).toFixed(2)} s)` : 'Nothing captured for this clip yet'}</output></div>

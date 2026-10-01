@@ -9,6 +9,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 import { downloadText } from '../../lib/download';
 import { consumeFileInput } from '../../lib/file-input';
 import { probeExportCapabilities } from './mastering-export';
+import type { StoredSession } from './mastering-persistence';
 import { formatBytes, messageOf, type MasteringPanelContext } from './mastering-ui';
 
 export type AutosaveState =
@@ -25,6 +26,11 @@ interface Props {
   busy: boolean;
   onSaveBackup: () => Promise<void>;
   onRestoreBackup: (file: File) => Promise<void>;
+  /** Other saved sessions (this tab's own is never included), newest first. */
+  sessions: StoredSession[];
+  onOpenSession: (session: StoredSession) => Promise<void>;
+  onDeleteSession: (id: string) => Promise<void>;
+  onRefreshSessions: () => Promise<void>;
 }
 
 interface DiagnosticRow { label: string; value: string; ok: boolean | null }
@@ -62,16 +68,27 @@ async function collectDiagnostics(channels: number, sampleRate: number): Promise
   return rows;
 }
 
-export default function MasteringProjectTab({ ctx, active, autosave, busy, onSaveBackup, onRestoreBackup }: Props) {
+export default function MasteringProjectTab({ ctx, active, autosave, busy, onSaveBackup, onRestoreBackup, sessions, onOpenSession, onDeleteSession, onRefreshSessions }: Props) {
   const [diagnostics, setDiagnostics] = useState<DiagnosticRow[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [persistState, setPersistState] = useState<string | null>(null);
+  const [sessionAction, setSessionAction] = useState<{ id: string; kind: 'open' | 'delete' } | null>(null);
+  const [refreshingSessions, setRefreshingSessions] = useState(false);
   const channels = ctx.render?.mix.channels.length ?? 2;
   const rate = ctx.document.sampleRate ?? 48_000;
 
   // Diagnostics load encoder code, so they run on first view, not with the page.
   const [shown, setShown] = useState(false);
   useEffect(() => { if (active) setShown(true); }, [active]);
+  // Other tabs may have saved sessions since this page loaded; catch up once this tab is shown.
+  useEffect(() => {
+    if (!active) return;
+    setRefreshingSessions(true);
+    onRefreshSessions().finally(() => setRefreshingSessions(false));
+    // Only on the first activation: onRefreshSessions is stable across re-renders in practice, and
+    // re-running on every parent update would refetch on every autosave tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
   useEffect(() => {
     if (!shown) return;
     let cancelled = false;
@@ -86,6 +103,16 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
     const file = input.files?.[0];
     consumeFileInput(input, () => (file ? onRestoreBackup(file) : undefined));
   };
+
+  const openSession = async (session: StoredSession) => {
+    setSessionAction({ id: session.id, kind: 'open' });
+    try { await onOpenSession(session); } finally { setSessionAction(null); }
+  };
+  const removeSession = async (session: StoredSession) => {
+    setSessionAction({ id: session.id, kind: 'delete' });
+    try { await onDeleteSession(session.id); } finally { setSessionAction(null); }
+  };
+  const refreshSessions = () => { setRefreshingSessions(true); onRefreshSessions().finally(() => setRefreshingSessions(false)); };
 
   // Some browsers (and insecure origins) expose no StorageManager at all.
   const canPersist = typeof navigator !== 'undefined' && 'storage' in navigator && typeof navigator.storage?.persist === 'function';
@@ -144,6 +171,36 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
         </label>
       </div>
       <p className="help-text">Opening a backup replaces the current project. Save a backup of this one first if you want to keep it.</p>
+    </section>
+
+    <section className="mastering-panel" aria-labelledby="project-sessions-heading">
+      <div className="mastering-panel-heading"><div>
+        <h3 id="project-sessions-heading">Saved sessions</h3>
+        <p>Autosaved sessions from this and other tabs on this device, newest first. Opening one replaces the current project.</p>
+      </div></div>
+      {!sessions.length && <p className="help-text">{refreshingSessions ? 'Checking…' : 'No other saved sessions right now.'}</p>}
+      {sessions.length > 0 && <ul className="mastering-session-list">
+        {sessions.map((session) => {
+          const names = session.sourceNames;
+          const summary = names.length ? `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}` : 'No audio loaded';
+          const trackCount = session.document.tracks.length;
+          const opening = sessionAction?.id === session.id && sessionAction.kind === 'open';
+          const deleting = sessionAction?.id === session.id && sessionAction.kind === 'delete';
+          return <li key={session.id} className="mastering-session-row">
+            <div>
+              <strong>{trackCount} track{trackCount === 1 ? '' : 's'}</strong>
+              <p className="help-text mastering-wrap">{summary} · saved {new Date(session.savedAt).toLocaleString()}</p>
+            </div>
+            <div className="button-row">
+              <button type="button" disabled={busy || Boolean(sessionAction)} onClick={() => void openSession(session)}>{opening ? 'Opening…' : 'Open'}</button>
+              <button type="button" disabled={busy || Boolean(sessionAction)} onClick={() => void removeSession(session)}>{deleting ? 'Deleting…' : 'Delete'}</button>
+            </div>
+          </li>;
+        })}
+      </ul>}
+      <div className="button-row">
+        <button type="button" disabled={refreshingSessions || Boolean(sessionAction)} onClick={refreshSessions}>{refreshingSessions ? 'Checking…' : 'Check for sessions from other tabs'}</button>
+      </div>
     </section>
 
     <section className="mastering-panel" aria-labelledby="project-diagnostics-heading">
