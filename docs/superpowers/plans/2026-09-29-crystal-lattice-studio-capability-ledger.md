@@ -1,8 +1,8 @@
 # Crystal Lattice Studio — Capability Ledger
 
-**Updated:** 2026-09-29  
+**Updated:** 2026-10-01
 **Design:** `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md` (163 numbered capabilities)  
-**Tally:** 75 done · 42 partial · 46 missing (of 163)
+**Tally:** 90 done · 48 partial · 25 missing (of 163)
 
 Status is judged from code and tests on `main`. **Done** means engine plus a reachable surface (UI or export) with tests. **Partial** names the exact gap. **Missing** means no implementation. The design exclusions (macromolecular building, CSD/ICSD, SHELX executables, magnetic-space-group solving) need owner-approved wording before they count as excluded; none is recorded as excluded here.
 
@@ -16,7 +16,7 @@ Update the status of an item here whenever its implementation changes; keep this
 | 4 | Import PDB coordinate models with crystallographic cell/symmetry records when present. | Done | cif-engine / structure-import-engine; crystal-cif, crystal-import tests |
 | 5 | Import VASP POSCAR/CONTCAR structures. | Done | cif-engine / structure-import-engine; crystal-cif, crystal-import tests |
 | 6 | Import XYZ and extended XYZ structures, preserving supported lattice/property fields. | Done | cif-engine / structure-import-engine; crystal-cif, crystal-import tests |
-| 7 | Import SHELX-style reflection `.hkl` text for observed-reflection workflows where the... | Missing | No SHELX .hkl import (only .hkl export) |
+| 7 | Import SHELX-style reflection `.hkl` text for observed-reflection workflows where the... | Partial | reflection-refinement-engine parseObservedReflections reads delimited h k l Fo text (comments, 0 0 0 terminator) from the Reflection & Fourier panel; tested in crystal-reflection-refinement and the phase-4 e2e; fixed-width SHELX columns with abutting numbers are not handled |
 | 8 | Import CIF reflection loops and powder-data loops when present. | Missing | No CIF reflection/powder loop import |
 | 9 | Import generic XY/XYE powder traces with explicit column mapping. | Partial | observed-pattern-engine parses two-column position/intensity peaks; no XYE column mapping |
 | 10 | Support multiple CIF data blocks and let the user choose or compare blocks without di... | Partial | Document keeps all blocks; no block chooser/compare UI |
@@ -121,27 +121,27 @@ Update the status of an item here whenever its implementation changes; keep this
 | 109 | Provide a bounded least-squares powder fitting core for scale, zero shift, lattice pa... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
 | 110 | Allow parameters to be fixed/free and bounded, with the active parameter set visible... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
 | 111 | Report convergence, parameter changes, residual metrics, iteration count, and termina... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
-| 112 | Provide an observed-reflection workspace for CIF/SHELX-style reflection data with Fc/... | Missing | Phase 4 not started |
-| 113 | Compute common residual summaries such as R1-style and weighted residual metrics with... | Missing | Phase 4 not started |
-| 114 | Calculate difference-Fourier-style scalar grids from suitable observed/calculated ref... | Missing | Phase 4 not started |
-| 115 | Find/rank local maxima/minima in generated difference maps as candidate residual-dens... | Missing | Phase 4 not started |
-| 116 | Provide a constrained experimental coordinate/occupancy/ADP least-squares refinement... | Missing | Phase 4 not started |
+| 112 | Provide an observed-reflection workspace for CIF/SHELX-style reflection data with Fc/... | Partial | Reflection & Fourier panel accepts .hkl/.txt observed reflections and compares them with the current model (crystal-reflection-refinement unit, phase-4 e2e); no CIF reflection-loop import (see 8) and no sigma weighting UI |
+| 113 | Compute common residual summaries such as R1-style and weighted residual metrics with... | Done | reflectionResiduals reports R1-style and weighted residuals with counts and scale; shown in the panel; crystal-reflection-refinement unit and phase-4 e2e (R1 visible) |
+| 114 | Calculate difference-Fourier-style scalar grids from suitable observed/calculated ref... | Done | differenceFourierGrid builds a model-phased difference map from observed and calculated amplitudes, labelled model-dependent; unit and phase-4 e2e |
+| 115 | Find/rank local maxima/minima in generated difference maps as candidate residual-dens... | Done | rankResidualDensityPeaks ranks finite maxima and minima; shown as Fourier extrema in the panel; unit and phase-4 e2e |
+| 116 | Provide a constrained experimental coordinate/occupancy/ADP least-squares refinement... | Partial | refinement-engine.ts refineLeastSquares supports coordinate, occupancy and ADP parameter kinds with bounds, fixed or free state and a termination reason (crystal-refinement unit); not connected to any UI |
 | 117 | Provide an optional charge-flipping exploration mode for suitable complete intensity... | Missing | Phase 4 not started |
-| 118 | Import Gaussian CUBE scalar fields. | Missing | Phase 4 not started |
-| 119 | Import XSF scalar grids. | Missing | Phase 4 not started |
-| 120 | Import simple MRC/CCP4 scalar maps if the parser can be implemented/verified without... | Missing | Phase 4 not started |
-| 121 | Render positive/negative isosurfaces with independent levels/opacities. | Missing | Phase 4 not started |
-| 122 | Render orthogonal scalar-field slices. | Missing | Phase 4 not started |
-| 123 | Render an arbitrary plane-aligned scalar-field slice. | Missing | Phase 4 not started |
-| 124 | Provide bounded grid resampling/downsampling for browser performance while preserving... | Missing | Phase 4 not started |
-| 125 | Estimate void/cavity regions from a periodic probe-radius grid. | Missing | Phase 4 not started |
-| 126 | Report approximate occupied/void/accessible fractions with grid resolution and probe... | Missing | Phase 4 not started |
-| 127 | Visualize cavity components and permit component selection/isolation. | Missing | Phase 4 not started |
-| 128 | Generate BFDH-style morphology from crystallographic face geometry/d-spacing. | Missing | Phase 4 not started |
-| 129 | Generate Wulff morphology from user-supplied facet energies. | Missing | Phase 4 not started |
-| 130 | Show facet Miller indices, relative area, normal, d-spacing, and supplied/derived wei... | Missing | Phase 4 not started |
-| 131 | Permit direct facet inclusion/exclusion and weight editing. | Missing | Phase 4 not started |
-| 132 | Overlay twin/domain morphology transforms when a twin matrix is supplied. | Missing | Phase 4 not started |
+| 118 | Import Gaussian CUBE scalar fields. | Done | parseCubeGrid via the Volumetric fields panel (.cube/.cub); crystal-volumetric unit and phase-4 e2e (2x2x2 grid, slice table, isosurface) |
+| 119 | Import XSF scalar grids. | Done | parseXsfGrid via the same panel (.xsf); crystal-volumetric unit; browser coverage uses CUBE only |
+| 120 | Import simple MRC/CCP4 scalar maps if the parser can be implemented/verified without... | Done | parseCcp4Grid via the same panel (.map/.mrc/.ccp4), bounded and typed; crystal-volumetric unit; browser coverage uses CUBE only |
+| 121 | Render positive/negative isosurfaces with independent levels/opacities. | Done | extractIsosurface with independent positive and negative levels and opacities in the panel; crystal-volumetric unit and phase-4 e2e (triangles reported) |
+| 122 | Render orthogonal scalar-field slices. | Done | orthogonalSlice with slice table and preview in the panel; crystal-volumetric unit and phase-4 e2e |
+| 123 | Render an arbitrary plane-aligned scalar-field slice. | Partial | samplePlaneSlice (arbitrary plane) is implemented and unit-tested in volumetric-engine.ts; no UI control |
+| 124 | Provide bounded grid resampling/downsampling for browser performance while preserving... | Partial | resampleScalarGrid provides bounded downsampling and is unit-tested; the panel does not expose it |
+| 125 | Estimate void/cavity regions from a periodic probe-radius grid. | Done | analyzePeriodicVoids on a periodic probe-radius grid with spacing and probe radius inputs; crystal-void-analysis unit and phase-4 e2e |
+| 126 | Report approximate occupied/void/accessible fractions with grid resolution and probe... | Done | Occupied, void and accessible fractions are reported with grid spacing, probe radius and radius basis; crystal-void-analysis unit and phase-4 e2e |
+| 127 | Visualize cavity components and permit component selection/isolation. | Done | Void components are listed and isolateVoidComponent drives a selectable preview; crystal-void-analysis unit; browser test covers the analysis run, not the selection |
+| 128 | Generate BFDH-style morphology from crystallographic face geometry/d-spacing. | Done | buildBfdhMorphology with a facet table (hkl, d-spacing, area, normal) and preview; crystal-morphology unit and phase-4 e2e; labelled a geometry heuristic |
+| 129 | Generate Wulff morphology from user-supplied facet energies. | Done | buildWulffMorphology from user-supplied surface energies in the panel; crystal-morphology unit |
+| 130 | Show facet Miller indices, relative area, normal, d-spacing, and supplied/derived wei... | Done | Facet table shows Miller indices, relative area, normal, d-spacing and the supplied or derived weight; crystal-morphology unit and phase-4 e2e |
+| 131 | Permit direct facet inclusion/exclusion and weight editing. | Done | Per-facet include checkbox, weight and surface-energy inputs in the panel; crystal-morphology unit |
+| 132 | Overlay twin/domain morphology transforms when a twin matrix is supplied. | Partial | transformMorphology applies a supplied twin or domain matrix and is unit-tested; no UI to supply a twin matrix |
 | 133 | Export morphology as SVG/PNG and GLB where geometry is representable. | Missing | Phase 4 not started |
 | 134 | Provide a searchable raw metadata/tag inspector for all imported blocks. | Partial | metadata-engine primitives + CrystalMetadataDialog; not dictionary-complete or loop-row/column editor |
 | 135 | Provide loop-aware editing rather than flattening loop data into unrelated scalar fie... | Partial | metadata-engine primitives + CrystalMetadataDialog; not dictionary-complete or loop-row/column editor |
