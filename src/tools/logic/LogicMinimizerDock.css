@@ -1,0 +1,190 @@
+.logic-minimizer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.logic-minimizer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.logic-minimizer-forms {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.logic-minimizer-close {
+  margin-left: auto;
+}
+
+.logic-minimizer-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.logic-minimizer button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #1f2933;
+}
+
+.logic-minimizer button[aria-pressed="true"] {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.logic-minimizer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.logic-kmap-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.logic-kmap-svg {
+  display: block;
+  max-width: none;
+  color: inherit;
+}
+
+.logic-kmap-cell {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.35;
+}
+
+.logic-kmap-index {
+  font-size: 9px;
+  fill: currentColor;
+  opacity: 0.55;
+  font-family: ui-monospace, monospace;
+}
+
+.logic-kmap-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  fill: currentColor;
+}
+
+.logic-kmap-value-0 {
+  opacity: 0.45;
+}
+
+.logic-kmap-value-X {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.logic-kmap-axis,
+.logic-kmap-corner,
+.logic-kmap-layer {
+  font-size: 11px;
+  fill: currentColor;
+  font-family: ui-monospace, monospace;
+}
+
+.logic-kmap-corner {
+  opacity: 0.7;
+}
+
+.logic-kmap-layer {
+  font-weight: 700;
+}
+
+.logic-minimizer-expression {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 0.95rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.logic-minimizer-stats {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.logic-minimizer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.logic-minimizer-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logic-minimizer-legend em {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.logic-minimizer-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.logic-minimizer-primes summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.logic-minimizer-primes table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.logic-minimizer-primes th,
+.logic-minimizer-primes td {
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  padding: 3px 8px;
+  text-align: left;
+}
+
+.logic-minimizer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.logic-minimizer-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.logic-workspace[data-theme="dark"] .logic-minimizer button,
+.logic-workspace[data-theme="high-contrast"] .logic-minimizer button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-minimizer button[aria-pressed="true"],
+.logic-workspace[data-theme="high-contrast"] .logic-minimizer button[aria-pressed="true"] {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+}

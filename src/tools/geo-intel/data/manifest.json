@@ -1,0 +1,62 @@
+{
+  "generatedBy": "src/tools/geo-intel/scripts/build-data.mjs",
+  "datasets": {
+    "countries": {
+      "source": "Natural Earth 1:50m Admin 0 – Countries",
+      "version": "v5.1.2",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_50m_admin_0_countries.geojson",
+      "license": "Public domain",
+      "attribution": "Made with Natural Earth",
+      "retrievedAt": "2026-09-29",
+      "bytes": 491595,
+      "features": 242
+    },
+    "countryTable": {
+      "source": "GeoNames countryInfo.txt + Natural Earth attributes + Wikidata P1622 (driving side)",
+      "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+      "license": "CC BY 4.0 (GeoNames); public domain (Natural Earth); CC0 (Wikidata)",
+      "attribution": "GeoNames (geonames.org), Natural Earth, Wikidata",
+      "retrievedAt": "2026-09-29",
+      "bytes": 138113,
+      "records": 252,
+      "drivingSideRecords": 247
+    },
+    "admin1": {
+      "source": "GeoNames admin1CodesASCII.txt",
+      "url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "license": "CC BY 4.0",
+      "attribution": "GeoNames (geonames.org)",
+      "retrievedAt": "2026-09-29",
+      "bytes": 126370,
+      "records": 3865
+    },
+    "places": {
+      "source": "Natural Earth 1:10m Populated Places (simple)",
+      "version": "v5.1.2",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_populated_places_simple.geojson",
+      "license": "Public domain",
+      "attribution": "Made with Natural Earth",
+      "retrievedAt": "2026-09-29",
+      "bytes": 408972,
+      "records": 7342,
+      "note": "popMax is Natural Earth pop_max (urban agglomeration estimate), not an administrative census count."
+    },
+    "timezones": {
+      "source": "timezone-boundary-builder timezones-with-oceans",
+      "version": "2026d",
+      "url": "https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026d/timezones-with-oceans.geojson.zip",
+      "license": "ODbL 1.0",
+      "attribution": "Timezone boundaries © OpenStreetMap contributors via timezone-boundary-builder (ODbL)",
+      "retrievedAt": "2026-09-29",
+      "bytes": 1086995,
+      "zones": 444,
+      "accuracy": {
+        "method": "area-uniform seeded random points, simplified vs full resolution",
+        "samples": 4000,
+        "agreement": 0.9998,
+        "landSamples": 1388,
+        "landAgreement": 0.9993
+      }
+    }
+  }
+}
