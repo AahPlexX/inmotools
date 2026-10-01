@@ -1,5 +1,9 @@
 # Done
 
+## Markdown Workbench parity pass — preview sync, tasks, counts, narrow split
+
+Additive to the F11–F21 closeout. Split view now follows preview scrolling as well as source scrolling, without the two panes fighting. Task rows in the preview toggle the source marker. Narrow split panes stay bounded. Focus writing keeps the save state. Words, lines, and reading time stay in the status bar, and document/export controls have plain tooltips. Editor settings are remembered locally. Notes: `docs/markdown-audit-2026-09-16.md` (2026-10-01 section) and `src/tools/markdown/README.md`.
+
 ## Tabular Sheet Workstation Wave B (TASK-022) — shipped and verified
 
 Wave B adds a local PivotTable and a GETPIVOTDATA subset to the Tabular Sheet Workstation, on top of Wave A (merged earlier via PR #73) and the P1-P16 parity slice.

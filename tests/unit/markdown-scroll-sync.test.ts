@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeScrollOffset } from '../../src/tools/markdown/scroll-sync';
+import { computeScrollOffset, sourceLineForScrollOffset } from '../../src/tools/markdown/scroll-sync';
 
 const anchors = [
   { sourceLine: 1, offsetTop: 0 },
@@ -43,5 +43,18 @@ describe('scroll synchronization interpolation', () => {
       { sourceLine: 5, offsetTop: 100 },
     ];
     expect(computeScrollOffset(unsorted, 3)).toBe(50);
+  });
+});
+
+describe('preview scroll maps back to a source line', () => {
+  it('returns the nearest interpolated source line for a preview offset', () => {
+    expect(sourceLineForScrollOffset(anchors, 0)).toBe(1);
+    expect(sourceLineForScrollOffset(anchors, 50)).toBe(3);
+    expect(sourceLineForScrollOffset(anchors, 300)).toBe(13);
+    expect(sourceLineForScrollOffset(anchors, 900)).toBe(20);
+  });
+
+  it('returns line 1 when no anchors have been measured', () => {
+    expect(sourceLineForScrollOffset([], 40)).toBe(1);
   });
 });

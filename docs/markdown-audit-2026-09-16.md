@@ -185,3 +185,19 @@ remaining intended behavior absent from `main`; its unique commits are supersede
 history and must not be merged wholesale. The connected GitHub capability does not expose branch/ref
 deletion, so the physical ref remains as non-authoritative history rather than as active or stranded
 work.
+
+
+## Parity pass — 2026-10-01
+
+This section is additive. Earlier findings in this file stay as written.
+
+Compared with local editors that writers actually use (StackEdit, HackMD, Typora, Obsidian, VS Code Markdown preview), the workbench already covered live preview, drafts, math, diagrams, citations, and multi-format export. The remaining gaps that fit the local-first, no-upload constraint were closed:
+
+- Preview scrolling now moves the source in split view, and source scrolling still moves the preview. A short ignore window stops the two from fighting, including while a smooth scroll is still in flight. Reduced-motion preference uses an instant jump.
+- Nested blocks, including each task-list item, carry `data-source-line`. Clicking a task row toggles `- [ ]` / `- [x]` in the source. The checkbox stays a local edit; nothing is uploaded.
+- Split view on narrow screens keeps both panes in a bounded grid so each one scrolls instead of growing the page.
+- Focus writing still hides export and panels, and now leaves the save state and live counts visible.
+- Words, lines, and a reading-time estimate sit in the status bar. The metrics panel still reports prose characters (the existing 19-character contract) and now also reports raw source length.
+- Document, view, and export controls have plain-language tooltips. Editor settings are remembered in this browser only.
+
+Not taken: cloud collaboration, remote image hosting, and a second Markdown engine. Those need a network or a dependency this repository does not allow.
