@@ -1,5 +1,13 @@
 # Done
 
+## Tactical Matchboard Studio residuals wave (T17-01) — shipped and verified
+
+Closed the Tactical Matchboard residual backlog, growing the verified feature ledger from 63 to **67/67**: pitch zoom and pan (row 64), board freehand (65), build-board confirmation (66), and a virtualized timeline with a 2,048-track cap and 40-row window (67); rows 3, 57, 58, 61 and 62 were updated in place. Help copy was rewritten as action, input, result (header sentence, help section match-setup, command-bar tooltips, the Build board tip, and the squad-growth note). The catalog entry was not changed.
+
+- Scope: src/tools/tactics/ and its tests, browser-local only; no auth, backend, telemetry, remote processing, cloud storage, secrets or AI surface; dependency pins unchanged.
+- Known limits, tracked rather than hidden: PDF page text stays WinAnsi (escalate before adding a font embedder such as @pdf-lib/fontkit); video export cap is 60 frames; roster ceiling is 64 players per team and is not a formation cap; timeline session cap is 2,048 tracks.
+- Verification (fresh, on the branch merged with current origin/main): tsc --noEmit -p tsconfig.app.json clean; tests/unit/tactics-*.test.ts 165/165 across 21 files (--testTimeout=60000); production build clean; tests/e2e/tactical-matchboard-studio.spec.ts 80 passed, 0 failed, 2 intentional single-project skips (one Axe pass and CSS-width reflow cover the shared DOM), desktop and mobile Chromium, --workers=1.
+
 ## glTF / GLB Optimizer completion (TASK-024) — 10/10 acceptance areas complete
 
 The glTF / GLB optimizer (`#/tools/gltf-optimizer`) now rejects malformed containers, reports measured results, preserves scene content, keeps texture formats by default, and optimizes in a cancellable worker.
