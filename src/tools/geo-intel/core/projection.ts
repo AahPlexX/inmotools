@@ -62,7 +62,10 @@ export function ringPath(ring: ArrayLike<ArrayLike<number>>): string {
   let d = '';
   for (let i = 0; i < ring.length; i += 1) {
     const [x, y] = project(ring[i][0], ring[i][1]);
-    d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
+    // A step of more than 180° is a crossing of the ±180° seam: start a new subpath instead of
+    // drawing a line across the whole map (each subpath still fills on its own side).
+    const jump = i > 0 && Math.abs(ring[i][0] - ring[i - 1][0]) > 180;
+    d += `${i === 0 || jump ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
   }
   return `${d}Z`;
 }

@@ -39,11 +39,33 @@ function clampView([x, y, w, h]: ViewBox): ViewBox {
   return [cx - nw / 2, cy - nh / 2, nw, nh];
 }
 
+const NICE = [1, 2, 5];
+/** Picks a round distance that is 60–150 px long at the current zoom (scale at the map centre). */
+export function scaleFor(metresPerPx: number, maxPx = 140): { label: string; px: number } | null {
+  if (!Number.isFinite(metresPerPx) || metresPerPx <= 0) return null;
+  const target = metresPerPx * maxPx;
+  const magnitude = 10 ** Math.floor(Math.log10(target));
+  let metres = magnitude;
+  for (const n of NICE) if (n * magnitude <= target) metres = n * magnitude;
+  return { px: metres / metresPerPx, label: metres >= 1000 ? `${(metres / 1000).toLocaleString()} km` : `${metres} m` };
+}
+
+function ScaleBar({ metresPerPx }: { metresPerPx: number | null }) {
+  const scale = metresPerPx ? scaleFor(metresPerPx) : null;
+  if (!scale) return null;
+  return (
+    <div className="gi-map-scale" data-tip="Scale at the centre of the map (it changes towards the edges on a world map)" aria-label={`Scale bar ${scale.label}`} role="img">
+      <span style={{ width: `${scale.px}px` }} />{scale.label}
+    </div>
+  );
+}
+
 export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({ scene, mode, onPick, onMeasure, onBox, onPinMenu, onMapMenu }, handle) {
   const svg = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(HOME);
   const [size, setSize] = useState({ width: 800, height: 400 });
   const [hover, setHover] = useState<{ x: number; y: number; name: string } | null>(null);
+  const [cursor, setCursor] = useState<LatLon | null>(null);
   const [draft, setDraft] = useState<{ a: LatLon; b: LatLon } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<{ startX: number; startY: number; view: ViewBox; moved: boolean; pinch?: { dist: number; cx: number; cy: number }; boxStart?: LatLon; longPress?: number; longFired?: boolean } | null>(null);
@@ -153,6 +175,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
     const g = gesture.current;
     if (!g) {
       if (event.pointerType === 'mouse') {
+        setCursor(toLatLon(event.clientX, event.clientY));
         const name = event.target instanceof Element ? event.target.closest<SVGElement>('[data-name]')?.dataset.name : undefined;
         setHover(name ? { x: event.clientX, y: event.clientY, name } : null);
       }
@@ -247,7 +270,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => { setHover(null); setCursor(null); }}
         onContextMenu={(event) => { event.preventDefault(); openMenuAt(event.target, event.clientX, event.clientY); }}
         onKeyDown={onKeyDown}
       >
@@ -261,6 +284,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, Props>(function MapCanvas({
         <button type="button" aria-label="Zoom out" data-tip="Zoom out (− key or scroll)" onClick={() => zoomAt(1 / 1.6)}><Icon name="minus" size={20} /></button>
         <button type="button" aria-label="Reset view" data-tip="Show the whole world (0 key)" onClick={() => setView(HOME)}><Icon name="home" size={20} /></button>
       </div>
+      <ScaleBar metresPerPx={(() => { const c = invert(fitted[0] + fitted[2] / 2, fitted[1] + fitted[3] / 2); return c ? metresPerPx(c) : null; })()} />
+      {cursor ? <p className="gi-map-cursor" aria-hidden="true">{cursor.lat.toFixed(4)}, {cursor.lon.toFixed(4)}</p> : null}
       <p className="gi-map-credit">Made with Natural Earth · Equal Earth projection</p>
     </div>
   );

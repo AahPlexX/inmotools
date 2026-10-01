@@ -1,5 +1,7 @@
 # In Progress
 
+- **Site tool discoverability audit (2026-09-29)** — verify that every workspace integrated into `main` has a catalog link and route loader, and prevent an orphan workspace from entering a future Pages build. Current `main` has 35 registered suites. Branch-only workspaces remain under their own active workstreams; do not advertise them as deployed until their code is integrated and validated. Completion gate: focused registration check, build, landing/route browser checks, integration into `origin/main`, and exact-main Pages evidence.
+
 - **Tactical Matchboard Studio** — local-first tactical authoring, animation, spatial-analysis, local-video, presentation, persistence, and export workstream. Production audit is on `cursor/tactical-matchboard-production-audit-8765` from `origin/main` `b51a51600fb9516378ab48f95cb0d057c72a1103` (`feat(tactics): Tactical Matchboard Studio (#76)`). Do not push to `feature/tactical-matchboard-studio` or PR #76.
   - Design: `docs/superpowers/specs/2026-09-21-tactical-matchboard-studio-design.md`
   - Plan: `docs/superpowers/plans/2026-09-21-tactical-matchboard-studio.md`

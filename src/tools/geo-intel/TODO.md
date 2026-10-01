@@ -404,3 +404,41 @@ All conditions satisfied: PR #89 open into `main`, CI green on the exact head co
 - Task-ID collision found: glTF claimed TASK-024 in `.tasks/config.json`; this tool's `.tasks` entries renumbered to **TASK-025** and `nextId` bumped to 26.
 - Evidence on the merged tree: `tsc` exit 0; `pnpm test:unit` 270 files / 3,090 tests passed (2 / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + gltf + accessibility + app specs 142 passed / 10 skipped / 0 failed.
 - Next: CI on the pushed head, merge PR #89, verify `main` CI and Pages deploy.
+
+## Production audit 2 — 2026-10-01 (on `main`, after integration at `c255111`)
+
+Method: static scan of `src/tools/geo-intel/**` (typing escapes, TODO/console leftovers, stock-phrase copy, controls without tooltips), a browser sweep through every tab, dialog, boundary load and choropleth while collecting page and console errors (none), and screenshots at 375, 844×390, 820×1180, 1180×820, 1366×768, 1440×900 and 3840×2160.
+
+### Findings and resolutions
+| # | Area | Finding | Resolution |
+| --- | --- | --- | --- |
+| B1 | Bug | geoBoundaries layers crossing ±180° (Fiji and other Pacific states) drew a line across the whole map and could put a point in the wrong unit (recorded as a known limitation in Delivery 15) | `ringPath` starts a new subpath at a seam crossing; boundary point-in-polygon unwraps crossing rings and tests λ, λ±360° |
+| B2 | Bug | A right-click near the bottom of the panel scrolled the row into view, and that scroll closed the menu it had just opened | The menu ignores scroll for 250 ms after opening |
+| B3 | Data | Two "country population" rows (GeoNames estimate and World Bank) showed different numbers side by side | The GeoNames estimate is shown only when the World Bank has no figure |
+| B4 | Data | Elevation appeared twice (dual-unit row plus a separate feet row) | Feet row shown only in imperial mode; kept in every export |
+| B5 | UI | Year badges ("2026") on every sun and clock time, where they add nothing | Year badges only on population, indicators, EU and admin figures, with a tooltip |
+| B6 | UI | Clock line read "GMT+2 · UTC+02:00" (same offset twice) | Abbreviation dropped when it is just an offset |
+| B7 | Responsive | "Sources" tab cut off and hidden behind a scrollbar on desktop/TV widths | Tabs wrap above 760 px; phones keep the bottom bar |
+| B8 | Responsive | On 2200 px+ screens the map took most of the width and the profile was cramped; text stayed 16 px | Equal columns and ~17 px base text at TV widths |
+| B9 | Tooltips | 11 controls had no tooltip (Clear all, Run batch, Cancel batch, Retry now, Look up this cell, Clear points, midpoint link, Clear box, choropleth toggle, Dismiss, Done) | Tooltips added; remaining untipped controls are self-explanatory form fields, Save/Cancel/Continue, or icon buttons with labels |
+| B10 | Copy | Labels read like a data dump: "Population (GeoNames country record)", "Nearest populated place (bundled)", "Land neighbours (ISO)", "Observes DST this year", "Daylight saving time now" | "Population (GeoNames estimate)", "Nearest town or city", "Bordering countries (ISO codes)", "Uses daylight saving this year", "Daylight saving in effect" |
+
+### Added to exceed parity (all offline, no new source or dependency)
+| # | Feature | Notes |
+| --- | --- | --- |
+| C1 | Find a value | Filter box over the ~70 profile rows by name or value; non-field cards hide while filtering; match count announced |
+| C2 | Row menu | Right-click (long-press on Android, Shift+F10) any value: Copy value, Copy raw value, Copy value with source (source, year, license, retrieval date), Show provenance |
+| C3 | Sun height chart | Sun altitude over the local solar day from the in-house NOAA model, with the horizon, the peak, and a live "now" marker with azimuth |
+| C4 | Map scale bar | Round 1/2/5 distance at the map centre, updated with zoom |
+| C5 | Cursor coordinates | Live latitude/longitude under the mouse on the map |
+| C6 | Meeting planner | Slider on Compare shifts every compared local time in half-hour steps (±24 h) and marks weekday 09:00–17:00 as working hours |
+| C7 | Keyboard shortcuts | `?` (or the ? button) opens a list of every shortcut |
+
+### Evaluated and not done
+- **Long-press row menu on iOS Safari:** iOS fires no `contextmenu` on long-press; the ⓘ button and the provenance dialog still give full access to every value. Revisit if a shared long-press helper is added for rows.
+- **Dark theme:** the site shell is light-only; a tool-only dark mode would clash with the surrounding page.
+
+### Evidence
+- `tests/unit/geo-intel-audit2.test.ts` (7 tests): Fiji-style straddling polygon inside/outside, seam path splitting, scale-bar choices, sun-curve peak vs the SunriseSunset.io fixture altitude (50.76°), working-hours detection, label copy.
+- `tests/e2e/geo-intel.spec.ts` +2 tests: profile filter, row menu items, sun chart, shortcuts dialog, scale bar; meeting planner.
+- `tsc` exit 0; `pnpm test:unit` 271 files / 3,096 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app specs 125 passed / 11 skipped / 0 failed.

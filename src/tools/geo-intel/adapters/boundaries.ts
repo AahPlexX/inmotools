@@ -55,13 +55,31 @@ export async function boundaryLayer(client: HttpClient, iso3: string, level: Adm
   return { meta, features, retrievedAt: response.retrievedAt, stale: response.stale };
 }
 
-function inRing(lon: number, lat: number, ring: number[][]): boolean {
+function rayCast(lon: number, lat: number, ring: number[][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
     if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
+}
+
+/**
+ * Rings that cross the ±180° seam (e.g. Fiji) are unwrapped into continuous longitudes
+ * (e.g. 179.5 → 180.5), and the point is then tested at λ and λ ± 360°.
+ */
+function inRing(lon: number, lat: number, ring: number[][]): boolean {
+  const crosses = ring.some((point, i) => i > 0 && Math.abs(point[0] - ring[i - 1][0]) > 180);
+  if (!crosses) return rayCast(lon, lat, ring);
+  let offset = 0;
+  const unwrapped = ring.map((point, i) => {
+    if (i > 0) {
+      const step = point[0] - ring[i - 1][0];
+      if (step > 180) offset -= 360; else if (step < -180) offset += 360;
+    }
+    return [point[0] + offset, point[1]];
+  });
+  return [lon, lon + 360, lon - 360].some((candidate) => rayCast(candidate, lat, unwrapped));
 }
 
 export function polygonContains(geometry: BoundaryFeature['geometry'], lon: number, lat: number): boolean {

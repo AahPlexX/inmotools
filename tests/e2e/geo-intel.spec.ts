@@ -243,3 +243,38 @@ test('tabs follow the ARIA arrow-key pattern', async ({ page, isMobile }) => {
   await page.keyboard.press('End');
   await expect(page.getByTestId('gi-tab-sources')).toBeFocused();
 });
+
+test('profile filter, row copy menu, sun chart and keyboard shortcuts', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'right-click and keyboard flows are desktop interactions');
+  await open(page);
+  await search(page, 'Berlin');
+  const profile = page.getByTestId('gi-profile');
+  await expect(profile.locator('.gi-sunchart svg')).toBeVisible();
+  await expect(profile.locator('[data-field="population.geonames"]')).toHaveCount(0);
+  await page.getByTestId('gi-profile-filter').fill('sunrise');
+  await expect(profile.locator('[data-field="solar.sunrise"]')).toBeVisible();
+  await expect(profile.locator('[data-field="country.capital"]')).toHaveCount(0);
+  await page.getByTestId('gi-profile-filter').fill('');
+  await profile.locator('[data-field="country.capital"]').click({ button: 'right' });
+  await expect(page.getByRole('menu', { name: 'Capital' }).getByRole('menuitem')).toHaveText(['Copy value', 'Copy raw value', 'Copy value with source', 'Show provenance']);
+  await page.keyboard.press('Escape');
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press('?');
+  await expect(page.getByTestId('gi-keys')).toContainText('Jump to the search box');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('gi-keys')).toBeHidden();
+  await expect(page.locator('.gi-map-scale')).toContainText(/\d+ (k?m)/);
+});
+
+test('meeting planner shifts compared local times', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  await page.getByTestId('gi-tab-compare').click();
+  const planner = page.getByTestId('gi-planner');
+  await expect(planner).toBeVisible();
+  const before = await page.locator('.gi-compare-card').getByText(/:\d\d/).first().innerText();
+  await planner.fill('8');
+  await expect(page.locator('.gi-planner output')).toHaveText('+4 h from now');
+  await expect(page.locator('.gi-compare-card').getByText(/:\d\d/).first()).not.toHaveText(before);
+});
