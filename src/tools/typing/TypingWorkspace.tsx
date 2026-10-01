@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/fira-code/400.css';
 import '@fontsource/roboto-mono/400.css';
@@ -73,6 +73,7 @@ import {
   type ExportMetadata,
 } from './typing-export';
 import { classifyKeystrokeSound, createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
+import { PASSAGE_WINDOW_LINES, passageWindowStartLine } from './typing-window';
 import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
 import {
   createSessionClock,
@@ -349,6 +350,9 @@ export default function TypingWorkspace() {
 
   const audioRef = useRef<AudioController | null>(null);
   const canvasRef = useRef<HTMLTextAreaElement | null>(null);
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const [windowOffsetPx, setWindowOffsetPx] = useState(0);
+  const [canvasFocused, setCanvasFocused] = useState(false);
   const compositionActiveRef = useRef(false);
   const compositionCommitRef = useRef<string | null>(null);
   const pendingPhysicalInputRef = useRef<{ code: string; t: number } | null>(null);
@@ -362,6 +366,24 @@ export default function TypingWorkspace() {
   const running = sessionClock.status === 'running';
   const paused = sessionClock.status === 'paused';
   const sessionActive = isSessionActive(sessionClock);
+
+  // Keep the line being typed on the middle row of the 3-line passage window.
+  useLayoutEffect(() => {
+    const text = textRef.current;
+    if (!text) return;
+    const place = () => {
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      if (!lineHeight) return;
+      const marker = text.querySelector<HTMLElement>('.tw-caret') ?? (text.lastElementChild as HTMLElement | null);
+      const activeLine = marker ? Math.floor((marker.offsetTop + marker.offsetHeight / 2) / lineHeight) : 0;
+      const totalLines = Math.round(text.scrollHeight / lineHeight);
+      setWindowOffsetPx(passageWindowStartLine(activeLine, totalLines) * lineHeight);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(text);
+    return () => observer.disconnect();
+  }, [engine.cursor, engine.targetText, engine.finished, config.fontSize, config.font]);
   const sessionNow = effectiveSessionNow(sessionClock, now);
   const activeTypist = typists.find((profile) => profile.id === activeTypistId)
     ?? { id: DEFAULT_TYPIST_ID, name: 'Local typist', createdAt: 0, updatedAt: 0 };
@@ -1186,7 +1208,7 @@ export default function TypingWorkspace() {
         {config.mode === 'custom' && (
           <button type="button" className="subtle" disabled={sessionActive} onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
         )}
-        <button type="button" aria-disabled={sessionActive} onClick={restart}>New text</button>
+        <button type="button" className="subtle" aria-disabled={sessionActive} onClick={restart}>New text</button>
         <button type="button" className="subtle" title="Discard this attempt without saving a result" onClick={abort} disabled={!sessionActive}>Abort &amp; discard</button>
         <button type="button" className="subtle" disabled={sessionActive} onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
@@ -1195,10 +1217,10 @@ export default function TypingWorkspace() {
       {/* Live stats */}
       {!(config.hideStatsDuringTest && running && !engine.finished) && (
         <div className="tw-stats-strip" aria-label="Live typing metrics">
-          <div className="tw-stat"><h3>Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm}</small></div>
+          <div className="tw-stat"><h3 title="Words per minute with errors subtracted (one word = five characters)">Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm} (before errors)</small></div>
           <div className="tw-stat"><h3>Accuracy</h3><p>{metrics.accuracy}%</p><small>{metrics.incorrectChars} errors</small></div>
-          <div className="tw-stat"><h3>Consistency</h3><p>{metrics.consistency}%</p><small>Higher is smoother</small></div>
-          <div className="tw-stat"><h3>Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
+          <div className="tw-stat"><h3 title="How steady your keystroke rhythm is">Consistency</h3><p>{metrics.consistency}%</p><small>Higher = steadier pace</small></div>
+          <div className="tw-stat"><h3 title="Characters per minute counting every key, errors included">Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
           <div className="tw-stat"><h3>Timer</h3><p>{formatMs(totalDurationMs ? durationRemainingMs : metrics.elapsedMs)}</p><small>{totalDurationMs ? 'Remaining' : 'Elapsed'}</small></div>
         </div>
       )}
@@ -1211,8 +1233,16 @@ export default function TypingWorkspace() {
         className={`tw-canvas ${config.blurUntilFocus && pauseUntilFocus ? 'blur-mode' : ''}`}
         style={{ fontSize: `${config.fontSize}px` }}
       >
-        <div className="tw-canvas-text" data-testid="typing-target" aria-label="Typing target text">
-          {renderCells(engine, config.caret)}
+        <div className="tw-canvas-window" style={{ '--tw-window-lines': PASSAGE_WINDOW_LINES } as CSSProperties}>
+          <div
+            ref={textRef}
+            className="tw-canvas-text"
+            data-testid="typing-target"
+            aria-label="Typing target text"
+            style={{ transform: `translateY(-${windowOffsetPx}px)` }}
+          >
+            {renderCells(engine, config.caret)}
+          </div>
         </div>
         <textarea
           ref={canvasRef}
@@ -1241,8 +1271,12 @@ export default function TypingWorkspace() {
             event.preventDefault();
             setStatusText('Drop input is disabled during a typing test.');
           }}
-          onFocus={() => setPauseUntilFocus(false)}
+          onFocus={() => { setCanvasFocused(true); setPauseUntilFocus(false); }}
+          onBlur={() => setCanvasFocused(false)}
         />
+        {!canvasFocused && !engine.finished && (
+          <div className="tw-focus-cue" aria-hidden="true"><span>{running ? 'Click to resume typing' : 'Click here and start typing'}</span></div>
+        )}
         {pauseUntilFocus && <span className="tw-visually-hidden">Focus the canvas to begin.</span>}
       </div>
 
@@ -1272,19 +1306,19 @@ export default function TypingWorkspace() {
           <h3>Per-key summary</h3>
           <KeyStatsTable rows={keyStats} />
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Personal best / pacer</h3>
-          <p style={{ margin: 0 }}>
+          <p className="tw-personal-best">
             {personalBest ? (
               <>Best {personalBest.netWpm} WPM · {personalBest.accuracy}% acc · {new Date(personalBest.savedAt).toLocaleDateString()}</>
             ) : (
               <>No comparable personal best yet.</>
             )}
           </p>
-          <label style={{ display: 'block', marginTop: '0.4rem' }}>
+          <label>
             <input type="checkbox" checked={config.ghostEnabled} onChange={(e) => setConfig((c) => ({ ...c, ghostEnabled: e.target.checked }))} /> Show ghost pacer
           </label>
-          <label style={{ display: 'block' }}>
+          <label>
             <input type="checkbox" checked={config.pacerEnabled} onChange={(e) => setConfig((c) => ({ ...c, pacerEnabled: e.target.checked }))} /> Target-WPM pacer
           </label>
           {config.pacerEnabled && (
@@ -1298,7 +1332,7 @@ export default function TypingWorkspace() {
             </label>
           )}
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Comfort &amp; accessibility</h3>
           <label>
             Theme
@@ -1339,7 +1373,7 @@ export default function TypingWorkspace() {
             <input type="checkbox" disabled={sessionActive} checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
           </label>
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Sensory feedback</h3>
           <label>
             Switch
@@ -1382,23 +1416,28 @@ export default function TypingWorkspace() {
             <input type="text" placeholder="e.g. morning,code" value={filterTagText} onChange={(e) => setFilterTagText(e.target.value)} />
           </label>
           <button className="subtle" type="button" onClick={async () => setHistory(await listTests())}>Refresh</button>
-          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Import JSON
-            <input type="file" disabled={sessionActive} accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept="application/json" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
           </label>
-          <label className="subtle" aria-disabled={sessionActive} style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Load CSV dictionary
-            <input type="file" disabled={sessionActive} accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept=".csv,text/csv" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
-          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
         </div>
         <div className="tw-stats-strip">
           <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
-          <div className="tw-stat"><h3>10-test avg</h3><p>{round(rolling.last10)}</p></div>
-          <div className="tw-stat"><h3>50-test avg</h3><p>{round(rolling.last50)}</p></div>
-          <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
+          <div className="tw-stat"><h3>10-test avg</h3><p>{visibleHistory.length ? round(rolling.last10) : '—'}</p></div>
+          <div className="tw-stat"><h3>50-test avg</h3><p>{visibleHistory.length ? round(rolling.last50) : '—'}</p></div>
+          <div className="tw-stat"><h3>All-time avg</h3><p>{visibleHistory.length ? round(rolling.allTime) : '—'}</p></div>
         </div>
-        <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        {visibleHistory.length === 0 && (
+          <p className="tw-empty" role="status">
+            {filterTags.length > 0 ? 'No saved tests match these tags.' : 'No saved tests yet. Finish a test and choose Save to start your history and trend chart.'}
+          </p>
+        )}
+        <div className="tw-chart tw-chart-history" hidden={visibleHistory.length === 0}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        <div className="tw-table-scroll" role="region" aria-label="Saved typing tests table" tabIndex={0}>
         <PagedTable
           columns={[
             { key: 'saved', label: 'Saved' },
@@ -1439,7 +1478,12 @@ export default function TypingWorkspace() {
             return null;
           }}
         />
-        <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
+        </div>
+        <p className="tw-muted">Daily activity (last 30 active days): {daily.length}</p>
+        <div className="tw-danger-zone">
+          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
+          <span className="tw-muted">Deletes this typist’s saved tests from this browser. Other typists are not affected.</span>
+        </div>
       </section>
 
       {/* Save modal */}
@@ -1512,7 +1556,9 @@ function renderCells(state: EngineState, caret: CaretStyle): ReactNode[] {
     if (idx === state.cursor && !state.finished) {
       out.push(<span key={`caret-${idx}`} className={`tw-caret style-${caret}`} aria-hidden="true" />);
     }
-    const rendered = cell.expected === ' ' ? '\u00A0' : cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
+    // A real space (not U+00A0) is the only line-break opportunity in the passage; the canvas is
+    // pre-wrap, so a non-breaking space here would make the whole text one unwrappable line.
+    const rendered = cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
     const displayed = cell.state === 'incorrect' && cell.typed ? (cell.typed === ' ' ? '_' : cell.typed) : rendered;
     out.push(
       <span key={idx} className={`tw-char ${cell.state}`}>{displayed}</span>
@@ -1567,7 +1613,7 @@ function VirtualKeyboard({ layout, heat, errors }: { layout: ReturnType<typeof f
 }
 
 function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>Finish a test to see analytics.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test and your per-key analytics appear here.</p>;
   return (
     <PagedTable
       columns={[
@@ -1594,7 +1640,7 @@ function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
 }
 
 function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>No data yet.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test to see this breakdown.</p>;
   return (
     <PagedTable
       columns={[
@@ -1632,22 +1678,34 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCer
 }) {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // Focus the panel, not a field: the typist is usually still mid-keystroke when the test ends,
+  // and focusing an input would swallow those keystrokes into the name.
+  useEffect(() => { panelRef.current?.focus(); }, []);
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
-      <div className="tw-modal">
+      <div className="tw-modal" ref={panelRef} tabIndex={-1}>
         <h3 id="tw-test-result-title">Test result</h3>
-        <div className="tw-summary">
-          <div><strong>{summary.netWpm}</strong><br /><small>Net WPM</small></div>
-          <div><strong>{summary.accuracy}%</strong><br /><small>Accuracy</small></div>
-          <div><strong>{summary.consistency}%</strong><br /><small>Consistency</small></div>
-          <div><strong>{summary.incorrectChars}</strong><br /><small>Errors</small></div>
+        <div className="tw-summary tw-result-summary">
+          <div><strong>{summary.netWpm}</strong><small>Net WPM</small></div>
+          <div><strong>{summary.accuracy}%</strong><small>Accuracy</small></div>
+          <div><strong>{summary.consistency}%</strong><small>Consistency</small></div>
+          <div><strong>{summary.incorrectChars}</strong><small>Errors</small></div>
         </div>
-        <label htmlFor="tw-result-typist">Typist name</label>
-        <input id="tw-result-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
-        <label htmlFor="tw-result-organization">Organization / classroom</label>
-        <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
-        <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
-        <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+        <div className="tw-modal-fields">
+          <div>
+            <label htmlFor="tw-result-typist">Typist name</label>
+            <input id="tw-result-typist" type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-organization">Organization / classroom</label>
+            <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
+            <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+          </div>
+        </div>
         <label htmlFor="tw-result-tag">Tags (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
@@ -1671,15 +1729,17 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCer
         </div>
         <label htmlFor="tw-result-notes">Notes</label>
         <textarea id="tw-result-notes" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
-        <label>
+        <label className="tw-check">
           <input type="checkbox" checked={meta.includeKeystrokes} onChange={(e) => setMeta((m) => ({ ...m, includeKeystrokes: e.target.checked }))} /> Save raw keystroke log
         </label>
-        <div className="row">
-          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
+        <div className="tw-export-row" role="group" aria-label="Export this result">
           <button type="button" className="subtle" onClick={() => void onExport('csv', meta)}>Export CSV</button>
           <button type="button" className="subtle" onClick={() => void onExport('json', meta)}>Export JSON</button>
           <button type="button" className="subtle" onClick={() => void onExport('keystrokes', meta)}>Export keystrokes</button>
           {canCertificate ? <button type="button" className="subtle" onClick={() => void onExport('pdf', meta)}>PDF certificate</button> : null}
+        </div>
+        <div className="row">
+          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
           <button type="button" onClick={() => void onSave(meta, { includeKeystrokes: meta.includeKeystrokes })}>Save</button>
         </div>
       </div>
@@ -1790,7 +1850,7 @@ function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything stays in this browser. Longer passages can be used for extended practice.</p>
         <label htmlFor="tw-custom-text-input">Custom text</label>
         <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
-        {!usableText ? <p role="status" style={{ fontSize: '0.8rem', color: '#6b7280' }}>Enter at least one non-whitespace character.</p> : null}
+        {!usableText ? <p role="status" className="tw-muted">Enter at least one non-whitespace character.</p> : null}
         <div className="row">
           <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
           <button type="button" disabled={!usableText} onClick={() => onApply(text)}>Use this text</button>

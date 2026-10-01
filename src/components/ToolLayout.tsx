@@ -8,8 +8,28 @@ export function ToolLayout({ tool, children }: { tool: ToolDefinition; children:
 
   useEffect(() => { markRecent(tool.slug); }, [markRecent, tool.slug]);
 
+  const guide = (
+    <section className="suite-guide" aria-labelledby="how-to-use">
+      <div>
+        <h2 id="how-to-use">How to use this tool</h2>
+        <ol>{tool.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+      </div>
+      <dl className="suite-facts">
+        <div><dt>Input</dt><dd>{tool.accepts}</dd></div>
+        <div><dt>Output</dt><dd>{tool.outputs}</dd></div>
+        <div><dt>Useful hint</dt><dd>{tool.hint}</dd></div>
+      </dl>
+    </section>
+  );
+
+  const workspace = (
+    <section className="suite-workspace" data-testid="suite-workspace" aria-label={`${tool.shortTitle} workspace`}>
+      {children}
+    </section>
+  );
+
   return (
-    <div className="suite-page">
+    <div className={`suite-page${tool.workspaceFirst ? ' suite-page--workspace-first' : ''}`}>
       <div className="suite-topline">
         <a className="back-link" href="#/">← All tools</a>
         <button className="favorite-button" type="button" onClick={() => toggleFavorite(tool.slug)} aria-pressed={favorite}>
@@ -29,21 +49,7 @@ export function ToolLayout({ tool, children }: { tool: ToolDefinition; children:
         </aside>
       </section>
 
-      <section className="suite-guide" aria-labelledby="how-to-use">
-        <div>
-          <h2 id="how-to-use">How to use this tool</h2>
-          <ol>{tool.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-        </div>
-        <dl className="suite-facts">
-          <div><dt>Input</dt><dd>{tool.accepts}</dd></div>
-          <div><dt>Output</dt><dd>{tool.outputs}</dd></div>
-          <div><dt>Useful hint</dt><dd>{tool.hint}</dd></div>
-        </dl>
-      </section>
-
-      <section className="suite-workspace" data-testid="suite-workspace" aria-label={`${tool.shortTitle} workspace`}>
-        {children}
-      </section>
+      {tool.workspaceFirst ? <>{workspace}{guide}</> : <>{guide}{workspace}</>}
     </div>
   );
 }

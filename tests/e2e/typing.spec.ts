@@ -495,6 +495,186 @@ test('reflows without page-level horizontal overflow across compact viewports', 
   }
 });
 
+// The page clips an over-wide workspace, so document.scrollWidth stays small even when the
+// workspace itself is thousands of pixels wide (the pre-fix toolbar measured 20,953 px). This test
+// measures the workspace's own geometry instead.
+test('keeps every workspace element inside its own bounds and wraps the passage at every width', async ({ page }) => {
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const workspace = await openWorkspace(page);
+    await expect(workspace.locator('.tw-canvas')).toBeVisible();
+    const report = await page.evaluate(() => {
+      const root = document.querySelector('.tw-root') as HTMLElement;
+      const bounds = root.getBoundingClientRect();
+      // An element that overhangs is acceptable only inside a deliberate horizontal scroll region
+      // that itself fits the workspace (e.g. the history table); anything else is a layout bug.
+      const insideFittingScrollRegion = (element: Element) => {
+        for (let parent = element.parentElement; parent && parent !== root; parent = parent.parentElement) {
+          const overflowX = getComputedStyle(parent).overflowX;
+          if ((overflowX === 'auto' || overflowX === 'scroll') && parent.getBoundingClientRect().right <= bounds.right + 1) return true;
+        }
+        return false;
+      };
+      const overhanging = [...root.querySelectorAll('*')].filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.right > bounds.right + 1 && !insideFittingScrollRegion(element);
+      }).map((element) => `${element.tagName.toLowerCase()}.${String(element.className).trim().replace(/[ 	]+/g, ".")}`);
+      const live = document.querySelector('[aria-label="Live typing metrics"]');
+      const statsInside = [...(live?.querySelectorAll('.tw-stat') ?? [])].every((stat) => stat.getBoundingClientRect().right <= bounds.right + 1);
+      const text = document.querySelector('.tw-canvas-text') as HTMLElement;
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      return {
+        rootWidth: Math.round(bounds.width),
+        toolbarWidth: Math.round(document.querySelector('.tw-toolbar')!.getBoundingClientRect().width),
+        overhanging,
+        statsInside,
+        statCount: live?.querySelectorAll('.tw-stat').length ?? 0,
+        passageLines: Math.round(text.scrollHeight / lineHeight),
+      };
+    });
+    expect(report.toolbarWidth, `toolbar wider than workspace at ${width}px`).toBeLessThanOrEqual(report.rootWidth + 1);
+    expect(report.overhanging, `elements overhanging the workspace at ${width}px`).toEqual([]);
+    expect(report.statCount).toBe(5);
+    expect(report.statsInside, `a live stat is clipped at ${width}px`).toBe(true);
+    expect(report.passageLines, `passage did not wrap at ${width}px`).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test('puts Start and the first line of the passage in the first viewport', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  const viewportHeight = page.viewportSize()!.height;
+
+  const start = await workspace.getByRole('button', { name: 'Start', exact: true }).boundingBox();
+  expect(start!.y + start!.height).toBeLessThanOrEqual(viewportHeight);
+
+  const firstChar = await workspace.locator('.tw-canvas-text .tw-char').first().boundingBox();
+  expect(firstChar!.y + firstChar!.height).toBeLessThanOrEqual(viewportHeight);
+});
+
+test('result dialog keeps stray keystrokes out of its fields and lays out stats, exports and actions', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByLabel('Duration').selectOption('words');
+  await wordCountSelect(workspace).selectOption('10');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill('one two three four five six seven eight nine ten');
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  await workspace.getByRole('textbox', { name: /Typing test canvas/i }).focus();
+  await page.keyboard.type('one two three four five six seven eight nine ten', { delay: 10 });
+
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  // Keystrokes still in flight when the dialog opens must not land in the typist name.
+  await page.keyboard.type('zzz');
+  await expect(resultDialog.locator('.tw-modal')).toBeFocused();
+  await expect(resultDialog.getByLabel('Typist name')).not.toHaveValue(/z/);
+
+  // Stats read as one row on wide screens, exports are grouped apart from Discard / Save.
+  const stats = await resultDialog.locator('.tw-result-summary > div').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  expect(stats).toHaveLength(4);
+  const exportGroup = resultDialog.getByRole('group', { name: 'Export this result' });
+  await expect(exportGroup.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+  await expect(exportGroup.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+  await expect(resultDialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+  await expect(resultDialog.getByRole('button', { name: 'Discard' })).toBeVisible();
+});
+
+test('history and analytics explain themselves before any test is saved', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  const history = workspace.getByRole('region', { name: 'Session history' });
+
+  await expect(history.getByText(/No saved tests yet/)).toBeVisible();
+  // Averages are not-yet-known, not zero.
+  await expect(history.locator('.tw-stat', { hasText: '10-test avg' }).locator('p')).toHaveText('—');
+  await expect(history.locator('.tw-chart-history')).toBeHidden();
+  await expect(workspace.getByText('Finish a test and your per-key analytics appear here.').first()).toBeVisible();
+  // Destructive reset lives in its own zone with a plain-language scope note.
+  const zone = history.locator('.tw-danger-zone');
+  await expect(zone.getByRole('button', { name: /Reset .* scores/ })).toBeVisible();
+  await expect(zone).toContainText('Other typists are not affected');
+});
+
+test('cues where to type, has one primary action, and lays settings out as rows', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  const cue = workspace.locator('.tw-focus-cue');
+  await expect(cue).toContainText('Click here and start typing');
+  await workspace.getByRole('textbox', { name: /Typing test canvas/i }).focus();
+  await expect(cue).toHaveCount(0);
+
+  // Start is the only filled button in the control area; New text is secondary.
+  const background = (name: string) => workspace.getByRole('button', { name, exact: true }).evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await background('New text')).not.toBe(await background('Start'));
+
+  // A setting's label and its control share a row (they used to run together).
+  const row = await workspace.locator('.tw-settings label', { hasText: 'Theme' }).evaluate((label) => {
+    const select = label.querySelector('select')!.getBoundingClientRect();
+    const box = label.getBoundingClientRect();
+    return { selectTop: select.top, labelTop: box.top, labelHeight: box.height, selectHeight: select.height };
+  });
+  expect(row.labelHeight).toBeLessThan(row.selectHeight + 12);
+  expect(Math.abs(row.selectTop - row.labelTop)).toBeLessThan(10);
+});
+
+test('every theme keeps text at WCAG AA contrast', async ({ page }) => {
+  test.setTimeout(90_000);
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  await expect(workspace.getByLabel('Theme').locator('option').first()).toBeAttached();
+  const themes = await workspace.getByLabel('Theme').locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+  expect(themes.length).toBeGreaterThanOrEqual(10);
+  for (const theme of themes) {
+    await workspace.getByLabel('Theme').selectOption(theme);
+    const results = await new AxeBuilder({ page }).include('.tw-root').withRules(['color-contrast']).analyze();
+    expect(results.violations.map((v) => `${theme}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 5).join(', ')}`), `contrast in ${theme}`).toEqual([]);
+  }
+});
+
+test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  const lines = Array.from({ length: 10 }, (_, i) => `line ${i + 1} alpha beta`);
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill(lines.join('\n'));
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  const windowBox = workspace.locator('.tw-canvas-window');
+  const lineHeight = await workspace.locator('.tw-canvas-text').evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  const box = await windowBox.boundingBox();
+  expect(box!.height).toBeLessThanOrEqual(lineHeight * 3 + 1);
+
+  const canvas = workspace.getByRole('textbox', { name: /Typing test canvas/i });
+  await canvas.focus();
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.type(lines[i], { delay: 5 });
+    await page.keyboard.press('Enter');
+    // The caret must stay inside the visible window, never scrolled out of sight.
+    const inside = await workspace.evaluate(() => {
+      const win = document.querySelector('.tw-canvas-window')!.getBoundingClientRect();
+      const caret = document.querySelector('.tw-caret')!.getBoundingClientRect();
+      return caret.top >= win.top - 1 && caret.bottom <= win.bottom + 1;
+    });
+    expect(inside, `caret visible after line ${i + 1}`).toBe(true);
+  }
+  // The window has scrolled: the first line is no longer visible.
+  const firstLineVisible = await workspace.evaluate(() => {
+    const win = document.querySelector('.tw-canvas-window')!.getBoundingClientRect();
+    const first = document.querySelector('.tw-canvas-text .tw-char')!.getBoundingClientRect();
+    return first.bottom > win.top + 1 && first.top < win.bottom - 1;
+  });
+  expect(firstLineVisible).toBe(false);
+});
+
 test('offers explicit lifecycle controls with pause-safe timing and active-session guardrails', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
