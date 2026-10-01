@@ -24,6 +24,90 @@ function makeMonoPcm16Wav(seconds = 2, sampleRate = 48_000, frequency = 220) {
   }
   return bytes;
 }
+test('stops safely when the realtime master processor crashes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions) {
+      original.call(this, type, listener, options);
+      if (type === 'processorerror' && listener && typeof AudioWorkletNode !== 'undefined' && this instanceof AudioWorkletNode) {
+        // The test fires the error itself once playback has really started: the audio clock can sit at
+        // zero for a while on hosts with a slow audio device, so a fixed delay is not reliable.
+        const nodes = ((window as unknown as { __masterNodes?: EventTarget[] }).__masterNodes ??= []);
+        nodes.push(this);
+      }
+    };
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Reference: load one on the Meters tab.')).toHaveCount(0);
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
+    name: 'processor-failure.wav',
+    mimeType: 'audio/wav',
+    buffer: makeMonoPcm16Wav(3),
+  });
+  await expect(page.locator('.status-line')).toContainText(/Loaded processor-failure\.wav/i);
+  await expect(page.getByText('Reference: load one on the Meters tab.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000', { timeout: 20_000 });
+  await page.evaluate(() => {
+    for (const node of (window as unknown as { __masterNodes?: EventTarget[] }).__masterNodes ?? []) node.dispatchEvent(new Event('processorerror'));
+  });
+  await expect(page.locator('.status-line')).toContainText(/Realtime audio processor stopped unexpectedly/i);
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeEnabled();
+  await expect(page.getByLabel('Playhead time')).not.toHaveText('0:00.000');
+});
+
+test('locks destructive processing safely when the DSP worker crashes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalPostMessage = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+      originalPostMessage.call(this, message, transfer ?? []);
+      if (typeof message === 'object' && message !== null && 'type' in message && (message as { type?: unknown }).type === 'render') {
+        window.setTimeout(() => this.dispatchEvent(new ErrorEvent('error', { message: 'Injected DSP worker failure' })), 0);
+      }
+    } as typeof Worker.prototype.postMessage;
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({
+    name: 'worker-failure.wav',
+    mimeType: 'audio/wav',
+    buffer: makeMonoPcm16Wav(3),
+  });
+
+  await expect(page.locator('.status-line')).toContainText(/audio processing worker stopped unexpectedly/i);
+  await expect(page.getByRole('alert')).toContainText(/Save a project backup, then reload this page/i);
+  await page.getByRole('tab', { name: 'Edit' }).click();
+  await expect(page.getByRole('button', { name: 'Normalize peak' })).toBeDisabled();
+
+  await page.getByRole('tab', { name: 'Project' }).click();
+  // The recovery banner and the Project tab each offer the backup; both must be usable.
+  const backupButtons = page.getByRole('button', { name: 'Save project backup' });
+  await expect(backupButtons).toHaveCount(2);
+  for (const button of await backupButtons.all()) await expect(button).toBeEnabled();
+});
+
+test('fails gracefully when the DSP worker cannot start', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'Worker', {
+      configurable: true,
+      value: class {
+        constructor() { throw new Error('Workers are blocked in this browser context.'); }
+      },
+    });
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('alert')).toContainText(/Local audio processing stopped/i);
+  await expect(page.getByRole('alert')).toContainText(/reload this page before adding audio/i);
+  await expect(page.locator('.mastering-import input[type="file"][multiple]')).toBeDisabled();
+  await expect(page.locator('.status-line')).toContainText(/Workers are blocked in this browser context/i);
+});
+
 test('imports, auditions, edits, marks, and undoes a local master', async ({ page }) => {
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
@@ -75,8 +159,16 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await expect(page.getByRole('heading', { name: 'Regions' })).toBeVisible();
   await expect(page.getByLabel('Region 1 name')).toHaveValue('Verse A');
 
-  await page.getByLabel('Gain to apply (dB)').fill('6');
+  const gainInput = page.getByLabel('Gain to apply (dB)');
+  await expect(gainInput).toHaveAttribute('inputmode', 'text');
+  await gainInput.click();
+  await gainInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await gainInput.press('Backspace');
+  await gainInput.pressSequentially('-3.5');
+  await gainInput.press('Enter');
+  await expect(gainInput).toHaveValue('-3.5');
   await page.getByRole('button', { name: 'Apply gain' }).click();
+  await expect(page.locator('.status-line')).toContainText(/Applied -3\.5 dB gain/);
   const levelPanel = page.locator('.mastering-panel').filter({ hasText: 'Level operations' });
   await expect(levelPanel.getByLabel('Clip edits')).toHaveText('1');
 
@@ -114,6 +206,7 @@ test('imports, auditions, edits, marks, and undoes a local master', async ({ pag
   await page.getByRole('button', { name: 'Remove DC offset' }).click();
   await page.getByRole('button', { name: 'Invert polarity' }).click();
   await page.getByRole('button', { name: 'Reverse selection' }).click();
+  await expect(page.getByLabel('Silence duration (seconds)')).toHaveAttribute('inputmode', 'decimal');
   await page.getByLabel('Silence duration (seconds)').fill('0.1');
   await page.getByRole('button', { name: 'Insert silence at playhead' }).click();
   await expect(levelPanel.getByLabel('Clip edits')).toHaveText('4');
@@ -217,9 +310,15 @@ test('processes a clip with loudness, bit depth, stretch, pitch, room tone, and 
   await expect(page.getByText(/voice\.wav: 0:02\.000 → 0:03\.000/)).toBeVisible();
   await page.getByRole('button', { name: 'Apply time stretch' }).click();
   await expect(page.getByLabel('Visible range')).toHaveText(/0:03\.000$/, { timeout: 20_000 });
-  await page.getByLabel('Semitones (−24 to 24)').fill('3');
+  const semitonesInput = page.getByLabel('Semitones (−24 to 24)');
+  await semitonesInput.click();
+  await semitonesInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await semitonesInput.press('Backspace');
+  await semitonesInput.pressSequentially('-7');
+  await semitonesInput.press('Enter');
+  await expect(semitonesInput).toHaveValue('-7');
   await page.getByRole('button', { name: 'Apply pitch shift' }).click();
-  await expect(page.locator('.status-line')).toContainText(/Shifted pitch by 3 semitones with formants preserved/);
+  await expect(page.locator('.status-line')).toContainText(/Shifted pitch by -7 semitones with formants preserved/);
   await expect(page.locator('.mastering-busy')).toHaveCount(0, { timeout: 30_000 });
 
   await page.getByRole('tab', { name: 'Edit', exact: true }).click();
@@ -290,6 +389,16 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
   await open('Plosive control');
   await page.getByRole('button', { name: 'Soften plosives' }).click();
   await open('De-esser');
+  const essThreshold = page.getByLabel('Threshold (dB, −60–0)');
+  await essThreshold.click();
+  await essThreshold.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await essThreshold.press('Backspace');
+  await essThreshold.pressSequentially('-31.5');
+  await essThreshold.press('Enter');
+  await expect(essThreshold).toHaveValue('-31.5');
+  await essThreshold.fill('-999');
+  await essThreshold.press('Enter');
+  await expect(essThreshold).toHaveValue('-60');
   await page.getByRole('button', { name: 'De-ess' }).click();
   await open('Hiss gate');
   await page.getByRole('button', { name: 'Gate hiss' }).click();
@@ -324,13 +433,18 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await page.getByLabel('Equalizer on').check();
   await page.locator('summary').filter({ hasText: 'Band 6' }).click();
   await page.getByLabel('Band 6 on').check();
-  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).fill('4');
-  await page.getByRole('spinbutton', { name: 'Band 6 gain' }).press('Enter');
-  await expect(status).toContainText(/Band 6 gain \+4\.0 dB/);
+  const bandGain = page.getByRole('spinbutton', { name: 'Band 6 gain' });
+  await expect(bandGain).toHaveAttribute('inputmode', 'text');
+  await bandGain.click();
+  await bandGain.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await bandGain.press('Backspace');
+  await bandGain.pressSequentially('-2.5');
+  await bandGain.press('Enter');
+  await expect(status).toContainText(/Band 6 gain -2\.5 dB/);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('0');
+  await expect(bandGain).toHaveValue('0');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Band 6 gain' })).toHaveValue('4');
+  await expect(bandGain).toHaveValue('-2.5');
 
   await page.locator('summary').filter({ hasText: 'True-peak limiter' }).click();
   await page.getByLabel('True-peak limiter on').check();
@@ -344,21 +458,23 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await expect(status).toContainText(/Master rendered offline: .* LUFS integrated/);
 
   await page.getByRole('tab', { name: 'Meters' }).click();
-  await expect(page.getByRole('radio', { name: 'Reference' })).toBeDisabled();
+  const transport = page.locator('.mastering-transport');
+  await expect(transport.getByRole('radio', { name: 'Reference', exact: true })).toBeDisabled();
   await page.getByRole('tabpanel', { name: 'Meters' }).locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
   await expect(status).toContainText(/Loaded reference\.wav as the reference/);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
   await expect(status).not.toContainText(/without the master chain/);
-  await page.getByRole('radio', { name: 'Reference' }).click();
+  await transport.getByRole('radio', { name: 'Reference', exact: true }).click();
   await expect(status).toContainText(/reference track, loudness-matched/);
   await expect(page.getByLabel('Integrated loudness', { exact: true })).not.toHaveText('— LUFS', { timeout: 10_000 });
-  await page.getByRole('radio', { name: 'Original' }).click();
+  await transport.getByRole('radio', { name: 'Original', exact: true }).click();
   await expect(status).toContainText(/original mix, loudness-matched/);
-  await page.getByRole('radio', { name: 'Difference' }).click();
+  await transport.getByRole('radio', { name: 'Difference', exact: true }).click();
   await page.getByLabel('Mono check (sum to mono)').check();
   await page.getByRole('radio', { name: 'Side only', exact: true }).check();
-  await page.getByRole('radio', { name: 'Processed' }).click();
+  await transport.getByRole('radio', { name: 'Processed', exact: true }).click();
+  await expect(transport.getByRole('radio', { name: 'Processed', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('meter', { name: 'Phase correlation' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(status).toContainText(/Paused at/);
@@ -375,6 +491,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(page.locator('.mastering-spectrogram .mastering-busy')).toHaveCount(0, { timeout: 15_000 });
 
   await page.getByRole('radio', { name: 'Paint regions' }).click();
+  await expect(overlay).toHaveCSS('touch-action', 'none');
   await overlay.scrollIntoViewIfNeeded();
   const box = await overlay.boundingBox();
   if (!box) throw new Error('spectrogram missing');
@@ -390,6 +507,7 @@ test('shows a synced spectrogram and repairs a painted region', async ({ page })
   await expect(page.getByLabel('Clip edits')).toHaveText('0');
 
   await page.getByRole('radio', { name: 'Select time' }).click();
+  await expect(overlay).toHaveCSS('touch-action', 'pan-y');
   await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.5);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5, { steps: 3 });
@@ -522,6 +640,78 @@ test('exports bit-exact WAV, tagged compressed files, reports, and stems as a ZI
 
 // --- SECTION: project persistence ---
 
+test('stages backup audio transactionally before replacing the live project', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    target.__masteringWorkerMessages = [];
+    const originalPostMessage = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message: unknown, transfer?: Transferable[]) {
+      if (typeof message === 'object' && message !== null && 'type' in message) {
+        const item = message as { type?: unknown; sourceId?: unknown };
+        if (item.type === 'loadSource' || item.type === 'releaseSource') {
+          target.__masteringWorkerMessages!.push({
+            type: String(item.type),
+            sourceId: typeof item.sourceId === 'string' ? item.sourceId : undefined,
+          });
+        }
+      }
+      originalPostMessage.call(this, message, transfer ?? []);
+    } as typeof Worker.prototype.postMessage;
+  });
+
+  await page.goto('./#/tools/audio-mastering');
+  await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
+  await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles([
+    { name: 'first.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 220) },
+    { name: 'second.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(1, 48_000, 330) },
+  ]);
+  await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+
+  const initialIds = await page.evaluate(() => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    return (target.__masteringWorkerMessages ?? []).filter((item) => item.type === 'loadSource').map((item) => item.sourceId);
+  });
+  expect(initialIds).toHaveLength(2);
+
+  await page.getByRole('tab', { name: 'Project' }).click();
+  const project = page.getByRole('tabpanel', { name: 'Project' });
+  const [backup] = await Promise.all([page.waitForEvent('download'), project.getByRole('button', { name: 'Save project backup' }).click()]);
+  const { readFile } = await import('node:fs/promises');
+  const { default: JSZip } = await import('jszip');
+  const archive = await JSZip.loadAsync(await readFile(await backup.path()));
+  const manifest = JSON.parse(await archive.file('project.json')!.async('string')) as {
+    document: { sources: Array<{ id: string }> };
+    files: Record<string, string>;
+  };
+  const [firstSource, secondSource] = manifest.document.sources;
+  archive.file(manifest.files[firstSource.id], makeMonoPcm16Wav(1, 48_000, 880));
+  archive.file(manifest.files[secondSource.id], Buffer.from('not-decodable-audio'));
+  const brokenBackup = await archive.generateAsync({ type: 'nodebuffer' });
+
+  await project.locator('input[type="file"]').setInputFiles({
+    name: 'broken project.zip',
+    mimeType: 'application/zip',
+    buffer: brokenBackup,
+  });
+  await expect(page.locator('.status-line')).toContainText(/Could not reopen the project:/);
+  await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+
+  const restoreMessages = await page.evaluate((initialCount) => {
+    const target = window as typeof window & { __masteringWorkerMessages?: Array<{ type: string; sourceId?: string }> };
+    const messages = target.__masteringWorkerMessages ?? [];
+    const loads = messages.filter((item) => item.type === 'loadSource').slice(initialCount);
+    const releases = messages.filter((item) => item.type === 'releaseSource');
+    return { loads, releases };
+  }, initialIds.length);
+
+  expect(restoreMessages.loads).toHaveLength(1);
+  const stagedId = restoreMessages.loads[0].sourceId;
+  expect(stagedId).toBeTruthy();
+  expect(initialIds).not.toContain(stagedId);
+  expect(restoreMessages.releases.map((item) => item.sourceId)).toContain(stagedId);
+});
+
 test('autosaves, recovers after a reload, backs up and reopens, saves presets, and reports capabilities', async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto('./#/tools/audio-mastering');
@@ -615,11 +805,39 @@ test('every workbench tab passes an axe scan with its disclosures open', async (
     { name: 'pad.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(2, 44_100, 110) },
   ]);
   await expect(page.getByText('2 of 8 tracks in use')).toBeVisible();
+  const assertMinimumAuthoredText = async (label: string) => {
+    const undersizedText = await page.locator('.mastering-lane-name, .mastering-clip span, .mastering-report thead th').evaluateAll((elements) =>
+      elements
+        .filter((element) => (element as HTMLElement).offsetParent !== null)
+        .map((element) => ({ text: (element.textContent ?? '').trim().slice(0, 80), size: Number.parseFloat(getComputedStyle(element).fontSize) }))
+        .filter((entry) => entry.size < 12),
+    );
+    expect(undersizedText, `${label} has authored informational text below the workstation's 12px floor`).toEqual([]);
+  };
+  const assertTouchTargets = async (label: string) => {
+    const undersizedTargets = await page.locator('.mastering-workspace button:not(.mastering-clip), .mastering-check, .mastering-shortcuts summary, .mastering-param-number, .mastering-workspace input[type="range"]').evaluateAll((elements) =>
+      elements
+        .filter((element) => (element as HTMLElement).offsetParent !== null)
+        .map((element) => ({ label: (element.textContent || (element as HTMLInputElement).ariaLabel || element.tagName).trim().slice(0, 80), height: element.getBoundingClientRect().height }))
+        .filter((entry) => entry.height < 43.5),
+    );
+    expect(undersizedTargets, `${label} has authored controls below the workstation's 44px touch-target baseline`).toEqual([]);
+  };
+  await assertTouchTargets('default tab');
   for (const tab of ['Edit', 'Arrange', 'Time & pitch', 'Repair', 'Master', 'Meters', 'Export', 'Project']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
     const panel = page.getByRole('tabpanel', { name: tab, exact: true });
     await expect(panel).toBeVisible();
     await panel.locator('details').evaluateAll((elements) => elements.forEach((element) => { (element as HTMLDetailsElement).open = true; }));
+    await assertTouchTargets(tab);
+    await assertMinimumAuthoredText(tab);
+    const scrollRegions = panel.locator('.mastering-table-scroll:visible');
+    for (let index = 0; index < await scrollRegions.count(); index += 1) {
+      const region = scrollRegions.nth(index);
+      await expect(region).toHaveAttribute('tabindex', '0');
+      await expect(region).toHaveAttribute('role', 'region');
+      await expect(region).toHaveAttribute('aria-label', /\S+/);
+    }
     await scan(tab);
   }
 });

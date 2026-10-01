@@ -130,13 +130,15 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
   const askToPersist = async () => {
     try {
       const granted = await navigator.storage?.persist?.();
-      setPersistState(granted ? 'The browser will keep your saved sessions even when space runs low.' : 'The browser declined for now. It often grants this after you use the site for a while.');
+      setPersistState(granted
+        ? 'Persistent storage was granted for this site, so saved sessions are less likely to be evicted automatically.'
+        : 'Persistent storage was not granted. Save a backup file for work you cannot afford to lose.');
       setDiagnostics(await collectDiagnostics(channels, rate));
     } catch (error) { setPersistState(`Could not ask: ${messageOf(error)}`); }
   };
 
   const autosaveText = autosave.state === 'saved'
-    ? `Saved on this device at ${new Date(autosave.at).toLocaleTimeString()}. If the tab closes or the browser crashes, you will be offered this session next time.`
+    ? `Saved on this device at ${new Date(autosave.at).toLocaleTimeString()}. This session can be offered on a later visit as long as browser storage remains available.`
     : autosave.state === 'full'
       ? 'Autosave is paused because browser storage is full. Save a backup file to keep your work, then free some space.'
       : autosave.state === 'unavailable'
@@ -159,13 +161,13 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
     <section className="mastering-panel" aria-labelledby="project-backup-heading">
       <div className="mastering-panel-heading"><div>
         <h3 id="project-backup-heading">Backup and restore</h3>
-        <p>A backup is one ZIP with your edits, arrangement, master chain, markers, and the original audio. Open it here in any browser to carry on where you left off.</p>
+        <p>A backup is one ZIP with your edits, arrangement, master chain, markers, and the original audio. Open it here later in a compatible browser to carry on where you left off.</p>
       </div></div>
       <div className="button-row">
-        <button type="button" className="mastering-primary" disabled={busy || !ctx.canEdit} onClick={() => void onSaveBackup()}>Save project backup</button>
-        <label className={`mastering-file-button mastering-file-secondary${busy ? ' is-disabled' : ''}`}>
+        <button type="button" className="mastering-primary" disabled={busy || !ctx.document.tracks.some((track) => track.clips.length)} onClick={() => void onSaveBackup()}>Save project backup</button>
+        <label className={`mastering-file-button mastering-file-secondary${busy || !ctx.canEdit ? ' is-disabled' : ''}`}>
           Open project backup
-          <input type="file" accept=".zip,application/zip" disabled={busy} onChange={onFile} />
+          <input type="file" accept=".zip,application/zip" disabled={busy || !ctx.canEdit} onChange={onFile} />
         </label>
       </div>
       <p className="help-text">Opening a backup replaces the current project. Save a backup of this one first if you want to keep it.</p>
@@ -207,7 +209,7 @@ export default function MasteringProjectTab({ ctx, active, autosave, busy, onSav
         <p>Useful when something is unavailable or slow. Share the report when asking for help; it contains no audio or file names.</p>
       </div></div>
       {checking && !diagnostics && <p className="mastering-busy" role="status">Checking…</p>}
-      {diagnostics && <div className="mastering-table-scroll"><table className="mastering-report mastering-diagnostics">
+      {diagnostics && <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Browser capability report"><table className="mastering-report mastering-diagnostics">
         <caption className="visually-hidden">Browser capabilities</caption>
         <tbody>{diagnostics.map((row) => <tr key={row.label}>
           <th scope="row">{row.label}</th>

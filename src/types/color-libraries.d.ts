@@ -22,6 +22,7 @@ declare module 'culori' {
   export function parse(value: string): CuloriColor | undefined;
   export function formatHex(color: CuloriColor | string): string;
   export function converter(mode: 'rgb'): (color: CuloriColor | string) => RgbColor | undefined;
+  export function differenceCiede2000(Kl?: number, Kc?: number, Kh?: number): (color1: CuloriColor | string, color2: CuloriColor | string) => number;
   /** Perceptual interpolation between two or more colours. */
   export function interpolate(
     colors: readonly (string | CuloriColor)[],

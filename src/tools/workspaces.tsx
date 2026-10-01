@@ -40,6 +40,9 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
   'geo-intelligence-hub': () => import('./geo-intel/GeoIntelWorkspace'),
   'tactical-matchboard-studio': () => import('./tactics/TacticalMatchboardWorkspace'),
+  'fiber-craft-workstation': () => import('./fiber-craft/FiberCraftWorkspace'),
+  'site-intelligence-analyzer': () => import('./site-intel/SiteIntelWorkspace'),
+  'cad-studio': () => import('./cad/CadWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();
