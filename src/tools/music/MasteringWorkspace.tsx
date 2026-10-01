@@ -67,6 +67,7 @@ type PlaybackGraph = {
   loopEnd: number;
   /** Seconds the processed audio lags the source (chain latency), from worklet reports. */
   latencySeconds: number;
+  processorError: EventListener | null;
   raf: number | null;
 };
 
@@ -151,6 +152,8 @@ export default function MasteringWorkspace() {
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [autosave, setAutosave] = useState<AutosaveState>({ state: 'starting' });
   const [projectBusy, setProjectBusy] = useState(false);
+  const [dspFailure, setDspFailure] = useState<string | null>(null);
+  const dspFailureRef = useRef<string | null>(null);
   const shortcutsRef = useRef<HTMLDetailsElement | null>(null);
 
   const commitDocument = useCallback((next: MasteringDocument) => setHistory((current) => commitProjectRevision(current, next)), []);
@@ -170,15 +173,30 @@ export default function MasteringWorkspace() {
   const clipEnd = clip ? clipStart + clipDurationSeconds(document, clip) : 0;
   const boundedSelection = useMemo(() => clampSelection(selection, duration), [selection, duration]);
   const hasAudio = document.tracks.some((track) => track.clips.length > 0);
-  const canEdit = hasAudio && !loading;
+  const canEdit = hasAudio && !loading && !dspFailure;
   const mixReady = Boolean(render && render.mix.channels[0]?.length);
 
   // --- SECTION: worker lifecycle and rendering ---
 
   useEffect(() => {
     mountedRef.current = true;
-    const client = new MasteringDspClient();
-    clientRef.current = client;
+    const reportFailure = (error: unknown) => {
+      const message = messageOf(error);
+      dspFailureRef.current = message;
+      if (!mountedRef.current) return;
+      setDspFailure(message);
+      setRendering(false);
+      setSpectrogramLoading(false);
+      setStatus(`The audio processing worker stopped unexpectedly: ${message} Reload this page to restart local audio processing. If a project is open, save a project backup first.`);
+    };
+    let client: MasteringDspClient;
+    try {
+      client = new MasteringDspClient(reportFailure);
+      clientRef.current = client;
+    } catch (error) {
+      reportFailure(error);
+      return () => { mountedRef.current = false; clientRef.current = null; };
+    }
     return () => {
       mountedRef.current = false;
       clientRef.current = null;
@@ -251,8 +269,9 @@ export default function MasteringWorkspace() {
     };
   }, [store, saveNow, document.sampleRate, document.sources, document.tracks, document.markers, document.regions, document.master, document.metadataEdits, document.selection]);
 
-  // Closing, reloading, or backgrounding the tab (where mobile browsers may kill it) writes a
-  // pending save at once; browsers let an IndexedDB transaction started here finish.
+  // Backgrounding is the last reliably observable lifecycle transition on mobile, so flush a
+  // pending save there and on pagehide as a best effort. IndexedDB cannot guarantee a transaction
+  // will finish if the browser process is terminated, which is why portable backups remain available.
   useEffect(() => {
     const flush = () => {
       if (pendingSaveRef.current === null) return;
@@ -285,7 +304,8 @@ export default function MasteringWorkspace() {
     }).catch((error: unknown) => {
       if (cancelled || !mountedRef.current) return;
       setRendering(false);
-      setStatus(`Could not render the timeline: ${messageOf(error)} Undo the last change to return to the previous version.`);
+      if (dspFailureRef.current) return;
+      setStatus(`Could not render the timeline: ${messageOf(error)} The last completed render is unchanged; fix the edit or undo it before continuing.`);
     });
     return () => { cancelled = true; };
   }, [renderKey, hasAudio]);
@@ -327,7 +347,11 @@ export default function MasteringWorkspace() {
       if (!node) continue;
       try { node.onended = null; node.stop(); } catch { /* source may already have ended */ }
     }
-    if (graph.master) graph.master.port.onmessage = null;
+    if (graph.master) {
+      if (graph.processorError) graph.master.removeEventListener('processorerror', graph.processorError);
+      graph.processorError = null;
+      graph.master.port.onmessage = null;
+    }
     for (const node of [graph.source, graph.reference, graph.master, graph.pre, graph.post]) {
       try { node?.disconnect(); } catch { /* already disconnected */ }
     }
@@ -388,7 +412,7 @@ export default function MasteringWorkspace() {
     const pre = context.createAnalyser();
     const post = context.createAnalyser();
     for (const analyser of [pre, post]) { analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.75; }
-    const graph: PlaybackGraph = { session, context, source, master: null, reference: null, pre, post, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, latencySeconds: 0, raf: null };
+    const graph: PlaybackGraph = { session, context, source, master: null, reference: null, pre, post, startedAt: 0, offset, loopStart: source.loopStart, loopEnd: source.loopEnd || mixDuration, latencySeconds: 0, processorError: null, raf: null };
     graphRef.current = graph;
     lastGraphRef.current = graph;
     setMeters(null);
@@ -411,6 +435,19 @@ export default function MasteringWorkspace() {
           graph.latencySeconds = event.data.latencyFrames / context.sampleRate;
           setMeters(event.data);
         };
+        graph.processorError = () => {
+          if (graphRef.current !== graph || sessionRef.current !== session) return;
+          const failedAt = timelinePosition(graph, context.currentTime, mixDuration);
+          sessionRef.current += 1;
+          graphRef.current = null;
+          releaseGraph(graph);
+          if (mountedRef.current) {
+            updateView({ playhead: Math.min(mixDuration, failedAt) });
+            setPlaybackState('paused');
+            setStatus(`Realtime audio processor stopped unexpectedly at ${formatTime(failedAt)}. Playback was stopped; your edits are unchanged. Press Resume to try again.`);
+          }
+        };
+        node.addEventListener('processorerror', graph.processorError);
         node.port.postMessage({ type: 'settings', settings: liveMasterRef.current } satisfies WorkletInbound);
         node.port.postMessage({ type: 'monitor', ...monitorRef.current } satisfies WorkletInbound);
         source.connect(node, 0, 0);
@@ -563,6 +600,7 @@ export default function MasteringWorkspace() {
       const detail = placements.length === 1 && first ? `: ${first.codec}, ${first.channelCount} channel${first.channelCount === 1 ? '' : 's'}, ${first.sampleRate.toLocaleString()} Hz` : '';
       setStatus(`Loaded ${added}${detail}.${skipped.length ? ` Skipped ${skipped.join('; ')}.` : ''}`);
     } catch (error) {
+      abandon();
       setStatus(`Could not open audio: ${messageOf(error)}`);
     } finally {
       if (revision === importRevisionRef.current && mountedRef.current) setLoading(false);
@@ -578,6 +616,12 @@ export default function MasteringWorkspace() {
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragging(false);
+    if (loading || projectBusy || dspFailure) {
+      setStatus(dspFailure
+        ? 'Local audio processing has stopped. Save a project backup, then reload this page before adding more audio.'
+        : 'Finish the current file operation before dropping more audio.');
+      return;
+    }
     const files = Array.from(event.dataTransfer.files ?? []).filter((file) => file.type.startsWith('audio/') || /\.(wav|wave|mp3|flac|ogg|oga|opus|m4a|aac|aiff?|caf|webm)$/i.test(file.name));
     if (files.length) void importFiles(files);
     else setStatus('Drop audio files (WAV, MP3, FLAC, Ogg, M4A, AIFF and similar).');
@@ -598,9 +642,10 @@ export default function MasteringWorkspace() {
   // --- SECTION: reopening saved projects (ledgers 18, 81) ---
 
   /**
-   * Replaces the project with a saved one: decodes each stored file under its original
-   * source id, then swaps the document in. The current project stays intact until every
-   * file has loaded, so a failed restore changes nothing.
+   * Replaces the project with a saved one transactionally. Restored sources are decoded
+   * under fresh worker ids and the saved document is remapped to those ids before any
+   * worker state is touched. The old project sources are released only after every new
+   * source has loaded, so a failed restore cannot overwrite live PCM behind the current UI.
    */
   const openProject = useCallback(async (saved: MasteringDocument, files: ReadonlyMap<string, Blob>, label: string, adoptSessionId?: string): Promise<boolean> => {
     const client = clientRef.current;
@@ -609,29 +654,43 @@ export default function MasteringWorkspace() {
     stopPlayback(false);
     setLoading(true);
     const previousIds = new Set(historyRef.current.present.sources.map((source) => source.id));
+    const stagedIds = new Map(saved.sources.map((source) => [source.id, newId('source')]));
     const loadedIds: string[] = [];
+    const abandonLoaded = () => {
+      for (const id of loadedIds) void client.releaseSource(id).catch(() => undefined);
+    };
     const infos: Record<string, AudioFileInfo> = {};
-    let next = saved;
+    const stagedFiles = new Map<string, Blob>();
+    let next: MasteringDocument = {
+      ...saved,
+      sources: saved.sources.map((source) => ({ ...source, id: stagedIds.get(source.id)! })),
+      tracks: saved.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((item) => ({ ...item, sourceId: stagedIds.get(item.sourceId)! })),
+      })),
+    };
     const lengthChanges: string[] = [];
     try {
       for (const [index, source] of saved.sources.entries()) {
+        const stagedId = stagedIds.get(source.id)!;
         const blob = files.get(source.id);
         if (!blob) throw new Error(`the audio for ${source.name} is missing.`);
         setStatus(`Reopening ${source.name} (${index + 1} of ${saved.sources.length})…`);
         const decoded = await decodeAudioFile(new File([blob], source.name, { lastModified: source.lastModified }));
-        if (revision !== importRevisionRef.current || !mountedRef.current) return false;
-        const loaded = await client.loadSource(source.id, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
-        loadedIds.push(source.id);
-        if (revision !== importRevisionRef.current || !mountedRef.current) return false;
-        infos[source.id] = decoded.info;
+        if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return false; }
+        const loaded = await client.loadSource(stagedId, bufferToPcm(decoded.buffer), saved.sampleRate ?? decoded.buffer.sampleRate);
+        loadedIds.push(stagedId);
+        stagedFiles.set(stagedId, blob);
+        if (revision !== importRevisionRef.current || !mountedRef.current) { abandonLoaded(); return false; }
+        infos[stagedId] = decoded.info;
         // Another browser's decoder can pad a compressed file differently; edits are timed in seconds, so record the new length and say so.
         if (loaded.frameCount !== source.frameCount) {
           lengthChanges.push(source.name);
-          next = { ...next, sources: next.sources.map((item) => (item.id === source.id ? { ...item, frameCount: loaded.frameCount } : item)) };
+          next = { ...next, sources: next.sources.map((item) => (item.id === stagedId ? { ...item, frameCount: loaded.frameCount } : item)) };
         }
       }
-      for (const id of previousIds) if (!next.sources.some((source) => source.id === id)) void client.releaseSource(id).catch(() => undefined);
-      sourceFilesRef.current = new Map(next.sources.map((source) => [source.id, files.get(source.id)!]));
+      for (const id of previousIds) void client.releaseSource(id).catch(() => undefined);
+      sourceFilesRef.current = stagedFiles;
       if (adoptSessionId) sessionIdRef.current = adoptSessionId;
       setRecovery(null);
       setSourceInfos(infos);
@@ -640,7 +699,7 @@ export default function MasteringWorkspace() {
       setStatus(`${label} ${count} track${count === 1 ? '' : 's'} and ${next.sources.length} audio file${next.sources.length === 1 ? '' : 's'}.${lengthChanges.length ? ` ${lengthChanges.join(', ')} decoded to a slightly different length in this browser; listen to edits near their ends.` : ''}`);
       return true;
     } catch (error) {
-      for (const id of loadedIds) if (!previousIds.has(id)) void client.releaseSource(id).catch(() => undefined);
+      abandonLoaded();
       if (mountedRef.current) setStatus(`Could not reopen the project: ${messageOf(error)} Your current project is unchanged.`);
       return false;
     } finally {
@@ -833,9 +892,18 @@ export default function MasteringWorkspace() {
           <p>Your session from {new Date(recovery.savedAt).toLocaleString()} is saved on this device: {recovery.sourceNames.slice(0, 3).join(', ')}{recovery.sourceNames.length > 3 ? ` and ${recovery.sourceNames.length - 3} more` : ''}.</p>
         </div>
         <div className="button-row">
-          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading}>Restore session</button>
+          <button type="button" className="mastering-primary" onClick={() => void restoreSession()} disabled={loading || projectBusy || Boolean(dspFailure)}>Restore session</button>
           <button type="button" onClick={() => void discardSession()} disabled={loading}>Discard it</button>
         </div>
+      </section>}
+      {dspFailure && <section className="mastering-recovery" role="alert">
+        <div>
+          <h3>Local audio processing stopped</h3>
+          <p>{dspFailure} {hasAudio ? 'Your project data is still in this tab. Save a project backup, then reload this page before making more audio changes.' : 'Reload this page before adding audio.'}</p>
+        </div>
+        {hasAudio && <div className="button-row">
+          <button type="button" className="mastering-primary" onClick={() => void saveBackup()} disabled={loading || projectBusy}>Save project backup</button>
+        </div>}
       </section>}
       <div
         className={`mastering-import${dragging ? ' is-dragging' : ''}`}
@@ -848,17 +916,17 @@ export default function MasteringWorkspace() {
           <p>{hasAudio ? 'Add more files as new tracks, or drop them here. Files at other sample rates are converted to the project rate.' : 'Choose or drop one or more audio files. Each file becomes its own track. Nothing is uploaded.'}</p>
         </div>
         <div className="mastering-import-actions">
-          <label className={`mastering-file-button${loading || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
+          <label className={`mastering-file-button${loading || projectBusy || dspFailure || document.tracks.length >= MAX_TRACKS ? ' is-disabled' : ''}`}>
             {loading ? 'Reading…' : hasAudio ? 'Add audio files' : 'Choose audio files'}
-            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
+            <input type="file" multiple accept={ACCEPTED_AUDIO} disabled={loading || projectBusy || Boolean(dspFailure) || document.tracks.length >= MAX_TRACKS} onChange={onFileChange} />
           </label>
           {!hasAudio && <label className={`mastering-file-button mastering-file-secondary${loading || projectBusy ? ' is-disabled' : ''}`}>
             Open project backup
             <input type="file" accept=".zip,application/zip" disabled={loading || projectBusy} onChange={onBackupFile} />
           </label>}
           {hasAudio && (confirmClear
-            ? <button type="button" className="mastering-danger" onClick={clearProject}>Confirm new project</button>
-            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading}>New project</button>)}
+            ? <button type="button" className="mastering-danger" onClick={clearProject} disabled={loading || projectBusy || Boolean(dspFailure)}>Confirm new project</button>
+            : <button type="button" onClick={() => setConfirmClear(true)} disabled={loading || projectBusy || Boolean(dspFailure)}>New project</button>)}
         </div>
       </div>
 
@@ -885,6 +953,7 @@ export default function MasteringWorkspace() {
             title={hint}
             onClick={() => setListen(value)}>{label}</button>)}
         </div>
+        {!reference && <span className="mastering-transport-note">Reference: load one on the Meters tab.</span>}
         {rendering && <span className="mastering-busy" role="status">Rendering…</span>}
         <output className="mastering-time" aria-label="Playhead time">{formatTime(playhead)}</output>
       </div>

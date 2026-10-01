@@ -83,7 +83,7 @@ export default function ParameterControl({ label, value, min, max, step, unit, d
       onKeyUp={commit}
       onBlur={commit}
     />
-    <input id={`${id}-number`} className="mastering-param-number" type="number" inputMode="decimal" min={min} max={max} step={step} value={text} disabled={disabled}
+    <input id={`${id}-number`} className="mastering-param-number" type="number" inputMode={min < 0 ? 'text' : 'decimal'} min={min} max={max} step={step} value={text} disabled={disabled}
       onChange={(event) => { setText(event.target.value); const parsed = Number(event.target.value); if (event.target.value.trim() !== '' && Number.isFinite(parsed)) onPreview?.(clamp(parsed)); }}
       onBlur={commitText} onKeyDown={onKey} />
   </div>;

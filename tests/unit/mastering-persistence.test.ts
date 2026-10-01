@@ -48,6 +48,32 @@ describe('parseMasteringDocument', () => {
     expect(parsed.master).toEqual(defaultMasterSettings());
   });
 
+  it('rejects ids that become ambiguous after normalization', () => {
+    const raw = JSON.parse(JSON.stringify(sampleDocument())) as {
+      tracks: Array<{ id: string; clips: Array<{ id: string }> }>;
+      markers: Array<{ id: string }>;
+      regions: Array<{ id: string }>;
+    };
+
+    const duplicateTrack = structuredClone(raw);
+    duplicateTrack.tracks[1].id = duplicateTrack.tracks[0].id;
+    expect(() => parseMasteringDocument(duplicateTrack)).toThrow(/tracks.*share one id/i);
+
+    const prefix = 'c'.repeat(120);
+    const truncatedClip = structuredClone(raw);
+    truncatedClip.tracks[0].clips[0].id = `${prefix}a`;
+    truncatedClip.tracks[1].clips[0].id = `${prefix}b`;
+    expect(() => parseMasteringDocument(truncatedClip)).toThrow(/clips.*share one id/i);
+
+    const duplicateMarker = structuredClone(raw);
+    duplicateMarker.markers.push({ ...duplicateMarker.markers[0] });
+    expect(() => parseMasteringDocument(duplicateMarker)).toThrow(/markers.*share one id/i);
+
+    const duplicateRegion = structuredClone(raw);
+    duplicateRegion.regions.push({ ...duplicateRegion.regions[0] });
+    expect(() => parseMasteringDocument(duplicateRegion)).toThrow(/regions.*share one id/i);
+  });
+
   it('refuses projects it cannot use, saying why', () => {
     expect(() => parseMasteringDocument({ version: 1 })).toThrow(/not an Audio Mastering project/);
     const raw = JSON.parse(JSON.stringify(sampleDocument())) as { tracks: Array<{ clips: Array<Record<string, unknown>> }>; sources: unknown[] };

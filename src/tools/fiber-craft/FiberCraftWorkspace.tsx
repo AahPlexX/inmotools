@@ -1,0 +1,576 @@
+import { useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { downloadBlob, downloadBytes, downloadText } from '../../lib/download';
+import {
+  addCrochetRound,
+  clearCrochetGrid,
+  clearCrochetRound,
+  createStarterCrochetDocument,
+  crochetRoundProgress,
+  fillCrochetRound,
+  removeLastCrochetRound,
+  resizeCrochetGrid,
+  setCrochetPatternCredit,
+  setCrochetRoundStitch,
+  setCrochetGauge,
+  setCrochetPatternClassification,
+  setCrochetTargetRoundCounts,
+  setCrochetYarnReference,
+  switchCrochetChartMode,
+  toggleCrochetGridCell,
+  toggleCrochetProgressStep,
+  transformCrochetGrid,
+  workNextCrochetStitch,
+  type CrochetGridTransform,
+  type CrochetPatternCredit,
+  type CrochetStitchModifiers,
+  type CycProjectLevel,
+} from './crochet-document-engine';
+import { CrochetStitchEditor, type CrochetLoopChoice } from './CrochetStitchEditor';
+import {
+  CrochetGridPanel,
+  CrochetRoundInsights,
+  GaugeScalingPanel,
+  PatternCreditPanel,
+  PatternDetailsPanel,
+  YarnReferencePanel,
+} from './CrochetPatternPanels';
+import { CountedThreadPanel } from './CountedThreadPanel';
+import { KnittingGridPanel } from './KnittingGridPanel';
+import { switchToCountedThreadDocument } from './engines/counted-thread-engine';
+import { switchToKnittingDocument } from './knitting-document-engine';
+import {
+  FIBER_CRAFT_DESCRIPTION_ID,
+  FiberCraftChartDescription,
+  type FiberCraftTheme,
+} from './FiberCraftAccessibility';
+import {
+  crochetPngDimensions,
+  hitTestPolarNode,
+  renderCrochetChartCanvas,
+  type CrochetPngScale,
+} from './engines/crochet-chart-renderer';
+import { CROCHET_SYMBOLS, crochetSymbolLabel, type CrochetDialect } from './engines/symbol-library';
+import {
+  commitFiberCraftHistory,
+  createFiberCraftHistory,
+  redoFiberCraftHistory,
+  undoFiberCraftHistory,
+  type FiberCraftHistory,
+} from './history-engine';
+import { createIndexedDbFiberCraftStore, type FiberCraftStore } from './persistence-engine';
+import {
+  fiberCraftFilenameStem,
+  fiberCraftProjectFilename,
+  parseFiberCraftProject,
+  serializeFiberCraftProject,
+} from './project-bundle-engine';
+import {
+  FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT,
+  FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH,
+  fiberCraftSocialPreviewFilename,
+  renderFiberCraftSocialPreview,
+} from './social-preview-engine';
+import type { ColorSlot, FiberCraftDocument, GaugeSwatch, PolarChart } from './fiber-craft-types';
+import './fiber-craft-workspace.css';
+import './fiber-craft-accessibility.css';
+
+type HistoryAction =
+  | { readonly type: 'commit'; readonly document: FiberCraftDocument }
+  | { readonly type: 'undo' }
+  | { readonly type: 'redo' }
+  | { readonly type: 'replace'; readonly document: FiberCraftDocument };
+
+const historyReducer = (history: FiberCraftHistory, action: HistoryAction): FiberCraftHistory => {
+  switch (action.type) {
+    case 'commit': return commitFiberCraftHistory(history, action.document);
+    case 'undo': return undoFiberCraftHistory(history);
+    case 'redo': return redoFiberCraftHistory(history);
+    case 'replace': return createFiberCraftHistory(action.document);
+    default: { const unreachable: never = action; return unreachable; }
+  }
+};
+
+/** Zoom steps in percent. The floor keeps grid cells at least 26px, above the 24px WCAG 2.2 target-size minimum. */
+const ZOOM_STEPS = [60, 80, 100, 125, 150, 200, 300] as const;
+const stepZoom = (zoom: number, direction: 1 | -1): number => {
+  const index = ZOOM_STEPS.findIndex((step) => step >= zoom);
+  const current = index === -1 ? ZOOM_STEPS.length - 1 : index;
+  return ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, current + direction))];
+};
+
+const canvasToPngBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
+  new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) => value ? resolve(value) : reject(new Error('This browser could not encode the PNG file.')),
+      'image/png',
+    );
+  });
+
+/**
+ * Maps a pointer position to canvas bitmap coordinates. The canvas is letterboxed (`object-fit:
+ * contain`) on narrow screens, so the scale is the smaller axis ratio and the bitmap is centred.
+ */
+const pointerToCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, clientY: number): { readonly x: number; readonly y: number } => {
+  const rect = canvas.getBoundingClientRect();
+  const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+  const offsetX = (rect.width - canvas.width * scale) / 2;
+  const offsetY = (rect.height - canvas.height * scale) / 2;
+  return { x: (clientX - rect.left - offsetX) / scale, y: (clientY - rect.top - offsetY) / scale };
+};
+
+function CrochetCanvas({ chart, palette, activeRound, selectedAngle, completedSteps, theme, zoom, onSelectNode, onKeyDown }: {
+  chart: PolarChart;
+  palette: readonly ColorSlot[];
+  activeRound: number;
+  selectedAngle: number;
+  completedSteps: readonly string[];
+  theme: FiberCraftTheme;
+  zoom: number;
+  onSelectNode: (round: number, angleIndex: number) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLCanvasElement>) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderedSymbols = chart.nodes.filter((node) => node.symbolId !== null).length;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    renderCrochetChartCanvas(context, chart, palette, {
+      width: canvas.width,
+      height: canvas.height,
+      theme,
+      activeRound,
+      completedSteps,
+      showProgress: true,
+      selectedNode: { round: activeRound, angleIndex: selectedAngle },
+    });
+  }, [activeRound, chart, completedSteps, palette, selectedAngle, theme]);
+
+  const selectFromPointer = (event: MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const point = pointerToCanvasPoint(canvas, event.clientX, event.clientY);
+    const hit = hitTestPolarNode(chart, canvas.width, canvas.height, point.x, point.y);
+    if (hit) onSelectNode(hit.round, hit.angleIndex);
+  };
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fiber-craft-canvas fiber-craft-canvas-interactive"
+      width={960}
+      height={720}
+      tabIndex={0}
+      aria-label={`Crochet round chart with vector stitch symbols. Round ${activeRound + 1} is active. Use the arrow keys to move between stitches, Enter to place a stitch, and Delete to clear one.`}
+      aria-describedby={FIBER_CRAFT_DESCRIPTION_ID}
+      data-testid="crochet-round-canvas"
+      data-symbol-rendering="vector"
+      data-rendered-symbols={renderedSymbols}
+      data-canvas-theme={theme}
+      style={{ width: `${zoom}%` }}
+      onClick={selectFromPointer}
+      onKeyDown={onKeyDown}
+    >
+      Crochet round chart with {chart.rounds} rounds. Round {activeRound + 1} is active.
+    </canvas>
+  );
+}
+
+export default function FiberCraftWorkspace() {
+  const [history, dispatch] = useReducer(historyReducer, undefined, () => createFiberCraftHistory(createStarterCrochetDocument()));
+  const [dialect, setDialect] = useState<CrochetDialect>('us');
+  const [theme, setTheme] = useState<FiberCraftTheme>('light');
+  const [descriptionVisible, setDescriptionVisible] = useState(true);
+  const [pngScale, setPngScale] = useState<CrochetPngScale>(2);
+  const [activeRound, setActiveRound] = useState(0);
+  const [activeGridRow, setActiveGridRow] = useState(0);
+  const [selectedSymbol, setSelectedSymbol] = useState('sc-dc');
+  const [selectedColor, setSelectedColor] = useState('primary');
+  const [newRoundStitches, setNewRoundStitches] = useState('6');
+  const [selectedAngle, setSelectedAngle] = useState(0);
+  const [sharedBase, setSharedBase] = useState(false);
+  const [loopChoice, setLoopChoice] = useState<CrochetLoopChoice>('both');
+  const [creditDirty, setCreditDirty] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [targetText, setTargetText] = useState('6');
+  const [status, setStatus] = useState('Preparing local autosave…');
+  const [storageReady, setStorageReady] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState<FiberCraftDocument | null>(null);
+  const storeRef = useRef<FiberCraftStore | null>(null);
+
+  const document = history.present;
+  const roundChart = document.metadata.discipline === 'crochet' && document.chart.kind === 'polar' ? document.chart : null;
+  const gridChart = document.metadata.discipline === 'crochet' && document.chart.kind === 'grid' ? document.chart : null;
+  const countedChart = document.metadata.discipline === 'cross-stitch' && document.chart.kind === 'counted-thread' ? document.chart : null;
+  const knittingChart = document.metadata.discipline === 'knitting' && document.chart.kind === 'grid' ? document.chart : null;
+  const progress = useMemo(() => roundChart ? crochetRoundProgress(document, Math.min(activeRound, Math.max(0, roundChart.rounds - 1))) : null, [activeRound, document, roundChart]);
+
+  // Give the tab, bookmarks, and history a meaningful title while the tool is open, then hand the page
+  // back exactly as found. The site is one hash-routed page, so this cannot change what search engines index.
+  useEffect(() => {
+    const previousTitle = window.document.title;
+    const description = window.document.querySelector('meta[name="description"]');
+    const previousDescription = description?.getAttribute('content') ?? null;
+    window.document.title = 'Fiber Craft Workstation — Crochet Chart Maker & Pattern Writer | InMo Tools';
+    description?.setAttribute('content', 'Chart crochet in rounds or on a C2C/filet grid and get the written pattern, stitch counts, and finished size as you work. Free, private, and everything stays in your browser.');
+    return () => {
+      window.document.title = previousTitle;
+      if (previousDescription !== null) description?.setAttribute('content', previousDescription);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof indexedDB === 'undefined') { setStatus('Local autosave is unavailable in this browser. Current work remains on screen.'); return; }
+    const store = createIndexedDbFiberCraftStore();
+    storeRef.current = store;
+    let active = true;
+    void store.load().then((saved) => {
+      if (!active) return;
+      if (saved) { setPendingRestore(saved); setStatus('A local draft is available to restore.'); }
+      else setStatus('Ready. Changes save locally in this browser.');
+      setStorageReady(true);
+    }).catch(() => { if (active) setStatus('Local autosave is unavailable in this browser. Current work remains on screen.'); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady || pendingRestore || !storeRef.current) return;
+    const timer = window.setTimeout(() => {
+      const store = storeRef.current;
+      if (!store) return;
+      void store.save(document).then(() => setStatus('Saved locally in this browser.')).catch(() => setStatus('Could not save locally. Current work remains on screen.'));
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [document, pendingRestore, storageReady]);
+
+  useEffect(() => {
+    if (roundChart && activeRound >= roundChart.rounds) setActiveRound(Math.max(0, roundChart.rounds - 1));
+    if (gridChart && activeGridRow >= gridChart.rows) setActiveGridRow(Math.max(0, gridChart.rows - 1));
+  }, [activeGridRow, activeRound, gridChart, roundChart]);
+
+  useEffect(() => { setTargetText((document.settings?.crochet?.targetRoundCounts ?? []).join(', ')); }, [document.settings?.crochet?.targetRoundCounts]);
+
+  const commit = (next: FiberCraftDocument, message: string) => { dispatch({ type: 'commit', document: next }); setStatus(message); };
+  const activeRoundPositions = roundChart ? roundChart.nodes.filter((node) => node.round === activeRound).length : 0;
+  const currentAngle = Math.min(selectedAngle, Math.max(0, activeRoundPositions - 1));
+  const modifiersFor = (angle: number): CrochetStitchModifiers => ({
+    sharedBase: sharedBase && angle > 0,
+    loop: loopChoice === 'both' ? null : loopChoice,
+  });
+  const describePosition = (round: number, angle: number): string => {
+    if (!roundChart) return '';
+    const count = roundChart.nodes.filter((node) => node.round === round).length;
+    const node = roundChart.nodes.find((candidate) => candidate.round === round && candidate.angleIndex === angle);
+    const where = `Round ${round + 1}, position ${angle + 1} of ${count}`;
+    if (!node || node.symbolId === null) return `${where}: unworked.`;
+    const color = document.palette.find((slot) => slot.id === node.colorId)?.label;
+    const notes = [node.sharedBase ? 'same base as the previous position' : '', node.loop === 'back' ? 'back loop only' : node.loop === 'front' ? 'front loop only' : ''].filter(Boolean);
+    return `${where}: ${crochetSymbolLabel(node.symbolId, dialect)}${color ? `, ${color}` : ''}${notes.length > 0 ? `, ${notes.join(', ')}` : ''}.`;
+  };
+  const selectPosition = (round: number, angle: number) => {
+    setActiveRound(round);
+    setSelectedAngle(angle);
+    setStatus(describePosition(round, angle));
+  };
+  const placeNextStitch = () => {
+    if (!roundChart) return;
+    const next = roundChart.nodes.find((node) => node.round === activeRound && node.symbolId === null);
+    try {
+      commit(workNextCrochetStitch(document, activeRound, selectedSymbol, selectedColor, new Date().toISOString(), modifiersFor(next?.angleIndex ?? 0)), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} in round ${activeRound + 1}.`);
+      if (next) setSelectedAngle(next.angleIndex);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+  };
+  const placeSelectedStitch = () => {
+    if (!roundChart) return;
+    try {
+      commit(setCrochetRoundStitch(document, activeRound, currentAngle, selectedSymbol, selectedColor, modifiersFor(currentAngle)), `Placed ${crochetSymbolLabel(selectedSymbol, dialect)} at round ${activeRound + 1}, position ${currentAngle + 1}.`);
+      setSelectedAngle((currentAngle + 1) % Math.max(1, activeRoundPositions));
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not place this stitch.'); }
+  };
+  const clearSelectedStitch = () => {
+    if (!roundChart) return;
+    try { commit(setCrochetRoundStitch(document, activeRound, currentAngle, null, null), `Cleared round ${activeRound + 1}, position ${currentAngle + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear this stitch.'); }
+  };
+  const fillActiveRound = () => {
+    if (!roundChart) return;
+    try {
+      commit(fillCrochetRound(document, activeRound, selectedSymbol, selectedColor, { sharedBase, loop: loopChoice === 'both' ? null : loopChoice }), sharedBase
+        ? `Filled round ${activeRound + 1} with ${crochetSymbolLabel(selectedSymbol, dialect)} in increase pairs.`
+        : `Filled round ${activeRound + 1} with ${crochetSymbolLabel(selectedSymbol, dialect)}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not fill this round.'); }
+  };
+  const clearActiveRound = () => {
+    if (!roundChart) return;
+    try { commit(clearCrochetRound(document, activeRound), `Cleared every stitch in round ${activeRound + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear this round.'); }
+  };
+  const removeLastRound = () => {
+    if (!roundChart) return;
+    try {
+      const removed = roundChart.rounds;
+      commit(removeLastCrochetRound(document), `Removed round ${removed}. Undo brings it back.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not remove the last round.'); }
+  };
+  const handleCanvasKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
+    if (!roundChart || event.altKey || event.ctrlKey || event.metaKey) return;
+    const count = Math.max(1, activeRoundPositions);
+    const moveToRound = (round: number) => {
+      const clamped = Math.min(Math.max(round, 0), roundChart.rounds - 1);
+      const nextCount = roundChart.nodes.filter((node) => node.round === clamped).length;
+      selectPosition(clamped, Math.min(nextCount - 1, Math.floor((currentAngle / count) * nextCount)));
+    };
+    switch (event.key) {
+      case 'ArrowRight': selectPosition(activeRound, (currentAngle + 1) % count); break;
+      case 'ArrowLeft': selectPosition(activeRound, (currentAngle - 1 + count) % count); break;
+      case 'Home': selectPosition(activeRound, 0); break;
+      case 'End': selectPosition(activeRound, count - 1); break;
+      case 'ArrowUp': moveToRound(activeRound - 1); break;
+      case 'ArrowDown': moveToRound(activeRound + 1); break;
+      case '+': case '=': setZoom((value) => stepZoom(value, 1)); break;
+      case '-': case '_': setZoom((value) => stepZoom(value, -1)); break;
+      case '0': setZoom(100); break;
+      case 'Enter': case ' ': placeSelectedStitch(); break;
+      case 'Delete': case 'Backspace': clearSelectedStitch(); break;
+      default: return;
+    }
+    event.preventDefault();
+  };
+  const addRound = () => {
+    if (!roundChart) return;
+    const count = Number(newRoundStitches);
+    try { commit(addCrochetRound(document, count), `Added round ${roundChart.rounds + 1} with ${count} stitches.`); setActiveRound(roundChart.rounds); setSelectedAngle(0); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not add this round.'); }
+  };
+  const changeChartMode = (mode: 'round' | 'grid' | 'counted' | 'knitting') => {
+    if ((mode === 'round' && roundChart) || (mode === 'grid' && gridChart) || (mode === 'counted' && countedChart) || (mode === 'knitting' && knittingChart)) return;
+    if (mode === 'counted') {
+      commit(switchToCountedThreadDocument(document), 'Opened a fresh counted-thread chart. Undo restores the previous chart.');
+      return;
+    }
+    if (mode === 'knitting') {
+      commit(switchToKnittingDocument(document), 'Opened a gauge-corrected knitting grid. Undo restores the previous chart.');
+      return;
+    }
+    commit(switchCrochetChartMode(document, mode), mode === 'round' ? 'Opened a fresh round chart. Undo restores the previous chart.' : 'Opened a fresh C2C / filet grid. Undo restores the previous chart.');
+    mode === 'round' ? setActiveRound(0) : setActiveGridRow(0);
+  };
+  const toggleGridCell = (row: number, col: number) => {
+    try { commit(toggleCrochetGridCell(document, row, col, selectedColor), `Updated row ${row + 1}, column ${col + 1}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update this grid cell.'); }
+  };
+  const toggleProgress = (stepId: string, label: string) => {
+    try {
+      const wasComplete = document.completedSteps.includes(stepId);
+      commit(toggleCrochetProgressStep(document, stepId), `${label} marked ${wasComplete ? 'unfinished' : 'complete'}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not update progress.'); }
+  };
+  const applyTargets = () => {
+    try {
+      const values = targetText.trim() === '' ? [] : targetText.split(/[\s,;]+/).filter(Boolean).map(Number);
+      commit(setCrochetTargetRoundCounts(document, values), values.length > 0 ? `Saved ${values.length} round-shaping targets.` : 'Cleared round-shaping targets.');
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save round targets.'); }
+  };
+  const saveYarnReference = (weight: number, materialClass: string, toolSize: string) => {
+    try { commit(setCrochetYarnReference(document, weight, materialClass, toolSize), 'Saved the project yarn and hook reference.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the yarn reference.'); }
+  };
+  const saveGauge = (gauge: GaugeSwatch) => {
+    try { commit(setCrochetGauge(document, gauge), `Saved measured gauge: ${gauge.stitchCount} stitches and ${gauge.rowCount} rows over ${gauge.span} ${gauge.unit}.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the measured gauge.'); }
+  };
+  const savePatternClassification = (difficulty: CycProjectLevel, techniqueTags: readonly string[]) => {
+    try { commit(setCrochetPatternClassification(document, difficulty, techniqueTags), 'Saved the project level and technique tags.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save pattern details.'); }
+  };
+  const resizeGrid = (rows: number, cols: number) => {
+    try { commit(resizeCrochetGrid(document, rows, cols), `Resized the grid to ${rows} rows × ${cols} columns.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not resize the grid.'); }
+  };
+  const clearGrid = () => {
+    try { commit(clearCrochetGrid(document), 'Cleared the grid. Undo brings the design back.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not clear the grid.'); }
+  };
+  const transformGrid = (transform: CrochetGridTransform) => {
+    const labels: Record<CrochetGridTransform, string> = { 'mirror-horizontal': 'Mirrored the design left to right', 'mirror-vertical': 'Flipped the design top to bottom', 'rotate-90': 'Rotated the design 90° clockwise' };
+    try { commit(transformCrochetGrid(document, transform), `${labels[transform]}. Row progress was reset; Undo restores it.`); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not transform the grid.'); }
+  };
+  const saveCredit = (credit: CrochetPatternCredit) => {
+    try { commit(setCrochetPatternCredit(document, credit), 'Saved the pattern title and credit.'); }
+    catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the title and credit.'); }
+  };
+  const saveProjectFile = () => {
+    try {
+      const filename = fiberCraftProjectFilename(document.metadata.title);
+      downloadText(serializeFiberCraftProject(document), filename, 'application/json;charset=utf-8');
+      setStatus(`Saved ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the project file.'); }
+  };
+  const renderChartPng = async (scale: CrochetPngScale): Promise<{ readonly blob: Blob; readonly width: number; readonly height: number }> => {
+    if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('PNG export currently supports crochet round and grid charts.');
+    const dimensions = crochetPngDimensions(scale);
+    const canvas = window.document.createElement('canvas');
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('This browser could not create a PNG rendering canvas.');
+    renderCrochetChartCanvas(context, document.chart, document.palette, { ...dimensions, theme: 'light', showProgress: false });
+    return { blob: await canvasToPngBlob(canvas), ...dimensions };
+  };
+  const renderSocialPng = async (): Promise<Blob> => {
+    if (document.chart.kind !== 'polar' && document.chart.kind !== 'grid') throw new Error('Social preview currently supports crochet round and grid charts.');
+    const chartCanvas = window.document.createElement('canvas');
+    chartCanvas.width = 560;
+    chartCanvas.height = 420;
+    const chartContext = chartCanvas.getContext('2d');
+    if (!chartContext) throw new Error('This browser could not create the preview chart canvas.');
+    renderCrochetChartCanvas(chartContext, document.chart, document.palette, { width: chartCanvas.width, height: chartCanvas.height, theme: 'light', showProgress: false });
+    const socialCanvas = window.document.createElement('canvas');
+    socialCanvas.width = FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH;
+    socialCanvas.height = FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT;
+    const socialContext = socialCanvas.getContext('2d');
+    if (!socialContext) throw new Error('This browser could not create the social preview canvas.');
+    renderFiberCraftSocialPreview(socialContext, chartCanvas, document);
+    return canvasToPngBlob(socialCanvas);
+  };
+  const exportPng = async () => {
+    try {
+      const { blob, width, height } = await renderChartPng(pngScale);
+      const filename = `${fiberCraftFilenameStem(document.metadata.title)}-${pngScale}x.png`;
+      downloadBlob(blob, filename);
+      setStatus(`Exported ${filename} at ${width} × ${height} pixels.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the PNG.'); }
+  };
+  const exportPatternPdf = async () => {
+    try {
+      const { buildCrochetPatternPdf, fiberCraftPatternPdfFilename } = await import('./pattern-export-engine');
+      const bytes = await buildCrochetPatternPdf(document, dialect);
+      const filename = fiberCraftPatternPdfFilename(document.metadata.title);
+      downloadBytes(bytes, filename, 'application/pdf');
+      setStatus(`Exported ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the pattern PDF.'); }
+  };
+  const patternText = async () => (await import('./pattern-export-engine')).buildCrochetPatternText(document, dialect);
+  const copyPatternText = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('This browser blocked copying. Download the .txt file instead.');
+      await navigator.clipboard.writeText(await patternText());
+      setStatus('Copied the written pattern.');
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not copy the pattern. Download the .txt file instead.'); }
+  };
+  const downloadPatternText = async () => {
+    try {
+      const { fiberCraftPatternTextFilename } = await import('./pattern-export-engine');
+      const filename = fiberCraftPatternTextFilename(document.metadata.title);
+      downloadText(await patternText(), filename);
+      setStatus(`Saved ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the written pattern.'); }
+  };
+  const downloadMaterialsList = async () => {
+    try {
+      const { buildCrochetMaterialsCsv, fiberCraftMaterialsFilename } = await import('./pattern-export-engine');
+      const filename = fiberCraftMaterialsFilename(document.metadata.title);
+      downloadText(buildCrochetMaterialsCsv(document, dialect), filename, 'text/csv;charset=utf-8');
+      setStatus(`Saved ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not save the materials list.'); }
+  };
+  const exportMaterialsPdf = async () => {
+    try {
+      const { buildCrochetMaterialsPdf, fiberCraftMaterialsPdfFilename } = await import('./pattern-export-engine');
+      const filename = fiberCraftMaterialsPdfFilename(document.metadata.title);
+      downloadBytes(await buildCrochetMaterialsPdf(document, dialect), filename, 'application/pdf');
+      setStatus(`Exported ${filename}.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the materials PDF.'); }
+  };
+  const exportSocialPreview = async () => {
+    try {
+      const filename = fiberCraftSocialPreviewFilename(document.metadata.title);
+      downloadBlob(await renderSocialPng(), filename);
+      setStatus(`Exported ${filename} at ${FIBER_CRAFT_SOCIAL_PREVIEW_WIDTH} × ${FIBER_CRAFT_SOCIAL_PREVIEW_HEIGHT} pixels.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not export the social preview.'); }
+  };
+  const exportRelease = async () => {
+    try {
+      setStatus('Building the release bundle…');
+      const { buildCrochetReleaseFiles, fiberCraftReleaseZipFilename, zipCrochetRelease } = await import('./pattern-export-engine');
+      const files = await buildCrochetReleaseFiles(document, dialect);
+      const stem = fiberCraftFilenameStem(document.metadata.title);
+      files[`${stem}-${pngScale}x.png`] = new Uint8Array(await (await renderChartPng(pngScale)).blob.arrayBuffer());
+      files[fiberCraftSocialPreviewFilename(document.metadata.title)] = new Uint8Array(await (await renderSocialPng()).arrayBuffer());
+      const filename = fiberCraftReleaseZipFilename(document.metadata.title);
+      downloadBytes(zipCrochetRelease(files), filename, 'application/zip');
+      setStatus(`Saved ${filename} with ${Object.keys(files).length} files.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not build the release bundle.'); }
+  };
+  const openProjectFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const loaded = parseFiberCraftProject(await file.text());
+      dispatch({ type: 'replace', document: loaded });
+      setPendingRestore(null);
+      if (loaded.chart.kind === 'polar') setActiveRound(0);
+      if (loaded.chart.kind === 'grid') setActiveGridRow(0);
+      setStatus(`Loaded ${file.name}. Changes will continue saving locally.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Could not open the project file.'); }
+    finally { input.value = ''; }
+  };
+  const restoreDraft = () => {
+    if (!pendingRestore) return;
+    dispatch({ type: 'replace', document: pendingRestore });
+    if (pendingRestore.chart.kind === 'polar') setActiveRound(Math.min(activeRound, pendingRestore.chart.rounds - 1));
+    if (pendingRestore.chart.kind === 'grid') setActiveGridRow(Math.min(activeGridRow, pendingRestore.chart.rows - 1));
+    setPendingRestore(null);
+    setStatus('Restored the last local session.');
+  };
+  const startFresh = () => { setPendingRestore(null); setStatus('Started with the current fresh chart. Changes will save locally.'); };
+
+  return (
+    <>
+      <div className="workspace-header fiber-craft-header"><div><h2>Fiber Craft pattern workspace</h2><p>Crochet, counted-thread, and gauge-corrected knitting charts with browser-local recovery.</p></div><span className="fiber-craft-local-badge">Local draft</span></div>
+      <div className="workspace-body fiber-craft-workspace" data-fiber-theme={theme}>
+        {pendingRestore ? <section className="fiber-craft-restore" aria-labelledby="fiber-restore-title"><div><h3 id="fiber-restore-title">Continue your last local session?</h3><p>A browser-local Fiber Craft draft was found. Restoring does not upload or replace a file on disk.</p></div><div className="fiber-craft-actions"><button className="action-button" type="button" onClick={restoreDraft}>Restore last session</button><button className="action-button secondary" type="button" onClick={startFresh}>Start fresh</button></div></section> : null}
+
+        <div className="fiber-craft-toolbar" role="toolbar" aria-label="Fiber Craft chart history, mode, terminology, and display">
+          <button className="action-button secondary" type="button" disabled={history.past.length === 0} onClick={() => dispatch({ type: 'undo' })}>Undo</button>
+          <button className="action-button secondary" type="button" disabled={history.future.length === 0} onClick={() => dispatch({ type: 'redo' })}>Redo</button>
+          <label><span>Chart mode</span><select value={knittingChart ? 'knitting' : countedChart ? 'counted' : roundChart ? 'round' : 'grid'} onChange={(event) => changeChartMode(event.target.value as 'round' | 'grid' | 'counted' | 'knitting')}><option value="round">Round / amigurumi</option><option value="grid">C2C / filet grid</option><option value="counted">Counted thread / cross-stitch</option><option value="knitting">Knitting colorwork</option></select></label>
+          {document.metadata.discipline === 'crochet' ? <label><span>Terminology</span><select value={dialect} onChange={(event) => setDialect(event.target.value as CrochetDialect)}><option value="us">US</option><option value="uk">UK</option></select></label> : null}
+          <label htmlFor="fiber-display-theme"><span>Display theme</span><select id="fiber-display-theme" value={theme} onChange={(event) => setTheme(event.target.value as FiberCraftTheme)}><option value="light">Light</option><option value="dark-room">Dark room</option><option value="high-contrast">High contrast</option></select></label>
+          <button className="action-button secondary" type="button" aria-pressed={descriptionVisible} onClick={() => setDescriptionVisible((visible) => !visible)}>{descriptionVisible ? 'Hide chart description' : 'Show chart description'}</button>
+          {document.metadata.discipline === 'crochet' ? <div className="fiber-craft-zoom-controls" role="group" aria-label="Chart zoom"><button className="action-button secondary" type="button" aria-label="Zoom out" disabled={zoom <= ZOOM_STEPS[0]} onClick={() => setZoom((value) => stepZoom(value, -1))}>−</button><output aria-live="polite" aria-label="Zoom level">{zoom}%</output><button className="action-button secondary" type="button" aria-label="Zoom in" disabled={zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]} onClick={() => setZoom((value) => stepZoom(value, 1))}>+</button><button className="action-button secondary" type="button" disabled={zoom === 100} onClick={() => setZoom(100)}>Fit</button></div> : null}
+          {roundChart ? <label><span>Active round</span><select value={activeRound} onChange={(event) => setActiveRound(Number(event.target.value))}>{Array.from({ length: roundChart.rounds }, (_, round) => <option key={round} value={round}>Round {round + 1}</option>)}</select></label> : null}
+        </div>
+
+        <div className="fiber-craft-main">
+          {roundChart ? <section className="fiber-craft-canvas-panel" aria-labelledby="fiber-chart-heading"><div className="fiber-craft-panel-heading"><div><h3 id="fiber-chart-heading">Round chart</h3><p>{roundChart.rounds} {roundChart.rounds === 1 ? 'round' : 'rounds'} · {roundChart.nodes.length} stitch positions</p></div><strong data-testid="active-round-progress">{progress?.worked ?? 0} of {progress?.total ?? 0} stitches worked</strong></div><div className="fiber-craft-zoom-viewport" tabIndex={0} role="region" aria-label="Scrollable round chart viewport"><CrochetCanvas zoom={zoom} chart={roundChart} palette={document.palette} activeRound={activeRound} selectedAngle={currentAngle} completedSteps={document.completedSteps} theme={theme} onSelectNode={selectPosition} onKeyDown={handleCanvasKeyDown} /></div></section>
+            : gridChart ? <CrochetGridPanel zoom={zoom} chart={gridChart} palette={document.palette} selectedColor={selectedColor} activeRow={activeGridRow} completedSteps={document.completedSteps} onActiveRowChange={setActiveGridRow} onToggleCell={toggleGridCell} onToggleRowComplete={(row) => toggleProgress(`row:${row}`, `Row ${row + 1}`)} onResize={resizeGrid} onClear={clearGrid} onTransform={transformGrid} />
+              : knittingChart ? <KnittingGridPanel document={document} chart={knittingChart} onCommit={commit} onStatus={setStatus} />
+                : countedChart ? <CountedThreadPanel document={document} chart={countedChart} selectedColor={selectedColor} onSelectedColorChange={setSelectedColor} onCommit={commit} onStatus={setStatus} /> : null}
+
+          <aside className="fiber-craft-inspector" aria-label="Fiber Craft chart inspector">
+            {roundChart ? <><section><h3>Stitch</h3><label className="fiber-craft-field" htmlFor="fiber-stitch-symbol"><span>Stitch symbol</span><select id="fiber-stitch-symbol" value={selectedSymbol} onChange={(event) => setSelectedSymbol(event.target.value)}>{CROCHET_SYMBOLS.map((symbol) => <option key={symbol.id} value={symbol.id}>{crochetSymbolLabel(symbol.id, dialect)}</option>)}</select></label><label className="fiber-craft-field" htmlFor="fiber-stitch-color"><span>Palette color</span><select id="fiber-stitch-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><button className="action-button fiber-craft-wide" type="button" onClick={placeNextStitch} disabled={(progress?.total ?? 0) > 0 && progress?.worked === progress?.total}>Place next stitch</button></section><CrochetStitchEditor round={activeRound} positions={activeRoundPositions} selectedAngle={currentAngle} selectedLabel={describePosition(activeRound, currentAngle)} sharedBase={sharedBase} loop={loopChoice} canRemoveRound={roundChart.rounds > 1} onSelectAngle={(angle) => selectPosition(activeRound, angle)} onSharedBaseChange={setSharedBase} onLoopChange={setLoopChoice} onPlaceSelected={placeSelectedStitch} onClearSelected={clearSelectedStitch} onFillRound={fillActiveRound} onClearRound={clearActiveRound} onRemoveLastRound={removeLastRound} /><section><h3>Add a round</h3><label className="fiber-craft-field" htmlFor="fiber-round-stitches"><span>Stitches in new round</span><input id="fiber-round-stitches" type="number" min="1" max="10000" step="1" inputMode="numeric" value={newRoundStitches} onChange={(event) => setNewRoundStitches(event.target.value)} /></label><button className="action-button secondary fiber-craft-wide" type="button" onClick={addRound}>Add round</button><button className="action-button secondary fiber-craft-wide" type="button" aria-pressed={document.completedSteps.includes(`round:${activeRound}`)} onClick={() => toggleProgress(`round:${activeRound}`, `Round ${activeRound + 1}`)}>{document.completedSteps.includes(`round:${activeRound}`) ? 'Mark round unfinished' : 'Mark round complete'}</button></section></>
+              : gridChart ? <section><h3>Mesh paint</h3><label className="fiber-craft-field" htmlFor="fiber-grid-color"><span>Palette color</span><select id="fiber-grid-color" value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>{document.palette.map((color) => <option key={color.id} value={color.id}>{color.label}</option>)}</select></label><p className="fiber-craft-muted">Select cells in the grid to switch between open and filled mesh blocks.</p></section>
+                : knittingChart ? <section><h3>Knitting gauge</h3><p className="fiber-craft-muted">Save your measured stitch and row gauge above the chart. Cell proportions update from the same project gauge used for the preview.</p></section>
+                  : <section><h3>Counted thread</h3><p className="fiber-craft-muted">Choose stitch, specialty mark, and floss controls directly above the counted-thread grid.</p></section>}
+            <section><h3>Palette</h3><div className="fiber-craft-swatches" aria-label="Project palette">{document.palette.map((color) => <span key={color.id} title={`${color.label}: ${color.hex}`}><i style={{ background: color.hex }} aria-hidden="true" />{color.label}</span>)}</div></section>
+            {document.metadata.discipline === 'crochet' ? <PatternCreditPanel document={document} onSaveCredit={saveCredit} onDirtyChange={setCreditDirty} /> : null}
+            {document.metadata.discipline === 'crochet' ? <section><h3>Export</h3><label className="fiber-craft-field" htmlFor="fiber-png-scale"><span>PNG resolution</span><select id="fiber-png-scale" value={pngScale} onChange={(event) => setPngScale(Number(event.target.value) as CrochetPngScale)}><option value={1}>1× · 960 × 720</option><option value={2}>2× · 1920 × 1440</option><option value={3}>3× · 2880 × 2160</option><option value={4}>4× · 3840 × 2880</option></select></label><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPng()}>Export PNG</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportPatternPdf()}>Export pattern PDF</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportSocialPreview()}>Export social preview</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void copyPatternText()}>Copy written pattern</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadPatternText()}>Save written pattern (.txt)</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void downloadMaterialsList()}>Save materials list (.csv)</button><button className="action-button secondary fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportMaterialsPdf()}>Print materials list (.pdf)</button><button className="action-button fiber-craft-wide" type="button" disabled={creditDirty} onClick={() => void exportRelease()}>Export everything (.zip)</button><p className="fiber-craft-muted">PNG exports re-render the chart at the selected pixel size. The pattern PDF includes a cover, materials and legend, a vector diagram, and written instructions. Social preview creates a 1200 × 630 share card with the project title and chart. The written pattern is plain text you can paste anywhere. The materials list is available as spreadsheet CSV and printable PDF. “Export everything” packs both PDFs, PNG, share card, written pattern, materials CSV, and project file into one zip.</p></section> : null}
+            <section><h3>Project file</h3><button className="action-button secondary fiber-craft-wide" type="button" onClick={saveProjectFile}>Save .craftproj</button><label className="fiber-craft-field" htmlFor="fiber-project-file"><span>Open project file</span><input id="fiber-project-file" type="file" accept=".craftproj,application/json" onChange={openProjectFile} /></label><p className="fiber-craft-muted">Portable project files keep the chart, palette, progress, project details, and embedded swatches together on your device.</p></section>
+          </aside>
+        </div>
+
+        <div className="fiber-craft-analysis-grid">
+          {roundChart ? <CrochetRoundInsights document={document} dialect={dialect} targetText={targetText} onTargetTextChange={setTargetText} onApplyTargets={applyTargets} /> : null}
+          {document.metadata.discipline === 'crochet' ? <><YarnReferencePanel document={document} onSaveReference={saveYarnReference} /><GaugeScalingPanel document={document} onSaveGauge={saveGauge} onApplyGridSize={resizeGrid} /><PatternDetailsPanel document={document} onSaveClassification={savePatternClassification} /></> : null}
+          <FiberCraftChartDescription document={document} dialect={dialect} visible={descriptionVisible} />
+        </div>
+
+        <p className="fiber-craft-status" role="status" aria-live="polite">{status}</p>
+      </div>
+    </>
+  );
+}

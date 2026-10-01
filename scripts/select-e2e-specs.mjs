@@ -35,6 +35,8 @@ const TOOL_SPECS = new Map([
   ['transcode', ['tests/e2e/transcode.spec.ts']],
   ['typography', ['tests/e2e/typography.spec.ts']],
   ['video', ['tests/e2e/video.spec.ts']],
+  ['fiber-craft', ['tests/e2e/fiber-craft.spec.ts']],
+  ['site-intel', ['tests/e2e/site-intel.spec.ts']],
 ]);
 
 const GLOBAL_CLIENT_PATHS = [

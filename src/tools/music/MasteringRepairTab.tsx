@@ -11,7 +11,7 @@ import { useState, type ReactNode } from 'react';
 import type { TimeSelection } from './mastering-engine';
 import MasteringSamplePen from './MasteringSamplePen';
 import { SPECTRAL_FRAME } from './dsp/spectral';
-import { formatTime, newSeed, type MasteringPanelContext } from './mastering-ui';
+import { CommitNumberField, formatTime, newSeed, type MasteringPanelContext } from './mastering-ui';
 
 function Tool({ title, summary, children, open = false }: { title: string; summary: string; children: ReactNode; open?: boolean }) {
   return <details className="mastering-tool" open={open}>
@@ -21,10 +21,7 @@ function Tool({ title, summary, children, open = false }: { title: string; summa
 }
 
 function NumberInput({ id, label, value, onChange, min, max, step, disabled }: { id: string; label: string; value: number; onChange: (value: number) => void; min: number; max: number; step: number; disabled: boolean }) {
-  return <div className="field"><label htmlFor={id}>{label}</label>
-    <input id={id} type="number" min={min} max={max} step={step} value={value} disabled={disabled}
-      onChange={(event) => { const next = Number(event.target.value); if (Number.isFinite(next)) onChange(next); }}
-      onBlur={() => onChange(Math.min(max, Math.max(min, value)))} /></div>;
+  return <CommitNumberField id={id} label={label} value={value} onCommit={onChange} onPreview={onChange} min={min} max={max} step={step} disabled={disabled} />;
 }
 
 export default function MasteringRepairTab({ ctx }: { ctx: MasteringPanelContext }) {

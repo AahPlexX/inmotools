@@ -320,9 +320,15 @@ importers:
       meshoptimizer:
         specifier: 1.2.0
         version: 1.2.0
+      ml-matrix:
+        specifier: 6.15.0
+        version: 6.15.0
       monaco-editor:
         specifier: 0.56.0
         version: 0.56.0
+      occt-wasm:
+        specifier: 5.0.0
+        version: 5.0.0
       opentype.js:
         specifier: 2.0.0
         version: 2.0.0
@@ -425,6 +431,9 @@ importers:
       vscode-oniguruma:
         specifier: 2.0.1
         version: 2.0.1
+      wasm-feature-detect:
+        specifier: 1.9.0
+        version: 1.9.0
       web-layout-zip:
         specifier: npm:jszip@3.10.2
         version: jszip@3.10.2
@@ -4276,6 +4285,9 @@ packages:
   iota-array@1.0.0:
     resolution: {integrity: sha512-pZ2xT+LOHckCatGQ3DcG/a+QuEqvoxqkiL7tvE8nn3uuu+f6i1TtpB5/FtWFbxUuVr5PZCx8KskuGatbJDXOWA==}
 
+  is-any-array@3.0.0:
+    resolution: {integrity: sha512-o4h+tylWykC4BD1vaejp6gDxoM13bwW8FGuNs4yIKpj8xbBJcRxJx8vZpq0dCr7ZDEfeKjmsi/euolKhX6f/ww==}
+
   is-arguments@1.2.0:
     resolution: {integrity: sha512-7bVbi0huj/wrIAOzb8U1aszg9kdi3KN/CyU19CTI7tAoZYEZoL9yCDXpbXN+uPsuWnP02cyug1gleqq+TU+YCA==}
     engines: {node: '>= 0.4'}
@@ -4947,6 +4959,18 @@ packages:
     resolution: {integrity: sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==}
     hasBin: true
 
+  ml-array-max@2.0.0:
+    resolution: {integrity: sha512-QQZ4kENwpWmyNb98UXRDFXrmtIXuXtt1+bSbda/2KA85+F+rrJP8hZk6QOkCQXM2Th9mUDYdq/PNByPdT9ID4A==}
+
+  ml-array-min@2.0.0:
+    resolution: {integrity: sha512-GRj6Ky6sW9vGL6yIjgsHmXZ9YgrdmcQ8nCxPqEGeKc6dkfYg1XDYxGFxADUjNuZyoCd5PUscWAS4N+cFaX6hFg==}
+
+  ml-array-rescale@2.0.0:
+    resolution: {integrity: sha512-2GGtKfSno94/kIloWGvpp/U5Q5vLvLrza+SAaGsLeo6Xj4mEbA6Gqx+oTfZFkxnd1grT2X007HfJNs3T5BsiVg==}
+
+  ml-matrix@6.15.0:
+    resolution: {integrity: sha512-wFa1v6KP8bKp+fj0nYmRs1Pb5K4zRkXGKsOvLinvILENFIADncm4XlOI+S1M7yuACMGfI6cfk0IifDgd4j5xmw==}
+
   mock-property@1.1.2:
     resolution: {integrity: sha512-Rw0vY0wBdNtm3sbANVMDUgO5Htew9xotKoqcdK/a4rW8jf5KEl6MAWGMBhjKng6gpPjX8SmO8f+65ssnxNroTw==}
     engines: {node: '>= 0.4'}
@@ -5035,6 +5059,9 @@ packages:
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
+
+  occt-wasm@5.0.0:
+    resolution: {integrity: sha512-FDMYmmgcMEus+a4sY/4oJTIok6Ar3EDcqBzhGQa4orcQ2VIl8k5tq64ccA6COptYBz3rppMsqeqRqPIjV1lBtA==}
 
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
@@ -10908,6 +10935,8 @@ snapshots:
 
   iota-array@1.0.0: {}
 
+  is-any-array@3.0.0: {}
+
   is-arguments@1.2.0:
     dependencies:
       call-bound: 1.0.4
@@ -11708,6 +11737,25 @@ snapshots:
     dependencies:
       minimist: 1.2.8
 
+  ml-array-max@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-min@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-rescale@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-max: 2.0.0
+      ml-array-min: 2.0.0
+
+  ml-matrix@6.15.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-rescale: 2.0.0
+
   mock-property@1.1.2:
     dependencies:
       define-data-property: 1.1.4
@@ -11804,6 +11852,10 @@ snapshots:
       es-object-atoms: 1.1.2
 
   obug@2.1.4: {}
+
+  occt-wasm@5.0.0:
+    dependencies:
+      comlink: 4.4.2
 
   once@1.4.0:
     dependencies:

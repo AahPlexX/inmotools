@@ -42,11 +42,11 @@ import { formatBytes, messageOf, type MasteringPanelContext } from './mastering-
 const FORMAT_ORDER: ExportFormat[] = ['wav', 'flac', 'mp3', 'm4a', 'ogg'];
 const FORMAT_NAMES: Record<ExportFormat, string> = { wav: 'WAV', flac: 'FLAC', mp3: 'MP3', m4a: 'AAC (M4A)', ogg: 'Ogg' };
 const FORMAT_HINTS: Record<ExportFormat, string> = {
-  wav: 'Uncompressed. The safest choice for mastering handoffs and archives.',
-  flac: 'Lossless and about half the size of WAV. Plays everywhere except some Apple apps.',
-  mp3: 'Lossy and universally supported. Use 320 kbps for the best quality.',
-  m4a: 'Lossy AAC. Good quality at smaller sizes, and native on Apple devices.',
-  ogg: 'Lossy and open. Opus is excellent at low bitrates.',
+  wav: 'Uncompressed PCM for editing, mastering handoffs, and archival workflows.',
+  flac: 'Lossless compression that is typically smaller than WAV. Playback support depends on the app and device.',
+  mp3: 'Lossy with broad playback support. Higher bitrates trade larger files for less compression loss.',
+  m4a: 'Lossy AAC in an M4A container. Playback support is broad across current mobile and desktop platforms.',
+  ogg: 'Lossy Ogg using Opus when available, otherwise Vorbis. Playback support depends on the app and device.',
 };
 const BITRATES: Partial<Record<ExportFormat, number[]>> = {
   mp3: [128, 192, 256, 320],
@@ -362,9 +362,9 @@ export default function MasteringExportTab({ ctx, active }: { ctx: MasteringPane
     {report && <section className="mastering-panel" aria-labelledby="export-report-heading">
       <div className="mastering-panel-heading"><div>
         <h3 id="export-report-heading">Last export</h3>
-        <p>Measured on the exact samples that were encoded, before any lossy compression.</p>
+        <p>Measured on the rendered PCM submitted to the encoder. Lossy codecs can change decoded peaks and loudness slightly, so this is pre-codec mastering telemetry rather than a post-codec compliance measurement.</p>
       </div></div>
-      <div className="mastering-table-scroll">
+      <div className="mastering-table-scroll" tabIndex={0} role="region" aria-label="Last export loudness report">
         <table className="mastering-report">
           <caption className="visually-hidden">Loudness of each exported file</caption>
           <thead><tr><th scope="col">File</th><th scope="col">Integrated</th><th scope="col">Range</th><th scope="col">True peak</th><th scope="col">Spectrum</th></tr></thead>
