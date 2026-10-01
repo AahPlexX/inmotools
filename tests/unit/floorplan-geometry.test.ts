@@ -5,6 +5,7 @@ import {
   satOverlap,
   screenToWorld,
   worldToScreen,
+  snapToGrid,
 } from '../../src/tools/floorplan/geometry-engine';
 import { createSnapIndex } from '../../src/tools/floorplan/snap-index';
 import type { Point2D, WallSegment, WallVertex } from '../../src/tools/floorplan/floorplan-types';
@@ -75,5 +76,12 @@ describe('PlanCraft geometry', () => {
     const matches = index.withinRadius({ x: 20, y: 15 }, 50);
     expect(matches.map((match) => match.id)).toEqual(['v1']);
     expect(index.nearest({ x: 5900, y: 50 }, 200)?.id).toBe('v2');
+  });
+
+  it('snaps to fractional imperial grids without drifting off the inch grid', () => {
+    // A 6" grid is 152.4 mm; rounding it to 152 mm would put twelve steps at 1824 mm, not 6'-0".
+    expect(snapToGrid({ x: 1830, y: -5 }, 152.4).x).toBeCloseTo(1828.8, 6);
+    expect(snapToGrid({ x: 26, y: 0 }, 25.4).x).toBeCloseTo(25.4, 6);
+    expect(snapToGrid({ x: 1234, y: 5678 }, 100)).toEqual({ x: 1200, y: 5700 });
   });
 });

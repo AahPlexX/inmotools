@@ -224,6 +224,7 @@ export const constrainAngle = (start: Point2D, end: Point2D, incrementDegrees = 
 };
 
 export const snapToGrid = (point: Point2D, gridMm: number): Point2D => {
-  const grid = Math.max(1, Math.round(gridMm));
+  // Imperial grids are fractional in millimeters (1" = 25.4 mm), so the size is not rounded.
+  const grid = Number.isFinite(gridMm) && gridMm >= 1 ? gridMm : 1;
   return { x: Math.round(point.x / grid) * grid, y: Math.round(point.y / grid) * grid };
 };

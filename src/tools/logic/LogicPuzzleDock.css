@@ -1,0 +1,173 @@
+.logic-puzzles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.logic-puzzles-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logic-puzzles-close {
+  margin-left: auto;
+}
+
+.logic-puzzles-count {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.logic-puzzles-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 16px;
+}
+
+.logic-puzzles-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.logic-puzzles button {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #1f2933;
+}
+
+.logic-puzzles button[aria-pressed="true"],
+.logic-puzzles button[aria-current="true"] {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.logic-puzzles-levels button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+
+.logic-puzzles-number {
+  font-weight: 700;
+  min-width: 1.4em;
+}
+
+.logic-puzzles-title {
+  flex: 1;
+}
+
+.logic-puzzles-stars {
+  color: #b45309;
+}
+
+.logic-puzzles-detail h3 {
+  margin: 0 0 4px;
+}
+
+.logic-puzzles-goal,
+.logic-puzzles-rules,
+.logic-puzzles-hint {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.logic-puzzles-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.logic-puzzles-result {
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.logic-puzzles-result ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.logic-puzzles-result button {
+  margin-left: 10px;
+}
+
+.logic-puzzles-pass {
+  background: rgba(22, 163, 74, 0.14);
+  border: 1px solid #16a34a;
+}
+
+.logic-puzzles-fail {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid #dc2626;
+}
+
+.logic-puzzles-table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-family: ui-monospace, monospace;
+}
+
+.logic-puzzles-table caption {
+  text-align: left;
+  font-family: inherit;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.logic-puzzles-table th,
+.logic-puzzles-table td {
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  padding: 3px 10px;
+  text-align: center;
+}
+
+.logic-puzzles-row-ok td {
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.logic-puzzles-row-bad td {
+  background: rgba(220, 38, 38, 0.14);
+  font-weight: 700;
+}
+
+.logic-workspace[data-theme="dark"] .logic-puzzles button,
+.logic-workspace[data-theme="high-contrast"] .logic-puzzles button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.logic-workspace[data-theme="dark"] .logic-puzzles button[aria-pressed="true"],
+.logic-workspace[data-theme="dark"] .logic-puzzles button[aria-current="true"],
+.logic-workspace[data-theme="high-contrast"] .logic-puzzles button[aria-pressed="true"],
+.logic-workspace[data-theme="high-contrast"] .logic-puzzles button[aria-current="true"] {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+}
+
+@media (max-width: 720px) {
+  .logic-puzzles-body {
+    grid-template-columns: 1fr;
+  }
+
+  .logic-puzzles-levels {
+    max-height: 180px;
+  }
+}

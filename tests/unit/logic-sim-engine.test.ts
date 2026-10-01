@@ -262,3 +262,28 @@ describe('sim-engine propagation delay', () => {
     expect(frame.hazards).toHaveLength(0);
   });
 });
+
+describe('sinks behind logic that follows a clocked part', () => {
+  it('shows the new level on the same tick as the clock edge, not one tick later', () => {
+    // A switch clocks a D flip-flop whose Q goes through an inverter to an LED.
+    let doc = createInitialDocument();
+    const place = (type: 'SWITCH' | 'D_FLIP_FLOP' | 'NOT' | 'LED', x: number) => {
+      doc = addComponent(doc, type, x, 0);
+      return doc.components[doc.components.length - 1]!.id;
+    };
+    const data = place('SWITCH', 0);
+    const clock = place('SWITCH', 2);
+    const flop = place('D_FLIP_FLOP', 6);
+    const inverter = place('NOT', 12);
+    const led = place('LED', 18);
+    doc = addWire(doc, { componentId: data, portId: 'Y' }, { componentId: flop, portId: 'D' });
+    doc = addWire(doc, { componentId: clock, portId: 'Y' }, { componentId: flop, portId: 'CLK' });
+    doc = addWire(doc, { componentId: flop, portId: 'Q' }, { componentId: inverter, portId: 'A' });
+    doc = addWire(doc, { componentId: inverter, portId: 'Y' }, { componentId: led, portId: 'A' });
+    let frame = step({ document: doc, previous: createInitialFrame(doc), elapsedMs: 0, interactions: { [data]: 1, [clock]: 0 } });
+    expect(readLevel(frame, led, 'A')).toBe(1);
+    frame = step({ document: doc, previous: frame, elapsedMs: 0, interactions: { [clock]: 1 } });
+    expect(readLevel(frame, flop, 'Q')).toBe(1);
+    expect(readLevel(frame, led, 'A')).toBe(0);
+  });
+});

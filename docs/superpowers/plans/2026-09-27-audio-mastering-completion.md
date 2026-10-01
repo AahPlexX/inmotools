@@ -129,3 +129,47 @@ Status values: **done** (implemented, reachable in the UI, tested), **partial** 
 - Unit tests go at pure seams (edit math, mix, DSP kernels, schema). Browser coverage extends `tests/e2e/mastering.spec.ts`; add a new spec only for a distinct failure mode.
 - Exact dependency pins only. MediaBunny core and any `@mediabunny/*` extension must share one version.
 - Every control needs a keyboard or numeric path; no hover-only information; 44 px targets on touch layouts.
+
+## Post-merge production audit (2026-09-28)
+
+After PR #81 merged to `main`, a file-by-file audit covered every component in
+`src/tools/music/` against: bugs, missing features, typing, responsiveness,
+accessibility, tooltip coverage, copy quality, and competitive parity. Fixes
+were applied directly (typecheck, `tests/unit/mastering*` 147/147, and
+`pnpm build` all clean before commit):
+
+- **Saved Sessions browser** (new, in the Project tab): previously the
+  autosave recovery system only ever offered the single newest other session,
+  once, via a one-time banner. It now lists every autosaved session (any tab,
+  any earlier visit) with Open/Delete actions and a manual refresh, reusing
+  the existing `MasteringStore` API with no persistence-layer changes. This
+  closes a real parity gap against DAW-style "recent projects" pickers.
+- **Accessibility fix**: track-level Mute/Solo buttons in the Arrange tab had
+  no distinguishing `aria-label` (every other row action — Move up/down,
+  Remove — already did). Automated axe scans do not catch this class of
+  issue because the buttons are still individually reachable; it only shows
+  up when a screen-reader user hears repeated "Mute button" announcements
+  with no way to tell rows apart.
+- **Copy/behavior fixes**: the Repair tab's noise-fingerprint and room-tone
+  capture instructions stated minimum durations ("half a second", "0.5
+  seconds") that didn't match the actual enforced minimums in code
+  (~53 ms and 20 ms respectively, from `SPECTRAL_FRAME` and `fillRoomTone`).
+  Rewrote to state the true minimum while still recommending a longer
+  capture for quality.
+- **Tooltip pass**: added `title` attributes (shortcut/behavior hints) to
+  transport controls, the Listen radiogroup, timeline zoom buttons, the
+  spectrogram mode toggle and region actions, and the sample pen's numeric
+  actions. These are supplements only — the tool's keyboard/numeric-path
+  rule for essential information was already satisfied everywhere audited.
+- **Minor fix**: "Insert silence at playhead" in the Edit tab now also
+  requires a clip under the playhead, matching its sibling clip-dependent
+  actions instead of only checking the duration field.
+- Reviewed with no changes needed (already solid): `MasteringMeters.tsx`,
+  `MasteringMasterTab.tsx`, `MasteringTimePitchTab.tsx`, `MasteringEqGraph.tsx`,
+  `MasteringTabs.tsx`, `mastering-ui.tsx`, `MasteringExportTab.tsx`,
+  `MasteringControls.tsx`, `mastering-persistence.ts`.
+- Deferred, not attempted this pass (judged too invasive for an incremental
+  audit): a labeled Undo History panel (would touch the project-history type
+  used across ~15 files), and a Trim/Silence-strip DSP tool (needs new
+  engine primitives, worker protocol, UI, and coverage). Both are reasonable
+  future ledger entries if picked up as their own scoped pieces of work.

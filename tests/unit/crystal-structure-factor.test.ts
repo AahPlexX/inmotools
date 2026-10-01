@@ -44,4 +44,23 @@ describe('crystal structure factor engine', () => {
     const f = structureFactor(partial, [1, 0, 0]);
     expect(f.real).toBeCloseTo(5.5, 8);
   });
+
+  it('uses coherent neutron scattering lengths (not Z) in neutron mode', () => {
+    // Na b=3.63 fm, Cl b=9.5792 fm (NIST NCNR) — very different ratio from Z=11/17,
+    // so a bug that reused the X-ray model would not reproduce these values.
+    const f200 = structureFactor(naclLike, [2, 0, 0], 'neutron');
+    expect(f200.real).toBeCloseTo(3.63 + 9.5792, 8);
+    const f111 = structureFactor(naclLike, [1, 1, 1], 'neutron');
+    expect(f111.real).toBeCloseTo(3.63 - 9.5792, 8);
+    expect(structureFactorIntensity(naclLike, [1, 1, 1], 'neutron')).toBeCloseTo((3.63 - 9.5792) ** 2, 6);
+  });
+
+  it('defaults to the X-ray (Z-based) model when radiation is omitted, unchanged from before', () => {
+    expect(structureFactor(naclLike, [2, 0, 0]).real).toBeCloseTo(structureFactor(naclLike, [2, 0, 0], 'xray').real, 10);
+  });
+
+  it('rejects neutron mode for an element with no verified scattering length', () => {
+    const noB: CrystalDocument = { ...naclLike, sites: [site('x', 'X', [0, 0, 0])] };
+    expect(() => structureFactor(noB, [1, 0, 0], 'neutron')).toThrow(/neutron coherent scattering length/);
+  });
 });

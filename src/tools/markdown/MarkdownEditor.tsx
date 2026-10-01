@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownKeymap } from '@codemirror/lang-markdown';
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
+import { tags } from '@lezer/highlight';
 import { vim } from '@replit/codemirror-vim';
 import { markdownSyntaxCompletions } from './markdown-completions';
 import { buildOutline } from './outline-engine';
@@ -56,16 +57,115 @@ const insertPatternAtSelection = (
   return true;
 };
 
+
+const DARK_HIGHLIGHT_STYLE = HighlightStyle.define([
+  { tag: tags.comment, color: '#aeb8c2', fontStyle: 'italic' },
+  { tag: tags.keyword, color: '#9fb8ff', fontWeight: '700' },
+  { tag: [tags.string, tags.literal], color: '#7ad9a5' },
+  { tag: [tags.number, tags.bool, tags.atom], color: '#f2b36c' },
+  { tag: [tags.typeName, tags.className, tags.namespace], color: '#d2adff' },
+  { tag: [tags.propertyName, tags.labelName, tags.heading], color: '#8cc8ff' },
+  { tag: [tags.meta, tags.operator, tags.punctuation], color: '#c7d0d9' },
+  { tag: [tags.link, tags.url], color: '#8cc8ff', textDecoration: 'underline' },
+  { tag: tags.invalid, color: '#ff8a80', textDecoration: 'underline wavy' },
+  { tag: tags.strong, fontWeight: '700' },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+]);
+
+const markdownEditorTheme = (dark: boolean) => EditorView.theme({
+  '&': { minHeight: '360px', height: '100%', backgroundColor: 'var(--surface)', color: 'var(--ink)' },
+  '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+  '.cm-content': { minHeight: '340px', padding: '10px 0', caretColor: 'var(--ink)' },
+  '.cm-gutters': { backgroundColor: 'var(--surface-strong)', color: 'var(--muted)', borderRight: '1px solid var(--line)' },
+  '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'var(--signal-soft)' },
+  '&.cm-focused': { outline: '2px solid var(--signal)', outlineOffset: '-2px' },
+}, { dark });
+
+const selectedEditorLines = (view: EditorView) => {
+  const { from, to } = view.state.selection.main;
+  const startLine = view.state.doc.lineAt(from).number;
+  const endLine = view.state.doc.lineAt(to).number;
+  const lines = [];
+  for (let number = startLine; number <= endLine; number += 1) lines.push(view.state.doc.line(number));
+  return lines;
+};
+
+const toggleLinePrefixInView = (view: EditorView, prefix: string): boolean => {
+  const lines = selectedEditorLines(view);
+  const allPrefixed = lines.every((line) => line.text.startsWith(prefix));
+  view.dispatch({
+    changes: lines.map((line) => allPrefixed
+      ? { from: line.from, to: line.from + prefix.length, insert: '' }
+      : { from: line.from, to: line.from, insert: prefix }),
+    userEvent: 'input',
+  });
+  view.focus();
+  return true;
+};
+
+const toggleOrderedListInView = (view: EditorView): boolean => {
+  const lines = selectedEditorLines(view);
+  const numbered = /^\d+\.\s/;
+  const allNumbered = lines.every((line) => numbered.test(line.text));
+  view.dispatch({
+    changes: lines.map((line, index) => {
+      const match = numbered.exec(line.text);
+      return allNumbered && match
+        ? { from: line.from, to: line.from + match[0].length, insert: '' }
+        : { from: line.from, to: line.from, insert: `${index + 1}. ` };
+    }),
+    userEvent: 'input',
+  });
+  view.focus();
+  return true;
+};
+
+interface MarkdownActionProps {
+  readonly id: string;
+  readonly label: string;
+  readonly help: string;
+  readonly onClick: () => void;
+  readonly ariaKeyShortcuts?: string;
+}
+
+function MarkdownAction({ id, label, help, onClick, ariaKeyShortcuts }: MarkdownActionProps) {
+  const [open, setOpen] = useState(false);
+  const tooltipId = `markdown-format-tip-${id}`;
+  return (
+    <span className="markdown-workbench-format-action" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        onClick={onClick}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        aria-describedby={tooltipId}
+        aria-keyshortcuts={ariaKeyShortcuts}
+      >
+        {label}
+      </button>
+      <span id={tooltipId} role="tooltip" className="markdown-workbench-format-tooltip" hidden={!open}>{help}</span>
+    </span>
+  );
+}
+
 export interface MarkdownEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onCursorLineChange?: (line: number) => void;
+  readonly onViewportLineChange?: (line: number) => void;
   readonly onStatus?: (message: string) => void;
   readonly lineWrapping: boolean;
   readonly fontSize: number;
   readonly vimMode: boolean;
   readonly spellcheck: boolean;
   readonly syntaxSuggestions: boolean;
+  readonly darkMode: boolean;
   // Incremented by the parent to request that a given line be scrolled into
   // view and focused (used by the document outline). A counter rather than a
   // bare line number so selecting the same heading twice still re-reveals it.
@@ -76,18 +176,21 @@ export default function MarkdownEditor({
   value,
   onChange,
   onCursorLineChange,
+  onViewportLineChange,
   onStatus,
   lineWrapping,
   fontSize,
   vimMode,
   spellcheck,
   syntaxSuggestions,
+  darkMode,
   revealRequest,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const onCursorLineChangeRef = useRef(onCursorLineChange);
+  const onViewportLineChangeRef = useRef(onViewportLineChange);
   const onStatusRef = useRef(onStatus);
   // Set around a programmatic dispatch (the value-sync effect below, used
   // when an external change - undo/redo, restoring a draft, opening a file -
@@ -101,6 +204,8 @@ export default function MarkdownEditor({
   const wrapCompartment = useRef(new Compartment()).current;
   const attributesCompartment = useRef(new Compartment()).current;
   const suggestionsCompartment = useRef(new Compartment()).current;
+  const themeCompartment = useRef(new Compartment()).current;
+  const highlightCompartment = useRef(new Compartment()).current;
 
   // Latest-value refs let the mount effect below seed the initial state
   // without taking a dependency on props that must not trigger a rebuild.
@@ -110,15 +215,18 @@ export default function MarkdownEditor({
   const lineWrappingRef = useRef(lineWrapping);
   const vimModeRef = useRef(vimMode);
   const syntaxSuggestionsRef = useRef(syntaxSuggestions);
+  const darkModeRef = useRef(darkMode);
   valueRef.current = value;
   fontSizeRef.current = fontSize;
   spellcheckRef.current = spellcheck;
   lineWrappingRef.current = lineWrapping;
   vimModeRef.current = vimMode;
   syntaxSuggestionsRef.current = syntaxSuggestions;
+  darkModeRef.current = darkMode;
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onCursorLineChangeRef.current = onCursorLineChange; }, [onCursorLineChange]);
+  useEffect(() => { onViewportLineChangeRef.current = onViewportLineChange; }, [onViewportLineChange]);
   useEffect(() => { onStatusRef.current = onStatus; }, [onStatus]);
 
   const insertImageAtSelection = async (view: EditorView, file: File, at?: number) => {
@@ -178,7 +286,8 @@ export default function MarkdownEditor({
         highlightActiveLine(),
         closeBrackets(),
         markdown(),
-        syntaxHighlighting(defaultHighlightStyle),
+        highlightCompartment.of(syntaxHighlighting(darkModeRef.current ? DARK_HIGHLIGHT_STYLE : defaultHighlightStyle)),
+        themeCompartment.of(markdownEditorTheme(darkModeRef.current)),
         wrapCompartment.of(lineWrappingRef.current ? EditorView.lineWrapping : []),
         suggestionsCompartment.of(buildSuggestions(syntaxSuggestionsRef.current)),
         keymap.of([
@@ -186,6 +295,15 @@ export default function MarkdownEditor({
           { key: 'Mod-i', run: (view) => insertPatternAtSelection(view, '*', '*', 'italic text') },
           { key: 'Mod-e', run: (view) => insertPatternAtSelection(view, '`', '`', 'code') },
           { key: 'Mod-k', run: (view) => insertPatternAtSelection(view, '[', '](https://example.com)', 'link text') },
+          {
+            any: (view, event) => {
+              if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey) return false;
+              if (event.code === 'Digit7') return toggleOrderedListInView(view);
+              if (event.code === 'Digit8') return toggleLinePrefixInView(view, '- ');
+              if (event.code === 'Period') return toggleLinePrefixInView(view, '> ');
+              return false;
+            },
+          },
           ...closeBracketsKeymap,
           ...markdownKeymap,
           ...defaultKeymap,
@@ -228,26 +346,29 @@ export default function MarkdownEditor({
         }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !isExternalSyncRef.current) onChangeRef.current(update.state.doc.toString());
+          if (update.viewportChanged) {
+            const viewportPosition = update.view.visibleRanges[0]?.from ?? update.view.viewport.from;
+            onViewportLineChangeRef.current?.(update.state.doc.lineAt(viewportPosition).number);
+          }
           if (update.selectionSet || update.docChanged) {
             const line = update.state.doc.lineAt(update.state.selection.main.head).number;
             onCursorLineChangeRef.current?.(line);
           }
-        }),
-        EditorView.theme({
-          '&': { minHeight: '360px', height: '100%', backgroundColor: 'var(--surface)', color: 'var(--ink)' },
-          '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
-          '.cm-content': { minHeight: '340px', padding: '10px 0' },
-          '.cm-gutters': { backgroundColor: 'var(--surface-strong)', color: 'var(--muted)', borderRight: '1px solid var(--line)' },
-          '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: 'var(--signal-soft)' },
-          '&.cm-focused': { outline: '2px solid var(--signal)', outlineOffset: '-2px' },
         }),
       ],
     });
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
-  }, [vimCompartment, wrapCompartment, attributesCompartment, suggestionsCompartment]);
+    // Manual scrolling moves the split preview too. CodeMirror only reports viewport changes when its
+    // rendered window shifts, which is far coarser than the user's scrolling, so listen to the scroller.
+    const onScroll = () => {
+      const topBlock = view.lineBlockAtHeight(view.scrollDOM.scrollTop);
+      onViewportLineChangeRef.current?.(view.state.doc.lineAt(topBlock.from).number);
+    };
+    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true });
+    return () => { view.scrollDOM.removeEventListener('scroll', onScroll); view.destroy(); viewRef.current = null; };
+  }, [vimCompartment, wrapCompartment, attributesCompartment, suggestionsCompartment, themeCompartment, highlightCompartment]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
@@ -270,6 +391,15 @@ export default function MarkdownEditor({
       ),
     });
   }, [syntaxSuggestions, suggestionsCompartment]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: [
+        themeCompartment.reconfigure(markdownEditorTheme(darkMode)),
+        highlightCompartment.reconfigure(syntaxHighlighting(darkMode ? DARK_HIGHLIGHT_STYLE : defaultHighlightStyle)),
+      ],
+    });
+  }, [darkMode, themeCompartment, highlightCompartment]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
@@ -322,48 +452,14 @@ export default function MarkdownEditor({
     if (view) insertPatternAtSelection(view, before, after, fallback, useSelection);
   };
 
-  // Lines touched by the current selection (or just the caret's line when
-  // nothing is selected), for prefix-style block formatting (blockquote,
-  // lists) that acts per-line rather than wrapping a single span.
-  const selectedLines = (view: EditorView) => {
-    const { from, to } = view.state.selection.main;
-    const startLine = view.state.doc.lineAt(from).number;
-    const endLine = view.state.doc.lineAt(to).number;
-    const lines = [];
-    for (let number = startLine; number <= endLine; number += 1) lines.push(view.state.doc.line(number));
-    return lines;
-  };
-
   const toggleLinePrefix = (prefix: string) => {
     const view = viewRef.current;
-    if (!view) return;
-    const lines = selectedLines(view);
-    const allPrefixed = lines.every((line) => line.text.startsWith(prefix));
-    view.dispatch({
-      changes: lines.map((line) => allPrefixed
-        ? { from: line.from, to: line.from + prefix.length, insert: '' }
-        : { from: line.from, to: line.from, insert: prefix }),
-      userEvent: 'input',
-    });
-    view.focus();
+    if (view) toggleLinePrefixInView(view, prefix);
   };
 
   const toggleOrderedList = () => {
     const view = viewRef.current;
-    if (!view) return;
-    const lines = selectedLines(view);
-    const numbered = /^\d+\.\s/;
-    const allNumbered = lines.every((line) => numbered.test(line.text));
-    view.dispatch({
-      changes: lines.map((line, index) => {
-        const match = numbered.exec(line.text);
-        return allNumbered && match
-          ? { from: line.from, to: line.from + match[0].length, insert: '' }
-          : { from: line.from, to: line.from, insert: `${index + 1}. ` };
-      }),
-      userEvent: 'input',
-    });
-    view.focus();
+    if (view) toggleOrderedListInView(view);
   };
 
   // Cycles the caret's current line through H1 - H6, then back to a plain
@@ -429,22 +525,22 @@ export default function MarkdownEditor({
 
   return <>
     <div className="markdown-workbench-format-actions" role="group" aria-label="Insert Markdown">
-      <button type="button" onClick={cycleHeading}>Heading</button>
-      <button type="button" onClick={insertTableOfContents}>Table of contents</button>
-      <button type="button" onClick={() => insertPattern('**', '**', 'bold text')} aria-keyshortcuts="Control+B Meta+B" title="Bold (Ctrl/Cmd+B)">Bold</button>
-      <button type="button" onClick={() => insertPattern('*', '*', 'italic text')} aria-keyshortcuts="Control+I Meta+I" title="Italic (Ctrl/Cmd+I)">Italic</button>
-      <button type="button" onClick={() => insertPattern('~~', '~~', 'deleted text')}>Strikethrough</button>
-      <button type="button" onClick={() => insertPattern('`', '`', 'code')} aria-keyshortcuts="Control+E Meta+E" title="Inline code (Ctrl/Cmd+E)">Inline code</button>
-      <button type="button" onClick={() => insertPattern('```\n', '\n```', 'code block', false)}>Code block</button>
-      <button type="button" onClick={() => toggleLinePrefix('> ')}>Blockquote</button>
-      <button type="button" onClick={() => toggleLinePrefix('- ')}>Bullet list</button>
-      <button type="button" onClick={toggleOrderedList}>Numbered list</button>
-      <button type="button" onClick={insertHorizontalRule}>Horizontal rule</button>
-      <button type="button" onClick={() => insertPattern('[', '](https://example.com)', 'link text')} aria-keyshortcuts="Control+K Meta+K" title="Link (Ctrl/Cmd+K)">Link</button>
-      <button type="button" onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')}>Image</button>
-      <button type="button" onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')}>Task</button>
-      <button type="button" onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)}>Table</button>
-      <button type="button" onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }}>Find / replace</button>
+      <MarkdownAction id="heading" label="Heading" help="Cycle the current line through heading levels 1–6, then back to body text." onClick={cycleHeading} />
+      <MarkdownAction id="toc" label="Table of contents" help="Insert links to the headings in the current document at the cursor." onClick={insertTableOfContents} />
+      <MarkdownAction id="bold" label="Bold" help="Wrap the selection in bold Markdown. Shortcut: Ctrl/Cmd+B." onClick={() => insertPattern('**', '**', 'bold text')} ariaKeyShortcuts="Control+B Meta+B" />
+      <MarkdownAction id="italic" label="Italic" help="Wrap the selection in italic Markdown. Shortcut: Ctrl/Cmd+I." onClick={() => insertPattern('*', '*', 'italic text')} ariaKeyShortcuts="Control+I Meta+I" />
+      <MarkdownAction id="strike" label="Strikethrough" help="Wrap the selection in GitHub-style strikethrough Markdown." onClick={() => insertPattern('~~', '~~', 'deleted text')} />
+      <MarkdownAction id="inline-code" label="Inline code" help="Wrap the selection as inline code. Shortcut: Ctrl/Cmd+E." onClick={() => insertPattern('`', '`', 'code')} ariaKeyShortcuts="Control+E Meta+E" />
+      <MarkdownAction id="code-block" label="Code block" help="Insert a fenced code block at the current selection." onClick={() => insertPattern('```\n', '\n```', 'code block', false)} />
+      <MarkdownAction id="blockquote" label="Blockquote" help="Toggle a quote prefix on each selected line. Shortcut: Ctrl/Cmd+Shift+." onClick={() => toggleLinePrefix('> ')} ariaKeyShortcuts="Control+Shift+. Meta+Shift+." />
+      <MarkdownAction id="bullets" label="Bullet list" help="Toggle bullet-list markers on the selected lines. Shortcut: Ctrl/Cmd+Shift+8." onClick={() => toggleLinePrefix('- ')} ariaKeyShortcuts="Control+Shift+8 Meta+Shift+8" />
+      <MarkdownAction id="numbers" label="Numbered list" help="Toggle numbered-list markers on the selected lines. Shortcut: Ctrl/Cmd+Shift+7." onClick={toggleOrderedList} ariaKeyShortcuts="Control+Shift+7 Meta+Shift+7" />
+      <MarkdownAction id="rule" label="Horizontal rule" help="Insert a thematic break on its own line." onClick={insertHorizontalRule} />
+      <MarkdownAction id="link" label="Link" help="Wrap the selection as a link. Shortcut: Ctrl/Cmd+K." onClick={() => insertPattern('[', '](https://example.com)', 'link text')} ariaKeyShortcuts="Control+K Meta+K" />
+      <MarkdownAction id="image" label="Image" help="Insert image Markdown using a URL. You can also paste or drop a local image to embed it." onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')} />
+      <MarkdownAction id="task" label="Task" help="Insert an unchecked GitHub-style task-list item." onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')} />
+      <MarkdownAction id="table" label="Table" help="Insert a two-column Markdown table starter." onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)} />
+      <MarkdownAction id="find" label="Find / replace" help="Open the editor’s find and replace controls for this document." onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }} />
     </div>
     <div className="markdown-workbench-editor" ref={hostRef} />
   </>;
