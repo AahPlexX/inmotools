@@ -602,7 +602,7 @@ export default function CrystalStructurePanel({
               This would create {supercellSiteCount.toLocaleString()} sites, above the Phase 1 limit of {MAX_PHASE_ONE_SITES.toLocaleString()}.
             </p>
           ) : null}
-          <button type="button" disabled={!supercellAllowed} onClick={applySupercell}>Apply supercell</button>
+          <button className="crystal-supercell-apply" type="button" disabled={!supercellAllowed} onClick={applySupercell}>Apply supercell</button>
         </section>
 
         <section className="crystal-editor-card" aria-labelledby="crystal-measurement-heading">

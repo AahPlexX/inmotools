@@ -416,3 +416,103 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+
+.crystal-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.crystal-analysis-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.crystal-analysis-summary {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.crystal-analysis-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.crystal-analysis-table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+}
+
+.crystal-analysis-table caption {
+  padding-block: 0 8px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.crystal-analysis-table th,
+.crystal-analysis-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.crystal-analysis-table th {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.crystal-analysis-table input {
+  min-width: 4.5rem;
+}
+
+@media (max-width: 520px) {
+  .crystal-analysis-table {
+    min-width: 24rem;
+  }
+
+  .crystal-analysis-grid .crystal-editor-card > button {
+    width: 100%;
+  }
+}
+
+
+.crystal-analysis-preview {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 12rem;
+  max-height: 18rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.crystal-analysis-preview text {
+  font-family: inherit;
+}
+
+
+.crystal-supercell-apply {
+  min-height: 44px;
+  scroll-margin-block: 5rem;
+}
+
+@media (max-width: 760px) {
+  .crystal-supercell-apply {
+    width: 100%;
+  }
+}
