@@ -8,23 +8,16 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
+import { busLevels, describeBus } from './bus-engine';
 import { getComponentPorts } from './component-library';
-import { componentBoundingBox, findPortAt, portAbsolutePosition, GRID_SIZE } from './geometry';
-import { renderScene, screenToWorld, snapToGrid, type DraftWire } from './render-engine';
+import { findComponentAt } from './gate-shapes';
+import { findPortAt, orthogonalWaypoints, portAbsolutePosition, GRID_SIZE } from './geometry';
+import { readLevel } from './sim-engine';
+import { levelLocation, markerWidthOf } from './subcircuit-ports';
+import { renderScene, screenToWorld, snapToGrid, THEME_PALETTES, type DraftWire } from './render-engine';
+import { beginPinch, updatePinch, zoomViewportAt, type PinchStart } from './touch-gestures';
 import type { ComponentType, LogicDocument, PortRef, SimulationFrame, ThemeName, WirePoint } from './logic-types';
 import './LogicCanvas.css';
-
-/**
- * A single L-bend between two absolute pixel positions, matching the
- * "orthogonal wire routing" the schematic canvas promises: horizontal
- * first when the endpoints are farther apart on that axis, vertical first
- * otherwise, so the bend reads naturally instead of a diagonal segment.
- */
-const orthogonalWaypoints = (start: WirePoint, end: WirePoint): WirePoint[] => {
-  if (start.x === end.x || start.y === end.y) return [];
-  const horizontalFirst = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y);
-  return horizontalFirst ? [{ x: end.x, y: start.y }] : [{ x: start.x, y: end.y }];
-};
 
 const CLICK_MOVEMENT_THRESHOLD = 6;
 const LONG_PRESS_MS = 550;
@@ -53,6 +46,8 @@ export interface LogicCanvasProps {
   readonly onSelect: (ids: string[]) => void;
   readonly onAddWire: (from: PortRef, to: PortRef, waypoints: readonly WirePoint[]) => void;
   readonly onToggleSwitch: (id: string) => void;
+  /** A double-click (or double-tap) on a part; the workspace opens it if it is a subcircuit. */
+  readonly onOpenComponent: (id: string) => void;
   readonly onPressButton: (id: string, pressed: boolean) => void;
   readonly onViewportChange: (viewport: Partial<LogicDocument['viewport']>) => void;
   readonly onDropComponent: (type: ComponentType, worldX: number, worldY: number) => void;
@@ -63,10 +58,13 @@ export interface LogicCanvasProps {
 
 interface ScreenPoint { readonly x: number; readonly y: number; }
 
+/** Whether the person asked their system to reduce motion; animated themes then hold still. */
+const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
 const isCoarsePointer = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
 
 export function LogicCanvas(props: LogicCanvasProps) {
-  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onPressButton, onViewportChange, onDropComponent, buildContextActions, cancelDraftWireToken } = props;
+  const { document: doc, frame, theme, placingType, onMoveComponent, onSelect, onAddWire, onToggleSwitch, onOpenComponent, onPressButton, onViewportChange, onDropComponent, buildContextActions, cancelDraftWireToken } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -74,6 +72,24 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [draftWire, setDraftWire] = useState<DraftWire | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Themes that draw moving signal flow need a free-running clock; everyone else redraws only when the circuit changes.
+  const animates = THEME_PALETTES[theme].flow === true && !prefersReducedMotion();
+  const [animationTime, setAnimationTime] = useState(0);
+  useEffect(() => {
+    if (!animates) return;
+    let raf = 0;
+    let last = 0;
+    const loop = (now: number) => {
+      // About 30 frames a second is plenty for a dash pattern and halves the redraw cost.
+      if (now - last >= 33) {
+        last = now;
+        setAnimationTime(now);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [animates]);
   const [menu, setMenu] = useState<{ x: number; y: number; radial: boolean; actions: readonly MenuAction[]; label: string } | null>(null);
 
   const dragRef = useRef<{ ids: string[]; startWorld: ScreenPoint; originals: Record<string, ScreenPoint>; moved: boolean; clickTargetId?: string; lastDx: number; lastDy: number } | null>(null);
@@ -81,6 +97,14 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const marqueeStartRef = useRef<ScreenPoint | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
+  /** Every finger currently on the canvas, by pointer id, so a second one can turn the gesture into a pan/zoom. */
+  const touchPointsRef = useRef(new Map<number, ScreenPoint>());
+  const pinchRef = useRef<PinchStart | null>(null);
+  /** A component drop started by a finger, held until that finger lifts so a pinch that follows it never drops one. */
+  /** A wire action on a bus pin that a touch has started but not yet finished (see the hold-to-read handling). */
+  const pendingPortTapRef = useRef<{ activate: () => void } | null>(null);
+  const tooltipTimerRef = useRef<number | null>(null);
+  const pendingTouchDropRef = useRef<{ pointerId: number; type: ComponentType; worldX: number; worldY: number } | null>(null);
 
   useEffect(() => {
     setDraftWire(null);
@@ -109,19 +133,15 @@ export function LogicCanvas(props: LogicCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    renderScene(ctx, size.width, size.height, doc.viewport, { document: doc, frame, hoverPort, draftWire: draftWire ?? undefined, marqueeRect: marquee ?? undefined }, theme);
-  }, [doc, frame, theme, size, hoverPort, draftWire, marquee]);
+    renderScene(ctx, size.width, size.height, doc.viewport, { document: doc, frame, hoverPort, draftWire: draftWire ?? undefined, marqueeRect: marquee ?? undefined, animationTime: animates ? animationTime : undefined }, theme);
+  }, [doc, frame, theme, size, hoverPort, draftWire, marquee, animates, animationTime]);
 
   const getScreenPoint = useCallback((event: { clientX: number; clientY: number }): ScreenPoint => {
     const rect = canvasRef.current?.getBoundingClientRect();
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
   }, []);
 
-  const componentAt = useCallback((worldPoint: ScreenPoint) =>
-    doc.components.find((component) => {
-      const box = componentBoundingBox(component);
-      return worldPoint.x >= box.minX && worldPoint.x <= box.maxX && worldPoint.y >= box.minY && worldPoint.y <= box.maxY;
-    }), [doc.components]);
+  const componentAt = useCallback((worldPoint: ScreenPoint) => findComponentAt(doc.components, worldPoint), [doc.components]);
 
   const portAt = useCallback((worldPoint: ScreenPoint) => {
     for (const component of doc.components) {
@@ -145,17 +165,74 @@ export function LogicCanvas(props: LogicCanvasProps) {
     }
   };
 
+  /**
+   * Drops whatever a single finger had started (a component drag, a held push
+   * button, a rubber-band box, a pending long press) so a second finger can
+   * take over as a pan/zoom. A drag already previewed on screen is put back
+   * where it began, so a pinch never leaves a component displaced.
+   */
+  const abandonSingleTouchGesture = () => {
+    clearLongPress();
+    pendingTouchDropRef.current = null;
+    pendingPortTapRef.current = null;
+    const drag = dragRef.current;
+    if (drag) {
+      if (drag.moved) {
+        for (const id of drag.ids) {
+          const origin = drag.originals[id];
+          if (origin) onMoveComponent(id, origin.x, origin.y, false);
+        }
+      }
+      for (const id of drag.ids) {
+        if (doc.components.find((candidate) => candidate.id === id)?.type === 'PUSH_BUTTON') onPressButton(id, false);
+      }
+      dragRef.current = null;
+    }
+    marqueeStartRef.current = null;
+    setMarquee(null);
+  };
+
+  const touchPair = (): [ScreenPoint, ScreenPoint] | undefined => {
+    const points = Array.from(touchPointsRef.current.values());
+    return points.length >= 2 ? [points[0]!, points[1]!] : undefined;
+  };
+
+  /** What hovering (or, on touch, holding) a pin says: the part, the pin, and for a bus its value in binary, hex, and decimal. */
+  const portTooltip = (component: LogicDocument['components'][number] | undefined, portDef: ReturnType<typeof getComponentPorts>[number] | undefined, portId: string): string => {
+    const base = `${component?.label ?? ''} · pin ${portDef?.label ?? portId}`;
+    if (!component || !portDef?.bus) return base;
+    return `${component.label} · ${describeBus(portDef.id, busLevels(portDef, (pin) => {
+      const where = levelLocation(component, portDef.id, pin);
+      return readLevel(frame, where.componentId, where.pinId);
+    }))}`;
+  };
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     setMenu(null);
     longPressFiredRef.current = false;
     const screenPoint = getScreenPoint(event);
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
 
+    // A second finger never clicks, drags, or wires on its own: together with
+    // the first it pans and zooms the view.
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.set(event.pointerId, screenPoint);
+      if (touchPointsRef.current.size >= 2) {
+        abandonSingleTouchGesture();
+        const pair = touchPair();
+        pinchRef.current = pair ? (beginPinch(pair[0], pair[1], doc.viewport) ?? null) : null;
+        return;
+      }
+    }
+
     if (placingType) {
       // Only the primary button places a component: a right-click would
       // otherwise both open a wire-cancel/context-menu gesture AND drop a
       // component, and a middle-click would drop one instead of panning.
-      if (event.button === 0) onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
+      if (event.button === 0) {
+        if (event.pointerType === 'touch') pendingTouchDropRef.current = { pointerId: event.pointerId, type: placingType, worldX: worldPoint.x / GRID_SIZE, worldY: worldPoint.y / GRID_SIZE };
+        else onDropComponent(placingType, worldPoint.x / GRID_SIZE, worldPoint.y / GRID_SIZE);
+      }
       return;
     }
 
@@ -173,17 +250,36 @@ export function LogicCanvas(props: LogicCanvasProps) {
 
     const port = portAt(worldPoint);
     if (port) {
-      if (draftWire) {
-        if (draftWire.from.componentId !== port.componentId || draftWire.from.portId !== port.portId) {
-          const targetComponent = doc.components.find((candidate) => candidate.id === port.componentId);
-          const targetPort = targetComponent ? getComponentPorts(targetComponent.type, targetComponent.params).find((candidate) => candidate.id === port.portId) : undefined;
-          const endPosition = targetComponent && targetPort ? portAbsolutePosition(targetComponent, targetPort) : worldPoint;
-          onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId }, orthogonalWaypoints(draftWire.fromPosition, endPosition));
+      const activate = () => {
+        if (draftWire) {
+          if (draftWire.from.componentId !== port.componentId || draftWire.from.portId !== port.portId) {
+            const targetComponent = doc.components.find((candidate) => candidate.id === port.componentId);
+            const targetPort = targetComponent ? getComponentPorts(targetComponent.type, targetComponent.params).find((candidate) => candidate.id === port.portId) : undefined;
+            const endPosition = targetComponent && targetPort ? portAbsolutePosition(targetComponent, targetPort) : worldPoint;
+            onAddWire(draftWire.from, { componentId: port.componentId, portId: port.portId }, orthogonalWaypoints(draftWire.fromPosition, endPosition));
+          }
+          setDraftWire(null);
+        } else {
+          setDraftWire({ from: { componentId: port.componentId, portId: port.portId }, fromPosition: worldPoint, waypoints: [], cursor: worldPoint });
         }
-        setDraftWire(null);
-      } else {
-        setDraftWire({ from: { componentId: port.componentId, portId: port.portId }, fromPosition: worldPoint, waypoints: [], cursor: worldPoint });
+      };
+      const owner = doc.components.find((candidate) => candidate.id === port.componentId);
+      const definition = owner ? getComponentPorts(owner.type, owner.params).find((candidate) => candidate.id === port.portId) : undefined;
+      if (event.pointerType === 'touch' && definition?.bus) {
+        // On touch there is no hover, so a bus pin's value is shown by holding it. A quick tap still wires, but
+        // only once the finger lifts, so a hold never also starts or finishes a wire.
+        pendingPortTapRef.current = { activate };
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressFiredRef.current = true;
+          pendingPortTapRef.current = null;
+          const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y - 48, size.width, size.height);
+          setTooltip({ x: clamped.x, y: clamped.y, text: portTooltip(owner, definition, port.portId) });
+          if (tooltipTimerRef.current !== null) window.clearTimeout(tooltipTimerRef.current);
+          tooltipTimerRef.current = window.setTimeout(() => setTooltip(null), 3500);
+        }, LONG_PRESS_MS);
+        return;
       }
+      activate();
       return;
     }
 
@@ -222,6 +318,18 @@ export function LogicCanvas(props: LogicCanvasProps) {
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screenPoint = getScreenPoint(event);
     const worldPoint = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
+
+    if (event.pointerType === 'touch' && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, screenPoint);
+      const pair = touchPair();
+      if (pair) {
+        // Fingers that started too close together define no scale yet; retry as they spread.
+        if (!pinchRef.current) pinchRef.current = beginPinch(pair[0], pair[1], doc.viewport) ?? null;
+        if (pinchRef.current) onViewportChange(updatePinch(pinchRef.current, pair[0], pair[1]));
+        return;
+      }
+      if (pendingTouchDropRef.current?.pointerId === event.pointerId) return;
+    }
 
     if (panRef.current) {
       const dx = screenPoint.x - panRef.current.startScreen.x;
@@ -270,7 +378,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
         const component = doc.components.find((candidate) => candidate.id === port.componentId);
         const portDef = component ? getComponentPorts(component.type, component.params).find((candidate) => candidate.id === port.portId) : undefined;
         const clamped = clampTooltipPosition(screenPoint.x + 14, screenPoint.y + 14, size.width, size.height);
-        setTooltip({ x: clamped.x, y: clamped.y, text: `${component?.label ?? ''} · pin ${portDef?.label ?? port.portId}` });
+        setTooltip({ x: clamped.x, y: clamped.y, text: portTooltip(component, portDef, port.portId) });
       }
       return;
     }
@@ -284,6 +392,26 @@ export function LogicCanvas(props: LogicCanvasProps) {
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     clearLongPress();
+    if (event.pointerType === 'touch') {
+      const wasPinching = touchPointsRef.current.size >= 2;
+      touchPointsRef.current.delete(event.pointerId);
+      if (touchPointsRef.current.size < 2) pinchRef.current = null;
+      // Lifting a finger out of a two-finger gesture ends it; the finger left
+      // down must not then read as a tap, drag, or drop.
+      if (wasPinching) return;
+      const pendingTap = pendingPortTapRef.current;
+      pendingPortTapRef.current = null;
+      if (pendingTap && event.type === 'pointerup' && !longPressFiredRef.current) {
+        pendingTap.activate();
+        return;
+      }
+      const pendingDrop = pendingTouchDropRef.current;
+      if (pendingDrop?.pointerId === event.pointerId) {
+        pendingTouchDropRef.current = null;
+        if (event.type === 'pointerup') onDropComponent(pendingDrop.type, pendingDrop.worldX, pendingDrop.worldY);
+        return;
+      }
+    }
     if (panRef.current) { panRef.current = null; return; }
 
     if (dragRef.current) {
@@ -299,7 +427,7 @@ export function LogicCanvas(props: LogicCanvasProps) {
       if (!longPressTriggered) {
         if (!moved && clickTargetId) {
           const component = doc.components.find((candidate) => candidate.id === clickTargetId);
-          if (component?.type === 'SWITCH') onToggleSwitch(component.id);
+          if (component?.type === 'SWITCH' || (component?.type === 'PORT_IN' && markerWidthOf(component.params) === 1)) onToggleSwitch(component.id);
         }
         for (const id of ids) {
           const component = doc.components.find((candidate) => candidate.id === id);
@@ -317,15 +445,24 @@ export function LogicCanvas(props: LogicCanvasProps) {
     setMarquee(null);
   };
 
+  /** The browser took the touch over (a system gesture, an incoming call): end it without acting on it. */
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    touchPointsRef.current.delete(event.pointerId);
+    if (touchPointsRef.current.size < 2) pinchRef.current = null;
+    abandonSingleTouchGesture();
+    pendingPortTapRef.current = null;
+    panRef.current = null;
+  };
+
   const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    const screenPoint = getScreenPoint(event);
-    const worldBefore = screenToWorld(screenPoint.x, screenPoint.y, doc.viewport);
-    const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
-    const zoom = Math.min(3, Math.max(0.25, doc.viewport.zoom * factor));
-    const panX = screenPoint.x - worldBefore.x * zoom;
-    const panY = screenPoint.y - worldBefore.y * zoom;
-    onViewportChange({ zoom, panX, panY });
+    onViewportChange(zoomViewportAt(doc.viewport, getScreenPoint(event), event.deltaY < 0 ? 1.12 : 1 / 1.12));
+  };
+
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    const point = getScreenPoint(event);
+    const target = componentAt(screenToWorld(point.x, point.y, doc.viewport));
+    if (target) onOpenComponent(target.id);
   };
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -343,9 +480,11 @@ export function LogicCanvas(props: LogicCanvasProps) {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onPointerLeave={handlePointerUp}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
+        onDoubleClick={handleDoubleClick}
         role="img"
         aria-label={`${doc.metadata.title} schematic canvas with ${doc.components.length} components`}
       />

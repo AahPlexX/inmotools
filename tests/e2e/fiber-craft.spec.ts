@@ -317,6 +317,7 @@ test.describe('Fiber Craft Workstation', () => {
   });
 
   test('crochet views pass axe in every theme (including hovered buttons), fit the viewport, and set a useful page title', async ({ page }) => {
+    test.setTimeout(90_000); // Six axe scans need longer than the default timeout in the full merged app.
     await page.goto('./#/fiber-craft-workstation');
     await expect(page).toHaveTitle(/Fiber Craft Workstation — Crochet Chart Maker/);
     await page.getByRole('button', { name: 'Fill round 1 with this stitch' }).click();

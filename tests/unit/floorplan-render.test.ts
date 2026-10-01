@@ -14,7 +14,8 @@ const door: HostedOpening = {
 
 describe('PlanCraft rendering geometry', () => {
   it('maps wall states to distinct visual treatments', () => {
-    expect(wallVisualStyle(baseWall).stroke).toBe('#334155');
+    // Existing walls must stay visible on the #0b1120 canvas (WCAG 2.2 SC 1.4.11, 3:1 minimum).
+    expect(wallVisualStyle(baseWall).stroke).toBe('#94a3b8');
     expect(wallVisualStyle({ ...baseWall, state: 'new_construction' }).stroke).toBe('#38bdf8');
     expect(wallVisualStyle({ ...baseWall, state: 'demolition' }).stroke).toBe('#f43f5e');
     expect(wallVisualStyle({ ...baseWall, state: 'demolition' }).dash.length).toBeGreaterThan(0);

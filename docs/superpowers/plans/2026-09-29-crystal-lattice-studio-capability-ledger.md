@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-29  
 **Design:** `docs/superpowers/specs/2026-09-11-crystal-lattice-studio-design.md` (163 numbered capabilities)  
-**Tally:** 75 done · 39 partial · 49 missing (of 163)
+**Tally:** 75 done · 42 partial · 46 missing (of 163)
 
 Status is judged from code and tests on `main`. **Done** means engine plus a reachable surface (UI or export) with tests. **Partial** names the exact gap. **Missing** means no implementation. The design exclusions (macromolecular building, CSD/ICSD, SHELX executables, magnetic-space-group solving) need owner-approved wording before they count as excluded; none is recorded as excluded here.
 
@@ -115,12 +115,12 @@ Update the status of an item here whenever its implementation changes; keep this
 | 103 | Apply common preferred-orientation correction models such as March–Dollase where appl... | Missing | No U/V/W, size, strain or March-Dollase models |
 | 104 | Overlay imported observed XY/XYE/pdCIF data with scale, offset, and region controls. | Partial | Overlay exists; scale/offset/region controls not verified |
 | 105 | Pick observed peaks manually and by deterministic local-maximum criteria. | Missing | No peak picking |
-| 106 | Compare observed versus simulated traces with residual curves and explicit numeric fi... | Partial | overlayResiduals peak deltas; no residual curve or R-metrics |
+| 106 | Compare observed versus simulated traces with residual curves and explicit numeric fi... | Partial | overlayResiduals peak deltas; Rp/Rwp with displayed formulas in powder-fit-engine; no residual-curve UI |
 | 107 | Simulate multiple structural phases in one powder pattern with adjustable phase scales. | Missing | No multi-phase patterns |
 | 108 | Estimate phase fractions from fitted scale parameters only when the required assumpti... | Missing | No multi-phase patterns |
-| 109 | Provide a bounded least-squares powder fitting core for scale, zero shift, lattice pa... | Missing | Phase 4 not started |
-| 110 | Allow parameters to be fixed/free and bounded, with the active parameter set visible... | Missing | Phase 4 not started |
-| 111 | Report convergence, parameter changes, residual metrics, iteration count, and termina... | Missing | Phase 4 not started |
+| 109 | Provide a bounded least-squares powder fitting core for scale, zero shift, lattice pa... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
+| 110 | Allow parameters to be fixed/free and bounded, with the active parameter set visible... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
+| 111 | Report convergence, parameter changes, residual metrics, iteration count, and termina... | Partial | fit-engine.ts LM core + powder-fit-engine.ts (scale, zero, linear background, width; fixed/free/bounds; convergence report) tested in crystal-fit and crystal-powder-fit; no UI, lattice/phase-scale refinement pending |
 | 112 | Provide an observed-reflection workspace for CIF/SHELX-style reflection data with Fc/... | Missing | Phase 4 not started |
 | 113 | Compute common residual summaries such as R1-style and weighted residual metrics with... | Missing | Phase 4 not started |
 | 114 | Calculate difference-Fourier-style scalar grids from suitable observed/calculated ref... | Missing | Phase 4 not started |

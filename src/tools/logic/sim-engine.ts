@@ -1,4 +1,13 @@
-import { getComponentPorts, isSequential } from './component-library';
+import { evaluateAlu } from './alu-engine';
+import { flattenDocument } from './subcircuit-engine';
+import { markerWidthOf } from './subcircuit-ports';
+import { isMatrixType, restoreMatrixPixels, matrixSizeOf, updateMatrixPixels } from './matrix-engine';
+import { isMemoryType, memoryOutputs, restoreMemoryRuntime, stepMemoryWrite } from './memory-engine';
+import { evaluateBlock, isBlockType } from './block-engine';
+import { portBits } from './bus-engine';
+import { getComponentPorts, getSimulationPorts, isSequential } from './component-library';
+import { isDisplayType, restoreSegmentLit, updateSegmentLit } from './display-engine';
+import { bitWidthOf, isRegisterType, registerOutputs, restoreRegisterRuntime, stepRegister } from './register-engine';
 import {
   portKey,
   type ComponentInstance,
@@ -21,7 +30,7 @@ import {
  * configured gates stay proportionally correct while remaining fast
  * enough to observe interactively.
  */
-const DELAY_SCALE_NS = 100;
+export const DELAY_SCALE_NS = 100;
 const MAX_SETTLE_ITERATIONS_PER_COMPONENT = 64;
 
 const toBit = (level: LogicLevel): 0 | 1 | undefined => (level === 0 || level === 1 ? level : undefined);
@@ -43,7 +52,7 @@ export interface NetIndex {
 
 const buildComponentPortMap = (components: readonly ComponentInstance[]): Map<string, readonly PortDefinition[]> => {
   const map = new Map<string, readonly PortDefinition[]>();
-  for (const component of components) map.set(component.id, getComponentPorts(component.type, component.params));
+  for (const component of components) map.set(component.id, getSimulationPorts(component.type, component.params));
   return map;
 };
 
@@ -70,20 +79,37 @@ export const buildNetIndex = (components: readonly ComponentInstance[], wires: r
     if (rootA !== rootB) parent.set(rootB, rootA);
   };
 
+  // The pins a person can wire, by component: a wire endpoint may name a bus port, which the simulator never sees.
+  const visiblePorts = new Map<string, ReadonlyMap<string, PortDefinition>>();
+  const aliases: (readonly [PortKey, PortKey])[] = [];
   for (const component of components) {
     const ports = portMap.get(component.id) ?? [];
     for (const port of ports) {
       const key = portKey(component.id, port.id);
       parent.set(key, key);
-      directionOf.set(key, port.direction);
+      // Passive pins (a bus splitter's) neither drive nor load a net, so they have no direction to record.
+      if (port.direction !== 'passive') directionOf.set(key, port.direction);
+      if (port.alias !== undefined) aliases.push([key, portKey(component.id, port.alias)]);
     }
+    visiblePorts.set(component.id, new Map(getComponentPorts(component.type, component.params).map((port) => [port.id, port] as const)));
   }
 
+  // A part's own permanent joins (a splitter's bus bit and its tap are one net).
+  for (const [a, b] of aliases) if (parent.has(a) && parent.has(b)) union(a, b);
+
   for (const wire of wires) {
-    const fromKey = portKey(wire.from.componentId, wire.from.portId);
-    const toKey = portKey(wire.to.componentId, wire.to.portId);
-    if (!parent.has(fromKey) || !parent.has(toKey)) continue;
-    union(fromKey, toKey);
+    const fromPort = visiblePorts.get(wire.from.componentId)?.get(wire.from.portId);
+    const toPort = visiblePorts.get(wire.to.componentId)?.get(wire.to.portId);
+    if (!fromPort || !toPort) continue;
+    // A single pin is a one-bit "bus"; a bus wire joins its two groups bit by bit. Mismatched widths join nothing.
+    const fromBits = portBits(fromPort);
+    const toBits = portBits(toPort);
+    if (fromBits.length !== toBits.length) continue;
+    fromBits.forEach((bit, index) => {
+      const fromKey = portKey(wire.from.componentId, bit);
+      const toKey = portKey(wire.to.componentId, toBits[index]!);
+      if (parent.has(fromKey) && parent.has(toKey)) union(fromKey, toKey);
+    });
   }
 
   const members = new Map<PortKey, PortKey[]>();
@@ -160,6 +186,10 @@ const isRisingEdge = (previous: LogicLevel | undefined, current: LogicLevel): bo
 const isFallingEdge = (previous: LogicLevel | undefined, current: LogicLevel): boolean =>
   toBit(current) === 0 && toBit(previous ?? 1) === 1;
 
+/** A one-bit input port marker outside a subcircuit: it behaves like a toggle switch, so a subcircuit can be tried on its own. */
+const isSingleInputPort = (component: { readonly type: string; readonly params: LogicDocument['components'][number]['params'] }): boolean =>
+  component.type === 'PORT_IN' && markerWidthOf(component.params) === 1;
+
 export interface StepInput {
   readonly document: LogicDocument;
   readonly previous: SimulationFrame;
@@ -171,21 +201,23 @@ export interface StepInput {
   readonly forceClockStep?: boolean;
 }
 
-export const createInitialFrame = (document: LogicDocument): SimulationFrame => {
+export const createInitialFrame = (source: LogicDocument): SimulationFrame => {
+  const document = flattenDocument(source);
   const levels: Record<PortKey, LogicLevel> = {};
   const state: Record<string, ComponentRuntimeState> = {};
   for (const component of document.components) {
-    for (const port of getComponentPorts(component.type, component.params)) {
+    for (const port of getSimulationPorts(component.type, component.params)) {
       levels[portKey(component.id, port.id)] = 'Z';
     }
-    if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON') {
+    if (component.type === 'SWITCH' || component.type === 'PUSH_BUTTON' || isSingleInputPort(component)) {
       state[component.id] = { switchLevel: component.params.initialLevel ?? 0 };
     }
   }
   return { tick: 0, portLevels: levels, componentState: state, pendingUpdates: [], hazards: [] };
 };
 
-export const step = ({ document, previous, elapsedMs, interactions = {}, forceClockStep = false }: StepInput): SimulationFrame => {
+export const step = ({ document: sourceDocument, previous, elapsedMs, interactions = {}, forceClockStep = false }: StepInput): SimulationFrame => {
+  const document = flattenDocument(sourceDocument);
   const tick = previous.tick + 1;
   const net = buildNetIndex(document.components, document.wires);
   const portMap = buildComponentPortMap(document.components);
@@ -203,7 +235,11 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
   // --- Source components: switches, push buttons, and clock generators drive their own net directly. ---
   for (const component of document.components) {
     const outKey = portKey(component.id, 'Y');
-    if (component.type === 'SWITCH') {
+    if (component.type === 'PORT_IN' && markerWidthOf(component.params) > 1) {
+      // A bus input port that is not inside a subcircuit drives the constant set in the inspector.
+      const value = Math.max(0, Math.trunc(component.params.portValue ?? 0));
+      for (let index = 0; index < markerWidthOf(component.params); index += 1) levels.set(portKey(component.id, `Y${index}`), (Math.floor(value / 2 ** index) % 2) as LogicLevel);
+    } else if (component.type === 'SWITCH' || isSingleInputPort(component)) {
       const forced = interactions[component.id];
       const current = nextState[component.id]?.switchLevel ?? component.params.initialLevel ?? 0;
       const level = forced ?? current;
@@ -273,27 +309,44 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
       const inputPorts = ports.filter((port) => port.direction === 'input');
       const readInput = (portId: string): LogicLevel => resolvedNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
 
-      let nextOutput: LogicLevel | undefined;
+      // Every combinational part reduces to "these output pins should now
+      // read these levels": gates drive their single Y pin, blocks drive
+      // however many pins their layout defines.
+      let nextOutputs: Readonly<Record<string, LogicLevel>> | undefined;
       if (component.type === 'TRI_BUFFER') {
-        nextOutput = evaluateTriBuffer(readInput('A'), readInput('EN'));
+        nextOutputs = { Y: evaluateTriBuffer(readInput('A'), readInput('EN')) };
       } else if (
         component.type === 'AND' || component.type === 'OR' || component.type === 'NAND' ||
         component.type === 'NOR' || component.type === 'XOR' || component.type === 'XNOR' ||
         component.type === 'NOT' || component.type === 'BUFFER'
       ) {
         const inputLevels = inputPorts.map((port) => readInput(port.id));
-        nextOutput = evaluateGateOutput(component.type, inputLevels);
+        nextOutputs = { Y: evaluateGateOutput(component.type, inputLevels) };
+      } else if (isBlockType(component.type)) {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = evaluateBlock(component.type, component.params, inputLevels);
+      } else if (component.type === 'ALU') {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = evaluateAlu(component.params, inputLevels);
+      } else if (isMemoryType(component.type)) {
+        const inputLevels: Record<string, LogicLevel> = {};
+        for (const port of inputPorts) inputLevels[port.id] = readInput(port.id);
+        nextOutputs = memoryOutputs(component.params, nextState[component.id]?.memoryWrites, inputLevels);
       }
-      if (nextOutput === undefined) continue;
+      if (nextOutputs === undefined) continue;
 
-      const outKey = portKey(component.id, 'Y');
-      const currentOutput = levels.get(outKey) ?? 'Z';
-      if (currentOutput === nextOutput) continue;
-      changed = true;
-      if (schedule) {
-        stillPending.push({ dueTick: tick + delayTicksFor(component.params.delayNs), componentId: component.id, portId: 'Y', level: nextOutput });
-      } else {
-        levels.set(outKey, nextOutput);
+      for (const [portId, nextLevel] of Object.entries(nextOutputs)) {
+        const outKey = portKey(component.id, portId);
+        const currentOutput = levels.get(outKey) ?? 'Z';
+        if (currentOutput === nextLevel) continue;
+        changed = true;
+        if (schedule) {
+          stillPending.push({ dueTick: tick + delayTicksFor(component.params.delayNs), componentId: component.id, portId, level: nextLevel });
+        } else {
+          levels.set(outKey, nextLevel);
+        }
       }
     }
     return changed;
@@ -367,6 +420,39 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
     levels.set(portKey(component.id, 'QN'), storedBit === undefined ? 'X' : storedBit === 1 ? 0 : 1);
   }
 
+  // --- Counters and registers: clocked multi-bit parts, sampled against the same pre-edge nets as the flip-flops. ---
+  for (const component of document.components) {
+    if (!isRegisterType(component.type)) continue;
+    const readInput = (portId: string): LogicLevel => finalNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
+    const state = nextState[component.id] ?? {};
+    const runtime = stepRegister({
+      type: component.type,
+      params: component.params,
+      runtime: restoreRegisterRuntime(state, bitWidthOf(component.params)),
+      read: readInput,
+      ideal: delayMode === 'ideal',
+    });
+    nextState[component.id] = {
+      ...state,
+      lastClockLevel: runtime.lastClockLevel,
+      registerBits: runtime.bits,
+      registerPreviousBits: runtime.previousBits,
+      rippleStage: runtime.rippleStage,
+    };
+    for (const [portId, level] of Object.entries(registerOutputs(component.type, component.params, runtime))) {
+      levels.set(portKey(component.id, portId), level);
+    }
+  }
+
+  // --- RAM: writes on the active clock edge, sampled against the same pre-edge nets as every other clocked part. ---
+  for (const component of document.components) {
+    if (component.type !== 'RAM') continue;
+    const readInput = (portId: string): LogicLevel => finalNets.get(net.find(portKey(component.id, portId))) ?? 'Z';
+    const state = nextState[component.id] ?? {};
+    const runtime = stepMemoryWrite({ params: component.params, runtime: restoreMemoryRuntime(state), read: readInput });
+    nextState[component.id] = { ...state, lastClockLevel: runtime.lastClockLevel, memoryWrites: runtime.writes, memoryFault: runtime.fault };
+  }
+
   // Re-resolve nets once more so anything wired directly to a Q/QN output
   // (an LED, a probe, another flip-flop's D/CLK, or a downstream gate) reads
   // the new value this same tick instead of one tick later, and let ideal
@@ -374,10 +460,47 @@ export const step = ({ document, previous, elapsedMs, interactions = {}, forceCl
   const postSequentialNets = resolveAllNets();
   for (const [key, value] of postSequentialNets) levels.set(key, value);
   settleIdealIfNeeded();
+  // The settling above moved outputs; carry them onto every pin they reach, or an LED behind a gate that
+  // follows a flip-flop would still show the level from before the clock edge until the next tick.
+  const displayNets = resolveAllNets();
+  for (const [key, value] of displayNets) levels.set(key, value);
+
+  // --- Segment displays: sinks that record which segments are lit, holding a multiplexed digit between selects. ---
+  for (const component of document.components) {
+    if (!isDisplayType(component.type)) continue;
+    const state = nextState[component.id] ?? {};
+    const segmentLit = updateSegmentLit({
+      type: component.type,
+      params: component.params,
+      previous: restoreSegmentLit(state.segmentLit, component.type),
+      read: (portId) => displayNets.get(net.find(portKey(component.id, portId))) ?? 'Z',
+    });
+    nextState[component.id] = { ...state, segmentLit };
+  }
+
+  // --- RGB matrices: sinks that record each pixel's color, holding a pixel while its row is not selected. ---
+  for (const component of document.components) {
+    if (!isMatrixType(component.type)) continue;
+    const state = nextState[component.id] ?? {};
+    const pixels = updateMatrixPixels({
+      params: component.params,
+      previous: restoreMatrixPixels(state.matrixPixels, matrixSizeOf(component.params)),
+      read: (portId) => displayNets.get(net.find(portKey(component.id, portId))) ?? 'Z',
+    });
+    nextState[component.id] = { ...state, matrixPixels: pixels };
+  }
 
   const hazards: Hazard[] = [];
   for (const root of oscillatingNets) {
     hazards.push({ type: 'oscillation', netKey: root, message: 'This net could not settle to a stable level within the ideal zero-delay model. Switch to realistic propagation delay to observe it as an oscillator.' });
+  }
+
+  // A RAM whose latest write could not be carried out says so for as long as that is true.
+  for (const component of document.components) {
+    const fault = nextState[component.id]?.memoryFault;
+    if (component.type === 'RAM' && fault !== undefined) {
+      hazards.push({ type: 'memory_write_skipped', netKey: portKey(component.id, 'WE'), message: `${component.label}: ${fault}` });
+    }
   }
 
   const finalLevels: Record<PortKey, LogicLevel> = {};
@@ -394,7 +517,8 @@ export const readLevel = (frame: SimulationFrame, componentId: string, portId: s
  * updates) forward across a document edit instead of resetting the whole
  * circuit, so editing an unrelated component never blanks live switch state.
  */
-export const migrateFrame = (previous: SimulationFrame, document: LogicDocument): SimulationFrame => {
+export const migrateFrame = (previous: SimulationFrame, source: LogicDocument): SimulationFrame => {
+  const document = flattenDocument(source);
   const fresh = createInitialFrame(document);
   const portLevels: Record<PortKey, LogicLevel> = { ...fresh.portLevels };
   for (const key of Object.keys(portLevels)) {
