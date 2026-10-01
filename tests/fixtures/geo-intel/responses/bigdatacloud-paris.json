@@ -1,0 +1,139 @@
+{
+  "latitude": 48.8584,
+  "lookupSource": "coordinates",
+  "longitude": 2.2945,
+  "localityLanguageRequested": "en",
+  "continent": "Europe",
+  "continentCode": "EU",
+  "countryName": "France",
+  "countryCode": "FR",
+  "principalSubdivision": "Ile-de-France",
+  "principalSubdivisionCode": "FR-IDF",
+  "city": "Paris",
+  "locality": "Gros-Caillou",
+  "postcode": "75007",
+  "plusCode": "8FW4V75V+9R",
+  "localityInfo": {
+    "administrative": [
+      {
+        "name": "France",
+        "description": "country with territory in Europe and several overseas regions and territories",
+        "isoName": "France",
+        "order": 3,
+        "adminLevel": 2,
+        "isoCode": "FR",
+        "wikidataId": "Q142",
+        "geonameId": 3017382
+      },
+      {
+        "name": "metropolitan France",
+        "description": "part of France located in Europe",
+        "order": 5,
+        "adminLevel": 3,
+        "wikidataId": "Q212429"
+      },
+      {
+        "name": "Ile-de-France",
+        "description": "administrative region of France",
+        "isoName": "Ile-de-France",
+        "order": 6,
+        "adminLevel": 4,
+        "isoCode": "FR-IDF",
+        "wikidataId": "Q13917",
+        "geonameId": 3012874
+      },
+      {
+        "name": "Paris",
+        "description": "capital city of France",
+        "isoName": "Paris",
+        "order": 9,
+        "adminLevel": 6,
+        "isoCode": "FR-75C",
+        "wikidataId": "Q90",
+        "geonameId": 2968815
+      },
+      {
+        "name": "Paris",
+        "description": "capital city of France",
+        "order": 10,
+        "adminLevel": 6,
+        "wikidataId": "Q90",
+        "geonameId": 2988507
+      },
+      {
+        "name": "arrondissement of Paris",
+        "description": "arrondissement of France in the Île-de-France region",
+        "order": 12,
+        "adminLevel": 7,
+        "wikidataId": "Q2863958"
+      },
+      {
+        "name": "Paris 07 Palais-Bourbon",
+        "description": "municipal arrondissement in Île-de-France, France",
+        "order": 13,
+        "adminLevel": 9,
+        "wikidataId": "Q259463",
+        "geonameId": 2988760
+      },
+      {
+        "name": "Gros-Caillou",
+        "description": "administrative quarter in Paris, France",
+        "order": 15,
+        "adminLevel": 10,
+        "wikidataId": "Q3413275",
+        "geonameId": 12510782
+      }
+    ],
+    "informative": [
+      {
+        "name": "Europe",
+        "description": "terrestrial continent located in north-western Eurasia",
+        "isoName": "Europe",
+        "order": 1,
+        "isoCode": "EU",
+        "wikidataId": "Q46",
+        "geonameId": 6255148
+      },
+      {
+        "name": "North European Plain",
+        "description": "geomorphological region in Europe",
+        "order": 2,
+        "wikidataId": "Q560549"
+      },
+      {
+        "name": "Europe/Paris",
+        "description": "time zone",
+        "order": 4
+      },
+      {
+        "name": "Grand Paris",
+        "description": "an administrative structure for cooperation covering the City of Paris and its nearest surrounding suburbs.",
+        "order": 7,
+        "wikidataId": "Q16665915"
+      },
+      {
+        "name": "Seine",
+        "description": "former French department (1790–1968)",
+        "order": 8,
+        "wikidataId": "Q1142326"
+      },
+      {
+        "name": "Paris Academy",
+        "description": "organization over the schools and universities of Paris, France",
+        "order": 11,
+        "wikidataId": "Q2822323"
+      },
+      {
+        "name": "Paris' 2nd constituency",
+        "description": "constituency of the French Fifth Republic",
+        "order": 14,
+        "wikidataId": "Q3025141"
+      },
+      {
+        "name": "75007",
+        "description": "postal code",
+        "order": 16
+      }
+    ]
+  }
+}
