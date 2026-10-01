@@ -652,6 +652,24 @@
 .tw-modal .row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
 .tw-modal .row button { padding: 0.4rem 0.9rem; border-radius: 8px; border: 1px solid #1f2a44; background: #1f2a44; color: white; font-weight: 600; }
 .tw-modal .row button.subtle { background: white; color: #1f2a44; }
+.tw-modal:focus { outline: none; }
+
+/* Result dialog: stats read as one row, fields pair up, exports sit apart from Discard / Save. */
+.tw-result-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0.5rem 0 0.75rem; }
+.tw-result-summary > div { display: grid; gap: 0.1rem; padding: 0.6rem 0.75rem; background: #f3f6fb; border-radius: 10px; }
+.tw-result-summary strong { font-size: 1.35rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tw-result-summary small { color: #4b5468; }
+.tw-modal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 0.75rem; }
+.tw-modal-fields > div:first-child { grid-column: 1 / -1; }
+.tw-modal label.tw-check { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
+.tw-modal label.tw-check input { width: auto; margin: 0; }
+.tw-export-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #dde3ee; }
+.tw-export-row button { padding: 0.3rem 0.7rem; border-radius: 8px; border: 1px solid #b6bfce; background: white; color: #1f2a44; font-size: 0.85rem; }
+@media (max-width: 480px) {
+  .tw-result-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tw-modal-fields { grid-template-columns: minmax(0, 1fr); }
+  .tw-modal .row button { flex: 1 1 0; }
+}
 
 .tw-ergo-hint {
   display: flex; gap: 0.75rem; align-items: center;

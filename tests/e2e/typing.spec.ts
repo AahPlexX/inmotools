@@ -552,6 +552,38 @@ test('puts Start and the first line of the passage in the first viewport', async
   expect(firstChar!.y + firstChar!.height).toBeLessThanOrEqual(viewportHeight);
 });
 
+test('result dialog keeps stray keystrokes out of its fields and lays out stats, exports and actions', async ({ page }) => {
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+
+  await workspace.getByLabel('Mode').selectOption('custom');
+  await workspace.getByLabel('Duration').selectOption('words');
+  await wordCountSelect(workspace).selectOption('10');
+  await workspace.getByRole('button', { name: 'Paste text' }).click();
+  const customDialog = workspace.getByRole('dialog', { name: 'Paste or edit custom text' });
+  await customDialog.getByRole('textbox', { name: 'Custom text' }).fill('one two three four five six seven eight nine ten');
+  await customDialog.getByRole('button', { name: 'Use this text' }).click();
+
+  await workspace.getByRole('textbox', { name: /Typing test canvas/i }).focus();
+  await page.keyboard.type('one two three four five six seven eight nine ten', { delay: 10 });
+
+  const resultDialog = workspace.getByRole('dialog', { name: 'Test result' });
+  await expect(resultDialog).toBeVisible();
+  // Keystrokes still in flight when the dialog opens must not land in the typist name.
+  await page.keyboard.type('zzz');
+  await expect(resultDialog.locator('.tw-modal')).toBeFocused();
+  await expect(resultDialog.getByLabel('Typist name')).not.toHaveValue(/z/);
+
+  // Stats read as one row on wide screens, exports are grouped apart from Discard / Save.
+  const stats = await resultDialog.locator('.tw-result-summary > div').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  expect(stats).toHaveLength(4);
+  const exportGroup = resultDialog.getByRole('group', { name: 'Export this result' });
+  await expect(exportGroup.getByRole('button', { name: 'Export CSV' })).toBeVisible();
+  await expect(exportGroup.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+  await expect(resultDialog.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+  await expect(resultDialog.getByRole('button', { name: 'Discard' })).toBeVisible();
+});
+
 test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);

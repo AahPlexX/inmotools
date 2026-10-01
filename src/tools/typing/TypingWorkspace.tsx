@@ -1665,22 +1665,34 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCer
 }) {
   const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // Focus the panel, not a field: the typist is usually still mid-keystroke when the test ends,
+  // and focusing an input would swallow those keystrokes into the name.
+  useEffect(() => { panelRef.current?.focus(); }, []);
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
-      <div className="tw-modal">
+      <div className="tw-modal" ref={panelRef} tabIndex={-1}>
         <h3 id="tw-test-result-title">Test result</h3>
-        <div className="tw-summary">
-          <div><strong>{summary.netWpm}</strong><br /><small>Net WPM</small></div>
-          <div><strong>{summary.accuracy}%</strong><br /><small>Accuracy</small></div>
-          <div><strong>{summary.consistency}%</strong><br /><small>Consistency</small></div>
-          <div><strong>{summary.incorrectChars}</strong><br /><small>Errors</small></div>
+        <div className="tw-summary tw-result-summary">
+          <div><strong>{summary.netWpm}</strong><small>Net WPM</small></div>
+          <div><strong>{summary.accuracy}%</strong><small>Accuracy</small></div>
+          <div><strong>{summary.consistency}%</strong><small>Consistency</small></div>
+          <div><strong>{summary.incorrectChars}</strong><small>Errors</small></div>
         </div>
-        <label htmlFor="tw-result-typist">Typist name</label>
-        <input id="tw-result-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
-        <label htmlFor="tw-result-organization">Organization / classroom</label>
-        <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
-        <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
-        <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+        <div className="tw-modal-fields">
+          <div>
+            <label htmlFor="tw-result-typist">Typist name</label>
+            <input id="tw-result-typist" type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-organization">Organization / classroom</label>
+            <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
+            <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+          </div>
+        </div>
         <label htmlFor="tw-result-tag">Tags (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
@@ -1704,15 +1716,17 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCer
         </div>
         <label htmlFor="tw-result-notes">Notes</label>
         <textarea id="tw-result-notes" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
-        <label>
+        <label className="tw-check">
           <input type="checkbox" checked={meta.includeKeystrokes} onChange={(e) => setMeta((m) => ({ ...m, includeKeystrokes: e.target.checked }))} /> Save raw keystroke log
         </label>
-        <div className="row">
-          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
+        <div className="tw-export-row" role="group" aria-label="Export this result">
           <button type="button" className="subtle" onClick={() => void onExport('csv', meta)}>Export CSV</button>
           <button type="button" className="subtle" onClick={() => void onExport('json', meta)}>Export JSON</button>
           <button type="button" className="subtle" onClick={() => void onExport('keystrokes', meta)}>Export keystrokes</button>
           {canCertificate ? <button type="button" className="subtle" onClick={() => void onExport('pdf', meta)}>PDF certificate</button> : null}
+        </div>
+        <div className="row">
+          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
           <button type="button" onClick={() => void onSave(meta, { includeKeystrokes: meta.includeKeystrokes })}>Save</button>
         </div>
       </div>
