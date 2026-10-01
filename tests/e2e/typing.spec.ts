@@ -600,6 +600,20 @@ test('history and analytics explain themselves before any test is saved', async 
   await expect(zone).toContainText('Other typists are not affected');
 });
 
+test('every theme keeps text at WCAG AA contrast', async ({ page }) => {
+  test.setTimeout(90_000);
+  await clearTypingDatabase(page);
+  const workspace = await openWorkspace(page);
+  await expect(workspace.getByLabel('Theme').locator('option').first()).toBeAttached();
+  const themes = await workspace.getByLabel('Theme').locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+  expect(themes.length).toBeGreaterThanOrEqual(10);
+  for (const theme of themes) {
+    await workspace.getByLabel('Theme').selectOption(theme);
+    const results = await new AxeBuilder({ page }).include('.tw-root').withRules(['color-contrast']).analyze();
+    expect(results.violations.map((v) => `${theme}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 5).join(', ')}`), `contrast in ${theme}`).toEqual([]);
+  }
+});
+
 test('shows a bounded 3-line passage window that follows the typist', async ({ page }) => {
   await clearTypingDatabase(page);
   const workspace = await openWorkspace(page);
