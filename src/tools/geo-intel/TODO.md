@@ -442,3 +442,16 @@ Method: static scan of `src/tools/geo-intel/**` (typing escapes, TODO/console le
 - `tests/unit/geo-intel-audit2.test.ts` (7 tests): Fiji-style straddling polygon inside/outside, seam path splitting, scale-bar choices, sun-curve peak vs the SunriseSunset.io fixture altitude (50.76°), working-hours detection, label copy.
 - `tests/e2e/geo-intel.spec.ts` +2 tests: profile filter, row menu items, sun chart, shortcuts dialog, scale bar; meeting planner.
 - `tsc` exit 0; `pnpm test:unit` 271 files / 3,096 tests passed (2 files / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app specs 125 passed / 11 skipped / 0 failed.
+
+## Delivery 17 — 2026-10-01 (after the repository cleanup)
+- Verified the cleanup kept this tool intact: Production audit 2 (`fa27aad0`) is an ancestor of `origin/main` @ `b878e995`; catalog entry, loader, `.tasks` records (TASK-025, between glTF 024 and Typing 026) all present; `nextId` 27.
+- Adopted the new optional `workspaceFirst` catalog flag (added in PR #97 / `ToolLayout`): the short title, then the workspace, then the "How to use" guide. Before, the map started below one full screen of intro at every width. Wiring test now asserts the flag.
+- Evidence on `b878e995` + this change: `tsc` exit 0; `pnpm test:unit` 273 files / 3,105 tests passed (2 / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app specs 125 passed / 11 skipped / 0 failed (after reinstalling the Playwright 1.63 browser, which the environment reset had removed); screenshots at 375 and 1440 px show the search box and map in the first viewport.
+
+## Completion record — 2026-10-01
+G12's note above was written while PR #89 was open; it has since been merged (`c255111`), the PR closed and `feature/geo-intelligence-hub` deleted. The tool now lives only on `origin/main`.
+
+- Verified on `origin/main` @ `80f74932` (latest; its only change since `94e112f2` is a `@gltf-transform` bump, which this tool does not import): `pnpm install --frozen-lockfile` clean; `tsc` exit 0; `pnpm test:unit` 273 files / 3,105 tests passed (2 / 14 skipped, pre-existing); `pnpm build` exit 0; geo-intel + accessibility + app browser specs 125 passed / 11 skipped / 0 failed.
+- CI on `94e112f2` (this tool's last change): Validate and deploy Pages, Focused tool validation and Sightline Velocity validation all succeeded; Pages deployed. The live route opens workspace-first, and a real lookup returns Paris, France.
+- Tracker state: G0–G12 checked; no TODO/FIXME or placeholder code under `src/tools/geo-intel/`; TASK-025 recorded in `.tasks/DONE.md` and `.tasks/WORK_LOG.md`; not listed in IN_PROGRESS, NEXT or BACKLOG.
+- Open by design (not defects): the limitations listed under "Known limitations" and each audit's "Evaluated and not done" section.
