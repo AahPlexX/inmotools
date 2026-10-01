@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/fira-code/400.css';
 import '@fontsource/roboto-mono/400.css';
@@ -23,6 +23,7 @@ import {
   perKeyStats,
   pressKey,
   round,
+  start as startEngine,
   weakKeys,
   wpmSeries,
   type EngineState,
@@ -42,17 +43,22 @@ import {
   type Quote,
 } from './typing-corpora';
 import {
-  clearAllTests,
+  clearTestsForTypist,
+  createTypist,
   dailyActivity,
   deleteTest,
+  ensureDefaultTypist,
   filterStoredTests,
   findPersonalBest,
   listTests,
+  listTypists,
   readPreference,
   rollingWpm,
   saveTest,
   writePreference,
+  DEFAULT_TYPIST_ID,
   type StoredTest,
+  type StoredTypist,
 } from './typing-storage';
 import {
   certificatePdf,
@@ -67,27 +73,50 @@ import {
   type ExportMetadata,
 } from './typing-export';
 import { classifyKeystrokeSound, createAudioController, type SwitchProfile, type AudioController } from './typing-audio';
+import { PASSAGE_WINDOW_LINES, passageWindowStartLine } from './typing-window';
 import { buildTargetText, buildZenChunk, normalizeDurationValue, type DurationMode } from './typing-target';
+import {
+  createSessionClock,
+  effectiveSessionNow,
+  finishSession,
+  isSessionActive,
+  pauseSession,
+  resetSession,
+  resumeSession,
+  startSession,
+} from './typing-session';
 
 // -------------------- reducer wiring --------------------
 
 interface EngineAction {
-  type: 'press' | 'reset' | 'finish' | 'restart' | 'extend';
+  type: 'press' | 'commitText' | 'reset' | 'finish' | 'restart' | 'extend' | 'start';
   key?: string;
   text?: string;
   code?: string;
   t?: number;
   initial?: EngineState;
-  reason?: 'aborted' | 'completed' | 'failed';
+  reason?: 'aborted' | 'completed' | 'failed' | 'stopped';
 }
 
 function reducer(state: EngineState, action: EngineAction): EngineState {
   switch (action.type) {
     case 'press':
       return pressKey(state, action.key ?? '', action.code ?? '', action.t ?? performance.now());
+    case 'commitText': {
+      const timestamp = action.t ?? performance.now();
+      const code = action.code ?? 'Input';
+      let next = state;
+      for (const character of (action.text ?? '').replace(/\r\n?/g, '\n')) {
+        if (next.finished) break;
+        next = pressKey(next, character === '\n' ? 'Enter' : character, code, timestamp);
+      }
+      return next;
+    }
     case 'reset':
     case 'restart':
       return action.initial ?? state;
+    case 'start':
+      return startEngine(state, action.t ?? performance.now());
     case 'finish':
       return finish(state, action.reason ?? 'aborted', action.t ?? performance.now());
     case 'extend':
@@ -300,12 +329,16 @@ export default function TypingWorkspace() {
     allowExtraChars: DEFAULT_CONFIG.allowExtras,
     caseSensitive: DEFAULT_CONFIG.caseSensitive,
   }));
-  const [running, setRunning] = useState(false);
+  const [sessionClock, setSessionClock] = useState(createSessionClock);
   const [now, setNow] = useState<number>(performance.now());
   const [history, setHistory] = useState<StoredTest[]>([]);
+  const [typists, setTypists] = useState<StoredTypist[]>([]);
+  const [activeTypistId, setActiveTypistId] = useState(DEFAULT_TYPIST_ID);
+  const [addTypistModalOpen, setAddTypistModalOpen] = useState(false);
   const [filterTagText, setFilterTagText] = useState('');
   const filterTags = useMemo(() => filterTagText.split(',').map((tag) => tag.trim()).filter(Boolean), [filterTagText]);
-  const visibleHistory = useMemo(() => filterStoredTests(history, filterTags.length > 0 ? { tags: filterTags } : {}), [history, filterTags]);
+  const profileHistory = useMemo(() => filterStoredTests(history, { typistId: activeTypistId }), [history, activeTypistId]);
+  const visibleHistory = useMemo(() => filterStoredTests(profileHistory, filterTags.length > 0 ? { tags: filterTags } : {}), [profileHistory, filterTags]);
   const [personalBest, setPersonalBest] = useState<StoredTest | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -316,13 +349,44 @@ export default function TypingWorkspace() {
   const [pauseUntilFocus, setPauseUntilFocus] = useState(false);
 
   const audioRef = useRef<AudioController | null>(null);
-  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLTextAreaElement | null>(null);
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const [windowOffsetPx, setWindowOffsetPx] = useState(0);
+  const [canvasFocused, setCanvasFocused] = useState(false);
+  const compositionActiveRef = useRef(false);
+  const compositionCommitRef = useRef<string | null>(null);
+  const pendingPhysicalInputRef = useRef<{ code: string; t: number } | null>(null);
   const wpmChartRef = useRef<HTMLCanvasElement | null>(null);
   const historyChartRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
   const histChartRef = useRef<Chart | null>(null);
   const milestoneRef = useRef<Set<number>>(new Set());
   const zenChunkRef = useRef(0);
+
+  const running = sessionClock.status === 'running';
+  const paused = sessionClock.status === 'paused';
+  const sessionActive = isSessionActive(sessionClock);
+
+  // Keep the line being typed on the middle row of the 3-line passage window.
+  useLayoutEffect(() => {
+    const text = textRef.current;
+    if (!text) return;
+    const place = () => {
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      if (!lineHeight) return;
+      const marker = text.querySelector<HTMLElement>('.tw-caret') ?? (text.lastElementChild as HTMLElement | null);
+      const activeLine = marker ? Math.floor((marker.offsetTop + marker.offsetHeight / 2) / lineHeight) : 0;
+      const totalLines = Math.round(text.scrollHeight / lineHeight);
+      setWindowOffsetPx(passageWindowStartLine(activeLine, totalLines) * lineHeight);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(text);
+    return () => observer.disconnect();
+  }, [engine.cursor, engine.targetText, engine.finished, config.fontSize, config.font]);
+  const sessionNow = effectiveSessionNow(sessionClock, now);
+  const activeTypist = typists.find((profile) => profile.id === activeTypistId)
+    ?? { id: DEFAULT_TYPIST_ID, name: 'Local typist', createdAt: 0, updatedAt: 0 };
 
   const totalDurationMs = useMemo(() => {
     if (config.durationMode === 'time') return config.durationValue * 1000;
@@ -346,6 +410,12 @@ export default function TypingWorkspace() {
             caseSensitive: restored.caseSensitive,
           }) });
         }
+        const defaultTypist = await ensureDefaultTypist();
+        const profiles = await listTypists();
+        const savedTypistId = await readPreference<string>('activeTypistId', defaultTypist.id);
+        const resolvedTypistId = profiles.some((profile) => profile.id === savedTypistId) ? savedTypistId : defaultTypist.id;
+        setTypists(profiles);
+        setActiveTypistId(resolvedTypistId);
         const rows = await listTests();
         setHistory(rows);
       } catch { /* IndexedDB unavailable, keep defaults */ }
@@ -364,17 +434,24 @@ export default function TypingWorkspace() {
     void writePreference('config', normalizeSavedConfig(config)).catch(() => undefined);
   }, [config, configHydrated]);
 
-  // Rebuild the audio profile when it changes.
+  useEffect(() => {
+    if (!configHydrated) return;
+    void writePreference('activeTypistId', activeTypistId).catch(() => undefined);
+  }, [activeTypistId, configHydrated]);
+
+  // Rebuild the audio profile when it changes. The metronome follows the
+  // scored session lifecycle so Ready/Paused/Finished never sound "active".
   useEffect(() => {
     audioRef.current?.setSwitch(config.audioProfile);
     audioRef.current?.setVolume(config.audioVolume);
-    if (config.metronomeOn) audioRef.current?.startMetronome(config.metronomeBpm);
+    if (config.metronomeOn && running) audioRef.current?.startMetronome(config.metronomeBpm);
     else audioRef.current?.stopMetronome();
-  }, [config.audioProfile, config.audioVolume, config.metronomeOn, config.metronomeBpm]);
+  }, [config.audioProfile, config.audioVolume, config.metronomeOn, config.metronomeBpm, running]);
 
   const personalBestQuery = useMemo(() => {
     const dur = classifyDuration(config);
     return {
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -382,7 +459,7 @@ export default function TypingWorkspace() {
       layout: config.layout,
       quoteLength: config.durationMode === 'quote' ? config.quoteLength : undefined,
     };
-  }, [config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
+  }, [activeTypistId, config.mode, config.durationMode, config.durationValue, config.language, config.layout, config.quoteLength]);
 
   // Refresh the personal-best pacer when its comparison family changes.
   useEffect(() => {
@@ -405,19 +482,19 @@ export default function TypingWorkspace() {
   useEffect(() => {
     if (!running || totalDurationMs === 0) return;
     if (engine.startedAt == null) return;
-    const elapsed = now - engine.startedAt;
+    const elapsed = sessionNow - engine.startedAt;
     if (elapsed >= totalDurationMs) {
       dispatch({ type: 'finish', reason: 'completed', t: engine.startedAt + totalDurationMs });
     }
-  }, [running, now, engine.startedAt, totalDurationMs]);
+  }, [running, sessionNow, engine.startedAt, totalDurationMs]);
 
   // Finite non-timed modes finish as soon as the target is cleanly completed.
   useEffect(() => {
     if (!running || engine.finished || totalDurationMs !== 0 || config.durationMode === 'zen') return;
     if (!isTargetCompleted(engine)) return;
     const lastEvent = engine.events[engine.events.length - 1];
-    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? performance.now() });
-  }, [running, engine, totalDurationMs, config.durationMode]);
+    dispatch({ type: 'finish', reason: 'completed', t: lastEvent?.t ?? sessionNow });
+  }, [running, engine, totalDurationMs, config.durationMode, sessionNow]);
 
   // Zen mode replenishes the active target before the typist reaches its end.
   useEffect(() => {
@@ -434,7 +511,7 @@ export default function TypingWorkspace() {
   useEffect(() => {
     if (!running || engine.finished || config.audioProfile === 'off') return;
     const progress = totalDurationMs > 0 && engine.startedAt != null
-      ? Math.min(1, Math.max(0, (now - engine.startedAt) / totalDurationMs))
+      ? Math.min(1, Math.max(0, (sessionNow - engine.startedAt) / totalDurationMs))
       : Math.min(1, engine.cursor / Math.max(1, engine.targetText.length));
     for (const threshold of [0.25, 0.5, 0.75]) {
       if (progress >= threshold && !milestoneRef.current.has(threshold)) {
@@ -443,25 +520,27 @@ export default function TypingWorkspace() {
         break;
       }
     }
-  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, now, totalDurationMs, config.audioProfile]);
+  }, [running, engine.finished, engine.startedAt, engine.cursor, engine.targetText.length, sessionNow, totalDurationMs, config.audioProfile]);
 
   // Watch for engine.finished transition.
   useEffect(() => {
-    if (engine.finished && running) {
-      setRunning(false);
-      const metrics = computeMetrics(engine);
-      if (config.audioProfile !== 'off') {
-        if (engine.finishReason === 'failed') audioRef.current?.playFail();
-        else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
-      }
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-      if (!reducedMotion && metrics.netWpm > 0 && engine.finishReason === 'completed') {
-        confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
-      }
-      setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${metrics.netWpm} WPM, ${metrics.accuracy}% accuracy.`);
-      setSaveModalOpen(true);
+    if (!engine.finished) return;
+    if (sessionClock.status === 'running' || sessionClock.status === 'paused') {
+      setSessionClock((clock) => finishSession(clock, engine.finishReason ?? 'aborted', performance.now()));
     }
-  }, [engine.finished, engine.finishReason, running, config.audioProfile]);
+    if (engine.finishReason === 'aborted') return;
+    const finalMetrics = computeMetrics(engine, sessionNow);
+    if (config.audioProfile !== 'off') {
+      if (engine.finishReason === 'failed') audioRef.current?.playFail();
+      else if (engine.finishReason === 'completed') audioRef.current?.playCompletion();
+    }
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (!reducedMotion && finalMetrics.netWpm > 0 && engine.finishReason === 'completed') {
+      confetti({ particleCount: 90, spread: 78, origin: { y: 0.4 } });
+    }
+    setStatusText(`Test ${engine.finishReason ?? 'ended'}: ${finalMetrics.netWpm} WPM, ${finalMetrics.accuracy}% accuracy.`);
+    setSaveModalOpen(true);
+  }, [engine.finished, engine.finishReason]);
 
   // Live WPM chart: create once, then update data in place on each sample tick.
   useEffect(() => {
@@ -490,7 +569,7 @@ export default function TypingWorkspace() {
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    const samples = wpmSeries(engine, now);
+    const samples = wpmSeries(engine, sessionNow);
     const ghost = config.ghostEnabled && personalBest?.keystrokes ? ghostSeries(personalBest.keystrokes) : [];
     const datasets: Chart['data']['datasets'] = [
       { label: 'WPM', data: samples.map((s) => s.wpm), borderColor: '#2a3d63', backgroundColor: 'rgba(42,61,99,0.15)', tension: 0.25, fill: true, pointRadius: 0 },
@@ -509,7 +588,7 @@ export default function TypingWorkspace() {
     chart.data.labels = samples.map((s) => `${s.seconds}s`);
     chart.data.datasets = datasets;
     chart.update('none');
-  }, [engine, now, personalBest, config.ghostEnabled, config.pacerEnabled, config.pacerWpm]);
+  }, [engine, sessionNow, personalBest, config.ghostEnabled, config.pacerEnabled, config.pacerWpm]);
 
   // Historical trend chart.
   useEffect(() => {
@@ -555,7 +634,7 @@ export default function TypingWorkspace() {
     };
   }, [visibleHistory]);
 
-  const metrics = useMemo(() => computeMetrics(engine, now), [engine, now]);
+  const metrics = useMemo(() => computeMetrics(engine, sessionNow), [engine, sessionNow]);
   const layoutDef = useMemo(() => findLayout(config.layout), [config.layout]);
   const homeAnchors = useMemo(() => homeRowAnchors(layoutDef), [layoutDef]);
   const keyStats = useMemo(() => perKeyStats(engine.events), [engine.events]);
@@ -564,6 +643,10 @@ export default function TypingWorkspace() {
   const weak = useMemo(() => weakKeys(engine.events, 6), [engine.events]);
 
   const rebuildTarget = useCallback((patchCfg?: Partial<Config>) => {
+    if (isSessionActive(sessionClock)) {
+      setStatusText('Stop or reset the current test before loading new text.');
+      return;
+    }
     const cfg = { ...config, ...(patchCfg ?? {}) };
     const nextSeed = Math.floor(Math.random() * 2147483647);
     const nextText = buildTargetText(cfg, nextSeed);
@@ -574,13 +657,18 @@ export default function TypingWorkspace() {
       allowExtraChars: cfg.allowExtras,
       caseSensitive: cfg.caseSensitive,
     }) });
-    setRunning(false);
+    setSessionClock(resetSession());
+    setNow(performance.now());
     milestoneRef.current.clear();
     zenChunkRef.current = 0;
     setStatusText('New text ready.');
-  }, [config]);
+  }, [config, sessionClock]);
 
   const applyConfig = useCallback((patch: Partial<Config>) => {
+    if (isSessionActive(sessionClock)) {
+      setStatusText('Stop or reset the current test before changing test settings.');
+      return;
+    }
     const normalized: Partial<Config> = { ...patch };
     if (patch.durationMode !== undefined) {
       normalized.durationValue = normalizeDurationValue(patch.durationMode, patch.durationValue ?? config.durationValue);
@@ -609,50 +697,252 @@ export default function TypingWorkspace() {
         caseSensitive: (normalized.caseSensitive ?? config.caseSensitive),
       }) });
     }
-  }, [config, rebuildTarget, target]);
+  }, [config, rebuildTarget, target, sessionClock]);
 
-  // Global key handler on the canvas.
-  const handleKey = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (running) dispatch({ type: 'finish', reason: 'aborted' });
-      setRunning(false);
+  const commitTextInput = useCallback((text: string, code = 'Input', t = performance.now()) => {
+    if (engine.finished || paused) return;
+    const normalized = text.replace(/\r\n?/g, '\n');
+    if (!normalized) return;
+    const effectiveT = effectiveSessionNow(sessionClock, t);
+    let preview = engine;
+    for (const character of normalized) {
+      if (preview.finished) break;
+      const key = character === '\n' ? 'Enter' : character;
+      const sound = classifyKeystrokeSound(key, preview.targetText[preview.cursor], config.caseSensitive);
+      const next = pressKey(preview, key, code, effectiveT);
+      if (next !== preview && config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
+      preview = next;
+    }
+
+    if (!running && !paused && engine.startedAt == null && preview.startedAt != null) {
+      setSessionClock((clock) => startSession(clock));
+      setStatusText('Test started.');
+    }
+    dispatch({ type: 'commitText', text: normalized, code, t: effectiveT });
+  }, [engine, running, paused, sessionClock, config.audioProfile, config.caseSensitive]);
+
+  const handleTextInput = useCallback((event: React.FormEvent<HTMLTextAreaElement>) => {
+    const nativeEvent = event.nativeEvent as InputEvent;
+    if (compositionActiveRef.current || nativeEvent.isComposing) return;
+
+    const committedComposition = compositionCommitRef.current;
+    if (
+      committedComposition !== null
+      && nativeEvent.inputType === 'insertCompositionText'
+      && nativeEvent.data === committedComposition
+    ) {
+      compositionCommitRef.current = null;
+      pendingPhysicalInputRef.current = null;
+      event.currentTarget.value = '';
+      return;
+    }
+    compositionCommitRef.current = null;
+
+    if (nativeEvent.inputType === 'deleteContentBackward') {
+      pendingPhysicalInputRef.current = null;
+      event.currentTarget.value = '';
+      if (!engine.finished && !paused) {
+        const t = effectiveSessionNow(sessionClock, performance.now());
+        dispatch({ type: 'press', key: 'Backspace', code: 'Backspace', t });
+        if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
+      }
+      return;
+    }
+
+    if (nativeEvent.inputType.startsWith('delete')) {
+      pendingPhysicalInputRef.current = null;
+      event.currentTarget.value = '';
+      return;
+    }
+
+    if (nativeEvent.inputType === 'insertFromPaste' || nativeEvent.inputType === 'insertFromDrop') {
+      pendingPhysicalInputRef.current = null;
+      event.currentTarget.value = '';
+      setStatusText('Paste and drop input are disabled during a typing test.');
+      return;
+    }
+
+    const stagedPhysicalInput = pendingPhysicalInputRef.current;
+    pendingPhysicalInputRef.current = null;
+    const text = nativeEvent.data ?? event.currentTarget.value;
+    event.currentTarget.value = '';
+    commitTextInput(text, stagedPhysicalInput?.code ?? 'Input', stagedPhysicalInput?.t ?? performance.now());
+  }, [commitTextInput, engine.finished, paused, sessionClock, config.audioProfile]);
+
+  const handleCompositionEnd = useCallback((event: React.CompositionEvent<HTMLTextAreaElement>) => {
+    compositionActiveRef.current = false;
+    event.currentTarget.value = '';
+    if (!event.data) return;
+    compositionCommitRef.current = event.data;
+    commitTextInput(event.data, 'IME');
+  }, [commitTextInput]);
+
+  // Keyboard events remain for physical control keys. Text itself is committed
+  // through input/composition events so touch keyboards and IMEs use the same engine.
+  const handleKey = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || compositionActiveRef.current) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (sessionActive && !engine.finished) {
+        const realNow = performance.now();
+        const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+        dispatch({ type: 'finish', reason: 'aborted', t: effectiveNow });
+        setSessionClock((clock) => finishSession(clock, 'aborted', realNow));
+        setNow(realNow);
+      }
       setStatusText('Test aborted.');
       return;
     }
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      rebuildTarget();
+
+    if (event.key === 'F2') {
+      event.preventDefault();
+      if (sessionActive) {
+        setStatusText('Stop or reset the current test before loading new text.');
+      } else {
+        rebuildTarget();
+      }
       return;
     }
-    if (engine.finished) return;
-    const t = performance.now();
-    const commitsExpectedCharacter = e.key.length === 1 || (e.key === 'Enter' && engine.targetText[engine.cursor] === '\n');
-    if (!running && commitsExpectedCharacter) {
-      setRunning(true);
-      setStatusText('Test started.');
+
+    if (event.key === 'Backspace' && !engine.finished && !paused) {
+      event.preventDefault();
+      pendingPhysicalInputRef.current = null;
+      const t = effectiveSessionNow(sessionClock, performance.now());
+      dispatch({ type: 'press', key: 'Backspace', code: event.code || 'Backspace', t });
+      if (config.audioProfile !== 'off') audioRef.current?.playKeystroke('backspace');
+      return;
     }
-    e.preventDefault();
-    const sound = classifyKeystrokeSound(e.key, engine.targetText[engine.cursor], config.caseSensitive);
-    dispatch({ type: 'press', key: e.key, code: e.code, t });
-    if (config.audioProfile !== 'off' && sound) audioRef.current?.playKeystroke(sound);
-  }, [engine.finished, engine.targetText, engine.cursor, rebuildTarget, running, config.audioProfile, config.caseSensitive]);
+
+    if (
+      !engine.finished
+      && !paused
+      && (event.key.length === 1 || event.key === 'Enter')
+      && event.code
+      && event.code !== 'Unidentified'
+    ) {
+      pendingPhysicalInputRef.current = { code: event.code, t: performance.now() };
+    }
+  }, [engine.finished, rebuildTarget, sessionActive, sessionClock, paused, config.audioProfile]);
+
+  const startTest = useCallback(() => {
+    if (sessionClock.status !== 'ready' || engine.finished) return;
+    const realNow = performance.now();
+    const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+    dispatch({ type: 'start', t: effectiveNow });
+    setSessionClock((clock) => startSession(clock));
+    setNow(realNow);
+    setStatusText('Test started.');
+    canvasRef.current?.focus({ preventScroll: true });
+  }, [sessionClock, engine.finished]);
+
+  const pauseTest = useCallback(() => {
+    if (!running) return;
+    const realNow = performance.now();
+    setNow(realNow);
+    setSessionClock((clock) => pauseSession(clock, realNow));
+    setStatusText('Test paused.');
+  }, [running]);
+
+  const resumeTest = useCallback(() => {
+    if (!paused) return;
+    const realNow = performance.now();
+    setNow(realNow);
+    setSessionClock((clock) => resumeSession(clock, realNow));
+    setStatusText('Test resumed.');
+    canvasRef.current?.focus({ preventScroll: true });
+  }, [paused, config.metronomeOn, config.metronomeBpm]);
+
+  const stopTest = useCallback(() => {
+    if (!sessionActive || engine.finished) return;
+    const realNow = performance.now();
+    const effectiveNow = effectiveSessionNow(sessionClock, realNow);
+    setNow(realNow);
+    dispatch({ type: 'finish', reason: 'stopped', t: effectiveNow });
+    setSessionClock((clock) => finishSession(clock, 'stopped', realNow));
+  }, [sessionActive, sessionClock, engine.finished]);
+
+  const resetAttempt = useCallback(() => {
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    milestoneRef.current.clear();
+    pendingPhysicalInputRef.current = null;
+    compositionCommitRef.current = null;
+    setSaveModalOpen(false);
+    setStatusText('Attempt reset. Same text is ready.');
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [target, config.errorMode, config.allowExtras, config.caseSensitive]);
 
   const restart = useCallback(() => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before loading new text.');
+      return;
+    }
     rebuildTarget();
-  }, [rebuildTarget]);
+    canvasRef.current?.focus({ preventScroll: true });
+  }, [rebuildTarget, sessionActive]);
 
   const abort = useCallback(() => {
-    if (running && !engine.finished) dispatch({ type: 'finish', reason: 'aborted' });
-    setRunning(false);
-  }, [running, engine.finished]);
+    if (!sessionActive || engine.finished) return;
+    const realNow = performance.now();
+    dispatch({ type: 'finish', reason: 'aborted', t: effectiveSessionNow(sessionClock, realNow) });
+    setSessionClock((clock) => finishSession(clock, 'aborted', realNow));
+    setNow(realNow);
+    setStatusText('Test aborted.');
+  }, [sessionActive, sessionClock, engine.finished]);
+
+  const selectTypist = useCallback((nextId: string) => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before switching typists.');
+      return;
+    }
+    const profile = typists.find((candidate) => candidate.id === nextId);
+    if (!profile) return;
+    setActiveTypistId(profile.id);
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    setPersonalBest(null);
+    setStatusText(`Switched to ${profile.name}.`);
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [sessionActive, typists, target, config.errorMode, config.allowExtras, config.caseSensitive]);
+
+  const addTypist = useCallback(async (name: string) => {
+    if (sessionActive) throw new Error('Stop or reset the current test before adding a typist.');
+    const profile = await createTypist(name);
+    const profiles = await listTypists();
+    setTypists(profiles);
+    setActiveTypistId(profile.id);
+    await writePreference('activeTypistId', profile.id);
+    dispatch({ type: 'reset', initial: initState(target, {
+      errorMode: config.errorMode,
+      allowExtraChars: config.allowExtras,
+      caseSensitive: config.caseSensitive,
+    }) });
+    setSessionClock(resetSession());
+    setNow(performance.now());
+    setPersonalBest(null);
+    setAddTypistModalOpen(false);
+    setStatusText(`Added ${profile.name} and made it active.`);
+    window.requestAnimationFrame(() => canvasRef.current?.focus({ preventScroll: true }));
+  }, [sessionActive, target, config.errorMode, config.allowExtras, config.caseSensitive]);
 
   // Save flow — invoked from the finish modal.
   const handleSave = useCallback(async (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => {
     const dur = classifyDuration(config);
     const stored: StoredTest = {
       savedAt: Date.now(),
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -680,12 +970,13 @@ export default function TypingWorkspace() {
     setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
     setSaveModalOpen(false);
     setStatusText('Test saved to local history.');
-  }, [config, engine, metrics, target, personalBestQuery]);
+  }, [activeTypistId, config, engine, metrics, target, personalBestQuery]);
 
   const handleExportSingle = useCallback(async (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => {
     const dur = classifyDuration(config);
     const currentTest: StoredTest = {
       savedAt: Date.now(),
+      typistId: activeTypistId,
       mode: config.mode,
       durationMode: dur.mode,
       durationValue: dur.value,
@@ -713,7 +1004,7 @@ export default function TypingWorkspace() {
     if (format === 'pdf') downloadBlob(certificatePdf(currentTest, meta), suggestFilename('pdf', 'test'));
     if (format === 'keystrokes') downloadText(keystrokesToCsv(currentTest.keystrokes ?? []), suggestFilename('csv', 'test').replace('.csv', '-keystrokes.csv'), 'text/csv;charset=utf-8');
     setStatusText(`Exported ${format === 'keystrokes' ? 'keystroke CSV' : format.toUpperCase()} for this test.`);
-  }, [config, engine, metrics, target]);
+  }, [activeTypistId, config, engine, metrics, target]);
 
   const handleExportHistory = useCallback(async (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => {
     const stamp = suggestFilename(format === 'md' ? 'md' : (format as 'csv' | 'json'), 'history');
@@ -725,11 +1016,15 @@ export default function TypingWorkspace() {
 
   // Import handlers.
   const importJson = useCallback(async (file: File) => {
+    if (sessionActive) {
+      setStatusText('Stop or reset the current test before importing score history.');
+      return;
+    }
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
       const { tests, skipped } = parseImportedTests(parsed);
-      for (const record of tests) await saveTest(record);
+      for (const record of tests) await saveTest({ ...record, id: undefined, typistId: activeTypistId });
       setHistory(await listTests());
       setPersonalBest(await findPersonalBest(personalBestQuery) ?? null);
       const skippedText = skipped > 0 ? ` Skipped ${skipped} invalid record${skipped === 1 ? '' : 's'}.` : '';
@@ -737,7 +1032,7 @@ export default function TypingWorkspace() {
     } catch (err) {
       setStatusText(`Import failed: ${(err as Error).message}`);
     }
-  }, [personalBestQuery]);
+  }, [activeTypistId, personalBestQuery, sessionActive]);
 
   const importCsvDictionary = useCallback(async (file: File) => {
     try {
@@ -775,7 +1070,7 @@ export default function TypingWorkspace() {
   // Rolling averages and activity reflect the same visible tag-filtered history used for exports.
   const rolling = useMemo(() => rollingWpm(visibleHistory), [visibleHistory]);
   const daily = useMemo(() => dailyActivity(visibleHistory).slice(-30), [visibleHistory]);
-  const durationRemainingMs = totalDurationMs && engine.startedAt != null ? Math.max(0, totalDurationMs - (now - engine.startedAt)) : totalDurationMs;
+  const durationRemainingMs = totalDurationMs && engine.startedAt != null ? Math.max(0, totalDurationMs - (sessionNow - engine.startedAt)) : totalDurationMs;
 
   // Blur-until-focus effect handler.
   useEffect(() => {
@@ -788,11 +1083,41 @@ export default function TypingWorkspace() {
       style={{ ['--tw-font-size' as string]: `${config.fontSize}px` }}>
       <div className="tw-visually-hidden" aria-live="polite" role="status">{config.ariaLive ? statusText : ''}</div>
 
+      <section className="tw-session-bar" aria-label="Typing session">
+        <div className="tw-profile-picker">
+          <label htmlFor="tw-active-typist">Active typist</label>
+          <select
+            id="tw-active-typist"
+            aria-label="Active typist"
+            value={activeTypistId}
+            disabled={sessionActive}
+            onChange={(event) => selectTypist(event.target.value)}
+          >
+            {typists.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+          <button type="button" className="subtle" disabled={sessionActive} onClick={() => setAddTypistModalOpen(true)}>Add typist</button>
+        </div>
+        <div className="tw-session-state" aria-label="Session status">
+          <span className={`tw-state-badge state-${sessionClock.status}`}>{sessionClock.status[0]!.toUpperCase() + sessionClock.status.slice(1)}</span>
+          <small>{activeTypist.name}</small>
+        </div>
+        <div className="tw-session-controls" aria-label="Session controls">
+          {paused ? (
+            <button type="button" onClick={resumeTest}>Resume</button>
+          ) : (
+            <button type="button" onClick={startTest} disabled={sessionClock.status !== 'ready' || engine.finished}>Start</button>
+          )}
+          <button type="button" className="subtle" onClick={pauseTest} disabled={!running}>Pause</button>
+          <button type="button" className="subtle" title="End and keep this partial result" onClick={stopTest} disabled={!sessionActive}>Stop</button>
+          <button type="button" className="subtle" onClick={resetAttempt}>Reset attempt</button>
+        </div>
+      </section>
+
       {/* Configuration toolbar */}
       <div className="tw-toolbar" role="region" aria-label="Test configuration">
         <label>
           Mode
-          <select value={config.mode} onChange={(e) => applyConfig({ mode: e.target.value as CorpusMode })}>
+          <select disabled={sessionActive} value={config.mode} onChange={(e) => applyConfig({ mode: e.target.value as CorpusMode })}>
             <option value="words-200">Top 200 words</option>
             <option value="words-1000">Top 1,000 words</option>
             <option value="words-5000">Top 5,000 words</option>
@@ -809,7 +1134,7 @@ export default function TypingWorkspace() {
         </label>
         <label>
           Duration
-          <select value={config.durationMode} onChange={(e) => applyConfig({ durationMode: e.target.value as DurationMode })}>
+          <select disabled={sessionActive} value={config.durationMode} onChange={(e) => applyConfig({ durationMode: e.target.value as DurationMode })}>
             <option value="time">Time</option>
             <option value="words">Words</option>
             <option value="quote">Quote</option>
@@ -820,7 +1145,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'time' && (
           <label>
             Seconds
-            <select value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
               <option value={15}>15s</option>
               <option value={30}>30s</option>
               <option value={60}>60s</option>
@@ -831,7 +1156,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'words' && (
           <label>
             Words
-            <select value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.durationValue} onChange={(e) => applyConfig({ durationValue: Number(e.target.value) })}>
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -843,7 +1168,7 @@ export default function TypingWorkspace() {
         {config.durationMode === 'quote' && (
           <label>
             Length
-            <select value={config.quoteLength} onChange={(e) => applyConfig({ quoteLength: e.target.value as Quote['length'] })}>
+            <select disabled={sessionActive} value={config.quoteLength} onChange={(e) => applyConfig({ quoteLength: e.target.value as Quote['length'] })}>
               <option value="short">Short</option>
               <option value="medium">Medium</option>
               <option value="long">Long</option>
@@ -853,19 +1178,19 @@ export default function TypingWorkspace() {
         )}
         <label>
           Language
-          <select value={config.language} onChange={(e) => applyConfig({ language: e.target.value as Language })}>
+          <select disabled={sessionActive} value={config.language} onChange={(e) => applyConfig({ language: e.target.value as Language })}>
             {Object.keys(LANGUAGE_POOLS).map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </label>
         <label>
           Layout
-          <select value={config.layout} onChange={(e) => applyConfig({ layout: e.target.value as LayoutId })}>
+          <select disabled={sessionActive} value={config.layout} onChange={(e) => applyConfig({ layout: e.target.value as LayoutId })}>
             {LAYOUTS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </label>
         <label>
           Errors
-          <select value={config.errorMode} onChange={(e) => applyConfig({ errorMode: e.target.value as ErrorMode })}>
+          <select disabled={sessionActive} value={config.errorMode} onChange={(e) => applyConfig({ errorMode: e.target.value as ErrorMode })}>
             <option value="strict">Strict</option>
             <option value="master">Master (instant fail)</option>
             <option value="forgiving">Forgiving</option>
@@ -875,44 +1200,83 @@ export default function TypingWorkspace() {
         {config.mode === 'code' && (
           <label>
             Snippet
-            <select value={config.codeIndex} onChange={(e) => applyConfig({ codeIndex: Number(e.target.value) })}>
+            <select disabled={sessionActive} value={config.codeIndex} onChange={(e) => applyConfig({ codeIndex: Number(e.target.value) })}>
               {CODE_SNIPPETS.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
             </select>
           </label>
         )}
         {config.mode === 'custom' && (
-          <button type="button" className="subtle" onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
+          <button type="button" className="subtle" disabled={sessionActive} onClick={() => setCustomTextModalOpen(true)}>Paste text</button>
         )}
-        <button type="button" onClick={restart}>New text</button>
-        <button type="button" className="subtle" onClick={abort} disabled={!running}>Abort</button>
-        <button type="button" className="subtle" onClick={launchDrill}>Weak-key drill</button>
+        <button type="button" className="subtle" aria-disabled={sessionActive} onClick={restart}>New text</button>
+        <button type="button" className="subtle" title="Discard this attempt without saving a result" onClick={abort} disabled={!sessionActive}>Abort &amp; discard</button>
+        <button type="button" className="subtle" disabled={sessionActive} onClick={launchDrill}>Weak-key drill</button>
         <button type="button" className="subtle" onClick={() => setExportModalOpen(true)}>Export…</button>
       </div>
 
       {/* Live stats */}
       {!(config.hideStatsDuringTest && running && !engine.finished) && (
         <div className="tw-stats-strip" aria-label="Live typing metrics">
-          <div className="tw-stat"><h3>Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm}</small></div>
+          <div className="tw-stat"><h3 title="Words per minute with errors subtracted (one word = five characters)">Net WPM</h3><p>{metrics.netWpm}</p><small>Gross {metrics.grossWpm} (before errors)</small></div>
           <div className="tw-stat"><h3>Accuracy</h3><p>{metrics.accuracy}%</p><small>{metrics.incorrectChars} errors</small></div>
-          <div className="tw-stat"><h3>Consistency</h3><p>{metrics.consistency}%</p><small>Higher is smoother</small></div>
-          <div className="tw-stat"><h3>Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
+          <div className="tw-stat"><h3 title="How steady your keystroke rhythm is">Consistency</h3><p>{metrics.consistency}%</p><small>Higher = steadier pace</small></div>
+          <div className="tw-stat"><h3 title="Characters per minute counting every key, errors included">Raw CPM</h3><p>{metrics.rawCpm}</p><small>{metrics.correctChars + metrics.incorrectChars + metrics.extraChars} chars</small></div>
           <div className="tw-stat"><h3>Timer</h3><p>{formatMs(totalDurationMs ? durationRemainingMs : metrics.elapsedMs)}</p><small>{totalDurationMs ? 'Remaining' : 'Elapsed'}</small></div>
         </div>
       )}
 
       {/* Typing canvas */}
+      <p className="tw-input-hint" id="tw-typing-input-help">
+        Press Start or simply begin typing. Pause freezes scoring time. <kbd>Esc</kbd> aborts, <kbd>F2</kbd> loads fresh text while idle, and <kbd>Tab</kbd> moves to the next control.
+      </p>
       <div
-        ref={canvasRef}
         className={`tw-canvas ${config.blurUntilFocus && pauseUntilFocus ? 'blur-mode' : ''}`}
-        tabIndex={0}
-        role="textbox"
-        aria-label="Typing test canvas. Type the visible text. Press Escape to abort or Tab for a new sample."
-        aria-multiline="true"
         style={{ fontSize: `${config.fontSize}px` }}
-        onKeyDown={handleKey}
-        onFocus={() => setPauseUntilFocus(false)}
       >
-        {renderCells(engine, config.caret)}
+        <div className="tw-canvas-window" style={{ '--tw-window-lines': PASSAGE_WINDOW_LINES } as CSSProperties}>
+          <div
+            ref={textRef}
+            className="tw-canvas-text"
+            data-testid="typing-target"
+            aria-label="Typing target text"
+            style={{ transform: `translateY(-${windowOffsetPx}px)` }}
+          >
+            {renderCells(engine, config.caret)}
+          </div>
+        </div>
+        <textarea
+          ref={canvasRef}
+          className="tw-input-capture"
+          aria-label="Typing test canvas. Type the visible text. Press Escape to abort or F2 for a new sample while idle."
+          aria-describedby="tw-typing-input-help"
+          aria-keyshortcuts="Escape F2"
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          inputMode="text"
+          spellCheck={false}
+          readOnly={paused}
+          onKeyDown={handleKey}
+          onInput={handleTextInput}
+          onCompositionStart={() => {
+            pendingPhysicalInputRef.current = null;
+            compositionActiveRef.current = true;
+          }}
+          onCompositionEnd={handleCompositionEnd}
+          onPaste={(event) => {
+            event.preventDefault();
+            setStatusText('Paste input is disabled during a typing test.');
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setStatusText('Drop input is disabled during a typing test.');
+          }}
+          onFocus={() => { setCanvasFocused(true); setPauseUntilFocus(false); }}
+          onBlur={() => setCanvasFocused(false)}
+        />
+        {!canvasFocused && !engine.finished && (
+          <div className="tw-focus-cue" aria-hidden="true"><span>{running ? 'Click to resume typing' : 'Click here and start typing'}</span></div>
+        )}
         {pauseUntilFocus && <span className="tw-visually-hidden">Focus the canvas to begin.</span>}
       </div>
 
@@ -942,19 +1306,19 @@ export default function TypingWorkspace() {
           <h3>Per-key summary</h3>
           <KeyStatsTable rows={keyStats} />
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Personal best / pacer</h3>
-          <p style={{ margin: 0 }}>
+          <p className="tw-personal-best">
             {personalBest ? (
               <>Best {personalBest.netWpm} WPM · {personalBest.accuracy}% acc · {new Date(personalBest.savedAt).toLocaleDateString()}</>
             ) : (
               <>No comparable personal best yet.</>
             )}
           </p>
-          <label style={{ display: 'block', marginTop: '0.4rem' }}>
+          <label>
             <input type="checkbox" checked={config.ghostEnabled} onChange={(e) => setConfig((c) => ({ ...c, ghostEnabled: e.target.checked }))} /> Show ghost pacer
           </label>
-          <label style={{ display: 'block' }}>
+          <label>
             <input type="checkbox" checked={config.pacerEnabled} onChange={(e) => setConfig((c) => ({ ...c, pacerEnabled: e.target.checked }))} /> Target-WPM pacer
           </label>
           {config.pacerEnabled && (
@@ -968,7 +1332,7 @@ export default function TypingWorkspace() {
             </label>
           )}
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Comfort &amp; accessibility</h3>
           <label>
             Theme
@@ -1003,13 +1367,13 @@ export default function TypingWorkspace() {
             <input type="checkbox" checked={config.ariaLive} onChange={(e) => setConfig((c) => ({ ...c, ariaLive: e.target.checked }))} /> Screen-reader announcements
           </label>
           <label>
-            <input type="checkbox" checked={config.caseSensitive} onChange={(e) => applyConfig({ caseSensitive: e.target.checked })} /> Case sensitive
+            <input type="checkbox" disabled={sessionActive} checked={config.caseSensitive} onChange={(e) => applyConfig({ caseSensitive: e.target.checked })} /> Case sensitive
           </label>
           <label>
-            <input type="checkbox" checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
+            <input type="checkbox" disabled={sessionActive} checked={config.allowExtras} onChange={(e) => applyConfig({ allowExtras: e.target.checked })} /> Allow extra characters
           </label>
         </div>
-        <div className="tw-panel">
+        <div className="tw-panel tw-settings">
           <h3>Sensory feedback</h3>
           <label>
             Switch
@@ -1045,30 +1409,35 @@ export default function TypingWorkspace() {
 
       {/* History */}
       <section className="tw-panel" aria-label="Session history">
-        <h3>History &amp; longitudinal analytics</h3>
+        <h3>History &amp; longitudinal analytics — {activeTypist.name}</h3>
         <div className="tw-history-controls">
           <label>
             Filter by tag
             <input type="text" placeholder="e.g. morning,code" value={filterTagText} onChange={(e) => setFilterTagText(e.target.value)} />
           </label>
           <button className="subtle" type="button" onClick={async () => setHistory(await listTests())}>Refresh</button>
-          <label className="subtle" style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Import JSON
-            <input type="file" accept="application/json" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept="application/json" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
           </label>
-          <label className="subtle" style={{ padding: '0.35rem 0.6rem', border: '1px solid #b6bfce', borderRadius: 8 }}>
+          <label className="subtle tw-file-button" aria-disabled={sessionActive}>
             Load CSV dictionary
-            <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
+            <input type="file" disabled={sessionActive} accept=".csv,text/csv" className="tw-file-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsvDictionary(f); e.target.value = ''; }} />
           </label>
-          <button className="subtle" type="button" onClick={() => setConfirmClear(true)}>Clear history…</button>
         </div>
         <div className="tw-stats-strip">
           <div className="tw-stat"><h3>{filterTags.length > 0 ? 'Matching tests' : 'Total tests'}</h3><p>{visibleHistory.length}</p></div>
-          <div className="tw-stat"><h3>10-test avg</h3><p>{round(rolling.last10)}</p></div>
-          <div className="tw-stat"><h3>50-test avg</h3><p>{round(rolling.last50)}</p></div>
-          <div className="tw-stat"><h3>All-time avg</h3><p>{round(rolling.allTime)}</p></div>
+          <div className="tw-stat"><h3>10-test avg</h3><p>{visibleHistory.length ? round(rolling.last10) : '—'}</p></div>
+          <div className="tw-stat"><h3>50-test avg</h3><p>{visibleHistory.length ? round(rolling.last50) : '—'}</p></div>
+          <div className="tw-stat"><h3>All-time avg</h3><p>{visibleHistory.length ? round(rolling.allTime) : '—'}</p></div>
         </div>
-        <div className="tw-chart" style={{ marginTop: '0.5rem' }}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        {visibleHistory.length === 0 && (
+          <p className="tw-empty" role="status">
+            {filterTags.length > 0 ? 'No saved tests match these tags.' : 'No saved tests yet. Finish a test and choose Save to start your history and trend chart.'}
+          </p>
+        )}
+        <div className="tw-chart tw-chart-history" hidden={visibleHistory.length === 0}><canvas ref={historyChartRef} role="img" aria-label="Typing history chart with net WPM, 10-test, 50-test, all-time averages, and accuracy" /></div>
+        <div className="tw-table-scroll" role="region" aria-label="Saved typing tests table" tabIndex={0}>
         <PagedTable
           columns={[
             { key: 'saved', label: 'Saved' },
@@ -1092,7 +1461,11 @@ export default function TypingWorkspace() {
             if (columnKey === 'tags') return test.tags.join(', ');
             if (columnKey === 'actions') {
               return (
-                <button type="button" className="subtle" onClick={async () => {
+                <button type="button" className="subtle" disabled={sessionActive} onClick={async () => {
+                  if (sessionActive) {
+                    setStatusText('Stop or reset the current test before changing saved score history.');
+                    return;
+                  }
                   if (test.id != null) {
                     await deleteTest(test.id);
                     setHistory(await listTests());
@@ -1105,7 +1478,12 @@ export default function TypingWorkspace() {
             return null;
           }}
         />
-        <p style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#4b5468' }}>Daily activity (last 30 active days): {daily.length}</p>
+        </div>
+        <p className="tw-muted">Daily activity (last 30 active days): {daily.length}</p>
+        <div className="tw-danger-zone">
+          <button className="subtle" type="button" disabled={sessionActive} onClick={() => setConfirmClear(true)}>Reset {activeTypist.name} scores…</button>
+          <span className="tw-muted">Deletes this typist’s saved tests from this browser. Other typists are not affected.</span>
+        </div>
       </section>
 
       {/* Save modal */}
@@ -1115,6 +1493,7 @@ export default function TypingWorkspace() {
           onSave={handleSave}
           onExport={handleExportSingle}
           summary={metrics}
+          typistName={activeTypist.name}
           canCertificate={engine.finishReason === 'completed'}
         />
       )}
@@ -1124,6 +1503,14 @@ export default function TypingWorkspace() {
           onCancel={() => setExportModalOpen(false)}
           onExport={handleExportHistory}
           tags={filterTagText}
+          typistName={activeTypist.name}
+        />
+      )}
+
+      {addTypistModalOpen && (
+        <AddTypistModal
+          onCancel={() => setAddTypistModalOpen(false)}
+          onAdd={addTypist}
         />
       )}
 
@@ -1131,24 +1518,28 @@ export default function TypingWorkspace() {
         <CustomTextModal
           value={config.customText}
           onCancel={() => setCustomTextModalOpen(false)}
-          onApply={(text) => { setCustomTextModalOpen(false); applyConfig({ mode: 'custom', customText: text }); }}
+          onApply={(text) => {
+            applyConfig({ mode: 'custom', customText: text });
+            setCustomTextModalOpen(false);
+            canvasRef.current?.focus({ preventScroll: true });
+          }}
         />
       )}
 
       {confirmClear && (
         <div className="tw-modal-backdrop" role="alertdialog" aria-modal="true" aria-labelledby="tw-clear-history-title" aria-describedby="tw-clear-history-description" onKeyDown={(event) => trapDialogKeyboard(event, () => setConfirmClear(false))}>
           <div className="tw-modal">
-            <h3 id="tw-clear-history-title">Clear local test history?</h3>
-            <p id="tw-clear-history-description">This removes every locally stored test from this browser. Exports are not affected.</p>
+            <h3 id="tw-clear-history-title">Reset {activeTypist.name} scores?</h3>
+            <p id="tw-clear-history-description">This removes {profileHistory.length} saved test{profileHistory.length === 1 ? '' : 's'} for {activeTypist.name}. Other typists, preferences, dictionaries, and drills are not affected.</p>
             <div className="row">
               <button autoFocus type="button" className="subtle" onClick={() => setConfirmClear(false)}>Cancel</button>
               <button type="button" onClick={async () => {
-                await clearAllTests();
-                setHistory([]);
+                await clearTestsForTypist(activeTypistId);
+                setHistory(await listTests());
                 setPersonalBest(null);
                 setConfirmClear(false);
-                setStatusText('Local test history cleared.');
-              }}>Clear history</button>
+                setStatusText(`${activeTypist.name} scores reset.`);
+              }}>Reset {activeTypist.name} scores</button>
             </div>
           </div>
         </div>
@@ -1165,7 +1556,9 @@ function renderCells(state: EngineState, caret: CaretStyle): ReactNode[] {
     if (idx === state.cursor && !state.finished) {
       out.push(<span key={`caret-${idx}`} className={`tw-caret style-${caret}`} aria-hidden="true" />);
     }
-    const rendered = cell.expected === ' ' ? '\u00A0' : cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
+    // A real space (not U+00A0) is the only line-break opportunity in the passage; the canvas is
+    // pre-wrap, so a non-breaking space here would make the whole text one unwrappable line.
+    const rendered = cell.expected === '' ? (cell.typed || '\u00A0') : cell.expected;
     const displayed = cell.state === 'incorrect' && cell.typed ? (cell.typed === ' ' ? '_' : cell.typed) : rendered;
     out.push(
       <span key={idx} className={`tw-char ${cell.state}`}>{displayed}</span>
@@ -1220,7 +1613,7 @@ function VirtualKeyboard({ layout, heat, errors }: { layout: ReturnType<typeof f
 }
 
 function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>Finish a test to see analytics.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test and your per-key analytics appear here.</p>;
   return (
     <PagedTable
       columns={[
@@ -1247,7 +1640,7 @@ function NgramTable({ rows }: { rows: ReturnType<typeof ngramLatencies> }) {
 }
 
 function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
-  if (rows.length === 0) return <p style={{ margin: 0, color: '#4b5468', fontSize: '0.85rem' }}>No data yet.</p>;
+  if (rows.length === 0) return <p className="tw-empty">Finish a test to see this breakdown.</p>;
   return (
     <PagedTable
       columns={[
@@ -1275,31 +1668,44 @@ function KeyStatsTable({ rows }: { rows: ReturnType<typeof perKeyStats> }) {
 
 // -------------------- modals --------------------
 
-function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: {
+function SaveTestModal({ onCancel, onSave, onExport, summary, typistName, canCertificate }: {
   onCancel: () => void;
   onSave: (meta: ExportMetadata, options: { includeKeystrokes: boolean }) => void | Promise<void>;
   onExport: (format: 'csv' | 'json' | 'pdf' | 'keystrokes', meta: ExportMetadata) => void | Promise<void>;
   summary: ReturnType<typeof computeMetrics>;
+  typistName: string;
   canCertificate: boolean;
 }) {
-  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, includeKeystrokes: true });
+  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName, includeKeystrokes: true });
   const [tagInput, setTagInput] = useState('');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // Focus the panel, not a field: the typist is usually still mid-keystroke when the test ends,
+  // and focusing an input would swallow those keystrokes into the name.
+  useEffect(() => { panelRef.current?.focus(); }, []);
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-test-result-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
-      <div className="tw-modal">
+      <div className="tw-modal" ref={panelRef} tabIndex={-1}>
         <h3 id="tw-test-result-title">Test result</h3>
-        <div className="tw-summary">
-          <div><strong>{summary.netWpm}</strong><br /><small>Net WPM</small></div>
-          <div><strong>{summary.accuracy}%</strong><br /><small>Accuracy</small></div>
-          <div><strong>{summary.consistency}%</strong><br /><small>Consistency</small></div>
-          <div><strong>{summary.incorrectChars}</strong><br /><small>Errors</small></div>
+        <div className="tw-summary tw-result-summary">
+          <div><strong>{summary.netWpm}</strong><small>Net WPM</small></div>
+          <div><strong>{summary.accuracy}%</strong><small>Accuracy</small></div>
+          <div><strong>{summary.consistency}%</strong><small>Consistency</small></div>
+          <div><strong>{summary.incorrectChars}</strong><small>Errors</small></div>
         </div>
-        <label htmlFor="tw-result-typist">Typist name</label>
-        <input id="tw-result-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
-        <label htmlFor="tw-result-organization">Organization / classroom</label>
-        <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
-        <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
-        <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+        <div className="tw-modal-fields">
+          <div>
+            <label htmlFor="tw-result-typist">Typist name</label>
+            <input id="tw-result-typist" type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-organization">Organization / classroom</label>
+            <input id="tw-result-organization" type="text" value={meta.organization} onChange={(e) => setMeta((m) => ({ ...m, organization: e.target.value }))} />
+          </div>
+          <div>
+            <label htmlFor="tw-result-certified-by">Certified by (proctor)</label>
+            <input id="tw-result-certified-by" type="text" value={meta.certifiedBy} onChange={(e) => setMeta((m) => ({ ...m, certifiedBy: e.target.value }))} />
+          </div>
+        </div>
         <label htmlFor="tw-result-tag">Tags (Enter to add)</label>
         <div className="tw-tags-input">
           {meta.tags.map((t) => (
@@ -1323,15 +1729,17 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: 
         </div>
         <label htmlFor="tw-result-notes">Notes</label>
         <textarea id="tw-result-notes" value={meta.notes} onChange={(e) => setMeta((m) => ({ ...m, notes: e.target.value }))} />
-        <label>
+        <label className="tw-check">
           <input type="checkbox" checked={meta.includeKeystrokes} onChange={(e) => setMeta((m) => ({ ...m, includeKeystrokes: e.target.checked }))} /> Save raw keystroke log
         </label>
-        <div className="row">
-          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
+        <div className="tw-export-row" role="group" aria-label="Export this result">
           <button type="button" className="subtle" onClick={() => void onExport('csv', meta)}>Export CSV</button>
           <button type="button" className="subtle" onClick={() => void onExport('json', meta)}>Export JSON</button>
           <button type="button" className="subtle" onClick={() => void onExport('keystrokes', meta)}>Export keystrokes</button>
           {canCertificate ? <button type="button" className="subtle" onClick={() => void onExport('pdf', meta)}>PDF certificate</button> : null}
+        </div>
+        <div className="row">
+          <button type="button" className="subtle" onClick={onCancel}>Discard</button>
           <button type="button" onClick={() => void onSave(meta, { includeKeystrokes: meta.includeKeystrokes })}>Save</button>
         </div>
       </div>
@@ -1339,18 +1747,19 @@ function SaveTestModal({ onCancel, onSave, onExport, summary, canCertificate }: 
   );
 }
 
-function ExportHistoryModal({ onCancel, onExport, tags }: {
+function ExportHistoryModal({ onCancel, onExport, tags, typistName }: {
   onCancel: () => void;
   onExport: (format: 'csv' | 'json' | 'md', meta: ExportMetadata) => void | Promise<void>;
   tags: string;
+  typistName: string;
 }) {
-  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA });
+  const [meta, setMeta] = useState<ExportMetadata>({ ...EMPTY_EXPORT_METADATA, typistName });
   const [tagInput, setTagInput] = useState('');
   return (
     <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-export-history-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
       <div className="tw-modal">
         <h3 id="tw-export-history-title">Export history</h3>
-        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>{tags ? `Filter by tags: ${tags}` : 'Exports every saved test.'}</p>
+        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>{tags ? `Filter by tags: ${tags}` : `Exports saved tests for ${typistName}.`}</p>
         <label htmlFor="tw-history-typist">Typist name</label>
         <input id="tw-history-typist" autoFocus type="text" value={meta.typistName} onChange={(e) => setMeta((m) => ({ ...m, typistName: e.target.value }))} />
         <label htmlFor="tw-history-organization">Organization</label>
@@ -1393,6 +1802,44 @@ function ExportHistoryModal({ onCancel, onExport, tags }: {
   );
 }
 
+function AddTypistModal({ onCancel, onAdd }: {
+  onCancel: () => void;
+  onAdd: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const usableName = name.trim().replace(/\s+/g, ' ');
+  return (
+    <div className="tw-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="tw-add-typist-title" onKeyDown={(event) => trapDialogKeyboard(event, onCancel)}>
+      <div className="tw-modal">
+        <h3 id="tw-add-typist-title">Add typist</h3>
+        <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Profiles stay in this browser and keep scores, averages, and personal bests separate.</p>
+        <label htmlFor="tw-add-typist-name">Typist name</label>
+        <input
+          id="tw-add-typist-name"
+          autoFocus
+          type="text"
+          value={name}
+          onChange={(event) => { setName(event.target.value); setError(''); }}
+        />
+        {error ? <p role="alert" className="tw-form-error">{error}</p> : null}
+        <div className="row">
+          <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
+          <button
+            type="button"
+            disabled={!usableName}
+            onClick={() => {
+              void onAdd(usableName).catch((caught) => setError((caught as Error).message));
+            }}
+          >
+            Add typist
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel: () => void; onApply: (text: string) => void }) {
   const [text, setText] = useState(value);
   const usableText = text.replace(/\t/g, '    ').trim();
@@ -1403,7 +1850,7 @@ function CustomTextModal({ value, onCancel, onApply }: { value: string; onCancel
         <p style={{ marginTop: 0, fontSize: '0.85rem' }}>Everything stays in this browser. Longer passages can be used for extended practice.</p>
         <label htmlFor="tw-custom-text-input">Custom text</label>
         <textarea id="tw-custom-text-input" autoFocus value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 240 }} />
-        {!usableText ? <p role="status" style={{ fontSize: '0.8rem', color: '#6b7280' }}>Enter at least one non-whitespace character.</p> : null}
+        {!usableText ? <p role="status" className="tw-muted">Enter at least one non-whitespace character.</p> : null}
         <div className="row">
           <button type="button" className="subtle" onClick={onCancel}>Cancel</button>
           <button type="button" disabled={!usableText} onClick={() => onApply(text)}>Use this text</button>

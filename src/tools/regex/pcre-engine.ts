@@ -4,6 +4,8 @@ const now = () => typeof performance !== 'undefined' ? performance.now() : Date.
 const DISPLAY_MATCH_LIMIT = 5_000;
 let runtimePromise: Promise<{ runtime: Awaited<ReturnType<(typeof import('pcre2-wasm'))['createPCRE2']>>; parseFlags: (flags: string) => number }> | undefined;
 
+export const preparePcre2Runtime = async (): Promise<void> => { await getRuntime(); };
+
 const getRuntime = () => {
   runtimePromise ??= import('pcre2-wasm').then(async (module) => ({ runtime: await module.createPCRE2(), parseFlags: module.parseFlags }));
   return runtimePromise;

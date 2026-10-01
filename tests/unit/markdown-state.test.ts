@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commitHistory, createHistory, redoHistory, undoHistory } from '../../src/tools/markdown/state-engine';
+import { commitHistory, createHistory, redoHistory, replaceHistoryPresent, undoHistory } from '../../src/tools/markdown/state-engine';
 
 describe('undo/redo history', () => {
   it('creates a history with an empty past and future', () => {
@@ -14,6 +14,14 @@ describe('undo/redo history', () => {
     expect(history.present).toBe('b');
     expect(history.past).toEqual(['a']);
     expect(history.future).toEqual([]);
+  });
+
+  it('replaces the current document without adding another toolbar history step', () => {
+    const history = commitHistory(createHistory('a'), 'b');
+    const grouped = replaceHistoryPresent(history, 'bc');
+    expect(grouped.present).toBe('bc');
+    expect(grouped.past).toEqual(['a']);
+    expect(grouped.future).toEqual([]);
   });
 
   it('undo restores the previous present and pushes the current one into future', () => {

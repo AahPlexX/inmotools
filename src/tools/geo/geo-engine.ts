@@ -115,6 +115,7 @@ export function validateGeoJson(input: unknown): GeoValidation {
       bounds.maxY = Math.max(bounds.maxY, y);
     }
     if (position.length > 3) warnings.push(`${path} has ${position.length} elements; RFC 7946 recommends no more than three.`);
+    if (x < -180 || x > 180) warnings.push(`${path} longitude ${x} is outside the WGS84 longitude range; check the coordinate reference system before export.`);
     if (y < -90 || y > 90) warnings.push(`${path} latitude ${y} is outside the WGS84 latitude range.`);
     return true;
   };
@@ -125,6 +126,14 @@ export function validateGeoJson(input: unknown): GeoValidation {
       return false;
     }
     return true;
+  };
+
+  const inspectBbox = (value: JsonObject, path: string) => {
+    if (!('bbox' in value)) return;
+    const bbox = value.bbox;
+    if (!Array.isArray(bbox) || bbox.length < 4 || bbox.length % 2 !== 0 || !bbox.every((part) => typeof part === 'number' && Number.isFinite(part))) {
+      errors.push(`${path}.bbox must contain finite numeric lower and upper coordinates for at least two dimensions.`);
+    }
   };
 
   const inspectLine = (value: unknown, path: string) => {
@@ -142,12 +151,14 @@ export function validateGeoJson(input: unknown): GeoValidation {
     }
   };
 
-  const inspectGeometry = (geometry: any, path: string) => {
-    if (geometry === null) return;
+  const inspectGeometry = (geometry: any, path: string, allowNull = false) => {
+    if (geometry === null && allowNull) return;
     if (!geometry || typeof geometry !== 'object' || Array.isArray(geometry)) {
       errors.push(`${path} must be a geometry object or null.`);
       return;
     }
+    inspectBbox(geometry, path);
+    if ('crs' in geometry) warnings.push(`${path}.crs is legacy metadata; RFC 7946 uses WGS84 longitude/latitude and this tool does not reproject coordinates.`);
     if (!GEOMETRY_TYPES.has(geometry.type)) {
       errors.push(`${path}.type is not a supported GeoJSON geometry type.`);
       return;
@@ -187,6 +198,8 @@ export function validateGeoJson(input: unknown): GeoValidation {
       errors.push(`${path} must be a GeoJSON object.`);
       return;
     }
+    if (value.type === 'Feature' || value.type === 'FeatureCollection') inspectBbox(value, path);
+    if ('crs' in value) warnings.push(`${path}.crs is legacy metadata; RFC 7946 uses WGS84 longitude/latitude and this tool does not reproject coordinates.`);
     if (!GEO_TYPES.has(value.type)) {
       errors.push(`${path}.type must be a GeoJSON type.`);
       return;
@@ -204,8 +217,9 @@ export function validateGeoJson(input: unknown): GeoValidation {
     }
     if (value.type === 'Feature') {
       featureCount += 1;
+      if ('id' in value && !(typeof value.id === 'string' || (typeof value.id === 'number' && Number.isFinite(value.id)))) errors.push(`${path}.id must be a string or finite number.`);
       if (!('properties' in value) || (value.properties !== null && (typeof value.properties !== 'object' || Array.isArray(value.properties)))) errors.push(`${path}.properties must be an object or null.`);
-      inspectGeometry(value.geometry, `${path}.geometry`);
+      inspectGeometry(value.geometry, `${path}.geometry`, true);
       return;
     }
     inspectGeometry(value, path);

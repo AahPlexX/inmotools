@@ -19,6 +19,7 @@
 .vector-studio button { border: 1px solid var(--vector-border); border-radius: 10px; background: Canvas; color: CanvasText; padding: 7px 10px; cursor: pointer; }
 .vector-studio button:hover:not(:disabled), .vector-file-button:hover { border-color: color-mix(in srgb, var(--vector-accent) 55%, currentColor 20%); background: color-mix(in srgb, var(--vector-accent) 7%, Canvas); }
 .vector-studio button:focus-visible, .vector-studio input:focus-visible, .vector-studio select:focus-visible, .vector-studio textarea:focus-visible, .vector-file-button:focus-within { outline: 3px solid color-mix(in srgb, var(--vector-accent) 42%, transparent); outline-offset: 2px; }
+.vector-canvas-scroll:focus-visible, .vector-inspector:focus-visible, .vector-layers:focus-visible, .vector-export-panel:focus-visible { outline: 3px solid color-mix(in srgb, var(--vector-accent) 58%, transparent); outline-offset: -3px; }
 .vector-studio button:disabled { opacity: .45; cursor: not-allowed; }
 
 .vector-studio-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 22px 24px 16px; border-bottom: 1px solid var(--vector-border); }

@@ -60,6 +60,69 @@
 .markdown-workbench-preview h5 { font-size: 1rem; }
 .markdown-workbench-preview h6 { font-size: .9rem; color: var(--muted); }
 
+/* Fenced code blocks share the source editor's light surface. Token colors
+   live in code-highlight.css as stable Lezer tok-* classes so the same
+   styling can be embedded into standalone HTML/EPUB exports. */
+.markdown-workbench-preview pre {
+  overflow: auto;
+  max-width: 100%;
+  padding: 12px 14px;
+  margin: .75em 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.markdown-workbench-preview pre > code {
+  display: block;
+  color: var(--ink);
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+
+.markdown-workbench-preview :not(pre) > code {
+  padding: .1em .35em;
+  border-radius: 5px;
+  background: var(--surface-strong);
+  font-size: .9em;
+}
+
+/* GitHub-style alert blockquotes (github-alerts-plugin.ts). Each kind reuses
+   the app's existing semantic status tokens rather than inventing new
+   colors, so a warning here reads the same as a warning anywhere else. */
+.markdown-workbench-preview .markdown-alert {
+  margin: .75em 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+
+.markdown-workbench-preview .markdown-alert > :last-child { margin-bottom: 0; }
+
+.markdown-workbench-preview .markdown-alert-title {
+  margin: 0 0 .35em;
+  font-weight: 700;
+  font-size: .85em;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.markdown-workbench-preview .markdown-alert-note { border-left-color: var(--signal); }
+.markdown-workbench-preview .markdown-alert-note .markdown-alert-title { color: var(--signal-strong); }
+
+.markdown-workbench-preview .markdown-alert-tip { border-left-color: var(--good); }
+.markdown-workbench-preview .markdown-alert-tip .markdown-alert-title { color: var(--good); }
+
+.markdown-workbench-preview .markdown-alert-important { border-left-color: var(--signal-strong); }
+.markdown-workbench-preview .markdown-alert-important .markdown-alert-title { color: var(--signal-strong); }
+
+.markdown-workbench-preview .markdown-alert-warning { border-left-color: var(--warning); }
+.markdown-workbench-preview .markdown-alert-warning .markdown-alert-title { color: var(--warning); }
+
+.markdown-workbench-preview .markdown-alert-caution { border-left-color: var(--danger); }
+.markdown-workbench-preview .markdown-alert-caution .markdown-alert-title { color: var(--danger); }
+
 .markdown-workbench-diagram-error-message {
   max-width: 100%;
   margin: .5rem 0 1rem;
@@ -207,4 +270,92 @@
   .markdown-workbench-help-header {
     align-items: flex-start;
   }
+}
+
+
+/* Preview-only mode keeps the CodeMirror instance mounted (so its native
+   selection/history survives view switches) while giving the rendered
+   document the full workspace width. */
+.markdown-workbench-view-preview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.markdown-workbench-view-preview .markdown-workbench-editor-pane {
+  display: none;
+  border-right: 0;
+}
+
+
+/* Production-audit interaction/accessibility additions. */
+.markdown-workbench-theme-dark {
+  color-scheme: dark;
+  --surface: #111827;
+  --surface-strong: #1f2937;
+  --ink: #f3f6fa;
+  --muted: #b4bec9;
+  --line: #344050;
+  --line-strong: #667487;
+  --signal: #7fa7ff;
+  --signal-strong: #adc4ff;
+  --signal-soft: #1e335f;
+  --good: #5ee0aa;
+  --warning: #f4b860;
+  --danger: #ff8a80;
+  --focus: #9fc0ff;
+  background: var(--surface);
+  color: var(--ink);
+}
+.markdown-workbench-theme-dark .markdown-workbench-diagram { padding: 10px; border-radius: var(--radius-sm); background: #fff; }
+.markdown-workbench-theme-dark pre code .tok-comment { color: #b4bec9; }
+.markdown-workbench-theme-dark pre code .tok-keyword { color: #9fb8ff; }
+.markdown-workbench-theme-dark pre code :is(.tok-string, .tok-string2, .tok-literal) { color: #7ad9a5; }
+.markdown-workbench-theme-dark pre code :is(.tok-number, .tok-atom, .tok-bool) { color: #f2b36c; }
+.markdown-workbench-theme-dark pre code :is(.tok-typeName, .tok-className, .tok-namespace) { color: #d2adff; }
+.markdown-workbench-theme-dark pre code :is(.tok-propertyName, .tok-labelName, .tok-heading, .tok-link, .tok-url) { color: #8cc8ff; }
+.markdown-workbench-theme-dark pre code :is(.tok-meta, .tok-punctuation, .tok-operator) { color: #c7d0d9; }
+.markdown-workbench-theme-dark pre code .tok-invalid { color: #ff8a80; }
+
+.markdown-workbench-check, .markdown-workbench-font-size { min-height: 32px; padding: 2px 4px; }
+.markdown-workbench-check input { width: 18px; height: 18px; min-height: 18px; }
+.markdown-workbench-font-size input[type="range"] { min-width: 96px; }
+.markdown-workbench-font-size output { min-width: 3.5em; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.markdown-workbench-format-action { position: relative; display: inline-flex; }
+.markdown-workbench-format-tooltip {
+  position: absolute; z-index: 20; top: calc(100% + 7px); left: 50%;
+  width: max-content; max-width: min(260px, calc(100vw - 32px)); padding: 7px 9px;
+  transform: translateX(-50%); border: 1px solid var(--line-strong); border-radius: 6px;
+  background: var(--ink); color: var(--surface); box-shadow: 0 8px 24px rgb(15 23 42 / .18);
+  font-size: 12px; font-weight: 500; line-height: 1.4; text-align: left; white-space: normal;
+}
+.markdown-workbench-format-tooltip[hidden] { display: none; }
+
+.markdown-workbench-outline-filter { display: grid; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.markdown-workbench-outline-filter input { width: min(360px, 100%); min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.markdown-workbench-outline button[aria-current="location"] { border-color: var(--signal); background: var(--signal-soft); color: var(--ink); }
+
+.markdown-workbench-focus .markdown-workbench-toolbar-section:not(:first-child),
+.markdown-workbench-focus .markdown-workbench-namebar,
+.markdown-workbench-focus .markdown-workbench-status,
+.markdown-workbench-focus .markdown-workbench-panel,
+.markdown-workbench-focus .markdown-workbench-toolbar-label,
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child .markdown-workbench-toolbar-group > button:not(.markdown-workbench-focus-toggle) { display: none; }
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child { flex: 1 1 100%; padding: 6px; border: 0; background: transparent; }
+.markdown-workbench-focus .markdown-workbench-toolbar { justify-content: flex-end; padding: 6px 8px; }
+.markdown-workbench-focus .markdown-workbench-toolbar-section:first-child .markdown-workbench-toolbar-group { justify-content: flex-end; }
+
+@media (max-width: 520px) {
+  .markdown-workbench-format-tooltip { position: fixed; inset: auto 12px 12px; width: auto; max-width: none; transform: none; }
+}
+
+/* Split view: bound the body so the source and the preview each scroll on their own and the preview
+   follows manual source scrolling (F11). Without a bound the grid grows to the document and the page scrolls. */
+.markdown-workbench-view-split { height: min(80vh, 800px); }
+.markdown-workbench-view-split .markdown-workbench-editor-pane,
+.markdown-workbench-view-split .markdown-workbench-preview-pane,
+.markdown-workbench-view-split .markdown-workbench-editor,
+.markdown-workbench-view-split .markdown-workbench-preview { min-height: 0; }
+.markdown-workbench-view-split .markdown-workbench-editor .cm-editor { height: 100%; }
+@media (max-width: 860px) {
+  .markdown-workbench-view-split { height: auto; grid-template-rows: min(60vh, 520px) min(60vh, 520px); }
 }

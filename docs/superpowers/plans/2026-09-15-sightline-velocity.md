@@ -6,7 +6,20 @@
 
 ## Status
 
-In progress. Milestones M1–M4 are implemented on the dedicated `feat/sightline-velocity` branch; M5 verification is active. The ledger in the design document stays authoritative and no item may be dropped without an explicit recorded rejection. Implementation presence is not acceptance: the workstream remains open until the deterministic completion goal below has fresh evidence.
+Complete and integrated on `origin/main`. All F1–F35 capabilities remain implemented. The
+2026-09-19 UX/real-world follow-up was quality remediation rather than feature expansion and
+merged through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403`.
+
+The follow-up resolved multi-document switching/failure accounting, loaded-state hierarchy,
+persistent reading controls/direct WPM, progressive disclosure, live-status semantics,
+nested drag-leave handling, simpler sample/clipboard flow, plain-language labels, explicit
+tab/tabpanel relationships, and narrow/coarse-pointer ergonomics.
+
+Closure evidence on the merged revision is green at Sightline scope: dedicated workflow
+`35613856993` passed 409/409 focused unit assertions across 16 files, the production build,
+and 48/48 desktop/mobile Chromium cases. Pages run `35613857161` built and deployed the
+production artifact successfully; its broad browser failures were confined to unrelated
+workspaces while all Sightline browser cases executed without a Sightline failure.
 
 ## Deterministic completion goal
 
@@ -60,3 +73,27 @@ Until item 1–7 hold, the workstream stays open in `IN_PROGRESS.md`.
 - M5 now uses `.github/workflows/sightline.yml` on the dedicated `feat/sightline-velocity` branch to run one bounded loop: frozen install, Sightline-only unit suites, production build, and the Sightline desktop/mobile browser spec. The repository-wide Pages gate remains unchanged and is still required before integration.
 - Dedicated validation run `35118094022` at `3e4bee27607baf9eae4a77e162a341966a49ae72` is green: 407/407 Sightline unit assertions across 16 files, production build, and 40/40 desktop/mobile Chromium browser cases passed.
 - F6 acceptance delta 2026-09-16: file input now accepts multi-file batches, the entire Sightline workspace accepts dropped files/text, and the built-in sample control exposes a three-item sample library. The four focused desktop/mobile F6 cases passed locally after a fresh production build and are now included in green dedicated run `35122984076` at `1d28b12b911f5a60b3f8ffe543466b4b1aa02c63`; that run passed all focused units, the production build, and 44/44 browser cases.
+
+
+## 2026-09-24 completion and maintenance handoff
+
+PR #66 merged the full UX/real-world remediation to `origin/main` as
+`ce878ada3bdcb73f0b05eb2c0ae31b218c948403`. The former
+`fix/sightline-ux-audit-2` work is no longer an active workstream.
+
+Fresh closure evidence:
+- dedicated Sightline workflow `35613856993`: 409/409 focused unit assertions, production
+  build, and 48/48 desktop/mobile Chromium browser checks passed;
+- Pages run `35613857161`: repository unit/build steps and production artifact build passed,
+  and the Pages deployment succeeded; broad browser failures were outside Sightline while all
+  Sightline cases ran without a Sightline failure;
+- final source scan found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or
+  WebSocket path. The only `fetch` search matches describe local/static asset loading and
+  PDF.js auto-fetch configuration rather than user-data upload;
+- `feat/sightline-velocity` is historical only: comparison against current `main` showed
+  0 commits ahead, so no completed Sightline work is stranded there.
+
+Future Sightline changes start from current `origin/main`. Preserve the F1–F35 contract,
+local-first privacy boundary, existing focused suites, accessibility/keyboard checks, export
+round-trip coverage, and responsive acceptance. New accepted scope must enter the repository
+task-state system before implementation; do not revive the retired audit handoff as active work.

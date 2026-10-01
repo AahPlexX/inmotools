@@ -94,12 +94,28 @@ describe('workspace first render', () => {
   it('shows the empty state and holds the document controls disabled', () => {
     expect(workspaceHtml).toContain('No document is open yet');
     expect(workspaceHtml).toContain('Load the sample passage');
-    expect(workspaceHtml).toContain('Read the clipboard');
+    expect(workspaceHtml).toContain('Clipboard option');
     expect(workspaceHtml).toContain('data-testid="sightline-clipboard"');
     expect(workspaceHtml).toContain('data-testid="sightline-dropzone"');
     const disabledButton = (testId: string) => new RegExp(`<button(?=[^>]*data-testid="${testId}")(?=[^>]*disabled)[^>]*>`);
     expect(workspaceHtml).toMatch(disabledButton('sightline-play'));
     expect(workspaceHtml).toMatch(disabledButton('sightline-ingest-paste'));
+  });
+
+  it('keeps the first-run path simple and exposes responsive progressive disclosure', () => {
+    expect(workspaceHtml).toContain('data-testid="sightline-start-here"');
+    expect(workspaceHtml).toContain('data-testid="sightline-source-details"');
+    expect(workspaceHtml).toContain('data-testid="sightline-settings-details"');
+    expect(workspaceHtml).toContain('data-testid="sightline-cockpit"');
+    expect(workspaceHtml).toContain('role="status"');
+    expect(workspaceHtml).toContain('aria-live="polite"');
+    expect(workspaceHtml).toContain('aria-controls="sightline-control-panel"');
+    const css = readFileSync('src/tools/sightline/sightline-workspace.css', 'utf8');
+    expect(css).toContain('container-type: inline-size');
+    expect(css).toContain('@container sightline');
+    expect(css).toContain('(pointer: coarse)');
+    expect(css).toContain('min-height: 44px');
+    expect(css).toContain('env(safe-area-inset-bottom');
   });
 
   it('states the limits instead of promising a multiplier', () => {
@@ -169,8 +185,8 @@ describe('control panels render with real data', () => {
     );
     expect(html).toContain('data-testid="sightline-wpm-range"');
     expect(html).toContain('data-testid="sightline-rate-note"');
-    expect(html).toContain('Subvocalization metronome');
-    expect(html).toContain('Velocity ramp trainer');
+    expect(html).toContain('Pacing beat');
+    expect(html).toContain('Speed trainer');
     expect(html).toContain('data-testid="sightline-speech-status"');
     // The speed presets are bare numbers, so the accessible name stays short.
     expect(html).toMatch(/>450</);

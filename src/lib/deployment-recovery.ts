@@ -38,7 +38,11 @@ const waitForWorkerState = (
 });
 
 export const recoverLatestDeployment = async () => {
-  if (!('serviceWorker' in navigator)) {
+  // Without a controlling service worker the reload is served by the network,
+  // which already has the current deployment. Waiting for a first-visit
+  // worker to finish precaching would only delay recovery (by several
+  // seconds for a large precache) without changing what the reload fetches.
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
     window.location.reload();
     return;
   }

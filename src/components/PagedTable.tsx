@@ -49,6 +49,10 @@ export function PagedTable<Row>({
 }: PagedTableProps<Row>) {
   const [requestedPage, setRequestedPage] = useState(0);
   const [seenRows, setSeenRows] = useState(rows);
+  // What the reader is typing into the page field. Null shows the current
+  // page; a draft is committed only on Enter or blur, so typing "12" does not
+  // jump to page 1 on the way.
+  const [pageDraft, setPageDraft] = useState<string | null>(null);
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
 
   // A new result starts at the first page. Keeping the old page number would
@@ -69,6 +73,15 @@ export function PagedTable<Row>({
   // unchanged.
   const page = Math.min(requestedPage, pageCount - 1);
   const setPage = (next: number) => setRequestedPage(Math.min(Math.max(0, next), pageCount - 1));
+
+  // An empty or non-numeric entry leaves the page unchanged; anything else is
+  // clamped to the valid range rather than rejected.
+  const commitPageDraft = () => {
+    if (pageDraft === null) return;
+    const typed = Number.parseInt(pageDraft, 10);
+    if (Number.isFinite(typed)) setPage(typed - 1);
+    setPageDraft(null);
+  };
 
   const start = page * pageSize;
   const visible = useMemo(() => rows.slice(start, start + pageSize), [rows, start, pageSize]);
@@ -100,7 +113,18 @@ export function PagedTable<Row>({
       {paginated ? (
         <div className="paged-table-controls">
           {/* aria-disabled rather than disabled: a disabled button at the last
-              page drops keyboard focus to the document body mid-interaction. */}
+              page drops keyboard focus to the document body mid-interaction.
+              First, Last, and the page field exist because single steps do not
+              scale: the end of a large result is thousands of Next presses
+              away. */}
+          <button
+            type="button"
+            className="action-button secondary"
+            onClick={() => { if (page > 0) setPage(0); }}
+            aria-disabled={page === 0}
+          >
+            First
+          </button>
           <button
             type="button"
             className="action-button secondary"
@@ -125,6 +149,31 @@ export function PagedTable<Row>({
           >
             Next
           </button>
+          <button
+            type="button"
+            className="action-button secondary"
+            onClick={() => { if (page < pageCount - 1) setPage(pageCount - 1); }}
+            aria-disabled={page >= pageCount - 1}
+          >
+            Last
+          </button>
+          <label className="paged-table-jump">
+            Go to page
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={pageCount}
+              value={pageDraft ?? String(page + 1)}
+              onChange={(event) => setPageDraft(event.target.value)}
+              onBlur={commitPageDraft}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') { event.preventDefault(); commitPageDraft(); }
+                if (event.key === 'Escape') setPageDraft(null);
+              }}
+              data-testid={testId ? `${testId}-page-input` : undefined}
+            />
+          </label>
         </div>
       ) : null}
     </div>

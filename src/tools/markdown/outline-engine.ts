@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import type { Root } from 'mdast';
 import type { OutlineEntry } from './markdown-types';
+import { headingText, toSlug } from './heading-slug';
 
 // Builds a document outline from the heading nodes of a parsed document.
 //
@@ -18,35 +19,6 @@ import type { OutlineEntry } from './markdown-types';
 // purposes.
 
 const createProcessor = () => unified().use(remarkParse).use(remarkGfm).use(remarkMath);
-
-// Concatenates the visible text of a heading's inline children. Inline code,
-// emphasis, and links contribute their text; images contribute their alt
-// text, which is the only text a reader would see in an outline.
-const headingText = (node: unknown): string => {
-  if (typeof node !== 'object' || node === null) return '';
-  const candidate = node as { type?: string; value?: unknown; alt?: unknown; children?: unknown[] };
-  if (candidate.type === 'text' || candidate.type === 'inlineCode') {
-    return typeof candidate.value === 'string' ? candidate.value : '';
-  }
-  if (candidate.type === 'image') {
-    return typeof candidate.alt === 'string' ? candidate.alt : '';
-  }
-  if (Array.isArray(candidate.children)) {
-    return candidate.children.map((child) => headingText(child)).join('');
-  }
-  return '';
-};
-
-// GitHub-style slug: lowercased, non-word characters dropped, spaces to
-// hyphens. Duplicate slugs get a numeric suffix so every outline entry has a
-// unique id, matching the disambiguation behaviour readers expect from
-// rendered markdown anchors.
-const toSlug = (text: string): string =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '')
-    .trim()
-    .replace(/\s+/g, '-');
 
 export const buildOutline = (source: string): OutlineEntry[] => {
   const tree = createProcessor().parse(source) as Root;

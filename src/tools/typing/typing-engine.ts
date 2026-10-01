@@ -31,6 +31,7 @@ export interface KeystrokeEvent {
 }
 
 export type ErrorMode = 'strict' | 'master' | 'forgiving' | 'confidence';
+export type FinishReason = 'completed' | 'failed' | 'aborted' | 'stopped';
 
 export interface EngineOptions {
   /** Behavior when the user types the wrong key. */
@@ -54,7 +55,7 @@ export interface EngineState {
   startedAt: number | null;
   endedAt: number | null;
   finished: boolean;
-  finishReason: 'completed' | 'failed' | 'aborted' | null;
+  finishReason: FinishReason | null;
   /** Number of keystrokes counted for accuracy denominator (excludes Backspace). */
   totalKeystrokes: number;
   /** Number of correct keystrokes. */
@@ -280,7 +281,12 @@ export function isTargetCompleted(state: EngineState): boolean {
   return true;
 }
 
-export function finish(state: EngineState, reason: 'completed' | 'failed' | 'aborted', t: number): EngineState {
+export function start(state: EngineState, t: number): EngineState {
+  if (state.finished || state.startedAt != null) return state;
+  return { ...state, startedAt: t };
+}
+
+export function finish(state: EngineState, reason: FinishReason, t: number): EngineState {
   if (state.finished) return state;
   return { ...state, finished: true, finishReason: reason, endedAt: t };
 }

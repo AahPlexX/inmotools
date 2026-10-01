@@ -12,7 +12,8 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'fluid-type-matrix': () => import('./typography/TypographyWorkspace'),
   'pdf-sanitizer': () => import('./pdf/PdfWorkspace'),
   'cron-team-matrix': () => import('./cron/CronWorkspace'),
-  'midi-harmony-lab': () => import('./music/MusicWorkspace'),
+  'midi-harmony-lab': () => import('./music/HarmonyWorkspace'),
+  'audio-mastering': () => import('./music/MusicWorkspace'),
   'svg-sprite-compiler': () => import('./svg/SvgWorkspace'),
   'regex-log-structurer': () => import('./logs/LogWorkspace'),
   'har-sanitizer': () => import('./har/HarWorkspace'),
@@ -32,9 +33,13 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'aethercast': () => import('./aethercast/AetherCastWorkspace'),
   'markdown-workbench': () => import('./markdown/MarkdownWorkspace'),
   'crystal-lattice-studio': () => import('./crystal/CrystalWorkspace'),
+  'transcode-workstation': () => import('./transcode/TranscodeWorkspace'),
   'sightline-velocity': () => import('./sightline/SightlineWorkspace'),
+  'digital-logic-workstation': () => import('./logic/LogicWorkspace'),
   'typing-workstation': () => import('./typing/TypingWorkspace'),
   'tabular-sheet-workstation': () => import('./sheets/SheetsWorkspace'),
+  'geo-intelligence-hub': () => import('./geo-intel/GeoIntelWorkspace'),
+  'tactical-matchboard-studio': () => import('./tactics/TacticalMatchboardWorkspace'),
 };
 
 const cached = new Map<ToolSlug, ComponentType>();

@@ -1,10 +1,326 @@
 # Done
 
+## Markdown Workbench production audit remediation (F11-F21) — shipped and verified
+
+Eleven evidence-backed functions extend the completed F01-F10 ledger: source-scroll sync (F11), bibliography diagnostics (F12), clean-draft persistence (F13), outline filter and current section (F14), local HTML import (F15), formatting tooltips (F16), >=24 px editor-setting targets with font-size feedback (F17), dark workspace (F18), focus writing (F19), Ctrl/Cmd+Shift+7/8/. block shortcuts (F20), and character and line counts (F21). Each has its own e2e test in tests/e2e/markdown-workbench-ux.spec.ts.
+
+- Correction made at integration: the branch's own commits did not deliver F11. The split panes were unbounded (the grid grew to the document, so nothing in the editor scrolled), no scroll listener existed, preview anchors used element.offsetTop (relative to a positioned ancestor, not the preview scroller, so line 1 mapped to ~1,248 px), and a sync request landing mid-render was dropped. Fixed with a scroller listener, a bounded split view (scoped to the Markdown stylesheet), anchors measured in the scroller's own coordinates, and re-application of the latest request once anchors are measured.
+- Stale tests corrected to match intended behavior: the file input's accessible name is now "Open a local Markdown, text, or HTML file" (it accepts HTML); the unsupported-file message says "not a supported document"; a clean untouched document is not persisted as a draft (F13), so an imported file gets its own draft once edited.
+- Verification: tsc clean; tests/unit/markdown*.test.ts 216/216 (run with --testTimeout=60000; the citation tests exceed the 5 s default on this host); tests/e2e/markdown-workbench.spec.ts, markdown-workbench-ux.spec.ts and markdown-mermaid.spec.ts 152/152 on desktop and mobile Chromium with --workers=1.
+
+## glTF / GLB Optimizer completion (TASK-024) — 10/10 acceptance areas complete
+
+The glTF / GLB optimizer (`#/tools/gltf-optimizer`) now rejects malformed containers, reports measured results, preserves scene content, keeps texture formats by default, and optimizes in a cancellable worker.
+
+- Design: `docs/superpowers/specs/2026-09-28-gltf-optimizer-completion-design.md`. Plan: `docs/superpowers/plans/2026-09-28-gltf-optimizer-completion.md`.
+- Integration: PR #94 squash-merged to `main` as `61a9ed5` (2026-10-01 UTC). The merged tree `7a03e8e` is identical to the verified branch head `136ffb0`. The merge base was current `origin/main` `dd12e94`, so nothing landed in parallel was overwritten.
+- Delivered: GLB 2 container framing validation (header length, chunk order and alignment, single BIN, unknown chunks block transformation while inspection still works); unavailable geometry counts shown as "not available", never zero; the geometry result is the measured triangle ratio with a lossy/best-effort note; the run aborts rather than write if camera count, animation count, or animation targets/samplers changed; textures keep their source format by default and WebP conversion is an explicit opt-in that discloses the required `EXT_texture_webp` (no PNG/JPEG fallback, because the installed `@gltf-transform/extensions` writer cannot emit one) before running; optimization runs in a Web Worker and cancel, setting changes, new files and unmount terminate it with no stale output; browsers without `Worker` keep inspection and preview with optimization disabled and explained (no main-thread fallback).
+- Exact-main evidence (`61a9ed5`): Validate and deploy Pages run `36804702509` passed `validate` (2948 unit tests passed, 14 skipped, 0 failed across 261 files; 1137 browser tests passed, 25 skipped, 2 flaky), `build-pages`, and `deploy`. The 2 flaky tests are `crystal-lattice-studio.spec.ts:133` and `typing.spec.ts:439` on mobile Chromium, neither glTF; all 10 glTF cases ran on desktop and mobile Chromium with none retried. The focused run `36804702512` also passed but selected only `exif.spec.ts` (its diff base), so it is not glTF evidence.
+- Post-merge dependency check: PR #96 (`ba91cf94`) later bumped `@gltf-transform/core` and `functions` to 4.5.0 on `main` with `extensions` at 4.4.2. On that merged tree (`71574ea8` plus this tracking change) the glTF tool still passes: `tsc --noEmit -p tsconfig.app.json` exit 0, `tests/unit/gltf.test.ts` + `gltf-worker-client.test.ts` + `e2e-spec-selection.test.mjs` 42/42, `pnpm build` exit 0, and `tests/e2e/gltf.spec.ts` 20/20 with `--workers=1`. The version skew was then removed by aligning all three packages to 4.5.1 (one copy of each in the lockfile, previously two of `core` and `extensions`); the glTF unit suites 42/42, `tsc`, `pnpm build` and `tests/e2e/gltf.spec.ts` 20/20 pass on that set, run against a preview server on its own port because another worktree held 4173.
+- Pre-merge evidence: PR #94 `validate` and `verify` passed. On the merged tree locally: `tsc --noEmit -p tsconfig.app.json` exit 0, focused units 42/42 (`gltf.test.ts` 28, `gltf-worker-client.test.ts` 10, `e2e-spec-selection.test.mjs` 3), `pnpm build` exit 0, `tests/e2e/gltf.spec.ts` 20/20 with `--workers=1`, including a byte-level check of the downloaded GLB (filename, `model/gltf-binary`, magic, declared length, JSON-first chunk order, BIN chunk, non-empty mesh/scene/accessors), phone/landscape/tablet reflow, and Axe with no serious or critical violations. A local full unit run on the authoring host showed 9 failures outside `src/tools/gltf/`; exact-main CI ran the same suite with 0 failures, so those were host-specific.
+- Defects found by tests and fixed: disposing the worker client left the in-flight promise pending (unmounting mid-run would have hung); the no-worker notice rendered only after a model loaded; the first cancel browser test raced real work and was replaced with a gated Worker seam so it is deterministic (6/6 under `--repeat-each=3`).
+- Known limits: converted WebP output requires viewers and engines that implement `EXT_texture_webp`; conversions the browser cannot encode are skipped and reported; very large models are bounded by browser memory. Follow-up recorded in `BACKLOG.md`: evaluate the open `@gltf-transform` 4.5.0 dependency updates.
+- Scope: `src/tools/gltf/`, `tests/unit/gltf*.test.ts`, `tests/e2e/gltf.spec.ts`, `tests/fixtures/gltf-binary.ts`, the glTF catalog entry, one added case in `tests/unit/e2e-spec-selection.test.mjs`, and status notes in the 2026-08-29 Tool 13 design and Task 9 plan. Other workstreams and branches are preserved.
+
+## Typing Workstation UX/UI elevation (TASK-026) — shipped and verified
+
+A real-browser audit (`docs/typing-ux-audit-2026-09-30.md`) found 14 UX defects in the shipped Typing
+Workstation, led by a rendering decision that stretched the workspace to ~21,000 px and clipped it; a
+15th (dark-theme text contrast of 1.0-3.1:1) was found during verification. All 15 are fixed, and the
+audit carries a Resolution table naming the test that guards each. Delivered via PR #97 (plan:
+`docs/superpowers/plans/2026-09-30-typing-ux-elevation.md`).
+
+- Layout: spaces render as real spaces and `.tw-root` uses a `minmax(0, 1fr)` track (page ~21,000 px to ~2,900 px); keyboard heatmap flexes inside a container query; the history table scrolls in its own focusable region.
+- Test first: opt-in `workspaceFirst` flag (catalog + `ToolLayout` + scoped `src/styles.css`) puts the workspace before the guide; on phones the session bar, passage and one-row metrics precede the settings.
+- Passage: bounded 3-line window (`src/tools/typing/typing-window.ts`, 8 unit tests) that follows the typist, plus an idle "Click here and start typing" cue.
+- Result dialog: focuses the panel, not a field (trailing keystrokes were being typed into "Typist name"); tabular stats, paired fields, exports grouped apart from Discard / Save.
+- Polish: one primary action, row-based settings, history/analytics empty states, reset in its own zone, plain-language stat hints, inline styles and hard-coded greys replaced by theme-aware classes, all ten themes at WCAG AA contrast.
+- Not changed: metrics engine, corpora, storage schema, export formats, shortcuts. Deliberately not done: collapsing the thirteen sections into tabs; real screen-reader (NVDA/VoiceOver) testing.
+- Verification: `tsc`, `pnpm build`, and `tests/e2e/typing.spec.ts` on desktop and mobile Chromium (run `--workers=1` on this host), with new geometry, first-viewport, windowing, dialog-focus, empty-state, cue/primary/settings and per-theme Axe tests.
+
+## Geo Intelligence Hub (TASK-025) — shipped and audited
+
+Added `geo-intelligence-hub` as a new catalog entry: a keyless, provenance-tracked location
+workstation. Every value shown (country, admin hierarchy, time zone, sun/moon times, elevation,
+holidays, World Bank/Eurostat figures, nearby places) carries its source, record ID, reference
+year, retrieval time, license, and confidence class. All 44 planned features (F01–F44, ledger in
+`src/tools/geo-intel/TODO.md`) are implemented: universal search across place names, postal codes,
+DD/DMS/DDM, UTM, MGRS, Plus Codes, geohash, Maidenhead locators, `geo:` URIs, map links, and
+shareable deep links; consented device location; map click lookup; batch CSV postal lookup;
+side-by-side comparison of up to 6 locations; a provenance inspector; a country choropleth; and
+exports to JSON, GeoJSON, KML, flat CSV, PDF, iCalendar, PNG, SVG, a 1200×630 social card, and a
+ZIP bundle, each with an editable title/author/tags/license/notes and a JSON re-import path.
+
+Every network source is free, keyless, and CORS-verified live from the deployed origin before use
+(Zippopotam.us, Postcodes.io, World Bank v2, Eurostat, Eurostat GISCO ID, geoBoundaries, BigDataCloud
+client reverse-geocode, Photon, Nominatim, Nager.Date, Sunrise-Sunset.org, SunriseSunset.io, AWS
+Terrain Tiles, Open-Elevation); country/timezone/populated-place/admin-1 data is bundled from Natural
+Earth, GeoNames, Wikidata, and timezone-boundary-builder for full offline operation. Nominatim is
+off by default (opt-in switch) per its usage policy; BigDataCloud's free endpoint is used only for
+the device's own location per its fair-use terms; Open Topo Data was dropped after live testing
+showed it sends no CORS header, replaced by AWS Terrain Tiles with an Open-Elevation fallback.
+
+A follow-up production audit (2026-09-29) found and fixed 17 issues before merge: a bare postal
+number with no country failed instead of falling back to search; the holiday panel went blank once
+every date in the year had passed instead of rolling to next year; sun/moon times had no date
+picker; moon phase/illumination/rise/set from both providers were computed but discarded; search
+had no way to pick a different match; there was no shareable link; geohash/Maidenhead/antipode and
+GeoJSON/KML export were missing versus GIS/radio-tool competitors; saved locations could not move
+between devices (JSON import added); the search box had no recent-query recall; errors could not be
+dismissed; every field label and card heading was an extra keyboard tab stop; the tab strip ignored
+the ARIA arrow-key pattern; status copy read as mechanical; the catalog title wrapped to five lines
+and one control used a glyph (`ⓘ`) the site font renders as an empty box; and the sun-date input
+kept a stale value across locations. Full findings/resolutions/evaluated-and-rejected list:
+`src/tools/geo-intel/TODO.md` → "Production audit — 2026-09-29".
+
+Scope stayed exactly within the declared boundary: every change lives in `src/tools/geo-intel/**`
+and new test files under `tests/{unit,e2e,fixtures}/geo-intel*`, except two required, minimal, and
+pre-declared exceptions — one new `TOOLS` entry in `src/catalog.ts` and one loader line in
+`src/tools/workspaces.tsx` (both required by the existing `Record<ToolSlug, …>` typing; no other
+tool's files were touched). No dependency was added; UTM/MGRS/Plus Codes/geohash/Maidenhead/PNG
+decoding/TopoJSON decoding are implemented in-house against official test vectors (Open Location
+Code's own `test_data`, proj4js/mgrs reference vectors, the published geohash example, ARRL W1AW's
+published Maidenhead locator) rather than adding a package.
+
+Fresh evidence on the final merge-ready tree (synced onto `main` tip `61a9ed5`, no conflicts; an
+earlier sync resolved a catalog/loader conflict with Tactical Matchboard Studio by keeping both
+entries): `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` **270 files / 3,090 tests
+passed** (2 files / 14 skipped, pre-existing and unrelated); `pnpm build` exit 0; the geo-intel,
+glTF, and catalog-wide `accessibility.spec.ts` + `app.spec.ts` browser specs **142 passed / 10
+skipped / 0 failed**. 26 of 29 automated PR review findings were fixed with regression tests
+(`tests/unit/geo-intel-review.test.ts`); 3 were declined with reasons (`src/tools/geo-intel/TODO.md`,
+Delivery 15). Task ID is TASK-025 (TASK-024 belongs to the glTF optimizer).
+
+## Digital Logic Workstation — 34/34 complete
+
+Local-first digital logic circuit simulator, schematic capture and prototyping workstation (`#/tools/digital-logic-workstation`). All 34 ledger items are implemented and merged; the per-item ledger is in the design document, the phased delivery in the plan. Handoff detail, evidence and known limits follow.
+
+- Design: `docs/superpowers/specs/2026-09-16-digital-logic-workstation-design.md`.
+- Plan: `docs/superpowers/plans/2026-09-16-digital-logic-workstation.md`.
+- Branch: `claude/digital-logic-workstation-gcq2m8` carried the work; PR #87 was squash-merged to `main` as `77e9f3d` on 2026-09-29 and the branch is retired.
+- Final state: **all 34 ledger items are implemented (Phase 4 delivered, 2026-09-29); the tool is complete and merged to `main` as `77e9f3d` (PR #87, squash, 2026-09-29); exact-main CI is green (Validate and deploy Pages run 36633253585, Focused tool validation run 36633253619).** History of the milestones, oldest first: **Phase 1 (PR #39) is merged to `main` (2026-09-21)**: infinite pan/zoom canvas, orthogonal wire routing, the AND/OR/NOT/NAND/NOR/XOR/XNOR/BUFFER/TRI-STATE gate suite (2-8 inputs), ideal and realistic (tick-scaled) propagation delay, D/JK/T flip-flops and SR latch, clock/switch/push-button/LED/probe, truth-table generation with SOP/POS extraction and CSV export, one-click ERC, context menus, keyboard shortcuts with a reference panel, four themes, undo/redo, autosave plus `.circuit.json` export/import, SVG schematic export with a title-block studio, and responsive slide-over palette/inspector. **Phase 2A (combinational blocks, ledger items 17 and 18) is delivered on this branch:** MUX, DEMUX, binary decoder and priority encoder (`src/tools/logic/block-engine.ts`), each with 2-16 select/address lines (`selectBits` 1-4), an optional EN pin (MUX/DEMUX/DECODER), decoder output polarity, 4-valued X/Z propagation, and matching Canvas2D and SVG rendering. Also fixed in the same change: the selection outline for gates/sequential parts was offset from the drawn body and ignored rotation/mirror, flip-flop captions collided with SET, and flip-flop outputs both read "Q" (now `Q`/`QN`). Palette group "Multiplexers & decoders", inspector controls, and an e2e 2:1-mux truth-table case are in. **Phase 2B (counters and registers, ledger items 7 and 10) is delivered on this branch:** `COUNTER` (2-8 bit, up or down, synchronous or asynchronous ripple, optional EN, optional synchronous LOAD with D pins, async RST, terminal-count `TC` flag, rising/falling edge, active-high/low RST/LOAD) and `REGISTER` (2-8 bit parallel capture with optional EN and RST) live in `src/tools/logic/register-engine.ts`; the ripple mode shows real transient states (0111 -> 0110 -> 0100 -> 0000 -> 1000) one tick per bit in realistic-delay mode and settles at once in ideal mode; a first clock sample is never an edge. The workspace loop keeps stepping while a ripple is settling. **Phase 2E (logic-analyzer dock, ledger item 15) is delivered on this branch:** `analyzer-engine.ts` (pure: channel selection from probes/LEDs or any output pin, up to 16; a rolling 2048-sample ring keyed to simulation ticks that records every step whether or not the dock is open; edges with rising/falling/unknown kinds, so a change into or out of Z/X is never called a clean edge; cursor measurement in ticks and, in realistic-delay mode, nanoseconds at `DELAY_SCALE_NS` per tick; time-axis math), `analyzer-render.ts` (canvas timing diagram: value labels, gridlines, edge markers, X band, dashed Z, cursor badges in a footer strip) and `LogicAnalyzerDock.tsx` (click places cursor A then B, drag or wheel scrolls, ctrl+wheel and buttons zoom, Fit all, Follow live, keyboard cursor nudging, channel picker, scroll slider, a screen-reader list of latest values, full-screen toggle, and always full screen on narrow viewports). A real-simulation test proves a 300 ns gate delay measures as 3 ticks / 300 ns. **Phase 2D (touch two-finger pan and pinch-zoom, closing the last Phase 1 UX gap) is delivered on this branch:** pure math in `touch-gestures.ts` (wheel and pinch share `zoomViewportAt`; a pinch is recomputed from its start state so error never accumulates and the drawing under the fingers stays under them, even at the zoom limits), per-finger tracking in `LogicCanvas.tsx`, second finger abandons the first's gesture (previewed drag restored, held push button released, touch drop only on lift), `pointercancel` handled. **Phase 2C (segment displays and BCD decoder, ledger item 12) is delivered on this branch:** `BCD_7SEG` (a combinational block: 4-bit BCD to segments A-G, optional EN, active-high/low; codes 10-15 blank), `SEVEN_SEGMENT`, `SEVEN_SEGMENT_4` (multiplexed: shared segment pins plus DIG1-DIG4 selects, each digit holds what it last captured, i.e. persistence of vision) and `SIXTEEN_SEGMENT` (pins A1 A2 B C D1 D2 E F G1 G2 H I J K L M DP; H/J are the upper-left/right diagonals, K/M the lower-left/right, I/L the upper/lower verticals) in `src/tools/logic/display-engine.ts` with shared glyph geometry in `segment-shapes.ts`; the simulator stores lit segments in `ComponentRuntimeState.segmentLit`; exports draw every digit unlit. Palette buttons use `paletteLabel`. A pin's label side now follows which edge it sits on (a display's digit selects are inputs on the right). Also fixed: component hit-testing used a padded 72px box per part and returned the first overlap, so a click on the lower of two switches placed the usual two rows apart hit the upper one (now tested against the drawn body, mirror/rotation applied, topmost first: `findComponentAt`). ERC now reports one finding per unwired pin and names the component and pin (it previously collapsed a part's floating pins into one anonymous finding); truth tables refuse counters/registers.
+- Latest evidence (Phase 4, 2026-09-29): `vitest run tests/unit/logic-*.test.ts` - 655/655 passing across 31 files (Phase 4 adds `logic-netlist-engine` 14, `logic-hdl-export` 19, `logic-hdl-toolchain` 9 and `logic-spice-toolchain` 4 (tool-gated), `logic-netlist-export` 14, `logic-bom-engine` 24, `logic-svg-subset` 20, `logic-pdf-export` 14, `logic-og-card` 18, `logic-export-formats` 10); `tests/e2e/logic.spec.ts` 52/52 on desktop and mobile Chromium (Phase 4 adds the Export dock case: Verilog, VHDL, PDF, BOM, PNG card with 1200x630 header check, meta tags, project file); filtered `tsc --noEmit -p tsconfig.app.json` clean; PDF and card output viewed rendered (pdftoppm, Chromium). Earlier evidence (Phase 3H, 2026-09-29): `vitest run tests/unit/logic-*.test.ts` — 508/508 passing across 21 files (3H adds `logic-subcircuit-engine.test.ts`, 30 tests: grouping, port reuse, buses, nesting, flatten ids, pass-through, scoped editing and write-back, frame scoping, import validation, scoped truth tables); `tests/e2e/logic.spec.ts` 50/50 on desktop and mobile Chromium (3H adds group/open/try/return and port-marker cases); evidence at 3G: 478 unit across 20 files and 46 e2e; evidence at 3F: 458 unit across 19 files (`logic-alu-engine.test.ts` 25, `logic-memory-engine.test.ts` 54) and 42 e2e; earlier evidence (3E): 379/379 unit and 36/36 e2e; earlier still: 345/345 passing across 16 files, including `logic-shortcut-engine.test.ts`, `logic-junior-theme.test.ts`, `logic-puzzle-engine.test.ts`, `logic-minimize-engine.test.ts`, `logic-synthesis-engine.test.ts`, `logic-analyzer-engine.test.ts`, `logic-block-engine.test.ts`, `logic-register-engine.test.ts`, `logic-display-engine.test.ts`, `logic-hit-testing.test.ts` and `logic-touch-gestures.test.ts` (truth tables, X-propagation, enable/polarity, port layout, clamping of untrusted `selectBits`, simulator and SVG-export integration). Filtered `tsc --noEmit -p tsconfig.app.json` (restricted to `src/tools/logic|tests/unit/logic`) clean. `tests/e2e/logic.spec.ts` — 34/34 (17 cases x desktop and mobile Chromium, including the counter, display, analyzer, K-map minimizer, puzzle, Junior Explorer, shortcut-remapping, two-finger and closely-spaced-switch cases; run against a Vite dev server started and stopped inside one shell command, because a background dev server does not survive between commands in this sandbox) against a local Vite dev server; screenshots reviewed for the block bodies, captions and selection outline. Not run in this sandbox: full `pnpm build` and the whole-repo unit suite (stale `node_modules` and `cdn.sheetjs.com` blocked by egress policy) — CI is the source of truth for those.
+- **Phase 2 is complete. Phase 3 (3A-3H) and Phase 4 (4a-4e) are delivered; the sub-phase notes below are in the order they were built. 3A:** the K-map solver and Quine-McCluskey minimizer (ledger item 21). `minimize-engine.ts` (pure: prime implicants, essential primes, exact Petrick cover with a deterministic fewest-terms-then-fewest-literals tie-break, POS via the complement, don't-cares, 2-5 variables, K-map layout in Gray order with textbook `AB = 00,01,11,10` headers, wrap-aware grouping-loop pieces), `synthesis-engine.ts` (builds a real AND-OR or OR-AND circuit of the workstation's own gates from a minimized expression, with an OR/AND tree above 8 terms, and places it clear of existing content), `LogicMinimizerDock.tsx` (SVG K-map with color-coded loops that open at wrapped edges, SOP/POS toggle, minimized expression and term/literal counts, accessible prime-implicant table, floating/contended rows optionally treated as don't-cares, buttons that add the minimized circuit undoably). Proven exhaustively: every 2- and 3-variable function is minimal (against a brute-force optimum over all prime subsets) and its synthesized circuit reproduces the function in the simulator; seeded random 4/5-variable functions likewise. `orthogonalWaypoints` moved to `geometry.ts` so the canvas and synthesis share one routing rule. **3B delivered: the gamified puzzle engine (ledger item 23)** — `puzzle-engine.ts` (11 built-in levels from "Light the bulb" to "Which number is bigger?", each with fixed labeled switches/LEDs, an allowed-parts list, and a reference part count as par; a verifier that reads the player's circuit through the truth-table generator so a pass means the simulator really produced the table, reports per-row expected vs actual (a floating output shows Z, not a wrong 0), names missing/extra/duplicate switches and LEDs and disallowed parts, and awards 1 star for a solve and 2 for matching par; defensively parsed saved progress) and `LogicPuzzleDock.tsx` (level list, goal/rules/hint, the truth table to match with ✗-marked wrong rows, Start this level, Check my circuit, Next level, progress remembered in localStorage). Every level's reference circuit is built and verified in tests to solve it at exactly par. **3C delivered: the Junior Explorer theme (ledger item 24)** — a fifth theme (`junior-explorer`) with heavier lines/pins/text (`ThemePalette.emphasis`), a body color per component family shared by the canvas and the palette buttons (`familyFill`), a glowing lit LED, and animated white dashes travelling along high wires (`flow`, drawn from a ~30 fps clock only in themes that ask, and held still under `prefers-reduced-motion`); a toolbar button swaps into it in one click (theme plus at least 1.35 zoom) and back, restoring the previous theme and zoom; large cream/orange workspace chrome with 44px-minimum controls. A new contrast test (WCAG AA text, 3:1 graphics) also caught and fixed a pre-existing accessibility flaw: the color-vision-safe theme's low-signal orange had 2.2:1 contrast on its background (now `#b35a00`, 4.75:1). **3D delivered: full keyboard remapping (ledger item 27, remaining part)** — `shortcut-engine.ts` (pure: ten actions including the new Step, Flip, Duplicate and Focus-palette alongside the original six; Ctrl and Cmd as one modifier; matching that requires the exact modifiers and ignores Alt; validation that refuses Tab/Enter, function keys, browser-owned Ctrl combinations and any key another action uses, naming that action; rebind/add/remove with at least one shortcut always kept; per-action reset that never steals a key another action holds; defensively parsed persistence in which a person's own customization beats another action's default and a displaced action gets a free letter rather than none) and `LogicShortcutsDock.tsx` (a table with Change/Remove/Add another/Reset per action and Reset all; recording uses a capture-phase listener so the recorded key does not also act; conflicts shown in an alert; choices saved to localStorage). The workspace's key handler now runs off the map. Also fixed: Space on a focused button or disclosure activated it and toggled the simulation; it now only activates the control. **3E delivered: multi-bit buses (ledger item 3)** — `bus-engine.ts` (pure: 2-16 bit widths, `Q[7:0]` labels, wire-end rules that refuse bus-to-single and width mismatches with a plain-language reason, aggregate level with X beating Z beating 1, binary/hex/decimal formatting, `describeBus`), a `BUS_SPLITTER` part (bus pin on the left, one tap per bit on the right), and a "Bus pins (D and Q as single buses)" option on REGISTER/COUNTER. The simulator itself stays scalar: `PortDefinition` gained `bus`/`hidden`/`alias` and a `passive` direction, `getComponentPorts` returns the visible pins and `getSimulationPorts` the single pins the simulator drives, and `buildNetIndex` unions bus bit groups pairwise and splitter alias pins, so bits ride buses bit for bit. Refused connections surface as a notice in the workspace (`wireProblem`); resizing a bus drops wires that no longer fit; project import rejects hand-edited files that join mismatched ends. Canvas and SVG export draw bus wires thick with a slash-and-count mark and bus pins as squares; hover, or touch hold, on a bus pin reads its value. **3F delivered: the ALU and RAM/ROM (ledger items 16 and 9)** — `alu-engine.ts` (4/8/16-bit combinational ALU: ADD, SUB, AND, OR, XOR, SHL, SHR, SAR with carry in, carry/borrow out, Z/N/V flags and always-on unsigned EQ/LT/GT; built from four-valued gates so unknown bits spread only as far as in hardware; verified exhaustively at 4 bits and by seeded sweeps at 8 and 16 against plain integer arithmetic) and `memory-engine.ts` (RAM/ROM, 4-32 bit addresses, 4/8/16/32-bit words, sparse contents, asynchronous reads, optional output enable that releases the bus, clocked RAM writes that are skipped and reported when address/data/enable are unknown, live writes as an overlay on stored contents, strict import validation, little-endian raw binary import/export) with `LogicMemoryDock.tsx` (paged hex and ASCII editor, go-to, fill, clear, write text, import/export, live and addressed-word markers, keep/reset live values). Bus width cap raised to 32. **3G delivered: the RGB LED pixel matrix (ledger item 13)** — `matrix-engine.ts` (8x8 and 16x16, row and column inputs plus R/G/B, a pixel lights where an asserted column crosses the selected row in the driven color and holds until its row is selected again so scanning demos read as one picture, selectable polarity, unknown or floating drive leaves a pixel unlit; one shared pixel layout for the canvas and the SVG export). **3H delivered: subcircuits and truth-table scoping (ledger items 4 and 19)** — `subcircuit-engine.ts`/`subcircuit-ports.ts`: "Group into subcircuit" turns a selection into one part whose ports are port markers made from the wires crossing the selection edge; the circuit is stored by value in the part (self-contained files, copies are independent, nesting to 8 levels); the simulator, rule check, truth table and analyzer run on the flattened circuit (`flattenDocument`, cached per document object), so behavior is identical to the ungrouped parts; double-click/context menu/inspector opens it, edits apply at the open path and write back through every level (`applyAtPath`), breadcrumbs and "Up one level" return, and the running simulation is shown from inside (`scopeFrame`); inside, port markers act as switches/LEDs so its truth table is over its ports; the truth table can be scoped to selected parts; imports are validated recursively (depth, expanded size, wires, bus widths). Inspector: name, icon (presets + text), port names, signal width for bus ports. **Phase 4 delivered: exporters (ledger items 29-33).** `netlist-engine.ts` (`buildNetlist`: the flattened circuit as parts with reference designators SW1/U1/D1..., pins, union-find nets named from switch/LED/probe labels or `n<k>`, circuit ports and bus bits) is the single source every text exporter reads; `cell-map.ts` and `hdl-cells.ts` map each part to a primitive or a behavioral cell. **4a** `hdl-verilog.ts` (gate primitives, optional per-gate delays, behavioral cells for flip-flops, muxes, counters, registers, ALU, memories, tri-state buses) and `hdl-vhdl.ts` (entity/architecture, out-port readback signals); both are proven by co-simulating the exported circuits in Icarus Verilog and GHDL against the workstation simulator (`logic-hdl-toolchain.test.ts`, tool-gated: skipped where iverilog/ghdl are missing). That co-simulation found a real simulator bug (a sink behind combinational logic that follows a clocked part showed the pre-edge level for one tick), fixed in `sim-engine.ts` with a regression test. **4b** `spice-export.ts` (behavioral B-source subcircuits, ngspice-verified in `logic-spice-toolchain.test.ts`, tool-gated), `kicad-export.ts` (s-expression netlist), `edif-export.ts` (EDIF 2 0 0, `rename` for non-identifier names). **4c** `bom-engine.ts` + `ic-catalog.ts`: gates and flip-flops map to 74-series packages with pin tables read from manufacturer datasheets on 2026-09-29 (7400, 7402, 7404, 7408, 7410, 7411, 7420, 7421, 7427, 7430, 7432, 7474, 7486, 74125; quirks kept: 7400 gate 3/4 input order, 7427 gate 3 swap), gates with no single package are decomposed into 2-input gates, spare gates list the inputs to tie off, blocks (mux, decoder, counter, ALU, memories) get a part number with notes but no pin allocation (their pinouts were not verified); CSV, JSON and pin-allocation CSV. **4d** `svg-subset.ts` reads the schematic SVG back into draw items and `pdf-export.ts` writes them as a one-page vector PDF with pdf-lib 1.17.1 (already pinned; npmjs.com confirmed it is the current release on 2026-09-29, so no dependency was added): drawing-sheet border with lettered columns and numbered rows, title block, reference designators, net labels, A4/A3/Letter, document properties from the project metadata, deterministic for a fixed date. `renderSchematicSvg` gained the options `designators`, `netLabels`, `sheet` and `titleBlock` (default output unchanged). Built-in Courier only: characters outside WinAnsi become an ASCII stand-in or `?`. **4e** `og-card.ts` (1200x630 social card SVG with title, description, author, version, license, tags and a schematic thumbnail; the `og:`/`twitter:` meta tags per ogp.me; title, description, site name and addresses editable at export time, addresses refused unless http(s) or relative; warnings when `og:url` or an absolute `og:image` is missing), `svg-raster.ts` (browser PNG), `export-formats.ts` (every file in one list, `runExport`), `LogicExportDock.tsx` (toolbar button "Export...": grouped downloads, warnings, paper size, live card preview). **Known limits:** production `pnpm build` cannot run in the authoring sandbox, so CI is the build gate; the tool-gated tests skip where iverilog, ghdl, ngspice or pdftotext are absent; Intel HEX is not written (the memory editor's raw binary import/export covers memory contents); `og:url` is the page's own address and must be typed. **Remaining:** none in the ledger. Optional follow-ups, each its own PR: refresh the tool's blurb in `src/catalog.ts` (buses, memory, subcircuits and the exporters are not mentioned; note that any edit to that file makes PR CI run every tool's browser suite), verified pin tables for the mux/counter/ALU/memory blocks in the BOM, Intel HEX export for memories.
+- Completion gate: every ledger item in the design document implemented or explicitly excluded per its scope policy (met: all 34 implemented), each phase's own unit/build/Playwright evidence green (units and e2e green locally; the build runs in CI), and the repository-wide Pages workflow green on the integrated revision (met: run 36633253585 on `77e9f3d`).
+- Scope: `src/tools/logic/`, `tests/unit/logic-*.test.ts`, `tests/e2e/logic.spec.ts`, this design/plan pair, and the additive catalog/loader registration. Other workstreams and branches are preserved.
+
+## PlanCraft Studio real-world hardening — 38/38 complete
+
+Owner field testing showed the floor-plan tool (`#/floorplan-studio`, TASK-001) was not fit for real
+use despite its earlier "complete" status. The 2026-09-27 pass verified and closed 22 defects and 16
+capability gaps (F01–F38). The per-row ledger, evidence, and known limits are in
+`src/tools/floorplan/TRACKING.md`. Highlights: DXF R2000 is now a valid R2000 file and both DXF
+versions are no longer mirrored; clearance checks separate real collisions from access zones and
+toilets use the 2010 ADA 604.3.1 clearance; walls split at T junctions so rooms divide correctly;
+wheel zoom no longer scrolls the page; touch taps and two-finger gestures behave; furniture and
+corners drag with single-step undo; inspector fields commit cleanly and accept feet-and-inches;
+selection is visible; PDF sheet/scale pickers explain oversize plans; phones get tools above the
+drawing. Integrated to `main` at `8b09048` by owner-approved fast-forward, because PR creation
+returned 403 for the working session.
+
+## Markdown Workbench real-world remediation + historical reconciliation — 10/10 complete
+
+The 2026-09-27 Markdown real-world pass is complete on `origin/main`. F01–F07 close dirty-safe
+file replacement, imported-file draft isolation, durable names/name-only autosave, hash-safe preview
+anchors, full-width Preview mode, runtime document-file validation, and conventional formatting
+shortcuts. Reconciliation of the stale `claude/markdown-tool-audit-docs-lwrb3w` branch then closed
+F08–F10 without merging its old tree: detached Copy/HTML/EPUB rendering now uses stable export-safe
+`tok-*` syntax-highlighting classes, cosmetic highlighting is bounded at 20,000 characters per fence,
+and the dead contradictory `markdown-types.ts` `ExportAsset` declaration is removed.
+
+Product implementation revision: `63b99476f3731266c1c57f268ca4259b446fe19f`.
+Final acceptance revision: `4607159234bc84653585c4a0906a212ea8574396`. Git comparison proves the
+only changes between those revisions are the Markdown regression files (one exact size-fixture
+correction and one Copy HTML browser assertion), so shipped product source is byte-identical.
+
+Fresh evidence:
+- same-product focused run `36332490614` / job `108656984010` passed the production build and
+  **124/124** desktop/mobile Chromium checks across all three Markdown specs;
+- exact-final focused run `36332688014` / job `108657533447` passed the production build and
+  **54/54** desktop/mobile UX checks, including Copy HTML token markup, self-contained standalone
+  HTML coloring, packaged EPUB coloring, oversized-fence fallback, and the complete F01–F07 UX set;
+- exact-final Pages run `36332688074` completed its repository unit step successfully, completed its
+  production build successfully, built/uploaded the Pages artifact through job `108657533637`, and
+  deployed successfully through job `108657642431`.
+
+No dependency changed. Direct current-tree reads confirm the contradictory `ExportAsset` type is gone
+and the export-safe stylesheet is present. The historical branch has no open PR and no intended behavior
+left stranded from `main`; it is superseded evidence and must not be merged wholesale. The available
+GitHub connector exposes no branch-delete/ref-delete action, so physical deletion of that already-
+superseded ref was not performed by this workstream.
+
+The durable handoff is `docs/markdown-audit-2026-09-16.md`. Future Markdown work should reopen task
+state only for a newly verified defect or explicitly accepted scope.
+
+## Markdown Workbench Gauntlet hardening — 4/4 complete
+
+The post-completion Markdown adversarial pass is integrated on `origin/main` at
+`9c005972e60c445700a45739865d4f0391cfd1ed` through merged PR #79. It closes four hardening
+contracts without changing the established Markdown feature count: stale citation-result rejection,
+table-formula Worker lifecycle/cancellation safety, detached export sanitization, and Graphviz SVG
+navigation/resource sanitization.
+
+Final PR run `36283957420` passed **195 unit files / 1956 tests**, production build, and **106/106**
+selected Markdown desktop/mobile Chromium cases. Exact-main focused run `36284149989` passed build and
+**106/106** Markdown browser cases again. Exact-main Pages run `36284150052` passed install, units and
+build, built/uploaded the production artifact, and deployed successfully through job `108521673120`.
+A forced uncached production-route fetch returned HTTP 200 with the current Markdown Workbench surface.
+
+The temporary validation workflow was removed before merge and the PR branch was removed after merge.
+Static closure found no Markdown FIXME/HACK, XHR/WebSocket, or internal prompt/confidence/chain-of-thought
+leakage. Remaining TODO text belongs to bundled upstream CSL XML; export `fetch` usage is limited to
+document-referenced asset inlining/EPUB packaging rather than hidden telemetry or file upload.
+
+## Photo Studio — 164/164 complete
+
+Photo Studio is complete against its authoritative 164-capability ledger and integrated on
+`origin/main` through merged PR #78 at product revision
+`4740cca77eb946801e09a78dec8022d448aac67a`. The final PR head
+`7d6a67e950e41bd4187f58ccf3f1b340b355ed85` and the integrated main commit share the
+identical Git tree `a1b3fedc3e6e5e023491bfe116a3c450fe46db37`; old draft PR #29 was closed
+as superseded.
+
+The completed product includes local JPEG/PNG/WebP/TIFF/camera-RAW acquisition, reversible global and
+local editing, crop/transform/perspective/detail/color workflows, selections and masks, retouching, layers
+and compositing, warp/liquify and deterministic filters, HDR/exposure-fusion/panorama/focus/average/median
+multi-image merges, project/preset/snapshot/version workflows, TIFF/AVIF and metadata-aware export,
+resampling, print/contact sheets, and progressive File System Access—all within the static/local-first
+architecture.
+
+Final evidence:
+- full merged-tree Pages validation run `36195289978` / job `108269628093` passed frozen install,
+  repository units, production build, Chromium installation, and the complete desktop/mobile browser suite;
+- exact-main Pages run `36204814286` passed frozen install, repository units and production build,
+  built/uploaded the production Pages artifact, and deployment job `108299095824` succeeded;
+- a forced uncached live fetch of `/#/tools/photo-studio` returned HTTP 200 and rendered the completed
+  production workspace after deployment;
+- the focused Photo matrix previously reached 210/210 desktop/mobile browser checks and 41 unit/selector
+  files / 445 tests;
+- all five Photo-specific runtime dependencies are current exact pins and the dependency audit found zero
+  known vulnerabilities across 136 scanned packages/dependencies;
+- static closure found no Photo TODO/FIXME/HACK implementation debt, remote network path, or internal
+  prompt/confidence/chain-of-thought leakage.
+
+No accepted capability is deferred. Future Photo scope must start from current `origin/main` and re-enter
+the task-state system.
+
+## Typing Workstation — 47/47 complete
+
+The approved 2026-09-25 traditional-controls/local-typist expansion is complete on top of the original 38-capability workstation. F39–F47 add explicit Start/Pause/Resume/Stop/Reset lifecycle controls, paused-time-excluded scoring, persistent browser-local typist profiles, profile-scoped history/averages/PBs/imports/exports, profile-specific score reset, and active-session mutation guardrails while preserving implicit first-character start and the existing native input/IME path.
+
+The Gauntlet adversarial pass found and fixed one remaining state-integrity/affordance gap: score-history import, saved-result deletion, and selected-profile score reset could still change history/PB context while Running/Paused, and the guarded focusable New text action lacked a visible unavailable state. Accepted product tip `7222854833f507ebfbcf00ab0c156b58ee90f335` passed dedicated run `36188765930` / job `108248550068`: **76/76 focused Typing units across eight files**, production build, and **18/18 desktop/mobile browser checks**. Pages run `36188765977` built and deployed the same product revision successfully.
+
+## Vector Studio — 66/66 complete
+
+Vector Studio is complete against the 66-capability design ledger in
+`docs/superpowers/specs/2026-09-11-vector-studio-design.md`. The authoritative product revision
+is `e5a31cf0a01da6ede1437f15a457a54afcdf3e29` on `origin/main`.
+
+The final closure pass did not add feature-count inflation. It reconciled the historical
+`feat/vector-spec-completion` and `fix/vector-path-motion-20260916` branches against current
+`main`, proving the accepted UI/export/tests are already integrated and that the current engine
+is the completed engine plus the later SVG path-geometry translation fix. It then fixed two real
+closure defects: focused validation omitted `vector-nested-composition.spec.ts`, and the
+artboard/inspector scroll regions failed Axe's serious `scrollable-region-focusable` rule.
+Focused SVG validation now selects both Vector browser specs; scrollable Vector regions are
+keyboard reachable with visible focus and native scrolling keys preserved.
+
+Exact-main focused run `36052165692` / job `107810129727` passed the production build,
+selector step, Chromium install, and **22/22 desktop/mobile browser checks**, including the new
+serious/critical Axe regression and nested composition parity. Pages run `36052165503` passed
+repository units and production build, built the production Pages artifact, and deployed the same
+revision successfully through job `107810383399`. Static closure found no Vector
+TODO/FIXME/HACK implementation debt and no remote `fetch`, `XMLHttpRequest`, or `WebSocket`
+path under `src/tools/svg/`.
+
+Historical Vector branches are evidence only and must not be merged wholesale. New Vector scope
+must re-enter the task-state system from current `origin/main`.
+
+## TASK-013: Reconcile the two undo histories in Markdown Workbench
+**Priority:** P3 | **Tags:** editor, ux | **Completed:** 2026-09-24
+
+Closed without collapsing the two history systems into one. CodeMirror keeps its native fine-grained Ctrl/Cmd+Z history and caret behavior. The workspace toolbar now exposes explicitly named document-step Undo/Redo controls and groups adjacent editor changes into one coarse snapshot by edit proximity; opening a file, loading a draft, starting a new document, or using toolbar undo/redo resets that grouping boundary. External document swaps remain excluded from CodeMirror history, so the two stacks do not fight.
+
+The same completion pass resolved TASK-014's Markdown-specific performance item: live table-formula substitution moved from the React render path to a reusable cancellable local Web Worker, with latest-request protection and a synchronous no-Worker fallback. Export actions still compute their requested exact snapshot synchronously because they are explicit operations rather than per-keystroke work.
+
+Red-first evidence was captured before implementation. Final pre-integration PR validation run 36042091133 passed 154/154 unit files (1507/1507 tests), the production TypeScript/Vite build, and all 100 focused Markdown browser checks across desktop and mobile Chromium.
+
+---
+
+## Typing Workstation completion audit — 38/38 complete
+
+The 2026-09-24 Typing follow-up is closed without expanding the original 38-capability denominator.
+Fresh source and standards review found two real interaction defects in the already-shipped tool:
+the typing surface depended on raw `keydown` text capture, which excluded reliable software-keyboard
+and IME text entry, and it intercepted `Tab` to generate a new sample instead of allowing standard
+focus traversal. The implementation now uses a native textarea input surface with
+`input`/composition handling, preserves physical `KeyboardEvent.code` metadata for raw hardware
+logs when available, supports mobile Backspace input, moves fresh-sample generation to `F2`, keeps
+`Tab` as normal focus navigation, exposes the shortcuts in visible copy, gives tag-removal targets
+a 24 CSS-pixel minimum, and reflows the virtual keyboard/panels across compact widths.
+
+Product changes landed directly on `origin/main` as
+`dea365cf61d1633db66fdcc49b8321a4f3e8ff76` and follow-up compatibility fix
+`1538148b21d7502bc181ffe7ffcf1f683beb750d`. Dedicated Typing run
+`36009754067` / job `107667101416` passed **67/67 focused unit tests**, the production
+build, Chromium installation, and **14/14 desktop/mobile browser checks**. Pages run
+`36009753871` built and deployed the same product revision successfully. Its repository-wide
+browser lane was red on 15 failures in other workspaces/infrastructure, while all 14 Typing cases
+executed and none failed. `main` subsequently advanced only through unrelated Crystal/task
+documentation before closure, and no Typing-named branch remains.
+
+The Typing plan is the maintenance handoff:
+`docs/superpowers/plans/2026-09-15-typing-workstation.md`. New Typing scope must re-enter the
+task-state system rather than reopening this completed audit implicitly.
+
+## Transcode Workstation — F01–F36 complete
+
+The local-first Transcode Workstation is complete against its 36-capability design ledger and
+integrated on `origin/main` through PR #33 (merge commit
+`c923512a753b15c2086e3e22f7c189c42fd4ca59`). The retired branch
+`arena/01a0a5c8-inmotools` no longer exists, so no completed Transcode work is stranded off
+`main`.
+
+Closure evidence was refreshed against current product revision
+`4f800253b29493d69fac21cbd1b665080ee3ca64`: Pages run `35914410493` passed the full
+unit-test step and production build, executed all 22 Transcode Playwright cases (11 desktop and
+11 mobile) with zero Transcode failures, and successfully built and deployed the Pages artifact.
+The run's 13 browser failures were confined to unrelated workspaces and do not change the
+Transcode workstream result. The prior focused Transcode gate also passed 124 focused unit tests,
+the production build, and 22/22 desktop/mobile browser cases after integration.
+
+A final static closure audit found no Transcode `FIXME` debt and no remote `fetch`,
+`XMLHttpRequest`, or `WebSocket` path. Search hits for `TODO` were the
+`markdownToDocx` identifier, while “placeholder” hits were normal form hints and the temporary
+TAR checksum field used while constructing a header. The design's legacy `.xlsb`/`.xls`
+ingest and additional legacy text encoders are explicitly non-ledger future scope; capability-
+dependent animated WebP remains governed by F14's documented “where supported” contract. Any
+new Transcode scope must re-enter `.tasks` before implementation.
+
 ## TASK-021: Close the Sightline Velocity Studio audit findings
 
 Sightline Velocity Studio itself was already integrated to `main` (`55887b7`); this closes the remaining audit findings found against it. The dedicated validation workflow only triggered on pushes to `feat/sightline-velocity`, so it never validated `main` or any `fix/sightline-*` branch — widened to `[main, feat/sightline-velocity, 'fix/sightline-*']`. Clearing local reading history, document history, and the word bank was a single click with no confirmation and no way back; it now asks first and names exactly what it removes. Loading multiple files reported the *last selected* file as "active" even when that file failed to load and an earlier one succeeded instead; failures and successes are now tracked separately and the status names the file that is genuinely active. The workspace never released its IndexedDB handle, audio context, or an in-flight speech-synthesis utterance on unmount, and the metronome allocated a `AudioContext` even when set to a visual-only channel; both are fixed. `clearWarehouse`'s result was previously discarded, so a failed clear silently reported success — it's now surfaced to the user instead.
 
 Accepted revision `f0b6c0481c9e600ca6ec00284527216e00d433f9` on `fix/sightline-audit` (a clean descendant of `main`): `tsc --noEmit` clean, 408/408 focused unit tests across 16 `tests/unit/sightline-*.test.ts` files, production build passed, and Playwright `tests/e2e/sightline.spec.ts` 46/46 passed (one earlier run showed a single 5s-timeout flake on the catalog-navigation test, not reproducible across 6 repeated runs afterward).
+
+
+
+**UX/real-world follow-up closure — 2026-09-24.** The later reading-first remediation merged
+through PR #66 as `ce878ada3bdcb73f0b05eb2c0ae31b218c948403` without changing the F1–F35
+denominator. It added accurate multi-file results and in-session document switching, loaded-state
+source collapse, a persistent reading cockpit with direct WPM control, progressive disclosure of
+specialist controls/diagnostics/metadata/contents, live status semantics, nested drag-leave
+correction, simpler sample/clipboard flow, plain-language labels, explicit tab/tabpanel wiring,
+and narrow/coarse-pointer ergonomics.
+
+Dedicated workflow `35613856993` passed 409/409 Sightline unit assertions across 16 files, the
+production build, and 48/48 desktop/mobile Chromium browser checks, including accessibility,
+keyboard-only operation, export round trips, and desktop/tablet/phone overflow coverage. Pages
+run `35613857161` built and deployed successfully; its broad browser failures were unrelated
+to Sightline and all Sightline cases ran without a Sightline failure. A final static closure scan
+found no Sightline TODO/FIXME implementation debt, XMLHttpRequest, or WebSocket path. The
+historical `feat/sightline-velocity` branch is 0 commits ahead of `main`, so no intended
+completed Sightline work is stranded there.
 
 ## TASK-020: Add the Typing Workstation
 
