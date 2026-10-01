@@ -27,6 +27,30 @@ The tool's engine is sound (metrics, corpora, storage, exports all have focused 
 | UX-13 | Low | Unexplained jargon. | "Raw CPM" and "Consistency — Higher is smoother" have no explanation; the audience in the catalog entry includes kids. |
 | UX-14 | Low | Layout and colour set inline. | `style={{…}}` for layout and a hard-coded grey in `TypingWorkspace.tsx` (e.g. the personal-best block, history footer, import labels), bypassing the theme tokens. |
 
+## Resolution (TASK-026, verified 2026-09-30)
+
+Every finding is closed on `fix/typing-ux-audit`. "Verified by" names the e2e test in `tests/e2e/typing.spec.ts` (or unit test) that fails if it regresses; all run on desktop and phone Chromium.
+
+| ID | Resolution | Verified by |
+|---|---|---|
+| UX-01 | Spaces render as real spaces; `.tw-root` grid track is `minmax(0, 1fr)`. Page height went from ~21,000 px to ~2,900 px at 1440 px wide. | "keeps every workspace element inside its own bounds…" (320/390/768/1440 px, geometry not `scrollWidth`) |
+| UX-02 | Opt-in `workspaceFirst` shell: workspace precedes the guide, intro compacted. On phones the session bar, passage and metrics precede the settings. | "puts Start and the first line of the passage in the first viewport" (iPhone 13, 664 px tall) |
+| UX-03 | 3-line passage window that keeps the active line on the middle row; pure helper `passageWindowStartLine`. | `tests/unit/typing-window.test.ts` (8) and "shows a bounded 3-line passage window that follows the typist" |
+| UX-04 | With a bounded passage the metrics sit directly below it, in one row on phones; measured mid-test, the page had scrolled 56 px on desktop and 0 px on a phone (it was 2,662 px before). | geometry and first-viewport tests above |
+| UX-05 | Focus moves to the dialog panel, not a field, so trailing keystrokes are not typed into "Typist name"; stats are a tabular row; exports are grouped apart from Discard / Save. | "result dialog keeps stray keystrokes out of its fields…" |
+| UX-06 | New text is a secondary button; Start is the single filled action. | "cues where to type, has one primary action…" |
+| UX-07 | Settings panels are one row per setting (label left, control right); checkboxes are their own rows. | same test (label and control share a row) |
+| UX-08 | Keys flex and shrink inside a container query; no clipping at any width. | geometry test |
+| UX-09 | Empty history and per-key panels explain what will appear; averages show "—" until a test exists; the empty chart is hidden. Section count is unchanged by choice (see below). | "history and analytics explain themselves…" |
+| UX-10 | Empty-state message, reset moved to its own zone with a scope note, import controls styled as buttons. | same test |
+| UX-11 | "Click here and start typing" cue over the idle passage; it never blocks clicks. | "cues where to type…" |
+| UX-12 | Geometry-based test replaces the toothless `scrollWidth` check. | UX-01 test |
+| UX-13 | Plain-language hints on Net WPM, Consistency and Raw CPM. | visible text; manual |
+| UX-14 | Layout and colour inline styles replaced by theme-aware classes (`tw-muted`, `tw-empty`, `tw-danger-zone`, `tw-file-button`, `tw-personal-best`). Remaining inline styles are the computed font size, window offset and dialog helper copy. | review |
+| UX-15 (found during verification) | Dark themes rendered stat tiles and panel headings at 1.0–1.9:1 contrast and pending passage text at 2.4–3.1:1. All ten themes now meet 4.5:1. | "every theme keeps text at WCAG AA contrast" (Axe across all ten themes) |
+
+Decisions, so the gap is explicit rather than silent: the thirteen sections were not collapsed into tabs, because that would change keyboard and screen-reader navigation for every panel and the 3-line window already removes the length problem; real screen-reader output (NVDA/VoiceOver) was not tested, only Axe and accessible-name assertions; the export-history, add-typist and custom-text dialogs received no layout changes beyond shared shell styles.
+
 ## Root-cause note on UX-01
 
 The fix is two parts and both are required. Rendering spaces as ordinary spaces restores the passage's line-break opportunities; `grid-template-columns: minmax(0, 1fr)` on `.tw-root` stops any future child with a large max-content width from widening the only track. Fixing only the glyph would leave the same trap for the next wide child.
