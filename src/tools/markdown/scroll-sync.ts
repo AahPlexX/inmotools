@@ -42,3 +42,27 @@ export const computeScrollOffset = (
   // Unreachable given the bounds checks above, but keeps the function total.
   return last.offsetTop;
 };
+
+export const sourceLineForScrollOffset = (
+  anchors: readonly ScrollAnchorOffset[],
+  offsetTop: number,
+): number => {
+  if (anchors.length === 0) return 1;
+  const sorted = sortAnchors([...anchors]);
+  if (offsetTop <= sorted[0].offsetTop) return sorted[0].sourceLine;
+  const last = sorted[sorted.length - 1];
+  if (offsetTop >= last.offsetTop) return last.sourceLine;
+
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    const start = sorted[index];
+    const end = sorted[index + 1];
+    if (offsetTop >= start.offsetTop && offsetTop <= end.offsetTop) {
+      const span = end.offsetTop - start.offsetTop;
+      if (span === 0) return start.sourceLine;
+      const t = (offsetTop - start.offsetTop) / span;
+      return Math.round(start.sourceLine + t * (end.sourceLine - start.sourceLine));
+    }
+  }
+
+  return last.sourceLine;
+};

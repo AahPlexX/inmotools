@@ -46,10 +46,18 @@ describe('markdown rendering and sanitization', () => {
     expect(result.anchors.map((a) => a.sourceLine)).toEqual([1, 3]);
   });
 
+  it('keeps a task checkbox and stamps each item with its own source line', () => {
+    const result = renderMarkdown('- [ ] Open\n- [x] Done');
+    expect(result.html).toContain('type="checkbox"');
+    expect(result.html).toContain('data-source-line="1"');
+    expect(result.html).toContain('data-source-line="2"');
+    expect(result.anchors.map((anchor) => anchor.sourceLine)).toEqual([1, 2]);
+  });
+
   it('renders a GFM table', () => {
     const result = renderMarkdown('| A | B |\n| - | - |\n| 1 | 2 |\n');
     expect(result.html).toContain('<table');
-    expect(result.html).toContain('<td>1</td>');
+    expect(result.html).toContain('>1</td>');
   });
 
   it('renders a footnote reference and its body', () => {

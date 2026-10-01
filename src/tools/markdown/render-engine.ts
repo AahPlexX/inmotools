@@ -33,10 +33,12 @@ const sanitizeSchema = {
     // attribute, added after sanitizing but declared here so it is never
     // accidentally stripped if tagging order ever changes.
     '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style', 'dataSourceLine'],
+    input: [...(defaultSchema.attributes?.input ?? []), 'type', 'disabled', 'checked'],
     annotation: ['encoding'],
   },
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
+    'input',
     'math', 'mrow', 'mi', 'mn', 'mo', 'msup', 'msub', 'msubsup', 'mfrac', 'msqrt', 'mroot',
     'mtable', 'mtr', 'mtd', 'mspace', 'mtext', 'mstyle', 'mpadded', 'menclose',
     'semantics', 'annotation',
@@ -67,12 +69,20 @@ export const renderMarkdown = (source: string): RenderResult => {
   const tree = processor.runSync(processor.parse(source)) as HastRoot;
 
   const anchors: ScrollAnchor[] = [];
-  tree.children.forEach((node, index) => {
-    if (!isElement(node) || !node.position) return;
-    const nodeId = `node-${index}`;
-    node.properties = { ...node.properties, dataSourceLine: String(node.position.start.line) };
-    anchors.push({ sourceLine: node.position.start.line, nodeId });
-  });
+  const seenLines = new Set<number>();
+  const stamp = (node: HastRootContent, nodeId: string) => {
+    if (!isElement(node)) return;
+    const line = node.position?.start.line;
+    if (line) {
+      node.properties = { ...node.properties, dataSourceLine: String(line) };
+      if (!seenLines.has(line)) {
+        seenLines.add(line);
+        anchors.push({ sourceLine: line, nodeId });
+      }
+    }
+    node.children.forEach((child, index) => stamp(child, `${nodeId}-${index}`));
+  };
+  tree.children.forEach((node, index) => stamp(node, `node-${index}`));
 
   return { html: toHtml(tree), anchors };
 };

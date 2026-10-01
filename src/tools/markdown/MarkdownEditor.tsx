@@ -169,7 +169,7 @@ export interface MarkdownEditorProps {
   // Incremented by the parent to request that a given line be scrolled into
   // view and focused (used by the document outline). A counter rather than a
   // bare line number so selecting the same heading twice still re-reveals it.
-  readonly revealRequest?: { readonly line: number; readonly nonce: number };
+  readonly revealRequest?: { readonly line: number; readonly nonce: number; readonly focus?: boolean };
 }
 
 export default function MarkdownEditor({
@@ -440,11 +440,12 @@ export default function MarkdownEditor({
     const lineCount = view.state.doc.lines;
     const target = Math.min(Math.max(revealRequest.line, 1), lineCount);
     const info = view.state.doc.line(target);
+    const focus = revealRequest.focus !== false;
     view.dispatch({
-      selection: { anchor: info.from },
+      selection: focus ? { anchor: info.from } : view.state.selection,
       effects: EditorView.scrollIntoView(info.from, { y: 'start' }),
     });
-    view.focus();
+    if (focus) view.focus();
   }, [revealRequest]);
 
   const insertPattern = (before: string, after: string, fallback: string, useSelection = true) => {

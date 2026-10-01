@@ -14,7 +14,8 @@ import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
 import { highlightCodeBlocks } from './code-highlight-engine';
 import { htmlToMarkdownDocument } from './html-import-engine';
-import { computeScrollOffset } from './scroll-sync';
+import { computeScrollOffset, sourceLineForScrollOffset } from './scroll-sync';
+import { toggleTaskListMarker } from './task-toggle';
 import { computeProseMetrics } from './prose-metrics-engine';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
@@ -75,6 +76,29 @@ const CITATION_STYLES: { id: CitationStyleId; label: string }[] = [
   { id: 'mla', label: 'MLA 9th' },
 ];
 
+const PREFS_KEY = 'inmotools.markdown-workbench.prefs';
+
+type EditorPrefs = {
+  view: ViewMode;
+  lineWrapping: boolean;
+  fontSize: number;
+  vimMode: boolean;
+  spellcheck: boolean;
+  syntaxSuggestions: boolean;
+  darkMode: boolean;
+};
+
+const loadEditorPrefs = (): Partial<EditorPrefs> => {
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<EditorPrefs>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
 const DEFAULT_SOURCE = `# Untitled document
 
 Start writing here. Add **bold text**, tables, math like $E = mc^2$, diagrams, and citations.
@@ -91,7 +115,7 @@ const formatBytes = (bytes: number): string =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 export default function MarkdownWorkspace() {
-  const [view, setView] = useState<ViewMode>('split');
+  const [view, setView] = useState<ViewMode>(() => loadEditorPrefs().view ?? 'split');
   const [history, setHistory] = useState<ProjectHistory<string>>(() => createHistory(DEFAULT_SOURCE));
   const source = history.present;
   const sourceRef = useRef(source);
@@ -105,16 +129,28 @@ export default function MarkdownWorkspace() {
   const [documentName, setDocumentName] = useState('');
   const documentNameRef = useRef(documentName);
   documentNameRef.current = documentName;
-  const [lineWrapping, setLineWrapping] = useState(true);
-  const [fontSize, setFontSize] = useState(13);
-  const [vimMode, setVimMode] = useState(false);
-  const [spellcheck, setSpellcheck] = useState(true);
-  const [syntaxSuggestions, setSyntaxSuggestions] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const [lineWrapping, setLineWrapping] = useState(() => loadEditorPrefs().lineWrapping ?? true);
+  const [fontSize, setFontSize] = useState(() => loadEditorPrefs().fontSize ?? 13);
+  const [vimMode, setVimMode] = useState(() => loadEditorPrefs().vimMode ?? false);
+  const [spellcheck, setSpellcheck] = useState(() => loadEditorPrefs().spellcheck ?? true);
+  const [syntaxSuggestions, setSyntaxSuggestions] = useState(() => loadEditorPrefs().syntaxSuggestions ?? true);
+  const [darkMode, setDarkMode] = useState(() => loadEditorPrefs().darkMode ?? false);
   const [focusMode, setFocusMode] = useState(false);
+  const syncLockRef = useRef<'source' | 'preview' | null>(null);
+  const ignorePreviewUntilRef = useRef(0);
+
+  useEffect(() => {
+    const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode };
+    try {
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // Private mode can reject storage. The session still works without remembered settings.
+    }
+  }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode]);
+
   const [outlineFilter, setOutlineFilter] = useState('');
   const [activeSourceLine, setActiveSourceLine] = useState(1);
-  const [revealRequest, setRevealRequest] = useState<{ line: number; nonce: number }>();
+  const [revealRequest, setRevealRequest] = useState<{ line: number; nonce: number; focus?: boolean }>();
 
   const [bibliographyText, setBibliographyText] = useState('');
   const [bibliographyFormat, setBibliographyFormat] = useState<'bib' | 'json'>('bib');
@@ -386,13 +422,38 @@ export default function MarkdownWorkspace() {
   }, []);
 
   const scrollPreviewToLine = useCallback((line: number) => {
+    if (syncLockRef.current === 'preview') return;
     lastScrollSyncRef.current = { line, at: Date.now() };
     const anchors = editorViewScrollRef.current;
     if (anchors.length === 0) return;
     const targetOffset = computeScrollOffset(anchors, line);
     const scroller = previewHostRef.current?.querySelector<HTMLElement>('.markdown-workbench-preview');
-    scroller?.scrollTo({ top: targetOffset, behavior: 'smooth' });
+    if (!scroller) return;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    ignorePreviewUntilRef.current = Date.now() + (reducedMotion ? 180 : 700);
+    scroller.scrollTo({ top: targetOffset, behavior: reducedMotion ? 'auto' : 'smooth' });
   }, []);
+
+  const handlePreviewScroll = useCallback((offsetTop: number) => {
+    if (view !== 'split' || Date.now() < ignorePreviewUntilRef.current) return;
+    const line = sourceLineForScrollOffset(editorViewScrollRef.current, offsetTop);
+    syncLockRef.current = 'preview';
+    setActiveSourceLine(line);
+    setRevealRequest({ line, nonce: Date.now(), focus: false });
+    window.setTimeout(() => {
+      if (syncLockRef.current === 'preview') syncLockRef.current = null;
+    }, 180);
+  }, [view]);
+
+  const toggleTaskAtLine = useCallback((line: number) => {
+    const next = toggleTaskListMarker(sourceRef.current, line);
+    if (!next || next === sourceRef.current) {
+      setStatus('That preview row is not a task checkbox.');
+      return;
+    }
+    handleEditorSourceChange(next);
+    setStatus('Toggled the task on that line. The change stays in this document.');
+  }, [handleEditorSourceChange]);
 
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
     editorViewScrollRef.current = offsets;
@@ -402,7 +463,7 @@ export default function MarkdownWorkspace() {
 
   const handleSourceLineChange = useCallback((line: number) => {
     setActiveSourceLine(line);
-    if (view === 'split') scrollPreviewToLine(line);
+    if (view === 'split' && syncLockRef.current !== 'preview') scrollPreviewToLine(line);
   }, [view, scrollPreviewToLine]);
 
   const revealLine = useCallback((line: number) => {
@@ -720,21 +781,21 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="View and history">
           <span className="markdown-workbench-toolbar-label">View &amp; history</span>
           <div className="markdown-workbench-toolbar-group">
-            <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'}>Source</button>
-            <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
-            <button type="button" onClick={() => setView('preview')} aria-pressed={view === 'preview'}>Preview</button>
+            <button type="button" onClick={() => setView('source')} aria-pressed={view === 'source'} title="Show only the Markdown source.">Source</button>
+            <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write on the left and follow the rendered document on the right. Scrolling either side moves the other.">Split</button>
+            <button type="button" onClick={() => setView('preview')} aria-pressed={view === 'preview'} title="Show only the rendered document. The source stays mounted so your caret is kept.">Preview</button>
             <button type="button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo document step" title="Undo one grouped document step. Ctrl/Cmd+Z inside the editor keeps CodeMirror's fine-grained text history.">Undo step</button>
             <button type="button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo document step" title="Redo one grouped document step.">Redo step</button>
-            <button type="button" className="markdown-workbench-focus-toggle" onClick={() => setFocusMode((current) => !current)}>{focusMode ? 'Exit focus' : 'Focus writing'}</button>
+            <button type="button" className="markdown-workbench-focus-toggle" onClick={() => setFocusMode((current) => !current)} title="Hide export and panels so the page is mostly the document. Save state stays visible.">{focusMode ? 'Exit focus' : 'Focus writing'}</button>
           </div>
         </div>
 
         <div className="markdown-workbench-toolbar-section" role="group" aria-label="Document">
           <span className="markdown-workbench-toolbar-label">Document</span>
           <div className="markdown-workbench-toolbar-group">
-            <button type="button" onClick={() => fileInputRef.current?.click()}>Open document</button>
-            <button type="button" onClick={startNewDraft}>New</button>
-            <button type="button" onClick={saveDraftNow}>Save draft</button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} title="Open a Markdown, text, or HTML file from this device. Nothing is uploaded.">Open document</button>
+            <button type="button" onClick={startNewDraft} title="Save the current document if it changed, then start a blank one.">New</button>
+            <button type="button" onClick={saveDraftNow} title="Save a local draft in this browser. Shortcut: Ctrl/Cmd+S." aria-keyshortcuts="Control+S Meta+S">Save draft</button>
             <input ref={fileInputRef} className="markdown-workbench-file-input" type="file" accept=".md,.markdown,.txt,.html,.htm,text/markdown,text/plain,text/html,application/xhtml+xml" onChange={onFileInputChange} aria-label="Open a local Markdown, text, or HTML file" />
           </div>
         </div>
@@ -755,13 +816,13 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-toolbar-section markdown-workbench-export-section" role="group" aria-label="Export as">
           <span className="markdown-workbench-toolbar-label">Export as</span>
           <div className="markdown-workbench-toolbar-group markdown-workbench-export-group">
-            <button type="button" onClick={exportMarkdown}>Markdown</button>
-            <button type="button" onClick={exportRenderedMarkdown}>Rendered Markdown</button>
-            <button type="button" onClick={() => void exportHtml()}>Standalone HTML</button>
-            <button type="button" onClick={printDocument}>Print / PDF</button>
-            <button type="button" onClick={() => void exportDocx()}>DOCX</button>
-            <button type="button" onClick={() => void exportEpub()}>EPUB (structural)</button>
-            <button type="button" onClick={exportAstJson}>AST JSON</button>
+            <button type="button" onClick={exportMarkdown} title="Download the source you typed, with formulas and citation markers left as written.">Markdown</button>
+            <button type="button" onClick={exportRenderedMarkdown} title="Download Markdown after table formulas and citations are filled in.">Rendered Markdown</button>
+            <button type="button" onClick={() => void exportHtml()} title="Download one HTML file with the rendered document, diagrams, and images bundled in.">Standalone HTML</button>
+            <button type="button" onClick={printDocument} title="Print the rendered preview, or save it as PDF from the print dialog. Switch out of Source view first.">Print / PDF</button>
+            <button type="button" onClick={() => void exportDocx()} title="Download a Word file. Math stays as plain text.">DOCX</button>
+            <button type="button" onClick={() => void exportEpub()} title="Package a structural EPUB on this device. It is not EPUBCheck-validated.">EPUB (structural)</button>
+            <button type="button" onClick={exportAstJson} title="Download the prepared document as a syntax tree, for inspection rather than reading.">AST JSON</button>
           </div>
         </div>
       </div>
@@ -773,8 +834,8 @@ export default function MarkdownWorkspace() {
         </label>
         <span className="markdown-workbench-hint" data-testid="markdown-filename-preview">Exports as <code>{filenameStem}.*</code></span>
         <div className="markdown-workbench-toolbar-group">
-          <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')}>Copy Markdown</button>
-          <button type="button" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }}>Copy HTML</button>
+          <button type="button" onClick={() => void copyToClipboard(source, 'the Markdown source')} title="Copy the source you typed.">Copy Markdown</button>
+          <button type="button" onClick={() => { void buildExportBodyHtml().then((html) => copyToClipboard(html, 'the rendered HTML')); }} title="Copy the rendered HTML, including code colors.">Copy HTML</button>
         </div>
       </div>
 
@@ -801,6 +862,8 @@ export default function MarkdownWorkspace() {
               preparedSource={preparedSource}
               onAnchorsMeasured={handleAnchorsMeasured}
               onRenderStateChange={handlePreviewRenderStateChange}
+              onPreviewScroll={handlePreviewScroll}
+              onToggleTask={toggleTaskAtLine}
             />
           </div>
         ) : null}
@@ -808,6 +871,7 @@ export default function MarkdownWorkspace() {
 
       <div className="markdown-workbench-status" role="status" aria-live="polite">
         <span data-testid="markdown-status">{status}</span>
+        <span className="markdown-workbench-live-metrics" data-testid="markdown-live-metrics">{proseMetrics.words} words · {source ? source.split(/\r\n|\r|\n/).length : 0} lines · {proseMetrics.readingMinutes < 1 && proseMetrics.words > 0 ? '<1' : proseMetrics.readingMinutes.toFixed(0)} min read</span>
         <span className="markdown-workbench-autosave-status" data-testid="markdown-save-state">
           {lastSavedAt ? `${isDirty ? 'Unsaved changes · last saved' : 'Saved'} ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Not yet saved locally'}
         </span>
@@ -839,13 +903,14 @@ export default function MarkdownWorkspace() {
         <dl className="markdown-workbench-metrics">
           <div><dt>Words</dt><dd>{proseMetrics.words}</dd></div>
           <div><dt>Characters</dt><dd>{proseMetrics.characters}</dd></div>
+          <div><dt>Source characters</dt><dd>{source.length}</dd></div>
           <div><dt>Lines</dt><dd>{source ? source.split(/\r\n|\r|\n/).length : 0}</dd></div>
           <div><dt>Sentences</dt><dd>{proseMetrics.sentences}</dd></div>
           <div><dt>Reading time (estimate)</dt><dd>{proseMetrics.readingMinutes.toFixed(1)} min</dd></div>
           <div><dt>Speaking time (estimate)</dt><dd>{proseMetrics.speakingMinutes.toFixed(1)} min</dd></div>
           <div><dt>Fog index (heuristic)</dt><dd>{proseMetrics.fogIndex.toFixed(1)}</dd></div>
         </dl>
-        <p className="markdown-workbench-hint">Reading/speaking time and the Fog index are heuristic estimates based on fixed rule-of-thumb constants, not measured facts about any individual reader.</p>
+        <p className="markdown-workbench-hint">Characters counts letters and numbers in the prose, skipping spaces and Markdown marks. Source characters is the raw document length. Reading time, speaking time, and the Fog index are rule-of-thumb estimates, not a measure of any one reader.</p>
       </details>
 
       {parsed.frontmatter.format !== null ? (

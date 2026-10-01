@@ -723,3 +723,29 @@ test('inserting a table of contents links to and lands on the actual rendered he
   await tocLink.click();
   expect(await page.evaluate(() => window.location.hash)).toBe(routeHash);
 });
+
+test('live counts stay visible and a preview task click edits the source', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  await setSource(page, '- [ ] Ship the note\n\nSecond paragraph for the count.');
+  await expect(page.getByTestId('markdown-live-metrics')).toContainText(/words/);
+  await expect(page.getByTestId('markdown-live-metrics')).toContainText(/lines/);
+  await page.locator('.markdown-workbench-preview li', { hasText: 'Ship the note' }).click();
+  await expect(editorLocator(page)).toContainText('- [x] Ship the note');
+  await expect(page.getByRole('button', { name: 'Open document', exact: true })).toHaveAttribute('title', /Nothing is uploaded/);
+});
+
+test('scrolling the preview moves the source without jumping the caret to the top', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const source = Array.from({ length: 40 }, (_, index) => `## Section ${index + 1}\n\nParagraph ${index + 1}.`).join('\n\n');
+  await setSource(page, source);
+  const editor = editorLocator(page);
+  await editor.click();
+  await editor.press('ControlOrMeta+Home');
+  const preview = page.locator('.markdown-workbench-preview');
+  await preview.evaluate((node) => {
+    const scroller = node as HTMLElement;
+    scroller.scrollTop = scroller.scrollHeight;
+    scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  await expect.poll(() => page.locator('.cm-scroller').evaluate((node) => (node as HTMLElement).scrollTop)).toBeGreaterThan(80);
+});

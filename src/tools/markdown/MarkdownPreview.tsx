@@ -10,6 +10,8 @@ export interface MarkdownPreviewProps {
   readonly preparedSource: string;
   readonly onAnchorsMeasured: (anchors: { sourceLine: number; offsetTop: number }[]) => void;
   readonly onRenderStateChange?: (pending: boolean) => void;
+  readonly onPreviewScroll?: (offsetTop: number) => void;
+  readonly onToggleTask?: (line: number) => void;
 }
 
 const DIAGRAM_DEBOUNCE_MS = 250;
@@ -30,7 +32,7 @@ const measureAnchors = (
   onAnchorsMeasured(offsets);
 };
 
-export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange }: MarkdownPreviewProps) {
+export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onRenderStateChange, onPreviewScroll, onToggleTask }: MarkdownPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const generationRef = useRef(0);
 
@@ -46,6 +48,15 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
 
     const origin = event.target;
     if (!(origin instanceof Element)) return;
+    const taskItem = origin.closest('li');
+    if (taskItem?.querySelector('input[type="checkbox"]')) {
+      const line = Number(taskItem.getAttribute('data-source-line'));
+      if (Number.isInteger(line) && line > 0) {
+        event.preventDefault();
+        onToggleTask?.(line);
+        return;
+      }
+    }
     const anchor = origin.closest<HTMLAnchorElement>('a[href^="#"]');
     if (!anchor || !event.currentTarget.contains(anchor)) return;
 
@@ -119,6 +130,21 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
       onRenderStateChange?.(false);
     };
   }, [preparedSource, onAnchorsMeasured, onRenderStateChange]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !onPreviewScroll) return;
+    let frame = 0;
+    const onScroll = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => onPreviewScroll(host.scrollTop));
+    };
+    host.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      host.removeEventListener('scroll', onScroll);
+    };
+  }, [onPreviewScroll]);
 
   return (
     <div
