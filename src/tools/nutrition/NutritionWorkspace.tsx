@@ -21,11 +21,14 @@ import {
   planToMarkdown,
   poundsToKg,
   validateEnergyPlanInput,
+  KJ_PER_KCAL,
   type ActivityLevel,
   type BiologicalSex,
   type BmrEquation,
   type EnergyPlanInput,
+  type GoalMode,
   type GoalType,
+  type MacroMode,
   type MacronutrientSplit,
   type SplitPreference,
 } from './nutrition-engine';
@@ -50,6 +53,17 @@ const SPLIT_OPTIONS: { value: SplitPreference; label: string }[] = [
   { value: 'custom', label: 'Custom' },
 ];
 
+const GOAL_MODE_OPTIONS: { value: GoalMode; label: string }[] = [
+  { value: 'tier', label: 'Percent of expenditure' },
+  { value: 'timeline', label: 'Target weight on a date' },
+  { value: 'fixed_target', label: 'Fixed calorie target' },
+];
+
+const MACRO_MODE_OPTIONS: { value: MacroMode; label: string }[] = [
+  { value: 'percent', label: 'Percent of energy' },
+  { value: 'protein_anchor', label: 'Protein per kilogram' },
+];
+
 interface FormState {
   readonly units: 'metric' | 'imperial';
   readonly weightKg: number;
@@ -64,6 +78,13 @@ interface FormState {
   readonly splitPreference: SplitPreference;
   readonly customSplit: MacronutrientSplit;
   readonly mealsPerDay: number;
+  readonly goalMode: GoalMode;
+  readonly targetWeightKg: number;
+  readonly timelineWeeks: number;
+  readonly fixedTargetKcal: number;
+  readonly macroMode: MacroMode;
+  readonly proteinGramsPerKgTarget: number;
+  readonly fatPercent: number;
 }
 
 interface SavedPreset {
@@ -86,6 +107,13 @@ const DEFAULT_FORM: FormState = {
   splitPreference: 'balanced',
   customSplit: { protein: 30, fat: 30, carbohydrate: 40 },
   mealsPerDay: 3,
+  goalMode: 'tier',
+  targetWeightKg: 75,
+  timelineWeeks: 12,
+  fixedTargetKcal: 2200,
+  macroMode: 'percent',
+  proteinGramsPerKgTarget: 1.6,
+  fatPercent: 30,
 };
 
 const finiteOr = (value: unknown, fallback: number): number =>
@@ -124,6 +152,13 @@ const normalizeFormState = (value: unknown): FormState => {
       carbohydrate: finiteOr(custom.carbohydrate, DEFAULT_FORM.customSplit.carbohydrate),
     },
     mealsPerDay: Math.max(1, Math.min(12, Math.round(finiteOr(parsed.mealsPerDay, DEFAULT_FORM.mealsPerDay)))),
+    goalMode: GOAL_MODE_OPTIONS.some((option) => option.value === parsed.goalMode) ? parsed.goalMode as GoalMode : DEFAULT_FORM.goalMode,
+    targetWeightKg: finiteOr(parsed.targetWeightKg, DEFAULT_FORM.targetWeightKg),
+    timelineWeeks: Math.max(1, Math.min(104, Math.round(finiteOr(parsed.timelineWeeks, DEFAULT_FORM.timelineWeeks)))),
+    fixedTargetKcal: finiteOr(parsed.fixedTargetKcal, DEFAULT_FORM.fixedTargetKcal),
+    macroMode: MACRO_MODE_OPTIONS.some((option) => option.value === parsed.macroMode) ? parsed.macroMode as MacroMode : DEFAULT_FORM.macroMode,
+    proteinGramsPerKgTarget: finiteOr(parsed.proteinGramsPerKgTarget, DEFAULT_FORM.proteinGramsPerKgTarget),
+    fatPercent: finiteOr(parsed.fatPercent, DEFAULT_FORM.fatPercent),
   };
 };
 
@@ -183,6 +218,12 @@ const toInput = (form: FormState): EnergyPlanInput => ({
   goalType: form.goalType,
   macronutrientSplitPreference: form.splitPreference,
   ...(form.splitPreference === 'custom' ? { customSplit: form.customSplit } : {}),
+  mealsPerDay: form.mealsPerDay,
+  goalMode: form.goalMode,
+  ...(form.goalMode === 'timeline' ? { targetWeightKg: form.targetWeightKg, timelineWeeks: form.timelineWeeks } : {}),
+  ...(form.goalMode === 'fixed_target' ? { fixedTargetKcal: form.fixedTargetKcal } : {}),
+  macroMode: form.macroMode,
+  ...(form.macroMode === 'protein_anchor' ? { proteinGramsPerKgTarget: form.proteinGramsPerKgTarget, fatPercent: form.fatPercent } : {}),
 });
 
 const numeric = (value: string) => (value.trim() === '' ? Number.NaN : Number(value));
@@ -291,19 +332,21 @@ export default function NutritionWorkspace() {
       <div className="workspace-header">
         <div>
           <h2>Energy and macronutrient plan</h2>
-          <p>Published equations, computed on this device with reconstructable exports.</p>
+          <p>The equations run in this browser. Exports keep the inputs, so you can rebuild the same numbers later.</p>
         </div>
         <button className="action-button" type="button" onClick={reset}>Reset</button>
       </div>
 
       <div className="workspace-body">
         <div className="notice" data-testid="planner-scope" style={{ marginBottom: 18, overflowWrap: 'anywhere' }}>
-          <strong>Supported scope</strong>
+          <strong>Who this is for</strong>
           <p>
-            This workflow is for non-pregnant, non-breastfeeding adults aged {MIFFLIN_DERIVATION_AGE_RANGE[0]}–{MIFFLIN_DERIVATION_AGE_RANGE[1]}.
-            The age range matches the original Mifflin-St Jeor derivation sample; it is not a child or pregnancy energy-needs calculator.
+            Adults aged {MIFFLIN_DERIVATION_AGE_RANGE[0]}–{MIFFLIN_DERIVATION_AGE_RANGE[1]} who are not pregnant or breastfeeding.
+            That age band is the original Mifflin-St Jeor sample, so this is not a child or pregnancy calculator.
           </p>
         </div>
+
+        <p className="status-line planner-live-note" role="status">{note}</p>
 
         <section className="planner-section" aria-labelledby="preset-heading">
           <div className="planner-section-head">
@@ -348,6 +391,7 @@ export default function NutritionWorkspace() {
                 <input id="weight-kg" data-testid="weight-input" type="number" inputMode="decimal" min="1" step="0.1"
                   value={Number.isNaN(form.weightKg) ? '' : form.weightKg}
                   onChange={(event) => update('weightKg', numeric(event.target.value))}
+                  aria-invalid={Boolean(issueFor('weightKg'))}
                   aria-describedby={issueFor('weightKg') ? 'weight-error' : undefined} />
                 {issueFor('weightKg') ? <p className="planner-error" id="weight-error">{issueFor('weightKg')}</p> : null}
               </div>
@@ -367,6 +411,7 @@ export default function NutritionWorkspace() {
                 <input id="height-cm" data-testid="height-input" type="number" inputMode="decimal" min="1" step="0.5"
                   value={Number.isNaN(form.heightCm) ? '' : form.heightCm}
                   onChange={(event) => update('heightCm', numeric(event.target.value))}
+                  aria-invalid={Boolean(issueFor('heightCm'))}
                   aria-describedby={issueFor('heightCm') ? 'height-error' : undefined} />
                 {issueFor('heightCm') ? <p className="planner-error" id="height-error">{issueFor('heightCm')}</p> : null}
               </div>
@@ -390,6 +435,7 @@ export default function NutritionWorkspace() {
               <input id="age-years" data-testid="age-input" type="number" inputMode="numeric" min={MIFFLIN_DERIVATION_AGE_RANGE[0]} max={MIFFLIN_DERIVATION_AGE_RANGE[1]} step="1"
                 value={Number.isNaN(form.ageYears) ? '' : form.ageYears}
                 onChange={(event) => update('ageYears', numeric(event.target.value))}
+                aria-invalid={Boolean(issueFor('ageYears'))}
                 aria-describedby={issueFor('ageYears') ? 'age-error' : undefined} />
               {issueFor('ageYears') ? <p className="planner-error" id="age-error">{issueFor('ageYears')}</p> : <small>Supported: 19–78 years.</small>}
             </div>
@@ -399,7 +445,7 @@ export default function NutritionWorkspace() {
               <select id="sex-variant" data-testid="sex-select" value={form.biologicalSex} onChange={(event) => update('biologicalSex', event.target.value as BiologicalSex)}>
                 <option value="male">Male</option><option value="female">Female</option>
               </select>
-              <small>Selects equation constants, not identity.</small>
+              <small>Picks the male or female constants. It is not a gender field.</small>
             </div>
 
             <div className="field">
@@ -409,11 +455,25 @@ export default function NutritionWorkspace() {
               </select>
               <small>{ACTIVITY_HELP[form.activityLevel]}</small>
               <small data-testid="activity-assumption">Planning assumption: ×{ACTIVITY_MULTIPLIERS[form.activityLevel]} multiplies the selected resting-energy estimate; it is not a measured expenditure.</small>
+              <details className="planner-tip">
+                <summary>What the multiplier is</summary>
+                <p>These five tiers are the usual planning factors (1.2 to 1.9). They sit inside the FAO sustainable activity range of about 1.1–2.5. They guess a typical day. They do not read a watch or a lab.</p>
+              </details>
             </div>
 
             <div className="field">
               <label className="planner-check" htmlFor="use-body-fat">
-                <input id="use-body-fat" data-testid="body-fat-toggle" type="checkbox" checked={form.useBodyFat} onChange={(event) => update('useBodyFat', event.target.checked)} />
+                <input id="use-body-fat" data-testid="body-fat-toggle" type="checkbox" checked={form.useBodyFat} onChange={(event) => {
+                  const checked = event.target.checked;
+                  setForm((current) => ({
+                    ...current,
+                    useBodyFat: checked,
+                    primaryEquation: !checked && current.primaryEquation === 'katch_mcardle' ? 'mifflin_st_jeor' : current.primaryEquation,
+                  }));
+                  if (!checked && form.primaryEquation === 'katch_mcardle') {
+                    setNote('Katch-McArdle needs body fat, so the equation switched back to Mifflin-St Jeor.');
+                  }
+                }} />
                 <span>Include body fat percentage</span>
               </label>
               <input aria-label="Body fat percentage" data-testid="body-fat-input" type="number" inputMode="decimal" min="1" max="70" step="0.1" disabled={!form.useBodyFat}
@@ -435,7 +495,11 @@ export default function NutritionWorkspace() {
               </select>
               {issueFor('primaryEquation')
                 ? <p className="planner-error" id="equation-error">{issueFor('primaryEquation')}</p>
-                : <small id="equation-help">This choice drives TDEE and the goal target. Other available equations remain visible for comparison.</small>}
+                : <small id="equation-help">This choice drives expenditure and the goal target. The other equations stay on screen for comparison.</small>}
+              <details className="planner-tip">
+                <summary>Equation notes</summary>
+                <p>Mifflin-St Jeor is the default adult equation from the 1990 derivation sample. Revised Harris-Benedict is the 1984 Roza and Shizgal revision. Katch-McArdle uses lean mass, so it stays off until you enter body fat.</p>
+              </details>
             </div>
           </div>
           {issueFor('measurements') ? <p className="planner-error" role="alert">{issueFor('measurements')}</p> : null}
@@ -445,14 +509,31 @@ export default function NutritionWorkspace() {
           <div className="planner-section-head"><h3 id="objective-heading">Objective</h3></div>
           <div className="workspace-grid three">
             <div className="field">
-              <label htmlFor="goal-type">Goal</label>
-              <select id="goal-type" data-testid="goal-select" value={form.goalType} onChange={(event) => update('goalType', event.target.value as GoalType)}>
+              <label htmlFor="goal-mode">How the target is set</label>
+              <select id="goal-mode" data-testid="goal-mode-select" value={form.goalMode} onChange={(event) => update('goalMode', event.target.value as GoalMode)}>
+                {GOAL_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <details className="planner-tip">
+                <summary>Which mode to use</summary>
+                <p>Percent of expenditure matches the usual calculator tiers. Target weight solves the daily intake that reaches a mass on the 7,700 kcal/kg planning rule. Fixed calories keeps your own number and still builds the macros.</p>
+              </details>
+            </div>
+            <div className="field">
+              <label htmlFor="goal-type">Goal tier</label>
+              <select id="goal-type" data-testid="goal-select" value={form.goalType} onChange={(event) => update('goalType', event.target.value as GoalType)} disabled={form.goalMode !== 'tier'}>
                 {GOAL_TYPES.map((goal) => <option key={goal} value={goal}>{formatGoalLabel(goal)}</option>)}
+              </select>
+              <small>{form.goalMode === 'tier' ? 'Applied as a percent of estimated expenditure.' : 'Saved with the preset. The active mode above sets today’s target.'}</small>
+            </div>
+            <div className="field">
+              <label htmlFor="macro-mode">Macro method</label>
+              <select id="macro-mode" data-testid="macro-mode-select" value={form.macroMode} onChange={(event) => update('macroMode', event.target.value as MacroMode)}>
+                {MACRO_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <div className="field">
               <label htmlFor="split-preference">Distribution</label>
-              <select id="split-preference" data-testid="split-select" value={form.splitPreference} onChange={(event) => update('splitPreference', event.target.value as SplitPreference)}>
+              <select id="split-preference" data-testid="split-select" value={form.splitPreference} onChange={(event) => update('splitPreference', event.target.value as SplitPreference)} disabled={form.macroMode !== 'percent'}>
                 {SPLIT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
@@ -460,9 +541,57 @@ export default function NutritionWorkspace() {
               <label htmlFor="meals-per-day">Meals per day</label>
               <input id="meals-per-day" data-testid="meals-input" type="number" inputMode="numeric" min="1" max="12" step="1" value={form.mealsPerDay}
                 onChange={(event) => update('mealsPerDay', Math.max(1, Math.min(12, Math.round(numeric(event.target.value) || 1))))} />
-              <small>Divides totals into per-meal figures.</small>
+              <small>Splits the day. The last meal absorbs any remainder from rounding.</small>
             </div>
           </div>
+
+          {form.goalMode === 'timeline' ? (
+            <div className="workspace-grid" style={{ marginTop: 16 }}>
+              <div className="field">
+                <label htmlFor="target-weight">Target body mass (kg)</label>
+                <input id="target-weight" data-testid="target-weight-input" type="number" inputMode="decimal" min="1" step="0.1" value={Number.isNaN(form.targetWeightKg) ? '' : form.targetWeightKg}
+                  onChange={(event) => update('targetWeightKg', numeric(event.target.value))}
+                  aria-invalid={Boolean(issueFor('targetWeightKg'))} />
+                {issueFor('targetWeightKg') ? <p className="planner-error">{issueFor('targetWeightKg')}</p> : <small>Stored in kilograms even if the measurement fields are showing pounds.</small>}
+              </div>
+              <div className="field">
+                <label htmlFor="timeline-weeks">Weeks</label>
+                <input id="timeline-weeks" data-testid="timeline-weeks-input" type="number" inputMode="numeric" min="1" max="104" step="1" value={form.timelineWeeks}
+                  onChange={(event) => update('timelineWeeks', Math.max(1, Math.min(104, Math.round(numeric(event.target.value) || 1))))}
+                  aria-invalid={Boolean(issueFor('timelineWeeks'))} />
+                {issueFor('timelineWeeks') ? <p className="planner-error">{issueFor('timelineWeeks')}</p> : null}
+              </div>
+            </div>
+          ) : null}
+
+          {form.goalMode === 'fixed_target' ? (
+            <div className="field" style={{ marginTop: 16 }}>
+              <label htmlFor="fixed-target">Fixed target (kcal)</label>
+              <input id="fixed-target" data-testid="fixed-target-input" type="number" inputMode="decimal" min="1" step="10" value={Number.isNaN(form.fixedTargetKcal) ? '' : form.fixedTargetKcal}
+                onChange={(event) => update('fixedTargetKcal', numeric(event.target.value))}
+                aria-invalid={Boolean(issueFor('fixedTargetKcal'))} />
+              {issueFor('fixedTargetKcal') ? <p className="planner-error">{issueFor('fixedTargetKcal')}</p> : <small>Your number replaces the percent tier. Expenditure stays visible so you can see the gap.</small>}
+            </div>
+          ) : null}
+
+          {form.macroMode === 'protein_anchor' ? (
+            <div className="workspace-grid" style={{ marginTop: 16 }}>
+              <div className="field">
+                <label htmlFor="protein-gkg">Protein (g/kg)</label>
+                <input id="protein-gkg" data-testid="protein-gkg-input" type="number" inputMode="decimal" min="0.4" max="4" step="0.1" value={Number.isNaN(form.proteinGramsPerKgTarget) ? '' : form.proteinGramsPerKgTarget}
+                  onChange={(event) => update('proteinGramsPerKgTarget', numeric(event.target.value))}
+                  aria-invalid={Boolean(issueFor('proteinGramsPerKgTarget'))} />
+                {issueFor('proteinGramsPerKgTarget') ? <p className="planner-error">{issueFor('proteinGramsPerKgTarget')}</p> : <small>1.6 g/kg is a common training planning start. 0.8 g/kg is the adequacy reference.</small>}
+              </div>
+              <div className="field">
+                <label htmlFor="fat-percent">Fat (% of energy)</label>
+                <input id="fat-percent" data-testid="fat-percent-input" type="number" inputMode="decimal" min="10" max="70" step="1" value={Number.isNaN(form.fatPercent) ? '' : form.fatPercent}
+                  onChange={(event) => update('fatPercent', numeric(event.target.value))}
+                  aria-invalid={Boolean(issueFor('fatPercent'))} />
+                {issueFor('fatPercent') ? <p className="planner-error">{issueFor('fatPercent')}</p> : <small>Carbohydrate takes whatever energy is left.</small>}
+              </div>
+            </div>
+          ) : null}
 
           {form.splitPreference === 'custom' ? (
             <div className="planner-custom-split">
@@ -488,14 +617,23 @@ export default function NutritionWorkspace() {
             <section className="planner-section" aria-labelledby="results-heading" data-testid="planner-results" aria-live="polite">
               <div className="planner-section-head"><h3 id="results-heading">Results</h3></div>
               <div className="planner-headline">
-                <div className="planner-headline-primary"><span>Target intake</span><strong data-testid="target-kcal">{plan.targetKcal.toLocaleString()}</strong><small>kcal per day</small></div>
+                <div className="planner-headline-primary"><span>Target intake</span><strong data-testid="target-kcal">{plan.targetKcal.toLocaleString()}</strong><small>kcal per day · {Math.round(plan.targetKcal * KJ_PER_KCAL).toLocaleString()} kJ</small></div>
                 <dl className="planner-headline-facts">
                   <div><dt>Selected resting-energy estimate</dt><dd data-testid="bmr-primary">{plan.bmr.primaryKcal.toLocaleString()} kcal · {plan.bmr.primaryEquation}</dd></div>
                   <div><dt>Total daily energy expenditure</dt><dd data-testid="tdee-kcal">{plan.tdeeKcal.toLocaleString()} kcal · ×{plan.activityMultiplier}</dd></div>
                   <div><dt>Goal adjustment</dt><dd>{plan.goalDeltaPercent > 0 ? '+' : ''}{plan.goalDeltaPercent}% of expenditure</dd></div>
-                  <div><dt>Estimated weekly mass change</dt><dd>{plan.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{plan.estimatedWeeklyMassChangeKg} kg</dd></div>
+                  <div><dt>Estimated weekly mass change</dt><dd>{plan.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}{plan.estimatedWeeklyMassChangeKg} kg{form.units === 'imperial' ? ` · ${plan.estimatedWeeklyMassChangeKg > 0 ? '+' : ''}${(Math.round(kgToPounds(plan.estimatedWeeklyMassChangeKg) * 10) / 10)} lb` : ''}</dd></div>
+                  <div><dt>Body mass index</dt><dd data-testid="bmi-readout">{plan.bmi} · {plan.bmiCategory}</dd></div>
+                  <div><dt>Fiber planning target</dt><dd data-testid="fiber-readout">{plan.fiberGrams} g · 14 g / 1,000 kcal</dd></div>
+                  <div><dt>Water adequate intake</dt><dd>{plan.waterAiMl.toLocaleString()} ml · food and drinks</dd></div>
+                  <div><dt>Per meal</dt><dd data-testid="per-meal-kcal">{plan.perMealKcal.toLocaleString()} kcal · {form.mealsPerDay} meals</dd></div>
                 </dl>
               </div>
+
+              <details className="planner-tip planner-worked" data-testid="worked-equation">
+                <summary>Equation with your numbers</summary>
+                <p>{plan.workedEquation}</p>
+              </details>
 
               <h4>Resting energy by equation</h4>
               <div className="metric-row">
@@ -516,7 +654,7 @@ export default function NutritionWorkspace() {
                     <tr key={macro.key}>
                       <th scope="row">{macronutrientLabel(macro.key)}</th><td data-testid={`grams-${macro.key}`}>{macro.grams} g</td><td>{macro.kcal.toLocaleString()}</td><td>{macro.percentOfEnergy}%</td>
                       <td><span className={macro.withinDistributionRange ? 'planner-badge is-inside' : 'planner-badge is-outside'}>{macro.withinDistributionRange ? 'Inside' : 'Outside'}</span><span className="planner-range">{macro.distributionRange[0]}–{macro.distributionRange[1]}%</span></td>
-                      <td>{Math.round(macro.grams / form.mealsPerDay)} g</td>
+                      <td>{Math.floor(macro.grams / form.mealsPerDay)} g{macro.grams % form.mealsPerDay ? ` +${macro.grams % form.mealsPerDay} g on the last meal` : ''}</td>
                     </tr>
                   ))}</tbody>
                 </table>

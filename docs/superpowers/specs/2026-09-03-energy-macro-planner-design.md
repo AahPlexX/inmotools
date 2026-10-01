@@ -96,3 +96,32 @@ The layout must hold from a 320 px portrait phone to a wide desktop, including l
 Unit tests assert each equation against hand-computed values, Katch-McArdle omission, multiplier and goal arithmetic, split percentages summing to the target, custom-split validation, boundary errors with their bounds, and advisory triggers.
 
 Browser tests assert the catalog link and both routes resolve, a calculation renders, body fat adds the third equation, the custom split rejects a bad sum, export controls exist, and the layout does not overflow horizontally at 320 px portrait and at landscape phone dimensions. The catalog-driven accessibility sweep covers the new route automatically.
+
+
+## Audit addendum — 2026-10-01
+
+This section records a production audit of the energy and macronutrient planner. Earlier sections in this file are unchanged.
+
+### Defects closed
+
+- Turning body fat off while Katch-McArdle was selected left the equation selected and blocked the plan. The control now switches back to Mifflin-St Jeor and says so.
+- Exports claimed to be reconstructable but omitted meals per day. Markdown and CSV now include meals, per-meal energy, goal mode, macro mode, body mass index, fiber target, water adequate intake, and the worked equation.
+- Activity and equation help existed only as small captions. Each now has a disclosure that opens on tap or keyboard, because hover tooltips fail on phones.
+- Invalid measurements now set `aria-invalid` on the matching field.
+- Copy in the workspace header and scope notice was tightened so it still states the adult, non-pregnancy boundary without sounding like a policy memo.
+
+### Features added inside the local-only constraint
+
+Competitors such as calculator.net and tdeecalculator.net stop at equation, activity, and a percent deficit. MacroFactor-style apps anchor protein in grams per kilogram. The NIH Body Weight Planner solves intake from a goal mass. Those behaviors are local algebra, so they fit this suite:
+
+- Goal mode: percent of expenditure (existing tiers), target mass over 1–104 weeks using the existing 7,700 kcal/kg heuristic, or a fixed kilocalorie target.
+- Macro mode: percent presets, or protein grams per kilogram plus a fat share, with carbohydrate taking the remainder. If protein plus fat exceed the target, carbohydrate is held at 0, fat is reduced, and a caution is recorded.
+- Body mass index with the WHO screening bands (under 18.5, 18.5–24.9, 25–29.9, 30 and above), labelled as a screening index.
+- Fiber planning target at 14 g per 1,000 kcal of the planned intake (Institute of Medicine adequate-intake basis).
+- Total water adequate intake at the EFSA 2010 references: 2,000 ml female formula, 2,500 ml male formula, food and drinks together.
+- Kilojoules beside kilocalories using 4.184 kJ/kcal.
+- Worked equation with the user’s own measurements.
+- Imperial weekly change in pounds when imperial units are selected.
+- Per-meal grams show the base share and any remainder on the last meal.
+
+No food database, account, or network call was added. The suite remains a planning calculator, not clinical guidance.
