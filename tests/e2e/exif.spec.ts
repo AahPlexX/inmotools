@@ -8,13 +8,13 @@ const onePixelPng = Buffer.from(
 test('sanitizes an image locally, reinspects it, and produces a download', async ({ page }) => {
   await page.goto('./#/tools/exif-scrubber');
   await page.getByLabel('Choose image').setInputFiles({ name: 'private.png', mimeType: 'image/png', buffer: onePixelPng });
-  await expect(page.getByText('Inspected metadata; no sensitive-field rule matches', { exact: true })).toBeVisible();
+  await expect(page.getByText('Checked. No location, device, identity, or time fields found.', { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Sanitize and download' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('private-sanitized.png');
-  await expect(page.getByText('Reinspected metadata; no sensitive-field rule matches')).toBeVisible();
+  await expect(page.getByText('Checked again. No privacy fields found.')).toBeVisible();
   await expect(page.getByAltText('Sanitized preview of private.png')).toBeVisible();
 });
 
@@ -31,8 +31,8 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
   await expect(page.getByLabel('JPEG transparency background')).toBeVisible();
   await expect(page.getByLabel('JPEG transparency background')).toHaveValue('#ffffff');
   await page.getByRole('button', { name: 'Sanitize files' }).click();
-  await expect(page.getByText(/2 sanitized copies created and reinspected/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(2);
+  await expect(page.getByText(/2 sanitized copies created and checked again/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Download sanitized/ })).toHaveCount(2);
 
   const zipDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download batch ZIP' }).click();
@@ -44,10 +44,10 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
   await expect(page.getByRole('cell', { name: 'second.png', exact: true })).toBeVisible();
 });
 
-
 test('leaving during encoding prevents a later download', async ({ page }) => {
   await page.goto('./#/tools/exif-scrubber');
   await page.getByLabel('Choose image').setInputFiles({ name: 'pending.png', mimeType: 'image/png', buffer: onePixelPng });
+  await page.getByLabel('Sanitize method').selectOption('rebuild');
   await expect(page.getByRole('button', { name: 'Sanitize and download' })).toBeEnabled();
   await page.evaluate(() => {
     const original = HTMLCanvasElement.prototype.toBlob;
