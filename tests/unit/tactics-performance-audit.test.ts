@@ -17,12 +17,13 @@ import {
 } from '../../src/tools/tactics/project-io';
 import { createStarterTacticalProject, validateTacticalProject } from '../../src/tools/tactics/tactics-engine';
 import type { TacticalProject, TimelineTrack } from '../../src/tools/tactics/tactics-types';
-import { addTimelineTrack, sampleTacticalProjectAtTime } from '../../src/tools/tactics/timeline-engine';
+import { MAX_TIMELINE_TRACKS, TIMELINE_TRACK_WINDOW } from '../../src/tools/tactics/session-bounds';
+import { addTimelineTrack, sampleTacticalProjectAtTime, timelineTrackWindow } from '../../src/tools/tactics/timeline-engine';
 import { bindHiddenDocumentPause } from '../../src/tools/tactics/video-review-engine';
 import { buildBeginnerTacticalProject } from '../../src/tools/tactics/workspace-engine';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const MAX_TRACKS = 256;
+const MAX_TRACKS = MAX_TIMELINE_TRACKS;
 const MAX_KEYFRAMES_PER_TRACK = 100_000;
 const MAX_MARKERS = 8_000;
 const MAX_ZIP_ENTRIES = 256;
@@ -338,7 +339,7 @@ describe('Tactical performance and adversarial audit', () => {
     expect(() => importTacticalProjectJson(JSON.stringify(tooManyMarkers), 'markers.json')).toThrow(/marker|limit/i);
   });
 
-  it('does not virtualize the timeline below the track bound because each track is one text row', () => {
+  it('virtualizes timeline rows inside the Pages-safe track cap', () => {
     const base = createStarterTacticalProject();
     const atBound = withTimeline(base, {
       ...base.timeline,
@@ -350,6 +351,13 @@ describe('Tactical performance and adversarial audit', () => {
     });
     expect(validateTacticalProject(atBound)).toEqual([]);
     expect(atBound.timeline.tracks).toHaveLength(MAX_TRACKS);
+    expect(MAX_TRACKS).toBeGreaterThan(256);
+    const window = timelineTrackWindow(atBound.timeline.tracks, 0, TIMELINE_TRACK_WINDOW);
+    expect(window.tracks).toHaveLength(TIMELINE_TRACK_WINDOW);
+    expect(window.tracks.length).toBeLessThan(atBound.timeline.tracks.length);
+    const later = timelineTrackWindow(atBound.timeline.tracks, 10_000, TIMELINE_TRACK_WINDOW);
+    expect(later.endIndex).toBe(MAX_TRACKS);
+    expect(later.tracks[0]?.id).toBe(`track-${MAX_TRACKS - TIMELINE_TRACK_WINDOW}`);
   });
 
   it('rejects a ZIP whose declared entry count or uncompressed size is hostile before expanding it', async () => {

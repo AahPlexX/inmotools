@@ -1,4 +1,4 @@
-import { createNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
+import { createNormalizedPoint, refreshStoredTrainingMarkings, trainingFormatProfiles } from './pitch-engine';
 import type {
   PitchRuleProfile,
   SourceProvenance,
@@ -368,11 +368,11 @@ export function applyPitchRuleProfile(
   return {
     ...project,
     ruleset: profile,
-    pitch: {
+    pitch: refreshStoredTrainingMarkings({
       ...project.pitch,
       profileId: profile.id,
       dimensions,
       overlays: profileOverlays(profile, dimensions),
-    },
+    }),
   };
 }

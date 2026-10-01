@@ -3,14 +3,20 @@ import { resolveTacticalShortcut } from '../../src/tools/tactics/accessibility-e
 import { serializeTacticalBoardSvg } from '../../src/tools/tactics/board-engine';
 import { addTimelineKeyframe, addTimelineTrack } from '../../src/tools/tactics/timeline-engine';
 import { displayPitchOverlays, fittedTrainingMarkings } from '../../src/tools/tactics/pitch-engine';
+import { exportTacticalProjectJson, importTacticalProjectJson } from '../../src/tools/tactics/project-io';
+import { getFormationTemplate } from '../../src/tools/tactics/formation-engine';
 import { applyPitchRuleProfile } from '../../src/tools/tactics/rules-engine';
 import { createStarterTacticalProject, validateTacticalProject } from '../../src/tools/tactics/tactics-engine';
 import {
   OPPOSITION_TEAM_ID,
+  PITCH_ZOOM_STEP,
   addTacticalArrow,
+  addTacticalFreehand,
   buildBeginnerTacticalProject,
   placeMirroredOpposition,
   removeTacticalAnnotation,
+  viewportPointToNormalized,
+  zoomPitchViewport,
 } from '../../src/tools/tactics/workspace-engine';
 
 const beginner = () => buildBeginnerTacticalProject({
@@ -43,8 +49,22 @@ describe('tactical production audit', () => {
   });
 
   it('draws fitted markings on a bare pitch and leaves sourced penalty diagrams unchanged', () => {
-    const bare = displayPitchOverlays(createStarterTacticalProject().pitch);
+    const starter = createStarterTacticalProject();
+    expect(starter.pitch.overlays.some((overlay) => overlay.id === 'training-left-penalty-area')).toBe(true);
+    const bare = displayPitchOverlays(starter.pitch);
     expect(bare.some((overlay) => overlay.id === 'training-left-penalty-area')).toBe(true);
+    const built = beginner();
+    expect(built.pitch.overlays.some((overlay) => overlay.id === 'training-left-penalty-area')).toBe(true);
+    expect(exportTacticalProjectJson(built)).toContain('training-left-penalty-area');
+    const stripped = {
+      ...built,
+      pitch: {
+        ...built.pitch,
+        overlays: built.pitch.overlays.filter((overlay) => !overlay.id.startsWith('training-')),
+      },
+    };
+    const imported = importTacticalProjectJson(JSON.stringify(stripped), 'bare.json');
+    expect(imported.pitch.overlays.some((overlay) => overlay.id === 'training-left-penalty-area')).toBe(true);
     const svg = serializeTacticalBoardSvg(beginner(), 'scene-1');
     expect(svg).toContain('id="training-left-penalty-area"');
     expect(svg).toContain('id="training-centre-circle"');
@@ -148,6 +168,57 @@ describe('tactical production audit', () => {
     };
     expect(() => placeMirroredOpposition(locked, 'scene-1', 'layer-1')).toThrow(/unlock the layer/i);
     expect(() => placeMirroredOpposition(beginner(), 'scene-1', 'missing')).toThrow(/does not exist/i);
+  });
+
+  it('places a separately chosen opposition formation in the opposite half', () => {
+    const start = beginner();
+    const formation = getFormationTemplate('ussf-7v7-1-3-2-1');
+    expect(formation).toBeDefined();
+    const placed = placeMirroredOpposition(start, 'scene-1', 'layer-1', { formation });
+    const primary = placed.playerTokens.filter((token) => token.teamId === 'team-primary');
+    const opposition = placed.playerTokens.filter((token) => token.teamId === OPPOSITION_TEAM_ID);
+    expect(primary).toHaveLength(start.playerTokens.length);
+    expect(opposition).toHaveLength(7);
+    expect(Math.min(...opposition.map((token) => token.position.x))).toBeGreaterThanOrEqual(0.54 - 1e-9);
+    expect(opposition.some((token) => token.rotationDeg === 180)).toBe(true);
+    const mirrored = placeMirroredOpposition(start, 'scene-1', 'layer-1');
+    expect(mirrored.playerTokens.filter((token) => token.teamId === OPPOSITION_TEAM_ID)).toHaveLength(start.playerTokens.length);
+    const other = getFormationTemplate('tool-11v11-1-5-3-2');
+    const eleven = buildBeginnerTacticalProject({
+      title: 'Eleven',
+      teamName: 'Blue',
+      primaryColor: '#154c79',
+      secondaryColor: '#ffffff',
+      formationId: 'ussf-11v11-1-4-3-3',
+      pitchDimensions: { lengthMeters: 105, widthMeters: 68 },
+      direction: 'left-to-right',
+    });
+    const shaped = placeMirroredOpposition(eleven, 'scene-1', 'layer-1', { formation: other });
+    const mirrorEleven = placeMirroredOpposition(eleven, 'scene-1', 'layer-1');
+    const shapedYs = shaped.playerTokens.filter((token) => token.teamId === OPPOSITION_TEAM_ID).map((token) => token.position.y).sort((left, right) => left - right);
+    const mirrorYs = mirrorEleven.playerTokens.filter((token) => token.teamId === OPPOSITION_TEAM_ID).map((token) => token.position.y).sort((left, right) => left - right);
+    expect(shapedYs).not.toEqual(mirrorYs);
+    expect(validateTacticalProject(placed)).toEqual([]);
+  });
+
+  it('stores a freehand stroke and keeps zoom centered on the same pitch point', () => {
+    const stroke = addTacticalFreehand(beginner(), 'scene-1', 'layer-1', [
+      { x: 0.2, y: 0.3 },
+      { x: 0.35, y: 0.45 },
+      { x: 0.5, y: 0.4 },
+    ], 'Press');
+    expect(stroke.annotations.map((annotation) => annotation.kind)).toContain('freehand');
+    const svg = serializeTacticalBoardSvg(stroke, 'scene-1');
+    expect(svg).toContain('data-annotation-kind="freehand"');
+    expect(() => addTacticalFreehand(beginner(), 'scene-1', 'layer-1', [{ x: 0.2, y: 0.2 }])).toThrow(/2 to/i);
+
+    const zoomed = zoomPitchViewport({ zoom: 1, panX: 0, panY: 0 }, 1 + PITCH_ZOOM_STEP);
+    expect(zoomed.zoom).toBeGreaterThan(1);
+    const center = viewportPointToNormalized(500, 300, 1000, 600, zoomed);
+    expect(center.x).toBeCloseTo(0.5, 5);
+    expect(center.y).toBeCloseTo(0.5, 5);
+    const identity = viewportPointToNormalized(600, 240, 1000, 600, { zoom: 1, panX: 0, panY: 0 });
+    expect(identity).toEqual({ x: 0.6, y: 0.4 });
   });
 
   it('removes a selected drawing from the pitch or page background and ignores Backspace in a field', () => {

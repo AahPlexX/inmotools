@@ -1,14 +1,14 @@
 # Tactical Matchboard Studio Execution Queue
 
 **Updated:** 2026-09-30
-**Branch:** `cursor/tactical-matchboard-production-audit-8765`
-**Base:** `origin/main` `b51a51600fb9516378ab48f95cb0d057c72a1103` (`feat(tactics): Tactical Matchboard Studio (#76)`)
-**PR:** new draft only. Do not push to `feature/tactical-matchboard-studio` or PR #76. Do not undraft or merge from this workstream.
+**Branch:** `cursor/matchboard-residuals-wave-8ddf`
+**Base:** `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
+**PR:** new draft only. Do not push to PR #76 or PR #92. Do not undraft or merge from this workstream.
 **Prior history, now on main via the squash:** T14 reconciled `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254`; T14 merge `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`; T14 runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7`; stage 1 runtime `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`; stage 1 test-only `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`; earlier runtime `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`.
 
 ## Purpose and source-of-truth roles
 
-- `FEATURE_MATRIX.md` is the authoritative 60-feature status ledger.
+- `FEATURE_MATRIX.md` is the authoritative 67-feature status ledger.
 - `TODO_SEQUENCE.md` is the authoritative execution order and concurrency contract.
 - `HANDOFF.md` is the authoritative resume snapshot and exact next action.
 - `.tasks/IN_PROGRESS.md` is the repository-wide pointer to this workstream.
@@ -16,7 +16,7 @@
 
 ## Agent coordination protocol
 
-1. Stay on `cursor/tactical-matchboard-production-audit-8765`. Do not push to `feature/tactical-matchboard-studio` or PR #76. The user required a new branch and a new draft PR for this audit.
+1. Stay on `cursor/matchboard-residuals-wave-8ddf`. Do not push to PR #76 or PR #92. The user required a new branch and a new draft PR for this residuals wave.
 2. Before every write, compare the last known branch tip to the live branch. If another agent advanced it, refresh the affected files and re-evaluate before writing.
 3. An agent must treat the **Primary files** on an `ACTIVE` item as reserved. Do not concurrently edit those files from another queue item.
 4. A forward-working agent takes the lowest-numbered `READY` item.
@@ -185,3 +185,12 @@
 - **Exit evidence:** focused Tactical units **162/162** across 21 `tactics-*.test.ts` files plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0. Production build `✓ built in 6.46s`. Full Tactical Playwright spec **72 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Verified numerator is **63/63**. Newly verified rows: **61, 62, 63**. Rows 1–60 were not reopened. Help copy changed. No dependency pin changed.
 - **Residual:** timeline virtualization and the 256-track cap; uncapped squad size; no pitch zoom/pan; opposition is a mirror rather than a second formation picker; training markings are derived at render/export; Build board still replaces the board without a confirm; 12-frame video cap; WinAnsi PDF page text.
 - **Reverse-safe:** complete for this audit. Do not undraft or merge the draft PR from this workstream.
+
+### T17-01 — Residuals wave
+- **Status:** DONE
+- **Depends on:** `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`
+- **Primary files:** tactical timeline, squad, pitch, board, workspace, export, and persistence modules, tactical tests, and this tool's SSOT. Do not edit Wave B or other tools.
+- **Implementation:** virtualized timeline window of 40 rows and a 2,048-track session cap; roster ceiling of 64 players per team that is not a formation cap; pitch zoom 1–4 and pan; a separately chosen opposition formation; training markings stored on `pitch.overlays`; confirm before Build board; video export cap raised from 12 to 60 frames; board freehand strokes that reuse the video telestration point rule.
+- **Exit evidence:** focused Tactical units **165/165** across 21 `tactics-*.test.ts` files plus e2e selector **3/3**. `tsc --noEmit -p tsconfig.app.json` exit 0. Production build `✓ built in 6.38s`. Full Tactical Playwright spec **80 passed / 2 intentional duplicate mobile Axe/reflow skips / 0 failures**. Verified numerator is **67/67**. Newly verified rows: **64, 65, 66, 67**. Rows 3, 57, 58, 61, and 62 were updated in place. Rows 1–63 were not reopened. Help copy changed. No dependency pin changed.
+- **Residual:** PDF page text remains WinAnsi. CoS escalate before adding `@pdf-lib/fontkit` or any other font embedder. Pins and CI were not changed.
+- **Reverse-safe:** complete for this wave. Do not undraft or merge the draft PR from this workstream.

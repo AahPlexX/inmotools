@@ -26,7 +26,7 @@ const ZIP_DATE = new Date('1980-01-01T00:00:00.000Z');
 const TOOL_ID = 'inmotools-tactical-matchboard';
 const ANALYTICS_SAMPLE_STEP_MS = 100;
 export const MAX_FRAME_SEQUENCE_FRAMES = 48;
-export const MAX_VIDEO_EXPORT_FRAMES = 12;
+export const MAX_VIDEO_EXPORT_FRAMES = 60;
 const MAX_STILL_DIMENSION = 4096;
 
 function escapeText(value: string): string {

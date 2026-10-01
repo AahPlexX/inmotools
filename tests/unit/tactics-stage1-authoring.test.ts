@@ -26,6 +26,7 @@ import {
 import { TRAINING_PROP_LIBRARY, placeTrainingProp, transformEquipment } from '../../src/tools/tactics/prop-library';
 import { importTacticalProjectJson, exportTacticalProjectJson } from '../../src/tools/tactics/project-io';
 import {
+  MAX_ROSTER_PLAYERS_PER_TEAM,
   addSquadParticipant,
   scaleActiveSquad,
   setRosterPlayerStatus,
@@ -73,6 +74,21 @@ describe('Dynamic squad and neutral-player scaler', () => {
     expect(reduced.playerTokens).toHaveLength(24);
     expect(reduced.playerTokens.filter((token) => token.visible)).toHaveLength(5);
     expect(scaleActiveSquad(reduced, teamId, 5, placement(reduced))).toBe(reduced);
+  });
+
+  it('allows growth past the formation size and stops at the Pages-safe roster ceiling', () => {
+    const start = trainingBoard();
+    const teamId = start.teams[0]!.id;
+    expect(MAX_ROSTER_PLAYERS_PER_TEAM).toBe(64);
+    const atCeiling = scaleActiveSquad(start, teamId, MAX_ROSTER_PLAYERS_PER_TEAM, placement(start));
+    expect(squadCounts(atCeiling, teamId).active).toBe(MAX_ROSTER_PLAYERS_PER_TEAM);
+    expect(squadCounts(atCeiling, teamId).roster).toBe(MAX_ROSTER_PLAYERS_PER_TEAM);
+    expect(() => scaleActiveSquad(start, teamId, MAX_ROSTER_PLAYERS_PER_TEAM + 1, placement(start))).toThrow(/64|ceiling|formation/i);
+    expect(() => addSquadParticipant(atCeiling, teamId, {
+      id: 'one-more',
+      displayName: 'One more',
+      status: 'neutral',
+    })).toThrow(/64|ceiling|formation/i);
   });
 
   it('authors neutral and coach participants and keeps them out of active scaling', () => {

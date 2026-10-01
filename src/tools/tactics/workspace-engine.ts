@@ -1,7 +1,9 @@
 import { addAnnotation, addPlayerToken, addRosterPlayer, addTeam } from './editor-engine';
 import { getFormationTemplate, materializeFormationPositions } from './formation-engine';
-import { createNormalizedPoint, createTrainingFormatProfile, trainingFormatProfiles } from './pitch-engine';
+import { createNormalizedPoint, createTrainingFormatProfile, refreshStoredTrainingMarkings, trainingFormatProfiles } from './pitch-engine';
+import { MAX_ROSTER_PLAYERS_PER_TEAM } from './squad-engine';
 import { createStarterTacticalProject } from './tactics-engine';
+import { MAX_TELESTRATION_POINTS } from './video-review-engine';
 import type {
   FormationTemplate,
   NormalizedPoint,
@@ -91,6 +93,79 @@ export function clientPointToNormalized(point: ClientPoint, rect: RectLike): Nor
   );
 }
 
+export const PITCH_ZOOM_MIN = 1;
+export const PITCH_ZOOM_MAX = 4;
+export const PITCH_ZOOM_STEP = 0.25;
+export const PITCH_PAN_STEP = 0.08;
+
+export interface PitchViewport {
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+function roundViewport(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+export function clampPitchViewport(viewport: PitchViewport): PitchViewport {
+  const zoom = roundViewport(Math.min(PITCH_ZOOM_MAX, Math.max(PITCH_ZOOM_MIN, viewport.zoom)));
+  const minPan = roundViewport(1 - zoom);
+  return {
+    zoom,
+    panX: roundViewport(Math.min(0, Math.max(minPan, viewport.panX))),
+    panY: roundViewport(Math.min(0, Math.max(minPan, viewport.panY))),
+  };
+}
+
+export function zoomPitchViewport(viewport: PitchViewport, nextZoom: number): PitchViewport {
+  const current = clampPitchViewport(viewport);
+  const zoom = roundViewport(Math.min(PITCH_ZOOM_MAX, Math.max(PITCH_ZOOM_MIN, nextZoom)));
+  const centerX = (0.5 - current.panX) / current.zoom;
+  const centerY = (0.5 - current.panY) / current.zoom;
+  return clampPitchViewport({
+    zoom,
+    panX: 0.5 - centerX * zoom,
+    panY: 0.5 - centerY * zoom,
+  });
+}
+
+export function panPitchViewport(viewport: PitchViewport, dx: number, dy: number): PitchViewport {
+  const current = clampPitchViewport(viewport);
+  return clampPitchViewport({
+    zoom: current.zoom,
+    panX: current.panX - dx,
+    panY: current.panY - dy,
+  });
+}
+
+export function dragPitchViewport(viewport: PitchViewport, dx: number, dy: number): PitchViewport {
+  const current = clampPitchViewport(viewport);
+  return clampPitchViewport({
+    zoom: current.zoom,
+    panX: current.panX + dx,
+    panY: current.panY + dy,
+  });
+}
+
+export function viewportPointToNormalized(
+  localX: number,
+  localY: number,
+  width: number,
+  height: number,
+  viewport: PitchViewport,
+): NormalizedPoint {
+  requirePositiveFinite(width, 'Board width');
+  requirePositiveFinite(height, 'Board height');
+  if (![localX, localY].every(Number.isFinite)) {
+    throw new RangeError('Board pointer coordinates must be finite.');
+  }
+  const view = clampPitchViewport(viewport);
+  const stageX = (localX - view.panX * width) / view.zoom;
+  const stageY = (localY - view.panY * height) / view.zoom;
+  return createNormalizedPoint(clampUnit(stageX / width), clampUnit(stageY / height));
+}
+
 export function nudgeNormalizedPoint(
   point: NormalizedPoint,
   deltaX: number,
@@ -132,12 +207,12 @@ export function buildBeginnerTacticalProject(
       title: options.title.trim() || 'Untitled tactical project',
     },
     ruleset: cloneRulesetForTeamSize(formation.teamSize),
-    pitch: {
+    pitch: refreshStoredTrainingMarkings({
       ...project.pitch,
       profileId: `training-${formation.teamSize}v${formation.teamSize}`,
       dimensions: pitchDimensions,
       direction: options.direction,
-    },
+    }),
     sessionPlan: {
       ...project.sessionPlan,
       playerCount: formation.teamSize,
@@ -180,6 +255,34 @@ export function buildBeginnerTacticalProject(
   return project;
 }
 
+function nextFreehandId(project: TacticalProject): string {
+  const occupied = occupiedProjectIds(project);
+  let index = 1;
+  while (occupied.has(`freehand-${index}`)) index += 1;
+  return `freehand-${index}`;
+}
+
+export function addTacticalFreehand(
+  project: TacticalProject,
+  sceneId: string,
+  layerId: string,
+  points: readonly NormalizedPoint[],
+  label?: string,
+): TacticalProject {
+  if (points.length < 2 || points.length > MAX_TELESTRATION_POINTS) {
+    throw new RangeError(`Freehand stroke must contain 2 to ${MAX_TELESTRATION_POINTS} points.`);
+  }
+  const normalized = points.map((point) => createNormalizedPoint(point.x, point.y));
+  return addAnnotation(project, {
+    id: nextFreehandId(project),
+    kind: 'freehand',
+    label: label?.trim() || undefined,
+    sceneId,
+    layerId,
+    points: normalized,
+  });
+}
+
 export function addTacticalArrow(
   project: TacticalProject,
   sceneId: string,
@@ -220,6 +323,13 @@ export interface OppositionPlacementOptions {
   teamName?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  formation?: FormationTemplate;
+}
+
+interface OppositionSeat {
+  position: NormalizedPoint;
+  jersey: string;
+  role?: string;
 }
 
 interface HalfRange {
@@ -253,6 +363,23 @@ function fitIntoHalf(points: readonly NormalizedPoint[], half: 'left' | 'right')
     span < 1e-9 ? (min + max) / 2 : min + ((point.x - lo) / span) * room,
     point.y,
   ));
+}
+
+function formationOppositionSeats(formation: FormationTemplate, half: 'left' | 'right'): OppositionSeat[] {
+  if (formation.teamSize > MAX_ROSTER_PLAYERS_PER_TEAM) {
+    throw new RangeError(
+      `Opposition formation cannot place more than ${MAX_ROSTER_PLAYERS_PER_TEAM} players. ${MAX_ROSTER_PLAYERS_PER_TEAM} is the Pages-safe roster ceiling.`,
+    );
+  }
+  const raw = materializeFormationPositions(formation, 'left-to-right');
+  const oriented = half === 'right'
+    ? raw.map((point) => createNormalizedPoint(1 - point.x, point.y))
+    : raw.map((point) => createNormalizedPoint(point.x, point.y));
+  return fitIntoHalf(oriented, half).map((position, index) => ({
+    position,
+    jersey: String(index + 1),
+    role: index < formation.goalkeepers ? 'Goalkeeper' : undefined,
+  }));
 }
 
 function cssHexColor(value: string, label: string): string {
@@ -386,16 +513,25 @@ export function placeMirroredOpposition(
       const rank = jerseyRank(project, primary.id, left.playerId) - jerseyRank(project, primary.id, right.playerId);
       return rank || left.id.localeCompare(right.id);
     });
-  if (!source.length) throw new Error('This scene has no visible outfield or goalkeeper tokens to mirror.');
+  if (!source.length) throw new Error('This scene has no visible active players to place an opposition against.');
 
   const centroid = source.reduce((sum, token) => sum + token.position.x, 0) / source.length;
   const primaryHalf = centroid <= 0.5 ? 'left' : 'right';
   const oppositionHalf = primaryHalf === 'left' ? 'right' : 'left';
   const fittedPrimary = fitIntoHalf(source.map((token) => token.position), primaryHalf);
-  const facing = fitIntoHalf(
-    fittedPrimary.map((point) => createNormalizedPoint(1 - point.x, point.y)),
-    oppositionHalf,
-  );
+  const seats: OppositionSeat[] = options.formation
+    ? formationOppositionSeats(options.formation, oppositionHalf)
+    : fitIntoHalf(
+      fittedPrimary.map((point) => createNormalizedPoint(1 - point.x, point.y)),
+      oppositionHalf,
+    ).map((position, index) => {
+      const paired = roster.get(source[index]!.playerId);
+      return {
+        position,
+        jersey: paired?.jerseyNumber ?? String(index + 1),
+        role: paired?.role,
+      };
+    });
   const blocked = source.find((token, index) => {
     const next = fittedPrimary[index]!;
     return token.locked && (token.position.x !== next.x || token.position.y !== next.y);
@@ -420,7 +556,7 @@ export function placeMirroredOpposition(
     withTokenGeometryShift(current, token.id, token.position, fittedPrimary[index]!)
   ), project);
 
-  if (existing.length === source.length) {
+  if (existing.length === seats.length) {
     const oppositionTeam = next.teams.find((team) => team.id === OPPOSITION_TEAM_ID);
     if (!oppositionTeam) throw new Error('Opposition tokens are missing their team.');
     const rosterIds = existing.map((token) => token.playerId);
@@ -437,13 +573,12 @@ export function placeMirroredOpposition(
               roster: team.roster.map((player) => {
                 const index = rosterIds.indexOf(player.id);
                 if (index < 0) return player;
-                const paired = roster.get(source[index]!.playerId);
-                const jersey = paired?.jerseyNumber ?? String(index + 1);
+                const seat = seats[index]!;
                 return {
                   ...player,
-                  displayName: `${teamName} ${jersey}`,
-                  jerseyNumber: jersey,
-                  role: paired?.role,
+                  displayName: `${teamName} ${seat.jersey}`,
+                  jerseyNumber: seat.jersey,
+                  role: seat.role,
                   status: 'active' as const,
                 };
               }),
@@ -451,7 +586,7 @@ export function placeMirroredOpposition(
       )),
     };
     existing.forEach((token, index) => {
-      const destination = facing[index]!;
+      const destination = seats[index]!.position;
       next = withTokenGeometryShift(next, token.id, token.position, destination);
       next = {
         ...next,
@@ -474,16 +609,14 @@ export function placeMirroredOpposition(
     secondaryColor,
     roster: [],
   });
-  source.forEach((token, index) => {
-    const paired = roster.get(token.playerId);
-    const jersey = paired?.jerseyNumber ?? String(index + 1);
+  seats.forEach((seat, index) => {
     const playerId = `player-opp-${index + 1}`;
     const tokenId = `token-opp-${index + 1}`;
     next = addRosterPlayer(next, OPPOSITION_TEAM_ID, {
       id: playerId,
-      displayName: `${teamName} ${jersey}`,
-      jerseyNumber: jersey,
-      role: paired?.role,
+      displayName: `${teamName} ${seat.jersey}`,
+      jerseyNumber: seat.jersey,
+      role: seat.role,
       status: 'active',
     });
     next = addPlayerToken(next, {
@@ -492,7 +625,7 @@ export function placeMirroredOpposition(
       teamId: OPPOSITION_TEAM_ID,
       sceneId,
       layerId,
-      position: facing[index]!,
+      position: seat.position,
       rotationDeg: rotation,
       visible: true,
       locked: false,

@@ -2,7 +2,7 @@ import type {
   NormalizedPoint,
   TacticalProject,
 } from './tactics-types';
-import { isNormalizedPoint, trainingFormatProfiles } from './pitch-engine';
+import { isNormalizedPoint, refreshStoredTrainingMarkings, trainingFormatProfiles } from './pitch-engine';
 import { validateTacticalTimeline } from './timeline-engine';
 import { createEmptyVideoReview, validateVideoReview } from './video-review-engine';
 export {
@@ -30,7 +30,7 @@ function cloneDefaultRuleset(): TacticalProject['ruleset'] {
 
 export function createStarterTacticalProject(): TacticalProject {
   const now = isoNow();
-  return {
+  const project: TacticalProject = {
     schemaVersion: TACTICS_SCHEMA_VERSION,
     id: 'tactical-project',
     metadata: {
@@ -124,6 +124,10 @@ export function createStarterTacticalProject(): TacticalProject {
       frameRate: 30,
       quality: 0.9,
     },
+  };
+  return {
+    ...project,
+    pitch: refreshStoredTrainingMarkings(project.pitch),
   };
 }
 
