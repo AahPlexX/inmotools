@@ -71,7 +71,7 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 - The source of every threshold constant, the choice of indices and the Fitzpatrick exposure model (TASK-012). Owed by the original author; not reconstructed here because these are health-adjacent.
 - AEC-R01 asks for location and fetches data as soon as the tool opens, and AEC-R03 fetches a saved location on open. The platform rules allow network use for "public keyless sources requested by the user's own action". Unknown: whether opening the tool counts as that action, or whether live loading should wait for a click.
 - Open-Meteo's free API is non-commercial only. The site shows a voluntary support link but no ads or subscriptions. Unknown: the owner's confirmation that this use is non-commercial.
-- Geo Intelligence Hub's spec excludes Open-Meteo "by its license" while AetherCast uses it. The owner decides which position is correct for the whole site.
+- Geo Intelligence Hub excludes Open-Meteo because its original brief did, not because of the licence (corrected 2026-10-02). Whether that exclusion still applies is the owner's decision.
 
 ## Change log
 

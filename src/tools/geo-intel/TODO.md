@@ -327,7 +327,7 @@ F01–F44 are implemented. Coverage: unit tests cover the logic of F01, F04–F1
 - **Autocomplete / search-as-you-type:** no keyless provider permits it (Nominatim forbids it; Photon's demo asks for reasonable volume). Replaced by the recent-query list and the other-matches chips.
 - **Route and travel-time distances:** OSRM's public demo has a usage policy against application use, and every other routing API needs a key. Great-circle distance stays.
 - **Satellite or slippy base map tiles:** OSM's tile policy forbids heavy app use and imagery providers need keys. The bundled vector map stays.
-- **Weather:** Open-Meteo is excluded by its license, and the other options need a key.
+- **Weather:** Open-Meteo is excluded by the build brief, and the other options need a key. *(Corrected 2026-10-02: an earlier version said "by its license"; Open-Meteo data is CC BY 4.0 and its free API allows non-commercial use. See spec GIH-R78.)*
 - **Tooltips on disabled buttons:** browsers send no pointer events to disabled controls; the reason is shown in text next to them instead (for example "— no holiday calendar").
 
 ### Evidence
