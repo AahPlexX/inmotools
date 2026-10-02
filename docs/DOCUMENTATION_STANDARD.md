@@ -25,6 +25,14 @@ If a function or feature can be built into a tool and it stays within the platfo
 - This covers ideas as well as requests: a useful addition found while documenting or building a tool that fits the platform rules becomes an ID'd requirement (`missing`) straight away, without waiting for approval. "Intent not recorded" is only for questions the rules cannot settle (a choice between two valid behaviours, a cost, a licence or terms question).
 - A tool's title, summary and catalog copy must not promise anything the tool does not do. A promised feature that is not built is a `missing` requirement until it is built.
 
+### What counts as a spec
+
+A tool's README or notes file is never its spec. "Complete" is defined only by a spec with ID'd requirements and a tracker that gives each one a status. A tool without both is `pending` in the index, however much prose it has.
+
+### Before deleting a branch or tag
+
+Compare every file the ref changed against `main`, and check that each commit's new functions and tests exist on `main`. Port anything missing first. Tags named `archive/*` are kept until an open task that cites them is done.
+
 ## Naming convention (approved 2026-10-02)
 
 Tool names follow `<distinctive name> <role word>`, at most 30 characters in total.

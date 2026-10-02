@@ -1,5 +1,18 @@
 # Next
 
+## TASK-029: Reconcile the archived Site Intelligence Analyzer audit with main
+**Priority:** P1 | **Tags:** site-intel, correctness, lost-work
+
+Tag `archive/site-intel-local-20260918` (commits `f8e79f8c`…`73a6f080`, 2026-09-17/18) holds a separate line of Site Intel work that never reached `main`; `main` got the other line from `feature/site-analysis-workstation`. None of the archived audit's fixes are on `main` (checked 2026-10-02):
+
+- DNS lookup failures are reported as "record absent" in seven checks (IPv6 readiness, CAA, DNSSEC, MX, SPF, DMARC, BIMI) and the DNSBL summary, so a network blip shows as a security finding. The archive adds `queryFailed()` in `doh-client.ts` and gates each finding on it.
+- `validateSpf` builds a RegExp from an unescaped hostname (`email-auth-engine.ts` line 54 on `main`).
+- SAN list silently truncated at 50; archive adds "…and N more".
+- Click-to-copy on URL tokens and DNS answers, Wayback per-year counts, raw per-engine telemetry in the JSON export, and a keyboard-accessible list beside the node graph.
+- The archived `TRACKING.md` holds 121 lines of verification evidence (main's has 19).
+
+The two lines diverge (for example `GeoMinimap.tsx` and `shortener-resolver.ts` on the archive, `GeoIpMap.tsx` on main), so this is a feature-by-feature port onto main's code with tests, not a merge. Keep the tag until this task is done.
+
 ## TASK-028: One site-wide theme selector (light, dark, follow system)
 **Priority:** P2 | **Tags:** theme, accessibility, site-shell
 
