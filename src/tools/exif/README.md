@@ -21,3 +21,7 @@ Unit coverage lives in `tests/unit/exif.test.ts`. Browser coverage lives in `tes
 ## Fixes
 
 - 2026-10-01 — Browser test `exif.spec.ts` "supports batch ZIP, per-file removal…" clicked the first button named like "Remove", which since the audit is a help tip whose text says "removed". It now clicks `Remove first.png` exactly. The tool itself was correct.
+
+## Standard documents
+
+Spec: `docs/superpowers/specs/2026-10-01-exif-scrubber-design.md`. Status: [TRACKER.md](TRACKER.md).
