@@ -1,8 +1,11 @@
 name: Focused tool validation
 
 on:
+  # Markdown-only changes run .github/workflows/docs.yml instead.
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:

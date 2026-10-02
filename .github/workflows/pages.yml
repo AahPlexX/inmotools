@@ -1,10 +1,15 @@
 name: Validate and deploy Pages
 
 on:
+  # Markdown-only changes run .github/workflows/docs.yml instead of the full suite.
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:

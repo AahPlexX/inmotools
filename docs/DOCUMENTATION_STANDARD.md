@@ -216,6 +216,7 @@ Dated entries, newest first.
 
 ## Change log
 
+- **2026-10-02:** Markdown-only pushes skip the full CI suite; `.github/workflows/docs.yml` checks links in the standard documents (`scripts/check-doc-links.mjs`) and runs the unit tests that read Markdown.
 - **2026-10-01:** Added the default integration rule: anything buildable within the platform rules is integrated and documented; `not planned` narrowed to platform, terms, licence, key or browser limits.
 - **2026-10-01:** Added the platform rules, the requirements for adding a new tool, the request-to-spec procedure and the feature-branch/worktree workflow.
 - **2026-10-01:** Created. Defines the spec (PRD), tracker, task-state and index documents per tool, the header block, requirement IDs and statuses, and the writing rules.

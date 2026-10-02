@@ -37,4 +37,4 @@ Update the tool's tracker (**Resume here**, requirement status, verification evi
 - Build: `pnpm build`
 - Browser tests: `pnpm test:e2e` (focused: `pnpm exec playwright test tests/e2e/<spec>.spec.ts`)
 
-CI and deployment are defined in [.github/workflows/pages.yml](.github/workflows/pages.yml).
+CI and deployment are defined in [.github/workflows/pages.yml](.github/workflows/pages.yml). A push that changes only Markdown skips the full suite and runs [.github/workflows/docs.yml](.github/workflows/docs.yml) instead (link check plus the unit tests that read Markdown); run `node scripts/check-doc-links.mjs` before pushing documents.

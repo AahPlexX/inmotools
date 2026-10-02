@@ -59,6 +59,15 @@ describe('deployment and bundler contracts', () => {
     expect(workflow).not.toContain('needs: validate');
   });
 
+  it('skips the full suite for Markdown-only changes and checks them in the docs workflow', () => {
+    const pages = read('.github/workflows/pages.yml');
+    expect(pages.match(/paths-ignore:\n\s+- '\*\*\/\*\.md'/g)).toHaveLength(2);
+    expect(read('.github/workflows/focused-tool.yml')).toContain("- '**/*.md'");
+    const docs = read('.github/workflows/docs.yml');
+    expect(docs).toContain('node scripts/check-doc-links.mjs');
+    expect(docs).toContain('tests/unit/cad-progress.test.ts');
+  });
+
   it('does not cancel per-commit validation and queues every main deployment', () => {
     const workflow = read('.github/workflows/pages.yml');
     expect(workflow).not.toContain('cancel-in-progress: true');
