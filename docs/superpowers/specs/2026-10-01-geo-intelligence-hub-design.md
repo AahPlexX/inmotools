@@ -30,7 +30,7 @@ Out of scope:
 - BigDataCloud for arbitrary coordinates: its free endpoint is limited to the device's own location.
 - Bundled GISCO NUTS geometry: GISCO geodata terms are non-commercial; only the code-returning ID service is used.
 - REST Countries live, Open-Meteo, IP geolocation: excluded in the original brief.
-- Items listed as `not planned` in the requirements table.
+- Items listed as `not planned` in the requirements table (each breaks a source's terms or licence, or needs a key).
 
 ## Constraints
 
@@ -124,8 +124,8 @@ Out of scope:
 | GIH-R76 | Route and travel-time distances | not planned: OSRM demo policy forbids app use; other routing APIs need keys |
 | GIH-R77 | Satellite or slippy base-map tiles | not planned: OSM tile policy forbids heavy app use; imagery needs keys |
 | GIH-R78 | Weather | not planned: Open-Meteo license excluded; other options need keys |
-| GIH-R79 | Dark theme | not planned: the site shell is light-only |
-| GIH-R80 | Long-press row menu on iOS Safari | not planned: iOS fires no `contextmenu` on long-press; ⓘ button and provenance dialog give the same access |
+| GIH-R79 | Dark colour theme for the workspace, following the system setting with a manual toggle, meeting the same contrast checks | Workspace switches to dark colours; axe passes in both themes |
+| GIH-R80 | Long-press on a profile row opens the row menu on iOS Safari (which fires no `contextmenu`) | Touch-and-hold on a row opens the row menu in WebKit |
 
 ## Definition of done
 
@@ -138,4 +138,5 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Change log
 
+- 2026-10-01 — Default integration rule applied: GIH-R79 (dark theme) and GIH-R80 (iOS long-press row menu) changed from `not planned` to required, because both can be built in the browser. Owner kept the name "Geo Intelligence Hub".
 - 2026-10-01 — Created as an as-built spec from `src/tools/geo-intel/TODO.md` (F01–F44, audit items A1–A17, B1–B10, C1–C7) and the tool's tests.

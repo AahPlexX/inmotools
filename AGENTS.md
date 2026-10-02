@@ -8,6 +8,8 @@ Instructions for any coding agent or person working in this repository. Binding 
 - No server, backend or server-side database; the site is static files on GitHub Pages.
 - Everything runs in the user's browser; tool data stays in that browser (IndexedDB, localStorage).
 
+Default integration rule: if a feature can be built into a tool within these rules, integrate it and document it (spec, tracker, `.tasks/`). Exclude a feature only when it breaks these rules, a source's terms or licence, needs a key, or cannot run in a browser.
+
 Details: [docs/DOCUMENTATION_STANDARD.md](docs/DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec).
 
 ## Find a tool's documents

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-Integrated on `origin/main` (TASK-025 done). 80 requirements: 63 verified, 11 implemented without a covering test, 6 not planned. Next action: add tests for the `implemented` rows listed under Open work. No blocker.
+Integrated on `origin/main` (TASK-025 done). 80 requirements: 63 verified, 11 implemented without a covering test, 2 missing, 4 not planned. Next action: build GIH-R79 and GIH-R80, then add tests for the `implemented` rows. No blocker. Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
 
 ## Documents
 
@@ -108,13 +108,14 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R76 | not planned | spec | |
 | GIH-R77 | not planned | spec | |
 | GIH-R78 | not planned | spec | |
-| GIH-R79 | not planned | spec | |
-| GIH-R80 | not planned | spec | |
+| GIH-R79 | missing | — | Required by the default integration rule |
+| GIH-R80 | missing | — | Required by the default integration rule; ⓘ button and provenance dialog cover the data meanwhile |
 
 ## Open work
 
-1. Add tests for the `implemented` rows: GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62.
-2. Owner decisions listed under "Intent not recorded" in the spec.
+1. Build GIH-R79 (dark theme) and GIH-R80 (iOS long-press row menu).
+2. Add tests for the `implemented` rows: GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62.
+3. Owner decisions listed under "Intent not recorded" in the spec.
 
 ## Known limitations
 
@@ -130,4 +131,5 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 
 ## Change log
 
+- 2026-10-01 — Default integration rule applied: GIH-R79 and GIH-R80 moved from `not planned` to `missing`. Owner kept the name.
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`; statuses taken from the tests listed above.

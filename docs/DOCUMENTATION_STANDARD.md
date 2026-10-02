@@ -16,6 +16,13 @@ This file defines where every tool's documentation lives and what it must contai
 
 Every spec restates these rules under Constraints, and a requirement that conflicts with them is `not planned` with the rule cited.
 
+### Default integration rule
+
+If a function or feature can be built into a tool and it stays within the platform rules above (browser only, no auth, no database, works on GitHub Pages), it is integrated, and the integration is documented in the tool's spec, tracker and `.tasks/` entry.
+
+- `not planned` is allowed only when the feature breaks a platform rule, breaks a third-party source's terms or licence, needs an API key or account, or cannot run in a browser. The reason names which one.
+- Design preference, effort or "the rest of the site does not do this" is not a reason; such a feature is `missing` and goes on the tracker's Open work list.
+
 ## The four documents per tool
 
 | # | Document | Path | Purpose |
@@ -52,7 +59,7 @@ A request (a prompt, message or plan) becomes requirements before any code is wr
 2. Write each requirement as observable behaviour ("Exports the location as GeoJSON with longitude before latitude"), not as an implementation step.
 3. Give each requirement an acceptance test that a reviewer could run or check.
 4. Put anything the request did not settle under **Intent not recorded** and ask the owner; do not decide it silently.
-5. Record exclusions as `not planned` with the reason (platform rules, licence, an unreachable source).
+5. Record exclusions as `not planned` only under the [default integration rule](#default-integration-rule), with the reason.
 6. The owner confirms the list; the spec header changes to `basis: approved` and the change log records the date.
 
 Later requests add new IDs; existing IDs are never renumbered.
@@ -125,7 +132,7 @@ grep -rln "^status: active$" src/tools         # trackers with work in progress
   - `implemented` — present in the code; no covering test found.
   - `partial` — some of the acceptance criteria are met; the tracker says which.
   - `missing` — required but not present.
-  - `not planned` — deliberately excluded; the reason is stated.
+  - `not planned` — excluded under the default integration rule; the reason names the rule, term, licence or browser limit.
 
 ## Spec (PRD) contents
 
@@ -205,5 +212,6 @@ Dated entries, newest first.
 
 ## Change log
 
+- **2026-10-01:** Added the default integration rule: anything buildable within the platform rules is integrated and documented; `not planned` narrowed to platform, terms, licence, key or browser limits.
 - **2026-10-01:** Added the platform rules, the requirements for adding a new tool, the request-to-spec procedure and the feature-branch/worktree workflow.
 - **2026-10-01:** Created. Defines the spec (PRD), tracker, task-state and index documents per tool, the header block, requirement IDs and statuses, and the writing rules.
