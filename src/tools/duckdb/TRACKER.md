@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 27 requirements: 14 verified, 7 implemented without a covering test, 1 partial, 5 missing Next action: add tests for the `implemented` rows; owner decision on CSV formula handling. No blocker.
+On `origin/main`. 27 requirements: 14 verified, 7 implemented without a covering test, 1 partial, 5 missing. Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering test, 2 missing Next action: add tests for FDD-R07 and R13. No blocker.
+On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering test, 2 missing. Next action: add tests for FDD-R07 and R13. No blocker.
 
 ## Documents
 

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 18 requirements: 7 verified, 7 implemented without a covering test, 4 missing Span details do not show span events or exception data, which the design asks for (OTF-R13); the engine does not keep events. Next action: build OTF-R13 and add tests for the `implemented` rows.
+On `origin/main`. 18 requirements: 7 verified, 7 implemented without a covering test, 4 missing. Span details do not show span events or exception data, which the design asks for (OTF-R13); the engine does not keep events. Next action: build OTF-R13 and add tests for the `implemented` rows.
 
 ## Documents
 

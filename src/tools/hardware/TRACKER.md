@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering test, 3 missing The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: owner decides whether to build HPI-R18 or change the title.
+On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering test, 3 missing. The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: owner decides whether to build HPI-R18 or change the title.
 
 ## Documents
 

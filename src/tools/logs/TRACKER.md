@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 20 requirements: 13 verified, 3 implemented without a covering test, 4 missing Next action: add tests for LGS-R11, R13, R16. No blocker.
+On `origin/main`. 20 requirements: 13 verified, 3 implemented without a covering test, 4 missing. Next action: add tests for LGS-R11, R13, R16. No blocker.
 
 ## Documents
 

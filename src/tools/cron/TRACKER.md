@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 25 requirements: 14 verified, 5 implemented without a covering test, 6 missing Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 25 requirements: 14 verified, 5 implemented without a covering test, 6 missing. Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 15 requirements: 9 verified, 3 implemented without a covering test, 1 partial, 2 missing Glyphs are previewed as rendered text, not from parsed outlines as the design asks (FNT-R06). Next action: build outline previews; add tests for the `implemented` rows.
+On `origin/main`. 15 requirements: 9 verified, 3 implemented without a covering test, 1 partial, 2 missing. Glyphs are previewed as rendered text, not from parsed outlines as the design asks (FNT-R06). Next action: build outline previews; add tests for the `implemented` rows.
 
 ## Documents
 

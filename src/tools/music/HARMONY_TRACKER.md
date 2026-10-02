@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 17 requirements: 11 verified, 2 implemented without a covering test, 4 missing Next action: add tests for MHL-R04 and R13. No blocker.
+On `origin/main`. 17 requirements: 11 verified, 2 implemented without a covering test, 4 missing. Next action: add tests for MHL-R04 and R13. No blocker.
 
 This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Audio Mastering, whose tracking stays in its own documents.
 

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering test, 3 missing The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: owner decides whether to build SUB-R15 or change the title. No other blocker.
+On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering test, 3 missing. The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: owner decides whether to build SUB-R15 or change the title. No other blocker.
 
 ## Documents
 
