@@ -9,7 +9,6 @@ const workspaceLoaders: Record<ToolSlug, () => Promise<{ default: ComponentType 
   'duckdb-workbench': () => import('./duckdb/DuckDbWorkspace'),
   'subtitle-drift': () => import('./subtitles/SubtitleWorkspace'),
   'hardware-packet-inspector': () => import('./hardware/HardwareWorkspace'),
-  'fluid-type-matrix': () => import('./typography/TypographyWorkspace'),
   'pdf-sanitizer': () => import('./pdf/PdfWorkspace'),
   'cron-team-matrix': () => import('./cron/CronWorkspace'),
   'midi-harmony-lab': () => import('./music/HarmonyWorkspace'),

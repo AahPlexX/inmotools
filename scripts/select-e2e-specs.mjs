@@ -33,7 +33,6 @@ const TOOL_SPECS = new Map([
   ['subtitles', ['tests/e2e/subtitles.spec.ts']],
   ['svg', ['tests/e2e/svg.spec.ts', 'tests/e2e/vector-nested-composition.spec.ts']],
   ['transcode', ['tests/e2e/transcode.spec.ts']],
-  ['typography', ['tests/e2e/typography.spec.ts']],
   ['video', ['tests/e2e/video.spec.ts']],
   ['fiber-craft', ['tests/e2e/fiber-craft.spec.ts']],
   ['site-intel', ['tests/e2e/site-intel.spec.ts']],
