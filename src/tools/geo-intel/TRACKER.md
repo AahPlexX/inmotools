@@ -108,12 +108,12 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R76 | not planned | spec | |
 | GIH-R77 | not planned | spec | |
 | GIH-R78 | not planned | spec | |
-| GIH-R79 | missing | — | Required by the default integration rule |
+| GIH-R79 | missing | — | Delivered through the site-wide theme selector (TASK-028), not a tool-only toggle |
 | GIH-R80 | missing | — | Required by the default integration rule; ⓘ button and provenance dialog cover the data meanwhile |
 
 ## Open work
 
-1. Build GIH-R79 (dark theme) and GIH-R80 (iOS long-press row menu).
+1. Build GIH-R80 (iOS long-press row menu); GIH-R79 follows TASK-028.
 2. Add tests for the `implemented` rows: GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62.
 3. Owner decisions listed under "Intent not recorded" in the spec.
 

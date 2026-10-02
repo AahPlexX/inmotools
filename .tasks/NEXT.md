@@ -1,5 +1,17 @@
 # Next
 
+## TASK-028: One site-wide theme selector (light, dark, follow system)
+**Priority:** P2 | **Tags:** theme, accessibility, site-shell
+
+One selector in the site header sets the theme for the shell and every tool, instead of a dark mode per tool. Awaiting the owner's go-ahead on the plan below.
+
+- Mechanism: `data-theme` on `<html>`, choice saved in `localStorage`, "follow system" via `prefers-color-scheme`; a small pre-paint script in `index.html` avoids a flash; `<meta name="color-scheme">` and `theme-color` follow the choice.
+- Tokens: a dark set of the existing `:root` tokens in `src/styles.css` (`--paper`, `--surface`, `--ink`, `--muted`, `--line`, `--signal*`, status colours); hard-coded shell colours (`.workspace-header`, `.privacy-rail`, `.action-button.danger`, selection, scrollbar) moved onto tokens. Tailwind gets `@custom-variant dark` keyed to `data-theme`.
+- Per-tool variants: `data-tool` on `.suite-page` in `ToolLayout.tsx` for tool-specific overrides. Tools with their own theme (Digital Logic, Typing, Sightline, Sheets, Fiber Craft, Markdown) default to following the site theme and keep their own choices. Fixed-dark tools (RegexMatrix, JSON Lattice, PlanCraft) stay dark. Exports and page renders (PDF pages, PNG/PDF/HTML exports) stay light.
+- Order: shell + about 20 tools that only use shared styles and tokens; then token-based tools; then tools with hard-coded colours (Photo, Vector, Tactical, Geo Intelligence Hub, canvas drawing).
+- Done when: every route passes the catalog-wide axe check in both themes, and each tool's spec records its theme behaviour as a requirement.
+- Inventory of colour usage per tool: recorded in the TASK-027 work session (2026-10-01).
+
 ## TASK-014: Work through the verified catalog-wide audit backlog
 **Priority:** P1 | **Tags:** audit, correctness, accessibility, performance
 

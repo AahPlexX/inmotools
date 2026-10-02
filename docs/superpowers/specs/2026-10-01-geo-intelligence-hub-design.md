@@ -124,7 +124,7 @@ Out of scope:
 | GIH-R76 | Route and travel-time distances | not planned: OSRM demo policy forbids app use; other routing APIs need keys |
 | GIH-R77 | Satellite or slippy base-map tiles | not planned: OSM tile policy forbids heavy app use; imagery needs keys |
 | GIH-R78 | Weather | not planned: Open-Meteo license excluded; other options need keys |
-| GIH-R79 | Dark colour theme for the workspace, following the system setting with a manual toggle, meeting the same contrast checks | Workspace switches to dark colours; axe passes in both themes |
+| GIH-R79 | Workspace follows the site-wide theme (light, dark, system) from TASK-028, meeting the same contrast checks | Workspace switches with the site theme; axe passes in both themes |
 | GIH-R80 | Long-press on a profile row opens the row menu on iOS Safari (which fires no `contextmenu`) | Touch-and-hold on a row opens the row menu in WebKit |
 
 ## Definition of done
