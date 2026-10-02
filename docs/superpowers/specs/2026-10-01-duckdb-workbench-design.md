@@ -61,6 +61,10 @@ Out of scope:
 | DDB-R21 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | DDB-R22 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | DDB-R23 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| DDB-R24 | CSV export has an option to neutralize spreadsheet formulas (off by default, so the default stays byte-exact) | With the option on, `=1+1` is written as text |
+| DDB-R25 | JSON and JSON Lines files can be registered and queried | `SELECT * FROM 'data.jsonl'` returns rows |
+| DDB-R26 | Export the captured result as Parquet | Downloaded Parquet re-imports with the same rows and types |
+| DDB-R27 | Queries can be saved by name in this browser and reopened | Saved query survives a reload |
 
 ## Definition of done
 
@@ -68,9 +72,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- CSV export writes values exactly, so a value starting with `=`, `+`, `-` or `@` stays a spreadsheet formula when opened in Excel. Other tools in this repository neutralize such cells. Unknown: whether this tool should neutralize them (safer) or stay byte-exact (lossless), or offer both.
-- Candidate additions that fit the platform rules, not yet requested: JSON and JSON Lines input files, Parquet export of a result, saving queries between visits in this browser. The owner decides whether they become requirements.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added DDB-R24, DDB-R25, DDB-R26, DDB-R27 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/duckdb/`, the catalog entry, `.tasks/DONE.md` TASK-003 and the tool's tests.

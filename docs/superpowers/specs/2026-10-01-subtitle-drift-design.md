@@ -56,6 +56,7 @@ Out of scope:
 | SUB-R16 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | SUB-R17 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | SUB-R18 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| SUB-R19 | Download the corrected copy in the other format (SRT to WebVTT and back) | SRT input exports a valid WebVTT |
 
 ## Definition of done
 
@@ -63,9 +64,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- SUB-R15 is taken from the catalog title ("Waveform Re-Aligner"); no design for it exists. Unknown: whether the waveform should be built (it fits the platform rules: Web Audio can decode a local file in the browser) or the word removed from the title.
-- Output always keeps the input format. Unknown: whether converting SRT to WebVTT and back is wanted.
+- SUB-R15 comes from the catalog title ("Waveform Re-Aligner"); under the default integration rule it is built, since Web Audio can decode a local file in the browser.
 
 ## Change log
 
+- 2026-10-02 — Added SUB-R19 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/subtitles/`, the catalog entry and the tool's tests.

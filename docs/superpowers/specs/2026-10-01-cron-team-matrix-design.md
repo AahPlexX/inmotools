@@ -58,6 +58,11 @@ Out of scope:
 | CRN-R18 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | CRN-R19 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | CRN-R20 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| CRN-R21 | Calendar event duration is editable (1 minute to 24 hours) | Exported events use the chosen duration |
+| CRN-R22 | Inputs are saved in this browser and restored on the next visit | Reload restores expression, zones and window |
+| CRN-R23 | A plain-language reading of the expression (for example "At 09:00, Monday to Friday") | Reading matches the expression |
+| CRN-R24 | A shareable link holds the inputs and restores them when opened | Opening the link restores the inputs |
+| CRN-R25 | Export the matrix as JSON | JSON contains runs and per-zone times |
 
 ## Definition of done
 
@@ -65,10 +70,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Calendar events last a fixed 1 minute. Unknown: whether the duration should be editable.
-- Inputs are not saved; a reload resets them to the defaults. Unknown: whether they should persist in this browser.
-- Candidate additions that fit the platform rules, not yet requested: a plain-language reading of the expression (for example "At 09:00, Monday to Friday"), a shareable link holding the inputs, and JSON export. The owner decides whether they become requirements.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added CRN-R21, CRN-R22, CRN-R23, CRN-R24, CRN-R25 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/cron/`, the catalog entry and the tool's tests.

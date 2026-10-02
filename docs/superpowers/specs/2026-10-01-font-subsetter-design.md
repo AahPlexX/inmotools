@@ -48,6 +48,7 @@ Out of scope:
 | FNT-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | FNT-R13 | Populated inspection reflows on phone portrait, landscape and tablet | Reflow test at those viewports |
 | FNT-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| FNT-R15 | Subset output also as TTF/OTF and WOFF | Each output format downloads and loads in the browser |
 
 ## Definition of done
 
@@ -55,8 +56,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Output is WOFF2 only. Unknown: whether TTF or WOFF output is wanted as well.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added FNT-R15 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/font/`, the shared design section and the tool's tests.

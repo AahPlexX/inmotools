@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 17 requirements: 13 verified, 3 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for LGS-R11, R13, R16. No blocker.
+On `origin/main`. 20 requirements: 13 verified, 3 implemented without a covering test, 4 missing Next action: add tests for LGS-R11, R13, R16. No blocker.
 
 ## Documents
 
@@ -46,9 +46,13 @@ On `origin/main`. 17 requirements: 13 verified, 3 implemented without a covering
 | LGS-R15 | verified | `tests/e2e/accessibility.spec.ts` route `regex-log-structurer` | |
 | LGS-R16 | implemented | — | No viewport test for this route |
 | LGS-R17 | missing | — | Delivered through TASK-028 |
+| LGS-R18 | missing | — | Added 2026-10-02 |
+| LGS-R19 | missing | — | Added 2026-10-02 |
+| LGS-R20 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: LGS-R18, LGS-R19, LGS-R20.
 1. Add tests for LGS-R11, R13, R16, and the 8 MB cut-off in LGS-R01.
 2. LGS-R17 with TASK-028.
 
@@ -62,4 +66,5 @@ On `origin/main`. 17 requirements: 13 verified, 3 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added LGS-R18, LGS-R19, LGS-R20 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

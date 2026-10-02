@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 19 requirements: 11 verified, 6 implemented without a covering test, 2 missing. Next action: build HEIC stripping (EXF-R16) and add tests for the `implemented` rows; owner decision on video metadata (spec, "Intent not recorded").
+On `origin/main`. 20 requirements: 11 verified, 6 implemented without a covering test, 3 missing Next action: build HEIC stripping (EXF-R16) and add tests for the `implemented` rows; owner decision on video metadata (spec, "Intent not recorded").
 
 ## Documents
 
@@ -49,9 +49,11 @@ On `origin/main`. 19 requirements: 11 verified, 6 implemented without a covering
 | EXF-R17 | verified | `tests/e2e/accessibility.spec.ts` route `exif-scrubber` | |
 | EXF-R18 | implemented | — | No viewport test for this route |
 | EXF-R19 | missing | — | Delivered through TASK-028 |
+| EXF-R20 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: EXF-R20.
 1. Build EXF-R16 (HEIC strip).
 2. Add tests for EXF-R04, R06, R08 (animation confirmation), R09, R14, and EXF-R18.
 3. EXF-R19 with TASK-028.
@@ -67,4 +69,5 @@ On `origin/main`. 19 requirements: 11 verified, 6 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added EXF-R20 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

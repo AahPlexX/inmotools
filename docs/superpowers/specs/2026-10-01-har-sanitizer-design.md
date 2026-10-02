@@ -52,6 +52,7 @@ Out of scope (from the README):
 | HAR-R15 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | HAR-R16 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | HAR-R17 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| HAR-R18 | Custom value patterns (regular expressions) as an extra redaction category, run with a time limit | A custom pattern redacts matching values |
 
 ## Definition of done
 
@@ -59,8 +60,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- The README puts custom value patterns out of scope without a reason; they would run in the browser. Unknown: whether that exclusion stands under the default integration rule.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added HAR-R18 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/har/`, its README, the shared design section and the tool's tests.

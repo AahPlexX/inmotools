@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 20 requirements: 14 verified, 5 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 25 requirements: 14 verified, 5 implemented without a covering test, 6 missing Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 
@@ -49,9 +49,15 @@ On `origin/main`. 20 requirements: 14 verified, 5 implemented without a covering
 | CRN-R18 | verified | `tests/e2e/accessibility.spec.ts` route `cron-team-matrix` | |
 | CRN-R19 | implemented | — | No viewport test for this route |
 | CRN-R20 | missing | — | Delivered through TASK-028 |
+| CRN-R21 | missing | — | Added 2026-10-02 |
+| CRN-R22 | missing | — | Added 2026-10-02 |
+| CRN-R23 | missing | — | Added 2026-10-02 |
+| CRN-R24 | missing | — | Added 2026-10-02 |
+| CRN-R25 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: CRN-R21, CRN-R22, CRN-R23, CRN-R24, CRN-R25.
 1. Add tests for CRN-R03, R09, R14, R15, R19.
 2. CRN-R20 with TASK-028.
 3. Owner decisions under "Intent not recorded" in the spec.
@@ -66,4 +72,5 @@ On `origin/main`. 20 requirements: 14 verified, 5 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added CRN-R21, CRN-R22, CRN-R23, CRN-R24, CRN-R25 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

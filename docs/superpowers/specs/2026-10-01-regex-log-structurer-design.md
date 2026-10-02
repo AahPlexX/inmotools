@@ -52,6 +52,9 @@ Out of scope:
 | LGS-R15 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | LGS-R16 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | LGS-R17 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| LGS-R18 | A library of ready patterns (nginx, Apache, syslog, JSON lines) that fill the pattern field | Choosing a pattern structures a sample line |
+| LGS-R19 | Patterns can be saved by name in this browser | Saved pattern survives a reload |
+| LGS-R20 | Filter structured rows by a column value | Filter narrows rows |
 
 ## Definition of done
 
@@ -59,8 +62,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Candidate additions that fit the platform rules, not yet requested: a library of ready patterns (nginx, Apache, syslog, JSON lines), saving patterns in this browser, filtering rows by column value. The owner decides whether they become requirements.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added LGS-R18, LGS-R19, LGS-R20 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/logs/`, the catalog entry, `.tasks/DONE.md` TASK-016 and the tool's tests.

@@ -58,6 +58,7 @@ Out of scope:
 | HPI-R19 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | HPI-R20 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | HPI-R21 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| HPI-R22 | Serial settings beyond baud rate: data bits, parity, stop bits and flow control | Port opens with the chosen settings |
 
 ## Definition of done
 
@@ -65,9 +66,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- HPI-R18 comes from the catalog title ("Web Serial / Web Bluetooth"); no design exists. Web Bluetooth works only in Chromium-based browsers. Unknown: whether to build it or remove it from the title.
-- Serial settings other than baud rate (data bits, parity, stop bits, flow control) are not offered; the Web Serial API supports them. Unknown: whether they are wanted.
+- HPI-R18 comes from the catalog title ("Web Serial / Web Bluetooth"); it is built under the default integration rule. Web Bluetooth works only in Chromium-based browsers, as Web Serial does.
 
 ## Change log
 
+- 2026-10-02 — Added HPI-R22 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/hardware/`, the catalog entry, `.tasks/DONE.md` TASK-018 and the tool's tests.

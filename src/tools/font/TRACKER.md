@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 14 requirements: 9 verified, 3 implemented without a covering test, 1 partial, 1 missing (site theme, TASK-028). Glyphs are previewed as rendered text, not from parsed outlines as the design asks (FNT-R06). Next action: build outline previews; add tests for the `implemented` rows.
+On `origin/main`. 15 requirements: 9 verified, 3 implemented without a covering test, 1 partial, 2 missing Glyphs are previewed as rendered text, not from parsed outlines as the design asks (FNT-R06). Next action: build outline previews; add tests for the `implemented` rows.
 
 ## Documents
 
@@ -43,9 +43,11 @@ On `origin/main`. 14 requirements: 9 verified, 3 implemented without a covering 
 | FNT-R12 | verified | `tests/e2e/accessibility.spec.ts` route `font-subsetter` | |
 | FNT-R13 | verified | e2e "reflows populated font inspection across phone portrait, landscape, and tablet viewports" | |
 | FNT-R14 | missing | — | Delivered through TASK-028 |
+| FNT-R15 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: FNT-R15.
 1. FNT-R06 outline previews.
 2. Add tests for FNT-R05, R07, R11 downloads, and WOFF2 input.
 3. FNT-R14 with TASK-028.
@@ -60,4 +62,5 @@ On `origin/main`. 14 requirements: 9 verified, 3 implemented without a covering 
 
 ## Change log
 
+- 2026-10-02 — Added FNT-R15 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

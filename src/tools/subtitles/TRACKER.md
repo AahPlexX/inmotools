@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 18 requirements: 12 verified, 4 implemented without a covering test, 2 missing. The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: owner decides whether to build SUB-R15 or change the title. No other blocker.
+On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering test, 3 missing The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: owner decides whether to build SUB-R15 or change the title. No other blocker.
 
 ## Documents
 
@@ -46,9 +46,11 @@ On `origin/main`. 18 requirements: 12 verified, 4 implemented without a covering
 | SUB-R16 | verified | `tests/e2e/accessibility.spec.ts` route `subtitle-drift` | |
 | SUB-R17 | implemented | — | No viewport test for this route |
 | SUB-R18 | missing | — | Delivered through TASK-028 |
+| SUB-R19 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: SUB-R19.
 1. Owner decision on SUB-R15 (build the waveform or change the title).
 2. Add tests for SUB-R11, R13, R14 (SRT), R17.
 3. SUB-R18 with TASK-028.
@@ -63,4 +65,5 @@ On `origin/main`. 18 requirements: 12 verified, 4 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added SUB-R19 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

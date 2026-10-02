@@ -22,6 +22,19 @@ If a function or feature can be built into a tool and it stays within the platfo
 
 - `not planned` is allowed only when the feature breaks a platform rule, breaks a third-party source's terms or licence, needs an API key or account, or cannot run in a browser. The reason names which one.
 - Design preference, effort or "the rest of the site does not do this" is not a reason; such a feature is `missing` and goes on the tracker's Open work list.
+- This covers ideas as well as requests: a useful addition found while documenting or building a tool that fits the platform rules becomes an ID'd requirement (`missing`) straight away, without waiting for approval. "Intent not recorded" is only for questions the rules cannot settle (a choice between two valid behaviours, a cost, a licence or terms question).
+- A tool's title, summary and catalog copy must not promise anything the tool does not do. A promised feature that is not built is a `missing` requirement until it is built.
+
+## Naming convention (approved 2026-10-02)
+
+Tool names follow `<distinctive name> <role word>`, at most 30 characters in total.
+
+- **Distinctive name:** a built-up word made from plain words that hint at the job (in the style of "AutoMix"), not a common phrase. Its parts are not reused by another tool on the site.
+- **Role word**, one of: Studio (create or edit), Workbench (load, analyse or query), Inspector (look inside without changing), Cleaner (remove sensitive data), Converter, Planner, Trainer.
+- **Page title:** `<name> — <what it does in plain words> | InMo Tools`. The plain-words part is what search results show; keywords are not repeated.
+- **Before adoption:** search the USPTO trademark database and a web search for software in the same field; a name already used for related software is rejected. The checks and their date go in the tool's spec change log.
+- **When renaming:** change the catalog `shortTitle`/`title`, visible text, export "creator" metadata and the tests that assert them. Never change the slug, folder, storage keys or format IDs. Record the old name in the index's "Former names" column.
+- Names the owner has kept are exempt: Geo Intelligence Hub, RegexMatrix Studio & Academy.
 
 ## The four documents per tool
 
@@ -216,6 +229,7 @@ Dated entries, newest first.
 
 ## Change log
 
+- **2026-10-02:** Ideas that fit the platform rules become requirements automatically; catalog copy may not promise unbuilt features; naming convention approved by the owner.
 - **2026-10-02:** Markdown-only pushes skip the full CI suite; `.github/workflows/docs.yml` checks links in the standard documents (`scripts/check-doc-links.mjs`) and runs the unit tests that read Markdown.
 - **2026-10-01:** Added the default integration rule: anything buildable within the platform rules is integrated and documented; `not planned` narrowed to platform, terms, licence, key or browser limits.
 - **2026-10-01:** Added the platform rules, the requirements for adding a new tool, the request-to-spec procedure and the feature-branch/worktree workflow.

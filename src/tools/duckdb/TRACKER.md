@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 23 requirements: 14 verified, 7 implemented without a covering test, 1 partial, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows; owner decision on CSV formula handling. No blocker.
+On `origin/main`. 27 requirements: 14 verified, 7 implemented without a covering test, 1 partial, 5 missing Next action: add tests for the `implemented` rows; owner decision on CSV formula handling. No blocker.
 
 ## Documents
 
@@ -52,9 +52,14 @@ On `origin/main`. 23 requirements: 14 verified, 7 implemented without a covering
 | DDB-R21 | verified | `tests/e2e/accessibility.spec.ts` route `duckdb-workbench` | |
 | DDB-R22 | partial | `tests/e2e/app.spec.ts` "layout does not create accidental horizontal page overflow" | Checked at the desktop and mobile project sizes only |
 | DDB-R23 | missing | — | Delivered through TASK-028 |
+| DDB-R24 | missing | — | Added 2026-10-02 |
+| DDB-R25 | missing | — | Added 2026-10-02 |
+| DDB-R26 | missing | — | Added 2026-10-02 |
+| DDB-R27 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: DDB-R24, DDB-R25, DDB-R26, DDB-R27.
 1. Add tests for DDB-R02, R03, R05, R06, R13, R18, R19, and the remaining DDB-R22 widths.
 2. DDB-R23 with TASK-028.
 3. Owner decisions under "Intent not recorded" in the spec (CSV formula handling first).
@@ -70,4 +75,5 @@ On `origin/main`. 23 requirements: 14 verified, 7 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added DDB-R24, DDB-R25, DDB-R26, DDB-R27 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

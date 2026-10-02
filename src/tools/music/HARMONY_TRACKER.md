@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 14 requirements: 11 verified, 2 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for MHL-R04 and R13. No blocker.
+On `origin/main`. 17 requirements: 11 verified, 2 implemented without a covering test, 4 missing Next action: add tests for MHL-R04 and R13. No blocker.
 
 This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Audio Mastering, whose tracking stays in its own documents.
 
@@ -45,9 +45,13 @@ This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Au
 | MHL-R12 | verified | `tests/e2e/accessibility.spec.ts` route `midi-harmony-lab` | |
 | MHL-R13 | implemented | — | No viewport test for this route |
 | MHL-R14 | missing | — | Delivered through TASK-028 |
+| MHL-R15 | missing | — | Added 2026-10-02 |
+| MHL-R16 | missing | — | Added 2026-10-02 |
+| MHL-R17 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: MHL-R15, MHL-R16, MHL-R17.
 1. Add tests for MHL-R04 (move), R13.
 2. MHL-R14 with TASK-028.
 
@@ -61,4 +65,5 @@ This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Au
 
 ## Change log
 
+- 2026-10-02 — Added MHL-R15, MHL-R16, MHL-R17 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

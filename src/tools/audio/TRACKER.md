@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 16 requirements: 12 verified, 3 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 17 requirements: 12 verified, 3 implemented without a covering test, 2 missing Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 
@@ -46,9 +46,11 @@ On `origin/main`. 16 requirements: 12 verified, 3 implemented without a covering
 | CRP-R14 | verified | `tests/e2e/accessibility.spec.ts` route `convolution-room-profiler` | |
 | CRP-R15 | implemented | — | No viewport test for this route |
 | CRP-R16 | missing | — | Delivered through TASK-028 |
+| CRP-R17 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: CRP-R17.
 1. Add tests for CRP-R08, R13, R15.
 2. CRP-R16 with TASK-028.
 
@@ -62,4 +64,5 @@ On `origin/main`. 16 requirements: 12 verified, 3 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added CRP-R17 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

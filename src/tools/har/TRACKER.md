@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 17 requirements: 11 verified, 5 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 18 requirements: 11 verified, 5 implemented without a covering test, 2 missing Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 
@@ -47,9 +47,11 @@ On `origin/main`. 17 requirements: 11 verified, 5 implemented without a covering
 | HAR-R15 | verified | `tests/e2e/accessibility.spec.ts` route `har-sanitizer` | |
 | HAR-R16 | implemented | — | No viewport test for this route |
 | HAR-R17 | missing | — | Delivered through TASK-028 |
+| HAR-R18 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: HAR-R18.
 1. Add tests for HAR-R01 (drop, sample, Clear), R09, R11 (jump), R12, R16.
 2. HAR-R17 with TASK-028.
 3. Owner decision on custom value patterns (spec, "Intent not recorded").
@@ -64,4 +66,5 @@ On `origin/main`. 17 requirements: 11 verified, 5 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added HAR-R18 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

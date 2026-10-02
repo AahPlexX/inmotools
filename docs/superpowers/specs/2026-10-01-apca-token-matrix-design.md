@@ -50,6 +50,7 @@ Out of scope:
 | APC-R13 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | APC-R14 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | APC-R15 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| APC-R16 | For a failing pair, suggest the nearest OKLCH lightness of the foreground that meets the selected target | Suggested colour meets the target |
 
 ## Definition of done
 
@@ -57,8 +58,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Candidate addition that fits the platform rules, not yet requested: suggesting the nearest OKLCH lightness that meets the target for a failing pair. The owner decides whether it becomes a requirement.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added APC-R16 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/contrast/`, the shared design section and the tool's tests.

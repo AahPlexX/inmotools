@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 15 requirements: 9 verified, 5 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 16 requirements: 9 verified, 5 implemented without a covering test, 2 missing Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 
@@ -44,9 +44,11 @@ On `origin/main`. 15 requirements: 9 verified, 5 implemented without a covering 
 | APC-R13 | verified | `tests/e2e/accessibility.spec.ts` route `apca-token-matrix` | |
 | APC-R14 | implemented | — | No viewport test for this route |
 | APC-R15 | missing | — | Delivered through TASK-028 |
+| APC-R16 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: APC-R16.
 1. Add tests for APC-R06, R07, R10, R12, R14.
 2. APC-R15 with TASK-028.
 
@@ -60,4 +62,5 @@ On `origin/main`. 15 requirements: 9 verified, 5 implemented without a covering 
 
 ## Change log
 
+- 2026-10-02 — Added APC-R16 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

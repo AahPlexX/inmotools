@@ -126,6 +126,8 @@ Out of scope:
 | GIH-R78 | Weather | not planned: the owner's original brief excluded Open-Meteo, the only keyless option (others need keys). Open-Meteo's licence does not forbid it: data is CC BY 4.0 and the free API is for non-commercial use (AetherCast already uses it). Lifting the brief exclusion makes this `missing` |
 | GIH-R79 | Workspace follows the site-wide theme (light, dark, system) from TASK-028, meeting the same contrast checks | Workspace switches with the site theme; axe passes in both themes |
 | GIH-R80 | Long-press on a profile row opens the row menu on iOS Safari (which fires no `contextmenu`) | Touch-and-hold on a row opens the row menu in WebKit |
+| GIH-R81 | PDF location brief keeps non-Latin names by embedding a freely licensed Unicode font | Cyrillic and CJK names appear in the PDF |
+| GIH-R82 | Nominatim can be switched off for every visitor without a redeploy, through a flag in a static JSON file served with the site | Setting the flag hides Nominatim |
 
 ## Definition of done
 
@@ -133,11 +135,11 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- PDF text is limited to WinAnsi (Helvetica), so non-Latin names are transliterated or dropped in the PDF only. Unknown: whether full Unicode in the PDF is required.
-- Nominatim cannot be switched off remotely without a redeploy. Unknown: whether a remote kill switch is required.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added GIH-R81, GIH-R82 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-02 — Corrected GIH-R78: Open-Meteo was excluded by the original brief, not by its licence.
 - 2026-10-01 — Default integration rule applied: GIH-R79 (dark theme) and GIH-R80 (iOS long-press row menu) changed from `not planned` to required, because both can be built in the browser. Owner kept the name "Geo Intelligence Hub".
 - 2026-10-01 — Created as an as-built spec from `src/tools/geo-intel/TODO.md` (F01–F44, audit items A1–A17, B1–B10, C1–C7) and the tool's tests.

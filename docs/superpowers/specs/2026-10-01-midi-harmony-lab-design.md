@@ -52,6 +52,9 @@ Out of scope:
 | MHL-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | MHL-R13 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | MHL-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| MHL-R15 | Seventh and extended chord qualities (maj7, m7, 7, m7b5, dim7, add9) | Each quality builds the correct notes and exports to MIDI |
+| MHL-R16 | Suggest the inversion with the smallest voice-leading movement from the previous chord | Suggestion picks the minimum-movement inversion |
+| MHL-R17 | Send the progression to a connected instrument through Web MIDI where the browser supports it | Notes reach a mocked MIDI output |
 
 ## Definition of done
 
@@ -59,8 +62,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Only triads are offered. Candidate additions that fit the platform rules, not yet requested: seventh and extended chords, automatic smoothest-inversion suggestion, MIDI output to a connected instrument through Web MIDI. The owner decides whether they become requirements.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added MHL-R15, MHL-R16, MHL-R17 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `HarmonyWorkspace.tsx`, `music-engine.ts`, the catalog entry and the tool's tests.

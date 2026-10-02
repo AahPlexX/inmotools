@@ -50,6 +50,8 @@ Out of scope:
 | OTF-R14 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | OTF-R15 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | OTF-R16 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| OTF-R17 | Load Zipkin JSON traces | Zipkin spans normalize to the common model |
+| OTF-R18 | Compare two traces side by side with per-span duration differences | Differences shown for matching spans |
 
 ## Definition of done
 
@@ -57,8 +59,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- Candidate additions that fit the platform rules, not yet requested: Zipkin JSON input, comparing two traces. The owner decides whether they become requirements.
+- None.
 
 ## Change log
 
+- 2026-10-02 — Added OTF-R17, OTF-R18 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/otel/`, the shared design section and the tool's tests.

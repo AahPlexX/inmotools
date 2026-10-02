@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 16 requirements: 7 verified, 7 implemented without a covering test, 2 missing. Span details do not show span events or exception data, which the design asks for (OTF-R13); the engine does not keep events. Next action: build OTF-R13 and add tests for the `implemented` rows.
+On `origin/main`. 18 requirements: 7 verified, 7 implemented without a covering test, 4 missing Span details do not show span events or exception data, which the design asks for (OTF-R13); the engine does not keep events. Next action: build OTF-R13 and add tests for the `implemented` rows.
 
 ## Documents
 
@@ -46,9 +46,12 @@ On `origin/main`. 16 requirements: 7 verified, 7 implemented without a covering 
 | OTF-R14 | verified | `tests/e2e/accessibility.spec.ts` route `otel-flamegraph` | |
 | OTF-R15 | implemented | — | No viewport test for this route |
 | OTF-R16 | missing | — | Delivered through TASK-028 |
+| OTF-R17 | missing | — | Added 2026-10-02 |
+| OTF-R18 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: OTF-R17, OTF-R18.
 1. Build OTF-R13 (keep span events in the engine; show events and exception fields).
 2. Add tests for OTF-R04, R07 (zoom), R08, R09, R10 (filters), R12, R15.
 3. OTF-R16 with TASK-028.
@@ -63,4 +66,5 @@ On `origin/main`. 16 requirements: 7 verified, 7 implemented without a covering 
 
 ## Change log
 
+- 2026-10-02 — Added OTF-R17, OTF-R18 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

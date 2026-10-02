@@ -54,6 +54,7 @@ Out of scope:
 | EXF-R17 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | EXF-R18 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
 | EXF-R19 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| EXF-R20 | Inspect and strip location and device metadata in MP4 and MOV video without re-encoding, as the catalog title ("Media", "Geotag Redactor") promises | Location atoms removed; video data unchanged |
 
 ## Definition of done
 
@@ -61,9 +62,9 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Intent not recorded
 
-- EXF-R16 is listed as "not implemented" in the README. HEIC is an ISO BMFF container that can be edited in the browser, so it falls under the default integration rule; no design exists yet.
-- The catalog title says "Media" and "Geotag Redactor", but the tool handles still images only. Unknown: whether video metadata (for example MP4 location atoms) is wanted or the title should say "Image".
+- EXF-R16 is listed as "not implemented" in the README. HEIC is an ISO BMFF container that can be edited in the browser, so it is built under the default integration rule.
 
 ## Change log
 
+- 2026-10-02 — Added EXF-R20 under the default integration rule (ideas that fit the platform rules become requirements).
 - 2026-10-01 — Created as an as-built spec from `src/tools/exif/`, its README, the catalog entry and the tool's tests.

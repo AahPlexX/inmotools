@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 14 requirements: 11 verified, 2 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for FDD-R07 and R13. No blocker.
+On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering test, 2 missing Next action: add tests for FDD-R07 and R13. No blocker.
 
 ## Documents
 
@@ -43,9 +43,11 @@ On `origin/main`. 14 requirements: 11 verified, 2 implemented without a covering
 | FDD-R12 | verified | `tests/e2e/accessibility.spec.ts` route `fuzzy-deduplicator` | |
 | FDD-R13 | implemented | — | No viewport test for this route |
 | FDD-R14 | missing | — | Delivered through TASK-028 |
+| FDD-R15 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: FDD-R15.
 1. Add tests for FDD-R07, R13, and XLSX input.
 2. FDD-R14 with TASK-028.
 
@@ -59,4 +61,5 @@ On `origin/main`. 14 requirements: 11 verified, 2 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added FDD-R15 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

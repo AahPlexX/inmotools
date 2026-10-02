@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 14 requirements: 10 verified, 3 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+On `origin/main`. 17 requirements: 10 verified, 3 implemented without a covering test, 4 missing Next action: add tests for the `implemented` rows. No blocker.
 
 ## Documents
 
@@ -43,9 +43,13 @@ On `origin/main`. 14 requirements: 10 verified, 3 implemented without a covering
 | GLS-R12 | verified | `tests/e2e/accessibility.spec.ts` route `glsl-sandbox` | |
 | GLS-R13 | implemented | — | No viewport test for this route |
 | GLS-R14 | missing | — | Delivered through TASK-028 |
+| GLS-R15 | missing | — | Added 2026-10-02 |
+| GLS-R16 | missing | — | Added 2026-10-02 |
+| GLS-R17 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: GLS-R15, GLS-R16, GLS-R17.
 1. Add tests for GLS-R01, R09, R13.
 2. GLS-R14 with TASK-028.
 
@@ -59,4 +63,5 @@ On `origin/main`. 14 requirements: 10 verified, 3 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added GLS-R15, GLS-R16, GLS-R17 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.

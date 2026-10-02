@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 21 requirements: 13 verified, 6 implemented without a covering test, 2 missing. The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: owner decides whether to build HPI-R18 or change the title.
+On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering test, 3 missing The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: owner decides whether to build HPI-R18 or change the title.
 
 ## Documents
 
@@ -50,9 +50,11 @@ On `origin/main`. 21 requirements: 13 verified, 6 implemented without a covering
 | HPI-R19 | verified | `tests/e2e/accessibility.spec.ts` route `hardware-packet-inspector` | |
 | HPI-R20 | implemented | — | No viewport test for this route |
 | HPI-R21 | missing | — | Delivered through TASK-028 |
+| HPI-R22 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
+0. Build the requirements added 2026-10-02: HPI-R22.
 1. Owner decision on HPI-R18 (build Web Bluetooth or change the title).
 2. Add tests for HPI-R01 (baud rate), R03 (reopen after disconnect), R08 (direction and bytes on one line), R11 (paging), R17 (Clear capture), R20.
 3. HPI-R21 with TASK-028.
@@ -68,4 +70,5 @@ On `origin/main`. 21 requirements: 13 verified, 6 implemented without a covering
 
 ## Change log
 
+- 2026-10-02 — Added HPI-R22 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.
