@@ -742,6 +742,7 @@ test('scrolling the preview moves the source without jumping the caret to the to
   await editor.click();
   await editor.press('ControlOrMeta+Home');
   const preview = page.locator('.markdown-workbench-preview');
+  await expect(preview).toContainText('Paragraph 40.');
   await preview.evaluate((node) => {
     const scroller = node as HTMLElement;
     scroller.scrollTop = scroller.scrollHeight;

@@ -35,3 +35,7 @@ No upload, no remote analyzer, and no live capture. Replay of a sanitized HAR is
 `pnpm exec vitest run tests/unit/har.test.ts`
 
 `pnpm exec playwright test tests/e2e/har.spec.ts`
+
+## Fixes
+
+- 2026-10-01 — A URL's `user:password@host` was also reported as an email address, so a fully cleaned HAR still listed 2 "remaining" findings when the optional email category was off. The email check now ignores URL user info (it is already reported as a credential under URL and query). Unit test: "reports URL user:password as a credential, not as an email address". The browser test now matches the current review wording ("0 unsanitized locations remain").

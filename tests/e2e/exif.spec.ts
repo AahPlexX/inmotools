@@ -39,7 +39,7 @@ test('supports batch ZIP, per-file removal, and explicit JPEG background selecti
   const zipDownload = await zipDownloadPromise;
   expect(zipDownload.suggestedFilename()).toBe('exif-sanitized-batch.zip');
 
-  await page.getByRole('button', { name: 'Remove' }).first().click();
+  await page.getByRole('button', { name: 'Remove first.png', exact: true }).click();
   await expect(page.getByRole('cell', { name: 'first.png', exact: true })).toHaveCount(0);
   await expect(page.getByRole('cell', { name: 'second.png', exact: true })).toBeVisible();
 });

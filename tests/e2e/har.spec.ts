@@ -40,7 +40,7 @@ test('prepares, reviews, and only then downloads a lossless sanitized HAR', asyn
   await expect(downloadPrepared).toBeDisabled();
   await page.getByRole('button', { name: 'Prepare sanitized HAR' }).click();
 
-  await expect(page.getByTestId('har-output-scan')).toContainText(/0 unsanitized credential-bearing locations remain/i);
+  await expect(page.getByTestId('har-output-scan')).toContainText(/0 unsanitized locations remain/i);
   await expect(downloadPrepared).toBeEnabled();
 
   const download = page.waitForEvent('download');

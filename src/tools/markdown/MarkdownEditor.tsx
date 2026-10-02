@@ -441,10 +441,10 @@ export default function MarkdownEditor({
     const target = Math.min(Math.max(revealRequest.line, 1), lineCount);
     const info = view.state.doc.line(target);
     const focus = revealRequest.focus !== false;
-    view.dispatch({
-      selection: focus ? { anchor: info.from } : view.state.selection,
-      effects: EditorView.scrollIntoView(info.from, { y: 'start' }),
-    });
+    // Without focus the caret stays where it is; re-sending the selection would report a caret move.
+    view.dispatch(focus
+      ? { selection: { anchor: info.from }, effects: EditorView.scrollIntoView(info.from, { y: 'start' }) }
+      : { effects: EditorView.scrollIntoView(info.from, { y: 'start' }) });
     if (focus) view.focus();
   }, [revealRequest]);
 

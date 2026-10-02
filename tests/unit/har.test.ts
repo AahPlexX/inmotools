@@ -153,3 +153,12 @@ it('finds and redacts emails, server IPs, and extra field names only when those 
   expect(text).not.toContain('203.0.113.10');
   expect(text).not.toContain('198.51.100.8');
 });
+
+it('reports URL user:password as a credential, not as an email address', () => {
+  const har = { log: { entries: [{ request: { method: 'GET', url: 'https://alice:request-pass@example.test/a?e=ada@example.test', headers: [], cookies: [], queryString: [] }, response: { status: 200, headers: [], cookies: [], content: {} } }] } };
+  const fields = analyzeHar(har as never).findings.map((finding) => `${finding.category}:${finding.field}`);
+  expect(fields).toContain('query:request.url:password');
+  expect(fields.filter((field) => field.startsWith('emails:'))).toEqual(['emails:request.url:email']);
+  const userOnly = { log: { entries: [{ request: { method: 'GET', url: 'https://alice:request-pass@example.test/a', headers: [], cookies: [], queryString: [] }, response: { status: 200, headers: [], cookies: [], content: {} } }] } };
+  expect(analyzeHar(userOnly as never).findings.some((finding) => finding.category === 'emails')).toBe(false);
+});

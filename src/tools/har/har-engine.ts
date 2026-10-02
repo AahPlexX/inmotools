@@ -296,10 +296,24 @@ function scanUrl(value: unknown, credentialPrefix: string, queryPrefix: string, 
   for (const [name] of new URLSearchParams(queryText)) if (isSensitiveName(name, extraNames)) add({ category: 'query', entryIndex, field: `${queryPrefix}:${name}` });
 }
 
+// `user:pass@host` in a URL is a credential (reported under query), not an email address.
+function withoutUrlUserinfo(value: string): string {
+  try {
+    const url = new URL(value);
+    if (!url.username && !url.password) return value;
+    url.username = '';
+    url.password = '';
+    return url.href;
+  } catch {
+    return value;
+  }
+}
+
 function notePersonalData(value: unknown, entryIndex: number, field: string, add: (finding: HarFinding) => void): void {
   if (typeof value !== 'string' || !value) return;
-  if (containsEmail(value)) add({ category: 'emails', entryIndex, field: `${field}:email` });
-  if (containsIp(value)) add({ category: 'addresses', entryIndex, field: `${field}:ip` });
+  const text = withoutUrlUserinfo(value);
+  if (containsEmail(text)) add({ category: 'emails', entryIndex, field: `${field}:email` });
+  if (containsIp(text)) add({ category: 'addresses', entryIndex, field: `${field}:ip` });
 }
 
 export function analyzeHar(har: HarLike, extraNames: readonly string[] = []) {

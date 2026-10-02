@@ -57,7 +57,7 @@ test('renders through a real worker with selectable text, document search naviga
   await expect(page.getByTestId('pdf-search-results')).toContainText('Renderer page two');
   await page.getByRole('button', { name: 'Go to page 2' }).click();
 
-  await expect(page.getByLabel('Preview page')).toHaveValue('2');
+  await expect(page.getByLabel('Preview page', { exact: true })).toHaveValue('2');
   await expect(canvas).toHaveAttribute('data-rendered-page', '2');
   await expect(textLayer).toContainText('Renderer page two');
   await expect(page.getByTestId('pdf-render-status')).toContainText('Rendered page 2');

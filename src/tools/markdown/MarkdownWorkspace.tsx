@@ -138,6 +138,9 @@ export default function MarkdownWorkspace() {
   const [focusMode, setFocusMode] = useState(false);
   const syncLockRef = useRef<'source' | 'preview' | null>(null);
   const ignorePreviewUntilRef = useRef(0);
+  const programmaticPreviewTopRef = useRef(0);
+  const lastPreviewTopRef = useRef(0);
+  const lastCursorLineRef = useRef(0);
 
   useEffect(() => {
     const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode };
@@ -431,11 +434,23 @@ export default function MarkdownWorkspace() {
     if (!scroller) return;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     ignorePreviewUntilRef.current = Date.now() + (reducedMotion ? 180 : 700);
+    programmaticPreviewTopRef.current = Math.max(0, Math.min(targetOffset, scroller.scrollHeight - scroller.clientHeight));
+    lastPreviewTopRef.current = scroller.scrollTop;
     scroller.scrollTo({ top: targetOffset, behavior: reducedMotion ? 'auto' : 'smooth' });
   }, []);
 
   const handlePreviewScroll = useCallback((offsetTop: number) => {
-    if (view !== 'split' || Date.now() < ignorePreviewUntilRef.current) return;
+    if (view !== 'split') return;
+    const previousTop = lastPreviewTopRef.current;
+    lastPreviewTopRef.current = offsetTop;
+    if (Date.now() < ignorePreviewUntilRef.current) {
+      // The tool's own scroll only moves toward its target. A move away from it is the person scrolling:
+      // they take over, and the pending source-driven position is dropped.
+      const target = programmaticPreviewTopRef.current;
+      if (Math.abs(offsetTop - target) <= Math.abs(previousTop - target) + 2) return;
+      ignorePreviewUntilRef.current = 0;
+    }
+    lastScrollSyncRef.current = null;
     const line = sourceLineForScrollOffset(editorViewScrollRef.current, offsetTop);
     syncLockRef.current = 'preview';
     setActiveSourceLine(line);
@@ -458,13 +473,26 @@ export default function MarkdownWorkspace() {
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
     editorViewScrollRef.current = offsets;
     const last = lastScrollSyncRef.current;
-    if (last && Date.now() - last.at < 1500) scrollPreviewToLine(last.line);
+    if (!last || Date.now() - last.at >= 1500) return;
+    const scroller = previewHostRef.current?.querySelector<HTMLElement>('.markdown-workbench-preview');
+    const settled = Date.now() >= ignorePreviewUntilRef.current;
+    // After the tool's own scroll has settled, a preview away from its target was moved by the person; leave it.
+    if (scroller && settled && Math.abs(scroller.scrollTop - programmaticPreviewTopRef.current) > 4) return;
+    scrollPreviewToLine(last.line);
   }, [scrollPreviewToLine]);
 
   const handleSourceLineChange = useCallback((line: number) => {
     setActiveSourceLine(line);
     if (view === 'split' && syncLockRef.current !== 'preview') scrollPreviewToLine(line);
   }, [view, scrollPreviewToLine]);
+
+  // CodeMirror reports the caret on every selection update, including repeats for the same line; only a real move should scroll the preview.
+  const handleCursorLineChange = useCallback((line: number) => {
+    setActiveSourceLine(line);
+    if (line === lastCursorLineRef.current) return;
+    lastCursorLineRef.current = line;
+    handleSourceLineChange(line);
+  }, [handleSourceLineChange]);
 
   const revealLine = useCallback((line: number) => {
     setRevealRequest({ line, nonce: Date.now() });
@@ -844,7 +872,7 @@ export default function MarkdownWorkspace() {
           <MarkdownEditor
             value={source}
             onChange={handleEditorSourceChange}
-            onCursorLineChange={handleSourceLineChange}
+            onCursorLineChange={handleCursorLineChange}
             onViewportLineChange={handleSourceLineChange}
             onStatus={setStatus}
             lineWrapping={lineWrapping}
