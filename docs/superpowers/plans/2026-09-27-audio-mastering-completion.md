@@ -1,5 +1,7 @@
 # Audio Mastering Workstation — Completion Plan and Function Status
 
+> **Post-merge status update — 2026-09-27:** the 81/81 implementation described below was safely integrated into `origin/main` through PR #81 at merge commit `4685013b261f83408145bed98851d09b0bca752e`. References below to the old active branch, “remaining” PR-head validation, or pending PR #81 integration are retained as historical execution evidence, not current instructions. The active post-merge production audit and competitive-parity handoff is `docs/superpowers/plans/2026-09-27-audio-mastering-production-parity-audit.md` on reconciled PR #85 (superseding documentation-conflicted PR #82). Do not merge the historical feature branches wholesale.
+
 **Created:** 2026-09-27
 **Supersedes for execution:** the open Task 2–7 checklists in `2026-09-18-audio-mastering-phase-3.md` (that file stays as history).
 **Spec:** `docs/superpowers/specs/2026-09-16-audio-mastering-workstation-design.md` (81-function ledger, unchanged).

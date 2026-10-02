@@ -48,6 +48,9 @@ describe('focused E2E spec selection', () => {
       'tests/e2e/svg.spec.ts',
       'tests/e2e/vector-nested-composition.spec.ts',
     ]);
+    expect(selectE2eSpecs(['src/tools/fiber-craft/FiberCraftWorkspace.tsx'])).toEqual([
+      'tests/e2e/fiber-craft.spec.ts',
+    ]);
   });
 
   it('routes Tactical Matchboard source changes to its focused browser contract', () => {

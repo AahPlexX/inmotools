@@ -4,7 +4,7 @@ allowBuilds:
   protobufjs: false
 
 minimumReleaseAgeExclude:
-  - mediabunny@1.58.0
+  - mediabunny@1.60.0
 
 overrides:
   '@colorhythm/libraw-wasm>typed-cstruct': 0.11.0
