@@ -1,5 +1,7 @@
 # Next Ten Local-First Tools Design
 
+Since 2026-10-01 each tool has its own as-built spec, which this document stays the original design for: [HAR](2026-10-01-har-sanitizer-design.md), [Keyframe Video Slicer](2026-10-01-video-keyframe-slicer-design.md), [Font Subsetter](2026-10-01-font-subsetter-design.md), [Room Profiler](2026-10-01-convolution-room-profiler-design.md), [APCA Token Matrix](2026-10-01-apca-token-matrix-design.md), [GLSL Sandbox](2026-10-01-glsl-sandbox-design.md), [Fuzzy Deduplicator](2026-10-01-fuzzy-deduplicator-design.md), [Trace Flamegraph](2026-10-01-otel-flamegraph-design.md). glTF and GeoJSON are tracked in their own documents.
+
 **Date:** 2026-08-29
 
 ## Goal
