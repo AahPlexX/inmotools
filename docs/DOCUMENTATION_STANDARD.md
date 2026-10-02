@@ -94,6 +94,10 @@ git worktree remove ../<repo>-<slug> && git branch -d feature/<slug>
 - Do not leave a merged branch, a stale worktree or an open pull request behind.
 - Record the merge commit in the tracker's verification evidence and in `.tasks/`.
 
+### Shared folders
+
+When two tools share one folder (for example `src/tools/music/` holds MIDI Harmony Lab and Audio Mastering), each tracker is named `<TOOL>_TRACKER.md` (for example `HARMONY_TRACKER.md`) and its header `tracker:` field gives that path.
+
 ## Header block (every spec, tracker and standard document)
 
 Each file starts with this block. Field names and values are fixed so that one search finds everything.
