@@ -114,6 +114,8 @@ Every other shipped suite has a plan and a design document under `docs/superpowe
 
 This is deliberately left as a task rather than written retrospectively: the design rationale belongs to whoever made those modelling choices, and inventing a justification after the fact would produce a document that reads as authoritative while being a guess. Health-adjacent thresholds are the last place that is acceptable.
 
+**2026-10-01:** an as-built spec now records what the tool does (`docs/superpowers/specs/2026-10-01-aethercast-design.md`); it deliberately leaves the threshold sources and model choices to this task.
+
 ### Plan
 
 - Have the original author record the intended scope, the standards each index implements, and the source of every threshold constant.
