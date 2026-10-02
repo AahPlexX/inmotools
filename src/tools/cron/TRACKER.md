@@ -1,0 +1,69 @@
+---
+tool: cron-team-matrix
+folder: src/tools/cron
+doc: tracker
+basis: as-built
+status: done
+spec: docs/superpowers/specs/2026-10-01-cron-team-matrix-design.md
+tracker: src/tools/cron/TRACKER.md
+updated: 2026-10-01
+---
+
+# Cron Team Matrix — tracker
+
+## Resume here
+
+On `origin/main`. 20 requirements: 14 verified, 5 implemented without a covering test, 1 missing (site theme, TASK-028). Next action: add tests for the `implemented` rows. No blocker.
+
+## Documents
+
+- Spec: [2026-10-01-cron-team-matrix-design.md](../../../docs/superpowers/specs/2026-10-01-cron-team-matrix-design.md)
+- Code: `cron-engine.ts` (parsing, projection, offsets, calendar), `CronWorkspace.tsx` (UI)
+- Task history: `.tasks/DONE.md` (run-count horizon; unrecognized-timezone crash fix) and `.tasks/NEXT.md` TASK-014 (paged output)
+- Index row: [TOOL_INDEX.md](../../../docs/TOOL_INDEX.md)
+- Unit tests: `tests/unit/cron.test.ts`; browser tests: `tests/e2e/cron.spec.ts`
+
+## Requirement status
+
+`unit` = `tests/unit/cron.test.ts`; `e2e` = `tests/e2e/cron.spec.ts`.
+
+| ID | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| CRN-R01 | verified | unit "returns ordered upcoming runs in the source timezone" | |
+| CRN-R02 | verified | unit "preserves seconds from six-field cron expressions"; e2e "keeps a fixed reference instant…" | |
+| CRN-R03 | implemented | — | Error path present in `CronWorkspace.tsx`; no test types an invalid expression |
+| CRN-R04 | verified | unit "bounds the requested run count" | |
+| CRN-R05 | verified | unit "requires an unambiguous editable reference instant", "rejects impossible ISO calendar dates…"; e2e "keeps a fixed reference instant across rerenders…" | |
+| CRN-R06 | verified | e2e "diagnoses invalid source and comparison timezones without unmounting" | |
+| CRN-R07 | verified | unit "partitions valid, duplicate, invalid, and over-limit zones"; e2e "diagnoses invalid…" | |
+| CRN-R08 | verified | unit "searches supported identifiers with starts-with matches first"; e2e "discovers supported timezones…" | |
+| CRN-R09 | implemented | — | No test asserts the source column with a list that omits it |
+| CRN-R10 | verified | unit "projects one instant into multiple named zones with offsets" | |
+| CRN-R11 | verified | e2e "keeps a fixed reference instant…" (`cron-first-instant`, `cron-reference-value`) | |
+| CRN-R12 | verified | unit "supports normal and overnight working-hour windows"; e2e "…labels working hours in text" | |
+| CRN-R13 | verified | unit "reports concrete New York UTC-offset changes"; e2e "…reports offset changes…" | |
+| CRN-R14 | implemented | unit "returns run hours safely" covers the hour helper | Distribution display has no test |
+| CRN-R15 | implemented | — | Uses the shared `PagedTable`; no cron test exceeds 50 rows |
+| CRN-R16 | verified | e2e "keeps a fixed reference instant…" (CSV download) | |
+| CRN-R17 | verified | unit "exports only the calculated occurrences…", "folds content lines to the RFC 5545 75-octet limit"; e2e (.ics download) | |
+| CRN-R18 | verified | `tests/e2e/accessibility.spec.ts` route `cron-team-matrix` | |
+| CRN-R19 | implemented | — | No viewport test for this route |
+| CRN-R20 | missing | — | Delivered through TASK-028 |
+
+## Open work
+
+1. Add tests for CRN-R03, R09, R14, R15, R19.
+2. CRN-R20 with TASK-028.
+3. Owner decisions under "Intent not recorded" in the spec.
+
+## Known limitations
+
+- Timezone names and rules come from the browser's `Intl` data, so results can differ slightly between browsers with different timezone database versions.
+
+## Verification evidence
+
+- 2026-10-01, `main` @ `35e55040`: `tests/unit/cron.test.ts` 14/14; `tests/e2e/cron.spec.ts` 6 passed (desktop and mobile); accessibility spec for the route 2 passed.
+
+## Change log
+
+- 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.
