@@ -62,7 +62,6 @@ On `origin/main`. 27 requirements: 14 verified, 7 implemented without a covering
 0. Build the requirements added 2026-10-02: DDB-R24, DDB-R25, DDB-R26, DDB-R27.
 1. Add tests for DDB-R02, R03, R05, R06, R13, R18, R19, and the remaining DDB-R22 widths.
 2. DDB-R23 with TASK-028.
-3. Owner decisions under "Intent not recorded" in the spec (CSV formula handling first).
 
 ## Known limitations
 

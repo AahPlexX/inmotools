@@ -118,7 +118,6 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 0. Build the requirements added 2026-10-02: GIH-R81, GIH-R82.
 1. Build GIH-R80 (iOS long-press row menu); GIH-R79 follows TASK-028.
 2. Add tests for the `implemented` rows: GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62.
-3. Owner decisions listed under "Intent not recorded" in the spec.
 
 ## Known limitations
 

@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering test, 3 missing. The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: owner decides whether to build HPI-R18 or change the title.
+On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering test, 3 missing. The catalog title promises Web Bluetooth (HPI-R18), which the tool does not have. Next action: build HPI-R18.
 
 ## Documents
 
@@ -55,7 +55,7 @@ On `origin/main`. 22 requirements: 13 verified, 6 implemented without a covering
 ## Open work
 
 0. Build the requirements added 2026-10-02: HPI-R22.
-1. Owner decision on HPI-R18 (build Web Bluetooth or change the title).
+1. Build HPI-R18 (Web Bluetooth); the owner chose building over changing the title (2026-10-02).
 2. Add tests for HPI-R01 (baud rate), R03 (reopen after disconnect), R08 (direction and bytes on one line), R11 (paging), R17 (Clear capture), R20.
 3. HPI-R21 with TASK-028.
 

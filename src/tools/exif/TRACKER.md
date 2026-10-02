@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 20 requirements: 11 verified, 6 implemented without a covering test, 3 missing. Next action: build HEIC stripping (EXF-R16) and add tests for the `implemented` rows; owner decision on video metadata (spec, "Intent not recorded").
+On `origin/main`. 20 requirements: 11 verified, 6 implemented without a covering test, 3 missing. Next action: build HEIC stripping (EXF-R16) and add tests for the `implemented` rows; then MP4/MOV metadata (EXF-R20).
 
 ## Documents
 

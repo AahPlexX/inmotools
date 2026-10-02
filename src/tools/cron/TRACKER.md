@@ -60,7 +60,6 @@ On `origin/main`. 25 requirements: 14 verified, 5 implemented without a covering
 0. Build the requirements added 2026-10-02: CRN-R21, CRN-R22, CRN-R23, CRN-R24, CRN-R25.
 1. Add tests for CRN-R03, R09, R14, R15, R19.
 2. CRN-R20 with TASK-028.
-3. Owner decisions under "Intent not recorded" in the spec.
 
 ## Known limitations
 
