@@ -13,7 +13,7 @@ updated: 2026-10-01
 
 ## Resume here
 
-On `origin/main`. 14 requirements: 5 verified, 6 implemented without a covering test, 3 missing. The design's visual timeline with keyframe markers (KVS-R10) is not built; the keyframe list stands in for it. No browser test loads a video. Next action: build KVS-R10 and add a browser test with a small fixture video.
+On `origin/main`. 14 requirements: 5 verified, 6 implemented without a covering test, 3 missing. The design's visual timeline with keyframe markers (VKS-R10) is not built; the keyframe list stands in for it. No browser test loads a video. Next action: build VKS-R10 and add a browser test with a small fixture video.
 
 ## Documents
 
@@ -29,26 +29,26 @@ On `origin/main`. 14 requirements: 5 verified, 6 implemented without a covering 
 
 | ID | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| KVS-R01 | implemented | — | |
-| KVS-R02 | implemented | — | |
-| KVS-R03 | verified | unit "snaps the start backward and the end forward…", "clamps requests to media bounds…", "rejects inverted ranges and media without a usable keyframe" | |
-| KVS-R04 | implemented | — | |
-| KVS-R05 | implemented | unit "navigates the complete verified keyframe sequence in either direction" covers the helper | UI buttons have no test |
-| KVS-R06 | implemented | — | |
-| KVS-R07 | verified | e2e (policy text) | Previews with a loaded file have no test |
-| KVS-R08 | implemented | — | No test exports a real file |
-| KVS-R09 | verified | audit "keeps every audio packet that starts before the exclusive trim end", "reads source rotation…", "does not use the packet at range.end…" | |
-| KVS-R10 | missing | — | Design requirement; only a keyframe table exists |
-| KVS-R11 | missing | — | Optional in the design; buildable, so kept under the default integration rule |
-| KVS-R12 | verified | e2e axe check; `tests/e2e/accessibility.spec.ts` route `video-keyframe-slicer` | |
-| KVS-R13 | verified | e2e (overflow at each viewport) | |
-| KVS-R14 | missing | — | Delivered through TASK-028 |
+| VKS-R01 | implemented | — | |
+| VKS-R02 | implemented | — | |
+| VKS-R03 | verified | unit "snaps the start backward and the end forward…", "clamps requests to media bounds…", "rejects inverted ranges and media without a usable keyframe" | |
+| VKS-R04 | implemented | — | |
+| VKS-R05 | implemented | unit "navigates the complete verified keyframe sequence in either direction" covers the helper | UI buttons have no test |
+| VKS-R06 | implemented | — | |
+| VKS-R07 | verified | e2e (policy text) | Previews with a loaded file have no test |
+| VKS-R08 | implemented | — | No test exports a real file |
+| VKS-R09 | verified | audit "keeps every audio packet that starts before the exclusive trim end", "reads source rotation…", "does not use the packet at range.end…" | |
+| VKS-R10 | missing | — | Design requirement; only a keyframe table exists |
+| VKS-R11 | missing | — | Optional in the design; buildable, so kept under the default integration rule |
+| VKS-R12 | verified | e2e axe check; `tests/e2e/accessibility.spec.ts` route `video-keyframe-slicer` | |
+| VKS-R13 | verified | e2e (overflow at each viewport) | |
+| VKS-R14 | missing | — | Delivered through TASK-028 |
 
 ## Open work
 
-1. Build KVS-R10 (timeline with keyframe markers), then KVS-R11.
-2. Add a browser test with a small fixture video covering KVS-R01, R02, R04–R08.
-3. KVS-R14 with TASK-028.
+1. Build VKS-R10 (timeline with keyframe markers), then VKS-R11.
+2. Add a browser test with a small fixture video covering VKS-R01, R02, R04–R08.
+3. VKS-R14 with TASK-028.
 
 ## Known limitations
 
