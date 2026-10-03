@@ -23,7 +23,7 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 ## Agent instruction files
 
-`AGENTS.md` is the only instruction file with content. `CLAUDE.md` (`@AGENTS.md`) and `GEMINI.md` exist only because those agents read their own file name instead of `AGENTS.md`; they point to it and add nothing.
+`AGENTS.md` is the only instruction file with content; it links to `GOVERNANCE.md`. `CLAUDE.md` (`@AGENTS.md`) and `GEMINI.md` (`@./AGENTS.md`) contain only an import, which both agents expand when they load the file (a plain link is followed only if the agent decides to open it). Claude Code reads `AGENTS.md` directly from v2.1.277 when no `CLAUDE.md` exists, and does not load it twice through the import; the import covers older versions and sessions without that support. Agents that read `AGENTS.md` natively need no pointer file. Add instructions to `AGENTS.md` only, never to a pointer file.
 
 ## Known exceptions (baseline 2026-10-03)
 
