@@ -192,8 +192,8 @@ importers:
         specifier: 1.2.3
         version: 1.2.3
       '@mediabunny/aac-encoder':
-        specifier: 1.60.0
-        version: 1.60.0(mediabunny@1.60.0)
+        specifier: 1.61.0
+        version: 1.61.0(mediabunny@1.60.0)
       '@mediabunny/flac-encoder':
         specifier: 1.60.0
         version: 1.60.0(mediabunny@1.60.0)
@@ -1434,8 +1434,8 @@ packages:
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
-  '@mediabunny/aac-encoder@1.60.0':
-    resolution: {integrity: sha512-wevrs3VuwOKMmXkEn01KIwapKAe5QoGazWyND1B9pYUz+GC+wxfVcyv9kUfrpXDfy/xPhM7pOePCHSC9aw0k5A==}
+  '@mediabunny/aac-encoder@1.61.0':
+    resolution: {integrity: sha512-DPXxmw7ZMgw+px/2BdeA//mJspTHrfI21yrGyQDwp4fvnadAm+PXV6enMKoRWQsyptoVwiciOqu52FhfwGRuGg==}
     peerDependencies:
       mediabunny: ^1.0.0
 
@@ -7275,7 +7275,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.4': {}
 
-  '@mediabunny/aac-encoder@1.60.0(mediabunny@1.60.0)':
+  '@mediabunny/aac-encoder@1.61.0(mediabunny@1.60.0)':
     dependencies:
       mediabunny: 1.60.0
 
