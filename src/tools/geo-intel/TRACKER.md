@@ -97,7 +97,7 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R65 | verified | unit:wiring "never requests credentials: no API keys, tokens or signup-gated hosts in source" | |
 | GIH-R66 | verified | e2e "lays out without horizontal overflow at <width> px" (7 widths) | |
 | GIH-R67 | verified | e2e "has no serious or critical axe violations…"; `tests/e2e/accessibility.spec.ts` | |
-| GIH-R68 | verified | unit:wiring "registers exactly one catalog entry with the ToolDefinition shape" | |
+| GIH-R68 | verified | unit:wiring "registers exactly one catalog entry with the ToolMeta shape" | |
 | GIH-R69 | verified | unit:engine "resolves postal codes without inventing a postal-code population"; e2e "postal lookups show the geography used…" | |
 | GIH-R70 | verified | unit:net "spaces Nominatim requests at least 1.1 s apart"; unit:engine "keeps Nominatim off unless enabled" | |
 | GIH-R71 | verified | unit:engine "synthesises a place-name profile where every field carries full provenance" | |

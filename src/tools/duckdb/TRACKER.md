@@ -40,7 +40,7 @@ On `origin/main`. 27 requirements: 14 verified, 7 implemented without a covering
 | DDB-R09 | verified | e2e (`duckdb-result-metadata`) | |
 | DDB-R10 | verified | e2e (`getByLabel('NULL')`) | |
 | DDB-R11 | verified | e2e ("1 of 1,000 captured rows match") | |
-| DDB-R12 | verified | e2e ("Rows 1–200 of 1,000") | |
+| DDB-R12 | verified | e2e "queries local files losslessly with bounded capture, types, history, export, schema, and removal" (asserts the `Rows 1–200 of 1,000` range text) | |
 | DDB-R13 | implemented | — | |
 | DDB-R14 | verified | e2e (history contains the query) | Loading back from history has no test |
 | DDB-R15 | verified | e2e | |
