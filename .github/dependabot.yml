@@ -1,18 +1,16 @@
 version: 2
 updates:
-  # pnpm projects are monitored under the "npm" ecosystem. This project pins exact
-  # versions, so each proposed update is an explicit, reviewable bump.
+  # Version-update pull requests are disabled (limit 0): the owner wants no open
+  # pull requests. Dependency bumps are made on request through a `fix/*` branch.
+  # A limit of 0 does not affect Dependabot security updates.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
-    groups:
-      dev-dependencies:
-        dependency-type: "development"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
