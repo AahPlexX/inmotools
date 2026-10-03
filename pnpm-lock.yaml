@@ -198,8 +198,8 @@ importers:
         specifier: 1.60.0
         version: 1.60.0(mediabunny@1.60.0)
       '@mediabunny/mp3-encoder':
-        specifier: 1.60.0
-        version: 1.60.0(mediabunny@1.60.0)
+        specifier: 1.61.0
+        version: 1.61.0(mediabunny@1.60.0)
       '@replit/codemirror-vim':
         specifier: 6.4.0
         version: 6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
@@ -1444,8 +1444,8 @@ packages:
     peerDependencies:
       mediabunny: ^1.0.0
 
-  '@mediabunny/mp3-encoder@1.60.0':
-    resolution: {integrity: sha512-dcDS+hh0g6JBJissiTUkbRCjUFLM348qZQBGgsVawmr61CzJK9ZgN9f/9BzkVzTlhmxxriRx8jYCK+Anqx8mMQ==}
+  '@mediabunny/mp3-encoder@1.61.0':
+    resolution: {integrity: sha512-b9IFKx5Dm2+OZNqXd0of+jPPGiHCGzuD5B0oCbx73Z051KyRPbrg+yMZODKbKZeyPOlgJWh8CtZFw0l4DkLGWQ==}
     peerDependencies:
       mediabunny: ^1.0.0
 
@@ -7283,7 +7283,7 @@ snapshots:
     dependencies:
       mediabunny: 1.60.0
 
-  '@mediabunny/mp3-encoder@1.60.0(mediabunny@1.60.0)':
+  '@mediabunny/mp3-encoder@1.61.0(mediabunny@1.60.0)':
     dependencies:
       mediabunny: 1.60.0
 
