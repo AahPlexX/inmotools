@@ -33,7 +33,6 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 | --- | --- | --- |
 | AetherCast | On open, fetches data for the saved location (`localStorage` key `inmotools.aethercast.live-location.v1`) or asks for geolocation, then refreshes every 15 minutes, without a user action. | Network use only on the user's action |
 | Site Intelligence Analyzer | Has an optional "CrUX API key" field (`SiteIntelWorkspace.tsx`, stored locally). | No API keys |
-| CAD Studio | Has no browser spec of its own; only the catalog-wide specs open it. | Browser coverage |
 | Fiber Craft Workstation | Its spec has no standard header block, so `tool:check` reports it as pending. | Documentation standard |
 | 21 tools | No standard spec and tracker yet (`pnpm tool:check --all`). Specs are the next workstream. | Documentation standard |
 | 17 standardized tools | 54 requirements are `missing` (`pnpm tool:check --all`). | Default integration rule |
