@@ -29,7 +29,7 @@ describe('geo intelligence hub wiring', () => {
 
   it('runs the full browser suite when the catalog changes', () => {
     expect(selectE2eSpecs(['src/catalog.ts'])).toEqual(['__FULL_SUITE__']);
-    expect(selectE2eSpecs(['src/tools/geo-intel/GeoIntelWorkspace.tsx'])).toEqual(['tests/e2e/app.spec.ts', 'tests/e2e/accessibility.spec.ts']);
+    expect(selectE2eSpecs(['src/tools/geo-intel/GeoIntelWorkspace.tsx'])).toEqual(['tests/e2e/geo-intel.spec.ts']);
   });
 
   it('never requests credentials: no API keys, tokens or signup-gated hosts in source', () => {
