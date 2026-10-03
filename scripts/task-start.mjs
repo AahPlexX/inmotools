@@ -5,13 +5,15 @@
 //  2. if that branch already exists on origin, it is someone's claim: resumes it in a
 //     worktree instead of starting over (another tool's branch is never touched);
 //  3. otherwise creates the branch from origin/main in ../<repo>-<slug>, writes a task
-//     file in .tasks/items/, commits it and pushes, so the claim is visible to others.
+//     file in .tasks/items/ (or activates a queued one for the same branch), commits it
+//     and pushes, so the claim is visible to others. integrate.yml does not merge a
+//     branch that carries only this claim commit.
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { KINDS, slugsOn, validateBranch } from './branch-check.mjs';
-import { ITEMS_DIR } from './docs-sync.mjs';
+import { ITEMS_DIR, readItems } from './docs-sync.mjs';
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -70,12 +72,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(0);
   }
   git(['worktree', 'add', '--quiet', '-b', branch, tree, 'origin/main']);
-  const id = taskId(slug);
-  const title = rest.join(' ') || `${kind} ${slug}`;
-  mkdirSync(resolve(tree, ITEMS_DIR), { recursive: true });
-  writeFileSync(resolve(tree, ITEMS_DIR, `${id}.md`), taskFile({ id, slug, kind, branch, title }));
+  // A queued task for this tool and branch is activated instead of creating a duplicate.
+  const queued = readItems(tree).find(({ header }) => header.tool === slug && header.branch === branch && ['next', 'backlog'].includes(header.state));
+  const id = queued?.header.task ?? taskId(slug);
+  const path = resolve(tree, ITEMS_DIR, `${id}.md`);
+  if (queued) {
+    const text = readFileSync(path, 'utf8')
+      .replace(/^state: (next|backlog)$/m, 'state: active')
+      .replace(/^updated: .*$/m, `updated: ${today()}`);
+    writeFileSync(path, `${text.trimEnd()}\n- ${today()}: claimed \`${branch}\`.\n`);
+  } else {
+    mkdirSync(resolve(tree, ITEMS_DIR), { recursive: true });
+    writeFileSync(path, taskFile({ id, slug, kind, branch, title: rest.join(' ') || `${kind} ${slug}` }));
+  }
   git(['add', `${ITEMS_DIR}/${id}.md`], tree);
   git(['commit', '--quiet', '-m', `chore(tasks): start ${id}`], tree);
   git(['push', '--quiet', '-u', 'origin', branch], tree);
-  console.log(`started ${branch} in ${tree}\ntask file: ${ITEMS_DIR}/${id}.md (fill in "Request" first)`);
+  console.log(`started ${branch} in ${tree}\ntask file: ${ITEMS_DIR}/${id}.md (${queued ? 'queued task activated; read it first' : 'fill in "Request" first'})`);
 }

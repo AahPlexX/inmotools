@@ -36,7 +36,7 @@ Anything that can be built within these rules is in scope (the default integrati
 
 ## 3. Work cycle
 
-1. **Start:** `pnpm task:start <slug> <new|expand|fix> "<title>"`. It creates `feature/<slug>` (new tool), `expand/<slug>` or `fix/<slug>` from `origin/main` in its own worktree, writes the task file and pushes it. If the branch already exists, it is resumed, not restarted. Other branch names are refused (`pnpm branch:check`).
+1. **Start:** `pnpm task:start <slug> <new|expand|fix> "<title>"`. It creates `feature/<slug>` (new tool), `expand/<slug>` or `fix/<slug>` from `origin/main` in its own worktree, writes the task file and pushes it. If the branch already exists, it is resumed, not restarted; a queued task file for the same branch is activated rather than duplicated. A branch carrying only this claim is not merged, so it stays visible as the claim. Other branch names are refused (`pnpm branch:check`).
 2. **Specify:** record the request verbatim in the task file, then turn it into ID'd requirements in the tool's spec before writing code. A request that leaves a choice open gets the conservative default, recorded under "Intent not recorded" with "owner may override".
 3. **Build and record:** keep the tracker's **Resume here**, requirement statuses and the task file current in the same commit as the work. Commit and push after every working step, so stopping at any point loses nothing.
 4. **Check:** `pnpm tool:check <slug>` computes completion from the spec, tracker and tests. A status is never typed as a summary; a `verified` row cites a test that exists.

@@ -4,6 +4,8 @@ name: Integrate branch into main
 # without a pull request: merge onto the latest main, check, push main, delete the
 # branch. If main moves during the run, the push is rejected and the run retries on
 # the new main. Nothing is merged unless every check passes on the merged result.
+# A push whose only change is the claim made by `pnpm task:start` is not merged, so
+# the branch stays on origin as the claim until it carries work.
 on:
   push:
     branches: ['feature/**', 'expand/**', 'fix/**']
@@ -58,6 +60,10 @@ jobs:
               echo "Nothing to integrate: main already contains $BRANCH."
               pushed=true
               break
+            fi
+            if ! grep -qv '^\.tasks/items/' <<< "$changed" && git log -1 --format=%s "$BRANCH_SHA" | grep -q '^chore(tasks): start '; then
+              echo "Only the task claim is on $BRANCH; kept as the claim until it carries work." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
             fi
             if grep -q '^\.github/workflows/' <<< "$changed"; then
               echo "::error::$BRANCH changes .github/workflows/, which a workflow token cannot push. Run the checks locally and push the merge to main yourself."
