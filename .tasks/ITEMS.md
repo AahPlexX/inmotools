@@ -12,7 +12,14 @@ None.
 
 ## next
 
-None.
+| Task | Tool | Kind | Branch | Updated | Title |
+| --- | --- | --- | --- | --- | --- |
+| [T-aethercast-20261003-2e02](items/T-aethercast-20261003-2e02.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-03 | Fetch live data only on the user's action |
+| [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
+| [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-03 | Give the Fiber Craft spec the standard header block |
+| [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
+| [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-03 | Remove or replace the CrUX API key field |
+| [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-03 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 
 ## backlog
 
@@ -20,7 +27,9 @@ None.
 
 ## done
 
-None.
+| Task | Tool | Kind | Branch | Updated | Title |
+| --- | --- | --- | --- | --- | --- |
+| [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 
 ## rejected
 

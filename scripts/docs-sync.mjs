@@ -72,7 +72,7 @@ export function renderItems(items) {
     const mine = items.filter((item) => item.header.state === state);
     out.push(`## ${state}`, '');
     if (!mine.length) out.push('None.', '');
-    else out.push('| Task | Tool | Kind | Branch | Updated | Title |', '| --- | --- | --- | --- | --- | --- |', ...mine.map(({ file, header, title }) => `| [${header.task}](items/${file}) | \`${header.tool}\` | ${header.kind} | \`${header.branch}\` | ${header.updated} | ${title} |`), '');
+    else out.push('| Task | Tool | Kind | Branch | Updated | Title |', '| --- | --- | --- | --- | --- | --- |', ...mine.map(({ file, header, title }) => `| [${header.task}](items/${file}) | ${header.tool ? `\`${header.tool}\`` : 'repository'} | ${header.kind} | \`${header.branch}\` | ${header.updated} | ${title} |`), '');
   }
   for (const { file, header } of items) {
     if (!TASK_STATES.includes(header.state)) errors.push(`${ITEMS_DIR}/${file}: state "${header.state}" is not one of ${TASK_STATES.join(', ')}`);
