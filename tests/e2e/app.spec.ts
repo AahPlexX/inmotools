@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { TOOLS } from '../../src/catalog';
+import { loadTools } from '../../scripts/tool-registry.mjs';
+
+const TOOLS = await loadTools();
 
 const toolSlugs = TOOLS.map((tool) => tool.slug);
 

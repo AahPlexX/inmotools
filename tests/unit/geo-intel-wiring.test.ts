@@ -7,10 +7,10 @@ const read = (path: string): string => readFileSync(new URL(`../../${path}`, imp
 const SLUG = 'geo-intelligence-hub';
 
 describe('geo intelligence hub wiring', () => {
-  it('registers exactly one catalog entry with the ToolDefinition shape', () => {
+  it('registers exactly one catalog entry with the ToolMeta shape', () => {
     expect(TOOLS.filter((tool) => tool.slug === SLUG)).toHaveLength(1);
     const tool = TOOL_BY_SLUG.get(SLUG);
-    expect(Object.keys(tool ?? {}).sort()).toEqual(['accepts', 'audience', 'hint', 'outputs', 'privacy', 'shortTitle', 'slug', 'steps', 'summary', 'title', 'workspaceFirst'].sort());
+    expect(Object.keys(tool ?? {}).sort()).toEqual(['accepts', 'audience', 'category', 'hint', 'load', 'outputs', 'privacy', 'shortTitle', 'slug', 'steps', 'summary', 'title', 'workspaceFirst'].sort());
     expect(tool?.shortTitle).toBe('Geo Intelligence Hub');
     // Interactive map tool: open on the workspace, not below the intro.
     expect(tool?.workspaceFirst).toBe(true);
@@ -22,9 +22,8 @@ describe('geo intelligence hub wiring', () => {
   });
 
   it('lazy-loads its own workspace and leaves the GeoJSON simplifier untouched', () => {
-    const workspaces = read('src/tools/workspaces.tsx');
-    expect(workspaces).toContain(`'${SLUG}': () => import('./geo-intel/GeoIntelWorkspace')`);
-    expect(workspaces).toContain(`'geojson-simplifier': () => import('./geo/GeoWorkspace')`);
+    expect(read(`src/tools/geo-intel/${SLUG}.meta.ts`)).toContain("load: () => import('./GeoIntelWorkspace')");
+    expect(read('src/tools/geo/geojson-simplifier.meta.ts')).toContain("load: () => import('./GeoWorkspace')");
     expect(read('src/tools/geo-intel/GeoIntelWorkspace.tsx')).toContain("import './geo-intel.css'");
   });
 

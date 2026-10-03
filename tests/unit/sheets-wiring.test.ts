@@ -27,7 +27,7 @@ describe('tabular sheet workstation wiring', () => {
     expect(tool?.summary).not.toMatch(/sheets-core|engine-formula|Univer/i);
     expect(read('src/tools/sheets/sheets.css')).toMatch(/@media print/);
     expect(read('src/tools/sheets/SheetsWorkspace.tsx')).toContain('tsw-parity-chrome');
-    expect(read('src/tools/workspaces.tsx')).toContain(`'${SLUG}': () => import('./sheets/SheetsWorkspace')`);
+    expect(read(`src/tools/sheets/${SLUG}.meta.ts`)).toContain("load: () => import('./SheetsWorkspace')");
   });
 
   it('keeps source free of Univer Pro and HyperFormula', () => {

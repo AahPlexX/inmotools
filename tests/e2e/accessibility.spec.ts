@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { TOOLS } from '../../src/catalog';
+import { loadTools } from '../../scripts/tool-registry.mjs';
+
+const TOOLS = await loadTools();
 
 // Driven from the catalog so a newly registered tool is audited without editing this file.
 const routes = ['./', ...TOOLS.map((tool) => `./#/tools/${tool.slug}`)];

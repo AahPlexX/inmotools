@@ -51,8 +51,7 @@ describe('catalog entry', () => {
   });
 
   it('is registered for the lazy workspace loader', () => {
-    const registry = read('src/tools/workspaces.tsx');
-    expect(registry).toContain(`'${SLUG}': () => import('./sightline/SightlineWorkspace')`);
+    expect(read(`src/tools/sightline/${SLUG}.meta.ts`)).toContain("load: () => import('./SightlineWorkspace')");
   });
 });
 
