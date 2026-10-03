@@ -3,7 +3,7 @@ task: T-cad-studio-20261003-f53e
 tool: cad-studio
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/cad-studio
 created: 2026-10-03
 updated: 2026-10-03
@@ -19,3 +19,4 @@ Not started. Write `tests/e2e/cad-studio.spec.ts` covering the critical sketch â
 
 ## Log
 - 2026-10-03: recorded.
+- 2026-10-03: claimed `fix/cad-studio`.
