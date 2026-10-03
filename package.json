@@ -13,7 +13,12 @@
     "test:e2e": "playwright test",
     "test:ci": "pnpm test:unit && pnpm build && playwright test",
     "prepare:pyodide": "node scripts/copy-pyodide.mjs",
-    "prepare:libarchive": "node scripts/copy-libarchive.mjs"
+    "prepare:libarchive": "node scripts/copy-libarchive.mjs",
+    "task:start": "node scripts/task-start.mjs",
+    "branch:check": "node scripts/branch-check.mjs",
+    "tool:check": "node scripts/tool-check.mjs",
+    "docs:sync": "node scripts/docs-sync.mjs",
+    "docs:check": "node scripts/docs-sync.mjs --check && node scripts/check-doc-links.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
