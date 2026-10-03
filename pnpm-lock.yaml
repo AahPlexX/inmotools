@@ -138,8 +138,8 @@ importers:
         specifier: 6.12.2
         version: 6.12.2
       '@codemirror/search':
-        specifier: 6.7.1
-        version: 6.7.1
+        specifier: 6.7.2
+        version: 6.7.2
       '@codemirror/state':
         specifier: 6.7.1
         version: 6.7.1
@@ -202,7 +202,7 @@ importers:
         version: 1.60.0(mediabunny@1.60.0)
       '@replit/codemirror-vim':
         specifier: 6.4.0
-        version: 6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
+        version: 6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.12.4)(@codemirror/search@6.7.2)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)
       '@spglib/moyo-wasm':
         specifier: 0.19.0
         version: 0.19.0
@@ -1085,8 +1085,8 @@ packages:
   '@codemirror/merge@6.12.2':
     resolution: {integrity: sha512-V8JvyAPjHbPupqP7BeMcsdsYCbyPij74jxIbaIJDORI+VZzW44zFmon8bF+oxGWvOKhcRmkiUMXd8MxHr3YA2w==}
 
-  '@codemirror/search@6.7.1':
-    resolution: {integrity: sha512-uMe5UO6PamJtSHrXhhHOzSX3ReWtiJrva6GnPMwSOrZtiExb5X5eExhr2OUZQVvdxPsKpY3Ro2mFbQadpPWmHA==}
+  '@codemirror/search@6.7.2':
+    resolution: {integrity: sha512-gUYkYhT2+n/+VGZ+8EzE5WFkYZUZYm1VOKDudIsNqh42uRVQJ0a6Yss9sdKT3MeOYfuL1N6AZA57oza0Oyr0LA==}
 
   '@codemirror/state@6.7.1':
     resolution: {integrity: sha512-9QzNDgE4EYDnAHfrTlR2lwiPciiOymLtwKK+8yHQzCc7GXhAP9xdEbEJFy2IWB1j9UGUl9BsgMmTo/ImA02T7A==}
@@ -6936,7 +6936,7 @@ snapshots:
       '@lezer/highlight': 1.2.3
       style-mod: 4.1.3
 
-  '@codemirror/search@6.7.1':
+  '@codemirror/search@6.7.2':
     dependencies:
       '@codemirror/state': 6.7.1
       '@codemirror/view': 6.43.9
@@ -7701,11 +7701,11 @@ snapshots:
 
   '@replit/codemirror-vim-core@0.1.0': {}
 
-  '@replit/codemirror-vim@6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.12.4)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)':
+  '@replit/codemirror-vim@6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.12.4)(@codemirror/search@6.7.2)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)':
     dependencies:
       '@codemirror/commands': 6.11.1
       '@codemirror/language': 6.12.4
-      '@codemirror/search': 6.7.1
+      '@codemirror/search': 6.7.2
       '@codemirror/state': 6.7.1
       '@codemirror/view': 6.43.9
       '@replit/codemirror-vim-core': 0.1.0
