@@ -1,0 +1,60 @@
+name: Janitor
+
+# Daily tidy-up so no merged branch or agent pull request is left behind.
+# - Deletes remote branches whose commits are all in main (nothing can be lost).
+# - Closes pull requests from feature/, expand/ and fix/ branches: integrate.yml merges
+#   those branches on push, so a pull request for one is never needed.
+# - Never deletes a branch with unmerged commits, however old (owner decision); lists
+#   those and any other open pull requests in the run summary instead.
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  janitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Tidy branches and pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary="$GITHUB_STEP_SUMMARY"
+          git fetch --quiet --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+          echo '## Branches' >> "$summary"
+          while read -r ref; do
+            branch="${ref#refs/remotes/origin/}"
+            [[ "$branch" == main || "$branch" == HEAD ]] && continue
+            if git merge-base --is-ancestor "$ref" origin/main; then
+              git push --quiet origin --delete "$branch" && echo "- deleted \`$branch\` (fully merged)" >> "$summary"
+            else
+              ahead="$(git rev-list --count "origin/main..$ref")"
+              echo "- kept \`$branch\`: $ahead commit(s) not in main" >> "$summary"
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/origin/)
+
+          echo '## Pull requests' >> "$summary"
+          gh api "repos/$REPO/pulls?state=open&per_page=100" \
+            --jq '.[] | [.number, .head.ref, (.head.repo.full_name // ""), .title] | @tsv' |
+          while IFS=$'\t' read -r number head head_repo title; do
+            if [[ "$head_repo" == "$REPO" && "$head" =~ ^(feature|expand|fix)/ ]]; then
+              gh api -X POST "repos/$REPO/issues/$number/comments" \
+                -f body="Closed automatically: pushes to \`$head\` are merged into main by the integrate workflow, so this pull request is not needed. The branch is kept until its commits are in main." > /dev/null
+              gh api -X PATCH "repos/$REPO/pulls/$number" -f state=closed > /dev/null
+              echo "- closed #$number ($head)" >> "$summary"
+            else
+              echo "- open #$number ($head): $title" >> "$summary"
+            fi
+          done

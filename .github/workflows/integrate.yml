@@ -1,0 +1,113 @@
+name: Integrate branch into main
+
+# Every push to feature/<slug>, expand/<slug> or fix/<slug> is merged into main here,
+# without a pull request: merge onto the latest main, check, push main, delete the
+# branch. If main moves during the run, the push is rejected and the run retries on
+# the new main. Nothing is merged unless every check passes on the merged result.
+on:
+  push:
+    branches: ['feature/**', 'expand/**', 'fix/**']
+
+permissions:
+  contents: write # push main, delete the branch
+  actions: write # start the Pages deployment (pushes made with GITHUB_TOKEN trigger no workflows)
+
+concurrency:
+  group: integrate-${{ github.ref }}
+  cancel-in-progress: true # a newer push to the same branch supersedes this run
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@v3
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies and Chromium
+        run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Merge, check and push to main
+        env:
+          BRANCH: ${{ github.ref_name }}
+          BRANCH_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          kind="${BRANCH%%/*}"
+          slug="${BRANCH#*/}"
+
+          pushed=false
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main
+            git checkout --quiet -B integrate origin/main
+            if ! git merge --quiet --no-ff --no-edit -m "integrate $BRANCH" "$BRANCH_SHA"; then
+              echo "::error::$BRANCH conflicts with main. On the branch: git fetch origin && git merge origin/main, resolve, commit, push."
+              exit 1
+            fi
+            changed="$(git diff --name-only origin/main HEAD)"
+            if [[ -z "$changed" ]]; then
+              echo "Nothing to integrate: main already contains $BRANCH."
+              pushed=true
+              break
+            fi
+            if grep -q '^\.github/workflows/' <<< "$changed"; then
+              echo "::error::$BRANCH changes .github/workflows/, which a workflow token cannot push. Run the checks locally and push the merge to main yourself."
+              exit 1
+            fi
+
+            pnpm install --frozen-lockfile
+            node scripts/branch-check.mjs "$BRANCH"
+            strict=""; [[ "$kind" == feature ]] && strict="--strict"
+            node scripts/tool-check.mjs "$slug" $strict --base origin/main
+            pnpm docs:sync
+            if ! git diff --quiet -- docs/TOOL_INDEX.md .tasks/ITEMS.md; then
+              git add docs/TOOL_INDEX.md .tasks/ITEMS.md
+              git commit --quiet -m "chore(docs): sync tool index and task view for $BRANCH"
+            fi
+            node scripts/check-doc-links.mjs
+            pnpm test:unit
+
+            if grep -qv '\.md$' <<< "$changed"; then
+              pnpm build
+              specs="$(node scripts/select-e2e-specs.mjs <<< "$changed")"
+              if [[ "$specs" == "__FULL_SUITE__" ]]; then
+                pnpm test:e2e
+              elif [[ -n "$specs" ]]; then
+                # Spec paths are repository-controlled and contain no whitespace.
+                # shellcheck disable=SC2086
+                pnpm exec playwright test $specs
+              fi
+            fi
+
+            if git push --quiet origin HEAD:main; then
+              pushed=true
+              break
+            fi
+            echo "main moved during attempt $attempt; retrying on the new main."
+          done
+          [[ "$pushed" == true ]] || { echo "::error::main kept moving; push $BRANCH again to retry."; exit 1; }
+
+          gh workflow run pages.yml --ref main -f validate=false
+          # Delete only if the branch still points at what was integrated.
+          git push --quiet --force-with-lease="refs/heads/$BRANCH:$BRANCH_SHA" origin ":refs/heads/$BRANCH" \
+            || echo "::notice::$BRANCH moved after this run started; kept for the next run."
+          echo "Integrated $BRANCH into main: $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Playwright failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: integrate-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

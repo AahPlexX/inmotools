@@ -10,7 +10,14 @@ on:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+  # integrate.yml dispatches this after it has validated and pushed a merge to main
+  # (its push cannot trigger workflows), with validate=false to deploy only.
   workflow_dispatch:
+    inputs:
+      validate:
+        description: Run the full validation suite as well as deploying
+        type: boolean
+        default: true
 
 permissions:
   actions: read
@@ -20,6 +27,7 @@ permissions:
 
 jobs:
   validate:
+    if: github.event_name != 'workflow_dispatch' || inputs.validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,6 +44,8 @@ jobs:
           install: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Records in step with the catalog
+        run: pnpm docs:check
       - name: Unit tests
         run: pnpm test:unit
       - name: Build
