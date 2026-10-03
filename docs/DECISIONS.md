@@ -1,0 +1,68 @@
+---
+doc: decisions
+updated: 2026-10-03
+---
+
+# Decisions, exceptions and open questions
+
+Owner decisions and repository-wide facts that are not universal rules. Universal rules are in [GOVERNANCE.md](../GOVERNANCE.md); everything about one tool is in its spec and tracker. Newest first in each section; one fact per line.
+
+## Owner decisions
+
+| Date | Decision |
+| --- | --- |
+| 2026-10-03 | Home page order: by category (`TOOL_CATEGORIES` in `src/tool-meta.ts`), then by short title. Each tool's category is set in its meta file. |
+| 2026-10-03 | Integration without pull requests: a push to `feature/`, `expand/` or `fix/<slug>` is merged into `main` by `.github/workflows/integrate.yml`, and the branch is deleted. |
+| 2026-10-03 | Incomplete tools and expansions may merge when their spec, tracker and task file show the state; a merge may not turn a `verified` requirement into another status. |
+| 2026-10-03 | Branches with unmerged commits are kept indefinitely; the janitor deletes only fully merged branches. The owner monitors the repository. |
+| 2026-10-03 | Dependabot version-update pull requests are disabled (`open-pull-requests-limit: 0`); open ones #108–#117 were closed. |
+| 2026-10-02 | Naming convention approved ([standard](DOCUMENTATION_STANDARD.md#naming-convention-approved-2026-10-02)). Names kept as they are: Geo Intelligence Hub, RegexMatrix Studio & Academy. PlanCraft Studio is to be renamed. |
+| 2026-10-02 | Fluid Type Matrix removed entirely (index, "Removed tools"). |
+| 2026-10-02 | Useful ideas that fit the platform rules become requirements without approval. |
+| 2026-10-01 | The site is non-commercial. |
+
+## Agent instruction files
+
+`AGENTS.md` is the only instruction file with content. `CLAUDE.md` (`@AGENTS.md`) and `GEMINI.md` exist only because those agents read their own file name instead of `AGENTS.md`; they point to it and add nothing.
+
+## Known exceptions (baseline 2026-10-03)
+
+Current departures from the rules, recorded so they are not mistaken for accepted behaviour. Each is fixed through the tool's own task.
+
+| Area | Fact | Rule |
+| --- | --- | --- |
+| AetherCast | On open, fetches data for the saved location (`localStorage` key `inmotools.aethercast.live-location.v1`) or asks for geolocation, then refreshes every 15 minutes, without a user action. | Network use only on the user's action |
+| Site Intelligence Analyzer | Has an optional "CrUX API key" field (`SiteIntelWorkspace.tsx`, stored locally). | No API keys |
+| CAD Studio | Has no browser spec of its own; only the catalog-wide specs open it. | Browser coverage |
+| Fiber Craft Workstation | Its spec has no standard header block, so `tool:check` reports it as pending. | Documentation standard |
+| 21 tools | No standard spec and tracker yet (`pnpm tool:check --all`). Specs are the next workstream. | Documentation standard |
+| 17 standardized tools | 54 requirements are `missing` (`pnpm tool:check --all`). | Default integration rule |
+
+## Version pins and package sources
+
+| Item | Fact |
+| --- | --- |
+| MediaBunny | `package.json` pins 1.60.0; `MEDIABUNNY_PIN` in `src/tools/tactics/export-types.ts` still says 1.58.0. |
+| MediaBunny release age | `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` lists `mediabunny@1.60.0`; that release is now older than the release-age window, so the entry has no effect. |
+| OpenCV | `@techstark/opencv-js` 5.0.0-release.1 is a pre-release. |
+| SheetJS | `xlsx` is installed from `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, not the npm registry. |
+| JSZip | `web-layout-zip` is an alias for `npm:jszip@3.10.2`. |
+| Build scripts | `allowBuilds`: `exifreader@4.45.2` allowed; `core-js` and `protobufjs` not allowed. |
+| Overrides | `@colorhythm/libraw-wasm>typed-cstruct` 0.11.0, `lodash-es` 4.18.1. |
+
+## Owner actions
+
+- Import the two rulesets in `.github/rulesets/` (Settings → Rules → Rulesets → New ruleset → Import a ruleset): `branch-names.json` refuses creation of any branch other than `main`, `feature/*`, `expand/*`, `fix/*` and `dependabot/*`; `protect-main.json` blocks deleting or force-pushing `main`. The agent token in use cannot manage rulesets (HTTP 403).
+
+## Open questions
+
+| Since | Question |
+| --- | --- |
+| 2026-10-03 | Spec approval: does a new tool's spec need the owner's confirmation before its first merge (one touchpoint), or is it reviewed after merge (none)? Until decided, the current rule stands: a new tool's spec has `basis: approved` before its first merge. |
+| 2026-10-03 | Dependabot security-update pull requests are still enabled. Keep them (the janitor lists them), or disable them and handle advisories through `fix/` branches? |
+| 2026-10-03 | Category assignment of each tool was set during the catalog migration; review the categories on the home page. |
+| 2026-10-02 | PlanCraft rename: shortlist Passway Studio, Doorline Studio; a USPTO search is still needed. |
+| 2026-10-02 | Support link `https://buymeacoffee.com/aahplexx` (`src/lib/support.ts`): keep on a non-commercial site? |
+| 2026-10-02 | MediaBunny: bump to 1.61.0, and align `MEDIABUNNY_PIN`? |
+| 2026-10-02 | pnpm release-age: enforce it strictly? |
+| 2026-10-02 | One global theme selector instead of per-tool themes (TASK-028). |

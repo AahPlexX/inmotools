@@ -1,153 +1,85 @@
 # Repository Governance
 
-**As of:** 2026-09-11
+**As of:** 2026-10-03
 
-This file is the north-star single source of truth (SSOT) for repository governance. It applies to every human or automated actor performing Create, Read, Update, or Delete operations in this repository.
+Binding rules for every person and automated agent that creates, reads, updates or deletes anything in this repository. A current request from the owner and this file must both be satisfied; if they conflict, stop the affected work and report the conflict.
 
-A current human request and this governance file must both be satisfied. If they conflict, stop the affected work and report the conflict rather than silently choosing one or rewriting governing intent.
+These rules apply to every tool equally, so this file names no tool, version, commit or task (`scripts/check-doc-links.mjs` enforces that). Facts about one tool live in its spec and tracker; owner decisions, exceptions and version pins live in [docs/DECISIONS.md](docs/DECISIONS.md).
 
-## SSOT directory
+## 1. Where things are
 
-Use these verified repository locations as the authoritative directory for their respective concerns:
+| Concern | Source of truth |
+| --- | --- |
+| These rules | `GOVERNANCE.md` |
+| Quick start for agents | [AGENTS.md](AGENTS.md) |
+| Document formats (spec, tracker, task file, index) | [docs/DOCUMENTATION_STANDARD.md](docs/DOCUMENTATION_STANDARD.md) |
+| Owner decisions, exceptions, pins, open questions | [docs/DECISIONS.md](docs/DECISIONS.md) |
+| One tool's catalog record (name, copy, category, route aliases, loader) | `src/tools/<folder>/<slug>.meta.ts` |
+| One tool's requirements and what "complete" means | its spec, `docs/superpowers/specs/<date>-<slug>-design.md` |
+| One tool's live state | its tracker, `src/tools/<folder>/TRACKER.md` |
+| One piece of work | its task file, `.tasks/items/<task id>.md` |
+| Generated views (never edit by hand) | `docs/TOOL_INDEX.md` tool table, `.tasks/ITEMS.md` (`pnpm docs:sync`) |
+| Scripts, dependencies | `package.json` |
+| CI, integration, deployment | `.github/workflows/` |
+| Completion gates | [.tasks/PROJECT_COMPLETION.md](.tasks/PROJECT_COMPLETION.md) |
 
-- `GOVERNANCE.md` — binding repository-mutation rules and governance history.
-- `README.md` — project architecture, privacy model, and local-development overview.
-- `package.json` — executable project scripts and dependency declarations.
-- `.github/workflows/pages.yml` — CI validation and GitHub Pages deployment pipeline.
-- `.tasks/` — repository task-tracking state when task planning is in use.
-- `.tasks/PROJECT_COMPLETION.md` — deterministic repository/workstream completion gates and progress-freshness contract.
-- `docs/superpowers/specs/` — project design/specification records.
-- `docs/superpowers/plans/` — project implementation-plan records.
-- `docs/DOCUMENTATION_STANDARD.md` — required per-tool documents (spec, tracker, task state, index row), their format and writing rules; `docs/TOOL_INDEX.md` is the per-tool index and `AGENTS.md` the entry point for agents.
+Do not invent a path, file, section, command, branch or policy. Check that every reference resolves before relying on it.
 
-Do not invent a referenced path, file, section, command, branch, or policy. Verify that every reference resolves before relying on it and re-check references after governance changes.
+## 2. Platform rules (never change)
 
-## Binding CRUD lifecycle
+- No user accounts or authentication.
+- No server, backend or server-side database; the site is static files on GitHub Pages.
+- Everything runs in the user's browser; data a tool keeps stays in that browser.
+- Network use is limited to the site's own files and public keyless sources requested by the user's own action.
 
-### 1. Forensically verify before every write
+Anything that can be built within these rules is in scope (the default integration rule in the documentation standard).
 
-Before changing repository state:
+## 3. Work cycle
 
-1. Read the current target files and nearby governing context.
-2. Verify the current repository, branch, branch tip, branch inventory, CI configuration, and relevant task state from direct evidence.
-3. If a local checkout exists, inspect its working tree and preserve any uncommitted changes not created by the current operation. Never discard or overwrite unknown work.
-4. If execution is remote-only and no local working tree exists, state that fact in the human-facing report; do not invent a working-tree status.
-5. Re-read branch state immediately before a write when concurrent changes are possible.
+1. **Start:** `pnpm task:start <slug> <new|expand|fix> "<title>"`. It creates `feature/<slug>` (new tool), `expand/<slug>` or `fix/<slug>` from `origin/main` in its own worktree, writes the task file and pushes it. If the branch already exists, it is resumed, not restarted. Other branch names are refused (`pnpm branch:check`).
+2. **Specify:** record the request verbatim in the task file, then turn it into ID'd requirements in the tool's spec before writing code. A request that leaves a choice open gets the conservative default, recorded under "Intent not recorded" with "owner may override".
+3. **Build and record:** keep the tracker's **Resume here**, requirement statuses and the task file current in the same commit as the work. Commit and push after every working step, so stopping at any point loses nothing.
+4. **Check:** `pnpm tool:check <slug>` computes completion from the spec, tracker and tests. A status is never typed as a summary; a `verified` row cites a test that exists.
+5. **Integrate:** pushing the branch is the integration request. `.github/workflows/integrate.yml` merges it onto the latest `main`, runs the checks, pushes `main`, starts the deployment and deletes the branch. There are no pull requests. A tool may merge while incomplete when its records say so; no merge may turn a `verified` requirement into anything else.
+6. **Continue:** after a merge, continue on `expand/<slug>` or `fix/<slug>` with `pnpm task:start`. Finished work: set the task file's `state: done` with evidence.
 
-Repository facts must come from the repository or its hosting service, not from memory.
+A change to `.github/workflows/` cannot be pushed by a workflow token; such a branch is checked locally and merged into `main` by the person or agent that made it, with the same checks.
 
-### 2. Require evidence before acting
+## 4. Parallel work
 
-Do not guess, assume, fabricate, or present inference as fact.
+- One branch per tool at a time: the branch is the claim. Never commit to another tool's branch or edit another tool's folder, spec or tracker.
+- Shared files (anything outside `src/tools/<folder>/`, that tool's spec, and `.tasks/items/`) change only on `fix/<slug>` with the reason in the task file, and run the full browser suite.
+- Sync with `git fetch origin && git merge origin/main` on the branch; resolve conflicts there, never on `main`.
 
-For externally verifiable decisions, standards, APIs, conventions, or tooling behavior:
+## 5. Evidence
 
-- research current authoritative or primary sources;
-- use enough corroborating evidence to reach at least 95% evidence-based confidence before acting;
-- resolve conflicting authoritative information before proceeding; and
-- record the sources and as-of dates in the human-facing completion report, not in client-facing code or incidental repository commentary.
+- Repository facts come from the repository or its host, not from memory. Re-read state before writing when others may be working.
+- External facts (standards, APIs, tool behaviour) come from authoritative or primary sources, with enough corroboration for at least 95% evidence-based confidence; resolve conflicting sources before acting. If that cannot be reached, stop that work and report the missing evidence.
+- Record sources and dates in the report to the owner, not in code or incidental comments.
+- Never claim a test, build, route or deployment passes without fresh evidence from that check. Record the baseline before attributing a failure to a change.
 
-If the required confidence cannot be reached, stop the dependent work and report the missing evidence as a blocker.
+## 6. Changes
 
-### 3. Plan in both directions before execution
+- Smallest correct change; keep valid existing content; no unrelated cleanup, restyling or dependency changes.
+- One purpose per commit, with a message that says what changed and why.
+- Never force-push, rewrite or delete `main`. Never discard work you did not create.
+- Never retrieve, print or commit secrets, tokens or keys; report only where one was found.
+- No placeholders that imply completion, no reasoning narrative, confidence statements or model/provider-specific instructions in repository files.
+- Running the same task again on a correct repository changes nothing.
 
-For every substantive task group, reconcile two passes before writing:
+## 7. Records
 
-- **Forward:** start from the verified current state and enumerate candidate steps, dependencies, operations, and downstream effects.
-- **Backward:** start from the definition of done and enumerate every condition that must be true at completion.
+- Every piece of work has a task file in `.tasks/items/` whose `state` is current (`active`, `next`, `backlog`, `done`, `rejected`). Newly found work gets its own task file before the session ends. Rejected work keeps its file with the reason.
+- The older files in `.tasks/` (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`, `DONE.md`, `REJECTED.md`, `WORK_LOG.md`) are history: their open entries stay valid until moved to task files; new work is not added to them.
+- If the code, a tracker and a task file disagree, the records are stale and the work is not complete.
 
-Every execution step must satisfy a required end condition, and every required end condition must have a covering step. Drop steps with no goal justification and fill uncovered goal conditions before execution.
+## 8. Report to the owner
 
-Before the plan is final, actively test it for syntax errors, semantic errors, dependency/order failures, branch-integrity violations, conflicts with existing content, regressions, edge cases, secret exposure, and unverifiable assumptions. Iterate until no remaining identifiable issue blocks the converged plan. Unresolvable issues become named blockers; do not improvise past them.
-
-### 4. Preserve the `origin/main` invariant
-
-`origin/main` is the authoritative branch.
-
-Before writing, verify current branch topology and repository integration mechanics. Temporary working branches are allowed, but at integrated completion:
-
-- all intended changes must have reached `origin/main`;
-- `origin/main` must not be behind any other branch;
-- no completed work may remain stranded only on another branch.
-
-Use only the integration mechanism evidenced by the repository configuration. Do not force-push, rewrite shared history, rebase shared history destructively, or delete shared branches unless the operation is proven safe, necessary, and authorized. Otherwise, stop and report the need as a blocker.
-
-Prefer fast-forward or otherwise non-destructive integration when available. Re-check branch topology after integration.
-
-### 5. Protect secrets and sensitive material
-
-Never intentionally retrieve, copy, echo, expose, or commit secrets, credentials, tokens, keys, or other sensitive values.
-
-If secret-scanning or repository evidence indicates sensitive material exists, record only its presence and location in the human-facing report and stop any operation that would require exposing the value. Do not reproduce the value in code, documentation, logs, commits, or reports.
-
-### 6. Keep changes minimal, atomic, and reversible
-
-- Make the smallest correct change that satisfies the verified requirement.
-- Preserve still-valid existing content and intent.
-- Do not perform unrelated cleanup, restyling, refactoring, or dependency changes.
-- Keep commits self-describing and scoped to one coherent purpose.
-- Do not hardcode project facts that were not verified.
-- Do not leave placeholders that imply completion when work remains.
-- A second execution against an already-correct repository must be a clean no-op.
-
-Never place private chain-of-thought, hidden reasoning, scratchpad material, confidence percentages, uncertainty meta-commentary, or model/provider-specific instructions in repository artifacts. Repository rationale must be concise, factual, and maintainability-relevant.
-
-### 7. Keep completion and progress state deterministic and current
-
-`.tasks/PROJECT_COMPLETION.md` defines the repository finish line. The existing `.tasks` state files are the live progress record and must remain synchronized with implementation state.
-
-- Accepted active work belongs in `IN_PROGRESS.md`; accepted queued work belongs in `NEXT.md`; deferred work belongs in `BACKLOG.md`.
-- A material milestone change must update the corresponding task state in the same execution cycle.
-- Newly discovered material work must be recorded before the execution cycle ends; it may not disappear merely because it is outside the current patch.
-- Work may move to `DONE.md` and `WORK_LOG.md` only after the applicable completion gates have fresh evidence.
-- Rejected scope must move to `REJECTED.md` with rationale rather than being silently removed.
-- Parallel branches do not create separate truth. Their intended progress must reconcile into the main task state when integrated.
-- If implementation state and `.tasks` disagree, task tracking is stale and the repository cannot be declared complete until they are reconciled.
-
-Do not weaken completion criteria to make the project appear finished. New user-approved scope may reopen a previously complete project by entering the task-state system.
-
-### 8. Validate against the verified project baseline
-
-Use the current validation entrypoints declared by `package.json` and the CI behavior defined by `.github/workflows/pages.yml`; do not rely on remembered commands.
-
-Capture the pre-write baseline before attributing failures to a change. If the baseline is already failing, identify the existing failure signature from evidence. After the change, verify that no new failure was introduced and never describe a pre-existing red baseline as green.
-
-Do not claim a test, build, deployment, route, or feature passes without fresh evidence from the corresponding validation surface.
-
-### 9. Close with a post-execution verification pass
-
-Before declaring completion, re-read final repository state and verify:
-
-- this governance file is present, current, model/provider-agnostic, and non-conflicting;
-- every SSOT reference resolves;
-- intended changes are on `origin/main`;
-- `origin/main` is not behind any other branch;
-- no completed work is stranded on another branch;
-- no destructive history operation occurred unless explicitly justified and authorized;
-- the final change set is atomic and scoped;
-- the working tree is clean when a local checkout exists, or remote-only execution is accurately reported;
-- validation evidence is fresh and accurately characterized;
-- `.tasks` accurately reflects active, queued, deferred, rejected, and completed work; and
-- no secrets, confidence disclosures, private reasoning, or model/provider-specific instructions leaked into repository artifacts.
-
-Any failed condition remains an open item or blocker and must be reported as such.
-
-## Human-facing completion report
-
-Keep the execution report outside the repository. It must include, as applicable:
-
-- remaining open items;
-- a separate TODO audit;
-- the reconciled execution sequence;
-- anticipated failures and how they were prevented or resolved;
-- blockers and the specific missing evidence;
-- post-execution verification evidence, including final `origin/main` branch state;
-- authoritative external sources and their as-of dates;
-- whether this governance file was read-only, created, or edited, and why; and
-- confidence level for the report.
+Outside the repository, at the end of each session: what changed, verification evidence with the commit it ran on, open items and blockers, external sources with dates, and questions for the owner.
 
 ## Change history
 
+- **2026-10-03:** Rewritten as universal rules only. Added the work cycle (task:start, computed completion, integration without pull requests), parallel-work rules and per-task files; tool-specific facts moved to docs/DECISIONS.md and the per-tool documents.
 - **2026-10-01:** Added the documentation standard, tool index and agent entry point to the SSOT directory.
-- **2026-09-11:** Added the deterministic project-completion contract to the SSOT directory and made task-state freshness a binding lifecycle invariant.
-- **2026-08-31:** Created the repository-wide governance SSOT, consolidated governing CRUD rules into one neutral root document, and retired redundant instruction surfaces.
+- **2026-09-11:** Added the deterministic project-completion contract and made task-state freshness a binding invariant.
+- **2026-08-31:** Created the repository-wide governance file.
