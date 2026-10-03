@@ -6,14 +6,14 @@ basis: as-built
 status: done
 spec: docs/superpowers/specs/2026-10-01-fuzzy-deduplicator-design.md
 tracker: src/tools/dedupe/TRACKER.md
-updated: 2026-10-01
+updated: 2026-10-03
 ---
 
 # Fuzzy Deduplicator — tracker
 
 ## Resume here
 
-On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering test, 2 missing. Next action: add tests for FDD-R07 and R13. No blocker.
+On `origin/main`. 15 requirements: 13 verified, 2 missing. Next action: build the missing requirements (Open work). No blocker.
 
 ## Documents
 
@@ -35,13 +35,13 @@ On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering
 | FDD-R04 | verified | unit "provides bounded deterministic similarity scores", "uses Double Metaphone-compatible phonetic keys" | |
 | FDD-R05 | verified | unit "returns stable clusters at the configured threshold", "does not let a stricter hard-coded blocker hide a pair…" | |
 | FDD-R06 | verified | unit "reports the weakest pair across a transitive cluster…"; e2e "labels transitive cluster confidence as the weakest pair" | |
-| FDD-R07 | implemented | — | Stop has no test |
+| FDD-R07 | verified | e2e "FDD-R07 Stop ends a running duplicate analysis" | |
 | FDD-R08 | verified | unit "defaults canonical fields to the first nonblank member"; e2e "requires explicit cluster review…" | |
 | FDD-R09 | verified | e2e "bounds large cluster rows and lets users control review columns independently" | |
 | FDD-R10 | verified | e2e "…reports export progress, and allows zero-cluster export" | |
 | FDD-R11 | verified | unit "protects spreadsheet exports from formula execution prefixes", "neutralizes formula-like values while preserving ordinary signed numeric and phone values exactly" | |
 | FDD-R12 | verified | `tests/e2e/accessibility.spec.ts` route `fuzzy-deduplicator` | |
-| FDD-R13 | implemented | — | No viewport test for this route |
+| FDD-R13 | verified | e2e "FDD-R13 lays out without horizontal overflow at <width> px" (7 widths) | |
 | FDD-R14 | missing | — | Delivered through TASK-028 |
 | FDD-R15 | missing | — | Added 2026-10-02 |
 
@@ -56,6 +56,8 @@ On `origin/main`. 15 requirements: 11 verified, 2 implemented without a covering
 - Very large files are bounded by browser memory.
 
 ## Verification evidence
+
+- 2026-10-03: `tests/e2e/dedupe.spec.ts` with the new FDD-R07 and FDD-R13 tests, desktop and mobile, 63/63 passed over three repeats (21 mobile viewport cases skipped by design); `pnpm build` clean.
 
 - 2026-10-01, `main` @ `49a6754a`: `tests/unit/dedupe.test.ts` 11/11; `tests/e2e/dedupe.spec.ts` 12 passed (desktop and mobile); accessibility spec for the route 2 passed.
 

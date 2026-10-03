@@ -91,3 +91,38 @@ test('bounds large cluster rows and lets users control review columns independen
  await members.getByRole('button',{name:'Next'}).click();
  await expect(members.locator('[data-testid$="-range"]')).toContainText('Rows 26–30 of 30');
 });
+
+// FDD-R07: Stop ends a running match in the worker; the result is not applied afterwards.
+test('FDD-R07 Stop ends a running duplicate analysis', async ({ page }) => {
+  await page.goto('./#/tools/fuzzy-deduplicator');
+  const rows = Array.from({ length: 40_000 }, (_, i) => `Person ${i % 997} Smith${i % 13},user${i % 3001}@example.com`);
+  await page.locator('#dedupe-file').setInputFiles({ name: 'large.csv', mimeType: 'text/csv', buffer: Buffer.from(`name,email\n${rows.join('\n')}\n`) });
+  await page.getByRole('button', { name: 'Find duplicate clusters' }).click();
+  const stop = page.getByRole('button', { name: 'Stop', exact: true });
+  await expect(stop).toBeVisible();
+  await stop.click();
+  const status = page.locator('.workspace-body .status-line[role="status"]');
+  await expect(status).toContainText('Duplicate analysis stopped.');
+  await expect(stop).toBeHidden();
+  await page.waitForTimeout(1_500);
+  await expect(status).toContainText('Duplicate analysis stopped.');
+  await expect(page.getByText(/Review status: pending/)).toHaveCount(0);
+});
+
+// FDD-R13: no horizontal overflow and the main controls stay inside the viewport.
+for (const width of [320, 375, 768, 1024, 1440, 1920, 2560]) {
+  test(`FDD-R13 lays out without horizontal overflow at ${width} px`, async ({ page, isMobile }) => {
+    test.skip(isMobile, 'viewport matrix runs on the desktop project');
+    await page.setViewportSize({ width, height: width < 800 ? 800 : 1000 });
+    await page.goto('./#/tools/fuzzy-deduplicator');
+    await page.locator('#dedupe-file').setInputFiles({ name: 'records.csv', mimeType: 'text/csv', buffer: Buffer.from('name,email\nSteven Smith,same@example.com\nStephen Smith,same@example.com\n') });
+    await page.getByRole('button', { name: 'Find duplicate clusters' }).click();
+    await expect(page.getByText(/Review status: pending/)).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    for (const name of ['Find duplicate clusters', 'Approve merge', 'Export reconciled CSV']) {
+      const box = await page.getByRole('button', { name }).boundingBox();
+      expect(box && box.x >= 0 && box.x + box.width <= width + 1, `${name} inside viewport at ${width}px`).toBe(true);
+    }
+  });
+}
