@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { SOURCES } from '../../src/tools/geo-intel/core/sources';
 
 const fixture = (name: string) => readFileSync(new URL(`../fixtures/geo-intel/responses/${name}`, import.meta.url));
 
@@ -21,6 +22,7 @@ const ROUTES: Array<[RegExp, string]> = [
   [/elevation-tiles-prod\/terrarium/, 'terrarium-12-2137-1448.png'],
   [/geoboundaries\.org\/api/, 'geoboundaries-lux-adm1.json'],
   [/media\.githubusercontent\.com/, 'geoboundaries-lux-adm1.geojson'],
+  [/api\.bigdatacloud\.net\/data\/reverse-geocode-client/, 'bigdatacloud-paris.json'],
 ];
 
 async function mockNetwork(page: Page) {
@@ -277,4 +279,238 @@ test('meeting planner shifts compared local times', async ({ page }) => {
   await planner.fill('8');
   await expect(page.locator('.gi-planner output')).toHaveText('+4 h from now');
   await expect(page.locator('.gi-compare-card').getByText(/:\d\d/).first()).not.toHaveText(before);
+});
+
+test('GIH-R02 asks for consent before requesting device location and resolves it through BigDataCloud', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 48.8584, longitude: 2.2945, accuracy: 25 });
+  await page.addInitScript(() => {
+    const w = window as unknown as { __geoCalls: number };
+    w.__geoCalls = 0;
+    const original = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+    navigator.geolocation.getCurrentPosition = (...args: Parameters<Geolocation['getCurrentPosition']>) => { w.__geoCalls += 1; return original(...args); };
+  });
+  const bdc: string[] = [];
+  page.on('request', (request) => { if (request.url().includes('bigdatacloud')) bdc.push(request.url()); });
+  await open(page);
+  const calls = () => page.evaluate(() => (window as unknown as { __geoCalls: number }).__geoCalls);
+  await page.getByRole('button', { name: 'Use my location' }).click();
+  const consent = page.getByRole('alertdialog', { name: 'Share this device’s location?' });
+  await expect(consent).toContainText('BigDataCloud');
+  expect(await calls()).toBe(0);
+  await consent.getByRole('button', { name: 'Cancel' }).click();
+  await expect(consent).toBeHidden();
+  expect(await calls()).toBe(0);
+  expect(bdc).toHaveLength(0);
+  await page.getByRole('button', { name: 'Use my location' }).click();
+  await consent.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('gi-profile-title')).toBeVisible({ timeout: 20_000 });
+  expect(await calls()).toBe(1);
+  expect(bdc.length).toBeGreaterThan(0);
+  const profile = page.getByTestId('gi-profile');
+  await expect(profile.locator('[data-field="country.name"]')).toContainText('France');
+  await expect(profile.locator('footer.gi-attribution')).toContainText('BigDataCloud');
+});
+
+test('GIH-R20 compares up to six locations and refuses a seventh', async ({ page }) => {
+  test.setTimeout(180_000);
+  await open(page);
+  const points = ['10, 10', '11, 11', '12, 12', '13, 13', '14, 14', '15, 15', '16, 16'];
+  for (const [index, point] of points.entries()) {
+    await page.getByTestId('gi-query').fill(point);
+    await page.getByTestId('gi-search').click();
+    await expect(page.getByTestId('gi-profile').getByRole('button', { name: 'Compare', exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.gi-coords .gi-link')).toContainText(`${10 + index}.000000`);
+    await page.getByTestId('gi-profile').getByRole('button', { name: 'Compare', exact: true }).click();
+    if (index < 6) await expect(page.getByTestId('gi-tab-compare').locator('.gi-count')).toHaveText(String(index + 1));
+  }
+  await expect(page.getByRole('status').filter({ hasText: 'The comparison holds 6 locations; remove one first.' }).first()).toBeAttached();
+  await expect(page.getByTestId('gi-tab-compare').locator('.gi-count')).toHaveText('6');
+  await page.getByTestId('gi-tab-compare').click();
+  await expect(page.locator('.gi-compare-card')).toHaveCount(6);
+});
+
+test('GIH-R26 shows the live local clock with UTC offset and DST state', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-07-01T10:00:00Z'));
+  await open(page);
+  await search(page, 'Berlin');
+  const clock = page.locator('.gi-clock');
+  await expect(clock.locator('.gi-clock-time')).toContainText('12:00:00');
+  await expect(clock.locator('.gi-clock-meta')).toContainText('UTC+02:00');
+  await expect(clock.locator('.gi-clock-meta')).toContainText('July 1, 2026');
+  const profile = page.getByTestId('gi-profile');
+  await expect(profile.locator('[data-field="tz.observesDst"] .gi-value')).toHaveText(/yes|true/i);
+});
+
+test('GIH-R27 shows daylight duration, golden hour and blue hour for the location and date', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  const profile = page.getByTestId('gi-profile');
+  for (const key of ['solar.dayLength', 'solar.goldenMorning', 'solar.goldenEvening', 'solar.blueMorning', 'solar.blueEvening']) {
+    await expect(profile.locator(`[data-field="${key}"] .gi-value`), key).toHaveText(/\d/);
+  }
+  await expect(profile.locator('[data-field="solar.dayLength"] .gi-value')).toHaveText(/\d+\s*h/);
+  await expect(profile.locator('.gi-daylight .gi-seg.golden')).toHaveCount(2);
+  await expect(profile.locator('.gi-daylight .gi-seg.blue')).toHaveCount(2);
+});
+
+test('GIH-R14 filters public holidays by month', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  const card = page.getByRole('region', { name: /Public holidays 2026/ });
+  const months = card.getByRole('group', { name: 'Filter holidays by month' });
+  await months.getByRole('button', { name: 'Oct', exact: true }).click();
+  await expect(months.getByRole('button', { name: 'Oct', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const dates = await card.locator('.gi-holidays time').evaluateAll((items) => items.map((item) => item.getAttribute('datetime')));
+  expect(dates).toEqual(['2026-10-03', '2026-10-31']);
+  await expect(card).toContainText('German Unity Day');
+  await months.getByRole('button', { name: 'Feb', exact: true }).click();
+  await expect(card).toContainText('No public holidays in this month.');
+  await months.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(card.locator('.gi-holidays li')).toHaveCount(19);
+});
+
+test('GIH-R42 sources tab shows each source state, and the Nominatim toggle and cache clearing take effect', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'sources panel flow checked on desktop; the mobile sheet is covered above');
+  test.setTimeout(90_000);
+  const nominatim: string[] = [];
+  await open(page);
+  await page.route(/photon\.komoot\.io\/api/, (route) => route.fulfill({ status: 200, body: JSON.stringify({ type: 'FeatureCollection', features: [] }), headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' } }));
+  await page.route(/nominatim\.openstreetmap\.org\/search/, (route) => { nominatim.push(route.request().url()); return route.fulfill({ status: 200, body: fixture('nominatim-search.json'), headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' } }); });
+  await page.getByTestId('gi-tab-sources').click();
+  const sources = page.getByTestId('gi-sources');
+  const table = sources.getByRole('region', { name: 'Source status' });
+  const networkSources = Object.values(SOURCES).filter((source) => source.network);
+  await expect(table.locator('tbody tr')).toHaveCount(networkSources.length);
+  for (const source of networkSources) await expect(table.locator('tbody tr').filter({ has: page.getByRole('rowheader', { name: source.name }) }).locator('.gi-state')).toHaveText(/^(idle|closed|paused|half-open|disabled)$/);
+  const nominatimRow = table.locator('tbody tr').filter({ has: page.getByRole('rowheader', { name: SOURCES.nominatim.name }) });
+  await expect(nominatimRow.locator('.gi-state')).toHaveText('disabled');
+
+  await page.getByTestId('gi-query').fill('Unfindable Place One');
+  await page.getByTestId('gi-search').click();
+  await expect(page.getByRole('alert')).toBeVisible({ timeout: 20_000 });
+  expect(nominatim).toHaveLength(0);
+
+  await page.getByTestId('gi-tab-sources').click();
+  await sources.getByLabel('Use OpenStreetMap Nominatim as a last-resort geocoder').check();
+  await expect(nominatimRow.locator('.gi-state')).toHaveText(/^(idle|closed)$/);
+  await page.getByTestId('gi-query').fill('Unfindable Place Two');
+  await page.getByTestId('gi-search').click();
+  await expect(page.getByTestId('gi-profile-title')).toBeVisible({ timeout: 20_000 });
+  expect(nominatim.length).toBeGreaterThan(0);
+  await expect(page.getByTestId('gi-profile').locator('footer.gi-attribution')).toContainText(SOURCES.nominatim.name);
+
+  await page.getByTestId('gi-tab-sources').click();
+  await expect(nominatimRow.locator('.gi-state')).toHaveText('closed');
+  await expect(sources.getByText(/^[1-9]\d* cached responses on this device$/)).toBeVisible();
+  await sources.getByRole('button', { name: 'Clear response cache' }).click();
+  await expect(sources.getByText('0 cached responses on this device')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Cleared cached responses. Saved locations are kept.' }).first()).toBeAttached();
+});
+
+test('GIH-R43 attribution footer lists exactly the sources the profile cites', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  await page.getByRole('button', { name: 'Export…' }).click();
+  const dialog = page.getByTestId('gi-export');
+  const [json] = await Promise.all([page.waitForEvent('download'), dialog.getByTestId('gi-export-json').click()]);
+  await dialog.getByRole('button', { name: 'Close export' }).click();
+  const parsed = JSON.parse(readFileSync(await json.path(), 'utf8')) as { profiles: Array<{ fields: Array<{ source: keyof typeof SOURCES }> }> };
+  const cited = [...new Set(parsed.profiles[0].fields.map((item) => item.source))].filter((id) => !['computed', 'user', 'device'].includes(id)).map((id) => SOURCES[id].name).sort();
+  const footer = page.getByTestId('gi-profile').locator('footer.gi-attribution li');
+  const listed = (await footer.evaluateAll((items) => items.map((item) => (item.querySelector('a')?.textContent ?? item.textContent?.split(' — ')[0] ?? '').trim()))).sort();
+  expect(cited.length).toBeGreaterThan(3);
+  expect(listed).toEqual(cited);
+});
+
+test('GIH-R44 keyboard: / focuses search, arrow keys pan the map, +/- zoom, Escape closes overlays', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'keyboard flows are desktop interactions');
+  await open(page);
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press('/');
+  await expect(page.getByTestId('gi-query')).toBeFocused();
+  const map = page.getByTestId('gi-map');
+  const view = async () => (await map.getAttribute('viewBox'))!.split(' ').map(Number);
+  await map.focus();
+  const home = await view();
+  await page.keyboard.press('+');
+  await expect.poll(async () => (await view())[2]).toBeLessThan(home[2]);
+  const zoomed = await view();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await view())[0]).toBeGreaterThan(zoomed[0]);
+  const right = await view();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(async () => (await view())[1]).toBeGreaterThan(right[1]);
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await view())[0]).toBeLessThan(right[0]);
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(async () => (await view())[1]).toBeCloseTo(zoomed[1], 3);
+  await page.keyboard.press('+');
+  await expect.poll(async () => (await view())[2]).toBeLessThan(zoomed[2]);
+  await page.keyboard.press('-');
+  await page.keyboard.press('-');
+  await expect.poll(async () => (await view())[2]).toBeGreaterThan(zoomed[2]);
+  await page.keyboard.press('?');
+  await expect(page.getByTestId('gi-keys')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('gi-keys')).toBeHidden();
+});
+
+test('GIH-R54 copies the summary and the share link from the buttons and the context menu', async ({ page, context, isMobile }) => {
+  test.skip(isMobile, 'clipboard and right-click checked on desktop');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await open(page);
+  await search(page, 'Berlin');
+  const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+  const profile = page.getByTestId('gi-profile');
+  await profile.getByRole('button', { name: 'Copy summary', exact: true }).click();
+  await expect.poll(clipboard).toMatch(/^Berlin, Germany\n52\.\d+, 13\.\d+ \(Plus Code [^)]+\)\nCountry: Germany[\s\S]*\nSources: /);
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await profile.getByRole('button', { name: 'Share link', exact: true }).click();
+  await expect.poll(clipboard).toMatch(/\/inmotools\/#\/tools\/geo-intelligence-hub\?q=Berlin$/);
+  await page.evaluate(() => navigator.clipboard.writeText(''));
+  await page.getByRole('region', { name: 'Resolved location' }).click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Copy summary as text' }).click();
+  await expect.poll(clipboard).toMatch(/^Berlin, Germany\n/);
+  await page.getByRole('region', { name: 'Resolved location' }).click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Copy share link' }).click();
+  await expect.poll(clipboard).toMatch(/#\/tools\/geo-intelligence-hub\?q=Berlin$/);
+});
+
+test('GIH-R55 offers recent queries as search suggestions', async ({ page }) => {
+  await open(page);
+  await search(page, 'Berlin');
+  await search(page, 'US 90210');
+  await expect(page.getByTestId('gi-query')).toHaveAttribute('list', 'gi-recent');
+  await expect.poll(() => page.locator('#gi-recent option').evaluateAll((items) => items.map((item) => (item as HTMLOptionElement).value).sort())).toEqual(['Berlin', 'US 90210']);
+});
+
+test('GIH-R56 dismisses an error message', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('gi-query').fill('120, 45');
+  await page.getByTestId('gi-search').click();
+  const alert = page.locator('.gi-statusbar').getByRole('alert');
+  await expect(alert).toContainText('Latitude is out of range');
+  await alert.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(alert).toHaveCount(0);
+});
+
+test('GIH-R62 shows the live cursor latitude and longitude on the map', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'pointer hover is a desktop interaction');
+  await open(page);
+  const map = page.getByTestId('gi-map');
+  const box = (await map.boundingBox())!;
+  const readout = page.locator('.gi-map-cursor');
+  const read = async () => (await readout.innerText()).split(',').map(Number);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(readout).toHaveText(/^-?\d+\.\d{4}, -?\d+\.\d{4}$/);
+  const [lat0, lon0] = await read();
+  expect(Math.abs(lat0)).toBeLessThan(2);
+  expect(Math.abs(lon0)).toBeLessThan(2);
+  await page.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.3);
+  await expect.poll(async () => (await read())[1]).toBeGreaterThan(lon0 + 30);
+  const [lat1] = await read();
+  expect(lat1).toBeGreaterThan(lat0 + 10);
+  await page.mouse.move(box.x - 20, box.y - 20);
+  await expect(readout).toHaveCount(0);
 });
