@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-24 requirements: 23 verified, 1 missing (AEC-R22, site theme, TASK-028). Live data starts only on the person's action (AEC-R24). Next: AEC-R22. Blocked on owner decisions: Open-Meteo non-commercial confirmation and the TASK-012 design rationale for thresholds.
+24 requirements: 23 verified, 1 missing (AEC-R22, site theme, TASK-028). Live data starts only on the person's action (AEC-R24). Next: AEC-R22. Blocked on the TASK-012 design rationale for thresholds.
 
 ## Documents
 
@@ -56,7 +56,7 @@ updated: 2026-10-04
 
 ## Open work
 
-1. Owner decisions in the spec's "Intent not recorded" (Open-Meteo non-commercial use, TASK-012).
+1. TASK-012 design rationale (spec "Intent not recorded").
 2. AEC-R22 with TASK-028.
 
 ## Known limitations
@@ -71,6 +71,7 @@ updated: 2026-10-04
 
 ## Change log
 
+- 2026-10-04 — Owner confirmed Open-Meteo non-commercial use; spec Constraints and Intent not recorded updated.
 - 2026-10-04 — Live data only on the person's action (T-aethercast-20261003-2e02): no fetch or geolocation on open; remembered location shown with Load live data; 15-minute refresh only after a user start, with Stop/Resume auto refresh. AEC-R01, R03, R04, R05 tests rewritten for the new behaviour; AEC-R24 added and verified.
 - 2026-10-04 — AEC-R23 added and verified: `detectAnomalies` takes the dataset timezone and reads night hours from the timestamp's own offset (T-aethercast-20261004-3116).
 - 2026-10-04 — Tests added for AEC-R03, R04, R14, R17, R18, R19 (now `verified`); AEC-R06 AetherCast JSON re-import covered by the AEC-R18 test. Inversion timezone defect recorded as T-aethercast-20261004-3116.

@@ -32,7 +32,7 @@ Out of scope:
 ## Constraints
 
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
-- Open-Meteo's free API is for non-commercial use only, at most 10,000 calls a day, and its data is CC BY 4.0 ([Open-Meteo terms](https://open-meteo.com/en/terms)). The tool shows the attribution.
+- Open-Meteo's free API is keyless and for non-commercial use only, under 600 calls a minute, 5,000 an hour and 10,000 a day, and its data is CC BY 4.0 ([Open-Meteo terms](https://open-meteo.com/en/terms)). The site is non-commercial (owner decision 2026-10-01; owner confirmed this use of Open-Meteo 2026-10-04). The tool shows the attribution.
 - Index values are recalculated from raw concentrations; provider-supplied index fields are not trusted.
 - Network requests happen only on the person's own action (platform rule): opening the tool requests nothing and asks for no location (AEC-R24).
 
@@ -72,11 +72,10 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 ## Intent not recorded
 
 - The source of every threshold constant, the choice of indices and the Fitzpatrick exposure model (TASK-012). Owed by the original author; not reconstructed here because these are health-adjacent.
-- Open-Meteo's free API is non-commercial only. The site shows a voluntary support link but no ads or subscriptions. Unknown: the owner's confirmation that this use is non-commercial.
-- Geo Intelligence Hub excludes Open-Meteo because its original brief did, not because of the licence (corrected 2026-10-02). Whether that exclusion still applies is the owner's decision.
 
 ## Change log
 
+- 2026-10-04 — Owner confirmed that the site's use of Open-Meteo is non-commercial and that Geo Intelligence Hub may use it; both items removed from Intent not recorded; Constraints list the current rate limits.
 - 2026-10-04 — Live loading waits for the person's action (T-aethercast-20261003-2e02): AEC-R01, R03, R04 and R05 reworded, AEC-R24 added (no request or geolocation on open), platform rule added under Constraints; the "live loading on open" item under Intent not recorded is settled by the platform rule and removed.
 - 2026-10-04 — Added AEC-R23: inversion night hours use the dataset's own offset or timezone (T-aethercast-20261004-3116).
 - 2026-10-01 — Created as an as-built spec from `src/tools/aethercast/`, the catalog entry, `.tasks/DONE.md` TASK-008, `.tasks/NEXT.md` TASK-012 and the tool's tests. Same day: catalog summary, privacy, accepts and first step corrected to describe the live Open-Meteo flow (they still said the tool never contacts a network service).

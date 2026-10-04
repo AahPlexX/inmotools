@@ -11,6 +11,7 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 | Date | Decision |
 | --- | --- |
+| 2026-10-04 | Open-Meteo's free keyless API may be used: the site is non-commercial. Any tool may use it where it fits the platform rules, including Geo Intelligence Hub. |
 | 2026-10-03 | Requirements that need real hardware or a person carry the flag `[awaiting physical testing by human]` and are never `verified` until a person records the check ([standard](DOCUMENTATION_STANDARD.md#flag-awaiting-physical-testing-by-human)). |
 | 2026-10-03 | When a new test shows a requirement's status is wrong, the agent corrects it, and fixes the code in the same branch when the fix is fully within that tool. |
 | 2026-10-03 | Home page order: by category (`TOOL_CATEGORIES` in `src/tool-meta.ts`), then by short title. Each tool's category is set in its meta file. |
