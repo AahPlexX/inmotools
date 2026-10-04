@@ -30,6 +30,7 @@ None.
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
 | [T-aethercast-20261004-2d2d](items/T-aethercast-20261004-2d2d.md) | `aethercast` | expand | `expand/aethercast` | 2026-10-04 | Cover untested requirements |
+| [T-apca-token-matrix-20261004-0c8f](items/T-apca-token-matrix-20261004-0c8f.md) | `apca-token-matrix` | expand | `expand/apca-token-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
