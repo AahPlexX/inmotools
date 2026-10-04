@@ -3,10 +3,10 @@ task: T-tactical-matchboard-studio-20261003-2c29
 tool: tactical-matchboard-studio
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/tactical-matchboard-studio
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Align MEDIABUNNY_PIN with the installed MediaBunny
@@ -19,3 +19,4 @@ Waiting on the owner decision about the MediaBunny version.
 
 ## Log
 - 2026-10-03: recorded.
+- 2026-10-04: claimed `fix/tactical-matchboard-studio`.
