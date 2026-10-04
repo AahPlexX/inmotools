@@ -3,7 +3,7 @@ task: T-audio-mastering-20261004-5d02
 tool: audio-mastering
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/audio-mastering
 created: 2026-10-04
 updated: 2026-10-04
@@ -19,3 +19,4 @@ Not started. Reproduce, make the test deterministic, run it 20 times.
 
 ## Log
 - 2026-10-04: recorded during the untested-requirement coverage pass.
+- 2026-10-04: claimed `fix/audio-mastering`.
