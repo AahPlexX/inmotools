@@ -212,6 +212,33 @@ export async function inspectFont(buffer: ArrayBuffer, fileName: string): Promis
   };
 }
 
+export type GlyphOutline = { d: string; viewBox: string };
+const parsedFonts = new WeakMap<ArrayBuffer, ReturnType<typeof parseFont>>();
+
+/** SVG outlines for the given glyph indices, in font units with y pointing down from the ascender. */
+export async function glyphOutlines(buffer: ArrayBuffer, glyphIndices: readonly number[]): Promise<Map<number, GlyphOutline>> {
+  let parsed = parsedFonts.get(buffer);
+  if (!parsed) {
+    parsed = parseFont(buffer);
+    parsedFonts.set(buffer, parsed);
+  }
+  const { font } = await parsed;
+  const ascender = Number(font.ascender) || Number(font.unitsPerEm) || 1000;
+  const descender = Number(font.descender) || 0;
+  const height = Math.max(1, ascender - descender);
+  const outlines = new Map<number, GlyphOutline>();
+  for (const index of new Set(glyphIndices)) {
+    const glyph = font.glyphs.get(index);
+    if (!glyph) continue;
+    const path = glyph.path;
+    const bounds = path.getBoundingBox();
+    const left = Math.min(0, Number.isFinite(bounds.x1) ? bounds.x1 : 0);
+    const right = Math.max(Number(glyph.advanceWidth ?? 0), Number.isFinite(bounds.x2) ? bounds.x2 : 0, left + 1);
+    outlines.set(index, { d: (path as unknown as { toPathData(options: object): string }).toPathData({ decimalPlaces: 1, optimize: false, flipY: true, flipYBase: ascender }), viewBox: `${left} 0 ${right - left} ${height}` });
+  }
+  return outlines;
+}
+
 function cloneGlyph(source: any, codePoints: number[]) {
   const glyph = new opentype.Glyph({ name: source.name || undefined, unicode: codePoints[0], advanceWidth: Number(source.advanceWidth ?? 0), leftSideBearing: Number(source.leftSideBearing ?? 0), path: source.path });
   if (codePoints.length > 1) {
