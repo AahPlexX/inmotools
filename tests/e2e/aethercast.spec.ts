@@ -340,3 +340,176 @@ test('AetherCast chart scrubs with a touch drag while vertical swipes still scro
   await touchAt(0.98, 'pointermove');
   await expect.poll(() => snapshot.innerText()).not.toBe(first);
 });
+
+const readDownload = async (download: import('@playwright/test').Download): Promise<Buffer> => {
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks);
+};
+
+const chooseMadisonville = async (page: Page) => {
+  await page.getByLabel('Search city or postal code').fill('Madisonville, LA');
+  await page.getByRole('button', { name: 'Search locations' }).click();
+  await page.getByRole('button', { name: 'Madisonville, Louisiana, United States' }).click();
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+};
+
+test('AEC-R03 reloads the remembered location from this browser on reopen', async ({ page }) => {
+  await freezeBrowserNow(page);
+  const { airRequests, geocodingRequests } = await installLiveApiMocks(page);
+  await page.goto('./#/tools/aethercast');
+  await chooseMadisonville(page);
+  const saved = await page.evaluate(() => window.localStorage.getItem('inmotools.aethercast.live-location.v1'));
+  expect(saved).toContain('Madisonville, Louisiana, United States');
+
+  const searchesBeforeReload = geocodingRequests.length;
+  const airBeforeReload = airRequests.length;
+  await page.reload();
+
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+  await expect(page.getByRole('table')).toBeVisible();
+  expect(geocodingRequests).toHaveLength(searchesBeforeReload);
+  await expect.poll(() => airRequests.length).toBeGreaterThan(airBeforeReload);
+  expect(airRequests.at(-1)?.searchParams.get('latitude')).toBe('30.404');
+  expect(airRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
+});
+
+test('AEC-R04 refreshes live data on Refresh now and every 15 minutes', async ({ page }) => {
+  await page.clock.install({ time: FIXED_NOW });
+  const { airRequests, weatherRequests } = await installLiveApiMocks(page);
+  await page.goto('./#/tools/aethercast');
+  await chooseMadisonville(page);
+  await expect(page.getByRole('table')).toBeVisible();
+
+  const afterLoad = airRequests.length;
+  await page.getByRole('button', { name: 'Refresh now' }).click();
+  await expect.poll(() => airRequests.length).toBe(afterLoad + 1);
+  await expect(page.getByRole('button', { name: 'Refresh now' })).toBeEnabled();
+
+  const afterManual = airRequests.length;
+  const weatherAfterManual = weatherRequests.length;
+  await page.clock.runFor(14 * 60_000);
+  expect(airRequests).toHaveLength(afterManual);
+  await page.clock.runFor(60_000 + 1_000);
+  await expect.poll(() => airRequests.length).toBe(afterManual + 1);
+  await expect.poll(() => weatherRequests.length).toBe(weatherAfterManual + 1);
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+});
+
+test('AEC-R14 lists a screening anomaly from the loaded data in the anomaly log', async ({ page }) => {
+  const fixture = hourlyFixture();
+  fixture.hourly.pm2_5 = fixture.hourly.pm2_5.map((value, index) => (index === 12 ? 90 : value));
+  await page.goto('./#/tools/aethercast');
+  await page.getByLabel('Import an air quality and UV data file').setInputFiles({
+    name: 'air-quality.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+  const log = page.getByRole('region', { name: 'Screening anomalies' });
+  await expect(log.getByRole('heading')).toHaveText('Screening anomalies (1)');
+  await expect(log.locator('li')).toHaveCount(1);
+  await expect(log.locator('li')).toContainText('Wildfire screen');
+  await expect(log.locator('li')).toContainText(fixture.hourly.time[11]);
+});
+
+test('AEC-R17 pages the hourly readout with first, previous, next and last', async ({ page }) => {
+  await freezeBrowserNow(page);
+  const length = 250;
+  const time = Array.from({ length }, (_, index) => new Date(FIXED_NOW + index * HOUR_MS).toISOString());
+  const constant = (value: number) => Array<number>(length).fill(value);
+  const fixture = { ...hourlyFixture(), hourly: { ...hourlyFixture().hourly, time, pm2_5: constant(8), pm10: constant(18), carbon_monoxide: constant(300), nitrogen_dioxide: constant(15), sulphur_dioxide: constant(10), ozone: constant(50), uv_index: constant(4), uv_index_clear_sky: constant(5), wind_speed_10m: constant(2), us_aqi: constant(42), european_aqi: constant(28) } };
+  await page.goto('./#/tools/aethercast');
+  await page.getByLabel('Import an air quality and UV data file').setInputFiles({
+    name: 'air-quality.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(fixture)),
+  });
+
+  const controls = page.locator('.aethercast-table-controls');
+  const rows = page.getByRole('table').locator('tbody tr');
+  const firstCell = rows.first().locator('td').first();
+  await expect(controls).toContainText('Rows 1–100 of 250');
+  await expect(controls).toContainText('Page 1 of 3');
+  await expect(rows).toHaveCount(100);
+  await expect(firstCell).toHaveText(time[0]);
+  await expect(controls.getByRole('button', { name: 'First' })).toBeDisabled();
+  await expect(controls.getByRole('button', { name: 'Previous' })).toBeDisabled();
+
+  await controls.getByRole('button', { name: 'Next' }).click();
+  await expect(controls).toContainText('Rows 101–200 of 250');
+  await expect(firstCell).toHaveText(time[100]);
+
+  await controls.getByRole('button', { name: 'Last' }).click();
+  await expect(controls).toContainText('Rows 201–250 of 250');
+  await expect(controls).toContainText('Page 3 of 3');
+  await expect(rows).toHaveCount(50);
+  await expect(firstCell).toHaveText(time[200]);
+  await expect(controls.getByRole('button', { name: 'Next' })).toBeDisabled();
+  await expect(controls.getByRole('button', { name: 'Last' })).toBeDisabled();
+
+  await controls.getByRole('button', { name: 'Previous' }).click();
+  await expect(controls).toContainText('Rows 101–200 of 250');
+  await expect(firstCell).toHaveText(time[100]);
+
+  await controls.getByRole('button', { name: 'First' }).click();
+  await expect(controls).toContainText('Rows 1–100 of 250');
+  await expect(firstCell).toHaveText(time[0]);
+});
+
+test('AEC-R18 exports a PDF brief, CSV, chart PNG and AetherCast JSON that re-imports', async ({ page }) => {
+  await loadFixture(page);
+
+  const pdfDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export PDF brief' }).click();
+  const pdf = await pdfDownload;
+  expect(pdf.suggestedFilename()).toBe('aethercast-brief.pdf');
+  expect((await readDownload(pdf)).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+  const csvDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const csvFile = await csvDownload;
+  expect(csvFile.suggestedFilename()).toBe('aethercast-hourly.csv');
+  const csvLines = (await readDownload(csvFile)).toString('utf8').trim().split(/\r?\n/);
+  expect(csvLines[0]).toContain('timestamp');
+  expect(csvLines).toHaveLength(25);
+
+  const pngDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export chart PNG' }).click();
+  const png = await pngDownload;
+  expect(png.suggestedFilename()).toBe('aethercast-forecast.png');
+  expect([...(await readDownload(png)).subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  const jsonDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON' }).click();
+  const jsonFile = await jsonDownload;
+  expect(jsonFile.suggestedFilename()).toBe('aethercast-dataset.json');
+  const jsonBuffer = await readDownload(jsonFile);
+  const exported = JSON.parse(jsonBuffer.toString('utf8')) as { importSource: string; points: unknown[]; timezone: string };
+  expect(exported.importSource).toBe('open-meteo-json');
+  expect(exported.points).toHaveLength(24);
+  expect(exported.timezone).toBe('America/New_York');
+
+  await page.getByText('Advanced: import a saved dataset').click();
+  await page.getByLabel('Import an air quality and UV data file').setInputFiles({
+    name: 'aethercast-dataset.json',
+    mimeType: 'application/json',
+    buffer: jsonBuffer,
+  });
+  await expect(page.getByText('Loaded rows: 24.')).toBeVisible();
+  await expect(page.getByTestId('aethercast-timestamp-reconciliation')).toContainText('24 of 24');
+  const snapshot = page.getByRole('region', { name: 'Selected snapshot' });
+  await expect(snapshot.locator('p').filter({ hasText: 'Imported provider US AQI' })).toContainText('42');
+});
+
+test('AEC-R19 shows Open-Meteo and CAMS attribution and labels live data as forecast-model data', async ({ page }) => {
+  await freezeBrowserNow(page);
+  await installLiveApiMocks(page);
+  await page.goto('./#/tools/aethercast');
+  await chooseMadisonville(page);
+
+  const source = page.getByTestId('aethercast-live-source');
+  await expect(source).toContainText('Forecast-model data, not a local regulatory monitor or sensor.');
+  await expect(source).toContainText('Copernicus Atmosphere Monitoring Service (CAMS)');
+  await expect(source.getByRole('link', { name: 'Open-Meteo' })).toHaveAttribute('href', 'https://open-meteo.com/');
+});
