@@ -12,6 +12,8 @@ import { resamplePcm } from '../../src/tools/music/dsp/resample';
 
 const RATE = 48_000;
 const dbToAmp = (db: number) => 10 ** (db / 20);
+// EBU Tech 3341 cases 3-5 (240 s) and Tech 3342 cases 1-4 (220 s) are defined at these lengths; metering that much stereo audio, true peak included, takes several seconds and longer on a loaded machine.
+const REFERENCE_SIGNAL_TIMEOUT_MS = 60_000;
 
 /** Concatenated 1 kHz sine segments at per-channel peak levels (dBFS); `null` means silence. */
 function tones(segments: Array<[seconds: number, levelDb: number | null]>, channels = 2, rate = RATE, frequency = 1000): Float32Array[] {
@@ -71,7 +73,7 @@ describe('EBU Tech 3341 minimum requirements', () => {
     within(measureLoudness(tones([[10, -36], [60, -23], [10, -36]]), RATE).integrated, -23);
     within(measureLoudness(tones([[10, -72], [10, -36], [60, -23], [10, -36], [10, -72]]), RATE).integrated, -23);
     within(measureLoudness(tones([[20, -26], [20.1, -20], [20, -26]]), RATE).integrated, -23);
-  });
+  }, REFERENCE_SIGNAL_TIMEOUT_MS);
 
   it('case 6: 5.0 channel weighting', () => {
     const [left] = tones([[20, -28]], 1);
@@ -168,7 +170,7 @@ describe('EBU Tech 3342 loudness range', () => {
     accept(measureLoudness(tones([[20, -20], [20, -15]]), RATE).loudnessRange, 5);
     accept(measureLoudness(tones([[20, -40], [20, -20]]), RATE).loudnessRange, 20);
     accept(measureLoudness(tones([[20, -50], [20, -35], [20, -20], [20, -35], [20, -50]]), RATE).loudnessRange, 15);
-  });
+  }, REFERENCE_SIGNAL_TIMEOUT_MS);
 
   it('follows the reference percentile rule', () => {
     expect(loudnessRangeFrom([])).toBe(0);
