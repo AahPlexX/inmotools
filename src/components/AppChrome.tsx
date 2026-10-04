@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { SUPPORT_PROMPT_EVENT, SUPPORT_URL, type SupportPromptDetail } from '../lib/support';
+import { ThemeControl } from './ThemeControl';
 
 export function AppChrome({ children }: { children: ReactNode }) {
   const [supportPrompt, setSupportPrompt] = useState<SupportPromptDetail | null>(null);
@@ -32,6 +33,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
           <a href="#privacy">Privacy</a>
           <a className="support-link" href={SUPPORT_URL} target="_blank" rel="noreferrer">☕ Buy me a coffee ($3)</a>
         </nav>
+        <ThemeControl />
       </header>
       <main id="main">{children}</main>
       {supportPrompt ? (

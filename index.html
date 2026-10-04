@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b1220" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f6f7f8" />
+    <script id="theme-prepaint">
+      // Pre-paint copy of src/lib/theme.ts (readThemeChoice, resolveTheme, applyTheme); keep both in step.
+      (function () {
+        var choice = 'system';
+        try {
+          var stored = window.localStorage.getItem('inmotools.theme.v1');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') choice = stored;
+        } catch (error) {}
+        var dark = choice === 'dark' || (choice === 'system' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var resolved = dark ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', resolved);
+        var scheme = document.querySelector('meta[name="color-scheme"]');
+        if (scheme) scheme.setAttribute('content', resolved);
+        var color = document.querySelector('meta[name="theme-color"]');
+        if (color) color.setAttribute('content', dark ? '#0e141b' : '#f6f7f8');
+      })();
+    </script>
     <meta name="description" content="InMo Tools — private, local-first browser utilities for serious work." />
     <link rel="icon" href="/inmotools/icon.svg" type="image/svg+xml" />
     <title>InMo Tools</title>
