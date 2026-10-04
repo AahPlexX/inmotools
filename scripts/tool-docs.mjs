@@ -4,6 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 export const STATUSES = ['verified', 'implemented', 'partial', 'missing', 'not planned'];
+/** Notes-column flag for criteria only a person with real hardware can check. */
+export const HUMAN_FLAG = '[awaiting physical testing by human]';
 const REQ_ROW = /^\| ([A-Z][A-Z0-9]*-R\d+) \|/;
 
 export function trackedFiles(pattern, root = process.cwd()) {
@@ -41,6 +43,6 @@ export function trackerRows(text) {
   return text.split('\n').flatMap((line) => {
     if (!REQ_ROW.test(line)) return [];
     const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
-    return [{ id: cells[0], status: cells[1], evidence: cells[2] ?? '' }];
+    return [{ id: cells[0], status: cells[1], evidence: cells[2] ?? '', notes: cells[3] ?? '' }];
   });
 }

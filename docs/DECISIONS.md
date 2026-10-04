@@ -11,6 +11,8 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 | Date | Decision |
 | --- | --- |
+| 2026-10-03 | Requirements that need real hardware or a person carry the flag `[awaiting physical testing by human]` and are never `verified` until a person records the check ([standard](DOCUMENTATION_STANDARD.md#flag-awaiting-physical-testing-by-human)). |
+| 2026-10-03 | When a new test shows a requirement's status is wrong, the agent corrects it, and fixes the code in the same branch when the fix is fully within that tool. |
 | 2026-10-03 | Home page order: by category (`TOOL_CATEGORIES` in `src/tool-meta.ts`), then by short title. Each tool's category is set in its meta file. |
 | 2026-10-03 | Integration without pull requests: a push to `feature/`, `expand/` or `fix/<slug>` is merged into `main` by `.github/workflows/integrate.yml`, and the branch is deleted. |
 | 2026-10-03 | Incomplete tools and expansions may merge when their spec, tracker and task file show the state; a merge may not turn a `verified` requirement into another status. |

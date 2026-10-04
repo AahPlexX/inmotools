@@ -10,7 +10,7 @@
 // so a checkpoint merge of an expansion cannot regress finished work.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { docsForTool, specRequirementIds, standardDocs, STATUSES, trackedFiles, trackerRows } from './tool-docs.mjs';
+import { docsForTool, HUMAN_FLAG, specRequirementIds, standardDocs, STATUSES, trackedFiles, trackerRows } from './tool-docs.mjs';
 import { loadTools } from './tool-registry.mjs';
 
 const testSources = () => trackedFiles('tests/**').filter((path) => /\.(ts|tsx|mjs|js)$/.test(path)).map((path) => readFileSync(path, 'utf8'));
@@ -41,10 +41,15 @@ export function checkTool(slug, { strict = false, docs = standardDocs(), sources
     if (!specIds.includes(row.id)) errors.push(`${row.id}: in ${row.file} but not in the spec`);
   }
   const counts = Object.fromEntries(STATUSES.map((status) => [status, 0]));
+  const awaitingHuman = [];
   for (const id of specIds) {
     const row = rowById.get(id);
     if (!row) { errors.push(`${id}: in the spec but has no tracker row`); continue; }
     if (!STATUSES.includes(row.status)) continue;
+    if (row.notes.includes(HUMAN_FLAG)) {
+      awaitingHuman.push(id);
+      if (!['partial', 'implemented'].includes(row.status)) errors.push(`${id}: flagged ${HUMAN_FLAG} but status is "${row.status}" (use partial or implemented)`);
+    }
     if (row.status === 'verified') {
       const quotes = [...row.evidence.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
       const byId = sources.some((source) => new RegExp(`\\b${id}\\b`).test(source));
@@ -58,7 +63,7 @@ export function checkTool(slug, { strict = false, docs = standardDocs(), sources
   }
   const complete = counts.verified + counts['not planned'];
   const verified = specIds.filter((id) => rowById.get(id)?.status === 'verified');
-  return { slug, pending: false, errors, counts, total: specIds.length, complete, verified };
+  return { slug, pending: false, errors, counts, total: specIds.length, complete, verified, awaitingHuman };
 }
 
 /** IDs marked verified in the tool's trackers as they are on a git ref. */
@@ -75,7 +80,8 @@ function report(result) {
   if (result.pending) return `${result.slug}: pending (no standard ${result.missing})${result.errors.length ? `\n  error: ${result.errors.join('\n  error: ')}` : ''}`;
   const parts = Object.entries(result.counts).filter(([, n]) => n).map(([status, n]) => `${status} ${n}`).join(', ');
   const state = result.total && result.complete === result.total ? 'complete' : 'incomplete';
-  return [`${result.slug}: ${state}, ${result.complete}/${result.total} requirements verified or not planned (${parts})`, ...result.errors.map((error) => `  error: ${error}`)].join('\n');
+  const human = result.awaitingHuman.length ? `; awaiting physical testing by human: ${result.awaitingHuman.join(', ')}` : '';
+  return [`${result.slug}: ${state}, ${result.complete}/${result.total} requirements verified or not planned (${parts})${human}`, ...result.errors.map((error) => `  error: ${error}`)].join('\n');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
