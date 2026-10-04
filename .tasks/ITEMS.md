@@ -15,7 +15,6 @@ None.
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
 | [T-audio-mastering-20261004-d7fa](items/T-audio-mastering-20261004-d7fa.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Make the mastering realtime-chain e2e test pass under load |
-| [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-03 | Give the Fiber Craft spec the standard header block |
 | [T-geo-intelligence-hub-20261004-9b3e](items/T-geo-intelligence-hub-20261004-9b3e.md) | `geo-intelligence-hub` | fix | `fix/geo-intelligence-hub` | 2026-10-04 | Find the cause of a one-off axe failure |
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
 
@@ -37,6 +36,7 @@ None.
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
+| [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-04 | Give the Fiber Craft spec the standard header block |
 | [T-font-subsetter-20261004-20c0](items/T-font-subsetter-20261004-20c0.md) | `font-subsetter` | expand | `expand/font-subsetter` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-geo-intelligence-hub-20261004-4771](items/T-geo-intelligence-hub-20261004-4771.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Record integration of untested-requirement tests |
