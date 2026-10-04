@@ -32,6 +32,7 @@ None.
 | [T-aethercast-20261004-2d2d](items/T-aethercast-20261004-2d2d.md) | `aethercast` | expand | `expand/aethercast` | 2026-10-04 | Cover untested requirements |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
+| [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
 | [T-font-subsetter-20261004-20c0](items/T-font-subsetter-20261004-20c0.md) | `font-subsetter` | expand | `expand/font-subsetter` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-geo-intelligence-hub-20261004-e828](items/T-geo-intelligence-hub-20261004-e828.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Cover untested requirements |
