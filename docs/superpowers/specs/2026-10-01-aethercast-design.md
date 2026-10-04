@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-01-aethercast-design.md
 tracker: src/tools/aethercast/TRACKER.md
-updated: 2026-10-01
+updated: 2026-10-04
 ---
 
 # AetherCast — spec
@@ -32,18 +32,19 @@ Out of scope:
 ## Constraints
 
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
-- Open-Meteo's free API is for non-commercial use only, at most 10,000 calls a day, and its data is CC BY 4.0 ([Open-Meteo terms](https://open-meteo.com/en/terms)). The tool shows the attribution.
+- Open-Meteo's free API is keyless and for non-commercial use only, under 600 calls a minute, 5,000 an hour and 10,000 a day, and its data is CC BY 4.0 ([Open-Meteo terms](https://open-meteo.com/en/terms)). The site is non-commercial (owner decision 2026-10-01; owner confirmed this use of Open-Meteo 2026-10-04). The tool shows the attribution.
 - Index values are recalculated from raw concentrations; provider-supplied index fields are not trusted.
+- Network requests happen only on the person's own action (platform rule): opening the tool requests nothing and asks for no location (AEC-R24).
 
 ## Requirements
 
 | ID | Requirement | Acceptance test |
 | --- | --- | --- |
-| AEC-R01 | On first open, with the browser's location permission, live Open-Meteo conditions load without an upload | Live data loads from mocked geolocation |
+| AEC-R01 | After the person chooses Use my location and grants the browser's location permission, live Open-Meteo conditions load without an upload | Live data loads from mocked geolocation after the click |
 | AEC-R02 | Without location access, a city or postal-code search loads live conditions | Search loads a location |
-| AEC-R03 | The chosen location is remembered in this browser and reloaded next time | Saved location loads on reopen |
-| AEC-R04 | Live data refreshes every 15 minutes and on Refresh now | Refresh reloads data |
-| AEC-R05 | A late geolocation answer never replaces a location or file the person chose meanwhile | Manual location and imported file survive a late geolocation |
+| AEC-R03 | The chosen location is remembered in this browser; on reopen it is shown with a Load live data control, and its data is fetched only when the person uses that control | On reopen the remembered location is shown with no request; Load live data fetches it |
+| AEC-R04 | Live data refreshes on Refresh now, and every 15 minutes only after the person has started live data in this visit; Stop auto refresh ends the automatic refresh and Resume auto refresh restarts it | Refresh reloads data; the 15-minute refresh runs after a user start, stops on Stop auto refresh and resumes |
+| AEC-R05 | A late answer to a requested geolocation never replaces a location or file the person chose meanwhile | Manual location and imported file survive a late geolocation |
 | AEC-R06 | Import an Open-Meteo JSON export, a mapped CSV (columns and source units mapped by the person), or an AetherCast JSON export | Each format imports |
 | AEC-R07 | Imported timestamps: wall-clock times use the given IANA timezone; impossible dates, nonexistent and ambiguous DST times are rejected; accepted and rejected counts are reported | Reconciliation counts shown; bad times rejected |
 | AEC-R08 | US EPA AQI is computed from raw concentrations, with PM NowCast, truncation before interpolation, the one-hour ozone and fixed SO2 rules, and category from the rounded value | EPA tests pass |
@@ -61,6 +62,8 @@ Out of scope:
 | AEC-R20 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | AEC-R21 | Loaded content reflows without horizontal overflow at the tested viewports | Reflow test at each viewport |
 | AEC-R22 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| AEC-R23 | The thermal-inversion screen judges night hours (20:00–06:00) at the dataset's location, never in the viewer's timezone: wall-clock timestamps and timestamps with a numeric UTC offset use the hour as written; `Z` timestamps use the dataset's IANA timezone, or UTC without one | A daytime window written with `+09:00` is not screened in any viewer timezone; `Z` timestamps follow the dataset timezone |
+| AEC-R24 | Opening the tool, with or without a remembered location, makes no network request and no geolocation call; requests start only from Use my location, Search locations, a search result, Load live data or Refresh now | Opening the tool and waiting past 15 minutes records no request to another origin and no geolocation call |
 
 ## Definition of done
 
@@ -69,10 +72,10 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 ## Intent not recorded
 
 - The source of every threshold constant, the choice of indices and the Fitzpatrick exposure model (TASK-012). Owed by the original author; not reconstructed here because these are health-adjacent.
-- AEC-R01 asks for location and fetches data as soon as the tool opens, and AEC-R03 fetches a saved location on open. The platform rules allow network use for "public keyless sources requested by the user's own action". Unknown: whether opening the tool counts as that action, or whether live loading should wait for a click.
-- Open-Meteo's free API is non-commercial only. The site shows a voluntary support link but no ads or subscriptions. Unknown: the owner's confirmation that this use is non-commercial.
-- Geo Intelligence Hub excludes Open-Meteo because its original brief did, not because of the licence (corrected 2026-10-02). Whether that exclusion still applies is the owner's decision.
 
 ## Change log
 
+- 2026-10-04 — Owner confirmed that the site's use of Open-Meteo is non-commercial and that Geo Intelligence Hub may use it; both items removed from Intent not recorded; Constraints list the current rate limits.
+- 2026-10-04 — Live loading waits for the person's action (T-aethercast-20261003-2e02): AEC-R01, R03, R04 and R05 reworded, AEC-R24 added (no request or geolocation on open), platform rule added under Constraints; the "live loading on open" item under Intent not recorded is settled by the platform rule and removed.
+- 2026-10-04 — Added AEC-R23: inversion night hours use the dataset's own offset or timezone (T-aethercast-20261004-3116).
 - 2026-10-01 — Created as an as-built spec from `src/tools/aethercast/`, the catalog entry, `.tasks/DONE.md` TASK-008, `.tasks/NEXT.md` TASK-012 and the tool's tests. Same day: catalog summary, privacy, accepts and first step corrected to describe the live Open-Meteo flow (they still said the tool never contacts a network service).

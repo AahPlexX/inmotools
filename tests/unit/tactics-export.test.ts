@@ -1,7 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { PDFDocument } from 'pdf-lib';
 import JSZip from 'jszip';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { measureTrajectory, sampleAuthoredTrajectory } from '../../src/tools/tactics/analysis-engine';
 import { addPlayerToken, addRosterPlayer, addTeam, addAnnotation } from '../../src/tools/tactics/editor-engine';
 import {
@@ -357,6 +358,10 @@ describe('Tactical PDF contact sheets and analytics reports', () => {
 });
 
 describe('Tactical video capability negotiation and frame fallback', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('samples integer times inside the frame cap', () => {
     const times = sampleExportTimes(1000, 30, 4);
     expect(times[0]).toBe(0);
@@ -372,7 +377,6 @@ describe('Tactical video capability negotiation and frame fallback', () => {
   });
 
   it('exposes a video combination only when the container and encoder both accept it', async () => {
-    expect(MEDIABUNNY_PIN).toBe('1.58.0');
     const probed: string[] = [];
     const probe = {
       async canEncodeVideo(codec: VideoExportCandidate['codec']) {
@@ -437,8 +441,12 @@ describe('Tactical video capability negotiation and frame fallback', () => {
     expect(Array.from(video.slice(0, 4))).toEqual([0x1a, 0x45, 0xdf, 0xa3]);
     expect(videoContainerTags(readExportMetadata(project)).comment).toContain('Keep the press.');
 
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-04T10:00:00.900Z'));
     const first = await exportFrameSequenceZip(project, 'scene-1', { maxFrames: 3, frameRate: 10 });
+    vi.setSystemTime(new Date('2026-10-04T10:00:03.100Z'));
     const second = await exportFrameSequenceZip(project, 'scene-1', { maxFrames: 3, frameRate: 10 });
+    vi.useRealTimers();
     expect(Array.from(first)).toEqual(Array.from(second));
     const zip = await JSZip.loadAsync(first);
     const manifest = JSON.parse(await zip.file('manifest.json')?.async('string') ?? '{}') as {
@@ -454,6 +462,20 @@ describe('Tactical video capability negotiation and frame fallback', () => {
     expect(frame).toContain('Pressing shape');
     const sidecar = JSON.parse(await zip.file('metadata.json')?.async('string') ?? '{}') as { club: string };
     expect(sidecar.club).toBe('Harbor FC');
+  });
+
+  it('stamps every frame ZIP entry, including the frames/ folder, with the fixed 1980-01-01 date', async () => {
+    const zip = await JSZip.loadAsync(await exportFrameSequenceZip(coachingProject(), 'scene-1', { maxFrames: 3, frameRate: 10 }));
+    const entries = Object.values(zip.files);
+    expect(entries.some((entry) => entry.dir && entry.name === 'frames/')).toBe(true);
+    for (const entry of entries) expect(entry.date.toISOString(), entry.name).toBe('1980-01-01T00:00:00.000Z');
+  });
+
+  it('pins MEDIABUNNY_PIN to the mediabunny version installed by package.json', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const installed = manifest.dependencies?.mediabunny ?? manifest.devDependencies?.mediabunny;
+    expect(installed).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(MEDIABUNNY_PIN).toBe(installed);
   });
 
   it('uses the pinned Mediabunny probe and withholds video when VideoEncoder is absent', async () => {

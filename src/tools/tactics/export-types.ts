@@ -1,4 +1,4 @@
-export const MEDIABUNNY_PIN = '1.58.0';
+export const MEDIABUNNY_PIN = '1.60.0';
 
 export const MEDIABUNNY_CONTAINER_CODECS = {
   mp4: ['avc', 'hevc', 'vp9', 'av1', 'vp8', 'prores'],

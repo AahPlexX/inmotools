@@ -121,3 +121,51 @@ test('hosting coordinates render an accessible GeoIP distribution minimap', asyn
   await expect(map).toHaveAttribute('aria-label', 'GeoIP distribution map');
   await expect(map.getByRole('button', { name: /203\.0\.113\.10.*Exampleville/i })).toBeVisible();
 });
+
+const readCruxSetting = (page: import('@playwright/test').Page) => page.evaluate(() => new Promise<unknown>((resolve, reject) => {
+  const open = indexedDB.open('inmotools-site-intelligence');
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => {
+    const db = open.result;
+    const request = db.transaction('settings', 'readonly').objectStore('settings').get('crux-api-key');
+    request.onsuccess = () => { db.close(); resolve(request.result ?? null); };
+    request.onerror = () => { db.close(); reject(request.error); };
+  };
+}));
+
+test('has no CrUX API key field, clears a previously stored key and never calls the CrUX API', async ({ page }) => {
+  const credentialRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = request.url();
+    if (/chromeuxreport\.googleapis\.com|pagespeedonline|[?&]key=/i.test(url)) credentialRequests.push(url);
+  });
+
+  await page.goto('./#/tools/site-intelligence-analyzer');
+  await expect(page.getByRole('heading', { name: /Site Intelligence Analyzer/i })).toBeVisible();
+  await page.evaluate(() => new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open('inmotools-site-intelligence');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('settings', 'readwrite');
+      tx.objectStore('settings').put({ key: 'crux-api-key', value: 'stored-test-key' });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }));
+  expect(await readCruxSetting(page)).toMatchObject({ value: 'stored-test-key' });
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: /Site Intelligence Analyzer/i })).toBeVisible();
+  await expect.poll(() => readCruxSetting(page)).toBeNull();
+
+  await page.getByLabel('URL, domain, or partial address').fill('example.com');
+  await page.getByRole('button', { name: 'Analyze' }).click();
+  await page.getByRole('button', { name: 'Performance & Tech' }).click();
+  await expect(page.getByTestId('site-intel-crux-unavailable')).toContainText('not available');
+  await expect(page.getByTestId('site-intel-crux-unavailable')).toContainText('needs an API key');
+  await expect(page.getByLabel(/CrUX API key/i)).toHaveCount(0);
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  await page.waitForTimeout(1_500);
+  expect(credentialRequests).toEqual([]);
+});
