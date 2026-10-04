@@ -273,7 +273,7 @@ test('GLS-R06 u_texture1 shows a black placeholder until an image is chosen and 
   await compileShader(page, 'void main(){outColor=texture(u_texture1,vec2(0.5))+vec4(0.0,0.0,0.0,1.0);}');
   await expect.poll(() => readShaderPixel(page)).toEqual([0, 0, 0, 255]);
   await page.locator('#shader-texture-1').setInputFiles({ name: 'green.png', mimeType: 'image/png', buffer: await pngOf(page, '#00ff00') });
-  await expect(page.locator('.status-line')).toContainText('green.png ready for u_texture1.');
+  await expect(page.getByRole('button', { name: 'Remove texture 1' })).toBeVisible();
   await expect.poll(() => readShaderPixel(page)).toEqual([0, 255, 0, 255]);
   await page.getByRole('button', { name: 'Remove texture 1' }).click();
   await expect.poll(() => readShaderPixel(page)).toEqual([0, 0, 0, 255]);
