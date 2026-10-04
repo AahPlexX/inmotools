@@ -29,6 +29,7 @@ None.
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
+| [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 
