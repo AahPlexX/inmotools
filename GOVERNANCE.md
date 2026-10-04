@@ -50,6 +50,7 @@ A change to `.github/workflows/` cannot be pushed by a workflow token; such a br
 - One branch per tool at a time: the branch is the claim. Never commit to another tool's branch or edit another tool's folder, spec or tracker.
 - Shared files (anything outside `src/tools/<folder>/`, that tool's spec, and `.tasks/items/`) change only on `fix/<slug>` with the reason in the task file, and run the full browser suite.
 - Sync with `git fetch origin && git merge origin/main` on the branch; resolve conflicts there, never on `main`.
+- Repository-wide work that belongs to no tool (the site shell, shared components, scripts) is done in its own worktree on a local branch that is not pushed, has a task file without a `tool:` field, runs the full checks including the full browser suite, and is merged into `main` by hand; tool branches then sync with `main`.
 
 ## 5. Evidence
 
