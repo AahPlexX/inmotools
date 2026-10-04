@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-22 requirements: 21 verified, 1 missing (AEC-R22, site theme, TASK-028). Next: AEC-R22; queued fixes T-aethercast-20261003-2e02 (live loading on the user's action) and T-aethercast-20261004-3116 (inversion night hours in the dataset timezone). Blocked on owner decisions: when live loading may start (on open or on a click), Open-Meteo non-commercial confirmation, and the TASK-012 design rationale for thresholds.
+23 requirements: 22 verified, 1 missing (AEC-R22, site theme, TASK-028). Next: T-aethercast-20261003-2e02 (live loading on the user's action) on `fix/aethercast`, then AEC-R22. Blocked on owner decisions: when live loading may start (on open or on a click), Open-Meteo non-commercial confirmation, and the TASK-012 design rationale for thresholds.
 
 ## Documents
 
@@ -51,12 +51,12 @@ updated: 2026-10-04
 | AEC-R20 | verified | `tests/e2e/accessibility.spec.ts` route `aethercast` | |
 | AEC-R21 | verified | e2e "AetherCast reflows loaded content at <viewport>" | |
 | AEC-R22 | missing | — | Delivered through TASK-028 |
+| AEC-R23 | verified | engine "AEC-R23 judges explicit-offset timestamps by their own offset in a <zone> browser", "AEC-R23 judges UTC (Z) timestamps in the dataset's IANA timezone in a <zone> browser", "AEC-R23 reads the local hour of wall-clock, offset and Z timestamps without the viewer timezone" | |
 
 ## Open work
 
 1. Owner decisions in the spec's "Intent not recorded" (live loading on open, Open-Meteo non-commercial use, TASK-012).
 2. AEC-R22 with TASK-028.
-3. AEC-R14: inversion night hours use the viewer's timezone for offset timestamps (T-aethercast-20261004-3116).
 
 ## Known limitations
 
@@ -69,5 +69,6 @@ updated: 2026-10-04
 
 ## Change log
 
+- 2026-10-04 — AEC-R23 added and verified: `detectAnomalies` takes the dataset timezone and reads night hours from the timestamp's own offset (T-aethercast-20261004-3116).
 - 2026-10-04 — Tests added for AEC-R03, R04, R14, R17, R18, R19 (now `verified`); AEC-R06 AetherCast JSON re-import covered by the AEC-R18 test. Inversion timezone defect recorded as T-aethercast-20261004-3116.
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`. Catalog copy corrected to describe the live Open-Meteo flow.

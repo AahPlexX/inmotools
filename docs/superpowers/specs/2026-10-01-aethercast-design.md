@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-01-aethercast-design.md
 tracker: src/tools/aethercast/TRACKER.md
-updated: 2026-10-01
+updated: 2026-10-04
 ---
 
 # AetherCast — spec
@@ -61,6 +61,7 @@ Out of scope:
 | AEC-R20 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | AEC-R21 | Loaded content reflows without horizontal overflow at the tested viewports | Reflow test at each viewport |
 | AEC-R22 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| AEC-R23 | The thermal-inversion screen judges night hours (20:00–06:00) at the dataset's location, never in the viewer's timezone: wall-clock timestamps and timestamps with a numeric UTC offset use the hour as written; `Z` timestamps use the dataset's IANA timezone, or UTC without one | A daytime window written with `+09:00` is not screened in any viewer timezone; `Z` timestamps follow the dataset timezone |
 
 ## Definition of done
 
@@ -75,4 +76,5 @@ The tool is complete when every requirement is `verified` or `not planned`, and 
 
 ## Change log
 
+- 2026-10-04 — Added AEC-R23: inversion night hours use the dataset's own offset or timezone (T-aethercast-20261004-3116).
 - 2026-10-01 — Created as an as-built spec from `src/tools/aethercast/`, the catalog entry, `.tasks/DONE.md` TASK-008, `.tasks/NEXT.md` TASK-012 and the tool's tests. Same day: catalog summary, privacy, accepts and first step corrected to describe the live Open-Meteo flow (they still said the tool never contacts a network service).

@@ -126,7 +126,7 @@ export default function AetherCastWorkspace() {
   const browserLocationPendingRef = useRef(false);
 
   const assessments = useMemo(() => (dataset ? assessDataset(dataset, settings) : []), [dataset, settings]);
-  const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.points) : []), [dataset]);
+  const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.points, dataset.timezone) : []), [dataset]);
   const activityWindows = useMemo(() => buildActivityWindows(assessments, settings.activeStandard), [assessments, settings.activeStandard]);
   const activeAssessment = activeIndex !== null ? assessments[activeIndex] : assessments[assessments.length - 1];
   const pageCount = Math.max(1, Math.ceil(assessments.length / PAGE_SIZE));
