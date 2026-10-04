@@ -32,6 +32,7 @@ None.
 | [T-aethercast-20261004-2d2d](items/T-aethercast-20261004-2d2d.md) | `aethercast` | expand | `expand/aethercast` | 2026-10-04 | Cover untested requirements |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
+| [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
 | [T-font-subsetter-20261004-20c0](items/T-font-subsetter-20261004-20c0.md) | `font-subsetter` | expand | `expand/font-subsetter` | 2026-10-04 | Cover untested requirements |
