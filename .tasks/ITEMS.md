@@ -14,7 +14,6 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
-| [T-audio-mastering-20261004-d7fa](items/T-audio-mastering-20261004-d7fa.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Make the mastering realtime-chain e2e test pass under load |
 | [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-03 | Give the Fiber Craft spec the standard header block |
 | [T-geo-intelligence-hub-20261004-9b3e](items/T-geo-intelligence-hub-20261004-9b3e.md) | `geo-intelligence-hub` | fix | `fix/geo-intelligence-hub` | 2026-10-04 | Find the cause of a one-off axe failure |
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
@@ -32,6 +31,7 @@ None.
 | [T-aethercast-20261004-3116](items/T-aethercast-20261004-3116.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-04 | Judge inversion night hours in the dataset's timezone |
 | [T-apca-token-matrix-20261004-0c8f](items/T-apca-token-matrix-20261004-0c8f.md) | `apca-token-matrix` | expand | `expand/apca-token-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-audio-mastering-20261004-5d02](items/T-audio-mastering-20261004-5d02.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Stop mastering loudness unit tests timing out under load |
+| [T-audio-mastering-20261004-d7fa](items/T-audio-mastering-20261004-d7fa.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Make the mastering realtime-chain e2e test pass under load |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
