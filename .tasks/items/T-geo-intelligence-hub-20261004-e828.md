@@ -19,4 +19,5 @@ Done. All `implemented` rows are covered by browser tests and `verified`; remain
 
 ## Log
 - 2026-10-04: claimed `expand/geo-intelligence-hub`.
-- 2026-10-04: added 13 browser tests in `tests/e2e/geo-intel.spec.ts` (GIH-R02, R14, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62); each passed 3/3 with `--repeat-each=3`. GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62 `implemented` → `verified`; GIH-R14 evidence extended (month filter). No code defects found. `pnpm tool:check geo-intelligence-hub --base origin/main`: 74 verified, 4 missing, 4 not planned, no errors.
+- 2026-10-04: added 12 browser tests in `tests/e2e/geo-intel.spec.ts` (GIH-R02, R14, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62); each passed 3/3 with `--repeat-each=3`. GIH-R02, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62 `implemented` → `verified`; GIH-R14 evidence extended (month filter). No code defects found. `pnpm tool:check geo-intelligence-hub --base origin/main`: 74 verified, 4 missing, 4 not planned, no errors.
+- 2026-10-04: integrated into `main` by `84b82b12` (integrate run 37212482086 succeeded on `967b8e52`).
