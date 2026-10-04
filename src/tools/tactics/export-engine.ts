@@ -611,7 +611,15 @@ export function exportAnalyticsJson(report: ReturnType<typeof buildAnalyticsRepo
 
 async function zipBytes(files: Array<{ name: string; data: string | Uint8Array }>): Promise<Uint8Array> {
   const zip = new JSZip();
-  for (const file of files) zip.file(file.name, file.data, { date: ZIP_DATE, createFolders: true });
+  for (const file of files) {
+    // JSZip stamps auto-created folders with the current time; explicit folder entries keep exports byte-identical.
+    const parts = file.name.split('/').slice(0, -1);
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      const folder = `${parts.slice(0, depth).join('/')}/`;
+      if (!zip.files[folder]) zip.file(folder, null, { dir: true, date: ZIP_DATE });
+    }
+    zip.file(file.name, file.data, { date: ZIP_DATE, createFolders: false });
+  }
   return zip.generateAsync({
     type: 'uint8array',
     compression: 'DEFLATE',

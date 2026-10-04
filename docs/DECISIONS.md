@@ -43,7 +43,6 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 
 | Item | Fact |
 | --- | --- |
-| MediaBunny | `package.json` pins 1.60.0; `MEDIABUNNY_PIN` in `src/tools/tactics/export-types.ts` still says 1.58.0. |
 | MediaBunny release age | `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` lists `mediabunny@1.60.0`; that release is now older than the release-age window, so the entry has no effect. |
 | OpenCV | `@techstark/opencv-js` 5.0.0-release.1 is a pre-release. |
 | SheetJS | `xlsx` is installed from `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, not the npm registry. |
