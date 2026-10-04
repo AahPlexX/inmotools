@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-82 requirements: 74 verified, 0 implemented, 4 missing, 4 not planned. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows TASK-028. No blocker. Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
+82 requirements: 74 verified, 0 implemented, 4 missing, 4 not planned. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows TASK-028. No blocker. GIH-R67 axe test made deterministic (T-geo-intelligence-hub-20261004-9b3e). Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
 
 ## Documents
 
@@ -96,7 +96,7 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R64 | verified | e2e "profile filter, row copy menu, sun chart and keyboard shortcuts" | |
 | GIH-R65 | verified | unit:wiring "never requests credentials: no API keys, tokens or signup-gated hosts in source" | |
 | GIH-R66 | verified | e2e "lays out without horizontal overflow at <width> px" (7 widths) | |
-| GIH-R67 | verified | e2e "has no serious or critical axe violations…"; `tests/e2e/accessibility.spec.ts` | |
+| GIH-R67 | verified | e2e "GIH-R67 has no serious or critical axe violations…"; `tests/e2e/accessibility.spec.ts` | |
 | GIH-R68 | verified | unit:wiring "registers exactly one catalog entry with the ToolMeta shape" | |
 | GIH-R69 | verified | unit:engine "resolves postal codes without inventing a postal-code population"; e2e "postal lookups show the geography used…" | |
 | GIH-R70 | verified | unit:net "spaces Nominatim requests at least 1.1 s apart"; unit:engine "keeps Nominatim off unless enabled" | |
@@ -127,12 +127,14 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 
 ## Verification evidence
 
+- 2026-10-04, `fix/geo-intelligence-hub` (T-geo-intelligence-hub-20261004-9b3e): GIH-R67 before the fix at `ee3b09a4`, `--repeat-each=40` desktop + mobile: 30 s timeout 34 passed / 46 timed out, 0 axe assertion failures; 180 s timeout 80/80 passed, max 48.2 s. After the fix `-g "GIH-R67" --repeat-each=40` ×2: 160/160 passed, max 19.9 s; 0 serious or critical violations in 264 complete runs. `tsc` exit 0; `pnpm test:unit` 3,707 passed; `pnpm build` exit 0; geo-intel spec 49 passed / 15 skipped; app spec 18 passed; accessibility spec (geo route) 2 passed.
 - 2026-10-04, `expand/geo-intelligence-hub` @ `6b9f0649` + working tree: `pnpm build` exit 0; `PW_PORT=4201 pnpm exec playwright test tests/e2e/geo-intel.spec.ts --repeat-each=3` 146 passed / 45 skipped / 1 failed (pre-existing axe test; rerun `-g "axe violations" --repeat-each=3` 6 passed); every new `GIH-R…` test passed 3/3 on each project it runs on; `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` 343 files / 3,703 tests passed, 0 failed; `pnpm tool:check geo-intelligence-hub --base origin/main` 78/82, no errors.
 - 2026-10-01, `origin/main` @ `0f8f42ed`: `tsc --noEmit -p tsconfig.app.json` exit 0; `pnpm test:unit` 344 files / 3,702 tests passed, 0 failed; `pnpm build` exit 0.
 - 2026-10-01, `origin/main` @ `80f74932`: geo-intel + accessibility + app browser specs 125 passed / 11 skipped / 0 failed (recorded in [TODO.md](TODO.md) completion record).
 
 ## Change log
 
+- 2026-10-04 — GIH-R67 browser test renamed with its ID; it scans only after the lookup and each dialog have settled, has a 120 s budget and reports rule, impact and element on failure.
 - 2026-10-04 — Browser tests added for GIH-R02, R14, R20, R26, R27, R42, R43, R44, R54, R55, R56, R62; the eleven `implemented` rows moved to `verified`.
 - 2026-10-02 — Added GIH-R81, GIH-R82 (default integration rule).
 - 2026-10-01 — Default integration rule applied: GIH-R79 and GIH-R80 moved from `not planned` to `missing`. Owner kept the name.

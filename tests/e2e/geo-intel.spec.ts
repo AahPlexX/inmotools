@@ -169,20 +169,31 @@ test('keeps working offline from bundled data', async ({ page }) => {
   await expect(profile.locator('[data-field="solar.sunrise"]')).toBeVisible();
 });
 
-test('has no serious or critical axe violations with a profile, the export dialog and the provenance inspector open', async ({ page }) => {
+test('GIH-R67 has no serious or critical axe violations with a profile, the export dialog and the provenance inspector open', async ({ page }) => {
+  // Three full-workspace axe runs take 20–48 s per run on a loaded 8-core runner.
+  test.setTimeout(120_000);
   const { default: AxeBuilder } = await import('@axe-core/playwright');
   await open(page);
   await search(page, 'Berlin');
+  // Settled: the lookup (history write and refresh included) has finished.
+  await expect(page.locator('.gi-busy')).toHaveCount(0);
+  await expect(page.getByTestId('gi-search')).toBeEnabled();
   const scan = async (label: string) => {
     const results = await new AxeBuilder({ page }).include('[data-testid="geo-intel-hub"]').analyze();
     const blocking = results.violations.filter((violation) => violation.impact === 'serious' || violation.impact === 'critical');
-    expect(blocking, `${label}: ${blocking.map((item) => `${item.id}: ${item.help}`).join('\n')}`).toEqual([]);
+    expect(blocking, `${label}: ${blocking.map((item) => `${item.id} (${item.impact}): ${item.help} — ${item.nodes.map((node) => `${node.target.join(' ')} ${node.html.slice(0, 200)} ${node.failureSummary ?? ''}`).join(' | ')}`).join('\n')}`).toEqual([]);
   };
   await scan('profile');
   await page.getByRole('button', { name: 'Export…' }).click();
+  const exportDialog = page.getByTestId('gi-export');
+  await expect(exportDialog.getByLabel('Project title')).toBeFocused();
   await scan('export dialog');
   await page.getByRole('button', { name: 'Close export' }).click();
+  await expect(exportDialog).toHaveCount(0);
   await page.getByRole('button', { name: 'Provenance', exact: true }).click();
+  const inspector = page.getByRole('dialog', { name: 'Provenance inspector' });
+  await expect(inspector.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+  await expect(inspector.locator('tbody tr').first()).toBeVisible();
   await scan('provenance inspector');
 });
 
