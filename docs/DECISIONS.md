@@ -1,6 +1,6 @@
 ---
 doc: decisions
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Decisions, exceptions and open questions
@@ -11,6 +11,7 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 | Date | Decision |
 | --- | --- |
+| 2026-10-04 | Open-Meteo's free keyless API may be used: the site is non-commercial. Any tool may use it where it fits the platform rules, including Geo Intelligence Hub. |
 | 2026-10-03 | Requirements that need real hardware or a person carry the flag `[awaiting physical testing by human]` and are never `verified` until a person records the check ([standard](DOCUMENTATION_STANDARD.md#flag-awaiting-physical-testing-by-human)). |
 | 2026-10-03 | When a new test shows a requirement's status is wrong, the agent corrects it, and fixes the code in the same branch when the fix is fully within that tool. |
 | 2026-10-03 | Home page order: by category (`TOOL_CATEGORIES` in `src/tool-meta.ts`), then by short title. Each tool's category is set in its meta file. |
@@ -33,7 +34,6 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 
 | Area | Fact | Rule |
 | --- | --- | --- |
-| AetherCast | On open, fetches data for the saved location (`localStorage` key `inmotools.aethercast.live-location.v1`) or asks for geolocation, then refreshes every 15 minutes, without a user action. | Network use only on the user's action |
 | Site Intelligence Analyzer | Has an optional "CrUX API key" field (`SiteIntelWorkspace.tsx`, stored locally). | No API keys |
 | Fiber Craft Workstation | Its spec has no standard header block, so `tool:check` reports it as pending. | Documentation standard |
 | 21 tools | No standard spec and tracker yet (`pnpm tool:check --all`). Specs are the next workstream. | Documentation standard |
