@@ -32,8 +32,8 @@ for this workstream.
 `Partial` = implemented but with a named, narrower scope than the spec text.
 `Blocked` = cannot be implemented as literally specified in a static,
 client-only, CORS-constrained environment; a substitution is implemented and
-flagged, or the feature is stubbed pending a resolvable blocker (e.g. a
-user-supplied credential).
+flagged, or the feature is stubbed pending a resolvable blocker.
+`Not planned` = excluded by a platform rule (no API keys or credentials); the reason is in the row.
 
 ## Feature status (all 38)
 
@@ -87,7 +87,7 @@ user-supplied credential).
 ### Group 6 — Performance Telemetry, Web Vitals & Technology Footprint
 | # | Feature | Status | Implementation |
 |---|---|---|---|
-| 28 | Public Core Web Vitals (CrUX) explorer | Blocked → user-key pattern implemented | `crux-engine.ts`; requires a user-supplied free Google CrUX API key stored only in local IndexedDB (Settings panel). No key ships in the bundle. This is a genuine external-credential blocker per the task's own escalation rule — flagged, not silently worked around. |
+| 28 | Public Core Web Vitals (CrUX) explorer | Not planned (needs an API key) | Removed 2026-10-04 (T-site-intelligence-analyzer-20261003-ba98): the key field, its IndexedDB setting and `crux-engine.ts` are gone; Performance & Tech shows that field data is not available without a key; a key saved by earlier versions is deleted on load (`vault-db.ts:purgeRetiredCredentials`). |
 | 29 | Edge CDN & cloud infrastructure classifier | Done | `fingerprint-engine.ts:classifyCdn` via CNAME/NS suffix signatures |
 | 30 | Web technology signature & CMS profiler | Done | `fingerprint-engine.ts:fingerprintCms` via URL/path pattern signatures |
 | 31 | Robots.txt & sitemap auto-path generator | Done | `wellknown-engine.ts`; in-app preview is best-effort (falls back to "open directly" when a target has no CORS header) |
@@ -105,12 +105,7 @@ user-supplied credential).
 
 ## Known blockers / explicit substitutions (flagged per task instructions)
 
-1. **Feature 28 (CrUX)** — genuine credential blocker. The Chrome UX Report
-   API requires a Google Cloud API key; there is no account-free way to call
-   it from a static site on behalf of every visitor. Resolution: users supply
-   their own free key, stored only in local IndexedDB. Not silently worked
-   around; surfaced in the UI as a "blocked" state with instructions until a
-   key is supplied.
+1. **Feature 28 (CrUX)** — not planned: the Chrome UX Report API requires a Google Cloud API key, and the platform rules allow keyless sources only. No keyless replacement is used: the PageSpeed Insights API can be called without a key, but its documentation states its real-world (CrUX) data is soon to be discontinued ([PageSpeed Insights API, Get started](https://developers.google.com/speed/docs/insights/v5/get-started), read 2026-10-04). The UI states that field data is not available without a key.
 2. **Feature 19/20/21 (Certificate Transparency via crt.sh)** — crt.sh is a
    community service without an uptime/CORS SLA. Verify current behavior in
    a network-enabled environment before relying on it for production
@@ -148,12 +143,13 @@ user-supplied credential).
       avoid flakiness when run without outbound internet access).
 - [ ] Content-Security-Policy / `connect-src` allowlist review for every
       external host this tool calls (Cloudflare/Google DoH, rdap.org,
-      web.archive.org, crt.sh, hstspreload.org, ipapi.co, chromeuxreport
-      googleapis.com) if/when this repository adopts a CSP meta tag.
+      web.archive.org, crt.sh, hstspreload.org, ipapi.co) if/when this repository adopts a CSP meta tag.
 - [ ] Visual polish pass (spacing, empty states, dark/light theme parity with
       the rest of InMo Tools) once functional scope is accepted.
 
 ## Verified/implemented so far (what a resuming agent can trust as tested)
+
+- 2026-10-04, `fix/site-intelligence-analyzer` from `main` @ `0153cf5a`: CrUX key field removed (Feature 28 not planned). `tests/unit/site-intel-no-api-key.test.ts` 2 passed (both fail against the previous source); `tests/e2e/site-intel.spec.ts` 10 passed on desktop and mobile Chromium, including "has no CrUX API key field, clears a previously stored key and never calls the CrUX API"; accessibility spec route `site-intelligence-analyzer` 2 passed; `tests/e2e/app.spec.ts` 18 passed; `tsc` clean; `pnpm build` passed.
 
 - 2026-09-27 completion slice: run `36323940637` passed Site Intelligence units, production build, Chromium install, and all 8 Site Intelligence browser executions on desktop/mobile after red-first proof (`36323072877`) established the missing resolver/minimap contracts. Feature 6 and Feature 13 are now Done.
 

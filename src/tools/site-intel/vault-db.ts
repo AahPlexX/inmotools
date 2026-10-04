@@ -65,3 +65,10 @@ export async function getSetting<T>(key: string): Promise<T | undefined> {
 export async function setSetting(key: string, value: unknown): Promise<void> {
   await getDb().settings.put({ key, value });
 }
+
+/** Settings rows from earlier versions that held a credential; the platform allows keyless sources only. */
+export const RETIRED_CREDENTIAL_SETTINGS = ['crux-api-key'] as const;
+
+export async function purgeRetiredCredentials(): Promise<void> {
+  await getDb().settings.bulkDelete([...RETIRED_CREDENTIAL_SETTINGS]);
+}

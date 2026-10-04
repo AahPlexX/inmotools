@@ -5,7 +5,7 @@
 // on narrow viewports, a dense multi-column grid on wide viewports (see
 // site-intel-workspace.css for the breakpoint rules).
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './site-intel-workspace.css';
 import { InfoBadge } from './components/InfoBadge';
 import { ScoreRadar } from './components/ScoreRadar';
@@ -24,14 +24,13 @@ import { fetchCtLog, summarizeSanSubdomains, assessCertificateExpiry, type CtRep
 import { checkHstsPreload, describeHstsPreload } from './hsts-engine';
 import { analyzeSchemeSecurity } from './mixed-content-engine';
 import { fetchMxRecords, validateSpf, inspectDmarc, checkBimi } from './email-auth-engine';
-import { fetchCruxReport, summarizeCrux } from './crux-engine';
 import { classifyCdn, fingerprintCms } from './fingerprint-engine';
 import { buildWellKnownPaths, previewWellKnownPath, type WellKnownPath } from './wellknown-engine';
 import { computeScorecard, type ScoreVector } from './scoring-engine';
 import { exportCsv, exportJson, exportMarkdown, exportPdf, type ReportMetadata } from './export-engine';
 import { renderSocialCard } from './social-card-engine';
 import { resolveShortUrl, type ShortUrlResolution } from './redirect-engine';
-import { deleteAudit, getSetting, listAudits, purgeAllAudits, saveAudit, setSetting } from './vault-db';
+import { deleteAudit, listAudits, purgeAllAudits, purgeRetiredCredentials, saveAudit } from './vault-db';
 import { downloadBlob, downloadText } from '../../lib/download';
 import type { AsyncTaskState, Finding, ParsedUrl } from './site-intel-types';
 import type { AuditRecord } from './site-intel-types';
@@ -99,12 +98,15 @@ export default function SiteIntelWorkspace() {
   const [dmarc, setDmarc] = useState(initialTask<{ findings: Finding[] }>());
   const [bimi, setBimi] = useState(initialTask<{ finding: Finding }>());
 
-  const [cruxKey, setCruxKey] = useState('');
-  const [crux, setCrux] = useState(initialTask<ReturnType<typeof summarizeCrux>>());
   const [cdnFindings, setCdnFindings] = useState<Finding[]>([]);
   const [cmsFindings, setCmsFindings] = useState<Finding[]>([]);
   const [wellKnown, setWellKnown] = useState<WellKnownPath[]>([]);
   const [wellKnownPreview, setWellKnownPreview] = useState<Record<string, { ok: boolean; body?: string; error?: string }>>({});
+
+  useEffect(() => {
+    // Removes the CrUX API key that earlier versions saved in this tool's IndexedDB settings.
+    void purgeRetiredCredentials().catch(() => undefined);
+  }, []);
 
   const [metadata, setMetadata] = useState<ReportMetadata>({ auditorName: '', organization: '', notes: '', auditTimestamp: Date.now() });
   const [vault, setVault] = useState<AuditRecord[]>([]);
@@ -140,9 +142,6 @@ export default function SiteIntelWorkspace() {
     setCaa({ status: 'loading' });
     setDnssec({ status: 'loading' });
     setDnsbl({ status: 'loading' });
-
-    const storedKey = await getSetting<string>('crux-api-key');
-    if (storedKey) setCruxKey(storedKey);
 
     const [dnsRes, rdapRes, waybackRes, ctRes, hstsRes, mxRes, spfRes, dmarcRes, bimiRes, caaRes, dnssecRes, dnsblRes] = await Promise.all([
       fetchDnsTable(hostname),
@@ -188,11 +187,6 @@ export default function SiteIntelWorkspace() {
     setCmsFindings(fingerprintCms(result.normalized));
     setWellKnown(buildWellKnownPaths(origin));
 
-    setCrux({ status: 'loading' });
-    const cruxRes = await fetchCruxReport(origin, storedKey ?? null);
-    if (cruxRes.status === 'ready' && cruxRes.data) setCrux({ status: 'ready', data: summarizeCrux(cruxRes.data), fetchedAt: Date.now() });
-    else setCrux({ status: cruxRes.status, error: cruxRes.error, blockedReason: cruxRes.blockedReason });
-
     setBusy(false);
     void v6; // reserved for future dual-stack detail panel
   }
@@ -202,11 +196,6 @@ export default function SiteIntelWorkspace() {
     setShortResolution({ status: 'loading' });
     const result = await resolveShortUrl(shortener.originalUrl);
     setShortResolution(result);
-  }
-
-  async function persistCruxKey(key: string) {
-    setCruxKey(key);
-    await setSetting('crux-api-key', key);
   }
 
   const scorecard = useMemo(() => {
@@ -237,10 +226,9 @@ export default function SiteIntelWorkspace() {
     }
 
     byVector.webStandards.push(...cmsFindings);
-    if (crux.data) byVector.webStandards.push(...crux.data);
 
     return computeScorecard(byVector);
-  }, [schemeFindings, homoglyphs, typosquats, dnsbl.data, ct.data, hsts.data, dmarc.data, spf.data, dnsTable.data, caa.data, dnssec.data, mx.data, bimi.data, nsRedundancy.data, anycast, hosting.data, cdnFindings, rdap, cmsFindings, crux.data]);
+  }, [schemeFindings, homoglyphs, typosquats, dnsbl.data, ct.data, hsts.data, dmarc.data, spf.data, dnsTable.data, caa.data, dnssec.data, mx.data, bimi.data, nsRedundancy.data, anycast, hosting.data, cdnFindings, rdap, cmsFindings]);
 
   const graphData: NodeGraphData = useMemo(() => {
     if (!parsed || !dnsTable.data) return { nodes: [], edges: [] };
@@ -455,10 +443,8 @@ export default function SiteIntelWorkspace() {
 
           <section className={`site-intel-section ${activeSection === 'performance' ? 'open' : ''}`} aria-labelledby="sec-perf">
             <h2 id="sec-perf">Performance & Tech</h2>
-            <label>CrUX API key (stored locally only) <InfoBadge term="core-web-vitals" />
-              <input type="password" value={cruxKey} onChange={(e) => void persistCruxKey(e.target.value)} placeholder="Optional — your own Google CrUX API key" />
-            </label>
-            <TaskPanel state={crux} render={(findings) => <ul className="finding-list">{findings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>} />
+            <h3>Core Web Vitals field data <InfoBadge term="core-web-vitals" /></h3>
+            <p className="site-intel-unavailable" data-testid="site-intel-crux-unavailable">Field data (Chrome UX Report: LCP, CLS, INP) is not available: Google's CrUX API needs an API key, and this tool uses only keyless public sources.</p>
             <h3>CDN / edge platform <InfoBadge term="cdn" /></h3>
             <ul className="finding-list">{cdnFindings.map((f) => <FindingRow key={f.id} finding={f} />)}</ul>
             <h3>CMS / platform fingerprint <InfoBadge term="cms-fingerprint" /></h3>
