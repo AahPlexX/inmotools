@@ -15,6 +15,7 @@ None.
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
 | [T-aethercast-20261003-2e02](items/T-aethercast-20261003-2e02.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-03 | Fetch live data only on the user's action |
+| [T-aethercast-20261004-3116](items/T-aethercast-20261004-3116.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-04 | Judge inversion night hours in the dataset's timezone |
 | [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-03 | Give the Fiber Craft spec the standard header block |
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-03 | Remove or replace the CrUX API key field |
@@ -28,9 +29,13 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
+| [T-aethercast-20261004-2d2d](items/T-aethercast-20261004-2d2d.md) | `aethercast` | expand | `expand/aethercast` | 2026-10-04 | Cover untested requirements |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
+| [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-geo-intelligence-hub-20261004-e828](items/T-geo-intelligence-hub-20261004-e828.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Cover untested requirements |
+| [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
+| [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 
 ## rejected
