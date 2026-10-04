@@ -8,6 +8,13 @@ const SENSITIVE_RULES: Array<{ risk: MetadataRisk; pattern: RegExp }> = [
   { risk: 'time', pattern: /datetime|create ?date|modify ?date|offset ?time|subsec|date ?stamp|^time$/i },
 ];
 
+// ExifReader's names for ICC colour-profile tags. They describe the colour profile, not the photo or its author.
+const ICC_PROFILE_TAGS = new Set([
+  'Preferred CMM type', 'Profile Version', 'Profile/Device class', 'Color Space', 'Connection Space', 'ICC Profile Date',
+  'ICC Signature', 'Primary Platform', 'Device Manufacturer', 'Device Model Number', 'Rendering Intent', 'Profile Creator',
+  'ICC Copyright', 'ICC Description', 'ICC Device Manufacturer for Display', 'ICC Device Model Description', 'ICC Viewing Conditions Description',
+]);
+
 export type MetadataRisk = 'location' | 'device' | 'identity' | 'time' | 'setting';
 export interface MetadataTag { description?: string | number; value?: unknown }
 export interface SensitiveMetadata { key: string; value: string }
@@ -102,7 +109,7 @@ export function classifyMetadata(tags: Record<string, MetadataTag | unknown>): C
   return Object.entries(tags)
     .filter(([key]) => key !== 'Thumbnail' && !key.startsWith('__'))
     .map(([key, raw]) => {
-      const rule = SENSITIVE_RULES.find((candidate) => candidate.pattern.test(key));
+      const rule = ICC_PROFILE_TAGS.has(key) ? undefined : SENSITIVE_RULES.find((candidate) => candidate.pattern.test(key));
       return { key, value: formatTagValue(raw), risk: rule?.risk ?? 'setting' };
     })
     .sort((left, right) => Number(left.risk === 'setting') - Number(right.risk === 'setting') || left.key.localeCompare(right.key));

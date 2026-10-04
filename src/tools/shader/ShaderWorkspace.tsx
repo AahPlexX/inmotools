@@ -381,6 +381,7 @@ export default function ShaderWorkspace() {
                 id={`shader-texture-${index}`}
                 type="file"
                 accept="image/*"
+                style={{ width: '100%', minWidth: 0 }}
                 onChange={(event) => consumeFileInput(event.target, () => loadTexture(event.target.files?.[0], index))}
               />
               {textures[index]

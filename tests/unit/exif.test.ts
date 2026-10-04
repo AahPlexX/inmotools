@@ -59,6 +59,21 @@ describe('EXIF scrubber helpers', () => {
     expect(listSensitiveMetadata({ Orientation: { description: 'Horizontal' } })).toEqual([]);
   });
 
+  it('EXF-R02 treats ICC colour-profile tags as settings, not identity fields', () => {
+    const found = classifyMetadata({
+      'ICC Copyright': { description: 'Copyright Google Inc. 2016' },
+      'Profile Creator': { description: 'Google' },
+      'ICC Description': { description: 'sRGB IEC61966-2.1' },
+      Artist: { description: 'Jane Doe' },
+      Copyright: { description: 'Jane Doe 2026' },
+    });
+    expect(found.find((item) => item.key === 'ICC Copyright')?.risk).toBe('setting');
+    expect(found.find((item) => item.key === 'Profile Creator')?.risk).toBe('setting');
+    expect(found.find((item) => item.key === 'ICC Description')?.risk).toBe('setting');
+    expect(found.find((item) => item.key === 'Artist')?.risk).toBe('identity');
+    expect(found.find((item) => item.key === 'Copyright')?.risk).toBe('identity');
+  });
+
   it('detects APNG animation control chunks before image data', () => {
     const bytes = new Uint8Array([
       137, ...asciiBytes('PNG'), 13, 10, 26, 10,

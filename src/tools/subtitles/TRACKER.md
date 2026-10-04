@@ -6,14 +6,14 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-01-subtitle-drift-design.md
 tracker: src/tools/subtitles/TRACKER.md
-updated: 2026-10-01
+updated: 2026-10-04
 ---
 
 # Subtitle Drift — tracker
 
 ## Resume here
 
-On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering test, 3 missing. The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: build SUB-R15. No other blocker.
+On `origin/main`. 19 requirements: 16 verified, 3 missing (SUB-R15, SUB-R18, SUB-R19). The catalog title promises waveform re-alignment (SUB-R15), which the tool does not have. Next action: build SUB-R15. No other blocker.
 
 ## Documents
 
@@ -38,13 +38,13 @@ On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering
 | SUB-R08 | verified | unit "retimes WebVTT inline timestamp tags…", "rejects WebVTT inline timestamps that are invalid or collapse…" | |
 | SUB-R09 | verified | unit "reports cues shifted below zero and refuses cues ending below zero" | |
 | SUB-R10 | verified | e2e "previews and applies drift correction without mutating the original WebVTT source" | |
-| SUB-R11 | implemented | — | |
+| SUB-R11 | verified | e2e "SUB-R11 a source or anchor change clears the old preview and asks for a new one" | |
 | SUB-R12 | verified | e2e "keeps the newest file or editor change when an older file read completes later" | |
-| SUB-R13 | implemented | — | |
-| SUB-R14 | implemented | e2e checks the `.vtt` download name | SRT download name has no test; counted implemented until both formats are covered |
+| SUB-R13 | verified | e2e "SUB-R13 the before/after table lists original and corrected times with text, 100 rows per page" | |
+| SUB-R14 | verified | e2e "previews and applies drift correction without mutating the original WebVTT source" (`.vtt`), e2e "SUB-R14 downloads an SRT input as <name>-corrected.srt in SRT format" | |
 | SUB-R15 | missing | — | Promised by the catalog title; not built |
 | SUB-R16 | verified | `tests/e2e/accessibility.spec.ts` route `subtitle-drift` | |
-| SUB-R17 | implemented | — | No viewport test for this route |
+| SUB-R17 | verified | e2e "SUB-R17 lays out without horizontal overflow at <name> px" | |
 | SUB-R18 | missing | — | Delivered through TASK-028 |
 | SUB-R19 | missing | — | Added 2026-10-02 |
 
@@ -52,8 +52,7 @@ On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering
 
 0. Build the requirements added 2026-10-02: SUB-R19.
 1. Build SUB-R15 (waveform); the owner chose building over changing the title (2026-10-02).
-2. Add tests for SUB-R11, R13, R14 (SRT), R17.
-3. SUB-R18 with TASK-028.
+2. SUB-R18 with TASK-028.
 
 ## Known limitations
 
@@ -61,9 +60,11 @@ On `origin/main`. 19 requirements: 12 verified, 4 implemented without a covering
 
 ## Verification evidence
 
+- 2026-10-04, `expand/subtitle-drift`: `pnpm build`; `PW_PORT=4205 pnpm exec playwright test tests/e2e/subtitles.spec.ts --repeat-each=3` 57 passed, 21 skipped (viewport matrix runs on the desktop project only), 0 failed. Covers SUB-R11, R13, R14 (SRT), R17.
 - 2026-10-01, `main` @ `f5d3385e`: `tests/unit/subtitles.test.ts` 13/13; `tests/e2e/subtitles.spec.ts` 6 passed (desktop and mobile); accessibility spec for the route 2 passed.
 
 ## Change log
 
+- 2026-10-04 — SUB-R11, R13, R14, R17 verified by new browser tests.
 - 2026-10-02 — Added SUB-R19 (default integration rule).
 - 2026-10-01 — Created per `docs/DOCUMENTATION_STANDARD.md`.
