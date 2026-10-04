@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   assessDataset,
   assessHour,
@@ -9,7 +9,7 @@ import {
   ugM3ToPpm,
 } from '../../src/tools/aethercast/aethercast-engine';
 import { buildActivityWindows } from '../../src/tools/aethercast/aethercast-activity';
-import { detectAnomalies } from '../../src/tools/aethercast/aethercast-anomaly';
+import { datasetLocalHour, detectAnomalies } from '../../src/tools/aethercast/aethercast-anomaly';
 import { parseCsvWithMapping, parseTimestampInZone } from '../../src/tools/aethercast/aethercast-import';
 import type { AetherCastDataset, AetherCastSettings, HourlyAtmosphericPoint } from '../../src/tools/aethercast/aethercast-types';
 
@@ -225,8 +225,8 @@ describe('CSV and timezone import', () => {
 
 describe('screening anomalies', () => {
   const localHourSeries = (startHour: number, values: Array<Partial<HourlyAtmosphericPoint>>): HourlyAtmosphericPoint[] => values.map((overrides, index) => {
-    const local = new Date(2026, 5, 1, startHour + index, 0, 0);
-    return point({ ...overrides, epochMs: local.getTime(), isoTimestamp: local.toISOString() });
+    const wall = new Date(Date.UTC(2026, 5, 1, startHour + index, 0, 0));
+    return point({ ...overrides, epochMs: wall.getTime(), isoTimestamp: wall.toISOString().slice(0, 19) });
   });
 
   it('AEC-R14 lists wildfire and thermal-inversion screens and ignores steady air', () => {
@@ -257,5 +257,52 @@ describe('screening anomalies', () => {
     expect(daytime).toEqual([]);
 
     expect(detectAnomalies(hourlySeries(24, { pm25: 8, nitrogenDioxide: 15, windSpeedMs: 2 }))).toEqual([]);
+  });
+});
+
+describe('inversion night hours in the dataset timezone', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    if (originalTz === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  const calmRising = [
+    { pm25: 10, nitrogenDioxide: 20, windSpeedMs: 0.5 },
+    { pm25: 12, nitrogenDioxide: 24, windSpeedMs: 0.6 },
+    { pm25: 14, nitrogenDioxide: 28, windSpeedMs: 0.4 },
+  ];
+  const offsetSeries = (isoTimestamps: string[]): HourlyAtmosphericPoint[] => isoTimestamps.map((iso, index) => point({
+    ...calmRising[index], isoTimestamp: iso, epochMs: Date.parse(iso),
+  }));
+
+  for (const viewerZone of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo', 'Pacific/Kiritimati']) {
+    it(`AEC-R23 judges explicit-offset timestamps by their own offset in a ${viewerZone} browser`, () => {
+      process.env.TZ = viewerZone;
+      const daytime = offsetSeries(['2026-06-01T12:00:00+09:00', '2026-06-01T13:00:00+09:00', '2026-06-01T14:00:00+09:00']);
+      expect(detectAnomalies(daytime, 'UTC')).toEqual([]);
+      expect(detectAnomalies(daytime, null)).toEqual([]);
+
+      const overnight = offsetSeries(['2026-06-01T21:00:00+09:00', '2026-06-01T22:00:00+09:00', '2026-06-01T23:00:00+09:00']);
+      expect(detectAnomalies(overnight, 'UTC')).toEqual([expect.objectContaining({ type: 'THERMAL_INVERSION', peakTimestamp: '2026-06-01T23:00:00+09:00' })]);
+    });
+
+    it(`AEC-R23 judges UTC (Z) timestamps in the dataset's IANA timezone in a ${viewerZone} browser`, () => {
+      process.env.TZ = viewerZone;
+      // 06:00–08:00Z is 02:00–04:00 in New York (EDT, UTC-4), 15:00–17:00 in Tokyo and daytime in UTC.
+      const series = offsetSeries(['2026-06-01T06:00:00Z', '2026-06-01T07:00:00Z', '2026-06-01T08:00:00Z']);
+      expect(detectAnomalies(series, 'America/New_York')).toHaveLength(1);
+      expect(detectAnomalies(series, 'Asia/Tokyo')).toEqual([]);
+      expect(detectAnomalies(series, null)).toEqual([]);
+      expect(detectAnomalies(series, 'Not/AZone')).toEqual([]);
+    });
+  }
+
+  it('AEC-R23 reads the local hour of wall-clock, offset and Z timestamps without the viewer timezone', () => {
+    process.env.TZ = 'Asia/Kolkata';
+    expect(datasetLocalHour({ isoTimestamp: '2026-06-01T05:00', epochMs: Date.parse('2026-06-01T10:00:00Z') }, 'America/Chicago')).toBe(5);
+    expect(datasetLocalHour({ isoTimestamp: '2026-06-01 14:30:00 -0500', epochMs: Date.parse('2026-06-01T19:30:00Z') }, null)).toBe(14);
+    expect(datasetLocalHour({ isoTimestamp: '2026-06-01T14:00:00.000Z', epochMs: Date.parse('2026-06-01T14:00:00Z') }, 'America/Chicago')).toBe(9);
+    expect(datasetLocalHour({ isoTimestamp: '2026-06-01T14:00:00Z', epochMs: Date.parse('2026-06-01T14:00:00Z') }, null)).toBe(14);
   });
 });
