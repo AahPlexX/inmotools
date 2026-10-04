@@ -226,6 +226,10 @@ The fixed 8-track ceiling is a real competitive limitation for larger music/podc
 - Timeline clip selection is keyboard-accessible, but direct manipulation is missing; adding tooltips alone would not solve the core discoverability/efficiency gap.
 - Native-title tooltips should not be introduced as a general solution. Prefer visible contextual help, labels, status feedback, or a shared accessible tooltip/popover primitive only where supplemental explanation is genuinely needed.
 
+## Post-integration fixes
+
+- **2026-10-04, realtime-chain browser test under load** (`.tasks/items/T-audio-mastering-20261004-d7fa.md`): "masters the mix with the realtime chain, meters, monitoring, and an offline render" in `tests/e2e/mastering.spec.ts` played the 6 s mix without loop, so on a loaded host playback finished before the final Pause and the button was correctly disabled (`idle`, playhead 0:06.000); with that fixed, the whole flow still took up to 40 s against the 30 s default. The test now turns Loop on before Play, waits for "Playing with loop on" and an enabled Pause before monitoring and before pausing, and has a 90 s timeout with the reason in a comment. No product change: Pause is disabled only when playback is not running.
+
 ## Acceptance contract for any parity phase
 
 Every accepted parity feature must:
