@@ -20,6 +20,7 @@ Unit coverage lives in `tests/unit/exif.test.ts`. Browser coverage lives in `tes
 
 ## Fixes
 
+- 2026-10-04 — ICC colour-profile tags (`ICC Copyright`, `Profile Creator`) were classified as identity fields, so a JPEG stripped with its colour profile kept was reported as still carrying privacy fields. `classifyMetadata` now treats ExifReader's ICC tag names as settings; unit "EXF-R02 treats ICC colour-profile tags as settings, not identity fields".
 - 2026-10-01 — Browser test `exif.spec.ts` "supports batch ZIP, per-file removal…" clicked the first button named like "Remove", which since the audit is a help tip whose text says "removed". It now clicks `Remove first.png` exactly. The tool itself was correct.
 
 ## Standard documents
