@@ -422,6 +422,9 @@ test('runs every restoration tool on a clip or a selection', async ({ page }) =>
 });
 
 test('masters the mix with the realtime chain, meters, monitoring, and an offline render', async ({ page }) => {
+  // About 45 UI steps plus an offline render and loudness measurement of the master: on a host
+  // with every core busy each step slows down and the whole flow takes longer than the 30 s default.
+  test.setTimeout(90_000);
   await page.goto('./#/tools/audio-mastering');
   await expect(page.getByRole('heading', { name: 'Audio mastering workstation' })).toBeVisible({ timeout: 20_000 });
   await page.locator('.mastering-import input[type="file"][multiple]').setInputFiles({ name: 'song.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(6, 48_000, 440) });
@@ -462,8 +465,13 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await expect(transport.getByRole('radio', { name: 'Reference', exact: true })).toBeDisabled();
   await page.getByRole('tabpanel', { name: 'Meters' }).locator('.mastering-file-secondary input[type="file"]').setInputFiles({ name: 'reference.wav', mimeType: 'audio/wav', buffer: makeMonoPcm16Wav(4, 44_100, 330) });
   await expect(status).toContainText(/Loaded reference\.wav as the reference/);
+  // The mix is 6 s long and the monitoring steps below can take longer than that on a loaded host;
+  // looping keeps playback running until the test pauses it instead of letting it finish.
+  await transport.getByLabel('Loop', { exact: true }).check();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+  const pauseButton = page.getByRole('button', { name: 'Pause', exact: true });
+  await expect(pauseButton).toBeEnabled();
+  await expect(status).toContainText(/Playing with loop on/);
   await expect(status).not.toContainText(/without the master chain/);
   await transport.getByRole('radio', { name: 'Reference', exact: true }).click();
   await expect(status).toContainText(/reference track, loudness-matched/);
@@ -476,7 +484,8 @@ test('masters the mix with the realtime chain, meters, monitoring, and an offlin
   await transport.getByRole('radio', { name: 'Processed', exact: true }).click();
   await expect(transport.getByRole('radio', { name: 'Processed', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('meter', { name: 'Phase correlation' })).toBeVisible();
-  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(pauseButton).toBeEnabled();
+  await pauseButton.click();
   await expect(status).toContainText(/Paused at/);
 });
 

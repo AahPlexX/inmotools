@@ -7,7 +7,33 @@ const INVERSION_WIND_THRESHOLD_MS = 1.5;
 const NIGHT_START_HOUR = 20;
 const NIGHT_END_HOUR = 6;
 
-export function detectAnomalies(points: readonly HourlyAtmosphericPoint[]): AnomalyEvent[] {
+const TIMESTAMP_HOUR = /^\d{4}-\d{2}-\d{2}[T ](\d{2}):\d{2}(?::\d{2}(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i;
+
+const hourInZone = (epochMs: number, timeZone: string): number | null => {
+  try {
+    const hour = new Intl.DateTimeFormat('en-US', { timeZone, hour: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(epochMs))
+      .find((part) => part.type === 'hour')?.value;
+    return hour === undefined ? null : Number(hour) % 24;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Hour of day at the dataset's location, independent of the viewer's timezone.
+ * Wall-clock timestamps and timestamps with a numeric UTC offset carry the location's hour as written;
+ * `Z` timestamps use the dataset's IANA timezone when one is valid, otherwise UTC.
+ */
+export function datasetLocalHour(point: Pick<HourlyAtmosphericPoint, 'isoTimestamp' | 'epochMs'>, timeZone: string | null = null): number {
+  const match = TIMESTAMP_HOUR.exec(point.isoTimestamp.trim());
+  const zone = match?.[2];
+  if (match && (!zone || zone.toUpperCase() !== 'Z')) return Number(match[1]);
+  const zoned = timeZone ? hourInZone(point.epochMs, timeZone) : null;
+  return zoned ?? new Date(point.epochMs).getUTCHours();
+}
+
+export function detectAnomalies(points: readonly HourlyAtmosphericPoint[], timeZone: string | null = null): AnomalyEvent[] {
   const events: AnomalyEvent[] = [];
 
   for (let index = 1; index < points.length; index += 1) {
@@ -45,7 +71,7 @@ export function detectAnomalies(points: readonly HourlyAtmosphericPoint[]): Anom
       continue;
     }
 
-    const localHour = new Date(window[2].isoTimestamp).getHours();
+    const localHour = datasetLocalHour(window[2], timeZone);
     const isNight = localHour >= NIGHT_START_HOUR || localHour < NIGHT_END_HOUR;
     const calmThroughout = window.every((point) => (point.windSpeedMs as number) < INVERSION_WIND_THRESHOLD_MS);
     const pm25Rising = (window[0].pm25 as number) < (window[1].pm25 as number) && (window[1].pm25 as number) < (window[2].pm25 as number);

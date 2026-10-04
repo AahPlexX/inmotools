@@ -130,9 +130,17 @@
   min-width: 0;
 }
 
-.aethercast-live-source button {
+.aethercast-live-source > button,
+.aethercast-live-actions {
   grid-column: 2;
   grid-row: 1 / span 3;
+}
+
+.aethercast-live-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .aethercast-live-source a {
@@ -402,7 +410,8 @@
 
   .aethercast-live-source strong,
   .aethercast-live-source span,
-  .aethercast-live-source button {
+  .aethercast-live-source > button,
+  .aethercast-live-actions {
     grid-column: 1;
     grid-row: auto;
   }
