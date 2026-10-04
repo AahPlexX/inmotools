@@ -34,7 +34,6 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 
 | Area | Fact | Rule |
 | --- | --- | --- |
-| Site Intelligence Analyzer | Has an optional "CrUX API key" field (`SiteIntelWorkspace.tsx`, stored locally). | No API keys |
 | Fiber Craft Workstation | Its spec has no standard header block, so `tool:check` reports it as pending. | Documentation standard |
 | 21 tools | No standard spec and tracker yet (`pnpm tool:check --all`). Specs are the next workstream. | Documentation standard |
 | 17 standardized tools | 54 requirements are `missing` (`pnpm tool:check --all`). | Default integration rule |

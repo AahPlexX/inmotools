@@ -16,6 +16,6 @@ export default {
     "Review lexical forensics, DNS/network, registration, TLS, email-auth, and performance sections; every technical term has an info badge.",
     "Review the composite scorecard, edit audit metadata, then export a report or save it to the local vault.",
   ],
-  hint: "This is a deterministic, telemetry-and-heuristics tool — it does not use AI/ML models, headless scraping, port scanning, or active exploitation. Some data sources (Certificate Transparency, Core Web Vitals) depend on third-party service availability or a user-supplied API key and degrade gracefully when unavailable.",
+  hint: "This is a deterministic, telemetry-and-heuristics tool — it does not use AI/ML models, headless scraping, port scanning, or active exploitation. Some data sources (Certificate Transparency) depend on third-party service availability and degrade gracefully when unavailable. Core Web Vitals field data is not offered, because Google's CrUX API needs an API key.",
   load: () => import('./SiteIntelWorkspace'),
 } satisfies ToolMeta;
