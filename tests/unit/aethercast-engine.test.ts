@@ -9,6 +9,7 @@ import {
   ugM3ToPpm,
 } from '../../src/tools/aethercast/aethercast-engine';
 import { buildActivityWindows } from '../../src/tools/aethercast/aethercast-activity';
+import { detectAnomalies } from '../../src/tools/aethercast/aethercast-anomaly';
 import { parseCsvWithMapping, parseTimestampInZone } from '../../src/tools/aethercast/aethercast-import';
 import type { AetherCastDataset, AetherCastSettings, HourlyAtmosphericPoint } from '../../src/tools/aethercast/aethercast-types';
 
@@ -219,5 +220,42 @@ describe('CSV and timezone import', () => {
     expect(result.dataset?.points[0].ozone).toBeCloseTo(98.16, 1);
     expect(result.dataset?.points[0].carbonMonoxideUgM3).toBeCloseTo(1374.7, 0);
     expect(result.dataset?.points[0].uvIndex).toBe(4);
+  });
+});
+
+describe('screening anomalies', () => {
+  const localHourSeries = (startHour: number, values: Array<Partial<HourlyAtmosphericPoint>>): HourlyAtmosphericPoint[] => values.map((overrides, index) => {
+    const local = new Date(2026, 5, 1, startHour + index, 0, 0);
+    return point({ ...overrides, epochMs: local.getTime(), isoTimestamp: local.toISOString() });
+  });
+
+  it('AEC-R14 lists wildfire and thermal-inversion screens and ignores steady air', () => {
+    const corroborated = detectAnomalies(localHourSeries(12, [
+      { pm25: 10, carbonMonoxideUgM3: 200 },
+      { pm25: 60, carbonMonoxideUgM3: 200 },
+    ]));
+    expect(corroborated).toHaveLength(1);
+    expect(corroborated[0]).toMatchObject({ type: 'WILDFIRE_SCREEN', confirmed: true });
+
+    const uncorroborated = detectAnomalies(localHourSeries(12, [{ pm25: 10 }, { pm25: 60 }]));
+    expect(uncorroborated).toHaveLength(1);
+    expect(uncorroborated[0]).toMatchObject({ type: 'WILDFIRE_SCREEN', confirmed: false });
+
+    const inversion = detectAnomalies(localHourSeries(21, [
+      { pm25: 10, nitrogenDioxide: 20, windSpeedMs: 0.5 },
+      { pm25: 12, nitrogenDioxide: 24, windSpeedMs: 0.6 },
+      { pm25: 14, nitrogenDioxide: 28, windSpeedMs: 0.4 },
+    ]));
+    expect(inversion).toHaveLength(1);
+    expect(inversion[0]).toMatchObject({ type: 'THERMAL_INVERSION', confirmed: true });
+
+    const daytime = detectAnomalies(localHourSeries(10, [
+      { pm25: 10, nitrogenDioxide: 20, windSpeedMs: 0.5 },
+      { pm25: 12, nitrogenDioxide: 24, windSpeedMs: 0.6 },
+      { pm25: 14, nitrogenDioxide: 28, windSpeedMs: 0.4 },
+    ]));
+    expect(daytime).toEqual([]);
+
+    expect(detectAnomalies(hourlySeries(24, { pm25: 8, nitrogenDioxide: 15, windSpeedMs: 2 }))).toEqual([]);
   });
 });
