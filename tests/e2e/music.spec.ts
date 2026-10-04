@@ -159,6 +159,8 @@ test('loops a snapshot, identifies the active chord, and applies edits on the ne
 
   await page.getByTestId('midi-stop').click();
   await page.getByLabel('Loop audition').uncheck();
+  // A 4-beat chord (0.8 s at 300 BPM) stays active long enough to be observed.
+  await page.getByLabel('Beats').fill('4');
   await page.getByRole('button', { name: 'Play progression' }).click();
   await expect(page.getByTestId('midi-active-chord')).toContainText(/Chord 1.*D4/i);
 });
@@ -191,3 +193,59 @@ test('saves and loads a versioned progression JSON document', async ({ page }) =
   for await (const chunk of stream) chunks.push(chunk as Buffer);
   expect(JSON.parse(Buffer.concat(chunks).toString('utf8'))).toEqual(imported);
 });
+
+test('MHL-R04 adds, removes (keeping one) and moves chords earlier or later', async ({ page }) => {
+  await gotoHarmony(page);
+  const roots = () => page.locator('input[id^="root-"]').evaluateAll((items) => items.map((item) => (item as HTMLInputElement).value));
+  const qualities = () => page.locator('select[id^="quality-"]').evaluateAll((items) => items.map((item) => (item as HTMLSelectElement).value));
+  expect(await roots()).toEqual(['C4', 'F4', 'G4', 'C4']);
+  await page.locator('#root-1').fill('A4');
+  await page.locator('#quality-1').selectOption('minor');
+
+  await page.getByRole('button', { name: 'Move chord 2 earlier' }).click();
+  expect(await roots()).toEqual(['A4', 'C4', 'G4', 'C4']);
+  expect(await qualities()).toEqual(['minor', 'major', 'major', 'major']);
+  await expect(page.locator('#inv-0')).toHaveValue('1');
+  await page.getByRole('button', { name: 'Move chord 1 later' }).click();
+  await page.getByRole('button', { name: 'Move chord 2 later' }).click();
+  expect(await roots()).toEqual(['C4', 'G4', 'A4', 'C4']);
+  await expect(page.getByRole('button', { name: 'Move chord 1 earlier' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Move chord 4 later' })).toBeDisabled();
+  await expect(page.getByTestId('chord-notes-2')).toContainText('MIDI notes: 72 · 76 · 81');
+
+  await page.getByTestId('midi-add-chord').click();
+  expect(await roots()).toEqual(['C4', 'G4', 'A4', 'C4', 'C4']);
+  await page.getByRole('button', { name: 'Remove chord 2' }).click();
+  expect(await roots()).toEqual(['C4', 'A4', 'C4', 'C4']);
+  for (const chord of [4, 3, 2]) await page.getByRole('button', { name: `Remove chord ${chord}` }).click();
+  expect(await roots()).toEqual(['C4']);
+  await expect(page.getByRole('button', { name: 'Remove chord 1' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Move chord 1 earlier' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Move chord 1 later' })).toBeDisabled();
+});
+
+for (const width of [320, 375, 768, 1024, 1440, 1920, 2560]) {
+  test(`MHL-R13 lays out without horizontal overflow and keeps controls usable at ${width} px`, async ({ page, isMobile }) => {
+    test.skip(isMobile, 'viewport matrix runs on the desktop project');
+    await installAudioProbe(page);
+    await page.setViewportSize({ width, height: width < 800 ? 800 : 1000 });
+    await gotoHarmony(page);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    for (const name of ['Play progression', 'Stop', 'Add chord', 'Export MIDI', 'Save progression JSON', 'Move chord 2 earlier', 'Remove chord 1']) {
+      const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+      expect(box && box.x >= 0 && box.x + box.width <= width + 1 && box.width >= 24 && box.height >= 24, `${name} inside viewport at ${width}px`).toBe(true);
+    }
+    for (const id of ['bpm', 'root-0', 'quality-0', 'inv-0', 'beats-0']) {
+      const box = await page.locator(`#${id}`).boundingBox();
+      expect(box && box.x >= 0 && box.x + box.width <= width + 1, `#${id} inside viewport at ${width}px`).toBe(true);
+    }
+    await page.getByTestId('midi-add-chord').click();
+    await expect(page.locator('[data-testid^="chord-notes-"]')).toHaveCount(5);
+    await page.getByRole('button', { name: 'Play progression' }).click();
+    await expect(page.getByTestId('midi-stop')).toBeEnabled();
+    await page.getByTestId('midi-stop').click();
+    await expect(page.getByTestId('midi-stop')).toBeDisabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  });
+}
