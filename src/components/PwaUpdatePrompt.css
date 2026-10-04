@@ -72,26 +72,25 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .pwa-update-prompt {
-    border-color: #475569;
-    background: #0f172a;
-    color: #f8fafc;
-  }
+/* Follows the site theme (data-theme on <html>, see src/lib/theme.ts). */
+:root[data-theme="dark"] .pwa-update-prompt {
+  border-color: #475569;
+  background: #0f172a;
+  color: #f8fafc;
+}
 
-  .pwa-update-copy span {
-    color: #cbd5e1;
-  }
+:root[data-theme="dark"] .pwa-update-copy span {
+  color: #cbd5e1;
+}
 
-  .pwa-update-primary {
-    border-color: #f8fafc;
-    background: #f8fafc;
-    color: #0f172a;
-  }
+:root[data-theme="dark"] .pwa-update-primary {
+  border-color: #f8fafc;
+  background: #f8fafc;
+  color: #0f172a;
+}
 
-  .pwa-update-secondary {
-    border-color: #64748b;
-    background: #1e293b;
-    color: #f8fafc;
-  }
+:root[data-theme="dark"] .pwa-update-secondary {
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f8fafc;
 }

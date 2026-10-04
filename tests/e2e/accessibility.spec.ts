@@ -7,6 +7,14 @@ const TOOLS = await loadTools();
 // Driven from the catalog so a newly registered tool is audited without editing this file.
 const routes = ['./', ...TOOLS.map((tool) => `./#/tools/${tool.slug}`)];
 
+// E2E_THEME=dark (or light) audits every route with that site theme stored; unset keeps the default.
+const theme = process.env.E2E_THEME;
+if (theme) {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((value) => { window.localStorage.setItem('inmotools.theme.v1', value); }, theme);
+  });
+}
+
 for (const route of routes) {
   test(`has no serious or critical axe violations at ${route}`, async ({ page }) => {
     await page.goto(route);

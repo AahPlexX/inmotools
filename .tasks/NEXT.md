@@ -14,6 +14,7 @@ Tag `archive/site-intel-local-20260918` (commits `f8e79f8c`…`73a6f080`, 2026-0
 The two lines diverge (for example `GeoMinimap.tsx` and `shortener-resolver.ts` on the archive, `GeoIpMap.tsx` on main), so this is a feature-by-feature port onto main's code with tests, not a merge. Keep the tag until this task is done.
 
 ## TASK-028: One site-wide theme selector (light, dark, follow system)
+Shared part done in `f9d5c9b1`; per-tool theme requirements continue in each tool.
 **Priority:** P2 | **Tags:** theme, accessibility, site-shell
 
 One selector in the site header sets the theme for the shell and every tool, instead of a dark mode per tool. Awaiting the owner's go-ahead on the plan below.

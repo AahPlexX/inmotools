@@ -29,7 +29,7 @@ export function ToolLayout({ tool, children }: { tool: ToolDefinition; children:
   );
 
   return (
-    <div className={`suite-page${tool.workspaceFirst ? ' suite-page--workspace-first' : ''}`}>
+    <div className={`suite-page${tool.workspaceFirst ? ' suite-page--workspace-first' : ''}`} data-tool={tool.slug}>
       <div className="suite-topline">
         <a className="back-link" href="#/">← All tools</a>
         <button className="favorite-button" type="button" onClick={() => toggleFavorite(tool.slug)} aria-pressed={favorite}>
