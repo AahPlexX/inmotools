@@ -3,10 +3,10 @@ task: T-site-intelligence-analyzer-20261003-ba98
 tool: site-intelligence-analyzer
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/site-intelligence-analyzer
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Remove or replace the CrUX API key field
@@ -19,3 +19,4 @@ Not started. Record the requirement as `not planned` (needs a key) and remove th
 
 ## Log
 - 2026-10-03: recorded.
+- 2026-10-04: claimed `fix/site-intelligence-analyzer`.
