@@ -35,6 +35,7 @@ None.
 | [T-font-subsetter-20261004-20c0](items/T-font-subsetter-20261004-20c0.md) | `font-subsetter` | expand | `expand/font-subsetter` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
+| [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
 | [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 
