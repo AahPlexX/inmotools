@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// PW_PORT lets parallel worktrees each serve their own build (default 4173).
+const port = Number(process.env.PW_PORT ?? 4173);
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['line']] : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173/inmotools/',
+    baseURL: `http://127.0.0.1:${port}/inmotools/`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -17,8 +20,8 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
   ],
   webServer: {
-    command: 'pnpm preview --host 127.0.0.1 --port 4173',
-    url: 'http://127.0.0.1:4173/inmotools/',
+    command: `pnpm preview --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}/inmotools/`,
     reuseExistingServer: !process.env.CI,
   },
 });
