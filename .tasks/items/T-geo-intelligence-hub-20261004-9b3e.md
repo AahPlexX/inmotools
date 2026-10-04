@@ -3,7 +3,7 @@ task: T-geo-intelligence-hub-20261004-9b3e
 tool: geo-intelligence-hub
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/geo-intelligence-hub
 created: 2026-10-04
 updated: 2026-10-04
@@ -19,3 +19,4 @@ Not started. Reproduce, make the test deterministic, run it 20 times.
 
 ## Log
 - 2026-10-04: recorded during the untested-requirement coverage pass.
+- 2026-10-04: claimed `fix/geo-intelligence-hub`.
