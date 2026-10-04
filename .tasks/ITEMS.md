@@ -14,8 +14,6 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
-| [T-aethercast-20261003-2e02](items/T-aethercast-20261003-2e02.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-03 | Fetch live data only on the user's action |
-| [T-aethercast-20261004-3116](items/T-aethercast-20261004-3116.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-04 | Judge inversion night hours in the dataset's timezone |
 | [T-audio-mastering-20261004-5d02](items/T-audio-mastering-20261004-5d02.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Stop mastering loudness unit tests timing out under load |
 | [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-03 | Give the Fiber Craft spec the standard header block |
 | [T-geo-intelligence-hub-20261004-9b3e](items/T-geo-intelligence-hub-20261004-9b3e.md) | `geo-intelligence-hub` | fix | `fix/geo-intelligence-hub` | 2026-10-04 | Find the cause of a one-off axe failure |
@@ -32,7 +30,9 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
+| [T-aethercast-20261003-2e02](items/T-aethercast-20261003-2e02.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-04 | Fetch live data only on the user's action |
 | [T-aethercast-20261004-2d2d](items/T-aethercast-20261004-2d2d.md) | `aethercast` | expand | `expand/aethercast` | 2026-10-04 | Cover untested requirements |
+| [T-aethercast-20261004-3116](items/T-aethercast-20261004-3116.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-04 | Judge inversion night hours in the dataset's timezone |
 | [T-apca-token-matrix-20261004-0c8f](items/T-apca-token-matrix-20261004-0c8f.md) | `apca-token-matrix` | expand | `expand/apca-token-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |

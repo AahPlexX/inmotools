@@ -162,13 +162,16 @@ const loadFixture = async (page: Page) => {
   await expect(page.getByRole('table')).toBeVisible();
 };
 
-test('AetherCast loads live Open-Meteo data from browser geolocation without requiring an upload', async ({ page, context }) => {
+test('AEC-R01 loads live Open-Meteo data from browser geolocation after Use my location, without an upload', async ({ page, context }) => {
   await freezeBrowserNow(page);
   const { airRequests, weatherRequests } = await installLiveApiMocks(page);
   await context.setGeolocation({ latitude: 30.404, longitude: -90.155 });
   await context.grantPermissions(['geolocation']);
 
   await page.goto('./#/tools/aethercast');
+  await expect(page.getByRole('heading', { name: 'Live air quality & UV' })).toBeVisible();
+  expect(airRequests).toHaveLength(0);
+  await page.getByRole('button', { name: 'Use my location' }).click();
 
   await expect(page.getByRole('table')).toBeVisible();
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Current location');
@@ -228,11 +231,12 @@ for (const search of [
   });
 }
 
-test('AetherCast keeps a manually selected location when initial geolocation resolves late', async ({ page }) => {
+test('AEC-R05 keeps a manually selected location when a requested geolocation resolves late', async ({ page }) => {
   await freezeBrowserNow(page);
   const { airRequests } = await installLiveApiMocks(page);
   await installDelayedGeolocation(page);
   await page.goto('./#/tools/aethercast');
+  await page.getByRole('button', { name: 'Use my location' }).click();
 
   await page.getByLabel('Search city or postal code').fill('Madisonville, LA');
   await page.getByRole('button', { name: 'Search locations' }).click();
@@ -245,11 +249,12 @@ test('AetherCast keeps a manually selected location when initial geolocation res
   expect(airRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
 });
 
-test('AetherCast keeps an imported fallback dataset when initial geolocation resolves late', async ({ page }) => {
+test('AEC-R05 keeps an imported fallback dataset when a requested geolocation resolves late', async ({ page }) => {
   await freezeBrowserNow(page);
   const { airRequests } = await installLiveApiMocks(page);
   await installDelayedGeolocation(page);
   await page.goto('./#/tools/aethercast');
+  await page.getByRole('button', { name: 'Use my location' }).click();
 
   await page.getByLabel('Import an air quality and UV data file').setInputFiles({
     name: 'air-quality.json',
@@ -355,7 +360,7 @@ const chooseMadisonville = async (page: Page) => {
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
 };
 
-test('AEC-R03 reloads the remembered location from this browser on reopen', async ({ page }) => {
+test('AEC-R03 remembers the chosen location and loads it on reopen only after Load live data', async ({ page }) => {
   await freezeBrowserNow(page);
   const { airRequests, geocodingRequests } = await installLiveApiMocks(page);
   await page.goto('./#/tools/aethercast');
@@ -367,15 +372,23 @@ test('AEC-R03 reloads the remembered location from this browser on reopen', asyn
   const airBeforeReload = airRequests.length;
   await page.reload();
 
+  const remembered = page.getByTestId('aethercast-remembered-location');
+  await expect(remembered).toContainText('Remembered location: Madisonville, Louisiana, United States');
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(airRequests).toHaveLength(airBeforeReload);
+
+  await remembered.getByRole('button', { name: 'Load live data' }).click();
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
   await expect(page.getByRole('table')).toBeVisible();
+  await expect(remembered).toHaveCount(0);
   expect(geocodingRequests).toHaveLength(searchesBeforeReload);
-  await expect.poll(() => airRequests.length).toBeGreaterThan(airBeforeReload);
+  await expect.poll(() => airRequests.length).toBe(airBeforeReload + 1);
   expect(airRequests.at(-1)?.searchParams.get('latitude')).toBe('30.404');
   expect(airRequests.at(-1)?.searchParams.get('longitude')).toBe('-90.155');
 });
 
-test('AEC-R04 refreshes live data on Refresh now and every 15 minutes', async ({ page }) => {
+test('AEC-R04 refreshes live data on Refresh now and every 15 minutes after the user starts it, until stopped', async ({ page }) => {
   await page.clock.install({ time: FIXED_NOW });
   const { airRequests, weatherRequests } = await installLiveApiMocks(page);
   await page.goto('./#/tools/aethercast');
@@ -395,7 +408,74 @@ test('AEC-R04 refreshes live data on Refresh now and every 15 minutes', async ({
   await expect.poll(() => airRequests.length).toBe(afterManual + 1);
   await expect.poll(() => weatherRequests.length).toBe(weatherAfterManual + 1);
   await expect(page.getByTestId('aethercast-live-source')).toContainText('Madisonville, Louisiana, United States');
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Refreshes every 15 minutes until you stop it');
+
+  await page.getByRole('button', { name: 'Stop auto refresh' }).click();
+  await expect(page.getByTestId('aethercast-live-source')).toContainText('Automatic refresh is off.');
+  const afterStop = airRequests.length;
+  await page.clock.runFor(2 * 15 * 60_000 + 1_000);
+  expect(airRequests).toHaveLength(afterStop);
+
+  await page.getByRole('button', { name: 'Resume auto refresh' }).click();
+  await page.clock.runFor(15 * 60_000 + 1_000);
+  await expect.poll(() => airRequests.length).toBe(afterStop + 1);
 });
+
+const installGeolocationSpy = async (page: Page) => {
+  await page.addInitScript(() => {
+    const calls = { count: 0 };
+    Object.defineProperty(window, '__aethercastGeolocationCalls', { value: calls });
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition() { calls.count += 1; },
+        watchPosition() { calls.count += 1; return 0; },
+        clearWatch() {},
+      },
+    });
+  });
+};
+
+for (const remembered of [false, true]) {
+  test(`AEC-R24 opening the tool ${remembered ? 'with' : 'without'} a remembered location makes no network request and no geolocation call`, async ({ page, baseURL }) => {
+    await page.clock.install({ time: FIXED_NOW });
+    const { airRequests, weatherRequests, geocodingRequests } = await installLiveApiMocks(page);
+    await installGeolocationSpy(page);
+    if (remembered) {
+      await page.addInitScript(() => {
+        window.localStorage.setItem('inmotools.aethercast.live-location.v1', JSON.stringify({
+          version: 1,
+          location: { label: 'Madisonville, Louisiana, United States', latitude: 30.404, longitude: -90.155, timezone: 'America/Chicago' },
+        }));
+      });
+    }
+    const siteOrigin = new URL(baseURL!).origin;
+    const foreignRequests: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.protocol.startsWith('http') && url.origin !== siteOrigin) foreignRequests.push(request.url());
+    });
+
+    await page.goto('./#/tools/aethercast');
+    await expect(page.getByRole('heading', { name: 'Live air quality & UV' })).toBeVisible();
+    if (remembered) {
+      const card = page.getByTestId('aethercast-remembered-location');
+      await expect(card).toContainText('Remembered location: Madisonville, Louisiana, United States');
+      await expect(card.getByRole('button', { name: 'Load live data' })).toBeEnabled();
+    } else {
+      await expect(page.getByTestId('aethercast-remembered-location')).toHaveCount(0);
+    }
+    await page.clock.runFor(16 * 60_000);
+
+    expect(airRequests).toHaveLength(0);
+    expect(weatherRequests).toHaveLength(0);
+    expect(geocodingRequests).toHaveLength(0);
+    expect(foreignRequests).toEqual([]);
+    expect(await page.evaluate(() => (window as unknown as { __aethercastGeolocationCalls: { count: number } }).__aethercastGeolocationCalls.count)).toBe(0);
+    await expect(page.getByRole('table')).toHaveCount(0);
+    await expect(page.getByTestId('aethercast-live-source')).toHaveCount(0);
+  });
+}
 
 test('AEC-R14 lists a screening anomaly from the loaded data in the anomaly log', async ({ page }) => {
   const fixture = hourlyFixture();

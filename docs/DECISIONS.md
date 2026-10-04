@@ -1,6 +1,6 @@
 ---
 doc: decisions
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Decisions, exceptions and open questions
@@ -33,7 +33,6 @@ Current departures from the rules, recorded so they are not mistaken for accepte
 
 | Area | Fact | Rule |
 | --- | --- | --- |
-| AetherCast | On open, fetches data for the saved location (`localStorage` key `inmotools.aethercast.live-location.v1`) or asks for geolocation, then refreshes every 15 minutes, without a user action. | Network use only on the user's action |
 | Site Intelligence Analyzer | Has an optional "CrUX API key" field (`SiteIntelWorkspace.tsx`, stored locally). | No API keys |
 | Fiber Craft Workstation | Its spec has no standard header block, so `tool:check` reports it as pending. | Documentation standard |
 | 21 tools | No standard spec and tracker yet (`pnpm tool:check --all`). Specs are the next workstream. | Documentation standard |

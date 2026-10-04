@@ -113,6 +113,8 @@ export default function AetherCastWorkspace() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
+  const [rememberedLocation, setRememberedLocation] = useState<LiveLocation | null>(() => readSavedLiveLocation());
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [locationResults, setLocationResults] = useState<LiveLocation[]>([]);
   const [locationSearchLoading, setLocationSearchLoading] = useState(false);
@@ -187,7 +189,10 @@ export default function AetherCastWorkspace() {
       setLiveLocation(location);
       setLastFetchedAt(result.fetchedAt);
       applyDataset(result.dataset, result.warnings);
-      if (persist) writeSavedLiveLocation(location);
+      if (persist) {
+        writeSavedLiveLocation(location);
+        setRememberedLocation(location);
+      }
     } catch (error) {
       if (isAbortError(error) || requestId !== liveRequestIdRef.current) return;
       setLiveError(errorMessage(error));
@@ -196,41 +201,34 @@ export default function AetherCastWorkspace() {
     }
   }, [applyDataset]);
 
-  useEffect(() => {
-    let disposed = false;
-    const initializeLiveData = async () => {
-      const saved = readSavedLiveLocation();
-      if (saved) {
-        if (!disposed) await loadLiveLocation(saved, false);
-        return;
-      }
-      const intentId = ++browserLocationIntentIdRef.current;
-      try {
-        const location = await getBrowserLiveLocation();
-        if (!disposed && intentId === browserLocationIntentIdRef.current) await loadLiveLocation(location, true);
-      } catch (error) {
-        if (!disposed && intentId === browserLocationIntentIdRef.current && !isAbortError(error)) {
-          setLiveError('Location access is unavailable. Search by city or postal code to load live conditions.');
-        }
-      }
-    };
-    void initializeLiveData();
-    return () => {
-      disposed = true;
-      browserLocationIntentIdRef.current += 1;
-      browserLocationPendingRef.current = false;
-      liveFetchRef.current?.abort();
-      locationSearchRef.current?.abort();
-    };
+  // Opening the tool makes no network request and no geolocation prompt; live data starts only from a control below.
+  useEffect(() => () => {
+    browserLocationIntentIdRef.current += 1;
+    browserLocationPendingRef.current = false;
+    liveFetchRef.current?.abort();
+    locationSearchRef.current?.abort();
+  }, []);
+
+  const startLiveLocation = useCallback((location: LiveLocation, persist: boolean) => {
+    setAutoRefresh(true);
+    return loadLiveLocation(location, persist);
   }, [loadLiveLocation]);
 
   useEffect(() => {
-    if (!liveLocation || dataset?.importSource !== 'open-meteo-live') return undefined;
+    if (!autoRefresh || !liveLocation || dataset?.importSource !== 'open-meteo-live') return undefined;
     const timer = window.setInterval(() => {
       void loadLiveLocation(liveLocation, false);
     }, LIVE_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [dataset?.importSource, liveLocation, loadLiveLocation]);
+  }, [autoRefresh, dataset?.importSource, liveLocation, loadLiveLocation]);
+
+  const loadRememberedLocation = useCallback(() => {
+    if (!rememberedLocation) return;
+    invalidatePendingBrowserLocation();
+    cancelLocationSearch();
+    setLocationSearchError(null);
+    void startLiveLocation(rememberedLocation, false);
+  }, [cancelLocationSearch, invalidatePendingBrowserLocation, rememberedLocation, startLiveLocation]);
 
   const useBrowserLocation = useCallback(async () => {
     cancelLocationSearch();
@@ -242,7 +240,7 @@ export default function AetherCastWorkspace() {
       const location = await getBrowserLiveLocation();
       if (intentId !== browserLocationIntentIdRef.current) return;
       browserLocationPendingRef.current = false;
-      await loadLiveLocation(location, true);
+      await startLiveLocation(location, true);
     } catch (error) {
       if (intentId !== browserLocationIntentIdRef.current) return;
       if (!isAbortError(error)) setLiveError('Location access is unavailable. Search by city or postal code instead.');
@@ -252,7 +250,7 @@ export default function AetherCastWorkspace() {
         setLiveLoading(false);
       }
     }
-  }, [cancelLocationSearch, loadLiveLocation]);
+  }, [cancelLocationSearch, startLiveLocation]);
 
   const submitLocationSearch = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -287,8 +285,8 @@ export default function AetherCastWorkspace() {
     invalidatePendingBrowserLocation();
     cancelLocationSearch();
     setLocationSearchError(null);
-    void loadLiveLocation(location, true);
-  }, [cancelLocationSearch, invalidatePendingBrowserLocation, loadLiveLocation]);
+    void startLiveLocation(location, true);
+  }, [cancelLocationSearch, invalidatePendingBrowserLocation, startLiveLocation]);
 
   const handleFile = useCallback(async (file: File) => {
     invalidatePendingBrowserLocation();
@@ -296,6 +294,7 @@ export default function AetherCastWorkspace() {
     liveFetchRef.current?.abort();
     liveRequestIdRef.current += 1;
     setLiveLocation(null);
+    setAutoRefresh(false);
     setLastFetchedAt(null);
     setLiveLoading(false);
     setLiveError(null);
@@ -373,7 +372,7 @@ export default function AetherCastWorkspace() {
       <div className="aethercast-section-heading">
         <div>
           <h3 id="aethercast-live-heading">Live air quality &amp; UV</h3>
-          <p>Use your current location or search a place. AetherCast loads the data directly—no download or upload step.</p>
+          <p>Nothing is requested until you choose: load your remembered location, use your current location, or search a place. AetherCast then loads the data directly—no download or upload step.</p>
         </div>
         <button type="button" onClick={() => void useBrowserLocation()} disabled={liveLoading}>Use my location</button>
       </div>
@@ -384,6 +383,13 @@ export default function AetherCastWorkspace() {
         </label>
         <button type="submit" disabled={locationSearchLoading}>{locationSearchLoading ? 'Searching…' : 'Search locations'}</button>
       </form>
+      {rememberedLocation && !(liveLocation && dataset?.importSource === 'open-meteo-live') ? (
+        <div className="aethercast-live-source" data-testid="aethercast-remembered-location">
+          <strong>Remembered location: {rememberedLocation.label}</strong>
+          <span>Saved in this browser. Live data is not requested until you load it.</span>
+          <button type="button" onClick={loadRememberedLocation} disabled={liveLoading}>Load live data</button>
+        </div>
+      ) : null}
       {locationSearchError ? <p className="aethercast-inline-error" role="alert">{locationSearchError}</p> : null}
       {locationResults.length > 0 ? (
         <div className="aethercast-location-results" aria-label="Location search results">
@@ -396,9 +402,12 @@ export default function AetherCastWorkspace() {
       {liveLocation && dataset?.importSource === 'open-meteo-live' ? (
         <div className="aethercast-live-source" data-testid="aethercast-live-source" role="status">
           <strong>Live Open-Meteo feed for {liveLocation.label}</strong>
-          <span>{lastFetchedAt ? `Updated ${new Date(lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. ` : ''}Refreshes every 15 minutes while this tool is open.</span>
+          <span>{lastFetchedAt ? `Updated ${new Date(lastFetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. ` : ''}{autoRefresh ? 'Refreshes every 15 minutes until you stop it or leave the tool.' : 'Automatic refresh is off.'}</span>
           <span>Forecast-model data, not a local regulatory monitor or sensor. Air-quality data: Copernicus Atmosphere Monitoring Service (CAMS) via <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo</a>.</span>
-          <button type="button" onClick={() => void loadLiveLocation(liveLocation, false)} disabled={liveLoading}>Refresh now</button>
+          <div className="aethercast-live-actions">
+            <button type="button" onClick={() => void loadLiveLocation(liveLocation, false)} disabled={liveLoading}>Refresh now</button>
+            <button type="button" onClick={() => setAutoRefresh((current) => !current)}>{autoRefresh ? 'Stop auto refresh' : 'Resume auto refresh'}</button>
+          </div>
         </div>
       ) : null}
       {liveError ? <p className="aethercast-inline-error" role="alert">{liveError}</p> : null}
