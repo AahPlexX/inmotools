@@ -3,7 +3,7 @@ task: T-audio-mastering-20261004-d7fa
 tool: audio-mastering
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/audio-mastering
 created: 2026-10-04
 updated: 2026-10-04
@@ -19,3 +19,4 @@ Not started. Reproduce under load, find why Pause is disabled at line 479, fix, 
 
 ## Log
 - 2026-10-04: recorded.
+- 2026-10-04: claimed `fix/audio-mastering`.
