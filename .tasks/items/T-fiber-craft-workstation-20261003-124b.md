@@ -3,10 +3,10 @@ task: T-fiber-craft-workstation-20261003-124b
 tool: fiber-craft-workstation
 doc: task
 kind: fix
-state: next
+state: active
 branch: fix/fiber-craft-workstation
 created: 2026-10-03
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Give the Fiber Craft spec the standard header block
@@ -19,3 +19,4 @@ Not started. Add the header block and the requirement table the tracker already 
 
 ## Log
 - 2026-10-03: recorded.
+- 2026-10-04: claimed `fix/fiber-craft-workstation`.
