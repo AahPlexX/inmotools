@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { PDFDocument } from 'pdf-lib';
 import JSZip from 'jszip';
@@ -372,7 +373,6 @@ describe('Tactical video capability negotiation and frame fallback', () => {
   });
 
   it('exposes a video combination only when the container and encoder both accept it', async () => {
-    expect(MEDIABUNNY_PIN).toBe('1.58.0');
     const probed: string[] = [];
     const probe = {
       async canEncodeVideo(codec: VideoExportCandidate['codec']) {
@@ -454,6 +454,13 @@ describe('Tactical video capability negotiation and frame fallback', () => {
     expect(frame).toContain('Pressing shape');
     const sidecar = JSON.parse(await zip.file('metadata.json')?.async('string') ?? '{}') as { club: string };
     expect(sidecar.club).toBe('Harbor FC');
+  });
+
+  it('pins MEDIABUNNY_PIN to the mediabunny version installed by package.json', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const installed = manifest.dependencies?.mediabunny ?? manifest.devDependencies?.mediabunny;
+    expect(installed).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(MEDIABUNNY_PIN).toBe(installed);
   });
 
   it('uses the pinned Mediabunny probe and withholds video when VideoEncoder is absent', async () => {
