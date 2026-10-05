@@ -4,6 +4,9 @@ name: Integrate branch into main
 # without a pull request: merge onto the latest main, check, push main, delete the
 # branch. If main moves during the run, the push is rejected and the run retries on
 # the new main. Nothing is merged unless every check passes on the merged result.
+# A conflict only in the generated .tasks/ITEMS.md is resolved by regenerating it.
+# On a retry, if main gained only Markdown changes since the tested merge, the
+# build and browser tests are not repeated (unit tests and doc checks still run).
 # A push whose only change is the claim made by `pnpm task:start` is not merged, so
 # the branch stays on origin as the claim until it carries work.
 on:
@@ -48,12 +51,28 @@ jobs:
           slug="${BRANCH#*/}"
 
           pushed=false
-          for attempt in 1 2 3; do
+          tested_base=""
+          for attempt in 1 2 3 4 5; do
             git fetch --quiet origin main
             git checkout --quiet -B integrate origin/main
             if ! git merge --quiet --no-ff --no-edit -m "integrate $BRANCH" "$BRANCH_SHA"; then
-              echo "::error::$BRANCH conflicts with main. On the branch: git fetch origin && git merge origin/main, resolve, commit, push."
-              exit 1
+              unmerged="$(git diff --name-only --diff-filter=U)"
+              if [[ "$unmerged" == ".tasks/ITEMS.md" ]]; then
+                # Generated file: rebuild it from the merged task files.
+                git checkout --quiet --ours .tasks/ITEMS.md
+                node scripts/docs-sync.mjs > /dev/null
+                git add .tasks/ITEMS.md
+                git commit --quiet --no-edit
+                echo "Regenerated .tasks/ITEMS.md to resolve its merge conflict."
+              else
+                echo "::error::$BRANCH conflicts with main in: $(tr '\n' ' ' <<< "$unmerged"). On the branch: git fetch origin && git merge origin/main, resolve, commit, push."
+                exit 1
+              fi
+            fi
+            light=false
+            if [[ -n "$tested_base" ]] && ! git diff --name-only "$tested_base" origin/main | grep -qv '\.md$'; then
+              light=true
+              echo "main gained only Markdown since the tested merge; skipping build and browser tests on this attempt."
             fi
             changed="$(git diff --name-only origin/main HEAD)"
             if [[ -z "$changed" ]]; then
@@ -82,7 +101,7 @@ jobs:
             node scripts/check-doc-links.mjs
             pnpm test:unit
 
-            if grep -qv '\.md$' <<< "$changed"; then
+            if [[ "$light" == false ]] && grep -qv '\.md$' <<< "$changed"; then
               pnpm build
               specs="$(node scripts/select-e2e-specs.mjs <<< "$changed")"
               if [[ "$specs" == "__FULL_SUITE__" ]]; then
@@ -94,6 +113,7 @@ jobs:
               fi
             fi
 
+            tested_base="$(git rev-parse origin/main)"
             if git push --quiet origin HEAD:main; then
               pushed=true
               break
