@@ -64,6 +64,7 @@ None.
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-04 | Remove or replace the CrUX API key field |
+| [T-site-intelligence-analyzer-20261005-1db7](items/T-site-intelligence-analyzer-20261005-1db7.md) | `site-intelligence-analyzer` | expand | `expand/site-intelligence-analyzer` | 2026-10-05 | Standard spec and tracker |
 | [T-subtitle-drift-20261004-24d9](items/T-subtitle-drift-20261004-24d9.md) | `subtitle-drift` | expand | `expand/subtitle-drift` | 2026-10-04 | Cover untested requirements |
 | [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 | [T-tactical-matchboard-studio-20261004-a71c](items/T-tactical-matchboard-studio-20261004-a71c.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Make the vector frame ZIP unit test deterministic |

@@ -25,7 +25,8 @@ Tag `archive/site-intel-local-20260918` (commits `f8e79f8c`…`73a6f080`, 2026-0
 The two lines diverge (for example `GeoMinimap.tsx` and `shortener-resolver.ts` on the archive, `GeoIpMap.tsx` on main), so this is a feature-by-feature port onto main's code with tests, not a merge. Keep the tag until this task is done.
 
 ## Resume here
-Not started. Port each listed fix from tag `archive/site-intel-local-20260918` onto current `main` with a test per fix; record each in `src/tools/site-intel/TRACKING.md`.
+Not started. Port each listed fix from tag `archive/site-intel-local-20260918` onto current `main` with a test per fix; record each in [TRACKER.md](../../src/tools/site-intel/TRACKER.md): SIA-R12, SIA-R37, SIA-R31, SIA-R09, SIA-R28, SIA-R84, SIA-R22.
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
+- 2026-10-05: the listed fixes are SIA requirements in the standard tracker (task T-site-intelligence-analyzer-20261005-1db7).
