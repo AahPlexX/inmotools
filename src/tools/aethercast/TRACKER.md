@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-24 requirements: 23 verified, 1 missing (AEC-R22, site theme, TASK-028). Live data starts only on the person's action (AEC-R24). Next: AEC-R22. Blocked on the TASK-012 design rationale for thresholds.
+24 requirements: 23 verified, 1 missing (AEC-R22, site theme, the site-wide theme selector). Live data starts only on the person's action (AEC-R24). Next: AEC-R22. Blocked on the TASK-012 design rationale for thresholds.
 
 ## Documents
 
@@ -50,14 +50,14 @@ updated: 2026-10-04
 | AEC-R19 | verified | e2e "AEC-R19 shows Open-Meteo and CAMS attribution and labels live data as forecast-model data" | |
 | AEC-R20 | verified | `tests/e2e/accessibility.spec.ts` route `aethercast` | |
 | AEC-R21 | verified | e2e "AetherCast reflows loaded content at <viewport>" | |
-| AEC-R22 | missing | — | Delivered through TASK-028 |
+| AEC-R22 | missing | — | Delivered through the site-wide theme selector |
 | AEC-R23 | verified | engine "AEC-R23 judges explicit-offset timestamps by their own offset in a <zone> browser", "AEC-R23 judges UTC (Z) timestamps in the dataset's IANA timezone in a <zone> browser", "AEC-R23 reads the local hour of wall-clock, offset and Z timestamps without the viewer timezone" | |
 | AEC-R24 | verified | e2e "AEC-R24 opening the tool without a remembered location makes no network request and no geolocation call", "AEC-R24 opening the tool with a remembered location makes no network request and no geolocation call" | |
 
 ## Open work
 
 1. TASK-012 design rationale (spec "Intent not recorded").
-2. AEC-R22 with TASK-028.
+2. AEC-R22 with the site-wide theme selector.
 
 ## Known limitations
 

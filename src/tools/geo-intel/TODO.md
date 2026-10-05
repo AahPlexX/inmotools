@@ -1,5 +1,7 @@
 # Geo Intelligence Hub — TODO (live tracker)
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 Slug: `geo-intelligence-hub` · Directory: `src/tools/geo-intel/` · Branch: `feature/geo-intelligence-hub` (cut from `origin/main` @ `1aa0a88`).
 
 Since 2026-10-01 the live status and requirement IDs are in [TRACKER.md](TRACKER.md); everything below is the build history.
@@ -8,7 +10,7 @@ This file is the single live progress record for this tool while it is developed
 
 ## Scope boundary
 
-- Only `src/tools/geo-intel/**` and `src/catalog.ts` are edited, plus the minimum registration/test surfaces listed under **Boundary exceptions**.
+Former instruction (no longer applies): - Only `src/tools/geo-intel/**` and `src/catalog.ts` are edited, plus the minimum registration/test surfaces listed under **Boundary exceptions**.
 - `src/tools/geo/` (GeoJSON Simplifier) is never touched.
 - No new npm dependencies: adding one would modify `package.json`/`pnpm-lock.yaml` (outside the boundary). Everything uses dependencies already pinned in `package.json` or in-house code with official test vectors.
 

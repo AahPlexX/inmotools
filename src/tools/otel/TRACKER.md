@@ -45,7 +45,7 @@ On `origin/main`. 18 requirements: 14 verified, 4 missing. Span details do not s
 | OTF-R13 | missing | — | Events and exception data are not parsed or shown |
 | OTF-R14 | verified | `tests/e2e/accessibility.spec.ts` route `otel-flamegraph` | |
 | OTF-R15 | verified | e2e "OTF-R15 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| OTF-R16 | missing | — | Delivered through TASK-028 |
+| OTF-R16 | missing | — | Delivered through the site-wide theme selector |
 | OTF-R17 | missing | — | Added 2026-10-02 |
 | OTF-R18 | missing | — | Added 2026-10-02 |
 
@@ -53,7 +53,7 @@ On `origin/main`. 18 requirements: 14 verified, 4 missing. Span details do not s
 
 1. Build the requirements added 2026-10-02: OTF-R17, OTF-R18.
 2. Build OTF-R13 (keep span events in the engine; show events and exception fields).
-3. OTF-R16 with TASK-028.
+3. OTF-R16 with the site-wide theme selector.
 
 ## Known limitations
 

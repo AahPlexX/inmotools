@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-82 requirements: 74 verified, 0 implemented, 5 missing, 3 prohibited. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows TASK-028. No blocker. GIH-R67 axe test made deterministic (T-geo-intelligence-hub-20261004-9b3e). Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
+82 requirements: 74 verified, 0 implemented, 5 missing, 3 prohibited. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows the site-wide theme. No blocker. GIH-R67 axe test made deterministic (T-geo-intelligence-hub-20261004-9b3e). Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
 
 ## Documents
 
@@ -108,7 +108,7 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R76 | prohibited | spec | |
 | GIH-R77 | prohibited | spec | |
 | GIH-R78 | missing | — | Open-Meteo allowed by the owner 2026-10-04 (non-commercial) |
-| GIH-R79 | missing | — | Delivered through the site-wide theme selector (TASK-028), not a tool-only toggle |
+| GIH-R79 | missing | — | Delivered through the site-wide theme selector (the site-wide theme selector), not a tool-only toggle |
 | GIH-R80 | missing | — | Required by the default integration rule; ⓘ button and provenance dialog cover the data meanwhile |
 | GIH-R81 | missing | — | Added 2026-10-02 |
 | GIH-R82 | missing | — | Added 2026-10-02 |
@@ -116,7 +116,7 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 ## Open work
 
 0. Build the requirements added 2026-10-02: GIH-R81, GIH-R82.
-1. Build GIH-R80 (iOS long-press row menu); GIH-R79 follows TASK-028.
+1. Build GIH-R80 (iOS long-press row menu); GIH-R79 follows the site-wide theme.
 
 ## Known limitations
 

@@ -51,7 +51,7 @@ Out of scope (from the README):
 | HAR-R14 | Canvas waterfall with blocked, DNS, connect (TLS removed), TLS, send, wait and receive; `-1` drawn as zero; rows windowed to the scrollport; device-pixel-ratio aware | SSL not double-counted in connect; waterfall labelled with request count |
 | HAR-R15 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | HAR-R16 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| HAR-R17 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| HAR-R17 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | HAR-R18 | Custom value patterns (regular expressions) as an extra redaction category, run with a time limit | A custom pattern redacts matching values |
 
 ## Definition of done

@@ -51,7 +51,7 @@ Out of scope:
 | MHL-R11 | Save and load a versioned progression JSON; unsupported versions and invalid chords are refused on load | JSON round-trips; bad versions refused |
 | MHL-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | MHL-R13 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| MHL-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| MHL-R14 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | MHL-R15 | Seventh and extended chord qualities (maj7, m7, 7, m7b5, dim7, add9) | Each quality builds the correct notes and exports to MIDI |
 | MHL-R16 | Suggest the inversion with the smallest voice-leading movement from the previous chord | Suggestion picks the minimum-movement inversion |
 | MHL-R17 | Send the progression to a connected instrument through Web MIDI where the browser supports it | Notes reach a mocked MIDI output |

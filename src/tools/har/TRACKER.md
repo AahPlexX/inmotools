@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-On `origin/main`. 18 requirements: 16 verified, 2 missing (HAR-R17, HAR-R18). Next action: build HAR-R18; HAR-R17 with TASK-028. No blocker.
+On `origin/main`. 18 requirements: 16 verified, 2 missing (HAR-R17, HAR-R18). Next action: build HAR-R18; HAR-R17 with the site-wide theme selector. No blocker.
 
 ## Documents
 
@@ -46,13 +46,13 @@ On `origin/main`. 18 requirements: 16 verified, 2 missing (HAR-R17, HAR-R18). Ne
 | HAR-R14 | verified | unit "does not double-count SSL inside connect in waterfall phases", "uses protected decimal timings for the waterfall…"; e2e "HAR-R14 windows waterfall rows to the scrollport at the device pixel ratio" | |
 | HAR-R15 | verified | `tests/e2e/accessibility.spec.ts` route `har-sanitizer` | |
 | HAR-R16 | verified | e2e "HAR-R16 lays out without horizontal overflow at <name> px" | |
-| HAR-R17 | missing | — | Delivered through TASK-028 |
+| HAR-R17 | missing | — | Delivered through the site-wide theme selector |
 | HAR-R18 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: HAR-R18.
-1. HAR-R17 with TASK-028.
+1. HAR-R17 with the site-wide theme selector.
 
 ## Known limitations
 

@@ -1,5 +1,7 @@
 # Tabular Sheet Workstation — locked Stage 1 / Stage 2 feature matrix
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 Suite id: `sheets`. Suite path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation` (same `*-workstation` pattern as `typing-workstation`). Persistence tool id: `inmotools-tabular-sheet-workstation`.
 Local-first only. Workbooks stay in this browser (IndexedDB / LocalStorage). No uploads, analytics, auth, or remote database.
 

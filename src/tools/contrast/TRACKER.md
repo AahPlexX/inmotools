@@ -43,13 +43,13 @@ On `origin/main`. 16 requirements: 14 verified, 2 missing (APC-R15 site theme, A
 | APC-R12 | verified | e2e "APC-R12 copied and downloaded CSS custom properties contain only the valid tokens" | |
 | APC-R13 | verified | `tests/e2e/accessibility.spec.ts` route `apca-token-matrix` | |
 | APC-R14 | verified | e2e "APC-R14 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| APC-R15 | missing | — | Delivered through TASK-028 |
+| APC-R15 | missing | — | Delivered through the site-wide theme selector |
 | APC-R16 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 1. Build the requirement added 2026-10-02: APC-R16.
-2. APC-R15 with TASK-028.
+2. APC-R15 with the site-wide theme selector.
 
 ## Known limitations
 

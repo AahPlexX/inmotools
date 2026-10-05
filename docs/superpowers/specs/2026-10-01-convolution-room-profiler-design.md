@@ -49,7 +49,7 @@ Out of scope:
 | CRP-R13 | Stereo routing of the convolution (design) | Stereo source and stereo IR render in stereo |
 | CRP-R14 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | CRP-R15 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| CRP-R16 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| CRP-R16 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | CRP-R17 | A small built-in set of impulse responses whose licences allow redistribution, so the tool works without the person finding one | Choosing a built-in IR renders without a file |
 
 ## Definition of done

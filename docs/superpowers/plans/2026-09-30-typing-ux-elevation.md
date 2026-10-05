@@ -1,5 +1,7 @@
 # Typing Workstation UX/UI elevation — plan (TASK-026)
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Status: implemented and verified 2026-09-30 (P0–P7).** Per-finding resolution and the test that guards each is in the audit doc's Resolution section.
 
 Source of findings: `docs/typing-ux-audit-2026-09-30.md` (UX-01 … UX-14). This plan changes presentation and interaction only. The engine, corpora, storage schema, export formats, shortcuts (Esc, F2, Tab) and every existing accessible name stay as they are; the `tw-stat`, `tw-char`, `tw-caret`, `tw-summary` and `tw-root` hooks the e2e spec depends on are preserved.

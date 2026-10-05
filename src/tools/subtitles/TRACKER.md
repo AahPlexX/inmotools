@@ -45,14 +45,14 @@ On `origin/main`. 19 requirements: 16 verified, 3 missing (SUB-R15, SUB-R18, SUB
 | SUB-R15 | missing | — | Promised by the catalog title; not built |
 | SUB-R16 | verified | `tests/e2e/accessibility.spec.ts` route `subtitle-drift` | |
 | SUB-R17 | verified | e2e "SUB-R17 lays out without horizontal overflow at <name> px" | |
-| SUB-R18 | missing | — | Delivered through TASK-028 |
+| SUB-R18 | missing | — | Delivered through the site-wide theme selector |
 | SUB-R19 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: SUB-R19.
 1. Build SUB-R15 (waveform); the owner chose building over changing the title (2026-10-02).
-2. SUB-R18 with TASK-028.
+2. SUB-R18 with the site-wide theme selector.
 
 ## Known limitations
 

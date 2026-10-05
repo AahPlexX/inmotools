@@ -1,5 +1,7 @@
 # Typing Workstation Session Controls & Local Typist Profiles Design
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Date:** 2026-09-25  
 **Parent workstream:** `docs/superpowers/plans/2026-09-15-typing-workstation.md`  
 **Status:** Complete — accepted on `main` at `7222854833f507ebfbcf00ab0c156b58ee90f335`  

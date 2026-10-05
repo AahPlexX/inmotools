@@ -60,7 +60,7 @@ Out of scope:
 | DDB-R20 | After first use, the DuckDB binaries are served from the browser cache, so the workbench keeps working offline | Deployment config caches DuckDB binaries on first use |
 | DDB-R21 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | DDB-R22 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| DDB-R23 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| DDB-R23 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | DDB-R24 | CSV export has an option to neutralize spreadsheet formulas (off by default, so the default stays byte-exact) | With the option on, `=1+1` is written as text |
 | DDB-R25 | JSON and JSON Lines files can be registered and queried | `SELECT * FROM 'data.jsonl'` returns rows |
 | DDB-R26 | Export the captured result as Parquet | Downloaded Parquet re-imports with the same rows and types |

@@ -48,7 +48,7 @@ Out of scope:
 | GLS-R11 | The preview stays bounded in short landscape viewports | Short landscape test passes |
 | GLS-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | GLS-R13 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| GLS-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| GLS-R14 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | GLS-R15 | Shaders can be saved by name in this browser and reopened | Saved shader survives a reload |
 | GLS-R16 | Export a PNG still of the preview | PNG downloads at the preview size |
 | GLS-R17 | Record a short WebM clip of the preview where MediaRecorder is supported | WebM downloads |

@@ -55,7 +55,7 @@ Out of scope:
 | SUB-R15 | Waveform re-alignment: show the audio waveform of a local video or audio file under the cues so anchors can be placed by sight, as the catalog title promises | Loading a local media file shows its waveform with cue markers; choosing a point sets an anchor |
 | SUB-R16 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | SUB-R17 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| SUB-R18 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| SUB-R18 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | SUB-R19 | Download the corrected copy in the other format (SRT to WebVTT and back) | SRT input exports a valid WebVTT |
 
 ## Definition of done

@@ -48,7 +48,7 @@ On `origin/main`. 25 requirements: 19 verified, 6 missing (CRN-R20 site theme; C
 | CRN-R17 | verified | unit "exports only the calculated occurrences…", "folds content lines to the RFC 5545 75-octet limit"; e2e (.ics download) | |
 | CRN-R18 | verified | `tests/e2e/accessibility.spec.ts` route `cron-team-matrix` | |
 | CRN-R19 | verified | e2e "CRN-R19 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| CRN-R20 | missing | — | Delivered through TASK-028 |
+| CRN-R20 | missing | — | Delivered through the site-wide theme selector |
 | CRN-R21 | missing | — | Added 2026-10-02 |
 | CRN-R22 | missing | — | Added 2026-10-02 |
 | CRN-R23 | missing | — | Added 2026-10-02 |
@@ -58,7 +58,7 @@ On `origin/main`. 25 requirements: 19 verified, 6 missing (CRN-R20 site theme; C
 ## Open work
 
 1. Build the requirements added 2026-10-02: CRN-R21, CRN-R22, CRN-R23, CRN-R24, CRN-R25.
-2. CRN-R20 with TASK-028.
+2. CRN-R20 with the site-wide theme selector.
 
 ## Known limitations
 

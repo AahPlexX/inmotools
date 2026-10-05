@@ -47,7 +47,7 @@ Out of scope:
 | VKS-R11 | Optional thumbnails along the timeline that never block trim or export (design) | Thumbnails appear without delaying export |
 | VKS-R12 | No serious or critical axe violations | Catalog-wide accessibility spec and the tool's own axe check |
 | VKS-R13 | No horizontal overflow at the target viewports | Reflow check across viewports |
-| VKS-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| VKS-R14 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 
 ## Definition of done
 

@@ -48,14 +48,14 @@ updated: 2026-10-04
 | EXF-R16 | missing | — | README: not implemented |
 | EXF-R17 | verified | `tests/e2e/accessibility.spec.ts` route `exif-scrubber` | |
 | EXF-R18 | verified | e2e "EXF-R18 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| EXF-R19 | missing | — | Delivered through TASK-028 |
+| EXF-R19 | missing | — | Delivered through the site-wide theme selector |
 | EXF-R20 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: EXF-R20.
 1. Build EXF-R16 (HEIC strip).
-2. EXF-R19 with TASK-028.
+2. EXF-R19 with the site-wide theme selector.
 
 ## Known limitations
 

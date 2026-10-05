@@ -47,7 +47,7 @@ Out of scope:
 | FDD-R11 | CSV export neutralizes formula prefixes while keeping signed numbers and phone numbers exactly | Formula cells neutralized |
 | FDD-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | FDD-R13 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| FDD-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| FDD-R14 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | FDD-R15 | Export the reconciled result as XLSX as well as CSV | XLSX downloads and reopens with the same rows |
 
 ## Definition of done

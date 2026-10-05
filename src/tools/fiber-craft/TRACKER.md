@@ -101,7 +101,7 @@ IDs are `FC-R01` … `FC-R65` (formerly `FC-01` … `FC-65`, same numbers; the p
 
 1. Remaining `partial` and `missing` requirements, in the plan's slice order (next: FC-R47, FC-R48, FC-R49).
 2. FC-R37 after a defensible manufacturer-data source exists.
-3. Site-wide theme (TASK-028): Fiber Craft keeps its own light / dark-room / high-contrast modes (FC-R07) and should default to the site theme.
+3. Site-wide theme (the site-wide theme selector): Fiber Craft keeps its own light / dark-room / high-contrast modes (FC-R07) and should default to the site theme.
 
 ## Known limitations
 

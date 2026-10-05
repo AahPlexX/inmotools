@@ -1,6 +1,8 @@
 # GeoJSON Simplifier
 
-Route: `#/tools/geojson-simplifier`. The catalog entry in `src/catalog.ts` supplies the title, summary, and usage guide. `GeoWorkspace.tsx` owns file and result state; `geo-engine.ts` validates and transforms data; `geo.worker.ts` runs simplification off the UI thread; `GeoPreview.tsx` draws the linked previews. Processing and downloads remain in the browser.
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
+Route: `#/tools/geojson-simplifier`. The catalog entry in `src/tools/geo/geojson-simplifier.meta.ts` supplies the title, summary, and usage guide. `GeoWorkspace.tsx` owns file and result state; `geo-engine.ts` validates and transforms data; `geo.worker.ts` runs simplification off the UI thread; `GeoPreview.tsx` draws the linked previews. Processing and downloads remain in the browser.
 
 ## User functions
 

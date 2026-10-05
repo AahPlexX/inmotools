@@ -47,7 +47,7 @@ Out of scope:
 | FNT-R11 | Download the WOFF2 and a CSS `@font-face` with a compact `unicode-range` | Both download; range is compact |
 | FNT-R12 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | FNT-R13 | Populated inspection reflows on phone portrait, landscape and tablet | Reflow test at those viewports |
-| FNT-R14 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| FNT-R14 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | FNT-R15 | Subset output also as TTF/OTF and WOFF | Each output format downloads and loads in the browser |
 
 ## Definition of done

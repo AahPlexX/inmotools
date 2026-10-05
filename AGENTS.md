@@ -21,6 +21,7 @@ pnpm tool:check <slug>                                # computed completion; fix
 git push                                               # after every working step; integrate.yml merges into main
 ```
 
+- **Which document wins:** `AGENTS.md`, `GOVERNANCE.md`, `docs/DOCUMENTATION_STANDARD.md`, `docs/DECISIONS.md`, a tool's spec and tracker, and task files in `.tasks/items/` are current. Any other document (plans, handoff notes, older specs, audits) is a historical record: where it conflicts with the current ones, the current ones win, and its branch, pull-request and registration instructions do not apply.
 - **Find a tool:** `grep "<slug>" docs/TOOL_INDEX.md`, then its tracker's **Resume here**, then its spec. `grep -rl "^tool: <slug>$" docs src .tasks` lists every document.
 - **New tool:** add `src/tools/<folder>/<slug>.meta.ts` (copy an existing one), a spec and a tracker. The catalog entry, home-page link, route and index row follow from those files; no shared file is edited.
 - **No pull requests.** Pushing `feature/`, `expand/` or `fix/<slug>` is the integration request; the branch is deleted once merged. If a run fails, read its log, fix on the branch, push again.

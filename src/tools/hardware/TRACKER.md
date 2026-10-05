@@ -49,7 +49,7 @@ updated: 2026-10-04
 | HPI-R18 | missing | — | Promised by the catalog title; not built |
 | HPI-R19 | verified | `tests/e2e/accessibility.spec.ts` route `hardware-packet-inspector` | |
 | HPI-R20 | verified | e2e "HPI-R20 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| HPI-R21 | missing | — | Delivered through TASK-028 |
+| HPI-R21 | missing | — | Delivered through the site-wide theme selector |
 | HPI-R22 | missing | — | Added 2026-10-02 |
 
 ## Open work
@@ -57,7 +57,7 @@ updated: 2026-10-04
 0. Build the requirements added 2026-10-02: HPI-R22.
 1. Build HPI-R18 (Web Bluetooth); the owner chose building over changing the title (2026-10-02).
 2. Physical checks for HPI-R01 and HPI-R03 with a real serial device (steps in their Notes).
-3. HPI-R21 with TASK-028.
+3. HPI-R21 with the site-wide theme selector.
 
 ## Known limitations
 

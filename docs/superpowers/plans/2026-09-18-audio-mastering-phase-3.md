@@ -1,5 +1,7 @@
 # Audio Mastering Workstation Phase 3 Implementation Plan
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 > **Superseded 2026-09-27.** Execution continues in `2026-09-27-audio-mastering-completion.md` on branch `claude/music-editing-tool-b9w0pq`. The unchecked Task 2–7 boxes below are historical; that file holds current status.
 
 **Status:** Active after verified Phase 2; Task 1 (ledger 17) is complete; Task 2 (ledgers 11 and 13) is partially implemented and remains active as of 2026-09-25.

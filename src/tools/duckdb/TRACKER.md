@@ -51,7 +51,7 @@ On `origin/main`. 27 requirements: 22 verified, 5 missing. Next action: build th
 | DDB-R20 | verified | `tests/unit/deployment-config.test.ts` "keeps DuckDB WebAssembly out of the install-time precache and caches it on first use" | |
 | DDB-R21 | verified | `tests/e2e/accessibility.spec.ts` route `duckdb-workbench` | |
 | DDB-R22 | verified | e2e "DDB-R22 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| DDB-R23 | missing | — | Delivered through TASK-028 |
+| DDB-R23 | missing | — | Delivered through the site-wide theme selector |
 | DDB-R24 | missing | — | Added 2026-10-02 |
 | DDB-R25 | missing | — | Added 2026-10-02 |
 | DDB-R26 | missing | — | Added 2026-10-02 |
@@ -60,7 +60,7 @@ On `origin/main`. 27 requirements: 22 verified, 5 missing. Next action: build th
 ## Open work
 
 1. Build the requirements added 2026-10-02: DDB-R24, DDB-R25, DDB-R26, DDB-R27.
-2. DDB-R23 with TASK-028.
+2. DDB-R23 with the site-wide theme selector.
 
 ## Known limitations
 

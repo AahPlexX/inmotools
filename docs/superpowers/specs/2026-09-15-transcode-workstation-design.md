@@ -1,5 +1,7 @@
 # Transcode Workstation — Design Specification
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Date:** 2026-09-15
 **Status:** Complete — F01–F36 shipped on `origin/main` through PR #33
 (`c923512a753b15c2086e3e22f7c189c42fd4ca59`). This remains the maintenance scope and

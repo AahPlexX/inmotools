@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-On `origin/main`. 15 requirements: 13 verified, 2 missing (FNT-R14, FNT-R15). Glyph tiles are drawn from parsed outlines (`glyphOutlines` in `font-engine.ts`). Next action: build FNT-R15; FNT-R14 with TASK-028.
+On `origin/main`. 15 requirements: 13 verified, 2 missing (FNT-R14, FNT-R15). Glyph tiles are drawn from parsed outlines (`glyphOutlines` in `font-engine.ts`). Next action: build FNT-R15; FNT-R14 with the site-wide theme selector.
 
 ## Documents
 
@@ -42,13 +42,13 @@ On `origin/main`. 15 requirements: 13 verified, 2 missing (FNT-R14, FNT-R15). Gl
 | FNT-R11 | verified | unit "generates compact unicode-range descriptors"; e2e "FNT-R11 downloads the WOFF2, the CSS with a compact unicode-range, and the ZIP bundle" | |
 | FNT-R12 | verified | `tests/e2e/accessibility.spec.ts` route `font-subsetter` | |
 | FNT-R13 | verified | e2e "reflows populated font inspection across phone portrait, landscape, and tablet viewports" | |
-| FNT-R14 | missing | — | Delivered through TASK-028 |
+| FNT-R14 | missing | — | Delivered through the site-wide theme selector |
 | FNT-R15 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: FNT-R15.
-1. FNT-R14 with TASK-028.
+1. FNT-R14 with the site-wide theme selector.
 
 ## Known limitations
 

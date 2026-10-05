@@ -1,10 +1,12 @@
 # Tactical Matchboard Studio Feature Matrix
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Deterministic denominator:** 67 accepted functional features
 **Allowed states:** `planned` | `in-progress` | `implemented` | `verified` | `blocked` | `rejected`
 **Verification rule:** UI presence alone is never verification. A row reaches `verified` only when its complete accepted behavior exists and the relevant unit/build/browser/accessibility/persistence/export evidence is recorded.
 **Current verified count:** 67/67
-**Current milestone:** T17-01 residuals wave is DONE on `cursor/matchboard-residuals-wave-8ddf` from `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`. Do not push to PR #76 or PR #92. Do not undraft or merge this draft PR.
+Former instruction (no longer applies): **Current milestone:** T17-01 residuals wave is DONE on `cursor/matchboard-residuals-wave-8ddf` from `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39`. Do not push to PR #76 or PR #92. Do not undraft or merge this draft PR.
 **Current executable evidence:** Residuals started from main `dd12e94`. Rows 1–63 stay verified. Rows 64–67 were added for pitch zoom/pan, board freehand, build-board confirmation, and timeline virtualization. Focused Tactical units pass 165/165 across 21 `tactics-*.test.ts` files and the e2e selector check passes 3/3. `tsc --noEmit -p tsconfig.app.json` exits 0 and the production build succeeds (`✓ built in 6.38s`). Desktop and mobile Chromium Playwright pass 80 tests with 2 intentional duplicate mobile Axe/reflow skips and 0 failures. Help copy changed: the workspace header sentence, help section `match-setup`, command-bar tooltips, the Build board tip, and the squad-growth note. No dependency pin changed. PDF page text remains WinAnsi; that sub-item is a CoS escalate because Unicode text needs a new font embedder pin.
 
 | ID | Feature | Status | Implementation surface | Validation evidence / limitation |

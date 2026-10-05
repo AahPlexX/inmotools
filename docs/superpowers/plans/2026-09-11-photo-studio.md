@@ -1,5 +1,7 @@
 # Photo Studio Implementation Plan
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 > **Completion note (2026-09-25):** This is the historical baseline execution plan. Photo Studio is complete at 164/164 capabilities on `origin/main`; do not restart these tasks. The authoritative completion/maintenance record is `.tasks/PHOTO_STUDIO.md`, and later expansion scope is documented in `docs/superpowers/plans/2026-09-12-photo-studio-capability-expansion.md`.
 
 **Goal:** Ship a local-first Photo Studio on INMOTOOLS Pages with 30+ functional non-destructive editing capabilities, safe browser rendering/export, professional metadata controls, local retouching, responsive accessibility, and focused validation.

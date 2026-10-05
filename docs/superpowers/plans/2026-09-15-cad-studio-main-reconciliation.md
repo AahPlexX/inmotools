@@ -1,5 +1,7 @@
 # CAD Studio / `main` Reconciliation Plan
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Goal:** Land `feat/cad-studio` on `origin/main` without regressing any existing tool, without a last-minute conflict crisis, and without exposing an unfinished tool to real users before it's ready.
 
 **Status:** Investigated and drafted 2026-09-15. Supersedes the informal "defer to G15" note in `.tasks/CAD_STUDIO.md`'s freshness section with a concrete, evidence-based plan. That note stays accurate in spirit (don't expose CAD to users early) but was ambiguous about *source* reconciliation vs. *activation* — this plan separates the two.

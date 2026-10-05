@@ -1,11 +1,13 @@
 # Audio Mastering Workstation — Completion Plan and Function Status
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 > **Post-merge status update — 2026-09-27:** the 81/81 implementation described below was safely integrated into `origin/main` through PR #81 at merge commit `4685013b261f83408145bed98851d09b0bca752e`. References below to the old active branch, “remaining” PR-head validation, or pending PR #81 integration are retained as historical execution evidence, not current instructions. The active post-merge production audit and competitive-parity handoff is `docs/superpowers/plans/2026-09-27-audio-mastering-production-parity-audit.md` on reconciled PR #85 (superseding documentation-conflicted PR #82). Do not merge the historical feature branches wholesale.
 
 **Created:** 2026-09-27
 **Supersedes for execution:** the open Task 2–7 checklists in `2026-09-18-audio-mastering-phase-3.md` (that file stays as history).
 **Spec:** `docs/superpowers/specs/2026-09-16-audio-mastering-workstation-design.md` (81-function ledger, unchanged).
-**Active branch:** `claude/music-editing-tool-b9w0pq`. It contains all of `feature/audio-mastering-workstation` (merged at `95d9028`) on top of current `main`, so it can integrate into `main` without a second merge. Do not continue on `feature/audio-mastering-workstation`; its draft PR #45 is superseded by this branch's PR.
+Former instruction (no longer applies): **Active branch:** `claude/music-editing-tool-b9w0pq`. It contains all of `feature/audio-mastering-workstation` (merged at `95d9028`) on top of current `main`, so it can integrate into `main` without a second merge. Do not continue on `feature/audio-mastering-workstation`; its draft PR #45 is superseded by this branch's PR.
 
 This file is the single status table for the 81 functions. Update the row and the count in the same commit as the evidence.
 

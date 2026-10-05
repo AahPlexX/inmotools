@@ -61,7 +61,7 @@ Out of scope:
 | AEC-R19 | Open-Meteo and CAMS attribution is shown with live data, which is labelled as forecast-model data, not a local monitor | Attribution and label visible |
 | AEC-R20 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | AEC-R21 | Loaded content reflows without horizontal overflow at the tested viewports | Reflow test at each viewport |
-| AEC-R22 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| AEC-R22 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | AEC-R23 | The thermal-inversion screen judges night hours (20:00–06:00) at the dataset's location, never in the viewer's timezone: wall-clock timestamps and timestamps with a numeric UTC offset use the hour as written; `Z` timestamps use the dataset's IANA timezone, or UTC without one | A daytime window written with `+09:00` is not screened in any viewer timezone; `Z` timestamps follow the dataset timezone |
 | AEC-R24 | Opening the tool, with or without a remembered location, makes no network request and no geolocation call; requests start only from Use my location, Search locations, a search result, Load live data or Refresh now | Opening the tool and waiting past 15 minutes records no request to another origin and no geolocation call |
 

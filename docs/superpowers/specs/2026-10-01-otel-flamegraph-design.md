@@ -49,7 +49,7 @@ Out of scope:
 | OTF-R13 | Span details also show events and exception data (design) | A span with events and an exception shows both |
 | OTF-R14 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | OTF-R15 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| OTF-R16 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| OTF-R16 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | OTF-R17 | Load Zipkin JSON traces | Zipkin spans normalize to the common model |
 | OTF-R18 | Compare two traces side by side with per-span duration differences | Differences shown for matching spans |
 

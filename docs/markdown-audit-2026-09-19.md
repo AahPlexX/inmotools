@@ -1,5 +1,7 @@
 # Markdown audit — 2026-09-19
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 Scope: Markdown Workbench only (`src/tools/markdown/`, its unit/e2e tests, this catalog's shared `.tasks` tracking). No dependencies or unrelated tools changed beyond the one new pinned package below. This is a follow-up to `docs/markdown-audit-2026-09-16.md`; findings from that audit are re-verified against current source rather than assumed still accurate.
 
 ## Method

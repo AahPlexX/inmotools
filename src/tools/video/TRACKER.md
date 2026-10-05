@@ -42,12 +42,12 @@ On `origin/main`. 14 requirements: 11 verified, 3 missing (VKS-R10 timeline with
 | VKS-R11 | missing | — | Optional in the design; buildable, so kept under the default integration rule |
 | VKS-R12 | verified | e2e axe check; `tests/e2e/accessibility.spec.ts` route `video-keyframe-slicer` | |
 | VKS-R13 | verified | e2e (overflow at each viewport) | |
-| VKS-R14 | missing | — | Delivered through TASK-028 |
+| VKS-R14 | missing | — | Delivered through the site-wide theme selector |
 
 ## Open work
 
 1. Build VKS-R10 (timeline with keyframe markers), then VKS-R11.
-2. VKS-R14 with TASK-028.
+2. VKS-R14 with the site-wide theme selector.
 
 ## Known limitations
 

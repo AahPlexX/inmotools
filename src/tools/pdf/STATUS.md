@@ -1,5 +1,7 @@
 # PDF Workstation Status
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 This is the durable single-tool progress ledger for the PDF Workstation. Keep it current whenever a capability changes state. Routine PDF progress stays here rather than in repository-wide task files while other tools are developed in parallel.
 
 ## Completion contract
@@ -18,13 +20,13 @@ Overall completion requires every capability 1–146 to be `verified`, `blocked`
 
 ## Current state
 
-- Branch: `feat/pdf-workstation`
+Former instruction (no longer applies): - Branch: `feat/pdf-workstation`
 - Branch creation base: `main@79ac4629c4e7110e43a81945ef5017319c4a1f76`
 - Draft integration PR: **#31** (`feat(pdf): evolve sanitizer into PDF Workstation`)
 - Current milestone: **B — renderer and editor-layer foundation — STARTED**
 - Current gate: **high-DPI rendering and selectable/copyable PDF.js text are verified; current-page search is live but whole-document result navigation remains; numeric zoom still needs fit-width/fit-page/actual-size modes**
 - Current counts: **27 verified / 7 started / 112 planned / 0 blocked / 0 excluded capabilities**
-- Current integration state: branch remains intentionally isolated and has diverged substantially from current `main`; PR #31 is not presently mergeable. Reconciliation is a separate conflict-safe Milestone H task, not a reason to rewrite the branch while parallel agents are active.
+Former instruction (no longer applies): - Current integration state: branch remains intentionally isolated and has diverged substantially from current `main`; PR #31 is not presently mergeable. Reconciliation is a separate conflict-safe Milestone H task, not a reason to rewrite the branch while parallel agents are active.
 - Existing `pdf-sanitizer` route/deep link remains the workstation route.
 
 ## Milestones

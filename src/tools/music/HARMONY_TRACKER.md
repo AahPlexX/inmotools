@@ -44,7 +44,7 @@ This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Au
 | MHL-R11 | verified | unit "round-trips a versioned progression document…", "rejects unsupported document versions", "rejects malformed or musically invalid imported progressions"; e2e "saves and loads a versioned progression JSON document" | |
 | MHL-R12 | verified | `tests/e2e/accessibility.spec.ts` route `midi-harmony-lab` | |
 | MHL-R13 | verified | e2e "MHL-R13 lays out without horizontal overflow and keeps controls usable at <width> px" (7 widths, 320–2560) | |
-| MHL-R14 | missing | — | Delivered through TASK-028 |
+| MHL-R14 | missing | — | Delivered through the site-wide theme selector |
 | MHL-R15 | missing | — | Added 2026-10-02 |
 | MHL-R16 | missing | — | Added 2026-10-02 |
 | MHL-R17 | missing | — | Added 2026-10-02 |
@@ -52,7 +52,7 @@ This file is named `HARMONY_TRACKER.md` because `src/tools/music/` also holds Au
 ## Open work
 
 0. Build the requirements added 2026-10-02: MHL-R15, MHL-R16, MHL-R17.
-1. MHL-R14 with TASK-028.
+1. MHL-R14 with the site-wide theme selector.
 
 ## Known limitations
 

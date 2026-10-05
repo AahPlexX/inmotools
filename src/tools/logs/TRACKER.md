@@ -45,7 +45,7 @@ On `origin/main`. 20 requirements: 16 verified, 4 missing (LGS-R17 to LGS-R20). 
 | LGS-R14 | verified | logs "exports RFC4180-safe CSV cells", "escapes markdown table delimiters"; audit "neutralizes spreadsheet formulas in CSV…" | |
 | LGS-R15 | verified | `tests/e2e/accessibility.spec.ts` route `regex-log-structurer` | |
 | LGS-R16 | verified | e2e "LGS-R16 lays out without horizontal overflow at <name> px" | |
-| LGS-R17 | missing | — | Delivered through TASK-028 |
+| LGS-R17 | missing | — | Delivered through the site-wide theme selector |
 | LGS-R18 | missing | — | Added 2026-10-02 |
 | LGS-R19 | missing | — | Added 2026-10-02 |
 | LGS-R20 | missing | — | Added 2026-10-02 |
@@ -53,7 +53,7 @@ On `origin/main`. 20 requirements: 16 verified, 4 missing (LGS-R17 to LGS-R20). 
 ## Open work
 
 0. Build the requirements added 2026-10-02: LGS-R18, LGS-R19, LGS-R20.
-1. LGS-R17 with TASK-028.
+1. LGS-R17 with the site-wide theme selector.
 
 ## Known limitations
 

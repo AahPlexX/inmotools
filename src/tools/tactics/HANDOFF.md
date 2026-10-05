@@ -1,10 +1,12 @@
 # Tactical Matchboard Studio Handoff
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 ## Workstream identity
 
 - Branch: `cursor/matchboard-residuals-wave-8ddf`
 - Base: `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
-- Do not push to PR #76 or PR #92. Do not reopen those PRs.
+Former instruction (no longer applies): - Do not push to PR #76 or PR #92. Do not reopen those PRs.
 - Do not undraft or merge the new draft PR from this workstream.
 - Milestone: **T17-01 residuals wave is DONE.**
 - Verified functional features: **67/67**. Rows 1–63 stayed verified. Rows 64–67 are the residuals additions. Rows 3, 57, 58, 61, and 62 were updated in place.
@@ -174,4 +176,4 @@ Whenever material Tactical state changes, update together:
 - `src/tools/tactics/TODO_SEQUENCE.md`
 - `src/tools/tactics/HANDOFF.md`
 - `.tasks/IN_PROGRESS.md`
-- the draft PR for `cursor/matchboard-residuals-wave-8ddf` when its milestone, count, or evidence becomes stale. Do not edit PR #76 or PR #92.
+Former instruction (no longer applies): - the draft PR for `cursor/matchboard-residuals-wave-8ddf` when its milestone, count, or evidence becomes stale. Do not edit PR #76 or PR #92.

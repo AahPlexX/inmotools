@@ -51,7 +51,7 @@ Out of scope:
 | LGS-R14 | Export CSV (RFC 4180 quoting, spreadsheet formulas neutralized, plain negative numbers kept), JSON and Markdown (table delimiters escaped) | Each export downloads with correct escaping |
 | LGS-R15 | No serious or critical axe violations | Catalog-wide accessibility spec for this route |
 | LGS-R16 | No horizontal overflow and controls usable from 320 px to 2560 px | Viewport check at the standard widths |
-| LGS-R17 | Workspace follows the site-wide theme (light, dark, system) from TASK-028 | Workspace switches with the site theme; axe passes in both themes |
+| LGS-R17 | Workspace follows the site-wide theme chosen in the site header (light, dark, system) | Workspace switches with the site theme; axe passes in both themes |
 | LGS-R18 | A library of ready patterns (nginx, Apache, syslog, JSON lines) that fill the pattern field | Choosing a pattern structures a sample line |
 | LGS-R19 | Patterns can be saved by name in this browser | Saved pattern survives a reload |
 | LGS-R20 | Filter structured rows by a column value | Filter narrows rows |

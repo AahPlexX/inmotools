@@ -1,9 +1,11 @@
 # Tactical Matchboard Studio Execution Queue
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Updated:** 2026-09-30
 **Branch:** `cursor/matchboard-residuals-wave-8ddf`
 **Base:** `origin/main` `dd12e943576c9e0fb2abbc9772edec7e9cfafd39` (`feat(tactics): production audit for Tactical Matchboard Studio (#92)`)
-**PR:** new draft only. Do not push to PR #76 or PR #92. Do not undraft or merge from this workstream.
+Former instruction (no longer applies): **PR:** new draft only. Do not push to PR #76 or PR #92. Do not undraft or merge from this workstream.
 **Prior history, now on main via the squash:** T14 reconciled `origin/main` `637a56960954eea2a6b8045a14c703c9a662b254`; T14 merge `47be37f3f0f74b0ed592f2b0723bf3882e3eb7f6`; T14 runtime `fae25d868ec1fb56d3594872a53fa77ca73f8da7`; stage 1 runtime `0a8e45e38e3de161f8ec8a1362218a0896e9ad26`; stage 1 test-only `4d4b0b2b74d5e2a3856af376160bbdee9209cb84`; earlier runtime `6dad76880d4da428fdae9a1d93b74d4c4e5c53f6`.
 
 ## Purpose and source-of-truth roles
@@ -16,7 +18,7 @@
 
 ## Agent coordination protocol
 
-1. Stay on `cursor/matchboard-residuals-wave-8ddf`. Do not push to PR #76 or PR #92. The user required a new branch and a new draft PR for this residuals wave.
+Former instruction (no longer applies): 1. Stay on `cursor/matchboard-residuals-wave-8ddf`. Do not push to PR #76 or PR #92. The user required a new branch and a new draft PR for this residuals wave.
 2. Before every write, compare the last known branch tip to the live branch. If another agent advanced it, refresh the affected files and re-evaluate before writing.
 3. An agent must treat the **Primary files** on an `ACTIVE` item as reserved. Do not concurrently edit those files from another queue item.
 4. A forward-working agent takes the lowest-numbered `READY` item.

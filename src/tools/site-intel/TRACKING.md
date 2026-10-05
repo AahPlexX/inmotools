@@ -1,5 +1,7 @@
 # Site Intelligence Analyzer — Living Tracking Document
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 **Do not let this document go stale.** Update it in the same change that alters
 implementation status. This is the single source of truth for what is done,
 what is partial, and what remains for this tool. It lives only inside this
@@ -11,8 +13,8 @@ for this workstream.
   branch was created; the branch has **not** been merged and must not be
   merged until every item below is either Done or explicitly accepted as
   Rejected/Deferred with rationale).
-- Tool slug: `site-intelligence-analyzer` (registered in `src/catalog.ts` and
-  `src/tools/workspaces.tsx`).
+- Tool slug: `site-intelligence-analyzer` (registered by
+  `src/tools/site-intel/site-intelligence-analyzer.meta.ts`).
 - No "AI" branding anywhere in this tool's copy, feature names, or docs. Every
   finding is produced by deterministic parsing, public-API telemetry, or
   static heuristic pattern matching — never a model.

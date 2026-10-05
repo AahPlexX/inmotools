@@ -1,5 +1,7 @@
 # Tabular Sheet Workstation — agent handoff
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 Suite id: `sheets`. Path: `src/tools/sheets/`. Catalog slug: `tabular-sheet-workstation`.
 Status: **Wave B is integrated into `main`** (squash-merged from `feature/tabular-sheet-wave-b`); the branch is deleted. Do not reuse `feature/tabular-sheet-parity` or `feature/tabular-sheet-wave-a`.
 
@@ -66,7 +68,7 @@ pnpm exec playwright test tests/e2e/tabular-sheet-workstation.spec.ts --project=
 
 ## Known out-of-suite CI reds
 
-Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70 / #71 / #73. **Do not chase or edit those tools:**
+Former instruction (no longer applies): Do **not** claim the full Pages / PR validate suite is green. Validate may fail on the same out-of-suite e2e class as PR #70 / #71 / #73. **Do not chase or edit those tools:**
 
 - `web-layout-studio` axe
 - `svg-sprite-compiler` axe

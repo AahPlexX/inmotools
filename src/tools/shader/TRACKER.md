@@ -42,7 +42,7 @@ On `origin/main`. 17 requirements: 13 verified, 4 missing. Next action: build th
 | GLS-R11 | verified | e2e "…stays bounded in short landscape" | |
 | GLS-R12 | verified | `tests/e2e/accessibility.spec.ts` route `glsl-sandbox` | |
 | GLS-R13 | verified | e2e "GLS-R13 lays out without horizontal overflow at <width> px" (320, 375, 768, 1024, 1440, 1920, 2560) | |
-| GLS-R14 | missing | — | Delivered through TASK-028 |
+| GLS-R14 | missing | — | Delivered through the site-wide theme selector |
 | GLS-R15 | missing | — | Added 2026-10-02 |
 | GLS-R16 | missing | — | Added 2026-10-02 |
 | GLS-R17 | missing | — | Added 2026-10-02 |
@@ -50,7 +50,7 @@ On `origin/main`. 17 requirements: 13 verified, 4 missing. Next action: build th
 ## Open work
 
 1. Build the requirements added 2026-10-02: GLS-R15, GLS-R16, GLS-R17.
-2. GLS-R14 with TASK-028.
+2. GLS-R14 with the site-wide theme selector.
 
 ## Known limitations
 

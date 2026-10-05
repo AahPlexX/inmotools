@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-17 requirements: 15 verified, 0 implemented, 2 missing. Next action: build CRP-R17; CRP-R16 follows TASK-028. No blocker.
+17 requirements: 15 verified, 0 implemented, 2 missing. Next action: build CRP-R17; CRP-R16 follows the site-wide theme. No blocker.
 
 ## Documents
 
@@ -45,13 +45,13 @@ updated: 2026-10-04
 | CRP-R13 | verified | e2e "CRP-R13 a stereo source with a stereo IR renders a stereo WAV that keeps each IR channel" (OfflineAudioContext render, decoded WAV) | |
 | CRP-R14 | verified | `tests/e2e/accessibility.spec.ts` route `convolution-room-profiler` | |
 | CRP-R15 | verified | e2e "CRP-R15 lays out without horizontal overflow and keeps controls usable at <width> px" (7 widths, 320–2560) | |
-| CRP-R16 | missing | — | Delivered through TASK-028 |
+| CRP-R16 | missing | — | Delivered through the site-wide theme selector |
 | CRP-R17 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: CRP-R17.
-1. CRP-R16 with TASK-028.
+1. CRP-R16 with the site-wide theme selector.
 
 ## Known limitations
 

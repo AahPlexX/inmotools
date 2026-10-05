@@ -124,7 +124,7 @@ Out of scope:
 | GIH-R76 | Route and travel-time distances | prohibited: OSRM demo policy forbids app use; other routing APIs need keys |
 | GIH-R77 | Satellite or slippy base-map tiles | prohibited: OSM tile policy forbids heavy app use; imagery needs keys |
 | GIH-R78 | Current weather and a short forecast for the location from Open-Meteo (keyless; non-commercial use, data CC BY 4.0, attributed) | After a lookup the profile shows current conditions and the next days' forecast with Open-Meteo attribution; no request is made before the user's lookup |
-| GIH-R79 | Workspace follows the site-wide theme (light, dark, system) from TASK-028, meeting the same contrast checks | Workspace switches with the site theme; axe passes in both themes |
+| GIH-R79 | Workspace follows the site-wide theme chosen in the site header (light, dark, system), meeting the same contrast checks | Workspace switches with the site theme; axe passes in both themes |
 | GIH-R80 | Long-press on a profile row opens the row menu on iOS Safari (which fires no `contextmenu`) | Touch-and-hold on a row opens the row menu in WebKit |
 | GIH-R81 | PDF location brief keeps non-Latin names by embedding a freely licensed Unicode font | Cyrillic and CJK names appear in the PDF |
 | GIH-R82 | Nominatim can be switched off for every visitor without a redeploy, through a flag in a static JSON file served with the site | Setting the flag hides Nominatim |

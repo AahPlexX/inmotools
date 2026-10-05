@@ -42,14 +42,14 @@ On `origin/main`. 15 requirements: 13 verified, 2 missing. Next action: build th
 | FDD-R11 | verified | unit "protects spreadsheet exports from formula execution prefixes", "neutralizes formula-like values while preserving ordinary signed numeric and phone values exactly" | |
 | FDD-R12 | verified | `tests/e2e/accessibility.spec.ts` route `fuzzy-deduplicator` | |
 | FDD-R13 | verified | e2e "FDD-R13 lays out without horizontal overflow at <width> px" (7 widths) | |
-| FDD-R14 | missing | — | Delivered through TASK-028 |
+| FDD-R14 | missing | — | Delivered through the site-wide theme selector |
 | FDD-R15 | missing | — | Added 2026-10-02 |
 
 ## Open work
 
 0. Build the requirements added 2026-10-02: FDD-R15.
 1. Add tests for FDD-R07, R13, and XLSX input.
-2. FDD-R14 with TASK-028.
+2. FDD-R14 with the site-wide theme selector.
 
 ## Known limitations
 

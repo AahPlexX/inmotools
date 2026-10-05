@@ -1,5 +1,7 @@
 # Next Ten Local-First Tools Design
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../../../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 Since 2026-10-01 each tool has its own as-built spec, which this document stays the original design for: [HAR](2026-10-01-har-sanitizer-design.md), [Keyframe Video Slicer](2026-10-01-video-keyframe-slicer-design.md), [Font Subsetter](2026-10-01-font-subsetter-design.md), [Room Profiler](2026-10-01-convolution-room-profiler-design.md), [APCA Token Matrix](2026-10-01-apca-token-matrix-design.md), [GLSL Sandbox](2026-10-01-glsl-sandbox-design.md), [Fuzzy Deduplicator](2026-10-01-fuzzy-deduplicator-design.md), [Trace Flamegraph](2026-10-01-otel-flamegraph-design.md). glTF and GeoJSON are tracked in their own documents.
 
 **Date:** 2026-08-29
