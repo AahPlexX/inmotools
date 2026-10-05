@@ -25,7 +25,7 @@ A tool, feature, audit, or other workstream is complete only when all of the fol
 4. Exported or persisted output is validated where the workstream produces files, serialized data, or saved state.
 5. Any material defect found during validation is fixed or explicitly moved to `NEXT.md`/`BACKLOG.md` with rationale; it may not disappear from tracking.
 6. Intended work is integrated into `origin/main`; no completed portion exists only on a temporary branch.
-7. `pnpm tool:check <slug>` reports every requirement `verified` or `not planned` with no errors, and the task file is `state: done` with the integrating commit and validation evidence in its log (older entries: removed from `IN_PROGRESS.md`, recorded in `DONE.md` and `WORK_LOG.md`).
+7. `pnpm tool:check <slug>` reports every requirement `verified` or `prohibited` with no errors, and the task file is `state: done` with the integrating commit and validation evidence in its log (older entries: removed from `IN_PROGRESS.md`, recorded in `DONE.md` and `WORK_LOG.md`).
 
 ### Current release complete
 

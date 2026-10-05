@@ -62,7 +62,7 @@ Out of scope:
 
 ## Definition of done
 
-The tool is complete when every requirement is `verified` or `not planned`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
+The tool is complete when every requirement is `verified` or `prohibited`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
 
 ## Intent not recorded
 

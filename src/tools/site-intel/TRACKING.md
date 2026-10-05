@@ -33,7 +33,7 @@ for this workstream.
 `Blocked` = cannot be implemented as literally specified in a static,
 client-only, CORS-constrained environment; a substitution is implemented and
 flagged, or the feature is stubbed pending a resolvable blocker.
-`Not planned` = excluded by a platform rule (no API keys or credentials); the reason is in the row.
+`Prohibited` = excluded by a platform rule (no API keys or credentials); the reason is in the row.
 
 ## Feature status (all 38)
 
@@ -87,7 +87,7 @@ flagged, or the feature is stubbed pending a resolvable blocker.
 ### Group 6 — Performance Telemetry, Web Vitals & Technology Footprint
 | # | Feature | Status | Implementation |
 |---|---|---|---|
-| 28 | Public Core Web Vitals (CrUX) explorer | Not planned (needs an API key) | Removed 2026-10-04 (T-site-intelligence-analyzer-20261003-ba98): the key field, its IndexedDB setting and `crux-engine.ts` are gone; Performance & Tech shows that field data is not available without a key; a key saved by earlier versions is deleted on load (`vault-db.ts:purgeRetiredCredentials`). |
+| 28 | Public Core Web Vitals (CrUX) explorer | Prohibited (needs an API key) | Removed 2026-10-04 (T-site-intelligence-analyzer-20261003-ba98): the key field, its IndexedDB setting and `crux-engine.ts` are gone; Performance & Tech shows that field data is not available without a key; a key saved by earlier versions is deleted on load (`vault-db.ts:purgeRetiredCredentials`). |
 | 29 | Edge CDN & cloud infrastructure classifier | Done | `fingerprint-engine.ts:classifyCdn` via CNAME/NS suffix signatures |
 | 30 | Web technology signature & CMS profiler | Done | `fingerprint-engine.ts:fingerprintCms` via URL/path pattern signatures |
 | 31 | Robots.txt & sitemap auto-path generator | Done | `wellknown-engine.ts`; in-app preview is best-effort (falls back to "open directly" when a target has no CORS header) |
@@ -105,7 +105,7 @@ flagged, or the feature is stubbed pending a resolvable blocker.
 
 ## Known blockers / explicit substitutions (flagged per task instructions)
 
-1. **Feature 28 (CrUX)** — not planned: the Chrome UX Report API requires a Google Cloud API key, and the platform rules allow keyless sources only. No keyless replacement is used: the PageSpeed Insights API can be called without a key, but its documentation states its real-world (CrUX) data is soon to be discontinued ([PageSpeed Insights API, Get started](https://developers.google.com/speed/docs/insights/v5/get-started), read 2026-10-04). The UI states that field data is not available without a key.
+1. **Feature 28 (CrUX)** — prohibited: the Chrome UX Report API requires a Google Cloud API key, and the platform rules allow keyless sources only. No keyless replacement is used: the PageSpeed Insights API can be called without a key, but its documentation states its real-world (CrUX) data is soon to be discontinued ([PageSpeed Insights API, Get started](https://developers.google.com/speed/docs/insights/v5/get-started), read 2026-10-04). The UI states that field data is not available without a key.
 2. **Feature 19/20/21 (Certificate Transparency via crt.sh)** — crt.sh is a
    community service without an uptime/CORS SLA. Verify current behavior in
    a network-enabled environment before relying on it for production

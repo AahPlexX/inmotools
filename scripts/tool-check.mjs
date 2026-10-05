@@ -61,7 +61,7 @@ export function checkTool(slug, { strict = false, docs = standardDocs(), sources
     }
     counts[row.status] += 1;
   }
-  const complete = counts.verified + counts['not planned'];
+  const complete = counts.verified + counts.prohibited;
   const verified = specIds.filter((id) => rowById.get(id)?.status === 'verified');
   return { slug, pending: false, errors, counts, total: specIds.length, complete, verified, awaitingHuman };
 }
@@ -81,7 +81,7 @@ function report(result) {
   const parts = Object.entries(result.counts).filter(([, n]) => n).map(([status, n]) => `${status} ${n}`).join(', ');
   const state = result.total && result.complete === result.total ? 'complete' : 'incomplete';
   const human = result.awaitingHuman.length ? `; awaiting physical testing by human: ${result.awaitingHuman.join(', ')}` : '';
-  return [`${result.slug}: ${state}, ${result.complete}/${result.total} requirements verified or not planned (${parts})${human}`, ...result.errors.map((error) => `  error: ${error}`)].join('\n');
+  return [`${result.slug}: ${state}, ${result.complete}/${result.total} requirements verified or prohibited (${parts})${human}`, ...result.errors.map((error) => `  error: ${error}`)].join('\n');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -31,6 +31,7 @@ Do not invent a path, file, section, command, branch or policy. Check that every
 - No server, backend or server-side database; the site is static files on GitHub Pages.
 - Everything runs in the user's browser; data a tool keeps stays in that browser.
 - Network use is limited to the site's own files and public keyless sources requested by the user's own action.
+- No large language models (hosted or in the browser). Other machine learning only on the device, under the ML ruleset in the documentation standard.
 
 Anything that can be built within these rules is in scope (the default integration rule in the documentation standard).
 

@@ -14,13 +14,15 @@ This file defines where every tool's documentation lives and what it must contai
 - **Everything runs in the browser.** Processing happens on the user's device; data the tool keeps is stored only in that browser (IndexedDB, localStorage, the Cache API) and is never uploaded to a service the repository operates.
 - **Network use is limited** to fetching the site's own static files and, where a tool needs it, public keyless sources requested by the user's own action (no API keys or credentials).
 
-Every spec restates these rules under Constraints, and a requirement that conflicts with them is `not planned` with the rule cited.
+Every spec restates these rules under Constraints, and a requirement that conflicts with them is `prohibited` with the rule cited.
 
 ### Default integration rule
 
 If a function or feature can be built into a tool and it stays within the platform rules above (browser only, no auth, no database, works on GitHub Pages), it is integrated, and the integration is documented in the tool's spec, tracker and `.tasks/` entry.
 
-- `not planned` is allowed only when the feature breaks a platform rule, breaks a third-party source's terms or licence, needs an API key or account, or cannot run in a browser. The reason names which one.
+- `prohibited` is allowed only when the feature breaks a platform rule, breaks a third-party source's terms or licence, needs an API key or account, uses a large language model (see below), or cannot run in a browser. The reason names which one.
+- A feature that is not wanted for any other reason is not recorded at all: no row, no "not planned" note. Records list only what is built, what is to be built, and what is prohibited.
+- Records written before 2026-10-04 may say `not planned`; it means `prohibited`.
 - Design preference, effort or "the rest of the site does not do this" is not a reason; such a feature is `missing` and goes on the tracker's Open work list.
 - This covers ideas as well as requests: a useful addition found while documenting or building a tool that fits the platform rules becomes an ID'd requirement (`missing`) straight away, without waiting for approval. "Intent not recorded" is only for questions the rules cannot settle (a choice between two valid behaviours, a cost, a licence or terms question).
 - A tool's title, summary and catalog copy must not promise anything the tool does not do. A promised feature that is not built is a `missing` requirement until it is built.
@@ -98,7 +100,7 @@ A request (a prompt, message or plan) becomes requirements before any code is wr
 2. Write each requirement as observable behaviour ("Exports the location as GeoJSON with longitude before latitude"), not as an implementation step.
 3. Give each requirement an acceptance test that a reviewer could run or check.
 4. Put anything the request did not settle under **Intent not recorded** and ask the owner; do not decide it silently.
-5. Record exclusions as `not planned` only under the [default integration rule](#default-integration-rule), with the reason.
+5. Record exclusions as `prohibited` only under the [default integration rule](#default-integration-rule), with the reason.
 6. The owner confirms the list; the spec header changes to `basis: approved` and the change log records the date.
 
 Later requests add new IDs; existing IDs are never renumbered.
@@ -155,14 +157,38 @@ grep -rln "^status: active$" src/tools         # trackers with work in progress
 
 ## Requirement IDs and statuses
 
-- Each tool has a short upper-case prefix recorded in its index row (e.g. `GIH`). The prefix, like the slug, never changes when the tool is renamed. Requirements are `<PREFIX>-R01`, `<PREFIX>-R02`, …; IDs are never reused or renumbered. A dropped requirement keeps its ID with status `not planned` and a reason.
+- Each tool has a short upper-case prefix recorded in its index row (e.g. `GIH`). The prefix, like the slug, never changes when the tool is renamed. Requirements are `<PREFIX>-R01`, `<PREFIX>-R02`, …; IDs are never reused or renumbered. A dropped requirement keeps its ID with status `prohibited` and a reason.
 - One requirement per table row, on one line.
 - Status values (no others):
   - `verified` — implemented and covered by a named test or recorded check; the evidence column cites it.
   - `implemented` — present in the code; no covering test found.
   - `partial` — some of the acceptance criteria are met; the tracker says which.
   - `missing` — required but not present.
-  - `not planned` — excluded under the default integration rule; the reason names the rule, term, licence or browser limit.
+  - `prohibited` — must not be built; the reason names the platform rule, term, licence, key, LLM or browser limit. Agents do not build, propose or partially build a prohibited feature.
+
+### Machine learning and AI
+
+- **Large language models (LLMs) are prohibited** in every tool, whether hosted or run in the browser: hosted LLMs need API keys or accounts, and LLM output is not reliable enough for a tool's results. "AI" in this repository means LLMs.
+- **Other machine learning (ML) is permitted** when it runs entirely in the browser (for example a model in WebAssembly, WebGPU or ONNX Runtime Web), needs no key or account, and its model and weights may be redistributed under their licence.
+- There are no user accounts, so ML that learns from one user over a long time is not built; a model may adapt within a session or from data the user explicitly loads.
+- ML is not required anywhere. The comparison below is made only when a function could reasonably be built either with or without ML; it is not applied to every function.
+
+When a function could use ML or a non-ML method, decide with this ruleset and record it in the spec:
+
+1. **Gates (pass or fail, both candidates):** runs fully in the browser on the site's own files; no key, account or server; licence of code, model and weights allows redistribution on this site; data stays on the device; not an LLM. A candidate that fails a gate is out.
+2. **Same test set:** evaluate every remaining candidate on the same inputs, chosen before the evaluation and representative of the function's real use (record them in `tests/fixtures/`).
+3. **Score each criterion 0–5 from measurements, not opinion,** then weight:
+
+   | Criterion | Weight | Measured as |
+   | --- | --- | --- |
+   | Result quality | 40 | The function's own metric on the test set (accuracy, error, perceptual score) |
+   | Reliability | 20 | Same input gives the same result; failure rate; behaviour on bad input |
+   | Speed and memory | 15 | Time and peak memory on a mid-range phone and a desktop |
+   | Download size | 10 | Bytes added to load the function (model and runtime included) |
+   | Maintainability | 15 | Code and dependencies to keep current; how results can be checked |
+
+4. **Choose the higher total.** A tie, or a difference under 5 points, goes to the non-ML method (simpler to verify). Do not favour either kind for novelty or familiarity.
+5. **Record** in the spec under "Technique decisions": the function's requirement ID, date, candidates, gate results, test set, measurements, scores, choice, and sources with dates. The decision holds for that date; it is revisited only when a requirement changes or a candidate's facts change (new model, licence, browser support).
 
 ### Flag: awaiting physical testing by human
 
@@ -198,7 +224,10 @@ Repository constraints that apply (static GitHub Pages hosting, local-first priv
 Responsive layout, accessibility, performance, offline behaviour, export validity — each as an ID'd row in the table above.
 
 ## Definition of done
-The tool is complete when every requirement is `verified` or `not planned`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
+The tool is complete when every requirement is `verified` or `prohibited`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
+
+## Technique decisions
+Only for functions where ML and a non-ML method were compared (see "Machine learning and AI"): one entry per decision.
 
 ## Intent not recorded
 Requirements whose intended behaviour could not be established from the code, tests or existing records. Each item names what is unknown; the owner resolves it.
@@ -252,6 +281,7 @@ Dated entries, newest first.
 
 ## Change log
 
+- **2026-10-04:** `not planned` replaced by `prohibited`; unwanted features are not recorded; LLMs prohibited; ML permitted under the ML ruleset.
 - **2026-10-03:** Added the `[awaiting physical testing by human]` flag for criteria that need real hardware or a person.
 - **2026-10-03:** Catalog records moved to per-tool meta files; task state moved to per-task files (`.tasks/items/`); index columns regenerated by `pnpm docs:sync`; branch workflow replaced by `task:start` and integration on push.
 - **2026-10-02:** Ideas that fit the platform rules become requirements automatically; catalog copy may not promise unbuilt features; naming convention approved by the owner.

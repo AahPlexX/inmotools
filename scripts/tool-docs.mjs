@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-export const STATUSES = ['verified', 'implemented', 'partial', 'missing', 'not planned'];
+export const STATUSES = ['verified', 'implemented', 'partial', 'missing', 'prohibited'];
 /** Notes-column flag for criteria only a person with real hardware can check. */
 export const HUMAN_FLAG = '[awaiting physical testing by human]';
 const REQ_ROW = /^\| ([A-Z][A-Z0-9]*-R\d+) \|/;

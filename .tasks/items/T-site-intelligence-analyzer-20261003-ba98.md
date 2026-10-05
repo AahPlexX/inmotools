@@ -17,7 +17,7 @@ Known exception (docs/DECISIONS.md): `SiteIntelWorkspace.tsx` offers an optional
 Owner, 2026-10-04: "Remove the field, its storage and any code path that sends a key; if a keyless source for the same data exists and its terms allow browser use, you may use it, otherwise remove the feature and leave a clear note in the UI that field data is not available without a key. Clear any previously stored key from localStorage on load. The tool has no standard spec; record the change in src/tools/site-intel/TRACKING.md."
 
 ## Resume here
-Done. Feature 28 (CrUX) is not planned (needs an API key) in `src/tools/site-intel/TRACKING.md`; the field, its storage and `crux-engine.ts` are removed; DECISIONS "Known exceptions" row removed.
+Done. Feature 28 (CrUX) is prohibited (needs an API key) in `src/tools/site-intel/TRACKING.md`; the field, its storage and `crux-engine.ts` are removed; DECISIONS "Known exceptions" row removed.
 
 ## Log
 - 2026-10-03: recorded.
