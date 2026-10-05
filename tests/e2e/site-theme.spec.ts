@@ -24,7 +24,7 @@ test('the header control switches the theme and the choice survives a reload', a
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('./');
   const group = themeGroup(page);
-  await expect(group.getByRole('radio', { name: 'System' })).toBeChecked();
+  await expect(group.getByRole('radio', { name: 'Light' })).toBeChecked();
   await expect(html(page)).toHaveAttribute('data-theme', 'light');
 
   await group.getByRole('radio', { name: 'Dark' }).check();
@@ -63,8 +63,16 @@ test('the control is a labelled radio group operable from the keyboard', async (
   await expect(html(page)).toHaveAttribute('data-theme', 'dark');
 });
 
+test('defaults to light even when the device prefers dark', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('./');
+  await expect(themeGroup(page).getByRole('radio', { name: 'Light' })).toBeChecked();
+  await expect(html(page)).toHaveAttribute('data-theme', 'light');
+});
+
 test('System follows the colour scheme, including live changes', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
+  await storeChoice(page, 'system');
   await page.goto('./');
   await expect(themeGroup(page).getByRole('radio', { name: 'System' })).toBeChecked();
   await expect(html(page)).toHaveAttribute('data-theme', 'dark');

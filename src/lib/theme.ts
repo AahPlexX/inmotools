@@ -9,7 +9,8 @@ export type ResolvedTheme = 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = 'inmotools.theme.v1';
 export const THEME_CHOICES: readonly ThemeChoice[] = ['light', 'dark', 'system'];
-export const DEFAULT_THEME_CHOICE: ThemeChoice = 'system';
+// Light until every tool passes the dark-theme contrast check (docs/DECISIONS.md).
+export const DEFAULT_THEME_CHOICE: ThemeChoice = 'light';
 export const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
 
 /** Browser UI colour per resolved theme; equal to that theme's --paper token. */

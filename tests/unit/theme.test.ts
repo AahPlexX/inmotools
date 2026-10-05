@@ -51,10 +51,10 @@ function fakeDocument() {
 }
 
 describe('theme choice storage', () => {
-  it('defaults to following the system when nothing is stored', () => {
-    expect(DEFAULT_THEME_CHOICE).toBe('system');
-    expect(readThemeChoice(new MemoryStorage())).toBe('system');
-    expect(readThemeChoice(null)).toBe('system');
+  it('defaults to light when nothing is stored', () => {
+    expect(DEFAULT_THEME_CHOICE).toBe('light');
+    expect(readThemeChoice(new MemoryStorage())).toBe('light');
+    expect(readThemeChoice(null)).toBe('light');
   });
 
   it('round-trips every choice under the versioned key', () => {
@@ -71,12 +71,12 @@ describe('theme choice storage', () => {
     const storage = new MemoryStorage();
     for (const value of ['', 'Dark', 'high-contrast', '"dark"', 'null']) {
       storage.setItem(THEME_STORAGE_KEY, value);
-      expect(readThemeChoice(storage)).toBe('system');
+      expect(readThemeChoice(storage)).toBe('light');
     }
   });
 
   it('survives storage that throws', () => {
-    expect(readThemeChoice(throwingStorage)).toBe('system');
+    expect(readThemeChoice(throwingStorage)).toBe('light');
     expect(() => writeThemeChoice(throwingStorage, 'dark')).not.toThrow();
   });
 });
@@ -150,8 +150,8 @@ describe('pre-paint script in index.html', () => {
     }
   });
 
-  it('falls back to the system setting when storage is blocked', () => {
-    expect(runPrepaint(null, true, true).theme()).toBe('dark');
+  it('falls back to light when storage is blocked', () => {
+    expect(runPrepaint(null, true, true).theme()).toBe('light');
     expect(runPrepaint(null, false, true).theme()).toBe('light');
   });
 });
