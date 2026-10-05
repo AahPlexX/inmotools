@@ -3,7 +3,7 @@ task: T-site-intelligence-analyzer-20261005-6a8f
 tool: site-intelligence-analyzer
 doc: task
 kind: expand
-state: next
+state: active
 branch: expand/site-intelligence-analyzer
 created: 2026-10-05
 updated: 2026-10-05
@@ -19,3 +19,4 @@ Read `src/tools/site-intel/TRACKING.md` and continue with its rows that are not 
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
+- 2026-10-05: claimed `expand/site-intelligence-analyzer`.
