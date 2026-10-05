@@ -11,7 +11,7 @@ Owner decisions and repository-wide facts that are not universal rules. Universa
 
 | Date | Decision |
 | --- | --- |
-| 2026-10-04 | One site-wide theme selector (TASK-028) in the site header: Light, Dark, System. The default is System (follows the device setting); the choice is stored in this browser under localStorage key `inmotools.theme.v1`; the browser `theme-color` follows the page background of the resolved theme. Per-tool theme behaviour is each tool's own requirement. |
+| 2026-10-04 | One site-wide theme selector (TASK-028) in the site header: Light, Dark, System. The default is Light until every tool passes the dark-theme contrast check, then System (follows the device setting); visitors can choose Dark or System now; the choice is stored in this browser under localStorage key `inmotools.theme.v1`; the browser `theme-color` follows the page background of the resolved theme. Per-tool theme behaviour is each tool's own requirement. |
 | 2026-10-04 | Open-Meteo's free keyless API may be used: the site is non-commercial. Any tool may use it where it fits the platform rules, including Geo Intelligence Hub. |
 | 2026-10-03 | Requirements that need real hardware or a person carry the flag `[awaiting physical testing by human]` and are never `verified` until a person records the check ([standard](DOCUMENTATION_STANDARD.md#flag-awaiting-physical-testing-by-human)). |
 | 2026-10-03 | When a new test shows a requirement's status is wrong, the agent corrects it, and fixes the code in the same branch when the fix is fully within that tool. |
