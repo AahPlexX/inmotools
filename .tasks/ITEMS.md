@@ -63,6 +63,7 @@ None.
 | [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
 | [T-pdf-sanitizer-20261005-a7bc](items/T-pdf-sanitizer-20261005-a7bc.md) | `pdf-sanitizer` | expand | `expand/pdf-sanitizer` | 2026-10-05 | Standard spec and tracker |
 | [T-regex-log-structurer-20261004-443d](items/T-regex-log-structurer-20261004-443d.md) | `regex-log-structurer` | expand | `expand/regex-log-structurer` | 2026-10-04 | Cover untested requirements |
+| [T-regex-matrix-20261005-80f4](items/T-regex-matrix-20261005-80f4.md) | `regex-matrix` | expand | `expand/regex-matrix` | 2026-10-05 | Standard spec and tracker |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
 | [T-sightline-velocity-20261005-99c0](items/T-sightline-velocity-20261005-99c0.md) | `sightline-velocity` | expand | `expand/sightline-velocity` | 2026-10-05 | Standard spec and tracker |
