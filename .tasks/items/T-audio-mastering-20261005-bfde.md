@@ -3,7 +3,7 @@ task: T-audio-mastering-20261005-bfde
 tool: audio-mastering
 doc: task
 kind: expand
-state: backlog
+state: active
 branch: expand/audio-mastering
 created: 2026-10-05
 updated: 2026-10-05
@@ -19,3 +19,4 @@ Becomes requirements when the tool's standard spec is written (T-repository-stan
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
+- 2026-10-05: claimed `expand/audio-mastering`.
