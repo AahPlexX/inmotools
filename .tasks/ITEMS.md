@@ -58,17 +58,22 @@ None.
 | [T-glsl-sandbox-20261004-eb99](items/T-glsl-sandbox-20261004-eb99.md) | `glsl-sandbox` | expand | `expand/glsl-sandbox` | 2026-10-04 | Cover untested requirements |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
 | [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
+| [T-markdown-workbench-20261005-f698](items/T-markdown-workbench-20261005-f698.md) | `markdown-workbench` | expand | `expand/markdown-workbench` | 2026-10-05 | Standard spec and tracker |
 | [T-midi-harmony-lab-20261004-8a99](items/T-midi-harmony-lab-20261004-8a99.md) | `midi-harmony-lab` | expand | `expand/midi-harmony-lab` | 2026-10-04 | Cover untested requirements |
 | [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
+| [T-pdf-sanitizer-20261005-a7bc](items/T-pdf-sanitizer-20261005-a7bc.md) | `pdf-sanitizer` | expand | `expand/pdf-sanitizer` | 2026-10-05 | Standard spec and tracker |
 | [T-regex-log-structurer-20261004-443d](items/T-regex-log-structurer-20261004-443d.md) | `regex-log-structurer` | expand | `expand/regex-log-structurer` | 2026-10-04 | Cover untested requirements |
 | [T-regex-matrix-20261005-80f4](items/T-regex-matrix-20261005-80f4.md) | `regex-matrix` | expand | `expand/regex-matrix` | 2026-10-05 | Standard spec and tracker |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
+| [T-sightline-velocity-20261005-99c0](items/T-sightline-velocity-20261005-99c0.md) | `sightline-velocity` | expand | `expand/sightline-velocity` | 2026-10-05 | Standard spec and tracker |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-04 | Remove or replace the CrUX API key field |
 | [T-subtitle-drift-20261004-24d9](items/T-subtitle-drift-20261004-24d9.md) | `subtitle-drift` | expand | `expand/subtitle-drift` | 2026-10-04 | Cover untested requirements |
+| [T-tabular-sheet-workstation-20261005-9af5](items/T-tabular-sheet-workstation-20261005-9af5.md) | `tabular-sheet-workstation` | expand | `expand/tabular-sheet-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 | [T-tactical-matchboard-studio-20261004-a71c](items/T-tactical-matchboard-studio-20261004-a71c.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Make the vector frame ZIP unit test deterministic |
 | [T-tactical-matchboard-studio-20261005-4bff](items/T-tactical-matchboard-studio-20261005-4bff.md) | `tactical-matchboard-studio` | expand | `expand/tactical-matchboard-studio` | 2026-10-05 | Standard spec and tracker |
+| [T-transcode-workstation-20261005-bbaa](items/T-transcode-workstation-20261005-bbaa.md) | `transcode-workstation` | expand | `expand/transcode-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-video-keyframe-slicer-20261004-e016](items/T-video-keyframe-slicer-20261004-e016.md) | `video-keyframe-slicer` | expand | `expand/video-keyframe-slicer` | 2026-10-04 | Cover untested requirements |
 
 ## rejected
