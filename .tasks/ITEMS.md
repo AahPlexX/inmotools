@@ -65,6 +65,7 @@ None.
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-04 | Remove or replace the CrUX API key field |
 | [T-subtitle-drift-20261004-24d9](items/T-subtitle-drift-20261004-24d9.md) | `subtitle-drift` | expand | `expand/subtitle-drift` | 2026-10-04 | Cover untested requirements |
+| [T-tabular-sheet-workstation-20261005-9af5](items/T-tabular-sheet-workstation-20261005-9af5.md) | `tabular-sheet-workstation` | expand | `expand/tabular-sheet-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 | [T-tactical-matchboard-studio-20261004-a71c](items/T-tactical-matchboard-studio-20261004-a71c.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Make the vector frame ZIP unit test deterministic |
 | [T-video-keyframe-slicer-20261004-e016](items/T-video-keyframe-slicer-20261004-e016.md) | `video-keyframe-slicer` | expand | `expand/video-keyframe-slicer` | 2026-10-04 | Cover untested requirements |
