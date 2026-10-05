@@ -68,6 +68,7 @@ None.
 | [T-subtitle-drift-20261004-24d9](items/T-subtitle-drift-20261004-24d9.md) | `subtitle-drift` | expand | `expand/subtitle-drift` | 2026-10-04 | Cover untested requirements |
 | [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 | [T-tactical-matchboard-studio-20261004-a71c](items/T-tactical-matchboard-studio-20261004-a71c.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Make the vector frame ZIP unit test deterministic |
+| [T-tactical-matchboard-studio-20261005-4bff](items/T-tactical-matchboard-studio-20261005-4bff.md) | `tactical-matchboard-studio` | expand | `expand/tactical-matchboard-studio` | 2026-10-05 | Standard spec and tracker |
 | [T-video-keyframe-slicer-20261004-e016](items/T-video-keyframe-slicer-20261004-e016.md) | `video-keyframe-slicer` | expand | `expand/video-keyframe-slicer` | 2026-10-04 | Cover untested requirements |
 
 ## rejected
