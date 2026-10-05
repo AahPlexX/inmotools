@@ -58,6 +58,7 @@ None.
 | [T-glsl-sandbox-20261004-eb99](items/T-glsl-sandbox-20261004-eb99.md) | `glsl-sandbox` | expand | `expand/glsl-sandbox` | 2026-10-04 | Cover untested requirements |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
 | [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
+| [T-markdown-workbench-20261005-f698](items/T-markdown-workbench-20261005-f698.md) | `markdown-workbench` | expand | `expand/markdown-workbench` | 2026-10-05 | Standard spec and tracker |
 | [T-midi-harmony-lab-20261004-8a99](items/T-midi-harmony-lab-20261004-8a99.md) | `midi-harmony-lab` | expand | `expand/midi-harmony-lab` | 2026-10-04 | Cover untested requirements |
 | [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
 | [T-pdf-sanitizer-20261005-a7bc](items/T-pdf-sanitizer-20261005-a7bc.md) | `pdf-sanitizer` | expand | `expand/pdf-sanitizer` | 2026-10-05 | Standard spec and tracker |
