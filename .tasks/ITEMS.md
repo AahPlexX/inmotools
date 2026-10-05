@@ -14,6 +14,7 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
+| [T-repository-dark-contrast-20261004-b7d2](items/T-repository-dark-contrast-20261004-b7d2.md) | repository | fix | `fix/<slug> per tool` | 2026-10-04 | Fix dark-theme contrast in ten tool workspaces, then default to System |
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
 
 ## backlog
