@@ -1,5 +1,7 @@
 # Photo Studio — Authoritative Completion Tracker
 
+> **Historical record (banner added 2026-10-05).** Written before the current workflow. Branches, pull requests, PR numbers and registration steps mentioned here (`src/catalog.ts` entries, `workspaces.tsx` loaders, `ToolSlug`, `.tasks/IN_PROGRESS.md`, `.tasks/config.json` IDs) are no longer used: tools register through `src/tools/<folder>/<slug>.meta.ts`, work starts with `pnpm task:start`, and pushes merge without pull requests ([AGENTS.md](../AGENTS.md)). Feature facts and evidence below stay valid as a record; current status is in the tool's tracker or task file.
+
 > This file is the authoritative completion and maintenance record for Photo Studio. The original implementation branches and PRs are historical only; future accepted Photo scope must start from current `origin/main` and re-enter the repository task-state system.
 
 ## Deterministic completion goal
