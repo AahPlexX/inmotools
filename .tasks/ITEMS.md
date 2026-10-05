@@ -30,7 +30,6 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
-| [T-audio-mastering-20261005-bfde](items/T-audio-mastering-20261005-bfde.md) | `audio-mastering` | expand | `expand/audio-mastering` | 2026-10-05 | Audio Mastering parity candidates |
 | [T-fiber-craft-workstation-20261005-c0ef](items/T-fiber-craft-workstation-20261005-c0ef.md) | `fiber-craft-workstation` | expand | `expand/fiber-craft-workstation` | 2026-10-05 | Group the crochet inspector into collapsible sections |
 | [T-repository-search-indexing-20261005-aecd](items/T-repository-search-indexing-20261005-aecd.md) | repository | expand | `main (repository-wide)` | 2026-10-05 | Crawlable per-tool URLs for search engines |
 
@@ -44,6 +43,7 @@ None.
 | [T-apca-token-matrix-20261004-0c8f](items/T-apca-token-matrix-20261004-0c8f.md) | `apca-token-matrix` | expand | `expand/apca-token-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-audio-mastering-20261004-5d02](items/T-audio-mastering-20261004-5d02.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Stop mastering loudness unit tests timing out under load |
 | [T-audio-mastering-20261004-d7fa](items/T-audio-mastering-20261004-d7fa.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Make the mastering realtime-chain e2e test pass under load |
+| [T-audio-mastering-20261005-bfde](items/T-audio-mastering-20261005-bfde.md) | `audio-mastering` | expand | `expand/audio-mastering` | 2026-10-05 | Standard spec and tracker |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
@@ -58,16 +58,22 @@ None.
 | [T-glsl-sandbox-20261004-eb99](items/T-glsl-sandbox-20261004-eb99.md) | `glsl-sandbox` | expand | `expand/glsl-sandbox` | 2026-10-04 | Cover untested requirements |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
 | [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
+| [T-markdown-workbench-20261005-f698](items/T-markdown-workbench-20261005-f698.md) | `markdown-workbench` | expand | `expand/markdown-workbench` | 2026-10-05 | Standard spec and tracker |
 | [T-midi-harmony-lab-20261004-8a99](items/T-midi-harmony-lab-20261004-8a99.md) | `midi-harmony-lab` | expand | `expand/midi-harmony-lab` | 2026-10-04 | Cover untested requirements |
 | [T-otel-flamegraph-20261004-b474](items/T-otel-flamegraph-20261004-b474.md) | `otel-flamegraph` | expand | `expand/otel-flamegraph` | 2026-10-04 | Cover untested requirements |
+| [T-pdf-sanitizer-20261005-a7bc](items/T-pdf-sanitizer-20261005-a7bc.md) | `pdf-sanitizer` | expand | `expand/pdf-sanitizer` | 2026-10-05 | Standard spec and tracker |
 | [T-photo-studio-20261005-aa18](items/T-photo-studio-20261005-aa18.md) | `photo-studio` | expand | `expand/photo-studio` | 2026-10-05 | Standard spec and tracker |
 | [T-regex-log-structurer-20261004-443d](items/T-regex-log-structurer-20261004-443d.md) | `regex-log-structurer` | expand | `expand/regex-log-structurer` | 2026-10-04 | Cover untested requirements |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
+| [T-sightline-velocity-20261005-99c0](items/T-sightline-velocity-20261005-99c0.md) | `sightline-velocity` | expand | `expand/sightline-velocity` | 2026-10-05 | Standard spec and tracker |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-04 | Remove or replace the CrUX API key field |
 | [T-subtitle-drift-20261004-24d9](items/T-subtitle-drift-20261004-24d9.md) | `subtitle-drift` | expand | `expand/subtitle-drift` | 2026-10-04 | Cover untested requirements |
+| [T-tabular-sheet-workstation-20261005-9af5](items/T-tabular-sheet-workstation-20261005-9af5.md) | `tabular-sheet-workstation` | expand | `expand/tabular-sheet-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-tactical-matchboard-studio-20261003-2c29](items/T-tactical-matchboard-studio-20261003-2c29.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Align MEDIABUNNY_PIN with the installed MediaBunny |
 | [T-tactical-matchboard-studio-20261004-a71c](items/T-tactical-matchboard-studio-20261004-a71c.md) | `tactical-matchboard-studio` | fix | `fix/tactical-matchboard-studio` | 2026-10-04 | Make the vector frame ZIP unit test deterministic |
+| [T-tactical-matchboard-studio-20261005-4bff](items/T-tactical-matchboard-studio-20261005-4bff.md) | `tactical-matchboard-studio` | expand | `expand/tactical-matchboard-studio` | 2026-10-05 | Standard spec and tracker |
+| [T-transcode-workstation-20261005-bbaa](items/T-transcode-workstation-20261005-bbaa.md) | `transcode-workstation` | expand | `expand/transcode-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-video-keyframe-slicer-20261004-e016](items/T-video-keyframe-slicer-20261004-e016.md) | `video-keyframe-slicer` | expand | `expand/video-keyframe-slicer` | 2026-10-04 | Cover untested requirements |
 
 ## rejected
