@@ -72,7 +72,7 @@ A change to `.github/workflows/` cannot be pushed by a workflow token; such a br
 ## 7. Records
 
 - Every piece of work has a task file in `.tasks/items/` whose `state` is current (`active`, `next`, `backlog`, `done`, `rejected`). Newly found work gets its own task file before the session ends. Rejected work keeps its file with the reason.
-- The older files in `.tasks/` (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`, `DONE.md`, `REJECTED.md`, `WORK_LOG.md`) are history: their open entries stay valid until moved to task files; new work is not added to them.
+- `DONE.md`, `WORK_LOG.md` and `REJECTED.md` in `.tasks/` are history from before task files. `IN_PROGRESS.md`, `NEXT.md` and `BACKLOG.md` are retired: they only list where their entries went. Nothing new is added to any of them.
 - If the code, a tracker and a task file disagree, the records are stale and the work is not complete.
 
 ## 8. Report to the owner

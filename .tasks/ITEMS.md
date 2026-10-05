@@ -14,12 +14,25 @@ None.
 
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
+| [T-aethercast-20261005-9dbc](items/T-aethercast-20261005-9dbc.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-05 | Record the sources for AetherCast's thresholds and models (TASK-012) |
+| [T-cad-studio-20261005-2c4b](items/T-cad-studio-20261005-2c4b.md) | `cad-studio` | expand | `expand/cad-studio` | 2026-10-05 | Continue CAD Studio at the current gate |
+| [T-crystal-lattice-studio-20261005-4e6d](items/T-crystal-lattice-studio-20261005-4e6d.md) | `crystal-lattice-studio` | expand | `expand/crystal-lattice-studio` | 2026-10-05 | Continue Crystal Lattice Studio against its master design |
+| [T-fiber-craft-workstation-20261005-1f3a](items/T-fiber-craft-workstation-20261005-1f3a.md) | `fiber-craft-workstation` | expand | `expand/fiber-craft-workstation` | 2026-10-05 | Build the remaining Fiber Craft requirements |
+| [T-repository-audit-backlog-20261005-7b9a](items/T-repository-audit-backlog-20261005-7b9a.md) | repository | fix | `fix/<slug> per tool` | 2026-10-05 | Work through the verified catalog-wide audit backlog (TASK-014) |
 | [T-repository-dark-contrast-20261004-b7d2](items/T-repository-dark-contrast-20261004-b7d2.md) | repository | fix | `fix/<slug> per tool` | 2026-10-04 | Fix dark-theme contrast in ten tool workspaces, then default to System |
+| [T-repository-scroll-regions-20261005-8cab](items/T-repository-scroll-regions-20261005-8cab.md) | repository | fix | `main (repository-wide)` | 2026-10-05 | Harden the shared scrollable regions for keyboard users (TASK-005) |
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
+| [T-site-intelligence-analyzer-20261005-5f7e](items/T-site-intelligence-analyzer-20261005-5f7e.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-05 | Port the archived Site Intelligence audit fixes (TASK-029) |
+| [T-site-intelligence-analyzer-20261005-6a8f](items/T-site-intelligence-analyzer-20261005-6a8f.md) | `site-intelligence-analyzer` | expand | `expand/site-intelligence-analyzer` | 2026-10-05 | Close the remaining Site Intelligence ledger gaps |
+| [T-web-layout-studio-20261005-3d5c](items/T-web-layout-studio-20261005-3d5c.md) | `web-layout-studio` | expand | `expand/web-layout-studio` | 2026-10-05 | Complete the Web Layout Studio feature ledger |
 
 ## backlog
 
-None.
+| Task | Tool | Kind | Branch | Updated | Title |
+| --- | --- | --- | --- | --- | --- |
+| [T-audio-mastering-20261005-bfde](items/T-audio-mastering-20261005-bfde.md) | `audio-mastering` | expand | `expand/audio-mastering` | 2026-10-05 | Audio Mastering parity candidates |
+| [T-fiber-craft-workstation-20261005-c0ef](items/T-fiber-craft-workstation-20261005-c0ef.md) | `fiber-craft-workstation` | expand | `expand/fiber-craft-workstation` | 2026-10-05 | Group the crochet inspector into collapsible sections |
+| [T-repository-search-indexing-20261005-aecd](items/T-repository-search-indexing-20261005-aecd.md) | repository | expand | `main (repository-wide)` | 2026-10-05 | Crawlable per-tool URLs for search engines |
 
 ## done
 

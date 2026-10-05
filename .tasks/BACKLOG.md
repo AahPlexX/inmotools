@@ -1,6 +1,11 @@
-# Backlog
+# Backlog (retired 2026-10-05)
 
-- **Tool-route search indexing (site-wide; raised independently by the PlanCraft pass 2026-09-27 and the GeoJSON pass 2026-09-28):** the shared GitHub Pages app uses fragment routes such as `#/floorplan-studio`, which Google Search Central says are not reliable separate content URLs, so no tool page can rank on its own and social previews only see the shared `index.html` metadata. A crawlable dedicated tool URL needs a repository-wide routing and deployment decision (History-API routes with GitHub Pages-compatible fallbacks and per-route static metadata). Do not treat a duplicate thin landing page as equivalent to a directly indexable tool route. Interim per-tool measures: GeoJSON improved its catalog title and summary; PlanCraft sets a tool-scoped `document.title` and meta description while open (helps tabs, bookmarks, and history, not indexing).
-- **Audio Mastering competitive-parity candidates (evidence-backed 2026-09-27 audit; deferred, not approved):** direct clip manipulation, editor clipboard, effect preview, recording, beat grid and snap, seamless-loop preparation, precise spectral selection, and macros or batch loudness. Source and rationale: docs/superpowers/plans/2026-09-27-audio-mastering-production-parity-audit.md. Needs an explicit implementation contract before any work starts.
-- **Fiber Craft crochet inspector grouping (2026-09-29):** the desktop inspector column stacks stitch editing, title & credit, export, and project file into one long scroll. Grouping rarely used sections into collapsible panels would shorten it; not required by any accepted crochet function. See `docs/fiber-craft-crochet-completion.md`.
-- **Tool-route search indexing (2026-09-28, deferred outside the GeoJSON-only scope):** the shared GitHub Pages app uses fragment routes, which Google Search Central says are not reliable separate content URLs. The GeoJSON catalog title and summary were improved, but a crawlable dedicated tool URL needs a repository-wide routing and deployment decision. Do not treat a duplicate thin landing page as equivalent to a directly indexable tool route. _(Restored 2026-10-02 from tag `archive/zealous-bohr-fiber-dup`; it was lost in the branch cleanup.)_
+This list is retired. Current work is in task files in [items/](items/), listed in [ITEMS.md](ITEMS.md). Do not add entries here and do not act on older copies of this file; its last content is in git history.
+
+Where each former entry went:
+
+| Former entry | Now |
+| --- | --- |
+| Tool-route search indexing (two entries) | [T-repository-search-indexing-20261005-aecd](items/T-repository-search-indexing-20261005-aecd.md) |
+| Audio Mastering parity candidates | [T-audio-mastering-20261005-bfde](items/T-audio-mastering-20261005-bfde.md) |
+| Fiber Craft crochet inspector grouping | [T-fiber-craft-workstation-20261005-c0ef](items/T-fiber-craft-workstation-20261005-c0ef.md) |
