@@ -13,7 +13,7 @@ updated: 2026-10-04
 
 ## Resume here
 
-82 requirements: 74 verified, 0 implemented, 4 missing, 4 not planned. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows TASK-028. No blocker. GIH-R67 axe test made deterministic (T-geo-intelligence-hub-20261004-9b3e). Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
+82 requirements: 74 verified, 0 implemented, 5 missing, 3 prohibited. Next action: build GIH-R81 and GIH-R82, then GIH-R80; GIH-R79 follows TASK-028. No blocker. GIH-R67 axe test made deterministic (T-geo-intelligence-hub-20261004-9b3e). Name confirmed by the owner (2026-10-01): Geo Intelligence Hub.
 
 ## Documents
 
@@ -104,10 +104,10 @@ Test names are quoted from the files under Documents. `e2e` = `tests/e2e/geo-int
 | GIH-R72 | verified | unit:review "neutralises formulas but keeps plain signed numbers"; unit:export "exports selected groups … formula neutralising" | |
 | GIH-R73 | verified | unit:net HttpClient tests (cache, dedupe, throttle, backoff, breaker, stale, timeout); unit:review "cancelling one caller does not cancel another caller…" | |
 | GIH-R74 | verified | unit:audit2 "finds points inside a boundary that crosses ±180°…", "starts a new subpath…" | |
-| GIH-R75 | not planned | spec | |
-| GIH-R76 | not planned | spec | |
-| GIH-R77 | not planned | spec | |
-| GIH-R78 | not planned | spec | |
+| GIH-R75 | prohibited | spec | |
+| GIH-R76 | prohibited | spec | |
+| GIH-R77 | prohibited | spec | |
+| GIH-R78 | missing | — | Open-Meteo allowed by the owner 2026-10-04 (non-commercial) |
 | GIH-R79 | missing | — | Delivered through the site-wide theme selector (TASK-028), not a tool-only toggle |
 | GIH-R80 | missing | — | Required by the default integration rule; ⓘ button and provenance dialog cover the data meanwhile |
 | GIH-R81 | missing | — | Added 2026-10-02 |

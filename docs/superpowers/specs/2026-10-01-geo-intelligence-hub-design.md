@@ -30,7 +30,7 @@ Out of scope:
 - BigDataCloud for arbitrary coordinates: its free endpoint is limited to the device's own location.
 - Bundled GISCO NUTS geometry: GISCO geodata terms are non-commercial; only the code-returning ID service is used.
 - REST Countries live, Open-Meteo, IP geolocation: excluded by the owner's original build brief (not by a licence; see GIH-R78).
-- Items listed as `not planned` in the requirements table (each breaks a source's terms or licence, or needs a key).
+- Items listed as `prohibited` in the requirements table (each breaks a source's terms or licence, or needs a key).
 
 ## Constraints
 
@@ -120,10 +120,10 @@ Out of scope:
 | GIH-R72 | Every CSV writer neutralises spreadsheet formulas but keeps plain signed numbers | Formula cells neutralised; `-12.5` kept |
 | GIH-R73 | Requests use a TTL cache, de-duplication, per-source throttling, timeout, backoff with Retry-After, a circuit breaker and stale-cache fallback | Each behaviour covered by the HTTP client tests |
 | GIH-R74 | Antimeridian-crossing boundaries draw without a stray line and test points correctly | Fiji-style polygon inside/outside; seam path splits |
-| GIH-R75 | Autocomplete / search-as-you-type | not planned: no keyless provider permits it |
-| GIH-R76 | Route and travel-time distances | not planned: OSRM demo policy forbids app use; other routing APIs need keys |
-| GIH-R77 | Satellite or slippy base-map tiles | not planned: OSM tile policy forbids heavy app use; imagery needs keys |
-| GIH-R78 | Weather | not planned: the owner's original brief excluded Open-Meteo, the only keyless option (others need keys). Open-Meteo's licence does not forbid it: data is CC BY 4.0 and the free API is for non-commercial use (AetherCast already uses it). Lifting the brief exclusion makes this `missing` |
+| GIH-R75 | Autocomplete / search-as-you-type | prohibited: no keyless provider permits it |
+| GIH-R76 | Route and travel-time distances | prohibited: OSRM demo policy forbids app use; other routing APIs need keys |
+| GIH-R77 | Satellite or slippy base-map tiles | prohibited: OSM tile policy forbids heavy app use; imagery needs keys |
+| GIH-R78 | Current weather and a short forecast for the location from Open-Meteo (keyless; non-commercial use, data CC BY 4.0, attributed) | After a lookup the profile shows current conditions and the next days' forecast with Open-Meteo attribution; no request is made before the user's lookup |
 | GIH-R79 | Workspace follows the site-wide theme (light, dark, system) from TASK-028, meeting the same contrast checks | Workspace switches with the site theme; axe passes in both themes |
 | GIH-R80 | Long-press on a profile row opens the row menu on iOS Safari (which fires no `contextmenu`) | Touch-and-hold on a row opens the row menu in WebKit |
 | GIH-R81 | PDF location brief keeps non-Latin names by embedding a freely licensed Unicode font | Cyrillic and CJK names appear in the PDF |
@@ -131,7 +131,7 @@ Out of scope:
 
 ## Definition of done
 
-The tool is complete when every requirement is `verified` or `not planned`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
+The tool is complete when every requirement is `verified` or `prohibited`, and the completion gates in `.tasks/PROJECT_COMPLETION.md` are met.
 
 ## Intent not recorded
 
