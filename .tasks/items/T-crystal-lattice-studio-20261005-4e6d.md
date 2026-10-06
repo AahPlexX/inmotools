@@ -3,10 +3,10 @@ task: T-crystal-lattice-studio-20261005-4e6d
 tool: crystal-lattice-studio
 doc: task
 kind: expand
-state: next
+state: active
 branch: expand/crystal-lattice-studio
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Continue Crystal Lattice Studio against its master design
@@ -19,3 +19,4 @@ The per-capability ledger `docs/superpowers/plans/2026-09-29-crystal-lattice-stu
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
+- 2026-10-06: claimed `expand/crystal-lattice-studio`.
