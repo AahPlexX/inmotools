@@ -172,7 +172,7 @@ export default function CadViewport({ bodies, selection, onSelectBody, rebuildin
       const height = Math.max(1, rect.height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(width, height, false);
+      renderer.setSize(width, height, true);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
