@@ -38,6 +38,13 @@ Out of scope: nothing is excluded beyond the platform rules.
 - The installed glTF Transform WebP writer cannot emit a PNG/JPEG fallback, so converted output requires `EXT_texture_webp`.
 - The slug, route, file names (`<name>.optimized.glb`) and accessible names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `@gltf-transform/core@4.5.1` reads and writes GLB; `@gltf-transform/extensions@4.5.1` registers the glTF extensions; `@gltf-transform/functions@4.5.1` provides weld, dedup and simplify; `meshoptimizer@1.2.0` supplies the Meshopt decoder and simplifier; `three@0.185.1` renders the preview with its GLTFLoader and OrbitControls.
+- Workers: `gltf.worker.ts` runs optimization, started by `gltf-worker-client.ts`; where Web Workers are missing, the tool reports that optimization cannot run.
+- Browser APIs: WebGL (Three.js `WebGLRenderer`) renders the preview; `createImageBitmap` and `OffscreenCanvas` resize textures, and where either is missing texture work is skipped.
+- Network: none.
+
 ## Requirements
 
 ### Loading and container validation

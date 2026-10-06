@@ -36,6 +36,14 @@ Out of scope:
 - Storage: IndexedDB database `inmotools-tabular-sheet-workstation`; portable bundle schema version 1. Names, storage keys and formats are not changed.
 - Responsive proof uses CSS-width viewports (`CLIENT_VIEWPORTS`), not one device profile (formerly P16).
 
+## Architecture and engine
+
+- Engines and libraries: `xlsx@0.20.3` reads workbooks; `exceljs@4.4.0` writes `.xlsx`; `jszip@3.10.2` packs and reads the portable workbook bundle; `fast-xml-parser@5.11.1` parses comment XML; `@formulajs/formulajs@4.6.1` supplies the fallback formula functions; `@univerjs/presets@0.25.1` and `@univerjs/preset-sheets-core@0.25.1` provide the lazily loaded Univer engine-formula; `chart.js@4.5.1` draws charts; `dexie@4.4.6` stores workbooks.
+- Workers: none.
+- Storage: IndexedDB database `inmotools-tabular-sheet-workstation` (Dexie) with `workbooks` (saved portable workbooks) and `preferences` (key/value) stores; localStorage key `inmotools-tabular-sheet-prefs` holds zoom, theme, last workbook id and progress-panel visibility.
+- Browser APIs: Clipboard writes copied cells as TSV and reads pasted text, with the in-tool clipboard used where `navigator.clipboard` is missing; Canvas renders Chart.js charts; File and Blob handle import and download. If Univer fails to load, the local grid and portable formula evaluator stay active.
+- Network: none.
+
 ## Requirements
 
 ### Workbook and sheets

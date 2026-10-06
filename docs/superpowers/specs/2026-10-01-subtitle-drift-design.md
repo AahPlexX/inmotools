@@ -34,6 +34,11 @@ Out of scope:
 - The original source text is never changed; corrections are made on a copy.
 - No network requests.
 
+## Architecture and engine
+
+- Browser APIs: File reads subtitle files as text (`File.text()`); Blob object URLs deliver downloads.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

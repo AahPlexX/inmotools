@@ -30,6 +30,11 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - The trace is never altered (design).
 
+## Architecture and engine
+
+- Engines and libraries: no third-party engine; `otel-engine.ts` parses trace exports (`JSON.parse`), normalises spans and computes the critical path, and React renders the workspace.
+- Browser APIs: Canvas 2D draws the flamegraph (`FlamegraphCanvas.tsx`, device-pixel-ratio scaled, capped at 4096 px); the File API reads the imported trace file.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

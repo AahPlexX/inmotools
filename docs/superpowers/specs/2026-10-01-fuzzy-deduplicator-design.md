@@ -30,6 +30,12 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Matching runs in `dedupe.worker.ts`; candidate blocking avoids comparing every pair (design).
 
+## Architecture and engine
+
+- Engines and libraries: `papaparse@5.7.0` parses CSV; `read-excel-file@9.3.10` reads XLSX sheets; `double-metaphone@2.0.1` generates phonetic blocking keys for candidate matching.
+- Workers: `dedupe.worker.ts` finds duplicate clusters off the main thread and is terminated when a run is cancelled or inputs change.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

@@ -34,6 +34,11 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Audition uses the Web Audio API; no samples are downloaded.
 
+## Architecture and engine
+
+- Engines and libraries: `@tonejs/midi@2.0.28` writes the Standard MIDI file; `music-engine.ts` builds and voices chord progressions and serialises the progression JSON.
+- Browser APIs: Web Audio (`AudioContext` with oscillator and gain nodes, scheduled from the progression) plays the audition; when the context cannot be created the status line reports the failure and the MIDI and JSON exports still work. Blob downloads save `.mid` and `.json` files; the File API reads imported progression JSON.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

@@ -34,6 +34,12 @@ Out of scope:
 - No large language models; other ML only on the device under the ML ruleset. The word "AI" does not appear in the tool's copy.
 - Libraries as in `package.json` (`pdf-lib` for the PDF export). The `.circuit.json` format (schema version 1) and the localStorage keys (`inmotools_logic_workstation_autosave`, the shortcut and puzzle-progress keys) are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `pdf-lib@1.17.1` builds the PDF export; the simulation, synthesis, minimizer, analyzer, netlist, HDL (Verilog and VHDL), KiCad, EDIF and SPICE engines are first-party TypeScript in `src/tools/logic/`.
+- Storage: localStorage key `inmotools_logic_workstation_autosave` holds the autosaved project; key `inmotools_logic_shortcuts` holds the keyboard shortcuts; key `inmotools_logic_puzzle_progress` holds puzzle progress.
+- Browser APIs: Canvas 2D draws the circuit canvas and the logic analyzer, and rasterizes SVG to PNG through `Image` and `canvas.toBlob` (`svg-raster.ts`); exports and memory images download through `src/lib/download`.
+
 ## Requirements
 
 ### Canvas and schematic capture

@@ -36,6 +36,13 @@ Out of scope:
 - Capabilities are named descriptively (Anchor-Weight Typography, Trail-Gradient Text, ORP RSVP); commercial reading marks are not used (2026-09-15 design, "Naming and marks").
 - Libraries as in `package.json` (pdf.js, `pdf-lib`, `jszip`, `docx`, `papaparse`). Storage keys, state version and export formats are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `pdfjs-dist@6.3.289` extracts text from PDFs; `jszip@3.10.2` and `fast-xml-parser@5.11.1` read DOCX and EPUB sources; `unified@11.0.5`, `remark-parse@11.0.0`, `remark-gfm@4.0.1`, `rehype-parse@9.0.1` and `hast-util-to-text@4.0.2` read Markdown and HTML sources; `double-metaphone@2.0.1` groups similar-sounding words for the vocabulary bank; `culori@4.0.2` computes palette and gradient colours; `docx@9.7.1`, `jszip@3.10.2`, `pdf-lib@1.17.1` and `papaparse@5.7.0` write DOCX, EPUB, PDF and CSV exports; plain-text, RTF and text-encoding decoding, segmentation, ORP pacing and syllable counting are in-repo code; the reader fonts are bundled as woff2 files in `fonts/`.
+- Workers: the PDF.js worker (`pdfjs-dist/build/pdf.worker.min.mjs`, set in `pdfjs-extractor.ts`) parses PDF sources off the main thread.
+- Storage: localStorage key `inmotools.sightline.v1` holds the versioned reader record (settings, bookmarks, highlights, margin notes, token position, keyed by a document fingerprint); IndexedDB database `inmotools.sightline.v1` (version 1) holds object stores `sessions` (reading sessions), `documents` (document records) and `vocabulary` (saved words, keyPath `word`).
+- Browser APIs: Web Audio (`AudioContext`) plays the metronome click; Web Speech synthesis (`speechSynthesis`) reads text aloud and lists voices; the async Clipboard API reads pasted text (otherwise the status asks the user to paste into the box); Web Workers and WebAssembly are required for PDF import (other formats keep working); IndexedDB stores sessions and vocabulary (the warehouse reports unavailability); `TextDecoder` decodes legacy text encodings; Blob downloads save exports.
+
 ## Requirements
 
 ### Ingestion

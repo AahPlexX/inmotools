@@ -32,6 +32,14 @@ Out of scope: CrUX field data and fetching through a CORS proxy (the `prohibited
 - Third-party sources are used within their terms; crt.sh and ipapi.co availability and limits are outside the tool's control, and failures are reported, not guessed.
 - Libraries in use stay as they are: Dexie, jsPDF, Papa Parse.
 
+## Architecture and engine
+
+- Engines and libraries: `dexie@4.4.6` stores the report vault; `jspdf@4.2.1` writes the PDF report; `papaparse@5.7.0` writes the CSV export; the lexical, scoring, fingerprint, redirect, mixed-content, email-auth and DNSBL engines are first-party code over DNS-over-HTTPS answers.
+- Workers: none.
+- Storage: IndexedDB database `inmotools-site-intelligence` (Dexie) with `audits` (saved audit records, tags, notes) and `settings` (key/value) stores (`vault-db.ts`).
+- Browser APIs: fetch with AbortController timeouts for every lookup; Canvas 2D draws the node graph and renders the social-card PNG; Clipboard copies the sanitized URL; Blob downloads deliver exports. A failed or blocked lookup is reported as a blocked section and the other sections still render.
+- Network: on Analyze, `cloudflare-dns.com` and `dns.google` (DNS-over-HTTPS), `rdap.org`, `crt.sh`, `hstspreload.org`, `ipapi.co` and `web.archive.org`; on a well-known path preview click, the analyzed site's own `/robots.txt`, `/sitemap.xml` or `/.well-known/security.txt`.
+
 ## Requirements
 
 ### URL parsing and lexical forensics

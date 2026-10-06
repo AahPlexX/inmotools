@@ -71,6 +71,7 @@ None.
 | [T-regex-log-structurer-20261004-443d](items/T-regex-log-structurer-20261004-443d.md) | `regex-log-structurer` | expand | `expand/regex-log-structurer` | 2026-10-04 | Cover untested requirements |
 | [T-regex-matrix-20261005-80f4](items/T-regex-matrix-20261005-80f4.md) | `regex-matrix` | expand | `expand/regex-matrix` | 2026-10-05 | Standard spec and tracker |
 | [T-repository-agent-workflow-20261003-7c1e](items/T-repository-agent-workflow-20261003-7c1e.md) | repository | fix | `main` | 2026-10-03 | Agent workflow: per-tool catalog, computed completion, integration without pull requests |
+| [T-repository-architecture-sections-20261006-d50e](items/T-repository-architecture-sections-20261006-d50e.md) | repository | expand | `main (repository-wide)` | 2026-10-06 | Architecture and engine section in every tool spec |
 | [T-repository-site-theme-20261004-814a](items/T-repository-site-theme-20261004-814a.md) | repository | expand | `main` | 2026-10-04 | Site-wide theme selector (light, dark, follow system): shared part of TASK-028 |
 | [T-sightline-velocity-20261005-99c0](items/T-sightline-velocity-20261005-99c0.md) | `sightline-velocity` | expand | `expand/sightline-velocity` | 2026-10-05 | Standard spec and tracker |
 | [T-site-intelligence-analyzer-20261003-ba98](items/T-site-intelligence-analyzer-20261003-ba98.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-04 | Remove or replace the CrUX API key field |

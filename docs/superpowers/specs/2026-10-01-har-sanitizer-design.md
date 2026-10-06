@@ -31,6 +31,12 @@ Out of scope (from the README):
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - The exported file stays valid HAR JSON and keeps unrelated fields and number lexemes exactly.
 
+## Architecture and engine
+
+- Engines and libraries: HAR parsing, secret detection, redaction and waterfall layout are in-house code in `har-engine.ts`; no third-party libraries beyond React.
+- Browser APIs: Web Crypto (`crypto.subtle.digest`, SHA-256) produces hashed replacements; Canvas 2D draws the waterfall chart.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

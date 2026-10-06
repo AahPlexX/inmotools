@@ -43,8 +43,24 @@ for (const file of UNIVERSAL.filter(existsSync)) {
   }
 }
 
+// Every spec has an "Architecture and engine" section; libraries named in it as `name@version`
+// must be dependencies in package.json at exactly that version.
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+for (const file of standard) {
+  const text = readFileSync(file, 'utf8');
+  if (!/^---\n[\s\S]*?\ndoc: spec\n/.test(text.slice(0, 600))) continue;
+  const section = /^## Architecture and engine\n([\s\S]*?)(?=^## )/m.exec(text)?.[1];
+  if (!section || !section.trim()) { problems.push(`${file}: missing the "## Architecture and engine" section`); continue; }
+  for (const [, name, version] of section.matchAll(/`((?:@[a-z0-9._-]+\/)?[a-z0-9._-]+)@(\d[^`\s]*)`/g)) {
+    const declared = deps[name];
+    if (!declared) problems.push(`${file}: architecture names ${name}@${version}, which is not a dependency in package.json`);
+    else if (declared !== version && !declared.endsWith(`@${version}`) && !declared.includes(`/${name}-${version}`)) problems.push(`${file}: architecture says ${name}@${version}, package.json has ${declared}`);
+  }
+}
+
 if (problems.length) {
   console.error(`Standard document problems:\n${problems.join('\n')}`);
   process.exit(1);
 }
-console.log(`Checked ${standard.length} standard documents; links resolve, tool headers match the catalog, universal rules name no tool.`);
+console.log(`Checked ${standard.length} standard documents; links resolve, tool headers match the catalog, universal rules name no tool, specs name only pinned dependencies.`);

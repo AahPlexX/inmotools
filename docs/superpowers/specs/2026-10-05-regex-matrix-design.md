@@ -36,6 +36,14 @@ Out of scope:
 - Browsers coarsen timers, so timings are stated in milliseconds.
 - Compatibility-only flavors are labelled as not executing; no engine is simulated.
 
+## Architecture and engine
+
+- Engines and libraries: `pcre2-wasm@10.47.5` runs PCRE2 patterns; `vscode-oniguruma@2.0.1` runs Oniguruma patterns (its `onig.wasm` is bundled); `pyodide@314.0.6` runs Python `re` (runtime files copied to the site's `pyodide/` folder); ECMAScript patterns run on the browser's own `RegExp`; `@eslint-community/regexpp@4.12.2` parses patterns to an AST; `redos-detector@6.1.4` checks patterns for catastrophic backtracking; `lz-string@1.5.0` compresses share-link state; `yaml@2.9.0` writes YAML assertion exports; `@codemirror/state@6.7.1`, `@codemirror/view@6.43.9`, `@codemirror/commands@6.11.1`, `@codemirror/autocomplete@6.20.3` and `@codemirror/search@6.7.1` provide the pattern editor.
+- Workers: `regex-worker.ts` executes ECMAScript, PCRE2 and Oniguruma matching (client `regex-worker-client.ts`); `python-worker.ts` loads Pyodide and executes Python matching (client `python-worker-client.ts`); `regex-substitution-worker.ts` runs ECMAScript replacement previews (client `regex-substitution-worker-client.ts`).
+- Storage: IndexedDB database `inmotools-regex-matrix` (version 1), object store `state`, holds the keys `saved-sessions`, `custom-tracks` and `academy-progress`; when IndexedDB is missing or fails, the same values go to localStorage under the prefix `inmotools_regex_matrix_`.
+- Browser APIs: Web Workers and WebAssembly run the engines; the Clipboard API copies share links (a failed write puts the state in the address bar hash instead); Blob downloads save match, assertion and custom-track exports.
+- Network: none beyond the site's own static files (the Oniguruma `.wasm` and the Pyodide runtime).
+
 ## Requirements
 
 ### Engines and execution

@@ -34,6 +34,11 @@ Out of scope:
 - Cron parsing uses the pinned `cron-parser` 5.10.1; timezone conversion uses the browser's `Intl` APIs, so the timezone list and rules are the browser's.
 - No network requests.
 
+## Architecture and engine
+
+- Engines and libraries: `cron-parser@5.10.1` (`CronExpressionParser`) resolves upcoming runs in the source timezone; timezone projection uses the browser `Intl.DateTimeFormat`.
+- Browser APIs: `Intl.DateTimeFormat` with `timeZone` validates and formats zones; `Intl.supportedValuesOf('timeZone')` lists zones where present, and only `UTC` is listed where it is missing; exports download through `src/lib/download`.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

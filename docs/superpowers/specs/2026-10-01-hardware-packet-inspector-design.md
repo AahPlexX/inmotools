@@ -33,6 +33,12 @@ Out of scope:
 - Web Serial needs a secure context and a Chromium-based browser; the device is chosen by the person in the browser's own picker.
 - Parsing-rule regular expressions run in a Web Worker with a time limit, so a slow pattern cannot freeze the page.
 
+## Architecture and engine
+
+- Engines and libraries: no third-party engine; `packet-engine.ts` frames, decodes and formats packets (`TextDecoder`/`TextEncoder`), and React renders the workspace.
+- Workers: `rules.worker.ts` matches capture rules against each entry's text and hex; it is created per run by `rule-runner.ts` and terminated after the result or a 1.5 s timeout.
+- Browser APIs: Web Serial (`navigator.serial.requestPort`, `SerialPort.open`, readable stream reader) reads the device; without it the status line says so and the built-in simulator remains available. Web Workers run rule matching; without them rule matching reports an error and capture continues. Blob downloads export text.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

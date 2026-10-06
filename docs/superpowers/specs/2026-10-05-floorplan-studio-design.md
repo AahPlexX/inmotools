@@ -36,6 +36,14 @@ Out of scope:
 - Libraries as in `package.json` (`pdf-lib` for the PDF export). The plan JSON format (`schemaVersion` 1), geometry in millimeters, the autosave key `inmotools_plancraft_autosave`, the slug `floorplan-studio` and the folder `src/tools/floorplan/` are not changed.
 - The name PlanCraft Studio is to be renamed under the naming convention ([DECISIONS.md](../../DECISIONS.md), open questions); the slug, prefix and storage key stay.
 
+## Architecture and engine
+
+- Engines and libraries: `pdf-lib@1.17.1` writes the PDF export; geometry, snapping, rendering and SVG/JSON export are in-house code in `src/tools/floorplan/`.
+- Workers: `floorplan-worker.ts` runs plan analysis (overlaps, clearances); where the worker cannot start or fails, the same analysis runs on the main thread.
+- Storage: localStorage key `inmotools_plancraft_autosave` holds the autosaved project JSON; where localStorage is unavailable, the project is not autosaved.
+- Browser APIs: Canvas 2D renders the plan (`render-engine.ts`).
+- Network: none.
+
 ## Requirements
 
 ### Wall drafting

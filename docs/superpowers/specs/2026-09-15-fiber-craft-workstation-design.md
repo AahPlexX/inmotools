@@ -47,6 +47,14 @@ chart can be compiled to a human-readable written pattern in addition to its vis
 
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 
+## Architecture and engine
+
+- Engines and libraries: `pdf-lib@1.17.1` writes pattern and materials PDFs; `fflate@0.8.3` zips the release files; `papaparse@5.7.0` writes the materials CSV; `culori@4.0.2` parses colours and computes CIEDE2000 differences for floss matching.
+- Workers: `counted-image.worker.ts` quantizes a photo to the counted grid, started by `counted-image-worker-client.ts`.
+- Storage: IndexedDB database `inmotools.fiber-craft-workstation`, object store `projects`, holds the autosaved project document; where IndexedDB is missing, autosave is reported unavailable and the work stays on screen.
+- Browser APIs: Canvas 2D draws the chart, grid and social preview; `createImageBitmap` and `OffscreenCanvas` decode and sample the image inside the worker; Clipboard (`navigator.clipboard.writeText`) copies pattern text, and where it is blocked the tool points to the .txt download.
+- Network: none.
+
 ## Requirements
 
 ### Shared canvas & workspace infrastructure

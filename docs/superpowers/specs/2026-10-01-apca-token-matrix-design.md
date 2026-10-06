@@ -31,6 +31,11 @@ Out of scope:
 - APCA via `apca-w3`; colour parsing via Culori (design).
 - At most 100 tokens, so the matrix stays within a bounded synchronous budget.
 
+## Architecture and engine
+
+- Engines and libraries: `apca-w3@0.1.9` computes APCA Lc; `culori@4.0.2` parses colour tokens and converts and formats them as hex; the WCAG ratio and the guidance thresholds are first-party code in `contrast-engine.ts`.
+- Browser APIs: Clipboard (`navigator.clipboard.writeText`) copies the CSS custom properties, and a status message reports when clipboard access is unavailable; exports download through `src/lib/download`.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

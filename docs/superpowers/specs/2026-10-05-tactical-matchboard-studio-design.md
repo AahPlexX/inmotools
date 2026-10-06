@@ -38,6 +38,14 @@ Out of scope:
 - Video export is offered only for combinations the browser's WebCodecs encoder confirms.
 - Rulesets carry provenance; validators are authoring aids, not officiating decisions.
 
+## Architecture and engine
+
+- Engines and libraries: `three@0.185.1` renders the 3D view and its OrbitControls; `dexie@4.4.6` stores projects and snapshots; `jszip@3.10.2` writes and reads project and frame-sequence ZIPs; `pdf-lib@1.17.1` writes PDF exports; `papaparse@5.7.0` reads and writes CSV; `mediabunny@1.60.0` encodes MP4/WebM video from a canvas.
+- Workers: none.
+- Storage: IndexedDB database `inmotools-tactical-matchboard` (Dexie) with `projects` (saved projects) and `snapshots` (autosave and named snapshots) stores (`persistence-engine.ts`).
+- Browser APIs: WebGL (through Three.js) for the 3D view, which shows an error notice and leaves the 2D board usable when WebGL fails or the context is lost; WebCodecs (through Mediabunny `canEncodeVideo`) decides which video formats are offered, and frame-sequence ZIP export covers browsers that cannot encode; Canvas 2D paints exported frames; HTMLVideoElement with Blob object URLs plays local review video.
+- Network: none.
+
 ## Requirements
 
 ### Pitch, rules and squad

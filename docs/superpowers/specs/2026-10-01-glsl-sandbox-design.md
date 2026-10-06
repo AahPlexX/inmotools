@@ -31,6 +31,12 @@ Out of scope:
 - Editor: CodeMirror 6 with the `shader` mode from `@codemirror/legacy-modes` (design).
 - The export never depends on InmoTools code (design).
 
+## Architecture and engine
+
+- Engines and libraries: `@codemirror/view@6.43.9`, `@codemirror/state@6.7.1`, `@codemirror/commands@6.11.1` and `@codemirror/language@6.12.4` provide the editor, and `@codemirror/legacy-modes@6.5.4` supplies the GLSL (C-like) highlighting.
+- Browser APIs: WebGL2 (`canvas.getContext('webgl2')`) compiles and runs the fragment shader, and where it is missing the tool reports that WebGL2 is unavailable; `webglcontextlost` and `webglcontextrestored` rebuild resources; `requestAnimationFrame` drives the render loop; `FileReader` and `Image` load texture files; the standalone HTML export embeds the shader and textures as data URLs.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |
