@@ -299,6 +299,7 @@
 .tsw-pivot-chrome {
   align-items: stretch;
   flex-direction: column;
+  flex-wrap: nowrap;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -369,6 +370,9 @@
 .tsw-chart {
   min-height: 14rem;
   position: relative;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tsw-engine-note {
