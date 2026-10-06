@@ -9,7 +9,7 @@
 **Capability expansion:** `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`
 **Authoritative plans:** `docs/superpowers/plans/2026-09-11-cad-studio.md` + `docs/superpowers/plans/2026-09-11-cad-studio-capability-expansion.md`
 **Dependency gate:** `docs/superpowers/specs/2026-09-11-cad-studio-dependency-decision.md`
-**Last tracked implementation commit:** `af0ddc095b8eecf53fd5f48b3624d1f346e3b4f7`
+**Last tracked implementation commit:** `855fa64708f26d3c3d75180200dbc4a719163d71`
 **Current gate:** G6 (feature evaluator, open) and G7 (workspace UI, started) in parallel
 **Completed gates:** 6 / 16
 **Capability target:** 195
