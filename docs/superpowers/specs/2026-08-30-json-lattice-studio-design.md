@@ -18,7 +18,7 @@ Current package choices verified on 2026-08-30:
 - `elkjs@0.12.0` — layered graph layout, executed inside our module Web Worker.
 - `@codemirror/lang-json@6.0.2`, `@codemirror/lint@6.9.7`, `@codemirror/search@6.7.1` — JSON language/lint/search on the existing CodeMirror 6 stack.
 - `yaml@2.9.0` — browser-capable YAML parser/stringifier.
-- `smol-toml@1.9.0` — TOML parser/stringifier.
+- `smol-toml@1.8.0` — TOML parser/stringifier.
 - `fast-xml-parser@5.11.1` — ESM/browser XML parser.
 - `papaparse@5.7.0` + `@types/papaparse@5.5.2` — browser CSV parsing/unparsing.
 - `jsonpath-plus@10.4.0` — JSONPath execution.
