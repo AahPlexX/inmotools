@@ -58,6 +58,7 @@ None.
 | [T-geo-intelligence-hub-20261004-9b3e](items/T-geo-intelligence-hub-20261004-9b3e.md) | `geo-intelligence-hub` | fix | `fix/geo-intelligence-hub` | 2026-10-04 | Find the cause of a one-off axe failure |
 | [T-geo-intelligence-hub-20261004-e828](items/T-geo-intelligence-hub-20261004-e828.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Cover untested requirements |
 | [T-glsl-sandbox-20261004-eb99](items/T-glsl-sandbox-20261004-eb99.md) | `glsl-sandbox` | expand | `expand/glsl-sandbox` | 2026-10-04 | Cover untested requirements |
+| [T-gltf-optimizer-20261006-a4eb](items/T-gltf-optimizer-20261006-a4eb.md) | `gltf-optimizer` | expand | `expand/gltf-optimizer` | 2026-10-06 | Standard spec and tracker |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
 | [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
 | [T-json-lattice-20261005-b260](items/T-json-lattice-20261005-b260.md) | `json-lattice` | expand | `expand/json-lattice` | 2026-10-05 | Standard spec and tracker |
