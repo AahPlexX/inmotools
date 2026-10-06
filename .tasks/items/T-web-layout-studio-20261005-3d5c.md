@@ -3,10 +3,10 @@ task: T-web-layout-studio-20261005-3d5c
 tool: web-layout-studio
 doc: task
 kind: expand
-state: next
+state: active
 branch: expand/web-layout-studio
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Complete the Web Layout Studio feature ledger
@@ -19,3 +19,4 @@ Open the ledger and continue at the first item not marked done. The tool has no 
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
+- 2026-10-06: claimed `expand/web-layout-studio`.
