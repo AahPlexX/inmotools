@@ -22,7 +22,6 @@ None.
 | [T-repository-standard-specs-20261003-3a9d](items/T-repository-standard-specs-20261003-3a9d.md) | repository | expand | `expand/<slug> per tool` | 2026-10-03 | Standard specs (per-feature spec sheets) for every tool |
 | [T-site-intelligence-analyzer-20261005-5f7e](items/T-site-intelligence-analyzer-20261005-5f7e.md) | `site-intelligence-analyzer` | fix | `fix/site-intelligence-analyzer` | 2026-10-05 | Port the archived Site Intelligence audit fixes (TASK-029) |
 | [T-site-intelligence-analyzer-20261005-6a8f](items/T-site-intelligence-analyzer-20261005-6a8f.md) | `site-intelligence-analyzer` | expand | `expand/site-intelligence-analyzer` | 2026-10-05 | Close the remaining Site Intelligence ledger gaps |
-| [T-web-layout-studio-20261005-3d5c](items/T-web-layout-studio-20261005-3d5c.md) | `web-layout-studio` | expand | `expand/web-layout-studio` | 2026-10-05 | Complete the Web Layout Studio feature ledger |
 
 ## backlog
 
@@ -84,6 +83,7 @@ None.
 | [T-transcode-workstation-20261005-bbaa](items/T-transcode-workstation-20261005-bbaa.md) | `transcode-workstation` | expand | `expand/transcode-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-typing-workstation-20261005-8002](items/T-typing-workstation-20261005-8002.md) | `typing-workstation` | expand | `expand/typing-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-video-keyframe-slicer-20261004-e016](items/T-video-keyframe-slicer-20261004-e016.md) | `video-keyframe-slicer` | expand | `expand/video-keyframe-slicer` | 2026-10-04 | Cover untested requirements |
+| [T-web-layout-studio-20261005-3d5c](items/T-web-layout-studio-20261005-3d5c.md) | `web-layout-studio` | expand | `expand/web-layout-studio` | 2026-10-06 | Standard spec and tracker |
 
 ## rejected
 
