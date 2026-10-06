@@ -16,7 +16,6 @@ None.
 | --- | --- | --- | --- | --- | --- |
 | [T-aethercast-20261005-9dbc](items/T-aethercast-20261005-9dbc.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-05 | Record the sources for AetherCast's thresholds and models (TASK-012) |
 | [T-cad-studio-20261005-2c4b](items/T-cad-studio-20261005-2c4b.md) | `cad-studio` | expand | `expand/cad-studio` | 2026-10-05 | Continue CAD Studio at the current gate |
-| [T-crystal-lattice-studio-20261005-4e6d](items/T-crystal-lattice-studio-20261005-4e6d.md) | `crystal-lattice-studio` | expand | `expand/crystal-lattice-studio` | 2026-10-05 | Continue Crystal Lattice Studio against its master design |
 | [T-fiber-craft-workstation-20261005-1f3a](items/T-fiber-craft-workstation-20261005-1f3a.md) | `fiber-craft-workstation` | expand | `expand/fiber-craft-workstation` | 2026-10-05 | Build the remaining Fiber Craft requirements |
 | [T-repository-audit-backlog-20261005-7b9a](items/T-repository-audit-backlog-20261005-7b9a.md) | repository | fix | `fix/<slug> per tool` | 2026-10-05 | Work through the verified catalog-wide audit backlog (TASK-014) |
 | [T-repository-dark-contrast-20261004-b7d2](items/T-repository-dark-contrast-20261004-b7d2.md) | repository | fix | `fix/<slug> per tool` | 2026-10-04 | Fix dark-theme contrast in ten tool workspaces, then default to System |
@@ -47,6 +46,7 @@ None.
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
+| [T-crystal-lattice-studio-20261005-4e6d](items/T-crystal-lattice-studio-20261005-4e6d.md) | `crystal-lattice-studio` | expand | `expand/crystal-lattice-studio` | 2026-10-06 | Standard spec and tracker |
 | [T-digital-logic-workstation-20261005-25b8](items/T-digital-logic-workstation-20261005-25b8.md) | `digital-logic-workstation` | expand | `expand/digital-logic-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
