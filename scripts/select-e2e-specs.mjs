@@ -10,7 +10,7 @@ import { listMetaFiles, META_SUFFIX } from './tool-registry.mjs';
 export const FULL_SUITE = '__FULL_SUITE__';
 const E2E_DIR = 'tests/e2e';
 /** Specs that loop over the whole catalog; run when any catalog record changes. */
-export const CATALOG_SPECS = [`${E2E_DIR}/app.spec.ts`, `${E2E_DIR}/accessibility.spec.ts`];
+export const CATALOG_SPECS = [`${E2E_DIR}/app.spec.ts`, `${E2E_DIR}/accessibility.spec.ts`, `${E2E_DIR}/responsive.spec.ts`];
 
 const GLOBAL_CLIENT_PATHS = [
   'index.html',

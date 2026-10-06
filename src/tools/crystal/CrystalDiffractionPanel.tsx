@@ -162,7 +162,8 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
                 })}</>);
               })()}
             </svg>
-            <table data-testid="crystal-diffraction-table">
+            <div className="crystal-analysis-table-wrap" role="region" aria-label="Reflection list" tabIndex={0}>
+            <table data-testid="crystal-diffraction-table" className="crystal-analysis-table">
               <thead>
                 <tr><th>h k l</th><th>d (Å)</th><th>2θ (°)</th><th>Intensity</th><th>Multiplicity</th></tr>
               </thead>
@@ -178,6 +179,7 @@ export default function CrystalDiffractionPanel({ document }: CrystalDiffraction
                 ))}
               </tbody>
             </table>
+            </div>
             {outcome.pattern.reflections.length > 50 ? (
               <p role="note">Showing the first 50 of {outcome.pattern.reflections.length.toLocaleString()} reflections.</p>
             ) : null}

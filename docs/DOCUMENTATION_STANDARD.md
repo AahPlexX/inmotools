@@ -71,6 +71,8 @@ The catalog slug (the meta file name and its `slug` field, e.g. `geo-intelligenc
 4. A `src/tools/<folder>/TRACKER.md` listing every spec requirement, with **Resume here** filled in.
 5. `pnpm docs:sync` adds the index row; fill in the hand-kept columns (Plans, Other docs, Former names) if they apply.
 
+`tests/e2e/responsive.spec.ts` covers every catalog tool automatically: at 320, 390 and 768 px with touch, nothing may be cut off by a clipping ancestor, editable fields must be at least 16px, and the shared header links at least 24px. A surface meant to be panned or zoomed inside a frame is listed in that spec's `PAN_SURFACES`.
+
 `integrate.yml` runs `pnpm tool:check <slug> --strict` for a `feature/` branch, so a new tool without a standard spec and tracker is not merged. It may merge before it is complete; the tracker shows what is left. After the first merge, continue on `expand/<slug>`.
 
 Optional per-tool documents (plans, research notes, audits) are linked from the tracker.
@@ -290,6 +292,7 @@ Dated entries, newest first.
 
 ## Change log
 
+- **2026-10-06:** Catalog-wide phone and tablet layout test added; its checks are part of the standard for every tool.
 - **2026-10-05:** Specs gain an "Architecture and engine" section; one function per requirement row; `any` is not used in new or changed code.
 - **2026-10-04:** `not planned` replaced by `prohibited`; unwanted features are not recorded; LLMs prohibited; ML permitted under the ML ruleset.
 - **2026-10-03:** Added the `[awaiting physical testing by human]` flag for criteria that need real hardware or a person.

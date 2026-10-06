@@ -201,7 +201,7 @@ updated: 2026-10-05
 | CLS-R167 | prohibited | — | Prohibited: cannot run in a browser (native executables) and their licences do not allow redistribution with the site. Reflection and structure files for those programs can still be imported and exported |
 | CLS-R168 | prohibited | — | Prohibited: both databases require a licence and authentication (accounts or keys), which the platform rules forbid. Files the user obtained lawfully open through Open structure |
 | CLS-R169 | partial | — | Site theme selector exists; no dark-theme run for this route is recorded and the workspace stylesheets define no dark rules |
-| CLS-R170 | partial | e2e "Phase 1 reflows across the explicit acceptance viewport matrix", "Phase 2 acceptance reflows the new panels without overflow" | Tested at 320, 390, 768, 844 and 1440 px; 1920 and 2560 px are not tested |
+| CLS-R170 | partial | e2e "Phase 1 reflows across the explicit acceptance viewport matrix", "Phase 2 acceptance reflows the new panels without overflow"; e2e "<slug> fits phone and tablet screens: nothing cut off, fields at least 16px, header links at least 24px" | Tested at 320, 390, 768, 844 and 1440 px, including the reflection table at 320 px; 1920 and 2560 px are not tested |
 | CLS-R171 | verified | e2e "Phase 1 workspace has no serious or critical axe violations", "Phase 2 acceptance passes Axe and keyboard operation for the new panels"; e2e (`tests/e2e/accessibility.spec.ts`) "has no serious or critical axe violations at <route>" |  |
 
 ## Open work
@@ -227,6 +227,8 @@ updated: 2026-10-05
 - The isosurface, void and morphology previews are 2D projections.
 
 ## Verification evidence
+
+- 2026-10-06: `tests/e2e/responsive.spec.ts` passes for this tool at 320, 390 and 768 px with touch and 2x pixel density (nothing cut off by a clipping ancestor, editable fields at least 16px, header links at least 24px).
 
 - 2026-10-05, `expand/crystal-lattice-studio` from `main` @ `a582f5dc`: `pnpm tool:check crystal-lattice-studio --base origin/main` 50/171, no errors; `pnpm docs:sync` and `pnpm docs:check` passed; `pnpm exec vitest run tests/unit/cad-progress.test.ts tests/unit/sheets-wave-b.test.ts tests/unit/deployment-config.test.ts` passed.
 
