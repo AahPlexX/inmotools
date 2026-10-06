@@ -3,20 +3,21 @@ task: T-cad-studio-20261005-2c4b
 tool: cad-studio
 doc: task
 kind: expand
-state: active
+state: done
 branch: expand/cad-studio
 created: 2026-10-05
 updated: 2026-10-05
 ---
 
-# Continue CAD Studio at the current gate
+# Standard spec and tracker
 
 ## Request
-Continue the accepted CAD Studio workstream governed by `.tasks/CAD_STUDIO.md` (16 gates, 195 capabilities). Former PR #28 is closed; all CAD code is on `main`.
+Owner, 2026-10-05: enumerate every function per tool in its spec, including the owner's notes; repo wins where they differ.
 
 ## Resume here
-Read `.tasks/CAD_STUDIO.md` (current gate: G6 feature evaluator and G7 workspace UI). Specs: `docs/superpowers/specs/2026-09-11-cad-studio-design.md` and `docs/superpowers/specs/2026-09-11-cad-studio-capability-expansion.md`. The tool has no standard spec and tracker yet (T-repository-standard-specs-20261003-3a9d).
+Done: standard spec and tracker written. Further work starts from the tracker's Open work.
 
 ## Log
 - 2026-10-05: moved from the retired `.tasks` lists (`IN_PROGRESS.md`, `NEXT.md`, `BACKLOG.md`); their last text is in git history at the commit before this one.
 - 2026-10-05: claimed `expand/cad-studio`.
+- 2026-10-05: spec [2026-10-05-cad-studio-design.md](../../docs/superpowers/specs/2026-10-05-cad-studio-design.md) and tracker [TRACKER.md](../../src/tools/cad/TRACKER.md): 212 functions; 14 verified, 4 implemented, 74 partial, 120 missing, 0 prohibited. `pnpm tool:check cad-studio --base origin/main`: 14/212, no errors; `pnpm docs:sync`, `pnpm docs:check` passed; `pnpm exec vitest run tests/unit/cad-progress.test.ts tests/unit/sheets-wave-b.test.ts tests/unit/deployment-config.test.ts` passed.
