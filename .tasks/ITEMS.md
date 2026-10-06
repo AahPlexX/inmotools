@@ -15,7 +15,6 @@ None.
 | Task | Tool | Kind | Branch | Updated | Title |
 | --- | --- | --- | --- | --- | --- |
 | [T-aethercast-20261005-9dbc](items/T-aethercast-20261005-9dbc.md) | `aethercast` | fix | `fix/aethercast` | 2026-10-05 | Record the sources for AetherCast's thresholds and models (TASK-012) |
-| [T-cad-studio-20261005-2c4b](items/T-cad-studio-20261005-2c4b.md) | `cad-studio` | expand | `expand/cad-studio` | 2026-10-05 | Continue CAD Studio at the current gate |
 | [T-crystal-lattice-studio-20261005-4e6d](items/T-crystal-lattice-studio-20261005-4e6d.md) | `crystal-lattice-studio` | expand | `expand/crystal-lattice-studio` | 2026-10-05 | Continue Crystal Lattice Studio against its master design |
 | [T-fiber-craft-workstation-20261005-1f3a](items/T-fiber-craft-workstation-20261005-1f3a.md) | `fiber-craft-workstation` | expand | `expand/fiber-craft-workstation` | 2026-10-05 | Build the remaining Fiber Craft requirements |
 | [T-repository-audit-backlog-20261005-7b9a](items/T-repository-audit-backlog-20261005-7b9a.md) | repository | fix | `fix/<slug> per tool` | 2026-10-05 | Work through the verified catalog-wide audit backlog (TASK-014) |
@@ -45,6 +44,7 @@ None.
 | [T-audio-mastering-20261004-d7fa](items/T-audio-mastering-20261004-d7fa.md) | `audio-mastering` | fix | `fix/audio-mastering` | 2026-10-04 | Make the mastering realtime-chain e2e test pass under load |
 | [T-audio-mastering-20261005-bfde](items/T-audio-mastering-20261005-bfde.md) | `audio-mastering` | expand | `expand/audio-mastering` | 2026-10-05 | Standard spec and tracker |
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
+| [T-cad-studio-20261005-2c4b](items/T-cad-studio-20261005-2c4b.md) | `cad-studio` | expand | `expand/cad-studio` | 2026-10-05 | Standard spec and tracker |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
 | [T-digital-logic-workstation-20261005-25b8](items/T-digital-logic-workstation-20261005-25b8.md) | `digital-logic-workstation` | expand | `expand/digital-logic-workstation` | 2026-10-05 | Standard spec and tracker |
@@ -59,6 +59,7 @@ None.
 | [T-geo-intelligence-hub-20261004-e828](items/T-geo-intelligence-hub-20261004-e828.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Cover untested requirements |
 | [T-geojson-simplifier-20261006-f6fe](items/T-geojson-simplifier-20261006-f6fe.md) | `geojson-simplifier` | expand | `expand/geojson-simplifier` | 2026-10-06 | Standard spec and tracker |
 | [T-glsl-sandbox-20261004-eb99](items/T-glsl-sandbox-20261004-eb99.md) | `glsl-sandbox` | expand | `expand/glsl-sandbox` | 2026-10-04 | Cover untested requirements |
+| [T-gltf-optimizer-20261006-a4eb](items/T-gltf-optimizer-20261006-a4eb.md) | `gltf-optimizer` | expand | `expand/gltf-optimizer` | 2026-10-06 | Standard spec and tracker |
 | [T-har-sanitizer-20261004-cc74](items/T-har-sanitizer-20261004-cc74.md) | `har-sanitizer` | expand | `expand/har-sanitizer` | 2026-10-04 | Cover untested requirements |
 | [T-hardware-packet-inspector-20261004-7ea6](items/T-hardware-packet-inspector-20261004-7ea6.md) | `hardware-packet-inspector` | expand | `expand/hardware-packet-inspector` | 2026-10-04 | Cover untested requirements |
 | [T-json-lattice-20261005-b260](items/T-json-lattice-20261005-b260.md) | `json-lattice` | expand | `expand/json-lattice` | 2026-10-05 | Standard spec and tracker |
