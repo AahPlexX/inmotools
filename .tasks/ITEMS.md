@@ -47,6 +47,7 @@ None.
 | [T-cad-studio-20261003-f53e](items/T-cad-studio-20261003-f53e.md) | `cad-studio` | fix | `fix/cad-studio` | 2026-10-03 | Add a CAD Studio browser spec |
 | [T-convolution-room-profiler-20261004-28f5](items/T-convolution-room-profiler-20261004-28f5.md) | `convolution-room-profiler` | expand | `expand/convolution-room-profiler` | 2026-10-04 | Cover untested requirements |
 | [T-cron-team-matrix-20261004-396a](items/T-cron-team-matrix-20261004-396a.md) | `cron-team-matrix` | expand | `expand/cron-team-matrix` | 2026-10-04 | Cover untested requirements |
+| [T-digital-logic-workstation-20261005-25b8](items/T-digital-logic-workstation-20261005-25b8.md) | `digital-logic-workstation` | expand | `expand/digital-logic-workstation` | 2026-10-05 | Standard spec and tracker |
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
 | [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-04 | Give the Fiber Craft spec the standard header block |
