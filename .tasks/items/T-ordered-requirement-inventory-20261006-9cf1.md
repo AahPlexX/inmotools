@@ -14,7 +14,7 @@ updated: 2026-10-06
 Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Project records describe concrete behavior and commands, not private conversation or provider-specific instructions.
 
 ## Resume here
-Current tool: 1, Markdown Workbench. Current requirement: MDW-R09. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
+Current tool: 1, Markdown Workbench. Current requirement: MDW-R20. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
 
 Before each checkpoint: update the tool tracker requirement row, its Resume here, active tool task and this cursor in the same commit. Record exact commands/outcomes, source/check commit, limitations and next item. Verify changes on the pushed/integrated revision. Reconcile current upstream changes instead of applying the audit snapshot blindly. If a physical check is required, preserve its explicit awaiting-human flag and do not invent verification.
 
@@ -65,4 +65,12 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 | 39 | tactical-matchboard-studio | TMS-R07, TMS-R31, TMS-R33, TMS-R44, TMS-R52, TMS-R73, TMS-R75, TMS-R78, TMS-R82, TMS-R83 |
 
 ## Log
-- 2026-10-06: recorded frozen order for39 tools and1188 existing unresolved requirements; cursor MDW-R09. No implementation completion claimed.
+- 2026-10-06: recorded frozen order for 39 tools and1188 existing unresolved requirements; cursor MDW-R09. No implementation completion claimed.
+- 2026-10-06: MDW-R09 desktop/touch acceptance passed 2/2 against source base82c03cd; implemented behavior required no runtime change. Cursor advanced to MDW-R12; regression suite/integration pending.
+- 2026-10-06: MDW-R09/12 acceptance6/6 pass and TypeScript check passes after preference validation. Source/local checkpoint based97e1b9d; full/shared regression, integration and deployment pending. Cursor MDW-R15.
+- 2026-10-06: MDW-R15 baseline2/2 failed (missing control), implementation2/2 passed on desktop/touch including landscape resize. Record cursor MDW-R17. Full shared/regression and release checks pending.
+- 2026-10-06: MDW-R17 desktop/touch2/2 pass with parsed table dimensions and Cancel/Undo. Cursor MDW-R18. Table builder unit boundary tests 9/9 passed; TypeScript check passed.
+
+- 2026-10-06: MDW-R18 desktop/touch acceptance passed 2/2, lint unit tests 5/5 and TypeScript check passed. Cursor MDW-R19. Full regression/integration pending.
+
+- 2026-10-06 21:33 UTC: combined six-item production acceptance passed 16/16 (57.3s). Clean build, TypeScript and five formatter-engine cases passed after removing the worker DOM dependency. Cursor MDW-R20. Corrected full regression and integration pending.

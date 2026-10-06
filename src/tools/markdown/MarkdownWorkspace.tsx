@@ -10,6 +10,7 @@ import MarkdownEditor from './MarkdownEditor';
 import MarkdownPreview from './MarkdownPreview';
 import MarkdownSyntaxHelp from './MarkdownSyntaxHelp';
 import { parseMarkdown } from './parse-engine';
+import { collectMarkdownStyleSuggestions, MAX_STYLE_SUGGESTIONS } from './lint-engine';
 import { renderMarkdown } from './render-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
 import { highlightCodeBlocks } from './code-highlight-engine';
@@ -86,14 +87,25 @@ type EditorPrefs = {
   spellcheck: boolean;
   syntaxSuggestions: boolean;
   darkMode: boolean;
+  typewriterMode: boolean;
 };
 
 const loadEditorPrefs = (): Partial<EditorPrefs> => {
   try {
     const raw = window.localStorage.getItem(PREFS_KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as Partial<EditorPrefs>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const values = parsed as Record<string, unknown>;
+    const prefs: Partial<EditorPrefs> = {};
+    if (values.view === 'source' || values.view === 'split' || values.view === 'preview') prefs.view = values.view;
+    if (typeof values.fontSize === 'number' && Number.isInteger(values.fontSize) && values.fontSize >= 11 && values.fontSize <= 20) {
+      prefs.fontSize = values.fontSize;
+    }
+    for (const key of ['lineWrapping', 'vimMode', 'spellcheck', 'syntaxSuggestions', 'darkMode', 'typewriterMode'] as const) {
+      if (typeof values[key] === 'boolean') prefs[key] = values[key];
+    }
+    return prefs;
   } catch {
     return {};
   }
@@ -135,6 +147,7 @@ export default function MarkdownWorkspace() {
   const [spellcheck, setSpellcheck] = useState(() => loadEditorPrefs().spellcheck ?? true);
   const [syntaxSuggestions, setSyntaxSuggestions] = useState(() => loadEditorPrefs().syntaxSuggestions ?? true);
   const [darkMode, setDarkMode] = useState(() => loadEditorPrefs().darkMode ?? false);
+  const [typewriterMode, setTypewriterMode] = useState(() => loadEditorPrefs().typewriterMode ?? false);
   const [focusMode, setFocusMode] = useState(false);
   const syncLockRef = useRef<'source' | 'preview' | null>(null);
   const ignorePreviewUntilRef = useRef(0);
@@ -143,13 +156,13 @@ export default function MarkdownWorkspace() {
   const lastCursorLineRef = useRef(0);
 
   useEffect(() => {
-    const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode };
+    const prefs: EditorPrefs = { view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode };
     try {
       window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
     } catch {
       // Private mode can reject storage. The session still works without remembered settings.
     }
-  }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode]);
+  }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode]);
 
   const [outlineFilter, setOutlineFilter] = useState('');
   const [activeSourceLine, setActiveSourceLine] = useState(1);
@@ -271,6 +284,11 @@ export default function MarkdownWorkspace() {
   }, []);
 
   const parsed = useMemo(() => parseMarkdown(source), [source]);
+  const [styleChecksOpen, setStyleChecksOpen] = useState(false);
+  const styleChecks = useMemo(
+    () => styleChecksOpen ? collectMarkdownStyleSuggestions(source, parsed) : { suggestions: [], total: 0 },
+    [source, parsed, styleChecksOpen],
+  );
   const proseMetrics = useMemo(() => computeProseMetrics(source), [source]);
   const slides = useMemo(() => splitIntoSlides(source), [source]);
   const outline = useMemo(() => buildOutline(source), [source]);
@@ -834,6 +852,7 @@ export default function MarkdownWorkspace() {
             <label className="markdown-workbench-check"><input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />Wrap lines</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
+            <label className="markdown-workbench-check"><input type="checkbox" checked={typewriterMode} onChange={(event) => setTypewriterMode(event.target.checked)} />Typewriter mode</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={syntaxSuggestions} onChange={(event) => setSyntaxSuggestions(event.target.checked)} />Syntax suggestions</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} />Dark workspace</label>
             <label className="markdown-workbench-font-size">Font size<input aria-label="Font size" type="range" min={11} max={20} value={fontSize} onChange={(event) => setFontSize(Number(event.target.value))} /><output data-testid="markdown-font-size-value">{fontSize} px</output></label>
@@ -870,6 +889,7 @@ export default function MarkdownWorkspace() {
       <div className={`markdown-workbench-body markdown-workbench-view-${view}`}>
         <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
+            onFormatChange={commitSource}
             value={source}
             onChange={handleEditorSourceChange}
             onCursorLineChange={handleCursorLineChange}
@@ -881,6 +901,7 @@ export default function MarkdownWorkspace() {
             spellcheck={spellcheck}
             syntaxSuggestions={syntaxSuggestions}
             darkMode={darkMode}
+            typewriterMode={typewriterMode}
             revealRequest={revealRequest}
           />
         </div>
@@ -904,6 +925,20 @@ export default function MarkdownWorkspace() {
           {lastSavedAt ? `${isDirty ? 'Unsaved changes · last saved' : 'Saved'} ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Not yet saved locally'}
         </span>
       </div>
+
+      <details className="markdown-workbench-panel" onToggle={(event) => setStyleChecksOpen(event.currentTarget.open)}>
+        <summary>Markdown checks</summary>
+        <p className="markdown-workbench-hint">Style suggestions for heading levels, adjacent bullet markers and unnecessary trailing whitespace. Valid Markdown can use different styles. These checks leave your source unchanged and preserve two-space hard breaks.</p>
+        <ul className="markdown-workbench-diagnostics" data-testid="markdown-lint">
+          {styleChecks.suggestions.map((suggestion) => (
+            <li key={`${suggestion.line}-${suggestion.rule}`}>
+              <button type="button" onClick={() => { setView('source'); revealLine(suggestion.line); }}>Line {suggestion.line}: {suggestion.message}</button>
+            </li>
+          ))}
+        </ul>
+        {styleChecksOpen && styleChecks.total === 0 ? <p>No style suggestions for these checks.</p> : null}
+        {styleChecks.total > MAX_STYLE_SUGGESTIONS ? <p>Showing the first {MAX_STYLE_SUGGESTIONS} of {styleChecks.total} suggestions.</p> : null}
+      </details>
 
       <details className="markdown-workbench-panel">
         <summary>Outline ({outline.length})</summary>
