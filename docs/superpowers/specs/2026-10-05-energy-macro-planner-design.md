@@ -35,6 +35,12 @@ Out of scope:
 - Reference values and sources are in the 2026-09-03 design (Mifflin-St Jeor 1990, Roza–Shizgal 1984, Atwater factors, IOM ranges, EFSA 2010). The constants, the storage keys `inmotools_energy_planner_autosave` and `inmotools_energy_planner_presets_v1`, the slug `energy-macro-planner` and the folder `src/tools/nutrition/` are not changed.
 - The tool's copy must not imply clinical advice.
 
+## Architecture and engine
+
+- Engines and libraries: the energy, macro and advisory calculations are first-party TypeScript in `nutrition-engine.ts`; no third-party package is used.
+- Storage: localStorage key `inmotools_energy_planner_autosave` holds the autosaved form; key `inmotools_energy_planner_presets_v1` holds the saved presets.
+- Browser APIs: Clipboard (`navigator.clipboard.writeText`) copies the plan as Markdown, and a message says access was refused when the clipboard is blocked; Markdown, CSV and JSON exports download through `src/lib/download`.
+
 ## Requirements
 
 ### Measurements and inputs

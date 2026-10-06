@@ -38,6 +38,13 @@ Out of scope: nothing is excluded beyond the platform rules.
 - The application uses hash routes on static hosting; fragment-based views are not reliably indexed as separate pages.
 - The slug, route, element ids, file names (`.simplified.geojson`, `.simplified.topojson`, `.simplification-stats.json`) and accessible names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `topojson-server@3.0.1` builds the topology; `topojson-simplify@3.0.3` pre-simplifies and simplifies arcs; `topojson-client@3.1.0` converts the topology back to GeoJSON.
+- Workers: `geo.worker.ts` runs simplification off the main thread and is terminated to cancel a run.
+- Browser APIs: SVG renders the preview; file input and anchor downloads load and save files.
+- Network: none.
+
 ## Requirements
 
 ### Loading

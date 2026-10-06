@@ -37,6 +37,12 @@ Out of scope:
 - Exact dependency pins as in `package.json` (`occt-wasm`, `manifold-3d`, `ml-matrix`, `wasm-feature-detect`); the kernel runs in a dedicated module worker and loads only when the CAD route opens; multi-threaded WebAssembly is not used.
 - Canonical storage in millimeters and radians; project `schemaVersion` 1. These formats and names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `occt-wasm@5.0.0` is the exact B-Rep kernel (OpenCascade compiled to WebAssembly), loaded lazily inside the worker; `three@0.185.1` renders the meshes and provides `OrbitControls`; `ml-matrix@6.15.0` solves the sketch constraints (SVD-backed Gauss-Newton step); `wasm-feature-detect@1.9.0` probes SIMD, tail calls and exception handling.
+- Workers: `cad.worker.ts` is the module Web Worker named `inmotools-cad-kernel` that hosts the kernel, started from `cad-worker-factory.ts`; `kernel-worker-client.ts` discards messages from any earlier worker generation.
+- Browser APIs: Web Workers and WebAssembly run the kernel, which does not start when WebAssembly, SIMD, tail calls or exception handling is missing, and an "unsupported browser" error names the missing features; WebGL (`THREE.WebGLRenderer`) draws the viewport.
+
 ## Requirements
 
 ### Sketch creation and inference

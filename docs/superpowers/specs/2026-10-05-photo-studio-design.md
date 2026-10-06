@@ -33,6 +33,13 @@ Out of scope: tethered camera control, OS display calibration and printer-driver
 - Libraries in use stay as they are: `tiff`, `@colorhythm/libraw-wasm`, `lcms-wasm`, `@techstark/opencv-js`, `@jsquash/avif`, `exifreader`, `pdf-lib`. Storage: the IndexedDB project database with OPFS source storage, and the `inmotools.photo-studio.templates` database.
 - Editing runs at 8 bits per channel after decode; sources are never modified.
 
+## Architecture and engine
+
+- Engines and libraries: `@colorhythm/libraw-wasm@1.1.1` decodes camera RAW files; `tiff@7.1.3` decodes TIFF; `@jsquash/avif@2.1.1` encodes AVIF; `lcms-wasm@1.0.5` converts colours between ICC profiles; `@techstark/opencv-js@5.0.0-release.1` aligns and merges exposures; `exifreader@4.45.2` reads source metadata; `pdf-lib@1.17.1` builds print and contact-sheet PDFs; the edit renderer, JPEG/PNG/WebP export through the browser canvas encoders, TIFF writer and metadata embedding are in-repo code.
+- Workers: `photo.worker.ts` runs the colour pipeline for renders (main-thread fallback when `Worker` is missing or fails); `codecs/raw.worker.ts` decodes RAW; `codecs/tiff.worker.ts` decodes TIFF; `codecs/avif-encode.worker.ts` encodes AVIF; `merge/photo-merge.worker.ts` runs exposure merge with OpenCV.
+- Storage: IndexedDB database `inmotools.photo-studio` (version 2) with object stores `projects` (saved edit projects), `sources` (source image blobs) and `presets` (saved presets); IndexedDB database `inmotools.photo-studio.templates` (version 1) with object store `templates` (named export presets, metadata templates and watermark presets); the Web Locks API serialises project-store writes where available and `navigator.storage` reports quota.
+- Browser APIs: Canvas 2D and OffscreenCanvas render and read pixels (HTML canvas fallback where OffscreenCanvas is missing); `createImageBitmap` decodes images (import fails with a message where it is missing); WebAssembly and Web Workers are required for RAW, TIFF and AVIF (each reports a message and the other formats keep working); `DecompressionStream` reads deflate TIFF and `CompressionStream` embeds ICC profiles in PNG, each reporting a message where missing; File System Access (`showOpenFilePicker`, `showSaveFilePicker`, `showDirectoryPicker`) saves exports to a chosen file or folder, with Blob downloads where missing; the async Clipboard API reads pasted images, with paste-event and file-input import where it is missing.
+
 ## Requirements
 
 ### Input and sources

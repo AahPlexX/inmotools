@@ -36,6 +36,11 @@ Out of scope:
 - Libraries as in `package.json`; the Moyo symmetry kernel runs locally. The project file schema `inmotools.crystal-project` version 1 is not changed.
 - Operations are bounded and fail visibly; the imported source file is never overwritten.
 
+## Architecture and engine
+
+- Engines and libraries: `@spglib/moyo-wasm@0.19.0` (Moyo, WebAssembly) performs space-group and symmetry analysis, loaded lazily on first use; `three@0.185.1` renders the structure, with `OrbitControls` and `ConvexGeometry` from its addons; the CIF, PDB, VASP and XYZ import and export, diffraction, reciprocal-space, refinement and fitting engines are first-party TypeScript in `src/tools/crystal/`.
+- Browser APIs: WebAssembly runs the symmetry kernel; WebGL (`THREE.WebGLRenderer`, `preserveDrawingBuffer`) draws the viewport, and the viewport shows the renderer's error message, or "WebGL is unavailable in this browser.", when it cannot start; Canvas 2D composes the PNG export (`canvas.toBlob`); exports download through `src/lib/download`.
+
 ## Requirements
 
 ### Import, project and structure creation

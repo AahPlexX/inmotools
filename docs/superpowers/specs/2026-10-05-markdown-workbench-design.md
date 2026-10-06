@@ -38,6 +38,13 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 - DOCX math is plain text; EPUB is structural and not EPUBCheck-validated; PDF uses the browser print pipeline.
 - Drafts are stored in IndexedDB; editor settings in localStorage under `inmotools.markdown-workbench.prefs`.
 
+## Architecture and engine
+
+- Engines and libraries: `unified@11.0.5`, `remark-parse@11.0.0`, `remark-gfm@4.0.1`, `remark-math@6.0.0`, `remark-rehype@11.1.2`, `rehype-sanitize@6.0.0`, `rehype-katex@7.0.1` and `hast-util-to-html@9.0.5` parse, sanitise and render Markdown; `katex@0.18.9` typesets math; `mermaid@12.0.0` renders Mermaid diagrams on the main thread; `@hpcc-js/wasm-graphviz@1.28.0` renders Graphviz DOT; `citeproc@2.4.63` formats citations with bundled APA, IEEE, Chicago author-date and MLA styles and the en-US locale; `yaml@2.9.0` and `smol-toml@1.8.0` parse front matter; `turndown@7.2.4` converts pasted HTML to Markdown; `docx@9.7.1` and `jszip@3.10.2` build DOCX and EPUB exports; `@codemirror/state@6.7.1`, `@codemirror/view@6.43.9`, `@codemirror/commands@6.11.1`, `@codemirror/language@6.12.4`, `@codemirror/lang-markdown@6.5.2`, `@codemirror/autocomplete@6.20.3`, `@codemirror/search@6.7.1`, `@codemirror/legacy-modes@6.5.4`, `@lezer/highlight@1.2.3` and `@replit/codemirror-vim@6.4.0` provide the editor with code-block highlighting and optional Vim keys.
+- Workers: `diagram.worker.ts` renders Graphviz DOT with WebAssembly, one worker per request terminated after its response; `table-formula.worker.ts` evaluates Markdown table formulas and falls back to the main thread when Workers are unavailable or fail to start.
+- Storage: IndexedDB database `inmotools.markdown-workbench` (version 1), object store `drafts` (keyPath `id`), holds per-document autosaved drafts; localStorage key `inmotools.markdown-workbench.prefs` holds editor preferences.
+- Browser APIs: IndexedDB (autosave is skipped when it is missing), `navigator.storage.estimate` (storage usage), Clipboard API (copy; a blocked clipboard reports a status message), FileReader (pasted or dropped images embedded as data URLs), `window.print` (print or PDF output), Blob downloads, Web Workers.
+
 ## Requirements
 
 ### Editing

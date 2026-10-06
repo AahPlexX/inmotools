@@ -41,6 +41,14 @@ Out of scope:
 - Project backups are JSON version 1, at most 1,000,000 bytes, at most 100 blocks and 150,000 characters per code language.
 - The slug, route, storage keys (`inmotools:web-layout:project:v1`, `inmotools:web-layout:library:v1`), file names (`web-layout.html.html`, `web-layout.css.css`, `web-layout.tokens.json`, `web-layout.project.json`, `web-layout.tokens.scss`, `web-layout.snapshot.json`, `web-layout.zip`) and accessible names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `monaco-editor@0.56.0` is the code editor and falls back to a plain textarea when it fails to load; `prettier@3.9.6` formats HTML, CSS and JavaScript; `lightningcss-wasm@1.33.0` minifies CSS for the chosen browser targets; `terser@5.51.2` minifies JavaScript; `axe-core@4.13.0` runs the accessibility audit inside the preview; `web-layout-zip` is `jszip@3.10.2` and writes the project ZIP.
+- Workers: `compiler.worker.ts` runs the CSS and JavaScript minification; Monaco's `editor.worker` runs editor language services.
+- Storage: localStorage keys `inmotools:web-layout:project:v1` (current project), `inmotools:web-layout:project:v1:autosave` (autosave flag) and `inmotools:web-layout:library:v1` (named snapshots); a full or blocked localStorage shows a message asking for a backup download.
+- Browser APIs: sandboxed `iframe` with `srcdoc` renders previews, and draft JavaScript runs only after the user consents; `postMessage` returns console and audit output; WebAssembly runs Lightning CSS; Blob downloads deliver exports.
+- Network: none.
+
 ## Requirements
 
 ### Page layout

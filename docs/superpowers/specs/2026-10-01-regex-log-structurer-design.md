@@ -31,6 +31,12 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Matching runs in a Web Worker with a deadline, so a runaway pattern cannot freeze the page (TASK-016).
 
+## Architecture and engine
+
+- Engines and libraries: `@eslint-community/regexpp@4.12.2` parses the user's pattern into an AST to find capture-group names; `log-engine.ts` structures the lines.
+- Workers: `log.worker.ts` runs log structuring in one pooled module worker managed by `log-runner.ts`, with a timeout and cancellation; without `Worker` support the same structuring runs on the main thread.
+- Browser APIs: the File API reads the imported log file; Blob downloads export CSV, Markdown and unmatched-line TSV.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

@@ -36,6 +36,13 @@ Out of scope:
 - Index values are recalculated from raw concentrations; provider-supplied index fields are not trusted.
 - Network requests happen only on the person's own action (platform rule): opening the tool requests nothing and asks for no location (AEC-R24).
 
+## Architecture and engine
+
+- Engines and libraries: `papaparse@5.7.0` parses imported CSV and writes the CSV export; `pdf-lib@1.17.1` builds the PDF brief; the AQI, EAQI, WHO, UV and anomaly engines are first-party TypeScript in `aethercast-engine.ts` and `aethercast-anomaly.ts`.
+- Storage: localStorage key `inmotools.aethercast.v1` holds the settings; key `inmotools.aethercast.live-location.v1` holds the remembered live location.
+- Browser APIs: Canvas 2D draws the forecast chart and the PNG export (`canvas.toBlob`); Geolocation supplies "Use my location" and, where it is missing, shows a message to search by city or postal code; `fetch` with `AbortSignal` loads live data; `window.setInterval` runs the 15-minute refresh after live data is started.
+- Network: `https://air-quality-api.open-meteo.com`, `https://api.open-meteo.com` and `https://geocoding-api.open-meteo.com` (keyless), contacted only when the user chooses a location or loads live data.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

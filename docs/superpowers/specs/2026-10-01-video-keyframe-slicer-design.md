@@ -30,6 +30,12 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Container reading and packet copying use the pinned Mediabunny; WebCodecs is not used as a muxer or demuxer (design).
 
+## Architecture and engine
+
+- Engines and libraries: `mediabunny@1.60.0` reads container tracks and keyframes and remuxes the selected packets into MP4, MOV or WebM output without re-encoding.
+- Browser APIs: File and Blob read the source; AbortController cancels inspection and cutting; HTMLVideoElement with Blob object URLs previews the source and the result.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

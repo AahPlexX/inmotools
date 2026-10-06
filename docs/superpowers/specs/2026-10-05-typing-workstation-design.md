@@ -35,6 +35,14 @@ Out of scope:
 - Libraries as pinned in `package.json` (`chart.js` 4.5.1, `dexie` 4.4.6, `canvas-confetti` 1.9.4, `papaparse` 5.7.0, `jspdf` 4.2.1, self-hosted `@fontsource` fonts). The ranked English corpus is bundled from FrequencyWords ([THIRD_PARTY_NOTICES.md](../../../src/tools/typing/THIRD_PARTY_NOTICES.md)); no corpus is fetched at runtime.
 - Storage schema, export formats, shortcuts (Esc, F2, Tab) and accessible names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `dexie@4.4.6` stores results and settings; `chart.js@4.5.1` draws the WPM and history charts; `jspdf@4.2.1` writes the PDF report; `papaparse@5.7.0` writes CSV; `canvas-confetti@1.9.4` plays the celebration effect; `@fontsource/jetbrains-mono@5.3.0`, `@fontsource/fira-code@5.3.0`, `@fontsource/roboto-mono@5.3.0`, `@fontsource/atkinson-hyperlegible@5.3.0` and `@fontsource/opendyslexic@5.3.0` bundle the typing fonts.
+- Workers: none.
+- Storage: IndexedDB database `inmotools-typing-workstation` (Dexie) with `tests` (finished test results), `typists` (profiles), `dictionaries` (custom word lists), `preferences` (key/value) and `drills` (saved drills) stores (`typing-storage.ts`).
+- Browser APIs: Web Audio `AudioContext` synthesizes key-click sounds and stays silent where it is missing; `matchMedia` reads `prefers-reduced-motion`; Canvas renders charts; Blob downloads deliver exports.
+- Network: none.
+
 ## Requirements
 
 ### Engine and metrics

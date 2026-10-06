@@ -35,6 +35,12 @@ Out of scope:
 - Vector Studio's canonical document is a structured scene graph that serializes to SVG; raster and PDF exports are rendered from the same SVG. The PDF holds a raster render of the artboard, not editable vector objects.
 - Imported images are embedded as data URLs; no external URL is fetched.
 
+## Architecture and engine
+
+- Engines and libraries: `svgo@4.1.0` (`svgo/browser` build) optimizes each uploaded SVG before it becomes a sprite symbol (`svg-engine.ts`).
+- Browser APIs: Clipboard copies the `<use>` snippet and reports when clipboard access is unavailable; File reads uploads; Blob downloads deliver the sprite.
+- Network: none.
+
 ## Requirements
 
 ### Sprite compiler: input and compile

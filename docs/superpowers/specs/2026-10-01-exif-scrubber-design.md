@@ -31,6 +31,12 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Metadata is read with ExifReader; pixel rebuild uses the browser canvas, so canvas size and decoder support limit it.
 
+## Architecture and engine
+
+- Engines and libraries: `exifreader@4.45.2` reads EXIF, XMP, ICC and other metadata tags; `jszip@3.10.2` builds the batch ZIP; JPEG, PNG and WebP metadata stripping is in-house byte code in `exif-engine.ts`.
+- Browser APIs: `createImageBitmap` (with `imageOrientation: 'from-image'`) decodes images for dimensions and pixel rebuild, so HEIC/HEIF rebuild works only where the browser decodes it; Canvas 2D re-encodes rebuilt pixels and reports an error where the context is unavailable; Clipboard (`navigator.clipboard.writeText`) copies field values.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

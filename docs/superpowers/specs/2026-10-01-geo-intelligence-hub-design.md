@@ -42,6 +42,13 @@ Out of scope:
 - Sources and their licenses: the verified source registry in [TODO.md](../../../src/tools/geo-intel/TODO.md).
 - A postal-code population is never fabricated; population is reported only for the geography that publishes it (country, NUTS region, populated place), with that geography and year.
 
+## Architecture and engine
+
+- Engines and libraries: `dexie@4.4.6` wraps IndexedDB; `papaparse@5.7.0` parses and writes CSV; `fflate@0.8.3` inflates the terrain-tile data; `jspdf@4.2.1` writes the PDF report and `jszip@3.10.2` builds export ZIPs, both loaded on demand; the bundled Natural Earth, GeoNames and timezone datasets ship in `data/` and load lazily.
+- Storage: IndexedDB database `inmotools-geo-intelligence-hub` (Dexie) with `responses` (cached API responses, pruned to 2,000 entries), `profiles` (saved location profiles) and `settings` (user settings); where IndexedDB is missing, responses are not cached.
+- Browser APIs: Geolocation (`navigator.geolocation`) reads the device position on request and reports an error where it is missing; Canvas 2D draws the map and PNG export; Clipboard copies results; File System Access (`showSaveFilePicker`) saves exports where present, otherwise an anchor download is used; Web Share (`navigator.share`) shares on coarse-pointer devices; `navigator.onLine` switches lookups to bundled data while offline; `Intl` formats time zones, numbers and currencies.
+- Network: only on the user's action and keyless, through `net/http.ts`: `nominatim.openstreetmap.org`, `photon.komoot.io`, `api.bigdatacloud.net`, `api.zippopotam.us`, `api.postcodes.io`, `api.worldbank.org`, `gisco-services.ec.europa.eu`, `ec.europa.eu`, `date.nager.at`, `api.sunrise-sunset.org`, `api.sunrisesunset.io`, `s3.amazonaws.com`, `api.open-elevation.com`, `www.geoboundaries.org`, `media.githubusercontent.com`.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

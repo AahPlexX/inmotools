@@ -35,6 +35,13 @@ Out of scope: nothing is excluded beyond the platform rules.
 - Libraries as pinned in `package.json`: `elkjs` 0.12.0 (layered layout in a Web Worker), CodeMirror 6 (`@codemirror/lang-json` 6.0.2), `yaml` 2.9.0, `smol-toml` 1.8.0, `fast-xml-parser` 5.11.1, `papaparse` 5.7.0, `jsonpath-plus` 10.4.0, `@duckdb/duckdb-wasm` 1.32.0 through the shared DuckDB client.
 - Paths are RFC 6901 JSON Pointers; edits are RFC 6902 operations. The storage key, file names (`json-lattice.*`) and accessible names are not changed.
 
+## Architecture and engine
+
+- Engines and libraries: `yaml@2.9.0`, `smol-toml@1.8.0`, `fast-xml-parser@5.11.1` and `papaparse@5.7.0` parse and write YAML, TOML, XML and CSV; `jsonpath-plus@10.4.0` runs JSONPath queries; `elkjs@0.12.0` lays out the graph; `@duckdb/duckdb-wasm@1.32.0` runs the local SQL panel (through the shared `src/tools/duckdb/duckdb-client.ts`); `@codemirror/state@6.7.1`, `@codemirror/view@6.43.9`, `@codemirror/commands@6.11.1`, `@codemirror/search@6.7.1`, `@codemirror/lint@6.9.7` and `@codemirror/lang-json@6.0.2` provide the editor.
+- Workers: `layout-worker.ts` wraps the ELK layered layout in a Web Worker created from `elkjs/lib/elk-worker.min.js`; the SQL panel starts the DuckDB-Wasm worker on first use, in an in-memory database.
+- Storage: localStorage key `inmotools:json-lattice:v1` holds the autosaved source, format, collapsed paths and layout direction; a button clears it.
+- Browser APIs: Web Workers run the layout and SQL engine; if the layout worker cannot start, the graph shows the error and the editor keeps working. Canvas 2D measures text and rasterises PNG and JPEG graph exports; the Clipboard API copies values; Blob downloads save exports.
+
 ## Requirements
 
 ### Input and parsing

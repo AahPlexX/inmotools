@@ -36,6 +36,12 @@ Out of scope:
 - Output is rebuilt into a new PDF; source document-level metadata and attachments are carried only when the user opts in.
 - Never describe an overlay as secure redaction, never claim encryption, certification or signature trust that the bytes do not prove.
 
+## Architecture and engine
+
+- Engines and libraries: `pdf-lib@1.17.1` reads and rewrites the PDF (metadata sanitising, page edits, overlays, attachments, form fields); `pdfjs-dist@6.3.289` renders pages to canvas and builds the selectable text layer and text search.
+- Workers: the PDF.js worker (`pdfjs-dist/build/pdf.worker.min.mjs`, configured in `pdfjs-browser.ts`) parses and renders pages off the main thread.
+- Browser APIs: Canvas 2D (`getContext('2d')`) displays rendered pages at the device pixel ratio; the File API reads the PDF and attachments; Blob downloads save the exported PDF and summary.
+
 ## Requirements
 
 ### Intake, diagnostics and page operations

@@ -30,6 +30,11 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Web Audio `ConvolverNode` accepts IRs with 1, 2 or 4 channels only.
 
+## Architecture and engine
+
+- Engines and libraries: the convolution runs on the browser `ConvolverNode`; the 24-bit PCM WAV encoder, equal-power mix and filter-range checks are first-party code in `audio-engine.ts`.
+- Browser APIs: Web Audio (`AudioContext`, `decodeAudioData`, `ConvolverNode`, `DelayNode`, `BiquadFilterNode`, `GainNode`, `AnalyserNode`) decodes files, builds the live graph and feeds the spectrogram, and an error states that Web Audio is unavailable when `AudioContext` is missing; `OfflineAudioContext` renders the WAV; Canvas 2D draws the live spectrogram; the WAV downloads through `src/lib/download`.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

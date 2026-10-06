@@ -37,6 +37,13 @@ Out of scope: MIDI Harmony Lab, which shares the folder and has its own spec and
 - Storage: IndexedDB database `inmotools.audio-mastering`; backup format `inmotools-audio-mastering` version 1. These names and formats do not change.
 - A project holds at most eight mono or stereo tracks.
 
+## Architecture and engine
+
+- Engines and libraries: `mediabunny@1.60.0` decodes imported audio (`mastering-media.ts`) and encodes exports (`mastering-export.ts`); `@mediabunny/mp3-encoder@1.60.0`, `@mediabunny/flac-encoder@1.60.0` and `@mediabunny/aac-encoder@1.60.0` supply MP3, FLAC and AAC encoding when the browser has no native encoder; `jszip@3.10.2` packs project backups and batch exports as ZIP; WAV writing (including the Broadcast Wave `bext` chunk), the FFT, loudness, dynamics, resampling, time-stretch and restoration DSP are first-party code in `mastering-export.ts` and `dsp/`.
+- Workers: `mastering-dsp.worker.ts` (a module Web Worker started by `mastering-dsp-client.ts`) renders the mix, analysis, spectrum, spectrogram, mastering and export passes; `mastering-master.worklet.ts` is the AudioWorklet that runs the realtime master chain.
+- Storage: IndexedDB database `inmotools.audio-mastering` (version 1) holds the `sessions`, `sources` and `presets` stores; localStorage key `inmotools.mastering.tab` holds the selected tab.
+- Browser APIs: Web Audio (`AudioContext`, `AudioWorkletNode`) plays back and the capability report checks for `OfflineAudioContext`, and playback goes straight to the output when the AudioWorklet cannot load; WebCodecs encoders are used when `canEncodeAudio` reports support, otherwise the bundled encoders apply; Canvas 2D draws the timeline, meters, EQ graph, spectrogram and the PNG export; IndexedDB stores projects; `navigator.storage` requests persistent storage and reports quota; Clipboard copies the capability report, which downloads instead when clipboard access is blocked.
+
 ## Requirements
 
 ### Import and sources

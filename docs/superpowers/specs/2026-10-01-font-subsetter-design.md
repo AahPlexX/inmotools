@@ -30,6 +30,12 @@ Out of scope:
 - Platform rules: no accounts, no server or database, everything runs in the browser ([DOCUMENTATION_STANDARD.md](../../DOCUMENTATION_STANDARD.md#platform-rules-apply-to-every-tool-and-every-spec)).
 - Parsing with OpenType.js; WOFF2 encoding with `woff2-encoder` in the browser (design).
 
+## Architecture and engine
+
+- Engines and libraries: `opentype.js@2.0.0` parses fonts and builds the subset font; `woff2-encoder@2.0.0` decodes and encodes WOFF2; `jszip@3.10.2` builds the subset bundle ZIP.
+- Browser APIs: `FontFace` and `document.fonts` render the source and subset previews; where `FontFace` is missing, the subset preview is unavailable and the verified WOFF2 download remains.
+- Network: none.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |

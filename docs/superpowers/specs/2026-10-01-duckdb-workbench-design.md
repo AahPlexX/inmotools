@@ -34,6 +34,12 @@ Out of scope:
 - The DuckDB binaries are not precached at first visit; they are cached on first use (TASK-003, asserted by `tests/unit/deployment-config.test.ts`).
 - Result capture is bounded by a row cap and 32 MiB of normalized data, because browser memory is finite.
 
+## Architecture and engine
+
+- Engines and libraries: `@duckdb/duckdb-wasm@1.32.0` runs SQL over CSV and Parquet files in an in-memory database; `selectBundle` chooses the `eh` or `mvp` WebAssembly bundle.
+- Workers: `duckdb-browser-eh.worker.js` or `duckdb-browser-mvp.worker.js` from `@duckdb/duckdb-wasm` runs the database, started from `duckdb-client.ts`.
+- Browser APIs: Web Workers and WebAssembly run the engine; `File.arrayBuffer` reads selected files, which are registered as in-memory buffers; results export through `src/lib/download`.
+
 ## Requirements
 
 | ID | Requirement | Acceptance test |
