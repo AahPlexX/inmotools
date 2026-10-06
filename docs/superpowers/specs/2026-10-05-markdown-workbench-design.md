@@ -84,7 +84,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R26 | Insert a table of contents built from the headings | Table of contents inserts a nested link list |
 | MDW-R27 | Fenced code is coloured by language (about 40 aliases); unknown languages stay plain (formerly F08) | A javascript fence shows coloured tokens; an unknown tag stays plain |
 | MDW-R28 | Fences over 20,000 characters are shown plain without highlighting (formerly F09) | A 26,000-character fence renders with no token spans |
-| MDW-R29 | Code blocks in the preview show line numbers and a Copy button | A fenced block shows numbered lines; Copy puts its text on the clipboard |
+| MDW-R29 | Live-preview code blocks show bounded line numbers and a Copy button; controls remain usable in narrow/oriented views and absent from exports/print | Copy preserves every literal line and terminal newline; blocked clipboard access offers selectable code; nested task controls preserve source; long blocks keep only visible line numbers in the DOM |
 | MDW-R30 | GitHub alert callouts: NOTE, TIP, IMPORTANT, WARNING and CAUTION | > [!TIP] renders a styled tip callout |
 | MDW-R31 | A DANGER callout kind | > [!DANGER] renders a danger callout |
 | MDW-R32 | Emoji shortcodes (about 150) render as emoji outside code; unknown codes stay as written | :tada: renders 🎉; `:tada:` in code stays text |

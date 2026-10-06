@@ -3,6 +3,7 @@ import { renderMarkdown } from './render-engine';
 import { scheduleIdle } from './diagram-engine';
 import { renderDiagramBlocks } from './diagram-renderer';
 import { highlightCodeBlocks } from './code-highlight-engine';
+import { addCodePreviewControls } from './code-preview-controls';
 import type { ScrollAnchor } from './markdown-types';
 import './code-highlight.css';
 
@@ -85,15 +86,16 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
   useEffect(() => {
     const { html, anchors } = renderMarkdown(preparedSource);
     const host = hostRef.current;
+    const cancels: (() => void)[] = [];
     if (host) {
       host.innerHTML = html;
+      cancels.push(addCodePreviewControls(host));
       measureAnchors(host, anchors, onAnchorsMeasured);
     }
 
     generationRef.current += 1;
     const generation = generationRef.current;
     const isCurrent = () => generationRef.current === generation;
-    const cancels: (() => void)[] = [];
     onRenderStateChange?.(true);
 
     const timer = setTimeout(() => {
@@ -115,7 +117,11 @@ export default function MarkdownPreview({ preparedSource, onAnchorsMeasured, onR
             },
           }))
           .finally(() => {
-            if (isCurrent()) onRenderStateChange?.(false);
+            if (isCurrent()) {
+              cancels.push(addCodePreviewControls(host, true));
+              measureAnchors(host, anchors, onAnchorsMeasured);
+              onRenderStateChange?.(false);
+            }
           });
       });
       cancels.push(cancelIdle);

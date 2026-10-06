@@ -10,6 +10,72 @@ const openSource = async (page: import('@playwright/test').Page, source: string)
   return editor;
 };
 
+test('MDW-R29 numbered code copies every literal line and keeps preview controls out of HTML exports', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const code = 'const value = "<tag>";\nconsole.log(value);\n';
+  await openSource(page, '```js\n' + code + '```');
+  const frame = page.locator('.markdown-code-frame');
+  await expect(frame).toHaveCount(1);
+  await expect(frame.locator('.markdown-code-line-numbers')).toHaveText('1\n2');
+  await page.setViewportSize({ width: 320, height: 568 });
+  const bounds = await frame.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+  await frame.getByRole('button', { name: /^Copy code/ }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  await page.getByRole('button', { name: 'Copy HTML', exact: true }).click();
+  await expect(page.getByTestId('markdown-status')).toContainText('Copied the rendered HTML');
+  const html = await page.evaluate(() => navigator.clipboard.readText());
+  expect(html).toContain('<pre');
+  expect(html).not.toContain('markdown-code-frame');
+  expect(html).not.toContain('Copy code block');
+});
+
+test('MDW-R29 denied clipboard access offers selection of code without line numbers', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.addInitScript(() => {
+    const clipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', { value: {
+      writeText: async () => { throw new DOMException('Test permission failure', 'NotAllowedError'); },
+      readText: () => clipboard.readText(),
+    } });
+  });
+  const editor = await openSource(page, '```text\nfirst <literal>\nsecond\n```');
+  const frame = page.locator('.markdown-code-frame');
+  await frame.getByRole('button', { name: /^Copy code/ }).click();
+  await expect(frame.getByRole('status')).toContainText('Clipboard blocked');
+  await frame.getByRole('button', { name: 'Select code', exact: true }).click();
+  const fallback = frame.getByRole('textbox', { name: /^Code ready to copy/ });
+  await expect(fallback).toHaveValue('first <literal>\nsecond\n');
+  expect(await fallback.evaluate((node) => {
+    const input = node as HTMLTextAreaElement;
+    return input.selectionStart === 0 && input.selectionEnd === input.value.length;
+  })).toBe(true);
+  await fallback.press('ControlOrMeta+c');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('first <literal>\nsecond\n');
+  await expect(editor).toContainText('first <literal>');
+});
+
+test('MDW-R29 long code keeps the numbered gutter bounded while showing the last lines', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const lines = Array.from({ length: 2000 }, (_, index) => `Literal line ${index + 1}`);
+  await page.goto('./#/tools/markdown-workbench');
+  const editor = page.getByRole('textbox', { name: 'Markdown source' });
+  await editor.click();
+  await editor.press('ControlOrMeta+a');
+  await page.evaluate((source) => navigator.clipboard.writeText(source), '```text\n' + lines.join('\n') + '\n```');
+  await editor.press('ControlOrMeta+v');
+  const frame = page.locator('.markdown-code-frame');
+  const body = frame.locator('.markdown-code-body');
+  await expect(body).toBeVisible();
+  await body.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await expect(frame.locator('.markdown-code-line-numbers')).toContainText('2000');
+  const gutter = await frame.locator('.markdown-code-line-numbers').innerText();
+  expect(gutter.split('\n').length).toBeLessThan(50);
+  await expect(frame.locator('code')).toContainText('Literal line 1');
+  await expect(frame.locator('code')).toContainText('Literal line 2000');
+});
+
 test('MDW-R20 Vim write saves the named draft without relying on the autosave timer', async ({ page }) => {
   await page.addInitScript(() => {
     const schedule = window.setTimeout.bind(window);

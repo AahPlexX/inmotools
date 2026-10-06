@@ -11,10 +11,10 @@ updated: 2026-10-06
 # Ordered requirement implementation
 
 ## Request
-Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Project records describe concrete behavior and commands, not private conversation or provider-specific instructions.
+Complete the reviewed inventory in the frozen order below, including associated bugs. Maintain current per-tool requirements, verification evidence and resumable progress. Preserve existing verified behavior and the static browser-only architecture. Record exact source revisions, reproducible checks, known limitations and the next action at every checkpoint.
 
 ## Resume here
-Current tool: 1, Markdown Workbench. Current requirement: MDW-R29. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
+Current tool: 1, Markdown Workbench. Current requirement: MDW-R31. Read its current tracker/spec and active tool task first. Work each frozen ID sequentially; an item already complete still needs current acceptance evidence. On finishing the listed items, resolve that tool's associated confirmed audit bugs and run its completion checks before advancing. All tool tasks stay active until integration/deployment evidence exists; incomplete work is never labeled done.
 
 Before each checkpoint: update the tool tracker requirement row, its Resume here, active tool task and this cursor in the same commit. Record exact commands/outcomes, source/check commit, limitations and next item. Verify changes on the pushed/integrated revision. Reconcile current upstream changes instead of applying the audit snapshot blindly. If a physical check is required, preserve its explicit awaiting-human flag and do not invent verification.
 
@@ -76,3 +76,7 @@ Baseline: `3d64fdeff005555388cb2f593ed5c15bfa3b7756`. Existing acceptance defini
 - 2026-10-06 21:33 UTC: combined six-item production acceptance passed 16/16 (57.3s). Clean build, TypeScript and five formatter-engine cases passed after removing the worker DOM dependency. Cursor MDW-R20. Corrected full regression and integration pending.
 
 - 2026-10-06: MDW-R20 production acceptance passed 4/4 (54.2s) including reload/restoration/rename and storage failure. Source is in this checkpoint. Cursor MDW-R29. Prior six items integrated/deployed as fc6a820f315bbc8abfed5e4e6094dbef3b8a799e; integration run37535034041 and Pages run37535764096 succeeded. Full regression pending.
+
+- 2026-10-06 22:18 UTC: first seven inventory items integrated as bcdd08ea4f42067c50f2c54870cf69d13a9902ef; Pages run 37537306543 succeeded. Current item MDW-R29 passed six focused checks and TypeScript, with production acceptance pending. Canonical full validation run 37538813696 on the seven-item main revision has passed records, units and build; browser checks remain in progress.
+
+- 2026-10-06 22:25 UTC: MDW-R29 production acceptance passed 12/12 with associated task-click fix; TypeScript/build passed. Cursor MDW-R31. Broader pre-guard Markdown regression passed 58/58; the guard separately passed 12/12. Canonical cross-tool validation and the next checkpoint's integration/deployment remain pending.
