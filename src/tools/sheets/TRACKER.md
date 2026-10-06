@@ -119,7 +119,7 @@ updated: 2026-10-05
 | TSW-R87 | prohibited | — | Cloud connectors need a server or provider accounts and keys (platform rules) |
 | TSW-R88 | prohibited | — | VBA cannot run in a browser; Apps Script runs on Google's servers with an account (browser limit, platform rules) |
 | TSW-R89 | verified | e2e "keeps parity chrome readable at <name>"; unit "keeps a device-agnostic portrait+landscape viewport matrix, not an iPhone 13-only proof" | |
-| TSW-R90 | partial | e2e "keeps Stage 2 chrome readable at a 320 CSS-pixel portrait viewport", "keeps pivot chrome usable at 320 CSS px" | Tested from 320 to 1024 px; 1440, 1920 and 2560 px not tested |
+| TSW-R90 | partial | e2e "keeps Stage 2 chrome readable at a 320 CSS-pixel portrait viewport", "keeps pivot chrome usable at 320 CSS px"; e2e "<slug> fits phone and tablet screens: nothing cut off, fields at least 16px, header links at least 24px" | Tested from 320 to 1024 px, including the pivot panel at 320, 390 and 768 px; 1440, 1920 and 2560 px not tested |
 | TSW-R91 | verified | e2e "has no serious or critical axe violations in the local grid"; `tests/e2e/accessibility.spec.ts` "has no serious or critical axe violations at <route>" | |
 | TSW-R92 | partial | — | Site theme selector exists; the workspace fails `color-contrast` in dark (T-repository-dark-contrast-20261004-b7d2) |
 | TSW-R93 | verified | unit "makes the overflowing feature-progress list keyboard-focusable" | |
@@ -143,6 +143,8 @@ updated: 2026-10-05
 - The sheet PIN is a local edit lock, not file encryption.
 
 ## Verification evidence
+
+- 2026-10-06: `tests/e2e/responsive.spec.ts` passes for this tool at 320, 390 and 768 px with touch and 2x pixel density (nothing cut off by a clipping ancestor, editable fields at least 16px, header links at least 24px).
 
 - 2026-10-05, `expand/tabular-sheet-workstation` from `main` @ `6c991e75`: `pnpm tool:check tabular-sheet-workstation --base origin/main` 62/93, no errors; `pnpm docs:sync` and `pnpm docs:check` passed; `pnpm exec vitest run tests/unit/cad-progress.test.ts tests/unit/sheets-wave-b.test.ts tests/unit/deployment-config.test.ts` 23 passed.
 

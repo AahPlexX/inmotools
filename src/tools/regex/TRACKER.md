@@ -90,7 +90,7 @@ updated: 2026-10-05
 | RXM-R59 | missing | — | JSON is exported (assertions, matches, tracks); only custom tracks import |
 | RXM-R60 | verified | e2e "RegexMatrix keyboard accelerators switch modes and submit Academy work" |  |
 | RXM-R61 | verified | e2e "Mobile Studio uses segmented work views without document overflow" |  |
-| RXM-R62 | partial | e2e "RegexMatrix audit surface reflows without document overflow or blocking accessibility defects at <name>" | 320, 844 and 768 px are tested; 1440–2560 px are not |
+| RXM-R62 | partial | e2e "RegexMatrix audit surface reflows without document overflow or blocking accessibility defects at <name>"; e2e "<slug> fits phone and tablet screens: nothing cut off, fields at least 16px, header links at least 24px" | 320, 390, 768 and 844 px are tested; 1440–2560 px are not |
 | RXM-R63 | verified | e2e "RegexMatrix remains accessible and avoids document overflow on the active viewport" |  |
 | RXM-R64 | partial | — | The workspace uses its own dark palette (`.regex-matrix` in `src/styles.css`) in every site theme; it does not switch to light |
 
@@ -109,6 +109,8 @@ updated: 2026-10-05
 - Results are capped at 5,000 records per run (continuation is ECMAScript only).
 
 ## Verification evidence
+
+- 2026-10-06: `tests/e2e/responsive.spec.ts` passes for this tool at 320, 390 and 768 px with touch and 2x pixel density (nothing cut off by a clipping ancestor, editable fields at least 16px, header links at least 24px).
 
 - 2026-10-05, `expand/regex-matrix` from `main` @ `8ff62503`: `pnpm tool:check regex-matrix --base origin/main` 45/64, no errors.
 

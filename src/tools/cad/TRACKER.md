@@ -241,7 +241,7 @@ updated: 2026-10-05
 | CAD-R208 | verified | unit "resolves the uniquely best semantic candidate without relying on a raw sub-shape ordinal", "reports ambiguity instead of silently choosing between equally plausible candidates", "reports missing when provenance and topology kind do not match", "stops an ambiguous topology reference instead of guessing a raw subshape index" |  |
 | CAD-R209 | verified | unit "round-trips supported length units through canonical millimeters", "round-trips degrees and radians through canonical radians", "rejects non-finite values instead of polluting the project model" |  |
 | CAD-R210 | partial | — | Site theme selector exists; the CAD workspace has no stylesheet of its own; no dark-theme run for this route is recorded |
-| CAD-R211 | partial | — | No CAD stylesheet and no overflow test for this route |
+| CAD-R211 | partial | e2e "<slug> fits phone and tablet screens: nothing cut off, fields at least 16px, header links at least 24px" | Checked at 320, 390 and 768 px on the first screen (canvas sized to its container at any pixel ratio); 1024–2560 px not tested |
 | CAD-R212 | verified | e2e (`tests/e2e/accessibility.spec.ts`) "has no serious or critical axe violations at <route>" |  |
 
 ## Open work
@@ -265,6 +265,8 @@ updated: 2026-10-05
 - The CAD route has no stylesheet of its own.
 
 ## Verification evidence
+
+- 2026-10-06: `tests/e2e/responsive.spec.ts` passes for this tool at 320, 390 and 768 px with touch and 2x pixel density (nothing cut off by a clipping ancestor, editable fields at least 16px, header links at least 24px).
 
 - 2026-10-05, `expand/cad-studio` from `main` @ `5fb22493`: `pnpm tool:check cad-studio --base origin/main` 14/212, no errors; `pnpm docs:sync` and `pnpm docs:check` passed; `pnpm exec vitest run tests/unit/cad-progress.test.ts tests/unit/sheets-wave-b.test.ts tests/unit/deployment-config.test.ts` passed.
 
