@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { autocompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { markdown, markdownKeymap } from '@codemirror/lang-markdown';
 import { defaultHighlightStyle, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { openSearchPanel, searchKeymap } from '@codemirror/search';
-import { Compartment, EditorState, Transaction } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { vim } from '@replit/codemirror-vim';
 import { markdownSyntaxCompletions } from './markdown-completions';
 import { buildOutline } from './outline-engine';
 import { HEADING_ID_PREFIX } from './heading-slug';
+import MarkdownTableBuilder from './MarkdownTableBuilder';
+
+const formattingChange = Annotation.define<boolean>();
 
 // CodeMirror 6 markdown source editor, mirroring the wiring pattern already
 // used by this catalog's other CodeMirror-based tools (see LatticeEditor.tsx,
@@ -157,6 +160,7 @@ function MarkdownAction({ id, label, help, onClick, ariaKeyShortcuts }: Markdown
 export interface MarkdownEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
+  readonly onFormatChange?: (value: string) => void;
   readonly onCursorLineChange?: (line: number) => void;
   readonly onViewportLineChange?: (line: number) => void;
   readonly onStatus?: (message: string) => void;
@@ -166,6 +170,7 @@ export interface MarkdownEditorProps {
   readonly spellcheck: boolean;
   readonly syntaxSuggestions: boolean;
   readonly darkMode: boolean;
+  readonly typewriterMode?: boolean;
   // Incremented by the parent to request that a given line be scrolled into
   // view and focused (used by the document outline). A counter rather than a
   // bare line number so selecting the same heading twice still re-reveals it.
@@ -175,6 +180,7 @@ export interface MarkdownEditorProps {
 export default function MarkdownEditor({
   value,
   onChange,
+  onFormatChange,
   onCursorLineChange,
   onViewportLineChange,
   onStatus,
@@ -184,14 +190,38 @@ export default function MarkdownEditor({
   spellcheck,
   syntaxSuggestions,
   darkMode,
+  typewriterMode = false,
   revealRequest,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const onFormatChangeRef = useRef(onFormatChange);
+  onFormatChangeRef.current = onFormatChange;
+  const formatterRef = useRef<Worker | null>(null);
+  const [formatting, setFormatting] = useState(false);
+  const cancelFormatting = (message?: string) => {
+    if (!formatterRef.current) return;
+    formatterRef.current.terminate();
+    formatterRef.current = null;
+    setFormatting(false);
+    if (message) onStatusRef.current?.(message);
+  };
   const onCursorLineChangeRef = useRef(onCursorLineChange);
   const onViewportLineChangeRef = useRef(onViewportLineChange);
   const onStatusRef = useRef(onStatus);
+  const typewriterRef = useRef(typewriterMode);
+  const centerFrameRef = useRef<number | null>(null);
+  typewriterRef.current = typewriterMode;
+  const centerCaret = (view: EditorView) => {
+    if (centerFrameRef.current !== null) cancelAnimationFrame(centerFrameRef.current);
+    centerFrameRef.current = requestAnimationFrame(() => {
+      centerFrameRef.current = null;
+      if (typewriterRef.current && view.scrollDOM.isConnected) {
+        view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'center' }) });
+      }
+    });
+  };
   // Set around a programmatic dispatch (the value-sync effect below, used
   // when an external change - undo/redo, restoring a draft, opening a file -
   // replaces the document from outside the editor). Without this guard, that
@@ -345,7 +375,12 @@ export default function MarkdownEditor({
           },
         }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !isExternalSyncRef.current) onChangeRef.current(update.state.doc.toString());
+          if (update.docChanged || update.selectionSet) cancelFormatting('Formatting cancelled because the document or caret changed. Run Auto-format again when ready.');
+          if (update.docChanged && !isExternalSyncRef.current) {
+            const report = update.transactions.some((transaction) => transaction.annotation(formattingChange))
+              ? onFormatChangeRef.current ?? onChangeRef.current : onChangeRef.current;
+            report(update.state.doc.toString());
+          }
           if (update.viewportChanged) {
             const viewportPosition = update.view.visibleRanges[0]?.from ?? update.view.viewport.from;
             onViewportLineChangeRef.current?.(update.state.doc.lineAt(viewportPosition).number);
@@ -353,6 +388,9 @@ export default function MarkdownEditor({
           if (update.selectionSet || update.docChanged) {
             const line = update.state.doc.lineAt(update.state.selection.main.head).number;
             onCursorLineChangeRef.current?.(line);
+          }
+          if (typewriterRef.current && !isExternalSyncRef.current && (update.docChanged || update.selectionSet)) {
+            centerCaret(update.view);
           }
         }),
       ],
@@ -367,8 +405,30 @@ export default function MarkdownEditor({
       onViewportLineChangeRef.current?.(view.state.doc.lineAt(topBlock.from).number);
     };
     view.scrollDOM.addEventListener('scroll', onScroll, { passive: true });
-    return () => { view.scrollDOM.removeEventListener('scroll', onScroll); view.destroy(); viewRef.current = null; };
+    const onResize = () => {
+      host.style.setProperty('--markdown-typewriter-padding', `${Math.max(0, (view.scrollDOM.clientHeight - view.defaultLineHeight) / 2)}px`);
+      if (typewriterRef.current) centerCaret(view);
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onResize);
+    observer?.observe(view.scrollDOM);
+    window.addEventListener('resize', onResize);
+    onResize();
+    return () => {
+      formatterRef.current?.terminate();
+      formatterRef.current = null;
+      observer?.disconnect();
+      window.removeEventListener('resize', onResize);
+      if (centerFrameRef.current !== null) cancelAnimationFrame(centerFrameRef.current);
+      view.scrollDOM.removeEventListener('scroll', onScroll);
+      view.destroy();
+      viewRef.current = null;
+    };
   }, [vimCompartment, wrapCompartment, attributesCompartment, suggestionsCompartment, themeCompartment, highlightCompartment]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && typewriterMode) centerCaret(view);
+  }, [typewriterMode]);
 
   useEffect(() => {
     viewRef.current?.dispatch({
@@ -524,6 +584,45 @@ export default function MarkdownEditor({
     view.focus();
   };
 
+  const autoFormat = () => {
+    const view = viewRef.current;
+    if (!view || formatterRef.current) return;
+    try {
+      const worker = new Worker(new URL('./format-worker.ts', import.meta.url), { type: 'module' });
+      formatterRef.current = worker;
+      setFormatting(true);
+      const snapshot = view.state.doc;
+      worker.onmessage = (event: MessageEvent<{ result?: { formatted: string; cursorOffset: number }; error?: string }>) => {
+        if (formatterRef.current !== worker || viewRef.current !== view) return;
+        cancelFormatting();
+        if (view.state.doc !== snapshot) {
+          onStatusRef.current?.('Formatting cancelled because the document changed.');
+          return;
+        }
+        const result = event.data.result;
+        if (!result) {
+          onStatusRef.current?.(event.data.error ?? 'Formatting failed. Your source is unchanged.');
+          return;
+        }
+        if (result.formatted !== snapshot.toString()) {
+          view.dispatch({
+            changes: { from: 0, to: snapshot.length, insert: result.formatted },
+            selection: { anchor: Math.max(0, Math.min(result.formatted.length, result.cursorOffset)) },
+            annotations: [isolateHistory.of('full'), formattingChange.of(true)],
+            userEvent: 'input.format',
+          });
+        }
+        view.focus();
+        onStatusRef.current?.('Markdown formatted. Undo restores the previous source.');
+      };
+      worker.onerror = () => cancelFormatting('Formatting failed. Your source is unchanged.');
+      worker.postMessage({ source: snapshot.toString(), cursorOffset: view.state.selection.main.head });
+    } catch {
+      cancelFormatting();
+      onStatusRef.current?.('Formatting could not start in this browser. Your source is unchanged.');
+    }
+  };
+
   return <>
     <div className="markdown-workbench-format-actions" role="group" aria-label="Insert Markdown">
       <MarkdownAction id="heading" label="Heading" help="Cycle the current line through heading levels 1–6, then back to body text." onClick={cycleHeading} />
@@ -541,8 +640,11 @@ export default function MarkdownEditor({
       <MarkdownAction id="image" label="Image" help="Insert image Markdown using a URL. You can also paste or drop a local image to embed it." onClick={() => insertPattern('![', '](https://example.com/image.png)', 'alt text')} />
       <MarkdownAction id="task" label="Task" help="Insert an unchecked GitHub-style task-list item." onClick={() => insertPattern('\n\n- [ ] ', '\n', 'task')} />
       <MarkdownAction id="table" label="Table" help="Insert a two-column Markdown table starter." onClick={() => insertPattern('\n\n', '\n', '| Column | Value |\n| --- | --- |\n| Item | Text |', false)} />
+      <MarkdownTableBuilder onInsert={(table) => insertPattern('\n\n', '\n', table, false)} />
+      <button type="button" onClick={autoFormat} disabled={formatting} title="Align tables and normalize Markdown spacing locally. Code and frontmatter stay intact; Undo restores the source.">{formatting ? 'Formatting…' : 'Auto-format'}</button>
+      {formatting ? <button type="button" onClick={() => cancelFormatting('Formatting cancelled. Your source is unchanged.')}>Cancel formatting</button> : null}
       <MarkdownAction id="find" label="Find / replace" help="Open the editor’s find and replace controls for this document." onClick={() => { const view = viewRef.current; if (view) openSearchPanel(view); }} />
     </div>
-    <div className="markdown-workbench-editor" ref={hostRef} />
+    <div className="markdown-workbench-editor" data-typewriter-mode={typewriterMode} ref={hostRef} />
   </>;
 }

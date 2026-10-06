@@ -6,7 +6,7 @@ basis: as-built
 status: active
 spec: docs/superpowers/specs/2026-10-05-markdown-workbench-design.md
 tracker: src/tools/markdown/TRACKER.md
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Markdown Workbench — spec
@@ -62,14 +62,14 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R09 | Find and replace with regular expressions and match case | Regex `\d+` replaces every number |
 | MDW-R10 | Context-aware syntax suggestions, on by default and switchable off | Typing `[` offers link syntax; turning suggestions off stops it |
 | MDW-R11 | Font size control with a visible value, keeping the caret and document when changed | Press ArrowRight on Font size; the value reads 14 px and the text is unchanged |
-| MDW-R12 | Wrap lines, Vim keys and Spellcheck switches, with editor settings remembered in this browser (`inmotools.markdown-workbench.prefs`) | Turn on Vim keys and reload; Vim keys is still on and Esc enters normal mode |
+| MDW-R12 | Wrap lines, Vim keys and Spellcheck switches, with editor settings remembered in this browser (`inmotools.markdown-workbench.prefs`); unknown/wrong-type settings and out-of-range font sizes fall back to usable defaults | Turn on Vim keys and reload; Vim keys is still on and Esc enters normal mode; malformed preference values cannot select an unknown view or unusable font size |
 | MDW-R13 | Toolbar Undo step and Redo step group adjacent typing into document steps; the editor keeps its own Ctrl/Cmd+Z history | Type twice, Undo step removes both; Redo step restores them |
 | MDW-R14 | Focus writing hides export and panels and keeps the save state, live counts and an exit control | Focus writing hides the panels; Exit focus restores them |
 | MDW-R15 | Typewriter mode keeps the caret line vertically centred while typing | Type at the end of a long document; the caret line stays at mid-height |
 | MDW-R16 | Syntax guide dialog with examples, focus return and a reachable close control on small screens | Open the guide, press Escape; focus returns to its trigger |
-| MDW-R17 | A table builder inserts a table with a chosen number of rows and columns | Choose 3×4; a table with 3 rows and 4 columns is inserted |
-| MDW-R18 | Markdown lint reports problems (for example heading level jumps, trailing spaces, inconsistent list markers) with their lines | A document jumping from # to ### reports the line |
-| MDW-R19 | Auto-format normalises the Markdown (list markers, spacing, table alignment) | Auto-format aligns a ragged table's pipes |
+| MDW-R17 | A table builder inserts a table with a chosen number of data rows (1–100) and columns (1–20), retaining the quick starter | Choose 3 data rows and 4 columns; a header plus 3 data rows, each with 4 cells, is inserted; invalid/fractional/out-of-range dimensions cannot insert |
+| MDW-R18 | Markdown checks report line-linked style suggestions for heading level jumps, unnecessary trailing whitespace and adjacent unordered-list marker changes; preserve hard breaks and literal code/math/HTML/frontmatter; no source mutation | A document jumping from # to ### reports the real source line; selecting a suggestion reveals that line; valid two-space hard breaks are not reported. Display the first 200 suggestions and disclose the total if capped |
+| MDW-R19 | Auto-format normalises Markdown list markers, spacing and table alignment in a cancellable local worker; retains frontmatter/code/single-tilde delimiters, maps the caret and preserves a separate Undo step | Auto-format aligns a ragged table's pipes; Undo restores the exact source. A delayed formatter cannot overwrite newer edits |
 | MDW-R20 | Vim mode command set beyond keybindings: ex commands such as :w save the draft | :w saves the draft |
 
 ### Markdown syntax and rendering
@@ -180,11 +180,11 @@ The tool is complete when every requirement is `verified` or `prohibited`, and t
 
 ## Technique decisions
 
-None recorded.
+- 2026-10-06: Typewriter mode is an independent editor option, default off, remembered locally. It centers the caret inside the source editor while typing, with padding for first/last lines and resizing; it does not alter document text or require Focus writing. Owner may override.
 
 ## Intent not recorded
 
-- Typewriter mode (MDW-R15) and reading view themes (MDW-R85): whether they are separate modes or options of Focus writing and Dark workspace is not settled. Owner may override.
+- Reading view themes (MDW-R85): relation to Focus writing and Dark workspace is not settled. Owner may override.
 
 ## Change log
 
