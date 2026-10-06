@@ -104,6 +104,8 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .site-header nav { display: flex; align-items: center; gap: 22px; font-size: 14px; }
 .site-header nav a { text-decoration: none; color: var(--muted); }
 .site-header nav a:hover { color: var(--ink); }
+.site-header nav a, .back-link { display: inline-flex; align-items: center; min-height: 24px; }
+@media (pointer: coarse) { .site-header nav a, .back-link { min-height: 32px; } }
 .site-header .support-link { color: var(--ink); border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
 @media (min-width: 601px) { .site-header nav { margin-left: auto; } }
 .theme-control { position: relative; display: inline-flex; flex: 0 0 auto; justify-self: start; margin: 0; padding: 2px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-size: 13px; }
@@ -530,6 +532,8 @@ tr:last-child td { border-bottom: 0; }
   .regex-matrix-bar label { width:100%; justify-content:space-between; }
   .regex-coffee { margin-left:0; }
   .regex-pattern-strip { grid-template-columns:minmax(0,1fr) 5.4rem; }
+  .regex-flags { flex-direction:column; align-items:stretch; gap:.2rem; min-width:0; }
+  .regex-flags input { width:100%; min-width:0; }
   .regex-run { grid-column:1/-1; }
   .regex-studio-grid { grid-template-columns:1fr; }
   .regex-studio-grid>section,.regex-studio-grid>aside { border-right:0; border-bottom:1px solid var(--matrix-line); }
@@ -906,4 +910,13 @@ tr:last-child td { border-bottom: 0; }
 .planner-section table td, .planner-section table th { overflow-wrap: anywhere; }
 @media (max-width: 600px) {
   .planner-tip summary { min-height: 44px; }
+}
+
+/* Touch screens: iPhone Safari zooms the page when a focused text field is under 16px. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not(.inputarea),
+  select,
+  textarea:not(.inputarea),
+  .cm-editor .cm-content,
+  .cm-editor .cm-scroller { font-size: 16px !important; }
 }
