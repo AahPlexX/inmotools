@@ -422,3 +422,88 @@
   text-align: left;
   line-height: 1.5;
 }
+.markdown-code-frame {
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.markdown-code-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  color: var(--ink);
+}
+.markdown-code-header button {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  white-space: normal;
+}
+.markdown-code-body {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  max-height: min(55dvh, 28rem);
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  background: var(--surface-strong);
+}
+.markdown-code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: stretch;
+  background: var(--surface-strong);
+  color: var(--muted);
+  user-select: none;
+}
+.markdown-code-line-numbers {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+  white-space: pre;
+  text-align: right;
+}
+.markdown-code-body pre code, .markdown-code-line-numbers {
+  font: 400 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.markdown-workbench-preview .markdown-code-body pre {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  overflow: visible;
+  border-radius: 0;
+}
+.markdown-code-body pre code { display: block; min-width: max-content; }
+.markdown-code-fallback { padding: 8px; }
+.markdown-code-fallback textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: min(35dvh, 12rem);
+  min-height: 96px;
+  padding: 8px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 16px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media print {
+  .markdown-code-frame { overflow: visible; }
+  .markdown-code-header, .markdown-code-gutter, .markdown-code-fallback { display: none; }
+  .markdown-code-body { display: block; max-height: none; overflow: visible; }
+  .markdown-code-body pre code { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+}

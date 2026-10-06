@@ -13,7 +13,7 @@ updated: 2026-10-06
 
 ## Resume here
 
-Current ordered item: MDW-R29 numbered code/copy controls, then MDW-R31 DANGER callout. MDW-R20 production acceptance passed 4/4, including reload/restoration/rename and failed local storage. MDW-R09/12/15/17/18/19 are integrated and deployed as fc6a820f. Full regression for that six-item checkpoint remains in progress; later work needs its own verification. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
+Current ordered item: MDW-R31 DANGER callout, then MDW-R33 subscript/superscript. MDW-R09/12/15/17/18/19/20 are integrated and deployed as bcdd08ea. MDW-R29 production acceptance passed 12/12, including the nested task-click fix, exact clipboard fallback, orientation, keyboard focus and print. Broader pre-guard Markdown regression passed 58/58; the separate 12/12 production run verifies the guard. Canonical full validation run 37538813696 remains in progress. R29 publication/release evidence is pending. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
 
 ## Documents
 
@@ -60,7 +60,7 @@ Current ordered item: MDW-R29 numbered code/copy controls, then MDW-R31 DANGER c
 | MDW-R26 | verified | e2e "inserting a table of contents links to and lands on the actual rendered heading" | |
 | MDW-R27 | verified | e2e "fenced code blocks are colored by language in the live preview"; unit "wraps a recognized language into styled spans without losing any source text", "leaves an unrecognized language as plain escaped text instead of guessing" | |
 | MDW-R28 | verified | e2e "an oversized recognized fence remains readable without running cosmetic syntax highlighting"; unit "leaves an oversized recognized fence plain instead of parsing it for cosmetic highlighting" | |
-| MDW-R29 | missing | — | |
+| MDW-R29 | verified | e2e "MDW-R29 numbered code copies every literal line and keeps preview controls out of HTML exports", "MDW-R29 denied clipboard access offers selection of code without line numbers", "MDW-R29 long code keeps the numbered gutter bounded while showing the last lines", "MDW-R29 selecting code inside a task preserves its checkbox while ordinary task clicks still work", "MDW-R29 code controls wrap through orientation changes and print without clipping or copy controls" | Production desktop/touch checks 12/12 including ordinary task toggling; TypeScript and clean build passed. Full regression/release pending |
 | MDW-R30 | verified | e2e "GitHub-style alert blockquotes render as styled callouts instead of plain quotes"; unit "leaves an ordinary blockquote without a marker untouched" | |
 | MDW-R31 | missing | — | Five GitHub kinds exist |
 | MDW-R32 | verified | e2e "a recognized emoji shortcode renders as its emoji in the live preview"; unit "converts a recognized emoji shortcode and leaves an unrecognized one exactly as written", "does not convert emoji-shaped text inside inline code or a fenced code block" | |
@@ -129,7 +129,7 @@ Current ordered item: MDW-R29 numbered code/copy controls, then MDW-R31 DANGER c
 
 1. Tests for implemented rows: MDW-R68.
 2. Editing: listed editing requirements complete; retain regression coverage.
-3. Markdown syntax and rendering: MDW-R29, MDW-R31, MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
+3. Markdown syntax and rendering: MDW-R31, MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
 4. Citations: MDW-R51.
 5. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57.
 6. Files and storage: MDW-R69, MDW-R70, MDW-R71, MDW-R72.
@@ -165,3 +165,5 @@ Current ordered item: MDW-R29 numbered code/copy controls, then MDW-R31 DANGER c
 ## Change log
 
 - **2026-10-05:** Created with the spec; 92 requirements.
+
+- 2026-10-06 22:25 UTC: MDW-R29 production acceptance passed 12/12 (1.5m) on the guard build. Clipboard and manual fallback preserve terminal newline, 2000-line gutter DOM stays bounded, 320px/landscape controls remain reachable, print removes controls and clipping, and code interaction preserves nested task state. TypeScript/build passed. Cursor MDW-R31; broader regression and publication remain pending.
