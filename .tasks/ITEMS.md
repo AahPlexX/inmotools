@@ -51,6 +51,7 @@ None.
 | [T-duckdb-workbench-20261004-9d38](items/T-duckdb-workbench-20261004-9d38.md) | `duckdb-workbench` | expand | `expand/duckdb-workbench` | 2026-10-04 | Cover untested requirements |
 | [T-exif-scrubber-20261004-60fc](items/T-exif-scrubber-20261004-60fc.md) | `exif-scrubber` | expand | `expand/exif-scrubber` | 2026-10-04 | Cover untested requirements |
 | [T-fiber-craft-workstation-20261003-124b](items/T-fiber-craft-workstation-20261003-124b.md) | `fiber-craft-workstation` | fix | `fix/fiber-craft-workstation` | 2026-10-04 | Give the Fiber Craft spec the standard header block |
+| [T-floorplan-studio-20261005-b571](items/T-floorplan-studio-20261005-b571.md) | `floorplan-studio` | expand | `expand/floorplan-studio` | 2026-10-05 | Standard spec and tracker |
 | [T-font-subsetter-20261004-20c0](items/T-font-subsetter-20261004-20c0.md) | `font-subsetter` | expand | `expand/font-subsetter` | 2026-10-04 | Cover untested requirements |
 | [T-fuzzy-deduplicator-20261003-4f83](items/T-fuzzy-deduplicator-20261003-4f83.md) | `fuzzy-deduplicator` | expand | `expand/fuzzy-deduplicator` | 2026-10-03 | Cover untested requirements FDD-R07 and FDD-R13 |
 | [T-geo-intelligence-hub-20261004-4771](items/T-geo-intelligence-hub-20261004-4771.md) | `geo-intelligence-hub` | expand | `expand/geo-intelligence-hub` | 2026-10-04 | Record integration of untested-requirement tests |
