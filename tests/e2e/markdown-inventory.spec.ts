@@ -10,6 +10,57 @@ const openSource = async (page: import('@playwright/test').Page, source: string)
   return editor;
 };
 
+test('MDW-R20 Vim write saves the named draft without relying on the autosave timer', async ({ page }) => {
+  await page.addInitScript(() => {
+    const schedule = window.setTimeout.bind(window);
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => schedule(delay === 1200 ? () => undefined : handler, delay, ...args)) as typeof window.setTimeout;
+  });
+  const editor = await openSource(page, '# Vim save\n\nOriginal content.');
+  await page.getByRole('textbox', { name: 'Document name', exact: true }).fill('Vim persisted');
+  await page.getByRole('checkbox', { name: 'Vim keys', exact: true }).check();
+  await editor.click();
+  await editor.press('Escape');
+  await editor.press(':');
+  const command = page.locator('.cm-vim-panel input');
+  await command.fill('w');
+  await command.press('Enter');
+  await expect(page.getByTestId('markdown-status')).toContainText('Saved a local draft');
+  await page.getByText(/^Local drafts and storage/).click();
+  await expect(page.getByTestId('markdown-draft-list')).toContainText('Vim persisted');
+  await expect(editor).toContainText('Original content.');
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Vim keys', exact: true })).toBeChecked();
+  await page.getByText(/^Local drafts and storage/).click();
+  await page.getByTestId('markdown-draft-list').locator('li > button').first().click();
+  await page.getByRole('textbox', { name: 'Document name', exact: true }).fill('Vim renamed');
+  await editor.click();
+  await editor.press('Escape');
+  await editor.press(':');
+  await command.fill('write');
+  await command.press('Enter');
+  await expect(page.getByTestId('markdown-status')).toContainText('Saved a local draft');
+  await expect(page.getByTestId('markdown-draft-list')).toContainText('Vim renamed');
+  await expect(page.getByTestId('markdown-draft-list').locator('li')).toHaveCount(1);
+});
+
+test('MDW-R20 Vim write reports local storage failure without losing the document', async ({ page }) => {
+  await page.addInitScript(() => {
+    IDBDatabase.prototype.transaction = function () { throw new DOMException('Test storage failure', 'QuotaExceededError'); };
+  });
+  await page.goto('./#/tools/markdown-workbench');
+  await page.getByRole('checkbox', { name: 'Vim keys', exact: true }).check();
+  const editor = page.getByRole('textbox', { name: 'Markdown source' });
+  const before = await editor.innerText();
+  await editor.click();
+  await editor.press('Escape');
+  await editor.press(':');
+  const command = page.locator('.cm-vim-panel input');
+  await command.fill('write');
+  await command.press('Enter');
+  await expect(page.getByTestId('markdown-status')).toContainText('Local autosave failed');
+  await expect(editor).toHaveText(before, { useInnerText: true });
+});
+
 test('MDW-R19 auto-format aligns a table, keeps literals and can undo the whole formatting action', async ({ page }) => {
   const source = '|A|Longer|\n|-|-|\n|one|two|\n\n* first\n* second\n\n```text\nexact   spaces\n```';
   const editor = await openSource(page, source);

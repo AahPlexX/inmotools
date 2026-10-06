@@ -850,7 +850,7 @@ export default function MarkdownWorkspace() {
           <span className="markdown-workbench-toolbar-label">Editor</span>
           <div className="markdown-workbench-toolbar-group">
             <label className="markdown-workbench-check"><input type="checkbox" checked={lineWrapping} onChange={(event) => setLineWrapping(event.target.checked)} />Wrap lines</label>
-            <label className="markdown-workbench-check"><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
+            <label className="markdown-workbench-check" title="Use Vim keybindings. In normal mode, :w or :write saves the current named draft locally."><input type="checkbox" checked={vimMode} onChange={(event) => setVimMode(event.target.checked)} />Vim keys</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={spellcheck} onChange={(event) => setSpellcheck(event.target.checked)} />Spellcheck</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={typewriterMode} onChange={(event) => setTypewriterMode(event.target.checked)} />Typewriter mode</label>
             <label className="markdown-workbench-check"><input type="checkbox" checked={syntaxSuggestions} onChange={(event) => setSyntaxSuggestions(event.target.checked)} />Syntax suggestions</label>
@@ -890,6 +890,7 @@ export default function MarkdownWorkspace() {
         <div className="markdown-workbench-editor-pane" onDrop={onEditorDrop} onDragOver={onEditorDragOver}>
           <MarkdownEditor
             onFormatChange={commitSource}
+            onSave={saveDraftNow}
             value={source}
             onChange={handleEditorSourceChange}
             onCursorLineChange={handleCursorLineChange}

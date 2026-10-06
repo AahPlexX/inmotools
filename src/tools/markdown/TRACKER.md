@@ -13,7 +13,7 @@ updated: 2026-10-06
 
 ## Resume here
 
-Current ordered item: MDW-R20 Vim saving. MDW-R18/19 production acceptance passes; formatting runs in a cancellable worker and preserves Undo. MDW-R09/12/15/17 acceptance passes. Table builder uses bounded integral dimensions and preserves Cancel/Undo and the original quick starter. Next MDW-R29 copy-code buttons after MDW-R20. Remaining counts are computed by `pnpm tool:check markdown-workbench`; do not use the historical summary. Work is on `fix/markdown-workbench`; tool remains incomplete.
+Current ordered item: MDW-R29 numbered code/copy controls, then MDW-R31 DANGER callout. MDW-R20 production acceptance passed 4/4, including reload/restoration/rename and failed local storage. MDW-R09/12/15/17/18/19 are integrated and deployed as fc6a820f. Full regression for that six-item checkpoint remains in progress; later work needs its own verification. Tool remains incomplete; compute counts with pnpm tool:check markdown-workbench.
 
 ## Documents
 
@@ -51,7 +51,7 @@ Current ordered item: MDW-R20 Vim saving. MDW-R18/19 production acceptance passe
 | MDW-R17 | verified | e2e "MDW-R17 bounded table builder inserts chosen dimensions and supports cancel and undo" | Desktop/touch pass; quick Table starter retained; 1–100 data rows, 1–20 columns; header separate |
 | MDW-R18 | verified | e2e "MDW-R18 style suggestions report source lines, reveal the caret and preserve valid hard breaks"; unit "reports heading jumps, adjacent mixed bullets and trailing whitespace at their actual source lines" | Literal code/math/HTML/frontmatter and intentional hard breaks preserved; first200 suggestions and total shown |
 | MDW-R19 | verified | e2e "MDW-R19 auto-format aligns a table, keeps literals and can undo the whole formatting action", "MDW-R19 a delayed formatter cannot overwrite a newer edit"; unit "preserves code and document extensions and returns a usable mapped caret" | Production desktop/touch pass; worker-only DOM dependency removed; metadata/code preserved and stale work cancelled |
-| MDW-R20 | missing | — | Vim keybindings exist (editor settings) |
+| MDW-R20 | verified | e2e "MDW-R20 Vim write saves the named draft without relying on the autosave timer", "MDW-R20 Vim write reports local storage failure without losing the document" | Production desktop/touch 4/4; reload, restore and renamed draft retained; transaction failure preserves source |
 | MDW-R21 | verified | unit "parses CommonMark headings and paragraphs with source line positions", "parses GFM tables as a single top-level node", "parses GFM strikethrough and task lists without throwing", "renders a GFM table", "renders a footnote reference and its body" | |
 | MDW-R22 | verified | unit "strips raw script tags from the rendered output, leaving only the inert text", "strips a javascript: URI from a link", "strips inline event handler attributes from raw HTML"; e2e "Standalone HTML export keeps sanitized Markdown inert through the detached render path" | |
 | MDW-R23 | verified | e2e "ATX heading levels are visibly distinct in the rendered preview" | |
@@ -128,7 +128,7 @@ Current ordered item: MDW-R20 Vim saving. MDW-R18/19 production acceptance passe
 ## Open work
 
 1. Tests for implemented rows: MDW-R68.
-2. Editing: MDW-R20.
+2. Editing: listed editing requirements complete; retain regression coverage.
 3. Markdown syntax and rendering: MDW-R29, MDW-R31, MDW-R33, MDW-R34, MDW-R35, MDW-R36, MDW-R38.
 4. Citations: MDW-R51.
 5. Navigation and metrics: MDW-R55, MDW-R56, MDW-R57.
@@ -143,6 +143,8 @@ Current ordered item: MDW-R20 Vim saving. MDW-R18/19 production acceptance passe
 - Images embedded by paste or drop are capped at 5 MB.
 
 ## Verification evidence
+
+- 2026-10-06: MDW-R20 production acceptance passed 4/4 (54.2s), including saved-name reload/restoration/rename and storage-failure source preservation. TypeScript and build passed. Six earlier inventory items integrated as fc6a820f315bbc8abfed5e4e6094dbef3b8a799e; integration run37535034041 and Pages run37535764096 succeeded. Full regression remains pending.
 
 - 2026-10-06 21:33 UTC: combined MDW-R09/12/15/17/18/19 production acceptance passed 16/16 (57.3s) with normal motion defaults, including lint bounds at 320 portrait and 844 landscape, formatter Undo and a delayed-worker edit race. Formatting engine tests passed 5/5; TypeScript check and clean build passed. Full regression/integration pending.
 

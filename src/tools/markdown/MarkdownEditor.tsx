@@ -7,7 +7,7 @@ import { openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state';
 import { drawSelection, EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
-import { vim } from '@replit/codemirror-vim';
+import { getCM, vim } from '@replit/codemirror-vim';
 import { markdownSyntaxCompletions } from './markdown-completions';
 import { buildOutline } from './outline-engine';
 import { HEADING_ID_PREFIX } from './heading-slug';
@@ -161,6 +161,7 @@ export interface MarkdownEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onFormatChange?: (value: string) => void;
+  readonly onSave?: () => void;
   readonly onCursorLineChange?: (line: number) => void;
   readonly onViewportLineChange?: (line: number) => void;
   readonly onStatus?: (message: string) => void;
@@ -181,6 +182,7 @@ export default function MarkdownEditor({
   value,
   onChange,
   onFormatChange,
+  onSave,
   onCursorLineChange,
   onViewportLineChange,
   onStatus,
@@ -198,6 +200,8 @@ export default function MarkdownEditor({
   const onChangeRef = useRef(onChange);
   const onFormatChangeRef = useRef(onFormatChange);
   onFormatChangeRef.current = onFormatChange;
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
   const formatterRef = useRef<Worker | null>(null);
   const [formatting, setFormatting] = useState(false);
   const cancelFormatting = (message?: string) => {
@@ -431,9 +435,18 @@ export default function MarkdownEditor({
   }, [typewriterMode]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
       effects: vimCompartment.reconfigure(vimMode ? vim() : []),
     });
+    const cm = getCM(view);
+    if (!cm) return;
+    // Built-in :w/:write delegates to this instance hook, keeping other
+    // catalog editors' save behavior independent of this workspace.
+    const previousSave = cm.save;
+    cm.save = () => onSaveRef.current?.();
+    return () => { cm.save = previousSave; };
   }, [vimMode, vimCompartment]);
 
   useEffect(() => {
