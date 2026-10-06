@@ -6,10 +6,14 @@ on:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - 'scripts/check-doc-links.mjs'
+      - 'scripts/docs-sync.mjs'
   pull_request:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - 'scripts/check-doc-links.mjs'
+      - 'scripts/docs-sync.mjs'
   # integrate.yml dispatches this after it has validated and pushed a merge to main
   # (its push cannot trigger workflows), with validate=false to deploy only.
   workflow_dispatch:
