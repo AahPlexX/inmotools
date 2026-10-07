@@ -17,7 +17,7 @@ Associated MDW-R36/37 interaction repair from the ordered audit: a task displaye
 
 ## Resume here
 
-Latest associated repair is published in 7025c67d17b3bd1dadcd30191bc6bc76b2c68c1d, tree-equal to validated source (343 Markdown units, TypeScript/build, 20 combined desktop/touch production cases passed without retries/skips). At 2026-10-07 04:44 UTC, integration 37572819658 is running and fresh full-site validation 37572856847 is queued; record-only pushes may supersede integration. Inspect latest main/Pages/official full receipts before closing this task. Earlier full 37571121544 validates the older runtime only. Parent cursor R38; no latest release/full-pass claim.
+Latest runtime is scoped-verified and deployed at main 58be2be9e46203b87e416699e1a7e038c9dbc7fd, equal to published runtime/tests 7025c67d. Integration 37572936067 and Pages 37573618697 succeeded; official receipt: 3852 unit passes/14 skips, 228 owned browser passes (6.5m), no browser retries/skips. Local 343 units, TypeScript/build and 20 combined production cases passed. At 2026-10-07 04:57 UTC, fresh full-site validation 37572856847 on 7025c67d remains in progress; earlier 37571121544 covers older runtime. Inspect latest full receipt and any owned failures, then close this task with its exact source/main receipts and computed tool-check result. Parent ordered cursor is R51. Task remains active until full-site evidence; no full-pass claim.
 
 ## Log
 
@@ -38,3 +38,5 @@ Latest associated repair is published in 7025c67d17b3bd1dadcd30191bc6bc76b2c68c1
 - 2026-10-07 04:39 UTC: R38 actual cycle exposed a further mixed-history defect on unchanged deployed editor code: keyboard task Undo then Redo within the document coalescing window leaves duplicate current/past snapshots, so immediate toolbar Undo does not change source. Both projects failed (3/3 remained instead of 2/3), while earlier independently sequenced history acceptance passed. The current update listener sends undo/redo through typing coalescing; preserve distinct document steps for these native history events through the existing isolated callback. R38 acceptance now verifies that mixed cycle. This associated task remains active.
 
 - 2026-10-07 04:43 UTC: Associated repair passes expanded actual-cycle acceptance: all 20 R36+R38 production cases (1.2m), 343 Markdown units (9.64s), TypeScript and clean build (13.66s). No retries/skips. Latest runtime publication/full-site/main/Pages pending; task remains active.
+
+- 2026-10-07 04:57 UTC: Latest repair integrated/deployed at main 58be2be: integration 37572936067 and Pages 37573618697 success. Official logs: 3852 unit passes/14 skips, 228 owned browsers passed (6.5m), no browser retries/skips. Fresh full 37572856847 still running; leave task active. Scoped R38 verified and cursor R51; tool incomplete.
