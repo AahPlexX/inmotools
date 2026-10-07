@@ -351,6 +351,11 @@
 .markdown-workbench-view-split .markdown-workbench-preview { min-height: 0; }
 .markdown-workbench-view-split .markdown-workbench-editor .cm-editor { height: 100%; }
 .markdown-workbench-live-metrics { font-variant-numeric: tabular-nums; }
+.markdown-workbench-status > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.markdown-workbench-status .markdown-workbench-autosave-status { white-space: normal; }
+.markdown-workbench-task-progress { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.markdown-workbench-task-progress > span { min-width: 0; overflow-wrap: anywhere; }
+.markdown-workbench-task-progress progress { width: 6rem; max-width: 100%; accent-color: var(--signal); }
 .markdown-workbench-preview li:has(> input[type="checkbox"]) { cursor: pointer; }
 .markdown-workbench-preview input[type="checkbox"] {
   width: 1.05rem;
