@@ -54,9 +54,18 @@ const parseFenced = (
 const parseJsonBlock = (lines: string[]): FrontmatterResult | null => {
   if (lines[0]?.trim() !== '{') return null;
   let depth = 0;
+  let quoted = false;
+  let escaped = false;
   let endIndex = -1;
   for (let index = 0; index < lines.length; index += 1) {
     for (const char of lines[index]) {
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === '"') quoted = false;
+        continue;
+      }
+      if (char === '"') { quoted = true; continue; }
       if (char === '{') depth += 1;
       if (char === '}') depth -= 1;
     }
@@ -85,7 +94,7 @@ const parseJsonBlock = (lines: string[]): FrontmatterResult | null => {
 
 export const parseFrontmatter = (source: string): FrontmatterResult => {
   if (!source) return emptyResult();
-  const lines = source.split('\n');
+  const lines = source.split(/\r\n|\r|\n/);
 
   const yamlResult = parseFenced(lines, YAML_FENCE, 'yaml');
   if (yamlResult) return yamlResult;
@@ -102,6 +111,12 @@ export const parseFrontmatter = (source: string): FrontmatterResult => {
 export const stripFrontmatter = (source: string): string => {
   const result = parseFrontmatter(source);
   if (result.format === null) return source;
-  const lines = source.split('\n');
-  return lines.slice(result.bodyStartLine - 1).join('\n');
+  const lineBreaks = /\r\n|\r|\n/g;
+  let offset = 0;
+  for (let line = 1; line < result.bodyStartLine; line += 1) {
+    const boundary = lineBreaks.exec(source);
+    if (!boundary) return '';
+    offset = boundary.index + boundary[0].length;
+  }
+  return source.slice(offset);
 };

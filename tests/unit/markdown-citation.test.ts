@@ -229,3 +229,21 @@ describe('in-text citation substitution', () => {
     expect(substituteInTextCitations('See [@smith2024].', new Map())).toBe('See [@smith2024].');
   });
 });
+
+
+describe('citation positions after native metadata', () => {
+  const headers = [
+    ['yaml', '---\ntitle: "[@metadata]"\n---'],
+    ['toml', '+++\ntitle = "[@metadata]"\n+++'],
+    ['json', '{\n"title": "brace } and [@metadata]"\n}'],
+  ] as const;
+  for (const [format, header] of headers) {
+    for (const newline of ['\n', '\r\n', '\r']) {
+      it(`uses original ${format} body offsets with ${JSON.stringify(newline)} line endings`, () => {
+        const source = header.replace(/\n/g, newline) + newline + ['', '[@alpha].', '', '    [@literal]', '', 'End.', ''].join(newline);
+        expect(extractCitekeys(source)).toEqual(['alpha']);
+        expect(substituteInTextCitations(source, new Map([['alpha', '(Alpha, 2026)']]))).toBe(source.replace('[@alpha]', '(Alpha, 2026)'));
+      });
+    }
+  }
+});

@@ -31,7 +31,7 @@ async function download(page: Page, label: string) {
 
 test('MDW-R51 all cited entries reach actual exports while native marker literals and original Windows source survive', async ({ page, context }) => {
   await page.goto('./#/tools/markdown-workbench');
-  const source = 'See [@beta], [@alpha], [@beta] and [@missing].\r\n\r\n    [@alpha]\r\n\r\n``[@alpha] ` inner``\r\n\r\n````md\r\n```\r\n[@alpha]\r\n````\r\n\r\n> <details>\r\n> <summary>Prose [@alpha], code ``[@alpha] ` inner``</summary>\r\n>\r\n> Closed body [@beta].\r\n>\r\n> </details>\r\n';
+  const source = '---\r\ntitle: "[@unused]"\r\n---\r\n\r\nSee [@beta], [@alpha], [@beta] and [@missing].\r\n\r\n    [@alpha]\r\n\r\n``[@alpha] ` inner``\r\n\r\n````md\r\n```\r\n[@alpha]\r\n````\r\n\r\n> <details>\r\n> <summary>Prose [@alpha], code ``[@alpha] ` inner``</summary>\r\n>\r\n> Closed body [@beta].\r\n>\r\n> </details>\r\n';
   await page.setInputFiles('input[type="file"][accept*=".html"]', { name: 'citations.md', mimeType: 'text/markdown', buffer: Buffer.from(source) });
   await loadLibrary(page);
   const preview = page.locator('.markdown-workbench-preview');
@@ -176,3 +176,27 @@ test('MDW-R51 failed style loading stops pending export state and recovers by se
   await page.evaluate(() => window.dispatchEvent(new Event('vite:preloadError', { cancelable: true })));
   await reload;
 });
+
+
+for (const [format, header] of [
+  ['yaml', '---\ntitle: "[@unused]"\n---'],
+  ['toml', '+++\ntitle = "[@unused]"\n+++'],
+  ['json', '{\n"title": "brace } and [@unused]"\n}'],
+] as const) {
+  test(`MDW-R51 ${format} metadata preserves citation boundaries and exact source for native line endings`, async ({ page }) => {
+    await page.goto('./#/tools/markdown-workbench');
+    await loadLibrary(page);
+    const preview = page.locator('.markdown-workbench-preview');
+    for (const newline of ['\n', '\r\n', '\r']) {
+      const source = header.replace(/\n/g, newline) + newline + newline + '[@alpha].' + newline + newline + '    [@beta]' + newline;
+      await page.setInputFiles('input[type="file"][accept*=".html"]', { name: `${format}-fixture.md`, mimeType: 'text/markdown', buffer: Buffer.from(source) });
+      await expect(preview.getByRole('heading', { name: 'References', exact: true })).toHaveCount(1);
+      await expect(preview.locator('#user-content-references ~ p')).toHaveCount(1);
+      await expect(preview).toContainText('(Alpha, 2026).');
+      await expect(preview).not.toContainText('Beta bibliography specimen');
+      await expect(preview).not.toContainText('Uncited bibliography specimen');
+      await expect(preview.locator('pre code')).toHaveText('[@beta]\n');
+      expect((await download(page, 'Markdown')).equals(Buffer.from(source))).toBe(true);
+    }
+  });
+}
