@@ -11,7 +11,7 @@ updated: 2026-10-07
 
 # Markdown Workbench — spec
 
-As built at `947272db` (last code change under `src/tools/markdown/`). Requirement prefix: `MDW`. Status of each requirement: [TRACKER.md](../../../src/tools/markdown/TRACKER.md).
+Historical specification baseline: `947272db`. Current implementation and exact release/checkpoint receipts are recorded in the tracker. Requirement prefix: `MDW`. Status of each requirement: [TRACKER.md](../../../src/tools/markdown/TRACKER.md).
 
 "(formerly Fnn)" gives the function number in the ten-function ledger of [markdown-audit-2026-09-16.md](../../markdown-audit-2026-09-16.md) ("Real-world remediation pass" and "Historical branch reconciliation", 2026-09-27).
 
@@ -94,7 +94,7 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 | MDW-R36 | Source-positioned details/summary disclosure blocks with optional open/name attributes | Native keyboard/touch toggle; nested Markdown content and literal code remain intact; malformed/unsafe wrappers stay inert and readable; source/AST/DOCX/HTML/EPUB/import retain content; grouping, stable unique-caption expansion within a document, narrow/oriented wrapping, closed-target navigation, print and format/Undo work without toggling a surrounding task; quoted task clicks edit only their native checkbox marker and preserve all source outside it |
 | MDW-R37 | Clicking a task checkbox in the preview toggles that line in the source | Click an open task; the source line reads - [x] |
 | MDW-R38 | Native task progress (completed of total) for the current document | Two of three tasks checked shows 2/3; nested quotes/lists/disclosures/footnotes count once, code/metadata/literal fallback are excluded; zero tasks is explicit without an indeterminate bar; preview toggles, source edits, Undo/Redo, import and document replacement update counts; accessible determinate progress and text stay readable without overlap at narrow portrait/landscape sizes |
-| MDW-R39 | Frontmatter in YAML, TOML or JSON is parsed, shown in a panel, and its title names the document | YAML title: Notes names exports notes.* |
+| MDW-R39 | Frontmatter in YAML, TOML or JSON is parsed, shown in a panel, and its title names the document | YAML title: Notes names exports notes.*; circular/shared aliases display without blanking the app; non-finite values stay readable; original downloads and narrow/oriented label/value bounds are retained |
 | MDW-R40 | Math with KaTeX (inline and display, mhchem, CD) | $a^2$ renders KaTeX markup |
 | MDW-R41 | Math check panel lists malformed expressions by line without breaking the preview | A broken expression is listed with its line |
 | MDW-R42 | Mermaid diagrams render in the preview, with visible line-specific errors and a size limit | A flowchart renders as SVG; a broken one shows an error |
@@ -235,3 +235,7 @@ HTML task import retains the checked state of a leading checkbox input directly 
 - 2026-10-07 14:15:46 UTC: R51 associated metadata repair must recognize LF/CRLF/CR and quote-aware JSON delimiters, canonicalize parser payload only, and preserve the body as an original source slice. Regression baseline 8 failed/49 passed; no repair pass claim.
 
 - 2026-10-07 14:25:51 UTC: Final metadata-repaired R51 scoped acceptance passed 34/34 production cases (4.2m), 391 units, TypeScript/build. Current R51 implemented; associated tasks active for fresh required full integration/main/Pages; R55 follows. Publish real repair before inspecting its new full receipt; prior 37632859293 validates earlier runtime only.
+
+- 2026-10-07 14:52:19 UTC: Associated MDW-R39 display repair must keep valid cyclic YAML metadata from blanking the app, mark cycle edges only in read-only display, preserve repeated non-circular aliases and raw source, and display non-finite numeric values truthfully. Task 42ab records unchanged/current baseline and primary MDN evidence before implementation.
+
+- 2026-10-07 15:20:46 UTC: References runtime a924c377/checkpoint a3885a9 is integrated at main 230f637d3c60a31a45559aaa05bc41c1c05de582 (exact tree equality). Full integration 37637141396 succeeded at 15:19:16 UTC: 3896 unit passes/14 skips and 1711 browser passes/171 skips (46.5m), zero browser retries/flaky cases. Pages build/deploy jobs 112856996133/112857318705 succeeded in run 37640254171; deploy completed 14:52:34 UTC. Live deployed actual References export acceptance passed 2/2 desktop/touch (27.7s). Separate duplicate main/PR validate jobs may still be running; they are not needed to invent or replace this exact full receipt. R51 verified, associated scoped tasks done; cursor R55 after independent owned metadata-display repair release. Tool incomplete.

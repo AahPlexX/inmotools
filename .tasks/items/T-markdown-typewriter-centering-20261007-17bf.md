@@ -36,3 +36,5 @@ At 2026-10-07 13:54:07 UTC, diagnostic full 37576166482 on cc6580a completed suc
 - 2026-10-07 05:53 UTC: Diagnostic+record integration 37576583682 succeeded as main 500adae. Later R38 runtime full 37572856847 passed 1697 browsers/171 skips with no retries; earlier R15 cause still unestablished. Diagnostic full 37576166482 remains active. No scrolling/threshold/timeout change.
 
 - 2026-10-07 13:54:07 UTC: Retrieved official diagnostic full receipt: 3852 units/14 skips; 1697 browsers/171 skips (50.3m), zero retries. No failing diagnostic geometry and no cause/repair claim.
+
+- 2026-10-07 15:20:46 UTC: Full References integration 37637141396 passed 1711 browser cases/171 skips (46.5m), zero retry markers/flaky summaries and no original 2571.9765625px failure marker. Desktop/mobile R15 both passed. This is fresh non-reproduction evidence, not a cause or runtime fix attribution; keep active.

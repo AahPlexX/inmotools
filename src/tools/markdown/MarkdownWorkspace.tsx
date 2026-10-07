@@ -18,6 +18,7 @@ import { toggleTaskListMarker } from './task-toggle';
 import { countMarkdownTasks } from './task-progress';
 import type { Root } from 'mdast';
 import { computeProseMetrics } from './prose-metrics-engine';
+import { formatFrontmatterValue } from './frontmatter-display';
 import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
 import { collectMathDiagnostics } from './math-engine';
@@ -1011,11 +1012,12 @@ export default function MarkdownWorkspace() {
           {frontmatterEntries.length > 0 ? (
             <dl className="markdown-workbench-metrics" data-testid="markdown-frontmatter">
               {frontmatterEntries.map(([key, value]) => (
-                <div key={key}><dt>{key}</dt><dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd></div>
+                <div key={key}><dt>{key}</dt><dd>{formatFrontmatterValue(value)}</dd></div>
               ))}
             </dl>
           ) : <p className="markdown-workbench-hint">The frontmatter block parsed but contained no top-level fields.</p>}
           <p className="markdown-workbench-hint">A <code>title</code> field here names your exports unless you set a document name above.</p>
+          <p className="markdown-workbench-hint">Circular references are shown as <code>[Circular reference]</code>. Your original Markdown is unchanged.</p>
         </details>
       ) : null}
 
