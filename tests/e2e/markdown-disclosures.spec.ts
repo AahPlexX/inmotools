@@ -154,3 +154,47 @@ test('MDW-R36 changed defaults and duplicate captions cannot reuse another discl
   await expect(details.first()).not.toHaveAttribute('open');
   await expect(details.nth(1)).not.toHaveAttribute('open');
 });
+
+test('MDW-R36 quoted disclosure tasks update the exact source marker with Undo', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const source = '> <details>\n> <summary>Quoted tasks</summary>\n>\n> - [ ] Quoted task\n>\n> </details>';
+  const editor = await setSource(page, source);
+  const details = page.locator('.markdown-workbench-preview details.markdown-disclosure');
+  await details.locator('summary').click();
+  await details.getByText('Quoted task', { exact: true }).click();
+  await expect(editor).toContainText('> - [x] Quoted task');
+  await expect(details).toHaveAttribute('open', '');
+  await editor.press('ControlOrMeta+z');
+  await expect(editor).toContainText('> - [ ] Quoted task');
+  const redoShortcut = await page.evaluate(() => /Mac|iP(hone|ad|od)/.test(navigator.platform) ? 'Meta+Shift+z' : 'Control+y');
+  await editor.press(redoShortcut);
+  await expect(editor).toContainText('> - [x] Quoted task');
+  await editor.press('ControlOrMeta+z');
+  await expect(editor).toContainText('> - [ ] Quoted task');
+  await details.getByText('Quoted task', { exact: true }).click();
+  await expect(editor).toContainText('> - [x] Quoted task');
+  await page.getByRole('button', { name: 'Undo document step', exact: true }).click();
+  await expect(editor).toContainText('> - [ ] Quoted task');
+  await page.getByRole('button', { name: 'Redo document step', exact: true }).click();
+  await expect(editor).toContainText('> - [x] Quoted task');
+});
+
+test('MDW-R36 imported Windows source keeps exact bytes through task clicks and keyboard Undo', async ({ page }) => {
+  await page.goto('./#/tools/markdown-workbench');
+  const source = '> <details>\r\n> <summary>Windows</summary>\r\n>\r\n> - [ ] Task\r\n>\r\n> </details>\r\n';
+  await page.setInputFiles('input[type="file"][accept*=".html"]', { name: 'windows.md', mimeType: 'text/markdown', buffer: Buffer.from(source) });
+  const editor = page.getByRole('textbox', { name: 'Markdown source' });
+  const details = page.locator('.markdown-workbench-preview details.markdown-disclosure');
+  await details.locator('summary').click();
+  await details.getByText('Task', { exact: true }).click();
+  await expect(editor).toContainText('> - [x] Task');
+  const downloadedSource = async () => {
+    const pending = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Markdown', exact: true }).click();
+    return (await readFile((await (await pending).path())!)).toString('utf8');
+  };
+  expect(await downloadedSource()).toBe(source.replace('[ ]', '[x]'));
+  await editor.press('ControlOrMeta+z');
+  await expect(editor).toContainText('> - [ ] Task');
+  expect(await downloadedSource()).toBe(source);
+});

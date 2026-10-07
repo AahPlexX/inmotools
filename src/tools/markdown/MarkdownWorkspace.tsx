@@ -137,6 +137,7 @@ export default function MarkdownWorkspace() {
   const [status, setStatus] = useState('Ready.');
   const [documentName, setDocumentName] = useState('');
   const [previewDocumentKey, setPreviewDocumentKey] = useState(0);
+  const [taskEditRequest, setTaskEditRequest] = useState<{ before: string; after: string }>();
   const documentNameRef = useRef(documentName);
   documentNameRef.current = documentName;
   const [lineWrapping, setLineWrapping] = useState(() => loadEditorPrefs().lineWrapping ?? true);
@@ -484,9 +485,8 @@ export default function MarkdownWorkspace() {
       setStatus('That preview row is not a task checkbox.');
       return;
     }
-    handleEditorSourceChange(next);
-    setStatus('Toggled the task on that line. The change stays in this document.');
-  }, [handleEditorSourceChange]);
+    setTaskEditRequest({ before: sourceRef.current, after: next });
+  }, []);
 
   const handleAnchorsMeasured = useCallback((offsets: { sourceLine: number; offsetTop: number }[]) => {
     editorViewScrollRef.current = offsets;
@@ -907,6 +907,7 @@ export default function MarkdownWorkspace() {
             darkMode={darkMode}
             typewriterMode={typewriterMode}
             revealRequest={revealRequest}
+            taskEditRequest={taskEditRequest}
           />
         </div>
         {view !== 'source' ? (
