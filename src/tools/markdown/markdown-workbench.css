@@ -490,3 +490,7 @@
 .markdown-workbench-ast-type { flex: 0 0 auto; font-weight: 700; }
 .markdown-workbench-ast-detail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .markdown-workbench-ast-range { flex: 0 0 auto; margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.markdown-workbench-outline-filter select { width: min(360px, 100%); min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font-size: 16px; }
+.markdown-workbench-diff-view { margin-top: 8px; max-width: 100%; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; }
+.markdown-workbench-diff-view .cm-editor { max-width: 100%; }

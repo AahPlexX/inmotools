@@ -127,6 +127,8 @@ Out of scope: real-time collaboration, cloud sync and comment threads (need a se
 
 MDW-R56 detail: the Syntax tree panel (collapsed by default) shows the document's mdast tree below the toolbar as an ARIA tree. Arrow Up/Down move and select, Right/Left expand, collapse or move to the parent, Home/End jump, Enter/Space select. Selecting a node highlights its source range in the editor (front matter lines are accounted for) without moving focus. Only expanded branches are built and rows are windowed; at most 20000 rows are listed. The highlight and selection follow edits by node path and clear when the path no longer exists.
 
+MDW-R57 detail: the Compare changes panel (collapsed by default) compares the current text with a baseline chosen from a list: the file opened this session (selected automatically when a file is opened) or any saved local draft. The unified read-only view marks added or changed lines and shows removed lines as struck blocks, with unchanged runs collapsed; a summary states the number of changes and lines. Line-ending style is ignored. The view is built only while the panel is open.
+
 ### Files and storage
 
 | ID | Requirement | Acceptance test |

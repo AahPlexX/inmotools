@@ -15,7 +15,7 @@ Complete the reviewed inventory in the frozen order below, including associated 
 
 ## Resume here
 
-Cursor: MDW-R56 done (syntax-tree inspector panel); next MDW-R57 (diff view). Base commit 7e32dd82. R56 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet.
+Cursor: MDW-R57 done (compare-changes diff panel); R56 done. Last R56 commit 620eb347. R57 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next open Markdown requirements follow the inventory order.
 
 ## Frozen inventory order
 

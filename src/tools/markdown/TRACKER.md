@@ -13,7 +13,7 @@ updated: 2026-10-07
 
 ## Resume here
 
-Cursor: MDW-R56 done (syntax-tree inspector panel); next MDW-R57 (diff view). Base commit 7e32dd82. R56 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet.
+Cursor: MDW-R57 done (compare-changes diff panel); R56 done. Last R56 commit 620eb347. R57 checks: units, TypeScript, docs and Markdown browser specs pass locally; no push or integration run yet. Next open Markdown requirements follow the inventory order.
 
 ## Documents
 
@@ -88,7 +88,7 @@ Cursor: MDW-R56 done (syntax-tree inspector panel); next MDW-R57 (diff view). Ba
 | MDW-R54 | verified | e2e "document metrics show characters and lines alongside words and sentences"; unit "counts words and sentences in a simple two-sentence passage", "computes a Gunning Fog index from words, sentences, and complex words" | Associated native prose/character/syllable defects are repaired in active R55 candidate 12d4, with local native-boundary/CMU/reference acceptance; fresh full release is pending. Counts and sentence/syllable boundaries remain heuristic. |
 | MDW-R55 | verified | unit "matches official CS50 2026 published rounded Coleman grades using letters alone", "matches the independently counted monosyllabic Flesch formula without clamping"; e2e "MDW-R55 reference grades update through editing Undo reset draft restore and exact source export", "MDW-R55 long metric labels and values fit phone orientations tablet and desktop without overlap" | English heuristic scope; unsupported input is reported unavailable. Verified on main 0ddb7cff: 8/8 e2e (desktop+mobile), CS50 reference unit. |
 | MDW-R56 | verified | e2e "MDW-R56 keyboard tree selection highlights the node source range and follows edits", "MDW-R56 large documents render a bounded window of tree rows"; unit "expands level by level with levels, positions and source ranges", "caps the row count for very large documents and reports truncation" | Syntax tree panel (tree role, arrow/Home/End/Enter keys); only expanded branches and a 28px row window are rendered, 20000-row cap. Highlight is a CodeMirror decoration that follows edits. |
-| MDW-R57 | missing | — | |
+| MDW-R57 | verified | e2e "MDW-R57 an edited line shows as changed against the opened file", "MDW-R57 compares the current text with a saved draft and updates as the text changes"; unit "shows an edited line as one change with one line removed and one added" | Compare changes panel: baseline is the opened file or a saved draft; unified read-only @codemirror/merge view (loaded on demand) plus a line-change summary. Line endings are ignored. |
 | MDW-R58 | verified | e2e "opens a local Markdown file without uploading it", "file selection validates Markdown or plain text instead of trusting accept alone", "dropping a .md file over the editor still opens it as a whole new document" | |
 | MDW-R59 | verified | e2e "local HTML files import as Markdown without upload" | |
 | MDW-R60 | verified | e2e "opening a file saves dirty work first and gives the imported file a separate draft identity" | |

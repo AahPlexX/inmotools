@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import type { Root as MdastRoot } from 'mdast';
 import { downloadBytes, downloadText } from '../../lib/download';
 import { requestSupportPrompt } from '../../lib/support';
@@ -23,6 +23,10 @@ import { splitIntoSlides } from './slide-engine';
 import { buildOutline } from './outline-engine';
 import type { AstRange } from './ast-inspector-engine';
 import AstInspector from './AstInspector';
+import { describeLineDiff, summarizeLineDiff } from './diff-engine';
+
+const OPENED_FILE_BASELINE = 'opened-file';
+const MarkdownDiffView = lazy(() => import('./MarkdownDiffView'));
 import { collectMathDiagnostics } from './math-engine';
 import { applyPreparedCitations, prepareDocument, toFilenameStem } from './document-pipeline';
 import { appendReferencesMarkdown } from './bibliography-engine';
@@ -175,6 +179,9 @@ export default function MarkdownWorkspace() {
   }, [view, lineWrapping, fontSize, vimMode, spellcheck, syntaxSuggestions, darkMode, typewriterMode]);
 
   const [outlineFilter, setOutlineFilter] = useState('');
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffBaselineId, setDiffBaselineId] = useState('');
+  const [openedFile, setOpenedFile] = useState<{ readonly name: string; readonly text: string } | null>(null);
   const [astOpen, setAstOpen] = useState(false);
   const [astHighlight, setAstHighlight] = useState<AstRange | null>(null);
   const [astRangeRequest, setAstRangeRequest] = useState<{ range: AstRange; nonce: number }>();
@@ -543,6 +550,16 @@ export default function MarkdownWorkspace() {
     }
   }, []);
 
+  const diffBaseline = useMemo(() => {
+    if (diffBaselineId === OPENED_FILE_BASELINE) return openedFile?.text ?? null;
+    return drafts.find((draft) => draft.id === diffBaselineId)?.text ?? null;
+  }, [diffBaselineId, openedFile, drafts]);
+  const deferredSource = useDeferredValue(source);
+  const diffSummary = useMemo(
+    () => diffOpen && diffBaseline !== null ? summarizeLineDiff(diffBaseline, deferredSource) : null,
+    [diffOpen, diffBaseline, deferredSource],
+  );
+
   const revealLine = useCallback((line: number) => {
     setRevealRequest({ line, nonce: Date.now() });
     scrollPreviewToLine(line, true);
@@ -596,6 +613,8 @@ export default function MarkdownWorkspace() {
       persistedDocumentNameRef.current = nextDocumentName;
       commitSource(text);
       setDocumentName(nextDocumentName);
+      setOpenedFile({ name: file.name, text });
+      setDiffBaselineId(OPENED_FILE_BASELINE);
       setLastSavedAt(null);
       setIsDirty(false);
       setStatus(kind === 'html'
@@ -791,6 +810,7 @@ export default function MarkdownWorkspace() {
     persistedDocumentNameRef.current = '';
     lastEditorChangeAtRef.current = 0;
     setHistory(createHistory(DEFAULT_SOURCE));
+    setOpenedFile(null);
     setDocumentName('');
     setLastSavedAt(null);
     setIsDirty(false);
@@ -820,6 +840,7 @@ export default function MarkdownWorkspace() {
     persistedTextRef.current = draft.text;
     persistedDocumentNameRef.current = restoredDocumentName;
     commitSource(draft.text);
+    setOpenedFile(null);
     setDocumentName(restoredDocumentName);
     setLastSavedAt(draft.updatedAt);
     setIsDirty(false);
@@ -1010,6 +1031,27 @@ export default function MarkdownWorkspace() {
         <summary>Syntax tree</summary>
         <p className="markdown-workbench-hint">The parsed Markdown tree for this document. Choose a node to highlight its source range in the editor.</p>
         {astOpen ? <AstInspector tree={parsed.tree} lineOffset={parsed.frontmatter.format === null ? 0 : parsed.frontmatter.bodyStartLine - 1} onSelect={handleAstSelect} /> : null}
+      </details>
+
+      <details className="markdown-workbench-panel" onToggle={(event) => setDiffOpen(event.currentTarget.open)}>
+        <summary>Compare changes</summary>
+        <p className="markdown-workbench-hint">Compare the current text with the opened file or a saved local draft. Added or changed lines are highlighted and removed lines are shown struck through.</p>
+        <label className="markdown-workbench-outline-filter">
+          Compare current text with
+          <select aria-label="Compare current text with" value={diffBaseline === null ? '' : diffBaselineId} onChange={(event) => setDiffBaselineId(event.target.value)}>
+            <option value="">Choose a baseline</option>
+            {openedFile ? <option value={OPENED_FILE_BASELINE}>Opened file: {openedFile.name}</option> : null}
+            {drafts.map((draft) => <option key={draft.id} value={draft.id}>Draft: {draft.name} — {new Date(draft.updatedAt).toLocaleString()}</option>)}
+          </select>
+        </label>
+        {diffOpen && diffBaseline !== null && diffSummary ? (
+          <>
+            <p className="markdown-workbench-hint" role="status" data-testid="markdown-diff-summary">{describeLineDiff(diffSummary)}</p>
+            <Suspense fallback={<p className="markdown-workbench-hint">Loading comparison…</p>}>
+              <MarkdownDiffView baseline={diffBaseline} current={deferredSource} />
+            </Suspense>
+          </>
+        ) : <p className="markdown-workbench-hint">{openedFile || drafts.length ? 'Choose what to compare with.' : 'Open a file or save a draft to compare against it.'}</p>}
       </details>
 
       <details className="markdown-workbench-panel">
